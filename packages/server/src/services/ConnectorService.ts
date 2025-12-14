@@ -528,12 +528,42 @@ export class ConnectorService {
       client_secret: clientSecret,
     };
 
-    const tokenResponse = await axios.post(tokenUrl, tokenPayload, {
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-      },
-    });
+    // Most OAuth2 token endpoints (including Discord, Google, LinkedIn) expect
+    // `application/x-www-form-urlencoded` for the token exchange.
+    const tokenForm = new URLSearchParams();
+    for (const [key, value] of Object.entries(tokenPayload)) {
+      tokenForm.set(key, String(value));
+    }
+
+    let tokenResponse;
+    try {
+      tokenResponse = await axios.post(tokenUrl, tokenForm, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+      });
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        // Keep error logs minimal and safe (no code/state/client_secret leakage).
+        console.error('[CONNECTOR_OAUTH] Token exchange failed', {
+          provider: providerFromCallback,
+          tokenUrl,
+          redirectUri,
+          status: err.response?.status,
+          responseData: err.response?.data,
+        });
+      } else {
+        console.error('[CONNECTOR_OAUTH] Token exchange failed with non-Axios error', {
+          provider: providerFromCallback,
+          tokenUrl,
+          redirectUri,
+          errorMessage: (err as Error | undefined)?.message,
+          errorName: (err as Error | undefined)?.name,
+        });
+      }
+      throw err;
+    }
 
     // Normalise token response into a common shape. We expect providers to
     // return JSON here; tokenResponse.data should already be the parsed object.

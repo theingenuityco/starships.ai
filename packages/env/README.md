@@ -33,7 +33,6 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 - `SERVER_PORT` (number) - Server port, defaults to 4000
 - `CLIENT_PORT` (number) - Client port, defaults to 3000
 - `NODE_ENV` (string) - Environment, defaults to 'development'
-- `LOG_LEVEL` (string) - Log level, defaults to 'info'
 
 ### URLs
 
@@ -52,11 +51,7 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 
 ### LLM Provider Configuration
 
-- `OPENAI_API_KEY` (string, optional) - OpenAI API key
-- `ANTHROPIC_API_KEY` (string, optional) - Anthropic API key
 - `OPENROUTER_API_KEY` (string, optional) - OpenRouter API key for accessing multiple LLM models
-- `DEFAULT_LLM_PROVIDER` ('openai' | 'anthropic' | '') - Default provider, defaults to 'openai'
-- `DEFAULT_CHAT_MODEL` (string) - Default model name, defaults to 'gpt-4o'
 
 ### Authentication & Payments
 

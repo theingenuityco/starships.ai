@@ -14,7 +14,6 @@ services:
       NODE_ENV: production
       SERVER_PORT: ${SERVER_PORT:-4000}
       CLIENT_PORT: ${CLIENT_PORT:-3000}
-      LOG_LEVEL: ${LOG_LEVEL:-info}
 
       # URLs
       PUBLIC_URL: ${PUBLIC_URL:-http://localhost:3000}
@@ -38,11 +37,7 @@ services:
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
 
       # LLM Provider Configuration
-      OPENAI_API_KEY: ${OPENAI_API_KEY}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
-      DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-openai}
-      DEFAULT_CHAT_MODEL: ${DEFAULT_CHAT_MODEL:-gpt-4o}
 
       # Stripe Configuration
       STRIPE_SECRET_KEY: ${STRIPE_SECRET_KEY}

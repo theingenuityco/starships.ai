@@ -80,7 +80,6 @@ jobs:
       NODE_ENV: ${{ vars.NODE_ENV }}
       SERVER_PORT: ${{ vars.SERVER_PORT }}
       CLIENT_PORT: ${{ vars.CLIENT_PORT }}
-      LOG_LEVEL: ${{ vars.LOG_LEVEL }}
 
       # URLs
       PUBLIC_URL: ${{ vars.PUBLIC_URL }}
@@ -98,10 +97,6 @@ jobs:
       POSTGRES_PASSWORD: ${{ secrets.POSTGRES_PASSWORD }}
       POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
       POSTGRES_SSL: ${{ secrets.POSTGRES_SSL }}
-
-      # LLM Providers (optional for build)
-      DEFAULT_LLM_PROVIDER: ${{ vars.DEFAULT_LLM_PROVIDER }}
-      DEFAULT_CHAT_MODEL: ${{ vars.DEFAULT_CHAT_MODEL }}
 
       # Stripe Configuration
       STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}

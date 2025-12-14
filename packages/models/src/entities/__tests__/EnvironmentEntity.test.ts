@@ -303,7 +303,7 @@ describe('EnvironmentEntity', () => {
 
   describe('Edge cases', () => {
     it('should handle various key formats', async () => {
-      const keyFormats = ['API_KEY', 'OPENAI_API_KEY', 'database-url', 'service.key', 'KEY_123', 'a', 'a'.repeat(100)];
+      const keyFormats = ['API_KEY', 'database-url', 'service.key', 'KEY_123', 'a', 'a'.repeat(100)];
 
       for (const key of keyFormats) {
         const record = {

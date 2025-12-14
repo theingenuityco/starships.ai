@@ -328,7 +328,6 @@ POSTGRES_PASSWORD=your-password
 POSTGRES_DATABASE=starships
 
 # Logging Configuration
-LOG_LEVEL=info
 LOG_CONSOLE=true
 LOG_METRICS=true
 ```

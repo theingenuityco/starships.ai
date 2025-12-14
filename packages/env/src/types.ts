@@ -8,7 +8,6 @@ export interface EnvironmentConfig {
   DOCS_PORT: number;
   PROXY_PORT: number;
   NODE_ENV: string;
-  LOG_LEVEL: string;
 
   // URLs
   PUBLIC_URL: string;
@@ -25,13 +24,7 @@ export interface EnvironmentConfig {
   POSTGRES_SSL: boolean;
 
   // LLM Provider Configuration
-  OPENAI_API_KEY?: string;
-  ANTHROPIC_API_KEY?: string;
   OPENROUTER_API_KEY?: string;
-
-  // Default Model Configuration
-  DEFAULT_LLM_PROVIDER: 'openai' | 'anthropic' | '';
-  DEFAULT_CHAT_MODEL: string;
 
   // JWT Authentication Configuration
   JWT_SECRET: string;

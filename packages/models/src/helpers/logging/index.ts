@@ -89,7 +89,7 @@ export class Logger {
   private enableMetrics: boolean;
 
   private constructor(config?: LoggerConfig) {
-    this.logLevel = this.parseLogLevel(config?.logLevel ?? process.env.LOG_LEVEL ?? 'info');
+    this.logLevel = this.parseLogLevel(config?.logLevel ?? 'info');
     this.enableConsole = config?.enableConsole ?? process.env.LOG_CONSOLE !== 'false';
     this.enableFile = config?.enableFile ?? process.env.LOG_FILE === 'true';
     this.enableMetrics = config?.enableMetrics ?? process.env.LOG_METRICS === 'true';

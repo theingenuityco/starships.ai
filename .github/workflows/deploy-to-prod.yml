@@ -93,8 +93,6 @@ jobs:
 
       - name: Update secrets
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -154,8 +152,6 @@ jobs:
 
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
-            --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
-            --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
             --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
             --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \

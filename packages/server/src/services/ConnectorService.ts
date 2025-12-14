@@ -735,6 +735,13 @@ export class ConnectorService {
       const existing = byProvider.get(template.provider);
 
       if (existing) {
+        const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+        const oauthConfig =
+          runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+            ? (runtimeConfig.oauth as Record<string, unknown>)
+            : ({} as Record<string, unknown>);
+        const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
+
         return {
           id: existing.id,
           starshipId: existing.starshipId,
@@ -744,7 +751,7 @@ export class ConnectorService {
           createdAt: existing.createdAt,
           updatedAt: existing.updatedAt,
           // Keep list item schema consistent with virtual connectors.
-          scopes: template.oauthScopes || [],
+          scopes,
           // Expose non-secret connector metadata (e.g. Discord guild_id) to tools/agents.
           metadata: existing.metadata || {},
         };
@@ -755,6 +762,12 @@ export class ConnectorService {
       // starship; it reuses the platform's JWT + SERVER_URL and does not
       // require additional managed env vars.
       const status = template.provider === 'starships' ? 'connected' : 'disconnected';
+      const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+      const oauthConfig =
+        runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+          ? (runtimeConfig.oauth as Record<string, unknown>)
+          : ({} as Record<string, unknown>);
+      const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
 
       return {
         id: `${starshipId}:${template.provider}`,
@@ -764,7 +777,7 @@ export class ConnectorService {
         lastError: undefined,
         createdAt: now,
         updatedAt: now,
-        scopes: template.oauthScopes || [],
+        scopes,
         metadata: {},
       };
     });

@@ -535,8 +535,6 @@ export class ConnectorService {
       },
     });
 
-    console.log('tokenResponse', tokenResponse.data);
-
     // Normalise token response into a common shape. We expect providers to
     // return JSON here; tokenResponse.data should already be the parsed object.
     const body = tokenResponse.data as {

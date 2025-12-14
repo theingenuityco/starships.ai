@@ -30,6 +30,7 @@ export function getEnvConfig(): EnvironmentConfig {
     CLIENT_URL: process.env.CLIENT_URL,
     SERVER_URL: process.env.SERVER_URL,
     DOCS_URL: process.env.DOCS_URL,
+    JWT_SECRET: process.env.JWT_SECRET,
     // For PostgreSQL we provide sensible defaults for host/port/user/database.
     // The password is the only truly required value.
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
@@ -83,7 +84,7 @@ export function getEnvConfig(): EnvironmentConfig {
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 
     // JWT Authentication Configuration
-    JWT_SECRET: process.env.JWT_SECRET || '',
+    JWT_SECRET: requiredEnvVars.JWT_SECRET!,
 
     // OAuth Provider Configuration
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,

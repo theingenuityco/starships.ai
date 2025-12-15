@@ -19,6 +19,7 @@ import { EnvironmentService } from './EnvironmentService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
+import { PlatformSecretService } from './PlatformSecretService';
 
 /**
  * Connector Service - Layer 4
@@ -32,6 +33,7 @@ export class ConnectorService {
   private environmentRepository: EnvironmentRepository;
   private environmentService: EnvironmentService;
   private starshipRepository: StarshipRepository;
+  private platformSecretService: PlatformSecretService;
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
@@ -39,6 +41,15 @@ export class ConnectorService {
     this.environmentRepository = new EnvironmentRepository();
     this.environmentService = new EnvironmentService();
     this.starshipRepository = new StarshipRepository();
+    this.platformSecretService = new PlatformSecretService();
+  }
+
+  private async resolvePlatformSecretOrEnv(envKey: string, env: Record<string, string | undefined>): Promise<string | undefined> {
+    const fromDb = await this.platformSecretService.getSecret(envKey);
+    if (fromDb && fromDb.trim()) return fromDb.trim();
+    const fromEnv = env[envKey];
+    if (fromEnv && fromEnv.trim()) return fromEnv.trim();
+    return undefined;
   }
 
   /**
@@ -308,6 +319,7 @@ export class ConnectorService {
   async startConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
     const template = await this.loadTemplateOrThrow(provider);
     const env = getEnvConfig();
+    const envRecord = env as unknown as Record<string, string | undefined>;
 
     const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
     const oauthConfig =
@@ -324,7 +336,7 @@ export class ConnectorService {
     // installation URLs while the host still owns secrets and state tokens.
     if (template.authType === 'custom') {
       const appSlugEnvKey = (runtimeConfig.appSlugEnvKey as string | undefined) || 'GITHUB_APP_SLUG';
-      const appSlug = (env as unknown as Record<string, string | undefined>)[appSlugEnvKey];
+      const appSlug = await this.resolvePlatformSecretOrEnv(appSlugEnvKey, envRecord);
 
       if (!appSlug) {
         throw new Error(`Custom connector ${provider} is not configured. Missing env: ${appSlugEnvKey}`);
@@ -363,7 +375,7 @@ export class ConnectorService {
       throw new Error(`oauth.clientId is not configured for connector template ${template.id}`);
     }
 
-    const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
+    const clientId = await this.resolvePlatformSecretOrEnv(clientIdEnvKey, envRecord);
     const authorizeUrl = oauthConfig.authorizeUrl as string | undefined;
     const redirectPath = oauthConfig.redirectPath as string | undefined;
 
@@ -468,6 +480,7 @@ export class ConnectorService {
     }
 
     const env = getEnvConfig();
+    const envRecord = env as unknown as Record<string, string | undefined>;
     const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
     const oauthConfig =
       runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
@@ -480,8 +493,8 @@ export class ConnectorService {
       throw new Error(`oauth.clientId/oauth.clientSecret not configured for connector template ${template.id}`);
     }
 
-    const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
-    const clientSecret = (env as unknown as Record<string, string | undefined>)[clientSecretEnvKey];
+    const clientId = await this.resolvePlatformSecretOrEnv(clientIdEnvKey, envRecord);
+    const clientSecret = await this.resolvePlatformSecretOrEnv(clientSecretEnvKey, envRecord);
     const tokenUrl = oauthConfig.tokenUrl as string | undefined;
     const redirectPath = oauthConfig.redirectPath as string | undefined;
 

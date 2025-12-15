@@ -231,7 +231,7 @@ export function Navigation(props: NavigationProps) {
               href: '/admin/agents/pending',
               label: 'Admin',
               icon: 'shield-check',
-              isActive: pathname.startsWith('/admin/agents'),
+              isActive: pathname.startsWith('/admin'),
             } as const,
           ]
         : []),

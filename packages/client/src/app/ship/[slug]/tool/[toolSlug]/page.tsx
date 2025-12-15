@@ -53,7 +53,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
   }, [convAgents, agents])
 
   // Keep conversation streaming active and capture live messages/UI actions
-  const { messages: liveMessages = [], lastUIAction, isResponding } = useConversationStreamed(conversationId, starship?.id || '', { enabled: true })
+  const stream = useConversationStreamed(conversationId, starship?.id || null, { enabled: true })
+  const { messages: liveMessages = [], lastUIAction, isResponding } = stream
   const deferredAgentCreate = useDeferredAgentCreationModal({
     liveMessages,
     isStreaming: isResponding,
@@ -700,7 +701,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       )}
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.templateId} />
       {conversationId && (
-        <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
+        <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id} value={stream}>
           <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
             <div className="max-w-2xl mx-auto pointer-events-auto">
               <ConversationMessageInput

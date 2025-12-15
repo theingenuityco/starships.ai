@@ -103,8 +103,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const budgetTokens = agentContextLength
 
   // UI state (conversation id only; message presence is derived from store)
-  const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
-  const currentConversationIdRef = useRef<string | null>(null)
+  //
+  // IMPORTANT:
+  // When navigating /conversations -> /conversations/:id, this component can remount.
+  // If we initialize to null and only populate from an effect, we get a first-render "null" conversationId
+  // which makes the input/loader briefly think it's idle. Initialize from the route param when available.
+  const initialConversationId = (externalConversationId ?? null) as string | null
+  const [currentConversationId, setCurrentConversationId] = useState<string | null>(initialConversationId)
+  const currentConversationIdRef = useRef<string | null>(initialConversationId)
   // When we create a new conversation from the /conversations landing, we set the id locally
   // before the route param updates. During that handoff, `externalConversationId` can still be null.
   // Track the pending id so we don't immediately overwrite local state back to null.

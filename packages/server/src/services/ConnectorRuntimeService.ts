@@ -35,6 +35,19 @@ export class ConnectorRuntimeService {
   }
 
   private parseSecretRef(ref: unknown): { type: ConnectorSecretRefType; key: string } | undefined {
+    // Legacy string formats (kept for backwards compatibility with older connector_templates.runtime_config):
+    // - "platform:DISCORD_BOT_TOKEN" => platform_secret
+    // - "GH_APP_ACCESS_TOKEN" => connector_secret
+    if (typeof ref === 'string') {
+      const raw = ref.trim();
+      if (!raw) return undefined;
+      if (raw.startsWith('platform:')) {
+        const key = raw.slice('platform:'.length).trim();
+        return key ? { type: 'platform_secret', key } : undefined;
+      }
+      return { type: 'connector_secret', key: raw };
+    }
+
     if (ref && typeof ref === 'object') {
       const rec = ref as Record<string, unknown>;
       const type = rec.type;

@@ -45,11 +45,6 @@ This document describes the **supported keys used by the current host runtime**.
     - `{ "type": "connector_secret", "key": "GH_APP_ACCESS_TOKEN" }`
     - `{ "type": "platform_secret", "key": "DISCORD_BOT_TOKEN" }`
 
-- **`oauth.metadataFromQuery?: string[]`**
-  - Optional allowlist of **OAuth callback query** fields to copy into persisted connector `metadata`.
-  - This is useful for providers that include non-secret context in the redirect query (e.g. Discord `guild_id`).
-  - Example: `["guild_id", "permissions"]`
-
 - **`oauth.authHeaderName?: string`**
   - HTTP header name to inject. Default: `"Authorization"`.
 

@@ -89,18 +89,13 @@ export function getEnvConfig(): EnvironmentConfig {
     // OAuth Provider Configuration
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    GOOGLE_DRIVE_CLIENT_ID: process.env.GOOGLE_DRIVE_CLIENT_ID,
-    GOOGLE_DRIVE_CLIENT_SECRET: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
     // GitHub OAuth App (used for user login)
     GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
 
-    // GitHub App Configuration (used for GitHub connector)
-    GH_APP_CLIENT_ID: process.env.GH_APP_CLIENT_ID,
-    GH_APP_CLIENT_SECRET: process.env.GH_APP_CLIENT_SECRET,
+    // GitHub App configuration (deprecated for connectors; kept for legacy ops tooling if needed)
     GITHUB_APP_ID: process.env.GITHUB_APP_ID,
     GITHUB_APP_PRIVATE_KEY_BASE64: process.env.GITHUB_APP_PRIVATE_KEY_BASE64,
-    GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG,
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
@@ -123,14 +118,7 @@ export function getEnvConfig(): EnvironmentConfig {
     EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
     AWS_SES_REGION: process.env.AWS_SES_REGION,
 
-    // LinkedIn OAuth Configuration (optional)
-    LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
-    LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
-
-    // Discord Bot OAuth Configuration (optional)
-    DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
-    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
-    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    // Connector platform secrets are stored in DB (platform_secrets) and not loaded here.
 
     // AWS S3 Configuration (File Attachments) - Optional, feature disabled if not set
     AWS_S3_BUCKET: process.env.AWS_S3_BUCKET,

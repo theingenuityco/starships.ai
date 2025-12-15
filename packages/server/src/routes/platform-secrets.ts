@@ -103,7 +103,7 @@ router.post('/admin/platform-secrets', jwtAuthMiddleware, async (req: Request, r
     // Enforce "create" semantics (avoid silently overwriting).
     const existing = await repo.findByKey(body.key);
     if (existing) {
-      sendError(res, 'CONFLICT', `Platform secret already exists: ${body.key}`, 409);
+      sendError(res, 'RESOURCE_ALREADY_EXISTS', `Platform secret already exists: ${body.key}`, 409);
       return;
     }
 

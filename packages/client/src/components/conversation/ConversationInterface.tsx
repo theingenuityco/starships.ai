@@ -966,7 +966,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       <div className="relative z-[2] flex flex-col h-full">
         {/* Single streaming provider for BOTH message list and input to avoid duplicate SSE subscriptions
             (and to keep the stop/loading UI in sync everywhere). */}
-        <ConversationStreamProvider key={currentConversationId || 'no-conversation'} conversationId={currentConversationId} starshipId={starshipId}>
+        <ConversationStreamProvider conversationId={currentConversationId} starshipId={starshipId}>
           {/* Main Content Area - Conversation only; builders use dedicated routes */}
           {/* Messages Area */}
           {showMessagesArea ? (

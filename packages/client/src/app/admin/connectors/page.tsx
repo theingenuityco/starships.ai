@@ -72,6 +72,7 @@ export default function AdminConnectorsPage(): React.JSX.Element {
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Provider</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Display name</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Auth</th>
+                      <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Enabled</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Version</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Updated</th>
                     </tr>
@@ -79,21 +80,21 @@ export default function AdminConnectorsPage(): React.JSX.Element {
                   <tbody>
                     {isLoading && (
                       <tr>
-                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={5}>
+                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
                           Loading…
                         </td>
                       </tr>
                     )}
                     {isError && !isLoading && (
                       <tr>
-                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={5}>
+                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
                           {(error as any)?.message || 'Failed to load connectors.'}
                         </td>
                       </tr>
                     )}
                     {!isLoading && !isError && connectors.length === 0 && (
                       <tr>
-                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={5}>
+                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
                           No connector templates found.
                         </td>
                       </tr>
@@ -105,6 +106,7 @@ export default function AdminConnectorsPage(): React.JSX.Element {
                           <td className="px-4 py-3 text-sm font-mono">{c.provider}</td>
                           <td className="px-4 py-3 text-sm">{c.displayName}</td>
                           <td className="px-4 py-3 text-sm font-mono">{c.authType}</td>
+                          <td className="px-4 py-3 text-sm font-mono">{c.isEnabled ? 'true' : 'false'}</td>
                           <td className="px-4 py-3 text-sm font-mono">{c.version}</td>
                           <td className="px-4 py-3 text-sm">{new Date(c.updatedAt).toLocaleString()}</td>
                         </tr>

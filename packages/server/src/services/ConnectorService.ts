@@ -296,14 +296,16 @@ export class ConnectorService {
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
     const templates = await this.connectorTemplateRepository.list();
-    return templates.map(
-      (tpl): ConnectorCatalogItem => ({
-        provider: tpl.provider as ConnectorProvider,
-        displayName: tpl.displayName,
-        description: tpl.description,
-        authType: tpl.authType as ConnectorCatalogItem['authType'],
-      })
-    );
+    return templates
+      .filter((tpl) => tpl.isEnabled !== false)
+      .map(
+        (tpl): ConnectorCatalogItem => ({
+          provider: tpl.provider as ConnectorProvider,
+          displayName: tpl.displayName,
+          description: tpl.description,
+          authType: tpl.authType as ConnectorCatalogItem['authType'],
+        })
+      );
   }
 
   /**
@@ -316,6 +318,9 @@ export class ConnectorService {
    */
   async startConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
     const template = await this.loadTemplateOrThrow(provider);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${provider} is disabled by the instance admin`);
+    }
     const env = getEnvConfig();
 
     const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
@@ -471,6 +476,9 @@ export class ConnectorService {
     callbackQuery: Record<string, unknown> | undefined
   ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const template = await this.loadTemplateOrThrow(providerFromCallback);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${providerFromCallback} is disabled by the instance admin`);
+    }
 
     if (template.authType !== 'oauth2') {
       throw new Error(`Connector ${providerFromCallback} does not use OAuth2 authentication`);
@@ -682,6 +690,9 @@ export class ConnectorService {
     callbackQuery: Record<string, unknown> | undefined
   ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const template = await this.loadTemplateOrThrow(providerFromCallback);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${providerFromCallback} is disabled by the instance admin`);
+    }
 
     if (template.authType !== 'custom') {
       throw new Error(`Connector ${providerFromCallback} does not use custom authentication`);
@@ -737,10 +748,11 @@ export class ConnectorService {
       this.connectorRepository.findByStarship(starshipId),
     ]);
     const byProvider = new Map(connectors.map((c) => [c.provider, c]));
+    const visibleTemplates = templates.filter((t) => t.isEnabled !== false || byProvider.has(t.provider));
 
     const now = new Date().toISOString();
 
-    return templates.map<ConnectorListItem>((template) => {
+    return visibleTemplates.map<ConnectorListItem>((template) => {
       const existing = byProvider.get(template.provider);
 
       if (existing) {
@@ -799,6 +811,9 @@ export class ConnectorService {
    */
   async connectWithApiKey(starshipId: string, provider: ConnectorProvider, payload: ConnectWithApiKeyRequest, userId: string) {
     const template = await this.loadTemplateOrThrow(provider);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${provider} is disabled by the instance admin`);
+    }
 
     if (template.authType !== 'api_key') {
       throw new Error(`Connector ${provider} does not use API key authentication`);

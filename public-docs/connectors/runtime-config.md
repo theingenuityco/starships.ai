@@ -23,12 +23,12 @@ This document describes the **supported keys used by the current host runtime**.
 
 ### `oauth` object
 
-`runtime_config.oauth` is used both for OAuth flows *and* for HTTP auth injection at runtime.
+`runtime_config.oauth` is used both for OAuth flows _and_ for HTTP auth injection at runtime.
 
-- **`oauth.clientId?: string | { type: "platform_secret", key: string }`**
+- **`oauth.clientId?: { type: "platform_secret", key: string }`**
   - Reference to the **platform secret** containing the OAuth client id.
 
-- **`oauth.clientSecret?: string | { type: "platform_secret", key: string }`**
+- **`oauth.clientSecret?: { type: "platform_secret", key: string }`**
   - Reference to the **platform secret** containing the OAuth client secret.
 
 - **`oauth.authorizeUrl?: string`**, **`oauth.tokenUrl?: string`**, **`oauth.redirectPath?: string`**
@@ -78,5 +78,3 @@ This document describes the **supported keys used by the current host runtime**.
   }
 }
 ```
-
-

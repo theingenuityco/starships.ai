@@ -105,6 +105,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // UI state (conversation id only; message presence is derived from store)
   const [currentConversationId, setCurrentConversationId] = useState<string | null>(null)
   const currentConversationIdRef = useRef<string | null>(null)
+  // When we create a new conversation from the /conversations landing, we set the id locally
+  // before the route param updates. During that handoff, `externalConversationId` can still be null.
+  // Track the pending id so we don't immediately overwrite local state back to null.
+  const pendingRouteConversationIdRef = useRef<string | null>(null)
 
   // Refs for direct communication with components
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
@@ -205,8 +209,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     return agentSuggestionCards.slice(0, 3)
   }, [agentSuggestionCards])
 
-  // Gate UI by presence of a conversation id; streaming details are handled in context consumers
-  const showMessagesArea = Boolean(currentConversationId)
+  // Gate the heavy "conversation layout" (message list + docked input) more carefully:
+  // - Existing conversations (loaded directly via route) should show immediately.
+  // - Newly created conversations should NOT abruptly flip layouts on the null->id handoff;
+  //   wait until we have at least one message or the turn is responding.
+  const initialHadConversationRef = useRef<boolean>(externalConversationId != null)
+  const conversationUi = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId] : undefined))
+  const hasAnyMessages = Boolean((conversationUi?.messages?.length ?? 0) > 0)
+  const isRespondingUi = Boolean(conversationUi?.isResponding)
+  const showMessagesArea = Boolean(currentConversationId && (initialHadConversationRef.current || hasAnyMessages || isRespondingUi))
 
   // Start docking immediately when messages area appears; allow welcome to fade concurrently
   useEffect(() => {
@@ -319,6 +330,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // Mark that we've moved beyond initial landing - prevent Gaia fallback
       hasEverSetAnyAgentRef.current = true
       setCurrentConversationId(conversationId)
+      pendingRouteConversationIdRef.current = conversationId
       onConversationChange?.(conversationId)
     },
     [onConversationChange]
@@ -333,6 +345,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   useEffect(() => {
     if (externalConversationId === undefined) return
+
+    // If we have a locally-created conversation id and we're waiting for the route to catch up,
+    // do NOT clear it just because the current route still reports null.
+    if (externalConversationId === null && pendingRouteConversationIdRef.current) {
+      // Only ignore the null if our current id matches the pending one (i.e. we're in the handoff window).
+      if (currentConversationIdRef.current === pendingRouteConversationIdRef.current) {
+        return
+      }
+    }
 
     const wasNull = lastConversationIdForResetRef.current === null
     const isNowSet = externalConversationId !== null
@@ -353,10 +374,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       // First conversation created - DON'T change key, DON'T remount input
       // Keep stable key so input preserves the user's @mention
       lastConversationIdForResetRef.current = externalConversationId
+      // Route has caught up; clear pending marker
+      if (pendingRouteConversationIdRef.current === externalConversationId) {
+        pendingRouteConversationIdRef.current = null
+      }
       // DON'T reset userSelectedAgentRef - preserve user's choice
       // Allow messages to update naturally without remounting
     } else {
       lastConversationIdForResetRef.current = externalConversationId
+      // If route now matches pending, clear it; if route switched elsewhere, also clear.
+      if (pendingRouteConversationIdRef.current && pendingRouteConversationIdRef.current === externalConversationId) {
+        pendingRouteConversationIdRef.current = null
+      }
     }
 
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))

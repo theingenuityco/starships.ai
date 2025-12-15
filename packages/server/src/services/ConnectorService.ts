@@ -423,7 +423,7 @@ export class ConnectorService {
       params.set('prompt', prompt);
     }
 
-    // Include provider-specific permissions when configured (e.g. Discord bot install).
+    // Include provider-specific permission parameters when configured.
     const permissionsRaw = oauthParams.permissions;
     if (permissionsRaw !== undefined && permissionsRaw !== null) {
       const permissionsValue = typeof permissionsRaw === 'number' ? String(permissionsRaw) : String(permissionsRaw);
@@ -543,7 +543,7 @@ export class ConnectorService {
       client_secret: clientSecret,
     };
 
-    // Most OAuth2 token endpoints (including Discord, Google, LinkedIn) expect
+    // Most OAuth2 token endpoints expect
     // `application/x-www-form-urlencoded` for the token exchange.
     const tokenForm = new URLSearchParams();
     for (const [key, value] of Object.entries(tokenPayload)) {
@@ -773,7 +773,7 @@ export class ConnectorService {
           updatedAt: existing.updatedAt,
           // Keep list item schema consistent with virtual connectors.
           scopes,
-          // Expose non-secret connector metadata (e.g. Discord guild_id) to tools/agents.
+          // Expose non-secret connector metadata to tools/agents.
           metadata: existing.metadata || {},
         };
       }
@@ -837,9 +837,8 @@ export class ConnectorService {
     return connector;
   }
 
-  // Discord OAuth start/completion are now handled generically via
-  // startOAuthConnector / completeOAuthConnector and connector_templates
-  // configuration.
+  // OAuth start/completion are handled generically via startOAuthConnector /
+  // completeOAuthConnector and connector_templates configuration.
 
   /**
    * Disconnect a provider for a starship and clean up related env vars.

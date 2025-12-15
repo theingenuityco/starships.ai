@@ -1,12 +1,13 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect, useState } from 'react'
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -654,6 +655,22 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
     case 'append': {
       const msg = chunk.message
       const messages = clone(acc)
+      // If we optimistically added a temp user message (on send), replace it with the
+      // server-persisted user message when it arrives to avoid duplicates.
+      try {
+        if (msg?.role === 'user' && messages.length > 0) {
+          const last: any = messages[messages.length - 1]
+          const lastIsTempUser = typeof last?.id === 'string' && last.id.startsWith('temp-user-')
+          const sameContent = typeof last?.content === 'string' && typeof (msg as any)?.content === 'string' && last.content === (msg as any).content
+          const lastTs = Date.parse(String(last?.createdAt || last?.updatedAt || ''))
+          const msgTs = Date.parse(String((msg as any)?.createdAt || (msg as any)?.updatedAt || ''))
+          const tsOk = !Number.isNaN(lastTs) && !Number.isNaN(msgTs) ? Math.abs(msgTs - lastTs) <= 30_000 : true
+          if (lastIsTempUser && sameContent && tsOk) {
+            messages[messages.length - 1] = { ...msg }
+            return messages
+          }
+        }
+      } catch {}
       if (msg?.id && messages.some(m => m.id === msg.id)) {
         return messages
       }
@@ -817,6 +834,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
 
   const enabledFlag = options?.enabled !== false
+  // Per-hook-instance guard key (do NOT use globals; multiple instances can exist).
+  const storeSyncKeyRef = useRef<string>('')
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
@@ -973,8 +992,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     if (hasCompleteEvent) return false
     // If we already have a final assistant message for the last user turn, do not show loader
     if (hasFinalAssistantAfterLastUser) return false
+    // Cap the "awaiting" window so we never get stuck showing loaders if turn events are missed.
+    if (preStreamExpired) return false
     return serverTurnActive && !isAssistantStreaming
-  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser])
+  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser, preStreamExpired])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
@@ -1013,6 +1034,49 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         attachmentIds: data.attachmentIds,
       })
       return response.data
+    },
+    onMutate: async variables => {
+      // Optimistically:
+      // - append the user message so the chat doesn't "go blank" during the /conversations -> /conversations/:id transition
+      // - mark the turn as started so the "assistant is typing..." gap loader stays visible
+      try {
+        const convId = (variables as any)?.conversationId as string | undefined
+        if (!convId) return
+
+        const now = new Date().toISOString()
+        const tempUser: ClientMessage = {
+          id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          role: 'user',
+          content: String((variables as any)?.content ?? ''),
+          createdAt: now,
+          updatedAt: now,
+          messageType: 'user_input',
+          // Best-effort: carry agentId through for UI (not required by protocol consumer)
+          ...(typeof (variables as any)?.agentId === 'string' ? ({ agentId: (variables as any).agentId } as any) : {}),
+          ...(Array.isArray((variables as any)?.attachmentIds) ? ({ attachmentIds: (variables as any).attachmentIds } as any) : {}),
+        }
+
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any[] | undefined) => {
+          const next = Array.isArray(old) ? old.slice() : []
+          // Ensure the optimistic user message exists before the local turn_started so lastUserSerial is stable.
+          next.push({ type: 'append', message: tempUser })
+          next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
+          return next
+        })
+
+        // ALSO update the central UI store immediately so UI stays consistent during route transitions.
+        try {
+          const ui = useStarshipUIStore.getState()
+          ui.appendMessage(convId, tempUser as any)
+          ui.setConversationMeta(convId, {
+            isSending: true,
+            isResponding: true,
+            isAwaitingAssistant: true,
+            isAssistantStreaming: false,
+            lastActivityAt: now,
+          })
+        } catch {}
+      } catch {}
     },
     onSuccess: (_res, variables) => {
       // Don't refetch - the SSE stream is already active and will receive new messages automatically
@@ -1063,6 +1127,44 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       toast.error('Failed to send message', { description: errorMessage })
     },
   })
+
+  // Keep the central UI store in sync with the streamed query state.
+  // This allows the entire conversation UI (messages + loaders) to be store-driven.
+  useEffect(() => {
+    if (!conversationId) return
+    // CRITICAL: Only the *enabled* stream hook instance should write to the store.
+    // We intentionally call `useConversationStreamed` in some places with enabled=false
+    // to satisfy rules-of-hooks (e.g. fallback hooks). Those instances must not sync.
+    if (!enabledFlag) return
+    // IMPORTANT: Guard against runaway update loops.
+    // Some streaming implementations may return a new `chunks` array reference on every render
+    // even when content is unchanged. If we write to Zustand unconditionally, it can create
+    // a render -> store set -> render loop (seen as "Maximum update depth exceeded").
+    try {
+      const chunksLen = Array.isArray(chunks) ? chunks.length : 0
+      const lastChunk: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
+      // Small, stable-ish signature of the latest streamed chunk
+      const lastChunkSig = lastChunk?.type === 'append' ? `append:${String(lastChunk?.message?.role || '')}:${String(lastChunk?.message?.id || '')}` : lastChunk?.type ? String(lastChunk.type) : 'none'
+
+      const syncKey = [conversationId, chunksLen, lastChunkSig, sendMessageMutation.isPending ? 1 : 0, isResponding ? 1 : 0, isAssistantStreaming ? 1 : 0, isAwaitingAssistant ? 1 : 0].join('|')
+
+      if (storeSyncKeyRef.current === syncKey) return
+      storeSyncKeyRef.current = syncKey
+
+      const ui = useStarshipUIStore.getState()
+      const last = Array.isArray(computedMessages) && computedMessages.length > 0 ? (computedMessages[computedMessages.length - 1] as any) : null
+      const lastActivityAt = String(last?.updatedAt || last?.createdAt || '') || undefined
+      ui.setConversationSnapshot(conversationId, {
+        messages: (computedMessages as any) || [],
+        total: Array.isArray(computedMessages) ? computedMessages.length : 0,
+        lastActivityAt,
+        isSending: Boolean(sendMessageMutation.isPending),
+        isResponding: Boolean(isResponding),
+        isAssistantStreaming: Boolean(isAssistantStreaming),
+        isAwaitingAssistant: Boolean(isAwaitingAssistant),
+      } as any)
+    } catch {}
+  }, [conversationId, enabledFlag, chunks, computedMessages, isResponding, isAssistantStreaming, isAwaitingAssistant, sendMessageMutation.isPending])
 
   return {
     messages: computedMessages,

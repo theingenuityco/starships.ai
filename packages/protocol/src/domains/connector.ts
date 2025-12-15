@@ -67,11 +67,6 @@ export interface ConnectorOAuthRuntimeConfig extends Record<string, unknown> {
   redirectPath?: string;
   scopes?: string[];
   params?: Record<string, unknown>;
-  /**
-   * Optional allowlist of callback query keys to copy into persisted connector metadata.
-   * Example (Discord): ["guild_id", "permissions"]
-   */
-  metadataFromQuery?: string[];
 
   // HostRuntime HTTP auth injection behavior
   authHeaderName?: string;

@@ -646,14 +646,12 @@ export class ConnectorService {
       ...(body.scope ? { scope: body.scope } : {}),
     };
 
-    // Optionally copy selected fields from callback query into metadata
-    const metadataFromQuery = Array.isArray(oauthConfig.metadataFromQuery)
-      ? oauthConfig.metadataFromQuery.map((k) => String(k))
-      : undefined;
-
-    if (Array.isArray(metadataFromQuery) && callbackQuery) {
-      for (const key of metadataFromQuery) {
-        const val = callbackQuery[key];
+    // Copy callback query fields into metadata (non-secret), excluding OAuth plumbing.
+    // This captures provider-specific extras like Discord's guild_id/permissions.
+    if (callbackQuery && typeof callbackQuery === 'object') {
+      const excluded = new Set(['code', 'state']);
+      for (const [key, val] of Object.entries(callbackQuery)) {
+        if (!key || excluded.has(key)) continue;
         if (val !== undefined) {
           metadata[key] = val;
         }

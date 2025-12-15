@@ -34,6 +34,33 @@ export class ConnectorRuntimeService {
     this.platformSecretService = new PlatformSecretService();
   }
 
+  private async resolveTokenRef(tokenRef: string, decryptedSecrets: Record<string, unknown>): Promise<string | undefined> {
+    const ref = tokenRef.trim();
+    if (!ref) return undefined;
+
+    // Allow connector_templates.runtime_config.oauth.accessToken to reference platform secrets
+    // without hard-coding providers in host code.
+    //
+    // Example (host-level secret token with a prefix):
+    //   oauth.accessToken = "platform:MY_SERVICE_TOKEN"
+    //   oauth.authPrefix  = "Bearer"
+    if (ref.startsWith('platform:')) {
+      const envKey = ref.slice('platform:'.length).trim();
+      if (!envKey) return undefined;
+      const secret = await this.platformSecretService.getSecret(envKey);
+      return typeof secret === 'string' && secret.trim() ? secret.trim() : undefined;
+    }
+
+    const raw = decryptedSecrets[ref];
+    return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
+  }
+
+  private buildAuthHeaderValue(prefix: string | undefined, token: string): string {
+    const p = typeof prefix === 'string' ? prefix.trim() : '';
+    if (!p) return token;
+    return `${p} ${token}`.trim();
+  }
+
   /**
    * Build connector-aware HTTP configuration for the current starship/user
    * context. This is passed to the remote Autopilot runner and consumed only
@@ -64,38 +91,6 @@ export class ConnectorRuntimeService {
           ? (runtimeConfig.oauth as Record<string, unknown>)
           : ({} as Record<string, unknown>);
 
-      /**
-       * Discord is a special case:
-       * - We use a single bot token configured on the host (server env)
-       * - OAuth "connect" captures install metadata (guild_id, permissions) per-starship
-       * - There is no per-starship access token to read from decrypted env
-       */
-      if (provider === 'discord') {
-        const botToken = await this.platformSecretService.getSecret('DISCORD_BOT_TOKEN');
-        if (!botToken || typeof botToken !== 'string' || !botToken.trim()) {
-          continue;
-        }
-
-        // Only expose the Discord connector to workflows if it is actually connected
-        // for this starship (i.e. bot installed via OAuth).
-        const discordConnector = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'discord');
-        if (!discordConnector || discordConnector.status !== 'connected') {
-          continue;
-        }
-
-        const baseUrl = this.getApiBaseUrl('discord', runtimeConfig);
-        if (!baseUrl) {
-          continue;
-        }
-        connectors[provider] = {
-          baseUrl,
-          headers: {
-            Authorization: `Bot ${botToken.trim()}`,
-          },
-        };
-        continue;
-      }
-
       // Starships connector uses a platform JWT instead of a stored access token.
       if (runtimeConfig.usesPlatformJwt === true && provider === 'starships') {
         try {
@@ -119,13 +114,13 @@ export class ConnectorRuntimeService {
       }
 
       // OAuth-style connectors typically specify which env key holds the access token.
-      const accessTokenEnvKey = oauthConfig.accessToken as string | undefined;
-      if (!accessTokenEnvKey) {
+      const accessTokenRef = typeof oauthConfig.accessToken === 'string' ? oauthConfig.accessToken : undefined;
+      if (!accessTokenRef) {
         continue;
       }
 
-      const rawToken = (decryptedSecrets as Record<string, unknown>)[accessTokenEnvKey];
-      if (!rawToken || typeof rawToken !== 'string' || !rawToken.trim()) {
+      const resolvedToken = await this.resolveTokenRef(accessTokenRef, decryptedSecrets as Record<string, unknown>);
+      if (!resolvedToken) {
         continue;
       }
 
@@ -135,10 +130,32 @@ export class ConnectorRuntimeService {
         continue;
       }
 
+      // Some connectors (e.g. platform-secret-backed bot tokens) must only be exposed
+      // to workflows when there is a connected record for this starship/provider.
+      const requiresConnected =
+        oauthConfig.requiresConnected === true || runtimeConfig.requiresConnected === true || accessTokenRef.trim().startsWith('platform:');
+      if (requiresConnected) {
+        const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
+        if (!existing || existing.status !== 'connected') {
+          continue;
+        }
+      }
+
+      const authHeaderName =
+        (typeof oauthConfig.authHeaderName === 'string' && oauthConfig.authHeaderName.trim()
+          ? oauthConfig.authHeaderName.trim()
+          : undefined) ||
+        (typeof oauthConfig.authHeader === 'string' && oauthConfig.authHeader.trim() ? oauthConfig.authHeader.trim() : 'Authorization');
+      const authPrefix =
+        (typeof oauthConfig.authPrefix === 'string' && oauthConfig.authPrefix.trim().length >= 0 ? oauthConfig.authPrefix : undefined) ||
+        (typeof oauthConfig.authHeaderPrefix === 'string' && oauthConfig.authHeaderPrefix.trim().length >= 0
+          ? oauthConfig.authHeaderPrefix
+          : 'Bearer');
+
       connectors[provider] = {
         baseUrl,
         headers: {
-          Authorization: `Bearer ${rawToken}`,
+          [authHeaderName]: this.buildAuthHeaderValue(authPrefix, resolvedToken),
         },
       };
     }

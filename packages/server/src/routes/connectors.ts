@@ -174,13 +174,6 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
     const bodyValidation = validateData(ApiKeyConnectSchema, req.body as ConnectWithApiKeyRequest, res, 'API key connector payload');
     if (!bodyValidation) return;
 
-    if (provider === 'discord') {
-      sendError(res, 'OPERATION_NOT_ALLOWED', 'Discord connector no longer supports API key flow; use OAuth instead.', 400, {
-        provider,
-      });
-      return;
-    }
-
     const connectorService = new ConnectorService();
     const connector = await connectorService.connectWithApiKey(starshipId, provider, bodyValidation as ConnectWithApiKeyRequest, userId);
 

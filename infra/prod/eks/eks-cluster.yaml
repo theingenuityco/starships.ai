@@ -17,10 +17,10 @@ availabilityZones:
 
 managedNodeGroups:
   - name: starships-nodes
-    instanceType: m7i-flex.large # 2 vCPU, 8GB RAM - Production M-series
-    desiredCapacity: 1 # Single node
+    instanceType: m8g.medium
+    desiredCapacity: 3
     minSize: 1
-    maxSize: 2
+    maxSize: 5
     volumeSize: 50
     volumeType: gp3
     privateNetworking: false # Public subnet - saves $35/mo on NAT

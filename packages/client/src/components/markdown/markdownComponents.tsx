@@ -183,8 +183,12 @@ export function getMarkdownComponents({ theme, enableLinkPreview = true, message
     },
 
     blockquote: ({ children }: any) => <blockquote className="border-l-4 border-primary/20 pl-4 py-2 bg-muted/20 rounded-r-lg my-2">{children}</blockquote>,
-    ul: ({ children }: any) => <ul className="list-disc list-inside space-y-1 my-2">{children}</ul>,
-    ol: ({ children }: any) => <ol className="list-decimal list-inside space-y-1 my-2">{children}</ol>,
+    // Use outside markers so list markers stay aligned with the first line of text even when the
+    // list item content is wrapped in block elements (e.g. markdown often wraps text in <p>).
+    ul: ({ children }: any) => <ul className="list-disc list-outside pl-5 space-y-1 my-2">{children}</ul>,
+    ol: ({ children }: any) => <ol className="list-decimal list-outside pl-5 space-y-1 my-2">{children}</ol>,
+    // Remove default paragraph margins inside list items to avoid odd spacing.
+    li: ({ children }: any) => <li className="[&>p]:m-0">{children}</li>,
     table: ({ children }: any) => (
       <TableWithCopy messageId={messageId} copiedStates={copiedStates} onCopyTable={onCopyTable}>
         {children}

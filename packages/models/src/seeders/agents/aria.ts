@@ -10,6 +10,7 @@ function createAriaDefaultBlueprint(): Blueprint {
   return createDefaultAgentBlueprint({
     name: 'Aria',
     model: 'anthropic/claude-sonnet-4.5',
+    reasoningEffort: 'medium',
     temperature: 0.4,
     maxTokens: 3000,
   });
@@ -140,7 +141,7 @@ Never assume which agents exist. Always call List Agents when you intend to dele
 export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Aria',
   slug: 'aria',
-  version: '1.0.2',
+  version: '1.0.3',
   description:
     'Delegation orchestrator that routes user requests to the best specialist agents on the current starship and summarizes their results.',
   category: 'automation',

@@ -325,11 +325,16 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
       res.redirect(redirectUrl);
       return;
     } catch (customError) {
-      console.error('[CONNECTOR_CALLBACK] Custom connector completion failed; falling back to oauth2', {
-        provider,
-        errorMessage: (customError as Error | undefined)?.message,
-        errorName: (customError as Error | undefined)?.name,
-      });
+      const msg = (customError as Error | undefined)?.message || '';
+      // Expected path for non-custom connectors: completeCustomConnector throws when authType !== 'custom'.
+      // Avoid noisy logs; just fall through to the OAuth2 handler below.
+      if (!msg.includes('does not use custom authentication')) {
+        console.error('[CONNECTOR_CALLBACK] Custom connector completion failed; falling back to oauth2', {
+          provider,
+          errorMessage: msg,
+          errorName: (customError as Error | undefined)?.name,
+        });
+      }
       // Fall through to generic OAuth error handling below when connector is
       // not custom or completion fails.
     }

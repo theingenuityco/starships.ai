@@ -27,14 +27,6 @@ export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error'
  * ConnectorTokenRef
  *
  * References a secret used by connector runtime.
- *
- * Supported formats:
- * - Legacy string:
- *   - Per-starship secret key: "GH_APP_ACCESS_TOKEN"
- *   - Platform secret ref: "platform:DISCORD_BOT_TOKEN"
- * - Explicit object (preferred):
- *   - { type: "connector_secret", key: "GH_APP_ACCESS_TOKEN" }
- *   - { type: "platform_secret",  key: "DISCORD_BOT_TOKEN" }
  */
 export type ConnectorSecretRefType = 'platform_secret' | 'connector_secret';
 

@@ -12,8 +12,19 @@ export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
+    // NOTE: In this repo, migrations are executed via the models connection wrapper,
+    // but older migrations type the parameter as `pg.Client`. To keep this migration
+    // compatible (and type-safe), read rows from either shape:
+    // - pg.Client: QueryResult<{ exists: boolean }> with `.rows`
+    // - models connection: Array<{ exists: boolean }>
+    const readExists = (result: unknown): boolean => {
+      if (Array.isArray(result)) return Boolean((result as Array<{ exists?: boolean }>)[0]?.exists);
+      const rows = (result as { rows?: Array<{ exists?: boolean }> } | null | undefined)?.rows;
+      return Boolean(rows?.[0]?.exists);
+    };
+
     // Guard: avoid ambiguous state.
-    const [{ exists: envExists }] = await client.query<{ exists: boolean }>(
+    const envExistsResult = await client.query<{ exists: boolean }>(
       `SELECT EXISTS (
         SELECT 1
         FROM information_schema.tables
@@ -21,8 +32,9 @@ export async function up(client: Client): Promise<void> {
           AND table_name = 'environments'
       ) AS exists`
     );
+    const envExists = readExists(envExistsResult);
 
-    const [{ exists: secretsExists }] = await client.query<{ exists: boolean }>(
+    const secretsExistsResult = await client.query<{ exists: boolean }>(
       `SELECT EXISTS (
         SELECT 1
         FROM information_schema.tables
@@ -30,6 +42,7 @@ export async function up(client: Client): Promise<void> {
           AND table_name = 'connector_secrets'
       ) AS exists`
     );
+    const secretsExists = readExists(secretsExistsResult);
 
     if (envExists && secretsExists) {
       throw new Error('Both tables exist: environments and connector_secrets. Refusing to continue.');
@@ -111,7 +124,13 @@ export async function down(client: Client): Promise<void> {
   await client.query('BEGIN');
 
   try {
-    const [{ exists: secretsExists }] = await client.query<{ exists: boolean }>(
+    const readExists = (result: unknown): boolean => {
+      if (Array.isArray(result)) return Boolean((result as Array<{ exists?: boolean }>)[0]?.exists);
+      const rows = (result as { rows?: Array<{ exists?: boolean }> } | null | undefined)?.rows;
+      return Boolean(rows?.[0]?.exists);
+    };
+
+    const secretsExistsResult = await client.query<{ exists: boolean }>(
       `SELECT EXISTS (
         SELECT 1
         FROM information_schema.tables
@@ -119,8 +138,9 @@ export async function down(client: Client): Promise<void> {
           AND table_name = 'connector_secrets'
       ) AS exists`
     );
+    const secretsExists = readExists(secretsExistsResult);
 
-    const [{ exists: envExists }] = await client.query<{ exists: boolean }>(
+    const envExistsResult = await client.query<{ exists: boolean }>(
       `SELECT EXISTS (
         SELECT 1
         FROM information_schema.tables
@@ -128,6 +148,7 @@ export async function down(client: Client): Promise<void> {
           AND table_name = 'environments'
       ) AS exists`
     );
+    const envExists = readExists(envExistsResult);
 
     if (envExists && secretsExists) {
       throw new Error('Both tables exist: environments and connector_secrets. Refusing to continue.');

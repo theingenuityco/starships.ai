@@ -68,6 +68,11 @@ export class ConnectorService {
       const rec = ref as Record<string, unknown>;
       const type = rec.type;
       const key = rec.key;
+      // Some connectors intentionally use a platform secret for runtime auth
+      // and do not persist OAuth token responses as per-starship secrets.
+      if (type === 'platform_secret') {
+        return undefined;
+      }
       if (type !== 'connector_secret') {
         throw new Error(`${label} must be a connector_secret ref`);
       }
@@ -200,11 +205,7 @@ export class ConnectorService {
    *
    * Source of truth is connector_secrets.connector_id linkage.
    */
-  private async getConnectorEnvSnapshot(
-    starshipId: string,
-    connectorId: string,
-    template: ConnectorTemplateEntity
-  ): Promise<Record<string, string>> {
+  private async getConnectorEnvSnapshot(starshipId: string, connectorId: string): Promise<Record<string, string>> {
     return this.connectorSecretRepository.getDecryptedSecretsByConnector(connectorId);
   }
 
@@ -224,7 +225,7 @@ export class ConnectorService {
       return null;
     }
 
-    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id, template);
+    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id);
 
     const execution = ExecutionItemUtils.createExecution();
     const input = {
@@ -294,7 +295,7 @@ export class ConnectorService {
       return null;
     }
 
-    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id, template);
+    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id);
 
     const execution = ExecutionItemUtils.createExecution();
     const input = {
@@ -635,6 +636,12 @@ export class ConnectorService {
 
     if (accessTokenEnvKey && body.access_token) {
       envUpdates[accessTokenEnvKey] = String(body.access_token);
+    } else if (!accessTokenEnvKey && body.access_token) {
+      // If oauth.accessToken is a platform_secret ref, parseSecretKeyForConnectorSecret returns undefined.
+      // This is expected for bot-style connectors (e.g. Discord) where runtime auth comes from a platform secret.
+      console.warn('[CONNECTOR_OAUTH] Skipping access_token persistence because oauth.accessToken is not a connector_secret ref', {
+        provider,
+      });
     }
     if (refreshTokenEnvKey && body.refresh_token) {
       envUpdates[refreshTokenEnvKey] = String(body.refresh_token);

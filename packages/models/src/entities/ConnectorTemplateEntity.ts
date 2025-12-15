@@ -1,5 +1,18 @@
 import { Expose } from 'class-transformer';
-import { IsArray, IsIn, IsObject, IsOptional, IsString, Length, IsISO8601, IsInt, Min, validate, ValidationError } from 'class-validator';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  IsISO8601,
+  IsInt,
+  Min,
+  validate,
+  ValidationError,
+} from 'class-validator';
 import type { Blueprint } from '@starships/autopilot';
 import type { ConnectorAuthType, ConnectorProvider } from '@starships/protocol';
 
@@ -70,6 +83,10 @@ export class ConnectorTemplateEntity {
   @Min(0)
   usageCount!: number;
 
+  @Expose()
+  @IsBoolean()
+  isEnabled!: boolean;
+
   // Inline blueprints for connector flows
 
   @Expose()
@@ -114,6 +131,7 @@ export class ConnectorTemplateEntity {
       version: (dataRecord.version as string) || '1.0.0',
       category: (dataRecord.category as string) || 'connector',
       usageCount: (dataRecord.usageCount as number) ?? 0,
+      isEnabled: (dataRecord.isEnabled as boolean) ?? true,
       connectBlueprint: dataRecord.connectBlueprint as Blueprint | undefined,
       refreshBlueprint: dataRecord.refreshBlueprint as Blueprint | undefined,
       testBlueprint: dataRecord.testBlueprint as Blueprint | undefined,

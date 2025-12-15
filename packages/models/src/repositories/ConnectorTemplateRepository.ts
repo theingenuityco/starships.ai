@@ -71,6 +71,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
         | 'displayName'
         | 'description'
         | 'authType'
+        | 'isEnabled'
         | 'runtimeConfig'
         | 'version'
         | 'category'

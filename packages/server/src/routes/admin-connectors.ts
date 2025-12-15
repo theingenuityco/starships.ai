@@ -30,6 +30,7 @@ const UpdateConnectorTemplateSchema = z
     displayName: TemplateTextSchema.max(255).optional(),
     description: TemplateTextSchema.max(1024).optional(),
     authType: z.enum(['oauth2', 'api_key', 'custom', 'none']).optional(),
+    isEnabled: z.boolean().optional(),
     version: z.string().trim().min(1).max(20).optional(),
     category: z.string().trim().min(1).max(100).optional(),
     runtimeConfig: z.record(z.string(), z.unknown()).optional(),
@@ -42,6 +43,7 @@ const UpdateConnectorTemplateSchema = z
       body.displayName !== undefined ||
       body.description !== undefined ||
       body.authType !== undefined ||
+      body.isEnabled !== undefined ||
       body.version !== undefined ||
       body.category !== undefined ||
       body.runtimeConfig !== undefined ||
@@ -59,6 +61,7 @@ function toTemplateSummary(entity: any): ConnectorTemplateModel {
     displayName: entity.displayName,
     description: entity.description,
     authType: entity.authType,
+    isEnabled: Boolean(entity.isEnabled),
     version: entity.version,
     category: entity.category,
     usageCount: entity.usageCount,
@@ -155,6 +158,7 @@ router.put('/admin/connectors/:id', jwtAuthMiddleware, async (req: Request, res:
       displayName: body.displayName,
       description: body.description,
       authType: body.authType as any,
+      isEnabled: body.isEnabled as any,
       version: body.version,
       category: body.category,
       runtimeConfig: body.runtimeConfig,

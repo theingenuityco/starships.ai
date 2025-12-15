@@ -41,6 +41,7 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
   const [displayName, setDisplayName] = useState('')
   const [description, setDescription] = useState('')
   const [authType, setAuthType] = useState<'oauth2' | 'api_key' | 'custom' | 'none'>('oauth2')
+  const [isEnabled, setIsEnabled] = useState(true)
   const [version, setVersion] = useState('')
   const [category, setCategory] = useState('')
 
@@ -57,6 +58,7 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
     setDisplayName(connector.displayName || '')
     setDescription(connector.description || '')
     setAuthType((connector.authType as any) || 'oauth2')
+    setIsEnabled((connector as any).isEnabled !== false)
     setVersion(connector.version || '')
     setCategory(connector.category || '')
 
@@ -157,6 +159,7 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
                         displayName,
                         description,
                         authType,
+                        isEnabled,
                         version,
                         category,
                         runtimeConfig: runtimeConfig === undefined ? undefined : (runtimeConfig as any),
@@ -212,6 +215,18 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
                             <SelectItem value="api_key">api_key</SelectItem>
                             <SelectItem value="custom">custom</SelectItem>
                             <SelectItem value="none">none</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Enabled</label>
+                        <Select value={isEnabled ? 'enabled' : 'disabled'} onValueChange={v => setIsEnabled(v === 'enabled')}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Enabled" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="enabled">enabled</SelectItem>
+                            <SelectItem value="disabled">disabled</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>

@@ -89,6 +89,7 @@ export interface ConnectorTemplateModel {
   displayName: string;
   description: string;
   authType: ConnectorAuthType;
+  isEnabled: boolean;
   version: string;
   category: string;
   usageCount: number;
@@ -125,6 +126,7 @@ export interface UpdateConnectorTemplateRequest {
   displayName?: string;
   description?: string;
   authType?: ConnectorAuthType;
+  isEnabled?: boolean;
   version?: string;
   category?: string;
   runtimeConfig?: Record<string, unknown>;

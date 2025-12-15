@@ -3,13 +3,15 @@
 import Icon from '@/components/primitives/Icon'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
-import { useAdminConnectorTemplates } from '@/hooks/useAdminConnectorTemplates'
+import { useAdminConnectorTemplates, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
 import Link from 'next/link'
 
 export default function AdminConnectorTemplatesPage(): React.JSX.Element {
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const { data: connectors = [], isLoading, isError, error } = useAdminConnectorTemplates(isAuthenticated && isInstanceAdmin)
+  const updateMutation = useUpdateAdminConnectorTemplate()
 
   if (!isAuthenticated) {
     return (
@@ -111,7 +113,28 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                           <td className="px-4 py-3 text-sm font-mono">{c.provider}</td>
                           <td className="px-4 py-3 text-sm">{c.displayName}</td>
                           <td className="px-4 py-3 text-sm font-mono">{c.authType}</td>
-                          <td className="px-4 py-3 text-sm font-mono">{c.isEnabled ? 'true' : 'false'}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <div
+                              className="inline-flex items-center gap-2"
+                              onClick={e => {
+                                // Prevent row navigation when toggling.
+                                e.stopPropagation()
+                              }}
+                            >
+                              <Switch
+                                size="sm"
+                                checked={c.isEnabled}
+                                disabled={updateMutation.isPending}
+                                onCheckedChange={async checked => {
+                                  await updateMutation.mutateAsync({
+                                    id: c.id,
+                                    updates: { isEnabled: checked },
+                                  })
+                                }}
+                              />
+                              <span className="text-xs font-mono text-muted-foreground">{c.isEnabled ? 'enabled' : 'disabled'}</span>
+                            </div>
+                          </td>
                           <td className="px-4 py-3 text-sm font-mono">{c.version}</td>
                           <td className="px-4 py-3 text-sm">{new Date(c.updatedAt).toLocaleString()}</td>
                         </tr>

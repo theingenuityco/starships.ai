@@ -58,7 +58,6 @@ export interface ConnectorOAuthRuntimeConfig extends Record<string, unknown> {
   // HostRuntime HTTP auth injection behavior
   authHeaderName?: string;
   authPrefix?: string; // e.g. "Bearer", "Bot", or "" for no prefix
-  requiresConnected?: boolean; // gate exposure to workflows unless connector.status === "connected"
 }
 
 /**
@@ -73,10 +72,6 @@ export interface ConnectorRuntimeConfig extends Record<string, unknown> {
 
   // Host-only special behavior
   usesPlatformJwt?: boolean; // used by the internal "starships" connector
-  requiresConnected?: boolean; // optional top-level gate
-
-  // Custom connector helpers (e.g. GitHub App slug env key name)
-  appSlugEnvKey?: string;
 }
 
 /**

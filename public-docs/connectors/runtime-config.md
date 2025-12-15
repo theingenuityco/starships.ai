@@ -19,9 +19,6 @@ This document describes the **supported keys used by the current host runtime**.
 - **`usesPlatformJwt?: boolean`**
   - Host-only flag for the internal `"starships"` connector (uses a platform JWT instead of stored tokens).
 
-- **`requiresConnected?: boolean`**
-  - If `true`, the host will only expose this connector to workflows/tools when the connector row is `status: "connected"` for the starship.
-
 ---
 
 ### `oauth` object
@@ -56,9 +53,6 @@ This document describes the **supported keys used by the current host runtime**.
   - Use `""` for no prefix (token is used as-is).
   - Examples: `"Bearer"`, `"Bot"`, `""`.
 
-- **`oauth.requiresConnected?: boolean`**
-  - Same meaning as top-level `requiresConnected`, but scoped to OAuth/auth behavior.
-
 ---
 
 ### Example: Discord bot token (platform secret + `Bot` prefix)
@@ -68,8 +62,7 @@ This document describes the **supported keys used by the current host runtime**.
   "apiBaseUrl": "https://discord.com",
   "oauth": {
     "accessToken": "platform:DISCORD_BOT_TOKEN",
-    "authPrefix": "Bot",
-    "requiresConnected": true
+    "authPrefix": "Bot"
   }
 }
 ```

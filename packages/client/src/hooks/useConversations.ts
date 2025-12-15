@@ -861,9 +861,26 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     gcTime: 2 * 60 * 1000,
   })
 
-  // Fold streamed chunks into final message array in-memory
+  // Fold streamed chunks into final message array in-memory.
+  //
+  // IMPORTANT: Some streaming/query implementations may mutate the underlying `chunks` array in-place
+  // (same reference, new length/content). If we memoize purely on `[chunks]`, derived state can go stale,
+  // causing loader state flicker (especially visible during route transitions).
+  //
+  // To make derived state robust, build a small "revision key" from length + last-chunk signature and
+  // memoize on that instead.
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
-  const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
+  const chunksLen = Array.isArray(chunks) ? chunks.length : 0
+  const lastChunkAny: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
+  const lastChunkSig =
+    lastChunkAny?.type === 'append'
+      ? `append:${String(lastChunkAny?.message?.role || '')}:${String(lastChunkAny?.message?.id || '')}`
+      : lastChunkAny?.type
+        ? String(lastChunkAny.type)
+        : 'none'
+  const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
+
+  const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunksRevisionKey])
 
   // Detect if current session has any live streaming signals (placeholder or deltas)
   const hasLiveStreamHint = useMemo(() => {
@@ -886,7 +903,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
     return false
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Track the start of the latest user turn and cap the pre-stream indicator duration
   const lastUserSerial = useMemo(() => {
@@ -919,7 +936,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (c?.type === 'ui_action') return c.payload ?? null
     }
     return null
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Invalidate usage totals when a turn completes.
   // Robust across both legacy 'complete' and newer 'turn_completed' SSE events.
@@ -936,7 +953,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
       }
     }
-  }, [chunks, conversationId, starshipId, queryClient])
+  }, [chunksRevisionKey, conversationId, starshipId, queryClient])
 
   // Check if we've received a 'turn_completed' event in the chunk stream
   const hasCompleteEvent = useMemo(() => {
@@ -947,7 +964,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (chunks[i].type === 'append' && (chunks[i] as any).message?.role === 'user') break
     }
     return false
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Server-authoritative turn state: derive from latest turn_* or turn_state events
   const serverTurnActive = useMemo(() => {
@@ -960,7 +977,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (c.type === 'turn_state') return Boolean(c.payload?.turnActive)
     }
     return false
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Heuristic: detect if there's already a non-streaming assistant message after the last user message.
   // This protects against edge cases where turn lifecycle events are missing or out-of-order on reconnect.
@@ -1021,7 +1038,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (c.type === 'turn_started' && c.payload?.local === true) return true
     }
     return false
-  }, [chunks, preStreamExpired, hasCompleteEvent, hasFinalAssistantAfterLastUser, isAssistantStreaming])
+  }, [chunksRevisionKey, preStreamExpired, hasCompleteEvent, hasFinalAssistantAfterLastUser, isAssistantStreaming])
 
   // Awaiting assistant: prefer server turn state; show awaiting when turn is active but no streaming caret
   const isAwaitingAssistant = useMemo(() => {
@@ -1213,33 +1230,97 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       // Small, stable-ish signature of the latest streamed chunk
       const lastChunkSig = lastChunk?.type === 'append' ? `append:${String(lastChunk?.message?.role || '')}:${String(lastChunk?.message?.id || '')}` : lastChunk?.type ? String(lastChunk.type) : 'none'
 
-      const syncKey = [conversationId, chunksLen, lastChunkSig, sendMessageMutation.isPending ? 1 : 0, isResponding ? 1 : 0, isAssistantStreaming ? 1 : 0, isAwaitingAssistant ? 1 : 0].join('|')
+      // IMPORTANT:
+      // Some initial connect / route-transition states can briefly produce a false-negative `isAwaitingAssistant`
+      // (e.g. the local turn_started marker exists, but turn_state/turn_started events haven't propagated through
+      // the streamedQuery cache yet). In those cases the UI store can be overwritten to "idle" and the loader
+      // disappears until a reload / next SSE chunk arrives.
+      //
+      // Make the store flags slightly "sticky" for the active turn: if the last message is a user message and we
+      // haven't seen completion/final assistant, treat it as awaiting (capped by preStreamExpired).
+      const lastMsg: any = Array.isArray(computedMessages) && computedMessages.length > 0 ? computedMessages[computedMessages.length - 1] : null
+      const fallbackAwaiting =
+        !preStreamExpired && !hasCompleteEvent && !hasFinalAssistantAfterLastUser && lastMsg?.role === 'user'
+
+      const nextIsAwaitingAssistant = Boolean(isAwaitingAssistant || fallbackAwaiting)
+      const nextIsResponding = Boolean(isAssistantStreaming || nextIsAwaitingAssistant)
+      const nextIsSending = Boolean(sendMessageMutation.isPending)
+
+      const syncKey = [conversationId, chunksLen, lastChunkSig, nextIsSending ? 1 : 0, nextIsResponding ? 1 : 0, isAssistantStreaming ? 1 : 0, nextIsAwaitingAssistant ? 1 : 0].join('|')
 
       if (storeSyncKeyRef.current === syncKey) return
       storeSyncKeyRef.current = syncKey
 
       const ui = useStarshipUIStore.getState()
+      const existing = ui.conversations?.[conversationId]
+      const computedLen = Array.isArray(computedMessages) ? computedMessages.length : 0
+
+      // IMPORTANT:
+      // During the /conversations -> /conversations/:id transition (and initial SSE connect),
+      // the streamed query can briefly report an empty `computedMessages` array even though we
+      // already optimistically seeded the UI store + query cache with a temp user message and
+      // marked the conversation as busy.
+      //
+      // If we sync an empty snapshot here, we clobber the optimistic messages + busy flags and
+      // the UI appears to "go blank" and drop the loader until the SSE stream catches up (works
+      // after reload because the conversationId is stable from first paint).
+      //
+      // So: if the store already has messages OR shows the conversation as busy, never overwrite
+      // it with an empty/idle snapshot.
+      if (
+        computedLen === 0 &&
+        existing &&
+        ((Array.isArray(existing.messages) && existing.messages.length > 0) ||
+          existing.isSending === true ||
+          existing.isResponding === true ||
+          existing.isAwaitingAssistant === true ||
+          existing.isAssistantStreaming === true)
+      ) {
+        dbg('syncToStore:skipEmptySnapshot', {
+          syncKey,
+          existingMessages: Array.isArray(existing.messages) ? existing.messages.length : 0,
+          existingIsSending: existing.isSending,
+          existingIsResponding: existing.isResponding,
+          existingIsAwaitingAssistant: existing.isAwaitingAssistant,
+          existingIsAssistantStreaming: existing.isAssistantStreaming,
+        })
+        return
+      }
+
       const last = Array.isArray(computedMessages) && computedMessages.length > 0 ? (computedMessages[computedMessages.length - 1] as any) : null
       const lastActivityAt = String(last?.updatedAt || last?.createdAt || '') || undefined
       ui.setConversationSnapshot(conversationId, {
         messages: (computedMessages as any) || [],
         total: Array.isArray(computedMessages) ? computedMessages.length : 0,
         lastActivityAt,
-        isSending: Boolean(sendMessageMutation.isPending),
-        isResponding: Boolean(isResponding),
+        isSending: nextIsSending,
+        isResponding: nextIsResponding,
         isAssistantStreaming: Boolean(isAssistantStreaming),
-        isAwaitingAssistant: Boolean(isAwaitingAssistant),
+        isAwaitingAssistant: nextIsAwaitingAssistant,
       } as any)
       dbg('syncToStore', {
         syncKey,
         total: Array.isArray(computedMessages) ? computedMessages.length : 0,
-        isSending: Boolean(sendMessageMutation.isPending),
-        isResponding: Boolean(isResponding),
+        isSending: nextIsSending,
+        isResponding: nextIsResponding,
         isAssistantStreaming: Boolean(isAssistantStreaming),
-        isAwaitingAssistant: Boolean(isAwaitingAssistant),
+        isAwaitingAssistant: nextIsAwaitingAssistant,
+        fallbackAwaiting,
       })
     } catch {}
-  }, [conversationId, enabledFlag, chunks, computedMessages, isResponding, isAssistantStreaming, isAwaitingAssistant, sendMessageMutation.isPending])
+  }, [
+    conversationId,
+    enabledFlag,
+    chunks,
+    computedMessages,
+    isResponding,
+    isAssistantStreaming,
+    isAwaitingAssistant,
+    sendMessageMutation.isPending,
+    preStreamExpired,
+    hasCompleteEvent,
+    hasFinalAssistantAfterLastUser,
+  ])
 
   return {
     messages: computedMessages,

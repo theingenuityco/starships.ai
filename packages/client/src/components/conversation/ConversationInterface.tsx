@@ -549,16 +549,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
       const action = (payload as any).__ui_action as string
 
-      // Debug logging for UI actions coming from SSE
-      try {
-        // eslint-disable-next-line no-console
-        console.debug('[ConversationInterface] handleUIPayload', {
-          action,
-          payload,
-          starshipId,
-        })
-      } catch {}
-
       // Builders are route-based now; no in-place form updates
 
       switch (action) {
@@ -577,10 +567,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         case 'child_conversation_created': {
           try {
             const sid = (payload as any)?.starshipId || starshipId
-            // eslint-disable-next-line no-console
-            console.debug('[ConversationInterface] child_conversation_created – invalidating conversations for starship', {
-              starshipId: sid,
-            })
             if (sid) {
               queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
             }

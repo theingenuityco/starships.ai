@@ -46,7 +46,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   }, [convAgents, agents])
 
   // Keep conversation streaming active and capture live messages/UI actions
-  const { messages: liveMessages = [], isResponding } = useConversationStreamed(conversationId, starship?.id || '')
+  const stream = useConversationStreamed(conversationId, starship?.id || null)
+  const { messages: liveMessages = [], isResponding } = stream
   const deferredAgentCreate = useDeferredAgentCreationModal({
     liveMessages,
     isStreaming: isResponding,
@@ -898,7 +899,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               />
 
               {conversationId && (
-                <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
+                <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id} value={stream}>
                   <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
                     <div className="max-w-2xl mx-auto pointer-events-auto">
                       <ConversationMessageInput

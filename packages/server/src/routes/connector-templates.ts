@@ -1,5 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
@@ -16,6 +16,17 @@ import type {
 import { ConnectorTemplateRepository } from '@starships/models';
 
 const router: Router = Router();
+
+function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+    sendError(res, 'FORBIDDEN', 'Only instance admins can access connector templates', 403);
+    return;
+  }
+  next();
+}
+
+// Enforce auth + instance-admin for all connector template admin endpoints.
+router.use('/admin/connector-templates', jwtAuthMiddleware, requireInstanceAdminMiddleware);
 
 const TemplateIdOrProviderSchema = z.string().trim().min(1).max(255);
 
@@ -85,13 +96,8 @@ function toAdminModel(entity: any): ConnectorTemplateAdminModel {
 // ============================================================================
 
 // GET /admin/connector-templates - List connector templates (summaries)
-router.get('/admin/connector-templates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/admin/connector-templates', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can view connector templates', 403);
-      return;
-    }
-
     const repo = new ConnectorTemplateRepository();
     const templates = await repo.list();
 
@@ -106,13 +112,8 @@ router.get('/admin/connector-templates', jwtAuthMiddleware, async (req: Request,
 });
 
 // GET /admin/connector-templates/:id - Get a connector template (admin view)
-router.get('/admin/connector-templates/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/admin/connector-templates/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can view connector templates', 403);
-      return;
-    }
-
     const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
     if (!params) return;
 
@@ -134,13 +135,8 @@ router.get('/admin/connector-templates/:id', jwtAuthMiddleware, async (req: Requ
 });
 
 // PUT /admin/connector-templates/:id - Update a connector template (admin only)
-router.put('/admin/connector-templates/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.put('/admin/connector-templates/:id', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can update connector templates', 403);
-      return;
-    }
-
     const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
     if (!params) return;
 

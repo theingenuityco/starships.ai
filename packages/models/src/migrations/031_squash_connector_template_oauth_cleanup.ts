@@ -290,6 +290,15 @@ export async function up(client: Client): Promise<void> {
       WHERE provider = 'github' AND (runtime_config->>'apiBaseUrl' IS NULL OR runtime_config->>'apiBaseUrl' = '')
     `);
 
+    // GitHub connector no longer uses GitHub App credentials (app id / private key) via templates.
+    await client.query(`
+      UPDATE connector_templates
+      SET
+        runtime_config = (COALESCE(runtime_config, '{}'::jsonb) - 'appIdEnvKey' - 'privateKeyEnvKey'),
+        updated_at = NOW()
+      WHERE provider = 'github' AND (runtime_config ? 'appIdEnvKey' OR runtime_config ? 'privateKeyEnvKey')
+    `);
+
     // Always normalize runtime_config.oauth shape and drop legacy duplicated keys.
     // This is safe even if oauth_* columns are already dropped (it uses only runtime_config JSONB).
     await client.query(`

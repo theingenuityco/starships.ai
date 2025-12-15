@@ -393,14 +393,20 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   return (
     <div className="h-full flex flex-col bg-transparent">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
-        <div className="max-w-4xl mx-auto space-y-2 bg-transparent">
+        <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map(message => (
-            <MemoizedMessageBubble key={message.id} message={message} agentName={message.agentName || agentName} isStreamingActive={message.id === activeRenderedStreamingAssistantId} starshipId={starshipId} />
+            <MemoizedMessageBubble
+              key={message.id}
+              message={message}
+              agentName={message.agentName || agentName}
+              isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+              starshipId={starshipId}
+            />
           ))}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
-              <div className="flex items-start gap-3 max-w-[85%]">
+              <div className="flex items-start gap-3 w-full">
                 <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
                   <AgentAvatar seed={agentName} size={32} />
                 </div>
@@ -454,7 +460,7 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
   if (isLoading) {
     return (
       <div className="mb-1 space-y-2">
-        {attachmentIds.map((id) => (
+        {attachmentIds.map(id => (
           <MessageAttachmentSkeleton key={id} className="max-w-xs" />
         ))}
       </div>
@@ -467,12 +473,8 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
 
   return (
     <div className="mb-1 space-y-2">
-      {attachments.map((attachment) => (
-        <MessageAttachment
-          key={attachment.id}
-          attachment={attachment}
-          className="max-w-xs"
-        />
+      {attachments.map(attachment => (
+        <MessageAttachment key={attachment.id} attachment={attachment} className="max-w-xs" />
       ))}
     </div>
   )
@@ -490,9 +492,7 @@ const MemoizedMessageBubble = memo(
           <div className="mb-4 mt-6 flex items-end gap-3 max-w-[70%]">
             <div className="flex flex-col gap-2 items-end">
               {/* Attachments outside bubble */}
-              {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && (
-                <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />
-              )}
+              {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
               {/* Message bubble */}
               <div className={`bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>

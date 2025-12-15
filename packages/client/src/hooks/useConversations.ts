@@ -836,6 +836,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const enabledFlag = options?.enabled !== false
   // Per-hook-instance guard key (do NOT use globals; multiple instances can exist).
   const storeSyncKeyRef = useRef<string>('')
+  const dbg = useCallback(
+    (event: string, data?: any) => {
+      try {
+        // eslint-disable-next-line no-console
+        console.debug('[conv-debug][stream]', event, { conversationId, enabledFlag, ...data })
+      } catch {}
+    },
+    [conversationId, enabledFlag]
+  )
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
@@ -987,6 +996,33 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return computedMessages.some(m => (m as any)?.streaming === true)
   }, [computedMessages, hasCompleteEvent])
 
+  // Local pending-turn signal: we seed a local `turn_started` during the create->route-change gap.
+  // Some servers emit `turn_state.turnActive=false` until the agent actually starts; if we follow that
+  // strictly, the UI "responding" state flickers off. This keeps responding ON for a short window
+  // after a locally-initiated send, until streaming begins or the timeout expires.
+  const localTurnPendingActive = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    if (preStreamExpired) return false
+    // If we've already received a completion event for the current turn window, do not keep pending.
+    if (hasCompleteEvent) return false
+    // If assistant already finalized for the last user, do not keep pending.
+    if (hasFinalAssistantAfterLastUser) return false
+    // If assistant is streaming, the normal path will handle responding.
+    if (isAssistantStreaming) return false
+
+    // Scan backwards until we reach the most recent *server* turn completion.
+    // This works even if the server appends the user message after we seeded the local turn_started.
+    // (The previous logic broke early on the user append and missed the local marker.)
+    const maxScan = Math.min(chunks.length, 250)
+    for (let n = 1; n <= maxScan; n++) {
+      const c: any = chunks[chunks.length - n]
+      if (!c) continue
+      if (c.type === 'turn_completed') return false
+      if (c.type === 'turn_started' && c.payload?.local === true) return true
+    }
+    return false
+  }, [chunks, preStreamExpired, hasCompleteEvent, hasFinalAssistantAfterLastUser, isAssistantStreaming])
+
   // Awaiting assistant: prefer server turn state; show awaiting when turn is active but no streaming caret
   const isAwaitingAssistant = useMemo(() => {
     if (hasCompleteEvent) return false
@@ -994,8 +1030,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     if (hasFinalAssistantAfterLastUser) return false
     // Cap the "awaiting" window so we never get stuck showing loaders if turn events are missed.
     if (preStreamExpired) return false
-    return serverTurnActive && !isAssistantStreaming
-  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser, preStreamExpired])
+    // If server says the turn is active, we're awaiting unless assistant is already streaming.
+    if (serverTurnActive && !isAssistantStreaming) return true
+    // Otherwise, fall back to local pending-turn state to bridge create/route-change gaps.
+    return localTurnPendingActive
+  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser, preStreamExpired, localTurnPendingActive])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
@@ -1043,6 +1082,32 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const convId = (variables as any)?.conversationId as string | undefined
         if (!convId) return
 
+        // If we've already injected an optimistic temp user + local turn_started for this send
+        // (e.g. during the "create conversation" -> upload attachments gap), do NOT inject again.
+        try {
+          const existing = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(convId)) as any[] | undefined
+          const existingArr = Array.isArray(existing) ? existing : []
+          const last = existingArr.length > 0 ? existingArr[existingArr.length - 1] : null
+          const prev = existingArr.length > 1 ? existingArr[existingArr.length - 2] : null
+          const hasLocalTurnStarted = last?.type === 'turn_started' && last?.payload?.local === true
+          const prevIsUserAppend = prev?.type === 'append' && prev?.message?.role === 'user'
+          const sameContent = prevIsUserAppend && String(prev?.message?.content ?? '') === String((variables as any)?.content ?? '')
+          const prevIsTemp = prevIsUserAppend && typeof prev?.message?.id === 'string' && String(prev.message.id).startsWith('temp-user-')
+          if (hasLocalTurnStarted && prevIsTemp && sameContent) {
+            // Ensure store flags are set, but skip duplicate stream-cache injections.
+            try {
+              useStarshipUIStore.getState().setConversationMeta(convId, {
+                isSending: true,
+                isResponding: true,
+                isAwaitingAssistant: true,
+                isAssistantStreaming: false,
+              })
+            } catch {}
+            dbg('onMutate:skipDuplicateSeed', { convId })
+            return
+          }
+        } catch {}
+
         const now = new Date().toISOString()
         const tempUser: ClientMessage = {
           id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -1063,6 +1128,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
           return next
         })
+        dbg('onMutate:seededCache', { convId })
 
         // ALSO update the central UI store immediately so UI stays consistent during route transitions.
         try {
@@ -1075,6 +1141,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             isAssistantStreaming: false,
             lastActivityAt: now,
           })
+          dbg('onMutate:storeMetaBusy', { convId })
         } catch {}
       } catch {}
     },
@@ -1163,6 +1230,14 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         isAssistantStreaming: Boolean(isAssistantStreaming),
         isAwaitingAssistant: Boolean(isAwaitingAssistant),
       } as any)
+      dbg('syncToStore', {
+        syncKey,
+        total: Array.isArray(computedMessages) ? computedMessages.length : 0,
+        isSending: Boolean(sendMessageMutation.isPending),
+        isResponding: Boolean(isResponding),
+        isAssistantStreaming: Boolean(isAssistantStreaming),
+        isAwaitingAssistant: Boolean(isAwaitingAssistant),
+      })
     } catch {}
   }, [conversationId, enabledFlag, chunks, computedMessages, isResponding, isAssistantStreaming, isAwaitingAssistant, sendMessageMutation.isPending])
 

@@ -84,8 +84,8 @@ function toAdminModel(entity: any): ConnectorTemplateAdminModel {
 // ADMIN CONNECTOR TEMPLATES (INSTANCE ADMIN ONLY)
 // ============================================================================
 
-// GET /admin/connectors - List connector templates (summaries)
-router.get('/admin/connectors', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /admin/connector-templates - List connector templates (summaries)
+router.get('/admin/connector-templates', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
       sendError(res, 'FORBIDDEN', 'Only instance admins can view connector templates', 403);
@@ -105,8 +105,8 @@ router.get('/admin/connectors', jwtAuthMiddleware, async (req: Request, res: Res
   }
 });
 
-// GET /admin/connectors/:id - Get a connector template (admin view)
-router.get('/admin/connectors/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// GET /admin/connector-templates/:id - Get a connector template (admin view)
+router.get('/admin/connector-templates/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
       sendError(res, 'FORBIDDEN', 'Only instance admins can view connector templates', 403);
@@ -133,8 +133,8 @@ router.get('/admin/connectors/:id', jwtAuthMiddleware, async (req: Request, res:
   }
 });
 
-// PUT /admin/connectors/:id - Update a connector template (admin only)
-router.put('/admin/connectors/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// PUT /admin/connector-templates/:id - Update a connector template (admin only)
+router.put('/admin/connector-templates/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
       sendError(res, 'FORBIDDEN', 'Only instance admins can update connector templates', 403);
@@ -158,7 +158,7 @@ router.put('/admin/connectors/:id', jwtAuthMiddleware, async (req: Request, res:
       displayName: body.displayName,
       description: body.description,
       authType: body.authType as any,
-      isEnabled: body.isEnabled as any,
+      isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
       runtimeConfig: body.runtimeConfig,

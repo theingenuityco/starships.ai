@@ -3,13 +3,11 @@
 import Icon from '@/components/primitives/Icon'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { EnvironmentVariableDeleteModal } from '@/components/environment'
-import { EnvironmentVariableForm } from '@/components/environment'
-import { EnvironmentVariableList } from '@/components/environment'
+import { PlatformSecretDeleteModal, PlatformSecretForm, PlatformSecretList } from '@/components/platform-secrets'
 import { useAuth } from '@/hooks/useAuth'
 import { useCreatePlatformSecret, useDeletePlatformSecret, usePlatformSecrets, useUpdatePlatformSecret } from '@/hooks/usePlatformSecrets'
 import type { PlatformSecretSummary } from '@starships/protocol'
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 
 export default function PlatformSecretsAdminPage(): React.JSX.Element {
@@ -23,20 +21,6 @@ export default function PlatformSecretsAdminPage(): React.JSX.Element {
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [isDeleteOpen, setIsDeleteOpen] = useState(false)
   const [selected, setSelected] = useState<PlatformSecretSummary | null>(null)
-
-  const variablesForList = useMemo(() => {
-    // Reuse environment variable list UI (same shape minus starshipId/connectorId).
-    return secrets.map(s => ({
-      id: s.id,
-      starshipId: 'platform',
-      key: s.key,
-      description: s.description,
-      createdAt: s.createdAt,
-      updatedAt: s.updatedAt,
-      createdBy: s.createdBy,
-      connectorId: undefined,
-    }))
-  }, [secrets])
 
   if (!isAuthenticated) {
     return (
@@ -109,19 +93,6 @@ export default function PlatformSecretsAdminPage(): React.JSX.Element {
     setSelected(null)
   }
 
-  const selectedAsEnvironmentSummary = selected
-    ? {
-        id: selected.id,
-        starshipId: 'platform',
-        key: selected.key,
-        description: selected.description,
-        createdAt: selected.createdAt,
-        updatedAt: selected.updatedAt,
-        createdBy: selected.createdBy,
-        connectorId: undefined,
-      }
-    : undefined
-
   return (
     <PageLayout>
       <div className="bg-background">
@@ -148,29 +119,17 @@ export default function PlatformSecretsAdminPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">Instance-level encrypted secrets used by connectors (OAuth client IDs/secrets, bot tokens, etc.). Values are never displayed after saving.</p>
             </div>
 
-            <EnvironmentVariableList
-              variables={variablesForList as any}
-              loading={isLoading}
-              onAdd={openCreate}
-              onEdit={v => openEdit(secrets.find(s => s.id === v.id) || (selected as any))}
-              onDelete={v => openDelete(secrets.find(s => s.id === v.id) || (selected as any))}
-            />
+            <PlatformSecretList secrets={secrets} loading={isLoading} onAdd={openCreate} onEdit={openEdit} onDelete={openDelete} />
 
-            <EnvironmentVariableForm
+            <PlatformSecretForm
               isOpen={isFormOpen}
               onClose={() => setIsFormOpen(false)}
               onSubmit={handleSubmit}
-              environmentVariable={selectedAsEnvironmentSummary as any}
+              secret={selected || undefined}
               loading={createMutation.isPending || updateMutation.isPending}
             />
 
-            <EnvironmentVariableDeleteModal
-              isOpen={isDeleteOpen}
-              onClose={() => setIsDeleteOpen(false)}
-              onConfirm={handleConfirmDelete}
-              environmentVariable={selectedAsEnvironmentSummary as any}
-              loading={deleteMutation.isPending}
-            />
+            <PlatformSecretDeleteModal isOpen={isDeleteOpen} onClose={() => setIsDeleteOpen(false)} onConfirm={handleConfirmDelete} secret={selected || undefined} loading={deleteMutation.isPending} />
           </div>
         </div>
       </div>

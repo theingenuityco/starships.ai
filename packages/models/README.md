@@ -48,7 +48,7 @@ const starships = await starshipRepo.findAll();
 - **Tool Templates**: Reusable tool configurations for rapid deployment
 - **Conversations**: Communication logs with agent relationships and structured metadata
 - **Messages**: Individual message storage with role-based threading
-- **Environments**: Encrypted environment variable management scoped to starships
+- **Connector secrets**: Encrypted secret management scoped to starships (DB-backed)
 - **Usage**: Token usage tracking for analytics
 
 ### Direct Repository Usage
@@ -85,19 +85,19 @@ try {
 
 ## Available Repositories
 
-| Repository                  | Purpose                                                   |
-| --------------------------- | --------------------------------------------------------- |
-| **StarshipRepository**      | Starship CRUD, agent deployment, subscription management  |
-| **AgentRepository**         | Agent lifecycle management and template instantiation     |
-| **AgentTemplateRepository** | Reusable agent configurations and marketplace             |
-| **ToolRepository**          | Tool lifecycle management and deployment                  |
-| **ToolTemplateRepository**  | Reusable tool configurations and marketplace              |
-| **UserRepository**          | User accounts, authentication, and profiles               |
-| **ConversationRepository**  | Chat history, agent relationships, and communication logs |
-| **MessageRepository**       | Individual message storage and retrieval                  |
-| **EnvironmentRepository**   | Environment variable management with encryption           |
-| **UsageRepository**         | Token usage tracking for analytics                        |
-| **WaitlistRepository**      | Early access user onboarding queue                        |
+| Repository                    | Purpose                                                   |
+| ----------------------------- | --------------------------------------------------------- |
+| **StarshipRepository**        | Starship CRUD, agent deployment, subscription management  |
+| **AgentRepository**           | Agent lifecycle management and template instantiation     |
+| **AgentTemplateRepository**   | Reusable agent configurations and marketplace             |
+| **ToolRepository**            | Tool lifecycle management and deployment                  |
+| **ToolTemplateRepository**    | Reusable tool configurations and marketplace              |
+| **UserRepository**            | User accounts, authentication, and profiles               |
+| **ConversationRepository**    | Chat history, agent relationships, and communication logs |
+| **MessageRepository**         | Individual message storage and retrieval                  |
+| **ConnectorSecretRepository** | Encrypted connector secrets management (DB-backed)        |
+| **UsageRepository**           | Token usage tracking for analytics                        |
+| **WaitlistRepository**        | Early access user onboarding queue                        |
 
 > **Note:** `WorkflowRepository`, `BlueprintRepository`, `ExecutionRepository`, `NodeRepository`, and `EdgeRepository` have been removed as no implementations exist. Blueprint data is stored as JSONB within agent and tool entities.
 
@@ -338,16 +338,16 @@ Comprehensive test coverage for Daedalus's tools with specialized testing utilit
 
 ### Available Tool Tests
 
-| Tool Category       | Tool Name          | Description                                                  |
-| ------------------- | ------------------ | ------------------------------------------------------------ |
-| **Utility Tools**   | `calculator`       | Mathematical expression evaluation with security validation  |
-|                     | `echo`             | Simple input/output testing and debugging utility            |
-|                     | `get_current_time` | Timezone-aware date/time generation with multiple formats    |
-| **Tool Management** | `open-tool`        | Create or open tool instances via REST API                   |
-|                     | `list-tools`       | List all tools for a starship with lean summaries            |
-|                     | `get-tool`         | Get full tool details by slug                                |
-|                     | `edit-tool`        | Edit existing tools by slug resolution                       |
-|                     | `test-tool`        | Execute tools with timing and pass/fail reporting            |
+| Tool Category       | Tool Name          | Description                                                 |
+| ------------------- | ------------------ | ----------------------------------------------------------- |
+| **Utility Tools**   | `calculator`       | Mathematical expression evaluation with security validation |
+|                     | `echo`             | Simple input/output testing and debugging utility           |
+|                     | `get_current_time` | Timezone-aware date/time generation with multiple formats   |
+| **Tool Management** | `open-tool`        | Create or open tool instances via REST API                  |
+|                     | `list-tools`       | List all tools for a starship with lean summaries           |
+|                     | `get-tool`         | Get full tool details by slug                               |
+|                     | `edit-tool`        | Edit existing tools by slug resolution                      |
+|                     | `test-tool`        | Execute tools with timing and pass/fail reporting           |
 
 ### Running Tool Tests
 

@@ -38,7 +38,6 @@ import widgetRoutes from '@/routes/widgets';
 import scheduleRoutes from '@/routes/schedules';
 import platformSecretRoutes from '@/routes/platform-secrets';
 import connectorTemplateRoutes from '@/routes/connector-templates';
-import connectorSecretRoutes from '@/routes/connector-secrets';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -113,7 +112,6 @@ app.use('/api/v1', widgetRoutes);
 app.use('/api/v1', scheduleRoutes);
 app.use('/api/v1', platformSecretRoutes);
 app.use('/api/v1', connectorTemplateRoutes);
-app.use('/api/v1', connectorSecretRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

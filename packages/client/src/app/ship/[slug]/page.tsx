@@ -15,7 +15,6 @@ import DailyUsageCalendarHeatmap from '@/components/billing/DailyUsageCalendarHe
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipUsageViewModel } from '@/hooks/useStarshipUsageViewModel'
 import { useAgentTools } from '@/hooks/useAgents'
-import { useEnvironmentVariables } from '@/hooks/useEnvironmentVariables'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipConversations } from '@/hooks/useConversations'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -39,7 +38,6 @@ export default function StarshipOverviewPage(): React.JSX.Element {
 
   const starshipId = starship?.id || ''
 
-  const { data: envVars = [], isLoading: envLoading } = useEnvironmentVariables(starshipId || '', !!starshipId)
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipId || '', !!starshipId)
   const { data: convData, isLoading: convLoading } = useStarshipConversations(starshipId || '', !!starshipId)
   const conversations = convData?.conversations || []

@@ -1,6 +1,6 @@
 import { Metadata } from 'next'
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
-import { EnvironmentSettingsContent } from '@/components/environment/EnvironmentSettingsContent'
+import { ConnectorsSettingsContent } from '@/components/connectors/ConnectorsSettingsContent'
 
 interface PageProps {
   params: Promise<{
@@ -21,11 +21,7 @@ export default async function ConnectorsPage({ params }: PageProps) {
 
   return (
     <JwtAuthGate>
-      <EnvironmentSettingsContent slug={slug} />
+      <ConnectorsSettingsContent slug={slug} />
     </JwtAuthGate>
   )
 }
-
-
-
-

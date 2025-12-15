@@ -12,6 +12,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { cn } from '@/lib/utils'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import type { AgentModel } from '@starships/protocol'
+import { useQueryClient } from '@tanstack/react-query'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
@@ -87,6 +88,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     ref
   ) => {
     const { userId } = useAuth()
+    const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
 
@@ -166,35 +168,36 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
     const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming } = streamCtx ?? fallbackStream
     const stopConversation = useConversationStop()
-    // Show stop button during pre-stream window and while streaming/responding
-    const [preStreamPending, setPreStreamPending] = useState(false)
-    // Block input from the moment user sends until streaming completes (covers pre-stream gap)
-    const isStreamingEffective = Boolean(isSending || preStreamPending || isResponding)
-    const shouldShowStop = Boolean(preStreamPending || sending || isSending || isAssistantStreaming || isResponding)
-    // The ring should be visible for the full "user sent -> agent finished" lifecycle,
-    // including the pre-stream gap before the first server streaming/turn events arrive.
-    const showLoaderRing = Boolean(shouldShowStop)
-
-    // Track last known conversationId to enable stop during pre-stream window
+    // Track last known conversationId to enable stop during pre-stream window and to bridge route transitions
     const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
     useEffect(() => {
       if (conversationId) {
         lastConversationIdRef.current = conversationId
       }
     }, [conversationId])
-    // Hide pre-stream indicator when not active
-    useEffect(() => {
-      // IMPORTANT: Do NOT clear preStreamPending just because we haven't observed
-      // remote streaming/turn state yet. That pre-stream gap is exactly what this
-      // flag is meant to cover, and clearing it causes a flicker back to "Send".
-      //
-      // Instead, clear it only once we see the stream/turn actually become active;
-      // after that, the UI will remain driven by isResponding/isAssistantStreaming.
-      if (!preStreamPending) return
-      if (isAssistantStreaming || isResponding) {
-        setPreStreamPending(false)
-      }
-    }, [preStreamPending, isAssistantStreaming, isResponding])
+
+    // Store-driven "busy" state. This should be the single source of truth for loaders
+    // across route transitions and streaming lifecycle.
+    // NOTE: during the /conversations -> /conversations/:id transition, the prop `conversationId`
+    // can briefly be null even though we've already created a conversation and started a turn.
+    // Use `lastConversationIdRef` as a fallback so loader/stop state doesn't flicker off.
+    const effectiveConversationId = conversationId ?? lastConversationIdRef.current ?? null
+    const storeIsSending = useStarshipUIStore(s => (effectiveConversationId ? Boolean(s.conversations[effectiveConversationId]?.isSending) : false))
+    const storeIsResponding = useStarshipUIStore(s => (effectiveConversationId ? Boolean(s.conversations[effectiveConversationId]?.isResponding) : false))
+
+    // Block input from the moment user sends until streaming completes.
+    //
+    // IMPORTANT:
+    // During the /conversations -> /conversations/:id route handoff, the *new* input instance can render
+    // before the UI store receives the optimistic `setConversationMeta(busy)` call. In that window,
+    // store flags can be false even though streamedQuery already indicates responding.
+    //
+    // So we treat hook-level flags as a fallback even when an id exists.
+    const hookBusy = Boolean(isSending || isResponding || isAssistantStreaming)
+    const storeBusy = Boolean(effectiveConversationId && (storeIsSending || storeIsResponding))
+    const isStreamingEffective = Boolean(sending || storeBusy || hookBusy)
+    const shouldShowStop = Boolean(sending || storeBusy || hookBusy)
+    const showLoaderRing = Boolean(shouldShowStop)
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
@@ -220,10 +223,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Sync ref from state, but preserve manual blocking during pre-stream window
       // Only sync when streaming is actually active OR when we're in idle state (not pre-stream pending)
       // This prevents the ref from being reset to false when conversationId changes during first message creation
-      if (isStreamingEffective || !preStreamPending) {
-        streamingRef.current = isStreamingEffective
-      }
-    }, [isStreamingEffective, preStreamPending])
+      streamingRef.current = isStreamingEffective
+    }, [isStreamingEffective])
     useEffect(() => {
       sendingRef.current = sending
     }, [sending])
@@ -308,13 +309,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       streamingRef.current = true
       // Then set state (async, but ref already blocks)
       setSending(true)
-      setPreStreamPending(true)
+
+      // Track the active conversation id within this send attempt (handles "create conversation" path)
+      let sendConversationId: string | null = conversationId ?? null
 
       // Helper to reset flags if validation fails
       const resetFlags = () => {
         setSending(false)
-        setPreStreamPending(false)
         streamingRef.current = false
+        // If we already created a conversation and marked it busy in the store, clear it.
+        try {
+          const cid = sendConversationId
+          if (cid) {
+            useStarshipUIStore.getState().setConversationMeta(cid, {
+              isSending: false,
+              isResponding: false,
+              isAwaitingAssistant: false,
+              isAssistantStreaming: false,
+            })
+          }
+        } catch {}
       }
 
       // Enforce presence of a leading @mention chip in the editor
@@ -365,6 +379,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       try {
         // Create conversation if one doesn't exist
         let currentConversationId = conversationId
+        let createdNewConversation = false
         if (!currentConversationId) {
           const newConversation = await createConversation.mutateAsync({
             title: `Chat with ${effectiveAgent.name}`,
@@ -372,14 +387,72 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             agentSlug: effectiveAgent.slug,
           })
           currentConversationId = newConversation.id
-          onConversationStart?.(currentConversationId!)
+          sendConversationId = currentConversationId
+          createdNewConversation = true
         }
+        sendConversationId = currentConversationId!
         // Ensure local ref is updated immediately for stop button usability
         lastConversationIdRef.current = currentConversationId!
 
         // Set agent information in store
         const { setConversationAgent } = useStarshipUIStore.getState()
         setConversationAgent(currentConversationId!, effectiveAgent.id, effectiveAgent.name)
+
+        // Mark the conversation as busy in the central store immediately.
+        // This keeps loaders active across route changes and any pre-send work (uploads).
+        try {
+          useStarshipUIStore.getState().setConversationMeta(currentConversationId!, {
+            isSending: true,
+            isResponding: true,
+            isAwaitingAssistant: true,
+            isAssistantStreaming: false,
+            lastActivityAt: new Date().toISOString(),
+          })
+        } catch {}
+
+        // CRITICAL: pre-seed the streamed cache with a temp user message + local turn_started
+        // BEFORE uploads / sendMessageFn() so the stream-derived responder state does not
+        // briefly drop to idle during the /conversations -> /conversations/:id route change.
+        try {
+          const now = new Date().toISOString()
+          const tempUser: any = {
+            id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            role: 'user',
+            content: contentToSend,
+            createdAt: now,
+            updatedAt: now,
+            messageType: 'user_input',
+            agentId: effectiveAgent!.id,
+          }
+          // Also reflect immediately in the UI store so the message appears instantly.
+          try {
+            useStarshipUIStore.getState().appendMessage(currentConversationId!, tempUser)
+          } catch {}
+          // Seed streamedQuery chunks; sendMessageMutation.onMutate will detect and avoid duplicating this.
+          queryClient.setQueryData(['conversations', 'detail', currentConversationId!, 'messages'], (old: any[] | undefined) => {
+            const next = Array.isArray(old) ? old.slice() : []
+            const last = next.length > 0 ? next[next.length - 1] : null
+            const prev = next.length > 1 ? next[next.length - 2] : null
+            const already =
+              last?.type === 'turn_started' &&
+              last?.payload?.local === true &&
+              prev?.type === 'append' &&
+              prev?.message?.role === 'user' &&
+              typeof prev?.message?.id === 'string' &&
+              String(prev.message.id).startsWith('temp-user-') &&
+              String(prev?.message?.content ?? '') === String(contentToSend)
+            if (already) return next
+            next.push({ type: 'append', message: tempUser })
+            next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
+            return next
+          })
+        } catch {}
+
+        // IMPORTANT: only after we seed store + cache do we trigger the route transition.
+        // This ensures the /conversations/:id page mounts into an already-busy conversation.
+        if (createdNewConversation) {
+          onConversationStart?.(currentConversationId!)
+        }
 
         // Clear only the text content, preserve the mention
         setMessage('')
@@ -470,7 +543,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
             // Restore message on error
             setMessage(messageToSend)
-            setPreStreamPending(false)
+            // Clear store busy flags on failure
+            try {
+              useStarshipUIStore.getState().setConversationMeta(currentConversationId!, {
+                isSending: false,
+                isResponding: false,
+                isAwaitingAssistant: false,
+                isAssistantStreaming: false,
+              })
+            } catch {}
           })
           .finally(() => {
             setSending(false)
@@ -486,7 +567,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
-        setPreStreamPending(false)
+        // Clear store busy flags on immediate failure when we may have created a conversation
+        try {
+          const cid = sendConversationId
+          if (cid) {
+            useStarshipUIStore.getState().setConversationMeta(cid, {
+              isSending: false,
+              isResponding: false,
+              isAwaitingAssistant: false,
+              isAssistantStreaming: false,
+            })
+          }
+        } catch {}
         streamingRef.current = false
       }
     }, [
@@ -504,6 +596,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       onAgentChange,
       starshipAgents,
+      queryClient,
     ])
 
     // Handle suggestion clicks
@@ -516,13 +609,25 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = true
         // Then set state (async, but ref already blocks)
         setSending(true)
-        setPreStreamPending(true)
+
+        let sendConversationId: string | null = conversationId ?? null
+        let createdNewConversation = false
 
         // Helper to reset flags if validation fails
         const resetFlags = () => {
           setSending(false)
-          setPreStreamPending(false)
           streamingRef.current = false
+          try {
+            const cid = sendConversationId
+            if (cid) {
+              useStarshipUIStore.getState().setConversationMeta(cid, {
+                isSending: false,
+                isResponding: false,
+                isAwaitingAssistant: false,
+                isAssistantStreaming: false,
+              })
+            }
+          } catch {}
         }
 
         // Validation for agent and starship
@@ -554,12 +659,32 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               agentSlug: selectedAgent.slug,
             })
             currentConversationId = newConversation.id
-            onConversationStart?.(currentConversationId!)
+            sendConversationId = currentConversationId
+            createdNewConversation = true
           }
+          sendConversationId = currentConversationId!
+          // Ensure local ref is updated immediately for stop button usability
+          lastConversationIdRef.current = currentConversationId!
 
           // Set agent information in store
           const { setConversationAgent } = useStarshipUIStore.getState()
           setConversationAgent(currentConversationId!, selectedAgent.id, selectedAgent.name)
+
+          // Mark the conversation as busy in the central store immediately (bridges create->send gap)
+          try {
+            useStarshipUIStore.getState().setConversationMeta(currentConversationId!, {
+              isSending: true,
+              isResponding: true,
+              isAwaitingAssistant: true,
+              isAssistantStreaming: false,
+              lastActivityAt: new Date().toISOString(),
+            })
+          } catch {}
+
+          // Trigger the route transition only after marking store busy.
+          if (createdNewConversation) {
+            onConversationStart?.(currentConversationId!)
+          }
 
           /* optimistic append skipped (server-SSE will add user message) */
 
@@ -584,7 +709,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
             .catch(error => {
               toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
-              setPreStreamPending(false)
+              try {
+                useStarshipUIStore.getState().setConversationMeta(currentConversationId!, {
+                  isSending: false,
+                  isResponding: false,
+                  isAwaitingAssistant: false,
+                  isAssistantStreaming: false,
+                })
+              } catch {}
               streamingRef.current = false
             })
             .finally(() => {
@@ -595,7 +727,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch (error) {
           toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
           setSending(false)
-          setPreStreamPending(false)
+          try {
+            const cid = sendConversationId
+            if (cid) {
+              useStarshipUIStore.getState().setConversationMeta(cid, {
+                isSending: false,
+                isResponding: false,
+                isAwaitingAssistant: false,
+                isAssistantStreaming: false,
+              })
+            }
+          } catch {}
           streamingRef.current = false
         }
       },
@@ -1809,13 +1951,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const docContent = Array.isArray(json?.content) ? json.content : []
         const firstBlock = docContent[0]
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
-        try {
-          const summary = blockContent
-            .slice(0, 4)
-            .map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs }))
-            .flat()
-          console.debug('[MessageInput.ensureLeadingAgentMention] current first paragraph', summary)
-        } catch {}
 
         // Always derive the mention from the current selected agent rather than
         // reusing whatever mention node happens to be in the document. This keeps
@@ -2220,7 +2355,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     onClick={() => {
                       const id = lastConversationIdRef.current
                       if (!id) return
-                      setPreStreamPending(false)
                       void stopConversation(id)
                     }}
                     variant="outline"

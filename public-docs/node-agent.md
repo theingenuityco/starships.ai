@@ -25,31 +25,39 @@ Generated default blueprint (when omitted)
   - llm (ref: "ai_assistant") with `messages: {{ state.messages }}`, `tools: {{ state.tools }}`
   - conditional ("Check Tool Calls") which returns:
     - "continue" (if finishReason === "length")
-    - "call_tool" (if a tool call is present and allowed by state.tools)
-    - "tool_not_allowed" (if tool call present but not in state.tools)
+    - "init_tool_calls" (if one or more tool calls are present)
     - "complete" otherwise
-  - code ("Prepare Tool Args") — materializes tool arguments from LLM message into a plain object
-  - tool ("Execute Tool") — name/description/schema/blueprint resolved from `state.tools` matching the LLM’s tool call slug
-  - mutate ("Add Tool Result") — appends `{ role: 'tool', toolCallId, content }` to `state.messages`
-  - mutate ("Handle Disallowed Tool") — appends structured error tool message to `state.messages`
+  - mutate ("Init Tool Calls Batch") — stores `pendingToolCalls` and resets `pendingToolCallIndex` to 0
+  - conditional ("Process Tool Calls") which returns:
+    - "call_tool" (if current pending tool call is allowed by `state.tools`)
+    - "tool_not_allowed" (if current pending tool call is not allowed)
+    - "done_tools" (when all pending tool calls have been processed)
+  - code ("Prepare Tool Args") — materializes current pending tool call arguments into a plain object
+  - tool ("Execute Tool") — resolves name/description/schema/blueprint from `state.tools` by slug for the current pending tool call
+  - mutate ("Add Tool Result") — appends `{ role: 'tool', toolCallId, content }` and advances `pendingToolCallIndex`
+  - mutate ("Handle Disallowed Tool") — appends structured error tool message and advances `pendingToolCallIndex`
   - end ("End")
 - Edges:
   - start → llm
   - llm → conditional
   - conditional → llm on "continue"
-  - conditional → code on "call_tool"
+  - conditional → mutate (Init Tool Calls Batch) on "init_tool_calls"
+  - conditional → end on "complete"
+  - mutate (Init Tool Calls Batch) → conditional (Process Tool Calls)
+  - conditional (Process Tool Calls) → code on "call_tool"
   - code → tool
   - tool → mutate (Add Tool Result)
-  - mutate (Add Tool Result) → llm
-  - conditional → mutate (Handle Disallowed Tool) on "tool_not_allowed"
-  - mutate (Handle Disallowed Tool) → llm
-  - conditional → end on "complete"
+  - mutate (Add Tool Result) → conditional (Process Tool Calls)
+  - conditional (Process Tool Calls) → mutate (Handle Disallowed Tool) on "tool_not_allowed"
+  - mutate (Handle Disallowed Tool) → conditional (Process Tool Calls)
+  - conditional (Process Tool Calls) → llm on "done_tools"
 
 Execution behavior
 - Execution state is created; `state` (messages/tools) is merged into `execution.state`.
 - Ordered messages:
   - systemPrompt (if provided) → state.messages → input messages (if input is `LlmMessage[]`)
 - `state.tools` is stored in `execution.state.tools` for use in LLM node templates.
+- When the LLM returns multiple tool calls in a single response, they are executed sequentially (in-order) before resuming the LLM.
 - Depth-aware runner selection; events from nested nodes stream through.
 - Validates required fields (name, model) and blueprint start node presence.
 

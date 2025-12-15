@@ -120,10 +120,51 @@ export class Agent implements NodeHandler {
     const conditionalNodeRef = builder.addNode({
       type: 'conditional',
       name: 'Check Tool Calls',
-      description: 'Check if LLM made any tool calls or needs to continue due to length finishReason',
+      description: 'Route after LLM: continue on length, initialize tool-call batch, or complete',
       parameters: {
         condition:
-          '{{(() => { const last = input; const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; const calls = last?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const allowed = slug ? tools.some(t => t && typeof t.slug === "string" && t.slug === String(slug) && t.blueprint) : false; if (slug) { return allowed ? "call_tool" : "tool_not_allowed"; } if (fr==="tool_calls") { return "tool_not_allowed"; } return Array.isArray(calls) && calls.length > 0 ? "tool_not_allowed" : "complete"; })()}}',
+          '{{(() => { const last = lastOutputOf("ai_assistant"); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "init_tool_calls" : "complete"; })()}}',
+      },
+    });
+
+    // Initialize pending tool calls batch in state (from the last LLM response)
+    const initToolCallsNodeRef = builder.addNode({
+      type: 'mutate',
+      name: 'Init Tool Calls Batch',
+      description: 'Store toolCalls[] and reset index for sequential execution',
+      parameters: {
+        reducers: [
+          `
+          (state, ctx) => {
+            const last = ctx.lastOutputOf("${llmNodeRef}") || {};
+            const calls = last?.choices?.[0]?.message?.toolCalls;
+            const pending = Array.isArray(calls) ? calls : [];
+            const next = { ...(state || {}) };
+            next.pendingToolCalls = pending;
+            next.pendingToolCallIndex = 0;
+            return next;
+          }
+          `,
+        ],
+      },
+    });
+
+    // Conditional node for per-tool execution loop (sequentially process pendingToolCalls)
+    const toolLoopConditionalRef = builder.addNode({
+      type: 'conditional',
+      name: 'Process Tool Calls',
+      description: 'Execute pending tool calls sequentially (allowed/disallowed) until done, then resume LLM',
+      parameters: {
+        condition: `{{(() => {
+          const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+          const rawIdx = state?.pendingToolCallIndex;
+          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+          if (!pending.length || idx >= pending.length) return "done_tools";
+          const slug = pending?.[idx]?.function?.name;
+          const tools = Array.isArray(state?.tools) ? state.tools : [];
+          const allowed = slug ? tools.some(t => t && typeof t.slug === "string" && t.slug === String(slug) && t.blueprint) : false;
+          return allowed ? "call_tool" : "tool_not_allowed";
+        })()}}`,
       },
     });
 
@@ -131,12 +172,15 @@ export class Agent implements NodeHandler {
     const argsNodeRef = builder.addNode({
       type: 'code',
       name: 'Prepare Tool Args',
-      description: 'Materialize arguments into a plain object for Tool input',
+      description: 'Materialize current pending tool call arguments into a plain object for Tool input',
       parameters: {
         code: `
         async function main(ctx) {
-          const last = ctx.lastOutputOf("${llmNodeRef}") || {};
-          let j = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.arguments;
+          const pending = Array.isArray(ctx.state?.pendingToolCalls) ? ctx.state.pendingToolCalls : [];
+          const rawIdx = ctx.state?.pendingToolCallIndex;
+          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+          const tc = pending?.[idx];
+          let j = tc?.function?.arguments;
           if (typeof j === 'string') { try { j = JSON.parse(j); } catch {}
           }
           if (j && typeof j === 'object') { return j; }
@@ -154,11 +198,11 @@ export class Agent implements NodeHandler {
       description: 'Execute tool',
       ref: toolNodeRef,
       parameters: {
-        name: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.name ?? (slug ?? ""); })() }}`,
-        description: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.description ?? ("Tool '" + (slug ?? "unknown") + "' not found"); })() }}`,
-        parameters: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
-        blueprint: `{{ (() => { const calls = lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls; const slug = calls?.[0]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.blueprint; })() }}`,
-        toolCallId: `{{ lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? "" }}`,
+        name: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; const slug = pending?.[idx]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.name ?? (slug ?? ""); })() }}`,
+        description: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; const slug = pending?.[idx]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.description ?? ("Tool '" + (slug ?? "unknown") + "' not found"); })() }}`,
+        parameters: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; const slug = pending?.[idx]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.parameters ?? ({ type: "object", properties: {} }); })() }}`,
+        blueprint: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; const slug = pending?.[idx]?.function?.name; const tools = Array.isArray(state?.tools) ? state.tools : []; const tool = tools.find(t => t && typeof t.slug === 'string' && t.slug === String(slug ?? '')); return tool?.blueprint; })() }}`,
+        toolCallId: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return pending?.[idx]?.id ?? ""; })() }}`,
       },
     });
 
@@ -166,16 +210,27 @@ export class Agent implements NodeHandler {
     const toolResultNodeRef = builder.addNode({
       type: 'mutate',
       name: 'Add Tool Result',
-      description: 'Add tool result message to conversation state',
+      description: 'Append tool result and advance to the next pending tool call',
       parameters: {
         reducers: [
           `
           (state, ctx) => {
-            const toolCallId = ctx.lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
+            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+            const rawIdx = state?.pendingToolCallIndex;
+            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+            const tc = pending?.[idx];
+            const toolCallId = tc?.id ?? '';
             const toolResult = ctx.lastOutputOf("${toolNodeRef}") ?? {};
             const content = (typeof toolResult === 'string') ? toolResult : JSON.stringify(toolResult);
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            const nextIdx = idx + 1;
+            if (pending.length > 0 && nextIdx >= pending.length) {
+              next.pendingToolCalls = [];
+              next.pendingToolCallIndex = 0;
+            } else {
+              next.pendingToolCallIndex = nextIdx;
+            }
             return next;
           }
           `,
@@ -187,18 +242,28 @@ export class Agent implements NodeHandler {
     const notAllowedNodeRef = builder.addNode({
       type: 'mutate',
       name: 'Handle Disallowed Tool',
-      description: 'Append tool result error when tool call is not assigned to this agent',
+      description: 'Append tool result error for current pending tool call and advance',
       parameters: {
         reducers: [
           `
           (state, ctx) => {
-            const last = ctx.lastOutputOf("${llmNodeRef}") || {};
-            const slug = last?.choices?.[0]?.message?.toolCalls?.[0]?.function?.name ?? 'unknown';
-            const toolCallId = last?.choices?.[0]?.message?.toolCalls?.[0]?.id ?? '';
+            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+            const rawIdx = state?.pendingToolCallIndex;
+            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+            const tc = pending?.[idx];
+            const slug = tc?.function?.name ?? 'unknown';
+            const toolCallId = tc?.id ?? '';
             const next = { ...(state || {}) };
             const payload = { ok: false, error: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." };
             const content = JSON.stringify(payload);
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            const nextIdx = idx + 1;
+            if (pending.length > 0 && nextIdx >= pending.length) {
+              next.pendingToolCalls = [];
+              next.pendingToolCallIndex = 0;
+            } else {
+              next.pendingToolCallIndex = nextIdx;
+            }
             return next;
           }
           `,
@@ -211,13 +276,16 @@ export class Agent implements NodeHandler {
       .addEdge(startRef, llmNodeRef)
       .addEdge(llmNodeRef, conditionalNodeRef)
       .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
-      .addEdge(conditionalNodeRef, notAllowedNodeRef, 'tool_not_allowed')
-      .addEdge(notAllowedNodeRef, llmNodeRef)
-      .addEdge(conditionalNodeRef, argsNodeRef, 'call_tool')
+      .addEdge(conditionalNodeRef, initToolCallsNodeRef, 'init_tool_calls')
+      .addEdge(conditionalNodeRef, endRef, 'complete')
+      .addEdge(initToolCallsNodeRef, toolLoopConditionalRef)
+      .addEdge(toolLoopConditionalRef, argsNodeRef, 'call_tool')
       .addEdge(argsNodeRef, toolNodeRef)
       .addEdge(toolNodeRef, toolResultNodeRef)
-      .addEdge(toolResultNodeRef, llmNodeRef)
-      .addEdge(conditionalNodeRef, endRef, 'complete')
+      .addEdge(toolResultNodeRef, toolLoopConditionalRef)
+      .addEdge(toolLoopConditionalRef, notAllowedNodeRef, 'tool_not_allowed')
+      .addEdge(notAllowedNodeRef, toolLoopConditionalRef)
+      .addEdge(toolLoopConditionalRef, llmNodeRef, 'done_tools')
       .setMetadata('generatedBy', 'Agent constructor')
       .build();
   }

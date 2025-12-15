@@ -65,10 +65,12 @@
       "@eslint/plugin-kit@<0.3.4": ">=0.3.4"
     },
     "onlyBuiltDependencies": [
+      "@sentry/cli",
       "@tailwindcss/oxide",
-      "core-js-pure",
+      "bcrypt",
       "cpu-features",
       "esbuild",
+      "msgpackr-extract",
       "protobufjs",
       "sharp",
       "ssh2",

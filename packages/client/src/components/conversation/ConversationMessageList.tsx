@@ -10,8 +10,7 @@ import type { MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationStreamed, useConversationAgents } from '@/hooks/useConversations'
-import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
+import { useConversationAgents } from '@/hooks/useConversations'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
@@ -27,26 +26,32 @@ interface ConversationMessageListProps {
 }
 
 export function ConversationMessageList({ conversationId, starshipId, bottomPaddingPx }: ConversationMessageListProps) {
-  // Render purely from the Zustand UI store. The subscription to query + SSE is driven elsewhere (e.g., input).
+  // Render purely from the Zustand UI store.
+  // SSE + streamedQuery subscriptions are driven elsewhere (ConversationStreamProvider / input),
+  // and are responsible for syncing messages + responding state into the store.
   const isLoading = false
   const error: any = null
-  const ctx = useConversationStreamContextOptional()
-  const fallbackStream = useConversationStreamed(conversationId, undefined, { enabled: !ctx })
-  const { messages, isResponding: isRespondingHook, isFetching: isFetchingHook, hasCompleteEvent: hasCompleteEventHook } = ctx ?? fallbackStream
+
+  const messages = useStarshipUIStore(state => {
+    if (!conversationId) return EMPTY_MESSAGES as any
+    return (state.conversations[conversationId]?.messages as any) || EMPTY_MESSAGES
+  })
 
   // Use stable selectors to avoid returning new objects each render
-  // messages are sourced from useConversationStreamed(conversationId)
   const storeAgentName = useStarshipUIStore(state => {
     if (!conversationId) return undefined
     return state.conversations[conversationId]?.agentName
+  })
+  const isResponding = useStarshipUIStore(state => {
+    if (!conversationId) return false
+    return Boolean(state.conversations[conversationId]?.isResponding)
   })
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
   const agentName = storeAgentName || agentObj?.name
-  const isResponding = isRespondingHook
-  const isFetching = isFetchingHook
-  const hasCompleteEvent = !!hasCompleteEventHook
+  const isFetching = false
+  const hasCompleteEvent = false
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)

@@ -166,13 +166,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const fallbackStream = useConversationStreamed(conversationId ?? null, starshipId, { enabled: !streamCtx })
     const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming } = streamCtx ?? fallbackStream
     const stopConversation = useConversationStop()
-    // Show stop button during pre-stream window and while streaming/responding
-    const [preStreamPending, setPreStreamPending] = useState(false)
-    // Block input from the moment user sends until streaming completes (covers pre-stream gap)
-    const isStreamingEffective = Boolean(isSending || preStreamPending || isResponding)
-    const shouldShowStop = Boolean(preStreamPending || sending || isSending || isAssistantStreaming || isResponding)
-    // The ring should be visible for the full "user sent -> agent finished" lifecycle,
-    // including the pre-stream gap before the first server streaming/turn events arrive.
+    // Store-driven "busy" state. This should be the single source of truth for loaders
+    // across route transitions and streaming lifecycle.
+    const storeIsSending = useStarshipUIStore(s => (conversationId ? Boolean(s.conversations[conversationId]?.isSending) : false))
+    const storeIsResponding = useStarshipUIStore(s => (conversationId ? Boolean(s.conversations[conversationId]?.isResponding) : false))
+
+    // Block input from the moment user sends until streaming completes.
+    // When a conversation id exists, rely on the central store; otherwise fall back to local send state
+    // (covers "create conversation" window where we don't yet have an id).
+    const isStreamingEffective = Boolean((conversationId && (storeIsSending || storeIsResponding)) || (!conversationId && (sending || isSending || isResponding)))
+    const shouldShowStop = Boolean(conversationId && (storeIsSending || storeIsResponding))
     const showLoaderRing = Boolean(shouldShowStop)
 
     // Track last known conversationId to enable stop during pre-stream window
@@ -182,19 +185,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         lastConversationIdRef.current = conversationId
       }
     }, [conversationId])
-    // Hide pre-stream indicator when not active
-    useEffect(() => {
-      // IMPORTANT: Do NOT clear preStreamPending just because we haven't observed
-      // remote streaming/turn state yet. That pre-stream gap is exactly what this
-      // flag is meant to cover, and clearing it causes a flicker back to "Send".
-      //
-      // Instead, clear it only once we see the stream/turn actually become active;
-      // after that, the UI will remain driven by isResponding/isAssistantStreaming.
-      if (!preStreamPending) return
-      if (isAssistantStreaming || isResponding) {
-        setPreStreamPending(false)
-      }
-    }, [preStreamPending, isAssistantStreaming, isResponding])
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
@@ -220,10 +210,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Sync ref from state, but preserve manual blocking during pre-stream window
       // Only sync when streaming is actually active OR when we're in idle state (not pre-stream pending)
       // This prevents the ref from being reset to false when conversationId changes during first message creation
-      if (isStreamingEffective || !preStreamPending) {
-        streamingRef.current = isStreamingEffective
-      }
-    }, [isStreamingEffective, preStreamPending])
+      streamingRef.current = isStreamingEffective
+    }, [isStreamingEffective])
     useEffect(() => {
       sendingRef.current = sending
     }, [sending])
@@ -308,12 +296,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       streamingRef.current = true
       // Then set state (async, but ref already blocks)
       setSending(true)
-      setPreStreamPending(true)
 
       // Helper to reset flags if validation fails
       const resetFlags = () => {
         setSending(false)
-        setPreStreamPending(false)
         streamingRef.current = false
       }
 
@@ -470,7 +456,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
             // Restore message on error
             setMessage(messageToSend)
-            setPreStreamPending(false)
           })
           .finally(() => {
             setSending(false)
@@ -486,7 +471,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
-        setPreStreamPending(false)
         streamingRef.current = false
       }
     }, [
@@ -516,12 +500,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = true
         // Then set state (async, but ref already blocks)
         setSending(true)
-        setPreStreamPending(true)
 
         // Helper to reset flags if validation fails
         const resetFlags = () => {
           setSending(false)
-          setPreStreamPending(false)
           streamingRef.current = false
         }
 
@@ -584,7 +566,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
             .catch(error => {
               toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
-              setPreStreamPending(false)
               streamingRef.current = false
             })
             .finally(() => {
@@ -595,7 +576,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         } catch (error) {
           toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
           setSending(false)
-          setPreStreamPending(false)
           streamingRef.current = false
         }
       },
@@ -2220,7 +2200,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     onClick={() => {
                       const id = lastConversationIdRef.current
                       if (!id) return
-                      setPreStreamPending(false)
                       void stopConversation(id)
                     }}
                     variant="outline"

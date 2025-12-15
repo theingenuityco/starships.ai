@@ -28,6 +28,13 @@ interface ConversationData {
   lastActivityAt?: string
   agentId?: string
   agentName?: string
+  // Stream / turn state (UI derived, store-authoritative)
+  isSending?: boolean
+  isResponding?: boolean
+  isAssistantStreaming?: boolean
+  isAwaitingAssistant?: boolean
+  // Internal: lightweight signature to prevent no-op updates causing render loops
+  __sig?: string
 }
 
 interface StarshipUIState {
@@ -44,6 +51,7 @@ interface StarshipUIState {
 
   // Conversation data actions (UI-driven from TanStack and SSE)
   setConversationSnapshot: (conversationId: string, data: ConversationData) => void
+  setConversationMeta: (conversationId: string, meta: Partial<ConversationData>) => void
   appendMessage: (conversationId: string, message: UIMessage) => void
   updateMessageAt: (conversationId: string, index: number, updater: Partial<UIMessage> | ((m: UIMessage) => UIMessage)) => void
   appendMessageChunk: (conversationId: string, index: number, chunk: UIStreamChunk) => void
@@ -82,6 +90,44 @@ export const useStarshipUIStore = create<StarshipUIState>()(
           set(
             state => {
               const prev = state.conversations[conversationId]
+              const nextMessages = Array.isArray(data.messages) ? data.messages : []
+              const nextTotal = typeof data.total === 'number' ? data.total : nextMessages.length
+              const last: any = nextMessages.length > 0 ? nextMessages[nextMessages.length - 1] : null
+              const lastId = last?.id != null ? String(last.id) : ''
+              const lastUpdatedAt = String(last?.updatedAt || last?.createdAt || '')
+              const lastStreaming = last?.role === 'assistant' ? (last as any)?.streaming === true : false
+              // Include streaming progress so we re-render while assistant is streaming.
+              // Without this, the snapshot can look "unchanged" (same id/updatedAt) even though
+              // chunks are growing, which makes the UI only update at completion.
+              const lastChunksLen = last?.role === 'assistant' && Array.isArray((last as any)?.chunks) ? Number((last as any).chunks.length) : 0
+              const lastRChunksLen = last?.role === 'assistant' && Array.isArray((last as any)?.reasoningChunks) ? Number((last as any).reasoningChunks.length) : 0
+              const lastChunkTs =
+                lastChunksLen > 0 && last?.role === 'assistant'
+                  ? String((last as any)?.chunks?.[lastChunksLen - 1]?.timestamp ?? '')
+                  : ''
+              const lastRChunkTs =
+                lastRChunksLen > 0 && last?.role === 'assistant'
+                  ? String((last as any)?.reasoningChunks?.[lastRChunksLen - 1]?.timestamp ?? '')
+                  : ''
+              const nextSig = [
+                'v1',
+                nextTotal,
+                lastId,
+                lastUpdatedAt,
+                lastStreaming ? 1 : 0,
+                lastChunksLen,
+                lastChunkTs,
+                lastRChunksLen,
+                lastRChunkTs,
+                data.isSending ? 1 : 0,
+                data.isResponding ? 1 : 0,
+                data.isAssistantStreaming ? 1 : 0,
+                data.isAwaitingAssistant ? 1 : 0,
+              ].join('|')
+
+              // If nothing meaningful changed, return the SAME state object (no notifications).
+              if (prev?.__sig === nextSig) return state
+
               return {
                 conversations: {
                   ...state.conversations,
@@ -89,16 +135,55 @@ export const useStarshipUIStore = create<StarshipUIState>()(
                     // Preserve only allowed metadata
                     agentId: prev?.agentId,
                     agentName: prev?.agentName,
+                    isSending: typeof data.isSending === 'boolean' ? data.isSending : prev?.isSending,
+                    isResponding: typeof data.isResponding === 'boolean' ? data.isResponding : prev?.isResponding,
+                    isAssistantStreaming: typeof data.isAssistantStreaming === 'boolean' ? data.isAssistantStreaming : prev?.isAssistantStreaming,
+                    isAwaitingAssistant: typeof data.isAwaitingAssistant === 'boolean' ? data.isAwaitingAssistant : prev?.isAwaitingAssistant,
                     // Override with the latest snapshot fields
-                    messages: Array.isArray(data.messages) ? data.messages : [],
-                    total: typeof data.total === 'number' ? data.total : Array.isArray(data.messages) ? data.messages.length : 0,
+                    messages: nextMessages,
+                    total: nextTotal,
                     lastActivityAt: data.lastActivityAt,
+                    __sig: nextSig,
                   },
                 },
               }
             },
             false,
             'convo/setSnapshot'
+          ),
+
+        setConversationMeta: (conversationId: string, meta: Partial<ConversationData>) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId] || { messages: [], total: 0 }
+              // If meta is a no-op (common when multiple layers race), avoid notifying.
+              const nextIsSending = typeof meta.isSending === 'boolean' ? meta.isSending : current.isSending
+              const nextIsResponding = typeof meta.isResponding === 'boolean' ? meta.isResponding : current.isResponding
+              const nextIsAssistantStreaming = typeof meta.isAssistantStreaming === 'boolean' ? meta.isAssistantStreaming : current.isAssistantStreaming
+              const nextIsAwaitingAssistant = typeof meta.isAwaitingAssistant === 'boolean' ? meta.isAwaitingAssistant : current.isAwaitingAssistant
+              const nextLastActivityAt = meta.lastActivityAt ?? current.lastActivityAt
+              const noChange =
+                nextIsSending === current.isSending &&
+                nextIsResponding === current.isResponding &&
+                nextIsAssistantStreaming === current.isAssistantStreaming &&
+                nextIsAwaitingAssistant === current.isAwaitingAssistant &&
+                nextLastActivityAt === current.lastActivityAt
+              if (noChange) return state
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: {
+                    ...current,
+                    ...meta,
+                    // Protect invariants
+                    messages: Array.isArray(meta.messages) ? (meta.messages as any) : current.messages,
+                    total: typeof meta.total === 'number' ? meta.total : current.total,
+                  },
+                },
+              }
+            },
+            false,
+            'convo/setMeta'
           ),
 
         appendMessage: (conversationId: string, message: UIMessage) =>

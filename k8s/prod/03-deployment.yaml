@@ -213,41 +213,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GOOGLE_CLIENT_SECRET
-            - name: LINKEDIN_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: LINKEDIN_CLIENT_ID
-            - name: LINKEDIN_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: LINKEDIN_CLIENT_SECRET
-            - name: GOOGLE_DRIVE_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GOOGLE_DRIVE_CLIENT_ID
-            - name: GOOGLE_DRIVE_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GOOGLE_DRIVE_CLIENT_SECRET
-            - name: DISCORD_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DISCORD_CLIENT_ID
-            - name: DISCORD_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DISCORD_CLIENT_SECRET
-            - name: DISCORD_BOT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DISCORD_BOT_TOKEN
 
             # Email
             - name: EMAIL_FROM_ADDRESS

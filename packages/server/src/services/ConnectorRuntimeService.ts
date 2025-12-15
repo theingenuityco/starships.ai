@@ -71,7 +71,7 @@ export class ConnectorRuntimeService {
        * - There is no per-starship access token to read from decrypted env
        */
       if (provider === 'discord') {
-        const botToken = (await this.platformSecretService.getSecret('DISCORD_BOT_TOKEN')) || env.DISCORD_BOT_TOKEN;
+        const botToken = await this.platformSecretService.getSecret('DISCORD_BOT_TOKEN');
         if (!botToken || typeof botToken !== 'string' || !botToken.trim()) {
           continue;
         }

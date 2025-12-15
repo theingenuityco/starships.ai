@@ -1,5 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { IdSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
@@ -13,6 +13,17 @@ import { StarshipService } from '@/services/StarshipService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 
 const router: Router = Router();
+
+function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+    sendError(res, 'FORBIDDEN', 'Only instance admins can access agent approvals', 403);
+    return;
+  }
+  next();
+}
+
+// Enforce auth + instance-admin for all agent publication approval endpoints.
+router.use('/admin/agents', jwtAuthMiddleware, requireInstanceAdminMiddleware);
 
 // Zod schemas for validation
 // Using standard pagination schema for consistency
@@ -582,13 +593,8 @@ router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async
 // ============================================================================
 
 // GET /admin/agents/pending - List agents pending approval
-router.get('/admin/agents/pending', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/admin/agents/pending', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can view pending agents', 403);
-      return;
-    }
-
     const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
     if (!queryValidation) return;
 
@@ -603,13 +609,8 @@ router.get('/admin/agents/pending', jwtAuthMiddleware, async (req: Request, res:
 });
 
 // GET /admin/agents/:id/tools - List tools pending publication for a specific agent
-router.get('/admin/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/admin/agents/:id/tools', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can view pending agent tools', 403);
-      return;
-    }
-
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
@@ -625,13 +626,8 @@ router.get('/admin/agents/:id/tools', jwtAuthMiddleware, async (req: Request, re
 });
 
 // POST /admin/agents/:id/approve - Approve pending agent publication
-router.post('/admin/agents/:id/approve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/admin/agents/:id/approve', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can approve agents', 403);
-      return;
-    }
-
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 
@@ -652,13 +648,8 @@ router.post('/admin/agents/:id/approve', jwtAuthMiddleware, async (req: Request,
 });
 
 // POST /admin/agents/:id/reject - Reject pending agent publication
-router.post('/admin/agents/:id/reject', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/admin/agents/:id/reject', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can reject agents', 403);
-      return;
-    }
-
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
     if (!paramValidation) return;
 

@@ -1,5 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
@@ -10,6 +10,17 @@ import type { AuthUser, PlatformSecretListResponse, PlatformSecretResponse } fro
 import { PlatformSecretRepository } from '@starships/models';
 
 const router: Router = Router();
+
+function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
+  if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+    sendError(res, 'FORBIDDEN', 'Only instance admins can access platform secrets', 403);
+    return;
+  }
+  next();
+}
+
+// Enforce auth + instance-admin for all platform secret admin endpoints.
+router.use('/admin/platform-secrets', jwtAuthMiddleware, requireInstanceAdminMiddleware);
 
 const PlatformSecretKeySchema = z
   .string()
@@ -67,13 +78,8 @@ function toSummary(entity: {
 // ============================================================================
 
 // GET /admin/platform-secrets - List platform secrets (no values returned)
-router.get('/admin/platform-secrets', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/admin/platform-secrets', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can view platform secrets', 403);
-      return;
-    }
-
     const repo = new PlatformSecretRepository();
     const secrets = await repo.list();
 
@@ -88,13 +94,8 @@ router.get('/admin/platform-secrets', jwtAuthMiddleware, async (req: Request, re
 });
 
 // POST /admin/platform-secrets - Create a new platform secret
-router.post('/admin/platform-secrets', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/admin/platform-secrets', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can create platform secrets', 403);
-      return;
-    }
-
     const body = validateData(CreatePlatformSecretSchema, req.body, res, 'platform secret');
     if (!body) return;
 
@@ -125,13 +126,8 @@ router.post('/admin/platform-secrets', jwtAuthMiddleware, async (req: Request, r
 });
 
 // PUT /admin/platform-secrets/:key - Update a platform secret (value and/or description)
-router.put('/admin/platform-secrets/:key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.put('/admin/platform-secrets/:key', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can update platform secrets', 403);
-      return;
-    }
-
     const params = validateData(z.object({ key: PlatformSecretKeySchema }), req.params, res, 'platform secret key');
     if (!params) return;
 
@@ -162,13 +158,8 @@ router.put('/admin/platform-secrets/:key', jwtAuthMiddleware, async (req: Reques
 });
 
 // DELETE /admin/platform-secrets/:key - Delete a platform secret
-router.delete('/admin/platform-secrets/:key', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/admin/platform-secrets/:key', async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
-      sendError(res, 'FORBIDDEN', 'Only instance admins can delete platform secrets', 403);
-      return;
-    }
-
     const params = validateData(z.object({ key: PlatformSecretKeySchema }), req.params, res, 'platform secret key');
     if (!params) return;
 

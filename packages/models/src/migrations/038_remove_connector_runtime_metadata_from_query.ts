@@ -23,9 +23,9 @@ export async function up(client: Client): Promise<void> {
               'oauth',
               (
                 CASE
-                  WHEN jsonb_typeof(COALESCE(runtime_config, '{}'::jsonb)->'oauth') = 'object'
-                    THEN (COALESCE(runtime_config, '{}'::jsonb)->'oauth' - 'metadataFromQuery')
-                  ELSE COALESCE(runtime_config, '{}'::jsonb)->'oauth'
+                  WHEN jsonb_typeof((COALESCE(runtime_config, '{}'::jsonb) -> 'oauth')) = 'object'
+                    THEN ((COALESCE(runtime_config, '{}'::jsonb) -> 'oauth') - 'metadataFromQuery')
+                  ELSE (COALESCE(runtime_config, '{}'::jsonb) -> 'oauth')
                 END
               )
             )
@@ -33,7 +33,7 @@ export async function up(client: Client): Promise<void> {
         updated_at = NOW()
       WHERE
         (COALESCE(runtime_config, '{}'::jsonb) ? 'metadataFromQuery')
-        OR (COALESCE(runtime_config, '{}'::jsonb)->'oauth' ? 'metadataFromQuery')
+        OR ((COALESCE(runtime_config, '{}'::jsonb) -> 'oauth') ? 'metadataFromQuery')
     `);
 
     await client.query('COMMIT');

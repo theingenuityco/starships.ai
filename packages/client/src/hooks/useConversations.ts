@@ -836,15 +836,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const enabledFlag = options?.enabled !== false
   // Per-hook-instance guard key (do NOT use globals; multiple instances can exist).
   const storeSyncKeyRef = useRef<string>('')
-  const dbg = useCallback(
-    (event: string, data?: any) => {
-      try {
-        // eslint-disable-next-line no-console
-        console.debug('[conv-debug][stream]', event, { conversationId, enabledFlag, ...data })
-      } catch {}
-    },
-    [conversationId, enabledFlag]
-  )
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
@@ -873,11 +864,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const chunksLen = Array.isArray(chunks) ? chunks.length : 0
   const lastChunkAny: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
   const lastChunkSig =
-    lastChunkAny?.type === 'append'
-      ? `append:${String(lastChunkAny?.message?.role || '')}:${String(lastChunkAny?.message?.id || '')}`
-      : lastChunkAny?.type
-        ? String(lastChunkAny.type)
-        : 'none'
+    lastChunkAny?.type === 'append' ? `append:${String(lastChunkAny?.message?.role || '')}:${String(lastChunkAny?.message?.id || '')}` : lastChunkAny?.type ? String(lastChunkAny.type) : 'none'
   const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
 
   const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunksRevisionKey])
@@ -1120,7 +1107,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
                 isAssistantStreaming: false,
               })
             } catch {}
-            dbg('onMutate:skipDuplicateSeed', { convId })
             return
           }
         } catch {}
@@ -1145,7 +1131,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
           return next
         })
-        dbg('onMutate:seededCache', { convId })
 
         // ALSO update the central UI store immediately so UI stays consistent during route transitions.
         try {
@@ -1158,7 +1143,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             isAssistantStreaming: false,
             lastActivityAt: now,
           })
-          dbg('onMutate:storeMetaBusy', { convId })
         } catch {}
       } catch {}
     },
@@ -1239,8 +1223,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       // Make the store flags slightly "sticky" for the active turn: if the last message is a user message and we
       // haven't seen completion/final assistant, treat it as awaiting (capped by preStreamExpired).
       const lastMsg: any = Array.isArray(computedMessages) && computedMessages.length > 0 ? computedMessages[computedMessages.length - 1] : null
-      const fallbackAwaiting =
-        !preStreamExpired && !hasCompleteEvent && !hasFinalAssistantAfterLastUser && lastMsg?.role === 'user'
+      const fallbackAwaiting = !preStreamExpired && !hasCompleteEvent && !hasFinalAssistantAfterLastUser && lastMsg?.role === 'user'
 
       const nextIsAwaitingAssistant = Boolean(isAwaitingAssistant || fallbackAwaiting)
       const nextIsResponding = Boolean(isAssistantStreaming || nextIsAwaitingAssistant)
@@ -1276,14 +1259,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           existing.isAwaitingAssistant === true ||
           existing.isAssistantStreaming === true)
       ) {
-        dbg('syncToStore:skipEmptySnapshot', {
-          syncKey,
-          existingMessages: Array.isArray(existing.messages) ? existing.messages.length : 0,
-          existingIsSending: existing.isSending,
-          existingIsResponding: existing.isResponding,
-          existingIsAwaitingAssistant: existing.isAwaitingAssistant,
-          existingIsAssistantStreaming: existing.isAssistantStreaming,
-        })
         return
       }
 
@@ -1298,15 +1273,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         isAssistantStreaming: Boolean(isAssistantStreaming),
         isAwaitingAssistant: nextIsAwaitingAssistant,
       } as any)
-      dbg('syncToStore', {
-        syncKey,
-        total: Array.isArray(computedMessages) ? computedMessages.length : 0,
-        isSending: nextIsSending,
-        isResponding: nextIsResponding,
-        isAssistantStreaming: Boolean(isAssistantStreaming),
-        isAwaitingAssistant: nextIsAwaitingAssistant,
-        fallbackAwaiting,
-      })
     } catch {}
   }, [
     conversationId,

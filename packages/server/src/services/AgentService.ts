@@ -34,7 +34,7 @@ import type {
 import { generateUniqueAgentSlug } from '@starships/models';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
-import { EnvironmentService } from './EnvironmentService';
+import { ConnectorSecretService } from './ConnectorSecretService';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
@@ -71,14 +71,16 @@ export class AgentService {
   private agentRepository: AgentRepository;
   private starshipRepository: StarshipRepository;
   private messageService: MessageService;
-  private environmentService: EnvironmentService;
+  // Kept for future use (runtime secrets, connector context, etc.)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private connectorSecretService: ConnectorSecretService;
   private connectorRuntimeService: ConnectorRuntimeService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
     this.starshipRepository = new StarshipRepository();
     this.messageService = new MessageService();
-    this.environmentService = new EnvironmentService();
+    this.connectorSecretService = new ConnectorSecretService();
     this.connectorRuntimeService = new ConnectorRuntimeService();
   }
 

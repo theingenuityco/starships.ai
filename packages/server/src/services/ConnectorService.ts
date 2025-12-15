@@ -10,12 +10,12 @@ import type {
 import {
   ConnectorTemplateRepository,
   ConnectorRepository,
-  EnvironmentRepository,
+  ConnectorSecretRepository,
   StarshipRepository,
   ConnectorTemplateEntity,
 } from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
-import { EnvironmentService } from './EnvironmentService';
+import { ConnectorSecretService } from './ConnectorSecretService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
@@ -25,21 +25,21 @@ import { PlatformSecretService } from './PlatformSecretService';
  * Connector Service - Layer 4
  *
  * Orchestrates connector configuration for starships while keeping
- * all runtime secrets in the existing environments table.
+ * all runtime secrets in the connector_secrets table.
  */
 export class ConnectorService {
   private connectorRepository: ConnectorRepository;
   private connectorTemplateRepository: ConnectorTemplateRepository;
-  private environmentRepository: EnvironmentRepository;
-  private environmentService: EnvironmentService;
+  private connectorSecretRepository: ConnectorSecretRepository;
+  private connectorSecretService: ConnectorSecretService;
   private starshipRepository: StarshipRepository;
   private platformSecretService: PlatformSecretService;
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
     this.connectorTemplateRepository = new ConnectorTemplateRepository();
-    this.environmentRepository = new EnvironmentRepository();
-    this.environmentService = new EnvironmentService();
+    this.connectorSecretRepository = new ConnectorSecretRepository();
+    this.connectorSecretService = new ConnectorSecretService();
     this.starshipRepository = new StarshipRepository();
     this.platformSecretService = new PlatformSecretService();
   }
@@ -105,7 +105,7 @@ export class ConnectorService {
   /**
    * Apply the side effects described by a ConnectorConnectOutput:
    * - Persist/update the connector row (status, metadata, lastError, template link)
-   * - Persist any env vars returned in output.env to the environments table
+   * - Persist any secrets returned in output.env to the connector_secrets table
    *
    * Returns the connector id and optional starship slug for downstream use.
    */
@@ -151,7 +151,7 @@ export class ConnectorService {
 
     if (output.env) {
       for (const [key, value] of Object.entries(output.env)) {
-        await this.upsertEnvironmentVariable(starshipId, key, value, userId, connector.id);
+        await this.upsertConnectorSecret(starshipId, key, value, userId, connector.id);
       }
     }
 
@@ -163,14 +163,14 @@ export class ConnectorService {
   /**
    * Build a decrypted snapshot of env vars for a connector.
    *
-   * Source of truth is environments.connector_id linkage.
+   * Source of truth is connector_secrets.connector_id linkage.
    */
   private async getConnectorEnvSnapshot(
     starshipId: string,
     connectorId: string,
     template: ConnectorTemplateEntity
   ): Promise<Record<string, string>> {
-    return this.environmentRepository.getDecryptedEnvironmentByConnector(connectorId);
+    return this.connectorSecretRepository.getDecryptedSecretsByConnector(connectorId);
   }
 
   /**
@@ -221,7 +221,7 @@ export class ConnectorService {
     if (result.env) {
       for (const [key, value] of Object.entries(result.env)) {
         // No user context for refresh flows; attribute to system.
-        await this.upsertEnvironmentVariable(starshipId, key, value, 'system', connector.id);
+        await this.upsertConnectorSecret(starshipId, key, value, 'system', connector.id);
       }
     }
 
@@ -857,7 +857,7 @@ export class ConnectorService {
     }
 
     // Remove env vars managed by this connector (connector_id linkage).
-    await this.environmentRepository.deleteByConnectorId(existing.id);
+    await this.connectorSecretRepository.deleteByConnectorId(existing.id);
 
     let newMetadata = existing.metadata || {};
 
@@ -883,17 +883,11 @@ export class ConnectorService {
    * Helper to create or update an environment variable with encryption.
    * Optionally associates the variable with a connector.
    */
-  private async upsertEnvironmentVariable(
-    starshipId: string,
-    key: string,
-    value: string,
-    userId: string,
-    connectorId?: string
-  ): Promise<void> {
-    const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
+  private async upsertConnectorSecret(starshipId: string, key: string, value: string, userId: string, connectorId?: string): Promise<void> {
+    const existing = await this.connectorSecretRepository.findByStarshipAndKey(starshipId, key);
 
     if (!existing) {
-      await this.environmentRepository.create({
+      await this.connectorSecretRepository.create({
         starshipId,
         key,
         value,
@@ -904,7 +898,7 @@ export class ConnectorService {
       return;
     }
 
-    await this.environmentRepository.update(existing.id, {
+    await this.connectorSecretRepository.update(existing.id, {
       value,
       description: existing.description,
       connectorId,

@@ -4,15 +4,16 @@ import Icon from '@/components/primitives/Icon'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuth } from '@/hooks/useAuth'
-import { useAdminConnectorTemplates } from '@/hooks/useAdminConnectors'
+import { useAdminConnectorTemplates } from '@/hooks/useAdminConnectorTemplates'
+import Link from 'next/link'
 
-export default function AdminConnectorsPage(): React.JSX.Element {
+export default function AdminConnectorTemplatesPage(): React.JSX.Element {
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const { data: connectors = [], isLoading, isError, error } = useAdminConnectorTemplates(isAuthenticated && isInstanceAdmin)
 
   if (!isAuthenticated) {
     return (
-      <PageLayout title="Connectors" description="Sign in to manage connectors." showHeader>
+      <PageLayout title="Connector templates" description="Sign in to manage connector templates." showHeader>
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">You must be signed in to view this page.</p>
         </div>
@@ -22,7 +23,7 @@ export default function AdminConnectorsPage(): React.JSX.Element {
 
   if (!isInstanceAdmin) {
     return (
-      <PageLayout title="Connectors" description="Instance admin tools for managing connectors." showHeader>
+      <PageLayout title="Connector templates" description="Instance admin tools for managing connector templates." showHeader>
         <div className="flex items-center justify-center h-full">
           <Card className="max-w-md w-full">
             <CardHeader>
@@ -49,19 +50,19 @@ export default function AdminConnectorsPage(): React.JSX.Element {
                 <h1 className="text-2xl font-bold">Admin</h1>
               </div>
               <div className="flex items-center justify-center gap-3 mt-2">
-                <a href="/admin/connectors" className="text-sm font-medium underline underline-offset-4">
-                  Connectors
-                </a>
+                <Link href="/admin/connector-templates" className="text-sm font-medium underline underline-offset-4">
+                  Connector templates
+                </Link>
                 <span className="text-muted-foreground">·</span>
-                <a href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
+                <Link href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
                   Agent approvals
-                </a>
+                </Link>
                 <span className="text-muted-foreground">·</span>
-                <a href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
+                <Link href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
                   Platform secrets
-                </a>
+                </Link>
               </div>
-              <p className="text-muted-foreground mt-3">Manage connector templates (runtime config and blueprints) for this instance.</p>
+              <p className="text-muted-foreground mt-3">Manage connector templates (enabled/disabled, runtime config and blueprints) for this instance.</p>
             </div>
 
             <section className="space-y-4">
@@ -88,7 +89,7 @@ export default function AdminConnectorsPage(): React.JSX.Element {
                     {isError && !isLoading && (
                       <tr>
                         <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
-                          {(error as any)?.message || 'Failed to load connectors.'}
+                          {(error as any)?.message || 'Failed to load connector templates.'}
                         </td>
                       </tr>
                     )}
@@ -102,7 +103,11 @@ export default function AdminConnectorsPage(): React.JSX.Element {
                     {!isLoading &&
                       !isError &&
                       connectors.map(c => (
-                        <tr key={c.id} className="border-b last:border-0 transition-colors hover:bg-muted/30 cursor-pointer" onClick={() => (window.location.href = `/admin/connectors/${c.id}`)}>
+                        <tr
+                          key={c.id}
+                          className="border-b last:border-0 transition-colors hover:bg-muted/30 cursor-pointer"
+                          onClick={() => (window.location.href = `/admin/connector-templates/${c.id}`)}
+                        >
                           <td className="px-4 py-3 text-sm font-mono">{c.provider}</td>
                           <td className="px-4 py-3 text-sm">{c.displayName}</td>
                           <td className="px-4 py-3 text-sm font-mono">{c.authType}</td>

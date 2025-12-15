@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useCreatePlatformSecret, useDeletePlatformSecret, usePlatformSecrets, useUpdatePlatformSecret } from '@/hooks/usePlatformSecrets'
 import type { PlatformSecretSummary } from '@starships/protocol'
 import { useMemo, useState } from 'react'
+import Link from 'next/link'
 
 export default function PlatformSecretsAdminPage(): React.JSX.Element {
   const { isAuthenticated, isInstanceAdmin } = useAuth()
@@ -132,17 +133,17 @@ export default function PlatformSecretsAdminPage(): React.JSX.Element {
                 <h1 className="text-2xl font-bold">Admin</h1>
               </div>
               <div className="flex items-center justify-center gap-3 mt-2">
-                <a href="/admin/connectors" className="text-sm font-medium underline underline-offset-4">
-                  Connectors
-                </a>
+                <Link href="/admin/connector-templates" className="text-sm font-medium underline underline-offset-4">
+                  Connector templates
+                </Link>
                 <span className="text-muted-foreground">·</span>
-                <a href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
+                <Link href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
                   Agent approvals
-                </a>
+                </Link>
                 <span className="text-muted-foreground">·</span>
-                <a href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
+                <Link href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
                   Platform secrets
-                </a>
+                </Link>
               </div>
               <p className="text-muted-foreground mt-2">Instance-level encrypted secrets used by connectors (OAuth client IDs/secrets, bot tokens, etc.). Values are never displayed after saving.</p>
             </div>

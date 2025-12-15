@@ -8,7 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
-import { useAdminConnectorTemplate, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectors'
+import { useAdminConnectorTemplate, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
+import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -29,7 +30,7 @@ function parseOptionalJson(value: string): unknown | undefined {
   return JSON.parse(trimmed)
 }
 
-export default function AdminConnectorDetailPage(): React.JSX.Element {
+export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const router = useRouter()
   const params = useParams<{ id: string }>()
@@ -68,11 +69,11 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
     setTestBlueprintText(formatJson(connector.testBlueprint))
   }, [connector])
 
-  const title = useMemo(() => (provider ? `Connector: ${provider}` : 'Connector'), [provider])
+  const title = useMemo(() => (provider ? `Connector template: ${provider}` : 'Connector template'), [provider])
 
   if (!isAuthenticated) {
     return (
-      <PageLayout title={title} description="Sign in to manage connectors." showHeader>
+      <PageLayout title={title} description="Sign in to manage connector templates." showHeader>
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">You must be signed in to view this page.</p>
         </div>
@@ -82,7 +83,7 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
 
   if (!isInstanceAdmin) {
     return (
-      <PageLayout title={title} description="Instance admin tools for managing connectors." showHeader>
+      <PageLayout title={title} description="Instance admin tools for managing connector templates." showHeader>
         <div className="flex items-center justify-center h-full">
           <Card className="max-w-md w-full">
             <CardHeader>
@@ -109,23 +110,23 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
                 <h1 className="text-2xl font-bold">Admin</h1>
               </div>
               <div className="flex items-center justify-center gap-3 mt-2">
-                <a href="/admin/connectors" className="text-sm font-medium underline underline-offset-4">
-                  Connectors
-                </a>
+                <Link href="/admin/connector-templates" className="text-sm font-medium underline underline-offset-4">
+                  Connector templates
+                </Link>
                 <span className="text-muted-foreground">·</span>
-                <a href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
+                <Link href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
                   Agent approvals
-                </a>
+                </Link>
                 <span className="text-muted-foreground">·</span>
-                <a href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
+                <Link href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
                   Platform secrets
-                </a>
+                </Link>
               </div>
               <p className="text-muted-foreground mt-3">Edit connector template configuration. Values are stored in `connector_templates`.</p>
             </div>
 
             <div className="flex items-center justify-between gap-3">
-              <Button variant="outline" onClick={() => router.push('/admin/connectors')}>
+              <Button variant="outline" onClick={() => router.push('/admin/connector-templates')}>
                 <Icon name="chevron-left" className="h-4 w-4 mr-1" />
                 Back
               </Button>
@@ -186,7 +187,7 @@ export default function AdminConnectorDetailPage(): React.JSX.Element {
                 </div>
               )}
 
-              {isError && !isLoading && <div className="flex items-center justify-center py-12 text-muted-foreground">{(error as any)?.message || 'Failed to load connector.'}</div>}
+              {isError && !isLoading && <div className="flex items-center justify-center py-12 text-muted-foreground">{(error as any)?.message || 'Failed to load connector template.'}</div>}
 
               {!isLoading && !isError && connector && (
                 <div className="grid gap-6">

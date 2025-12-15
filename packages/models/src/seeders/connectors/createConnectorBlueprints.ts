@@ -136,11 +136,7 @@ export function createApiKeyConnectBlueprint(config: ApiKeyConnectBlueprintConfi
       const oauth = (config.oauth && typeof config.oauth === 'object') ? config.oauth : {};
       const apiKeyRef = oauth.apiKey;
       const envKey =
-        (typeof apiKeyRef === 'string'
-          ? apiKeyRef
-          : (apiKeyRef && typeof apiKeyRef === 'object' && typeof apiKeyRef.key === 'string'
-              ? apiKeyRef.key
-              : undefined)) ||
+        (apiKeyRef && typeof apiKeyRef === 'object' && typeof apiKeyRef.key === 'string' ? apiKeyRef.key : undefined) ||
         config.envKey ||
         'API_KEY';
 

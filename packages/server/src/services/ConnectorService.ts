@@ -47,12 +47,6 @@ export class ConnectorService {
   }
 
   private parseSecretKeyForPlatformSecret(ref: unknown, label: string): string {
-    // Legacy format for oauth.clientId/clientSecret: plain string env key.
-    if (typeof ref === 'string') {
-      const key = ref.trim();
-      if (!key) throw new Error(`${label} must not be empty`);
-      return key;
-    }
     if (ref && typeof ref === 'object') {
       const rec = ref as Record<string, unknown>;
       const type = rec.type;
@@ -69,12 +63,7 @@ export class ConnectorService {
   }
 
   private parseSecretKeyForConnectorSecret(ref: unknown, label: string): string | undefined {
-    // Legacy format for oauth.accessToken/refreshToken/apiKey storage keys: plain string env key.
     if (ref === undefined || ref === null) return undefined;
-    if (typeof ref === 'string') {
-      const key = ref.trim();
-      return key ? key : undefined;
-    }
     if (ref && typeof ref === 'object') {
       const rec = ref as Record<string, unknown>;
       const type = rec.type;
@@ -418,10 +407,7 @@ export class ConnectorService {
       throw new Error(`Connector ${provider} does not support start flow for authType ${template.authType}`);
     }
 
-    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(
-      oauthConfig.clientId as ConnectorTokenRef | undefined,
-      `oauth.clientId`
-    );
+    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(oauthConfig.clientId as ConnectorTokenRef | undefined, `oauth.clientId`);
 
     const clientId = await this.resolvePlatformSecret(clientIdEnvKey);
     const authorizeUrl = oauthConfig.authorizeUrl as string | undefined;
@@ -537,10 +523,7 @@ export class ConnectorService {
         ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
         : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
 
-    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(
-      oauthConfig.clientId as ConnectorTokenRef | undefined,
-      `oauth.clientId`
-    );
+    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(oauthConfig.clientId as ConnectorTokenRef | undefined, `oauth.clientId`);
     const clientSecretEnvKey = this.parseSecretKeyForPlatformSecret(
       oauthConfig.clientSecret as ConnectorTokenRef | undefined,
       `oauth.clientSecret`

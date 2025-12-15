@@ -35,21 +35,6 @@ export class ConnectorRuntimeService {
   }
 
   private parseSecretRef(ref: unknown): { type: ConnectorSecretRefType; key: string } | undefined {
-    if (typeof ref === 'string') {
-      const trimmed = ref.trim();
-      if (!trimmed) return undefined;
-
-      // Legacy format: "platform:ENV_KEY"
-      if (trimmed.startsWith('platform:')) {
-        const key = trimmed.slice('platform:'.length).trim();
-        if (!key) return undefined;
-        return { type: 'platform_secret', key };
-      }
-
-      // Legacy format: plain string = connector secret key
-      return { type: 'connector_secret', key: trimmed };
-    }
-
     if (ref && typeof ref === 'object') {
       const rec = ref as Record<string, unknown>;
       const type = rec.type;

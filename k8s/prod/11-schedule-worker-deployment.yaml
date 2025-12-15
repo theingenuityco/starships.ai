@@ -31,13 +31,6 @@ spec:
           env:
             - name: NODE_ENV
               value: 'production'
-            - name: RUNNER_URL
-              value: 'http://autopilot-runner.starships-prod.svc.cluster.local:50051'
-            - name: RUNNER_AUTH_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: RUNNER_AUTH_TOKEN
             - name: SKIP_BUILD
               value: 'true'
             - name: SKIP_INSTALL

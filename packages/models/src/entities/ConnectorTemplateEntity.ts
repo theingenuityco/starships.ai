@@ -1,6 +1,5 @@
 import { Expose } from 'class-transformer';
 import {
-  IsArray,
   IsBoolean,
   IsIn,
   IsObject,

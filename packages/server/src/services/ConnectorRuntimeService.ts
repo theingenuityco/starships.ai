@@ -1,7 +1,7 @@
 import { ConnectorRepository, ConnectorTemplateRepository } from '@starships/models';
 import type { ConnectorProvider } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
-import { EnvironmentService } from './EnvironmentService';
+import { ConnectorSecretService } from './ConnectorSecretService';
 import { generateJWT } from '@/utils/jwt';
 import { PlatformSecretService } from './PlatformSecretService';
 
@@ -24,13 +24,13 @@ export interface ConnectorHttpConfig {
 export class ConnectorRuntimeService {
   private connectorTemplateRepository: ConnectorTemplateRepository;
   private connectorRepository: ConnectorRepository;
-  private environmentService: EnvironmentService;
+  private connectorSecretService: ConnectorSecretService;
   private platformSecretService: PlatformSecretService;
 
   constructor() {
     this.connectorTemplateRepository = new ConnectorTemplateRepository();
     this.connectorRepository = new ConnectorRepository();
-    this.environmentService = new EnvironmentService();
+    this.connectorSecretService = new ConnectorSecretService();
     this.platformSecretService = new PlatformSecretService();
   }
 
@@ -53,8 +53,8 @@ export class ConnectorRuntimeService {
     // Load templates to understand which connectors exist and how they are wired.
     const templates = await this.connectorTemplateRepository.list();
 
-    // Decrypt per-starship env vars once for all connectors.
-    const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
+    // Decrypt per-starship secrets once for all connectors.
+    const decryptedSecrets = await this.connectorSecretService.getDecryptedSecrets(starshipId);
 
     for (const tpl of templates) {
       const provider = tpl.provider as ConnectorProvider;
@@ -124,7 +124,7 @@ export class ConnectorRuntimeService {
         continue;
       }
 
-      const rawToken = (decryptedEnv as Record<string, unknown>)[accessTokenEnvKey];
+      const rawToken = (decryptedSecrets as Record<string, unknown>)[accessTokenEnvKey];
       if (!rawToken || typeof rawToken !== 'string' || !rawToken.trim()) {
         continue;
       }

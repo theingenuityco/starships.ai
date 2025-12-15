@@ -1,17 +1,17 @@
-import { EnvironmentEntity } from '@/entities/EnvironmentEntity';
+import { ConnectorSecretEntity } from '@/entities/ConnectorSecretEntity';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { EnvironmentModel, EnvironmentSummary } from '@starships/protocol';
+import type { ConnectorSecretModel, ConnectorSecretSummary } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 
-export class EnvironmentRepository extends BaseRepository {
+export class ConnectorSecretRepository extends BaseRepository {
   private static readonly ALGORITHM = 'aes-256-gcm';
   private static readonly IV_LENGTH = 16;
   private static readonly TAG_LENGTH = 16;
 
   constructor() {
-    super('EnvironmentRepository');
+    super('ConnectorSecretRepository');
   }
 
   /**
@@ -19,8 +19,8 @@ export class EnvironmentRepository extends BaseRepository {
    */
   private encrypt(value: string, starshipId: string): string {
     const key = this.getEncryptionKey(starshipId);
-    const iv = randomBytes(EnvironmentRepository.IV_LENGTH);
-    const cipher = createCipheriv(EnvironmentRepository.ALGORITHM, key, iv);
+    const iv = randomBytes(ConnectorSecretRepository.IV_LENGTH);
+    const cipher = createCipheriv(ConnectorSecretRepository.ALGORITHM, key, iv);
 
     const encrypted = Buffer.concat([cipher.update(value, 'utf8'), cipher.final()]);
     const tag = cipher.getAuthTag();
@@ -35,11 +35,14 @@ export class EnvironmentRepository extends BaseRepository {
     const key = this.getEncryptionKey(starshipId);
     const data = Buffer.from(encryptedValue, 'base64');
 
-    const iv = data.subarray(0, EnvironmentRepository.IV_LENGTH);
-    const tag = data.subarray(EnvironmentRepository.IV_LENGTH, EnvironmentRepository.IV_LENGTH + EnvironmentRepository.TAG_LENGTH);
-    const encrypted = data.subarray(EnvironmentRepository.IV_LENGTH + EnvironmentRepository.TAG_LENGTH);
+    const iv = data.subarray(0, ConnectorSecretRepository.IV_LENGTH);
+    const tag = data.subarray(
+      ConnectorSecretRepository.IV_LENGTH,
+      ConnectorSecretRepository.IV_LENGTH + ConnectorSecretRepository.TAG_LENGTH
+    );
+    const encrypted = data.subarray(ConnectorSecretRepository.IV_LENGTH + ConnectorSecretRepository.TAG_LENGTH);
 
-    const decipher = createDecipheriv(EnvironmentRepository.ALGORITHM, key, iv);
+    const decipher = createDecipheriv(ConnectorSecretRepository.ALGORITHM, key, iv);
     decipher.setAuthTag(tag);
 
     return decipher.update(encrypted, undefined, 'utf8') + decipher.final('utf8');
@@ -61,7 +64,7 @@ export class EnvironmentRepository extends BaseRepository {
       .digest();
   }
 
-  async findByStarship(starshipId: string): Promise<EnvironmentSummary[]> {
+  async findByStarship(starshipId: string): Promise<ConnectorSecretSummary[]> {
     return this.executeWithErrorHandling(
       async () => {
         if (!starshipId?.trim()) {
@@ -69,31 +72,32 @@ export class EnvironmentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>('SELECT * FROM environments WHERE starship_id = $1 ORDER BY key', [
-          starshipId,
-        ]);
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM connector_secrets WHERE starship_id = $1 ORDER BY key',
+          [starshipId]
+        );
 
         return result.map((record) => {
-          const env = fromDatabase(EnvironmentEntity, record);
+          const secret = fromDatabase(ConnectorSecretEntity, record);
           // Return summary without encrypted value
           return {
-            id: env.id,
-            starshipId: env.starshipId,
-            key: env.key,
-            description: env.description,
-            connectorId: env.connectorId,
-            createdAt: env.createdAt,
-            updatedAt: env.updatedAt,
-            createdBy: env.createdBy,
+            id: secret.id,
+            starshipId: secret.starshipId,
+            key: secret.key,
+            description: secret.description,
+            connectorId: secret.connectorId,
+            createdAt: secret.createdAt,
+            updatedAt: secret.updatedAt,
+            createdBy: secret.createdBy,
           };
         });
       },
       'findByStarship',
-      'Environment'
+      'ConnectorSecret'
     );
   }
 
-  async findByStarshipAndKey(starshipId: string, key: string): Promise<EnvironmentModel | null> {
+  async findByStarshipAndKey(starshipId: string, key: string): Promise<ConnectorSecretModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         if (!starshipId?.trim() || !key?.trim()) {
@@ -102,14 +106,14 @@ export class EnvironmentRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const result = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM environments WHERE starship_id = $1 AND key = $2',
+          'SELECT * FROM connector_secrets WHERE starship_id = $1 AND key = $2',
           [starshipId, key]
         );
 
-        return result ? fromDatabase(EnvironmentEntity, result) : null;
+        return result ? fromDatabase(ConnectorSecretEntity, result) : null;
       },
       'findByStarshipAndKey',
-      'Environment'
+      'ConnectorSecret'
     );
   }
 
@@ -120,13 +124,13 @@ export class EnvironmentRepository extends BaseRepository {
     description?: string;
     createdBy: string;
     connectorId?: string;
-  }): Promise<EnvironmentModel> {
+  }): Promise<ConnectorSecretModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
         const encryptedValue = this.encrypt(data.value, data.starshipId);
 
-        const envData = {
+        const secretData = {
           starshipId: data.starshipId,
           key: data.key,
           encryptedValue,
@@ -137,17 +141,16 @@ export class EnvironmentRepository extends BaseRepository {
           createdBy: data.createdBy,
         };
 
-        await EnvironmentEntity.validate(envData, 'create');
+        await ConnectorSecretEntity.validate(secretData, 'create');
 
-        // Create entity instance from plain object, then serialize
-        const environmentEntity = toEntityInstance(EnvironmentEntity, envData);
-        const databaseFormat = toDatabase(environmentEntity);
-        const result = await this.createEntity<Record<string, unknown>>('environments', databaseFormat);
+        const entity = toEntityInstance(ConnectorSecretEntity, secretData);
+        const databaseFormat = toDatabase(entity);
+        const result = await this.createEntity<Record<string, unknown>>('connector_secrets', databaseFormat);
 
-        return fromDatabase(EnvironmentEntity, result);
+        return fromDatabase(ConnectorSecretEntity, result);
       },
       'create',
-      'Environment'
+      'ConnectorSecret'
     );
   }
 
@@ -156,15 +159,10 @@ export class EnvironmentRepository extends BaseRepository {
     updates: {
       value?: string;
       description?: string;
-      /**
-       * Optional connector owner to associate this env var with.
-       * Used by connector-managed env vars so they can be cleaned up without
-       * needing template-managed key lists.
-       */
       connectorId?: string;
       updatedBy: string;
     }
-  ): Promise<EnvironmentModel | null> {
+  ): Promise<ConnectorSecretModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         if (!id?.trim()) {
@@ -173,20 +171,20 @@ export class EnvironmentRepository extends BaseRepository {
 
         const connection = this.getConnection();
 
-        // Get existing environment to get starshipId for encryption
-        const existing = await connection.queryOne<Record<string, unknown>>('SELECT * FROM environments WHERE id = $1', [id]);
+        // Get existing secret to get starshipId for encryption
+        const existing = await connection.queryOne<Record<string, unknown>>('SELECT * FROM connector_secrets WHERE id = $1', [id]);
 
         if (!existing) {
           return null;
         }
 
-        const existingEnv = fromDatabase(EnvironmentEntity, existing);
+        const existingSecret = fromDatabase(ConnectorSecretEntity, existing);
         const updateProps: Record<string, unknown> = {
           updatedAt: new Date().toISOString(),
         };
 
         if (updates.value !== undefined) {
-          updateProps.encryptedValue = this.encrypt(updates.value, existingEnv.starshipId);
+          updateProps.encryptedValue = this.encrypt(updates.value, existingSecret.starshipId);
         }
 
         if (updates.description !== undefined) {
@@ -197,24 +195,23 @@ export class EnvironmentRepository extends BaseRepository {
           updateProps.connectorId = updates.connectorId;
         }
 
-        await EnvironmentEntity.validate(updateProps, 'update');
+        await ConnectorSecretEntity.validate(updateProps, 'update');
 
-        // Convert entity updates to database format
-        const updateData = toDatabase(toEntityInstance(EnvironmentEntity, updateProps));
+        const updateData = toDatabase(toEntityInstance(ConnectorSecretEntity, updateProps));
 
         // Filter out protected fields (id, createdAt)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
 
         if (Object.keys(filteredUpdateData).length === 0) {
-          return existingEnv;
+          return existingSecret;
         }
 
-        const result = await this.updateEntity<Record<string, unknown>>('environments', id, filteredUpdateData);
-        return result ? fromDatabase(EnvironmentEntity, result) : null;
+        const result = await this.updateEntity<Record<string, unknown>>('connector_secrets', id, filteredUpdateData);
+        return result ? fromDatabase(ConnectorSecretEntity, result) : null;
       },
       'update',
-      'Environment',
+      'ConnectorSecret',
       id
     );
   }
@@ -226,10 +223,10 @@ export class EnvironmentRepository extends BaseRepository {
           throw new Error('ID is required for delete operation');
         }
 
-        return await this.deleteEntity('environments', id);
+        return await this.deleteEntity('connector_secrets', id);
       },
       'delete',
-      'Environment',
+      'ConnectorSecret',
       id
     );
   }
@@ -243,14 +240,14 @@ export class EnvironmentRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const result = await connection.query<Record<string, unknown>>(
-          'DELETE FROM environments WHERE starship_id = $1 AND key = $2 RETURNING id',
+          'DELETE FROM connector_secrets WHERE starship_id = $1 AND key = $2 RETURNING id',
           [starshipId, key]
         );
 
         return result.length > 0;
       },
       'deleteByStarshipAndKey',
-      'Environment'
+      'ConnectorSecret'
     );
   }
 
@@ -262,26 +259,23 @@ export class EnvironmentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>('DELETE FROM environments WHERE connector_id = $1 RETURNING id', [
-          connectorId,
-        ]);
+        const result = await connection.query<Record<string, unknown>>(
+          'DELETE FROM connector_secrets WHERE connector_id = $1 RETURNING id',
+          [connectorId]
+        );
 
         return result.length;
       },
       'deleteByConnectorId',
-      'Environment',
+      'ConnectorSecret',
       connectorId
     );
   }
 
   /**
-   * Get decrypted env vars for a specific connector.
-   *
-   * Connector-managed env vars are linked via environments.connector_id, so we
-   * can safely snapshot secrets for refresh/test flows without relying on
-   * connector_templates.required_env_keys / optional_env_keys.
+   * Get decrypted connector secrets for a specific connector.
    */
-  async getDecryptedEnvironmentByConnector(connectorId: string): Promise<Record<string, string>> {
+  async getDecryptedSecretsByConnector(connectorId: string): Promise<Record<string, string>> {
     return this.executeWithErrorHandling(
       async () => {
         if (!connectorId?.trim()) {
@@ -289,31 +283,33 @@ export class EnvironmentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>('SELECT * FROM environments WHERE connector_id = $1', [connectorId]);
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM connector_secrets WHERE connector_id = $1', [
+          connectorId,
+        ]);
 
-        const env: Record<string, string> = {};
+        const secrets: Record<string, string> = {};
 
         for (const record of result) {
-          const environment = fromDatabase(EnvironmentEntity, record);
+          const secret = fromDatabase(ConnectorSecretEntity, record);
           try {
-            env[environment.key] = this.decrypt(environment.encryptedValue, environment.starshipId);
+            secrets[secret.key] = this.decrypt(secret.encryptedValue, secret.starshipId);
           } catch (error) {
-            console.error(`Failed to decrypt environment variable ${environment.key}:`, error);
+            console.error(`Failed to decrypt connector secret ${secret.key}:`, error);
           }
         }
 
-        return env;
+        return secrets;
       },
-      'getDecryptedEnvironmentByConnector',
-      'Environment',
+      'getDecryptedSecretsByConnector',
+      'ConnectorSecret',
       connectorId
     );
   }
 
   /**
-   * Get decrypted environment variables as a Record for use in execution context
+   * Get decrypted connector secrets as a Record for use in execution context
    */
-  async getDecryptedEnvironment(starshipId: string): Promise<Record<string, string>> {
+  async getDecryptedSecrets(starshipId: string): Promise<Record<string, string>> {
     return this.executeWithErrorHandling(
       async () => {
         if (!starshipId?.trim()) {
@@ -321,24 +317,26 @@ export class EnvironmentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>('SELECT * FROM environments WHERE starship_id = $1', [starshipId]);
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM connector_secrets WHERE starship_id = $1', [
+          starshipId,
+        ]);
 
-        const env: Record<string, string> = {};
+        const secrets: Record<string, string> = {};
 
         for (const record of result) {
-          const environment = fromDatabase(EnvironmentEntity, record);
+          const secret = fromDatabase(ConnectorSecretEntity, record);
           try {
-            env[environment.key] = this.decrypt(environment.encryptedValue, starshipId);
+            secrets[secret.key] = this.decrypt(secret.encryptedValue, starshipId);
           } catch (error) {
-            console.error(`Failed to decrypt environment variable ${environment.key}:`, error);
+            console.error(`Failed to decrypt connector secret ${secret.key}:`, error);
             // Skip invalid encrypted values
           }
         }
 
-        return env;
+        return secrets;
       },
-      'getDecryptedEnvironment',
-      'Environment'
+      'getDecryptedSecrets',
+      'ConnectorSecret'
     );
   }
 }

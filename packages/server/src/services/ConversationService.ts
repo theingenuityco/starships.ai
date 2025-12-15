@@ -1,6 +1,6 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { EnvironmentService } from '@/services/EnvironmentService';
+import { ConnectorSecretService } from '@/services/ConnectorSecretService';
 import { UsageService } from '@/services/UsageService';
 import { AttachmentService } from '@/services/AttachmentService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, RunnerFactory } from '@starships/autopilot';
@@ -63,7 +63,9 @@ export class ConversationService {
   private streamingService!: StreamingService;
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
-  private environmentService!: EnvironmentService;
+  // Kept for future use (runtime secrets, connector context, etc.)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private connectorSecretService!: ConnectorSecretService;
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
@@ -146,7 +148,7 @@ export class ConversationService {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
-    this.environmentService = new EnvironmentService();
+    this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();

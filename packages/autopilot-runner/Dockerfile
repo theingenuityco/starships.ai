@@ -1,5 +1,8 @@
 FROM node:20-slim AS build
 WORKDIR /app
+# For multi-arch builds (docker buildx), BuildKit provides TARGETARCH (amd64/arm64)
+ARG TARGETARCH
+ARG BUF_VERSION=v1.45.0
 # Install pnpm
 RUN npm i -g pnpm
 # Install curl for fetching buf
@@ -18,11 +21,17 @@ COPY packages/autopilot/ ./packages/autopilot/
 COPY packages/autopilot-runner/ ./packages/autopilot-runner/
 # Build dependencies in order: autopilot first, then generate runner types, then build runner
 RUN pnpm -C packages/autopilot build
-RUN curl -sSL -o /usr/local/bin/buf https://github.com/bufbuild/buf/releases/download/v1.45.0/buf-Linux-x86_64 \
-  && chmod +x /usr/local/bin/buf \
-  && buf --version \
-  && pnpm -C packages/autopilot-runner gen \
-  && pnpm -C packages/autopilot-runner build
+RUN set -eux; \
+  case "${TARGETARCH}" in \
+    amd64) BUF_ARCH="x86_64" ;; \
+    arm64) BUF_ARCH="aarch64" ;; \
+    *) echo "Unsupported TARGETARCH=${TARGETARCH} (expected amd64 or arm64)"; exit 1 ;; \
+  esac; \
+  curl -fsSL -o /usr/local/bin/buf "https://github.com/bufbuild/buf/releases/download/${BUF_VERSION}/buf-Linux-${BUF_ARCH}"; \
+  chmod +x /usr/local/bin/buf; \
+  buf --version; \
+  pnpm -C packages/autopilot-runner gen; \
+  pnpm -C packages/autopilot-runner build
 
 FROM node:20-slim
 WORKDIR /app/packages/autopilot-runner

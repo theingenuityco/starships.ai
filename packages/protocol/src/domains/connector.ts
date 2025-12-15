@@ -43,7 +43,7 @@ export interface ConnectorSecretRef {
   key: string;
 }
 
-export type ConnectorTokenRef = string | ConnectorSecretRef;
+export type ConnectorTokenRef = ConnectorSecretRef;
 
 /**
  * ConnectorOAuthRuntimeConfig

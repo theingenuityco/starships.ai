@@ -39,14 +39,11 @@ This document describes the **supported keys used by the current host runtime**.
 
 #### Runtime auth injection keys
 
-- **`oauth.accessToken?: string`**
+- **`oauth.accessToken?: { type: "platform_secret" | "connector_secret", key: string }`**
   - Where the host should read the token from when injecting auth for `http_request` with `connector: "<provider>"`.
   - Supported formats:
-    - **Per-starship connector secret key** (typical OAuth): `"GH_APP_ACCESS_TOKEN"`
-    - **Platform secret ref (legacy)**: `"platform:DISCORD_BOT_TOKEN"`
-    - **Explicit ref (preferred)**:
-      - `{ "type": "connector_secret", "key": "GH_APP_ACCESS_TOKEN" }`
-      - `{ "type": "platform_secret", "key": "DISCORD_BOT_TOKEN" }`
+    - `{ "type": "connector_secret", "key": "GH_APP_ACCESS_TOKEN" }`
+    - `{ "type": "platform_secret", "key": "DISCORD_BOT_TOKEN" }`
 
 - **`oauth.authHeaderName?: string`**
   - HTTP header name to inject. Default: `"Authorization"`.

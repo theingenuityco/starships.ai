@@ -57,6 +57,18 @@ export class PlatformSecretRepository extends BaseRepository {
     return decipher.update(encrypted, undefined, 'utf8') + decipher.final('utf8');
   }
 
+  async list(): Promise<PlatformSecretEntity[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>('SELECT * FROM platform_secrets ORDER BY key ASC');
+        return result.map((record) => fromDatabase(PlatformSecretEntity, record));
+      },
+      'list',
+      'PlatformSecret'
+    );
+  }
+
   async findByKey(key: string): Promise<PlatformSecretEntity | null> {
     return this.executeWithErrorHandling(
       async () => {
@@ -148,6 +160,62 @@ export class PlatformSecretRepository extends BaseRepository {
       'upsertSecret',
       'PlatformSecret',
       data.key
+    );
+  }
+
+  async updateSecretByKey(data: {
+    key: string;
+    value?: string;
+    description?: string;
+    updatedBy: string;
+  }): Promise<PlatformSecretEntity | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!data.key?.trim()) throw new Error('key is required');
+        if (!data.updatedBy?.trim()) throw new Error('updatedBy is required');
+
+        const existing = await this.findByKey(data.key);
+        if (!existing) return null;
+
+        const now = new Date().toISOString();
+        const updateProps: Record<string, unknown> = {
+          updatedAt: now,
+          updatedBy: data.updatedBy,
+        };
+
+        if (data.value !== undefined) {
+          updateProps.encryptedValue = this.encrypt(data.value);
+        }
+
+        if (data.description !== undefined) {
+          updateProps.description = data.description;
+        }
+
+        await PlatformSecretEntity.validate(updateProps, 'update');
+        const updateData = toDatabase(toEntityInstance(PlatformSecretEntity, updateProps));
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { id: _id, created_at: _createdAt, ...filteredUpdateData } = updateData;
+
+        const updated = await this.updateEntity<Record<string, unknown>>('platform_secrets', existing.id, filteredUpdateData);
+        return updated ? fromDatabase(PlatformSecretEntity, updated) : null;
+      },
+      'updateSecretByKey',
+      'PlatformSecret',
+      data.key
+    );
+  }
+
+  async deleteByKey(key: string): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!key?.trim()) throw new Error('key is required');
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>('DELETE FROM platform_secrets WHERE key = $1 RETURNING id', [key]);
+        return result.length > 0;
+      },
+      'deleteByKey',
+      'PlatformSecret',
+      key
     );
   }
 }

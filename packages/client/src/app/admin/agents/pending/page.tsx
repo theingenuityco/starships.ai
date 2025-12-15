@@ -169,9 +169,18 @@ export default function PendingAgentsPage(): React.JSX.Element {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="shield-check" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Agent publish approvals</h1>
+                <h1 className="text-2xl font-bold">Admin</h1>
               </div>
-              <p className="text-muted-foreground mt-2">Review and approve or reject agents that owners have requested to publish.</p>
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <a href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
+                  Agent approvals
+                </a>
+                <span className="text-muted-foreground">·</span>
+                <a href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
+                  Platform secrets
+                </a>
+              </div>
+              <p className="text-muted-foreground mt-3">Review pending publishes and manage instance-level encrypted secrets.</p>
             </div>
 
             <section className="space-y-6">

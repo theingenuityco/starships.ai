@@ -36,6 +36,7 @@ import docsRoutes from '@/routes/docs';
 import ledgerRoutes from '@/routes/ledger';
 import widgetRoutes from '@/routes/widgets';
 import scheduleRoutes from '@/routes/schedules';
+import platformSecretRoutes from '@/routes/platform-secrets';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -108,6 +109,7 @@ app.use('/api/v1', openrouterRoutes);
 app.use('/api/v1', ledgerRoutes);
 app.use('/api/v1', widgetRoutes);
 app.use('/api/v1', scheduleRoutes);
+app.use('/api/v1', platformSecretRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

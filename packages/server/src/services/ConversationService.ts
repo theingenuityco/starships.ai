@@ -152,11 +152,11 @@ export class ConversationService {
     this.walletService = new WalletService();
     this.connectorRuntimeService = new ConnectorRuntimeService();
 
-    // Choose default runner based on AUTOPILOT_RUNNER:
-    // - 'remote' -> RemoteRunner via RunnerFactory (uses autopilot.setRunnerConfig)
-    // - anything else -> ChildProcessRunner with local process isolation and limits
-    const mode = process.env.AUTOPILOT_RUNNER || 'child';
-    if (mode === 'remote') {
+    // Choose default runner based on whether a remote runner is configured.
+    // When RUNNER_URL is set, server startup configures autopilot.setRunnerConfig({ url, token })
+    // and RunnerFactory will return a RemoteRunner. Otherwise we use a child process
+    // runner with local isolation and limits.
+    if (process.env.RUNNER_URL) {
       this.defaultRunner = RunnerFactory.getTopLevelRunner(0);
     } else {
       this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);

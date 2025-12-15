@@ -31,8 +31,6 @@ spec:
           env:
             - name: NODE_ENV
               value: 'production'
-            - name: AUTOPILOT_RUNNER
-              value: 'remote'
             - name: RUNNER_URL
               value: 'http://autopilot-runner.starships-prod.svc.cluster.local:50051'
             - name: RUNNER_AUTH_TOKEN

@@ -53,6 +53,11 @@ interface ConnectionInfo {
   runningAdds: number; // number of server-emitted message appends after connect
   // Support multiple overlapping placeholders (stack-like behavior)
   placeholderStack: number[]; // top is the most recent placeholder index
+
+  // Snapshot of buffered logical event count at connect time.
+  // Used to prevent replay routines (invoked immediately after connect) from duplicating
+  // events that were already delivered live after the connection was established.
+  bufferSnapshotLength: number;
 }
 
 /**
@@ -143,6 +148,7 @@ export class StreamingService {
       baseLength: typeof opts?.baseLength === 'number' && opts.baseLength >= 0 ? opts.baseLength : 0,
       runningAdds: 0,
       placeholderStack: [],
+      bufferSnapshotLength: (this.eventBuffers.get(streamId) || []).length,
     };
     const existing = this.connections.get(streamId);
     if (existing) {
@@ -476,7 +482,10 @@ export class StreamingService {
     try {
       for (const connection of conns) {
         if (connection.res.destroyed) continue;
-        for (const evt of buffer) {
+        const limit = typeof connection.bufferSnapshotLength === 'number' ? connection.bufferSnapshotLength : buffer.length;
+        const end = Math.min(Math.max(limit, 0), buffer.length);
+        for (let i = 0; i < end; i++) {
+          const evt = buffer[i];
           if (filter && !filter(evt)) continue;
           switch (evt.type) {
             case 'delta': {
@@ -701,49 +710,55 @@ export class StreamingService {
     const conns = this.connections.get(streamId);
     if (!conns || conns.size === 0) return;
 
-    const buffer = this.eventBuffers.get(streamId) || [];
-    if (buffer.length === 0) return;
-
-    // Prefer replaying from the most recent turn_started so that turn lifecycle events
-    // (including turn_completed) are always delivered on resume.
-    let from = 0;
-    let turnStartedIdx = -1;
-    for (let i = buffer.length - 1; i >= 0; i--) {
-      if (buffer[i].type === 'turn_started') {
-        turnStartedIdx = i;
-        break;
-      }
-    }
-    if (turnStartedIdx >= 0) {
-      from = turnStartedIdx;
-    } else {
-      // Fallback: start after the last 'complete' event to avoid replaying past turns indefinitely.
-      let lastComplete = -1;
-      for (let i = buffer.length - 1; i >= 0; i--) {
-        if (buffer[i].type === 'complete') {
-          lastComplete = i;
-          break;
-        }
-      }
-      from = Math.max(lastComplete + 1, 0);
-      if (from >= buffer.length) return;
-    }
-
-    // Check if turn_completed exists in the buffer
-    let hasTurnCompleted = false;
-    for (let i = from; i < buffer.length; i++) {
-      if (buffer[i].type === 'turn_completed') {
-        hasTurnCompleted = true;
-        break;
-      }
-    }
-
     this.suppressBuffering = true;
     try {
-      const lastEvt = buffer[buffer.length - 1];
-      let replayedAny = false;
       for (const connection of conns) {
         if (connection.res.destroyed) continue;
+
+        // Only replay events that existed when this connection was established.
+        const fullBuffer = this.eventBuffers.get(streamId) || [];
+        const limit = typeof connection.bufferSnapshotLength === 'number' ? connection.bufferSnapshotLength : fullBuffer.length;
+        const end = Math.min(Math.max(limit, 0), fullBuffer.length);
+        const buffer = fullBuffer.slice(0, end);
+        if (buffer.length === 0) continue;
+
+        // Prefer replaying from the most recent turn_started so that turn lifecycle events
+        // (including turn_completed) are always delivered on resume.
+        let from = 0;
+        let turnStartedIdx = -1;
+        for (let i = buffer.length - 1; i >= 0; i--) {
+          if (buffer[i].type === 'turn_started') {
+            turnStartedIdx = i;
+            break;
+          }
+        }
+        if (turnStartedIdx >= 0) {
+          from = turnStartedIdx;
+        } else {
+          // Fallback: start after the last 'complete' event to avoid replaying past turns indefinitely.
+          let lastComplete = -1;
+          for (let i = buffer.length - 1; i >= 0; i--) {
+            if (buffer[i].type === 'complete') {
+              lastComplete = i;
+              break;
+            }
+          }
+          from = Math.max(lastComplete + 1, 0);
+          if (from >= buffer.length) continue;
+        }
+
+        // Check if turn_completed exists in the replay window
+        let hasTurnCompleted = false;
+        for (let i = from; i < buffer.length; i++) {
+          if (buffer[i].type === 'turn_completed') {
+            hasTurnCompleted = true;
+            break;
+          }
+        }
+
+        const lastEvt = buffer[buffer.length - 1];
+        let replayedAny = false;
+
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
           if (evt.type === 'message') continue; // avoid duplicating persisted history

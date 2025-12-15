@@ -51,6 +51,16 @@ export function StarshipsLogo({
             x2="100%"
             y2="0%"
             key={triggerAnimation}
+            // `motion.linearGradient` animates these attributes; in dev/StrictMode the motion
+            // values can briefly be `undefined` during mount/remount, which causes noisy
+            // SVG warnings like: "<linearGradient> attribute x1: Expected length, 'undefined'."
+            // Provide explicit initial values to keep the attributes valid at all times.
+            initial={{
+              x1: '0%',
+              y1: '75%',
+              x2: '100%',
+              y2: '0%',
+            }}
             animate={{
               x1: ['-150%', '150%'],
               x2: ['-50%', '250%'],

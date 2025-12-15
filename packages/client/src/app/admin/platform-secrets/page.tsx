@@ -129,7 +129,20 @@ export default function PlatformSecretsAdminPage(): React.JSX.Element {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="shield-check" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Platform secrets</h1>
+                <h1 className="text-2xl font-bold">Admin</h1>
+              </div>
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <a href="/admin/connectors" className="text-sm font-medium underline underline-offset-4">
+                  Connectors
+                </a>
+                <span className="text-muted-foreground">·</span>
+                <a href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
+                  Agent approvals
+                </a>
+                <span className="text-muted-foreground">·</span>
+                <a href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
+                  Platform secrets
+                </a>
               </div>
               <p className="text-muted-foreground mt-2">Instance-level encrypted secrets used by connectors (OAuth client IDs/secrets, bot tokens, etc.). Values are never displayed after saving.</p>
             </div>

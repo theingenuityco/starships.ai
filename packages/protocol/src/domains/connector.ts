@@ -63,7 +63,7 @@ export interface ConnectorListResponse {
   connectors: ConnectorListItem[];
 }
 
-export type ConnectorAuthType = 'oauth2' | 'api_key' | 'custom';
+export type ConnectorAuthType = 'oauth2' | 'api_key' | 'custom' | 'none';
 
 export interface ConnectorCatalogItem {
   provider: ConnectorProvider;
@@ -94,6 +94,43 @@ export interface ConnectorTemplateModel {
   usageCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * ConnectorTemplateAdminModel
+ *
+ * Instance-admin view of a connector template, including runtime configuration
+ * and (optional) inline autopilot blueprints.
+ */
+export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
+  runtimeConfig: Record<string, unknown>;
+  connectBlueprint?: Record<string, unknown> | null;
+  refreshBlueprint?: Record<string, unknown> | null;
+  testBlueprint?: Record<string, unknown> | null;
+}
+
+// ============================================================================
+// ADMIN (INSTANCE ADMIN ONLY) - CONNECTOR TEMPLATE MANAGEMENT
+// ============================================================================
+
+export interface AdminConnectorTemplateListResponse {
+  connectors: ConnectorTemplateModel[];
+}
+
+export interface AdminConnectorTemplateResponse {
+  connector: ConnectorTemplateAdminModel;
+}
+
+export interface UpdateConnectorTemplateRequest {
+  displayName?: string;
+  description?: string;
+  authType?: ConnectorAuthType;
+  version?: string;
+  category?: string;
+  runtimeConfig?: Record<string, unknown>;
+  connectBlueprint?: Record<string, unknown> | null;
+  refreshBlueprint?: Record<string, unknown> | null;
+  testBlueprint?: Record<string, unknown> | null;
 }
 
 export interface ConnectWithApiKeyRequest {

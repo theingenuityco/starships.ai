@@ -1951,13 +1951,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const docContent = Array.isArray(json?.content) ? json.content : []
         const firstBlock = docContent[0]
         const blockContent = Array.isArray(firstBlock?.content) ? firstBlock.content : []
-        try {
-          const summary = blockContent
-            .slice(0, 4)
-            .map((n: any) => (n?.type === 'text' ? { type: 'text', text: (n.text || '').slice(0, 50) } : { type: n?.type, attrs: n?.attrs }))
-            .flat()
-          console.debug('[MessageInput.ensureLeadingAgentMention] current first paragraph', summary)
-        } catch {}
 
         // Always derive the mention from the current selected agent rather than
         // reusing whatever mention node happens to be in the document. This keeps

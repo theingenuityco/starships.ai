@@ -1554,65 +1554,62 @@ export class ConversationService {
             const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
             // Extract reasoning from OpenRouter unified fields (reasoning and reasoning_details)
+            // IMPORTANT: Many providers send BOTH a cumulative snapshot (reasoning.content) AND token deltas (reasoning.tokens).
+            // Concatenating both will double the text. Prefer a single source in priority order:
+            // 1) reasoning_details (structured), else 2) reasoning.tokens (incremental), else 3) reasoning.content/text/string.
             const extractReasoning = (node: unknown): string => {
               try {
                 if (!node || typeof node !== 'object') return '';
                 const rec = node as Record<string, unknown>;
-                const parts: string[] = [];
 
-                // Unified reasoning field
-                const raw = rec.reasoning as unknown;
-
-                const appendFromRaw = (r: unknown): void => {
-                  if (!r) return;
-                  if (typeof r === 'string') {
-                    parts.push(r);
-                    return;
-                  }
-                  if (typeof r === 'object' && r !== null) {
-                    const obj = r as Record<string, unknown>;
-                    if (typeof obj.content === 'string') parts.push(obj.content);
-                    if (Array.isArray(obj.tokens)) {
-                      for (const t of obj.tokens as unknown[]) {
-                        if (t && typeof t === 'object') {
-                          const tr = t as Record<string, unknown>;
-                          const text = typeof tr.text === 'string' ? tr.text : '';
-                          const content = typeof tr.content === 'string' ? tr.content : '';
-                          if (text) parts.push(text);
-                          else if (content) parts.push(content);
-                        }
-                      }
-                    }
-                  }
-                  if (Array.isArray(r)) {
-                    for (const p of r as unknown[]) {
-                      if (p && typeof p === 'object') {
-                        const pr = p as Record<string, unknown>;
-                        const text = typeof pr.text === 'string' ? pr.text : '';
-                        const content = typeof pr.content === 'string' ? pr.content : '';
-                        if (text) parts.push(text);
-                        else if (content) parts.push(content);
-                      }
-                    }
-                  }
-                };
-
-                appendFromRaw(raw);
-
-                // OpenRouter unified 'reasoning_details' chunks
+                // 1) Prefer structured reasoning_details if present
                 const details = rec.reasoning_details as unknown;
-                if (Array.isArray(details)) {
+                if (Array.isArray(details) && details.length > 0) {
+                  const parts: string[] = [];
                   for (const d of details as unknown[]) {
                     if (d && typeof d === 'object') {
                       const det = d as Record<string, unknown>;
-                      if (det.type === 'reasoning.text' && typeof det.text === 'string') {
+                      if (det.type === 'reasoning.text' && typeof det.text === 'string' && det.text.length > 0) {
                         parts.push(det.text);
                       }
                     }
                   }
+                  if (parts.length > 0) return parts.join('');
                 }
 
-                return parts.join('');
+                const raw = rec.reasoning as unknown;
+                if (!raw) return '';
+
+                const pickText = (obj: unknown): string => {
+                  if (!obj) return '';
+                  if (typeof obj === 'string') return obj;
+                  if (typeof obj !== 'object') return '';
+                  const r = obj as Record<string, unknown>;
+                  if (typeof r.text === 'string' && r.text.length > 0) return r.text;
+                  if (typeof r.content === 'string' && r.content.length > 0) return r.content;
+                  return '';
+                };
+
+                // 2) If reasoning is an object with tokens, prefer tokens (incremental) and ignore obj.content to avoid duplication
+                if (typeof raw === 'object' && raw !== null && !Array.isArray(raw)) {
+                  const obj = raw as Record<string, unknown>;
+                  const tokens = obj.tokens as unknown;
+                  if (Array.isArray(tokens) && tokens.length > 0) {
+                    return (tokens as unknown[]).map(pickText).join('');
+                  }
+                  // Otherwise, use content/text on the object
+                  return pickText(obj);
+                }
+
+                // 3) If reasoning is an array, join by text/content
+                if (Array.isArray(raw)) {
+                  return (raw as unknown[]).map(pickText).join('');
+                }
+
+                // 4) If reasoning is a string, return as-is
+                if (typeof raw === 'string') return raw;
+
+                return '';
               } catch {
                 return '';
               }

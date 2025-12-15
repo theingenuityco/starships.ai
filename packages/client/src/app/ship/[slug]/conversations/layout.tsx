@@ -25,10 +25,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   // Handle conversation change from ConversationInterface
   const handleConversationChange = useCallback(
     (newConversationId: string | null) => {
-      try {
-        // eslint-disable-next-line no-console
-        console.debug('[conv-debug][layout] onConversationChange', { slug: routeParams.slug, from: routeParams.conversationId, to: newConversationId })
-      } catch {}
       if (newConversationId) {
         router.push(`/ship/${routeParams.slug}/conversations/${newConversationId}`)
       } else {

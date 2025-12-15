@@ -91,20 +91,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
-    const dbg = useCallback(
-      (event: string, data?: any) => {
-        try {
-          // eslint-disable-next-line no-console
-          console.debug('[conv-debug][input]', event, {
-            conversationId,
-            sending,
-            storeBusy: conversationId ? useStarshipUIStore.getState().conversations?.[conversationId]?.isResponding : undefined,
-            ...data,
-          })
-        } catch {}
-      },
-      [conversationId, sending]
-    )
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -323,7 +309,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       streamingRef.current = true
       // Then set state (async, but ref already blocks)
       setSending(true)
-      dbg('submit:start', { messageLen: messageToSend.length })
 
       // Track the active conversation id within this send attempt (handles "create conversation" path)
       let sendConversationId: string | null = conversationId ?? null
@@ -332,7 +317,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       const resetFlags = () => {
         setSending(false)
         streamingRef.current = false
-        dbg('submit:resetFlags', { sendConversationId })
         // If we already created a conversation and marked it busy in the store, clear it.
         try {
           const cid = sendConversationId
@@ -397,7 +381,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let currentConversationId = conversationId
         let createdNewConversation = false
         if (!currentConversationId) {
-          dbg('createConversation:start')
           const newConversation = await createConversation.mutateAsync({
             title: `Chat with ${effectiveAgent.name}`,
             starshipId: starshipId,
@@ -405,11 +388,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
           currentConversationId = newConversation.id
           sendConversationId = currentConversationId
-          dbg('createConversation:success', { newConversationId: currentConversationId })
           createdNewConversation = true
         }
         sendConversationId = currentConversationId!
-        dbg('submit:haveConversationId', { sendConversationId })
         // Ensure local ref is updated immediately for stop button usability
         lastConversationIdRef.current = currentConversationId!
 
@@ -427,7 +408,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             isAssistantStreaming: false,
             lastActivityAt: new Date().toISOString(),
           })
-          dbg('store:setConversationMeta(busy)', { cid: currentConversationId })
         } catch {}
 
         // CRITICAL: pre-seed the streamed cache with a temp user message + local turn_started
@@ -447,7 +427,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           // Also reflect immediately in the UI store so the message appears instantly.
           try {
             useStarshipUIStore.getState().appendMessage(currentConversationId!, tempUser)
-            dbg('store:appendMessage(tempUser)', { cid: currentConversationId, tempUserId: tempUser.id })
           } catch {}
           // Seed streamedQuery chunks; sendMessageMutation.onMutate will detect and avoid duplicating this.
           queryClient.setQueryData(['conversations', 'detail', currentConversationId!, 'messages'], (old: any[] | undefined) => {
@@ -467,13 +446,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
             return next
           })
-          dbg('cache:seedStream(localTurnStarted)', { cid: currentConversationId })
         } catch {}
 
         // IMPORTANT: only after we seed store + cache do we trigger the route transition.
         // This ensures the /conversations/:id page mounts into an already-busy conversation.
         if (createdNewConversation) {
-          dbg('route:push(delayedAfterSeed)', { cid: currentConversationId })
           onConversationStart?.(currentConversationId!)
         }
 
@@ -553,7 +530,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         }
 
         // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
-        dbg('sendMessageFn:start', { cid: currentConversationId })
         void sendMessageFn({
           conversationId: currentConversationId!,
           agentId: effectiveAgent!.id,
@@ -567,7 +543,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
             // Restore message on error
             setMessage(messageToSend)
-            dbg('sendMessageFn:error', { cid: currentConversationId, error: (error as any)?.message })
             // Clear store busy flags on failure
             try {
               useStarshipUIStore.getState().setConversationMeta(currentConversationId!, {
@@ -580,7 +555,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
           .finally(() => {
             setSending(false)
-            dbg('sendMessageFn:finally', { cid: currentConversationId })
             // Clear attachments after successful send
             setPendingFiles([])
             setUploadedAttachmentIds([])
@@ -593,7 +567,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Restore message and ensure local sending cleared on immediate failure
         setMessage(messageToSend)
         setSending(false)
-        dbg('submit:exception', { error: (error as any)?.message, sendConversationId })
         // Clear store busy flags on immediate failure when we may have created a conversation
         try {
           const cid = sendConversationId

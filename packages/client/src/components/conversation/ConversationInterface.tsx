@@ -732,10 +732,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     // Consume UI actions emitted over SSE (conversation title updates, child conversations, etc.)
     useEffect(() => {
       if (!lastUIAction) return
-      try {
-        // eslint-disable-next-line no-console
-        console.debug('[ConversationInterface] lastUIAction from stream', lastUIAction)
-      } catch {}
       handleUIPayload(lastUIAction)
     }, [lastUIAction, handleUIPayload])
 

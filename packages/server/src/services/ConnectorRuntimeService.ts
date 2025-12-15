@@ -129,15 +129,11 @@ export class ConnectorRuntimeService {
         continue;
       }
 
-      // Some connectors (e.g. platform-secret-backed bot tokens) must only be exposed
-      // to workflows when there is a connected record for this starship/provider.
-      const requiresConnected =
-        oauthConfig.requiresConnected === true || runtimeConfig.requiresConnected === true || accessTokenRef.trim().startsWith('platform:');
-      if (requiresConnected) {
-        const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
-        if (!existing || existing.status !== 'connected') {
-          continue;
-        }
+      // Connectors should only be exposed to workflows when the connector is connected
+      // for this starship (except the internal "starships" connector handled above).
+      const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
+      if (!existing || existing.status !== 'connected') {
+        continue;
       }
 
       const authHeaderName =

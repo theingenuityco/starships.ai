@@ -9,7 +9,6 @@ import type { Client } from 'pg';
  * This migration updates the Discord template runtime_config to:
  * - oauth.accessToken = "platform:DISCORD_BOT_TOKEN"
  * - oauth.authPrefix = "Bot"
- * - oauth.requiresConnected = true
  */
 export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
@@ -20,18 +19,13 @@ export async function up(client: Client): Promise<void> {
         runtime_config =
           jsonb_set(
             jsonb_set(
-              jsonb_set(
-                COALESCE(runtime_config, '{}'::jsonb),
-                '{oauth,accessToken}',
-                to_jsonb('platform:DISCORD_BOT_TOKEN'::text),
-                true
-              ),
-              '{oauth,authPrefix}',
-              to_jsonb('Bot'::text),
+              COALESCE(runtime_config, '{}'::jsonb),
+              '{oauth,accessToken}',
+              to_jsonb('platform:DISCORD_BOT_TOKEN'::text),
               true
             ),
-            '{oauth,requiresConnected}',
-            to_jsonb(true),
+            '{oauth,authPrefix}',
+            to_jsonb('Bot'::text),
             true
           ),
         updated_at = NOW()
@@ -60,7 +54,6 @@ export async function down(client: Client): Promise<void> {
               COALESCE(runtime_config->'oauth', '{}'::jsonb)
               - 'accessToken'
               - 'authPrefix'
-              - 'requiresConnected'
             ),
             true
           ),

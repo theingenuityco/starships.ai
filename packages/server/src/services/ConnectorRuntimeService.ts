@@ -1,5 +1,5 @@
 import { ConnectorRepository, ConnectorTemplateRepository } from '@starships/models';
-import type { ConnectorProvider, ConnectorRuntimeConfig } from '@starships/protocol';
+import type { ConnectorProvider, ConnectorRuntimeConfig, ConnectorSecretRefType, ConnectorTokenRef } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { generateJWT } from '@/utils/jwt';
@@ -34,24 +34,44 @@ export class ConnectorRuntimeService {
     this.platformSecretService = new PlatformSecretService();
   }
 
-  private async resolveTokenRef(tokenRef: string, decryptedSecrets: Record<string, unknown>): Promise<string | undefined> {
-    const ref = tokenRef.trim();
-    if (!ref) return undefined;
+  private parseSecretRef(ref: unknown): { type: ConnectorSecretRefType; key: string } | undefined {
+    if (typeof ref === 'string') {
+      const trimmed = ref.trim();
+      if (!trimmed) return undefined;
 
-    // Allow connector_templates.runtime_config.oauth.accessToken to reference platform secrets
-    // without hard-coding providers in host code.
-    //
-    // Example (host-level secret token with a prefix):
-    //   oauth.accessToken = "platform:MY_SERVICE_TOKEN"
-    //   oauth.authPrefix  = "Bearer"
-    if (ref.startsWith('platform:')) {
-      const envKey = ref.slice('platform:'.length).trim();
-      if (!envKey) return undefined;
-      const secret = await this.platformSecretService.getSecret(envKey);
+      // Legacy format: "platform:ENV_KEY"
+      if (trimmed.startsWith('platform:')) {
+        const key = trimmed.slice('platform:'.length).trim();
+        if (!key) return undefined;
+        return { type: 'platform_secret', key };
+      }
+
+      // Legacy format: plain string = connector secret key
+      return { type: 'connector_secret', key: trimmed };
+    }
+
+    if (ref && typeof ref === 'object') {
+      const rec = ref as Record<string, unknown>;
+      const type = rec.type;
+      const key = rec.key;
+      if ((type === 'platform_secret' || type === 'connector_secret') && typeof key === 'string' && key.trim()) {
+        return { type, key: key.trim() };
+      }
+    }
+
+    return undefined;
+  }
+
+  private async resolveTokenRef(tokenRef: ConnectorTokenRef, decryptedSecrets: Record<string, unknown>): Promise<string | undefined> {
+    const parsed = this.parseSecretRef(tokenRef);
+    if (!parsed) return undefined;
+
+    if (parsed.type === 'platform_secret') {
+      const secret = await this.platformSecretService.getSecret(parsed.key);
       return typeof secret === 'string' && secret.trim() ? secret.trim() : undefined;
     }
 
-    const raw = decryptedSecrets[ref];
+    const raw = decryptedSecrets[parsed.key];
     return typeof raw === 'string' && raw.trim() ? raw.trim() : undefined;
   }
 
@@ -113,7 +133,7 @@ export class ConnectorRuntimeService {
       }
 
       // OAuth-style connectors typically specify which env key holds the access token.
-      const accessTokenRef = typeof oauthConfig.accessToken === 'string' ? oauthConfig.accessToken : undefined;
+      const accessTokenRef = oauthConfig.accessToken as ConnectorTokenRef | undefined;
       if (!accessTokenRef) {
         continue;
       }

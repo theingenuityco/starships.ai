@@ -7,6 +7,7 @@ export { AgentEntity } from './entities/AgentEntity';
 export { AgentTemplateEntity } from './entities/AgentTemplateEntity';
 export { ConversationEntity } from './entities/ConversationEntity';
 export { EnvironmentEntity } from './entities/EnvironmentEntity';
+export { PlatformSecretEntity } from './entities/PlatformSecretEntity';
 export { ConnectorEntity } from './entities/ConnectorEntity';
 export { ConnectorTemplateEntity } from './entities/ConnectorTemplateEntity';
 export { MessageEntity } from './entities/MessageEntity';
@@ -33,6 +34,7 @@ export { AgentTemplateRepository } from './repositories/AgentTemplateRepository'
 export { AttachmentRepository } from './repositories/AttachmentRepository';
 export { ConversationRepository } from './repositories/ConversationRepository';
 export { EnvironmentRepository } from './repositories/EnvironmentRepository';
+export { PlatformSecretRepository } from './repositories/PlatformSecretRepository';
 export { ConnectorTemplateRepository } from './repositories/ConnectorTemplateRepository';
 export { ConnectorRepository } from './repositories/ConnectorRepository';
 export { MessageRepository } from './repositories/MessageRepository';

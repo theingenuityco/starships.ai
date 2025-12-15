@@ -3,6 +3,7 @@ import type { ConnectorProvider } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { EnvironmentService } from './EnvironmentService';
 import { generateJWT } from '@/utils/jwt';
+import { PlatformSecretService } from './PlatformSecretService';
 
 export interface ConnectorHttpConfig {
   baseUrl: string;
@@ -24,11 +25,13 @@ export class ConnectorRuntimeService {
   private connectorTemplateRepository: ConnectorTemplateRepository;
   private connectorRepository: ConnectorRepository;
   private environmentService: EnvironmentService;
+  private platformSecretService: PlatformSecretService;
 
   constructor() {
     this.connectorTemplateRepository = new ConnectorTemplateRepository();
     this.connectorRepository = new ConnectorRepository();
     this.environmentService = new EnvironmentService();
+    this.platformSecretService = new PlatformSecretService();
   }
 
   /**
@@ -68,7 +71,7 @@ export class ConnectorRuntimeService {
        * - There is no per-starship access token to read from decrypted env
        */
       if (provider === 'discord') {
-        const botToken = env.DISCORD_BOT_TOKEN;
+        const botToken = (await this.platformSecretService.getSecret('DISCORD_BOT_TOKEN')) || env.DISCORD_BOT_TOKEN;
         if (!botToken || typeof botToken !== 'string' || !botToken.trim()) {
           continue;
         }

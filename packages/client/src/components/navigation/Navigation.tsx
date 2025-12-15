@@ -228,7 +228,7 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && isInstanceAdmin
         ? [
             {
-              href: '/admin/agents/pending',
+              href: '/admin/connectors',
               label: 'Admin',
               icon: 'shield-check',
               isActive: pathname.startsWith('/admin'),

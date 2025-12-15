@@ -172,6 +172,10 @@ export default function PendingAgentsPage(): React.JSX.Element {
                 <h1 className="text-2xl font-bold">Admin</h1>
               </div>
               <div className="flex items-center justify-center gap-3 mt-2">
+                <a href="/admin/connectors" className="text-sm font-medium underline underline-offset-4">
+                  Connectors
+                </a>
+                <span className="text-muted-foreground">·</span>
                 <a href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
                   Agent approvals
                 </a>

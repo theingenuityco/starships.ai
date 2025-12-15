@@ -14,9 +14,10 @@ import type {
   UpdateConnectorTemplateRequest,
 } from '@starships/protocol';
 import { ConnectorTemplateRepository } from '@starships/models';
-import { IdSchema } from '@/schemas/common';
 
 const router: Router = Router();
+
+const TemplateIdOrProviderSchema = z.string().trim().min(1).max(255);
 
 const TemplateTextSchema = z
   .string()
@@ -109,11 +110,11 @@ router.get('/admin/connectors/:id', jwtAuthMiddleware, async (req: Request, res:
       return;
     }
 
-    const params = validateData(z.object({ id: IdSchema }), req.params, res, 'connector template id');
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
     if (!params) return;
 
     const repo = new ConnectorTemplateRepository();
-    const template = await repo.findById(params.id);
+    const template = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
       return;
@@ -137,14 +138,20 @@ router.put('/admin/connectors/:id', jwtAuthMiddleware, async (req: Request, res:
       return;
     }
 
-    const params = validateData(z.object({ id: IdSchema }), req.params, res, 'connector template id');
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
     if (!params) return;
 
     const body = validateData(UpdateConnectorTemplateSchema, req.body as UpdateConnectorTemplateRequest, res, 'connector template update');
     if (!body) return;
 
     const repo = new ConnectorTemplateRepository();
-    const updated = await repo.update(params.id, {
+    const existing = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
+    if (!existing) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const updated = await repo.update(existing.id, {
       displayName: body.displayName,
       description: body.description,
       authType: body.authType as any,

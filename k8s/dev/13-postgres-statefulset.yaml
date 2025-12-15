@@ -54,19 +54,52 @@ spec:
               fi
 
               echo "Scanning /old for existing Postgres cluster..."
-              OLD_PG_VERSION_PATH=$(find /old -maxdepth 6 -type f -name PG_VERSION | head -n 1 || true)
+              # Prefer the known path from the previous "fat container" layout, if present.
+              # (Using `find ... | head -n 1` is not safe because it can accidentally match
+              # stray PG_VERSION files under `base/<oid>/...`, which is not the cluster root.)
+              OLD_CLUSTER_DIR=""
+              for CANDIDATE in /old/postgres/data/pgdata /old/var/lib/postgresql/data/pgdata /old/var/lib/postgresql/data; do
+                if [ -f "$CANDIDATE/PG_VERSION" ] && [ -d "$CANDIDATE/base" ] && [ -d "$CANDIDATE/global" ]; then
+                  OLD_CLUSTER_DIR="$CANDIDATE"
+                  break
+                fi
+              done
 
-              if [ -z "$OLD_PG_VERSION_PATH" ]; then
+              if [ -z "$OLD_CLUSTER_DIR" ]; then
+                OLD_PG_VERSION_PATH=$(find /old -maxdepth 10 -type f -name PG_VERSION 2>/dev/null | head -n 1 || true)
+                if [ -n "$OLD_PG_VERSION_PATH" ]; then
+                  DIR=$(dirname "$OLD_PG_VERSION_PATH")
+                  # Walk upward until we find the actual cluster root (contains base/ + global/ + PG_VERSION).
+                  while [ "$DIR" != "/old" ] && [ "$DIR" != "/" ]; do
+                    if [ -f "$DIR/PG_VERSION" ] && [ -d "$DIR/base" ] && [ -d "$DIR/global" ]; then
+                      OLD_CLUSTER_DIR="$DIR"
+                      break
+                    fi
+                    DIR=$(dirname "$DIR")
+                  done
+                fi
+              fi
+
+              if [ -z "$OLD_CLUSTER_DIR" ]; then
                 echo "No existing Postgres cluster found under /old; skipping migration."
                 exit 0
               fi
 
-              OLD_CLUSTER_DIR=$(dirname "$OLD_PG_VERSION_PATH")
               echo "Found existing Postgres cluster at $OLD_CLUSTER_DIR"
 
               echo "Copying existing Postgres data from old volume to new volume..."
-              mkdir -p /new/data/pgdata
-              cp -a "$OLD_CLUSTER_DIR/." /new/data/pgdata/.
+              rm -rf /new/data/pgdata.new
+              mkdir -p /new/data/pgdata.new
+              cp -a "$OLD_CLUSTER_DIR/." /new/data/pgdata.new/.
+              if [ ! -f /new/data/pgdata.new/PG_VERSION ] || [ ! -f /new/data/pgdata.new/postgresql.conf ]; then
+                echo "Migration failed: copied directory is missing expected cluster root files (PG_VERSION/postgresql.conf)."
+                echo "Refusing to replace /new/data/pgdata."
+                exit 1
+              fi
+              rm -rf /new/data/pgdata
+              mv /new/data/pgdata.new /new/data/pgdata
+              # Ensure the postgres container user can read/write the data directory.
+              chown -R 70:70 /new/data/pgdata
               echo "Postgres data copy complete."
           volumeMounts:
             - name: old-postgres-data

@@ -19,6 +19,66 @@ export type ConnectorProvider = 'linkedin' | 'discord' | 'starships' | 'google_d
 
 export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
+// ============================================================================
+// CONNECTOR TEMPLATE RUNTIME CONFIG (runtime_config JSON)
+// ============================================================================
+
+/**
+ * ConnectorTokenRef
+ *
+ * - For per-starship secrets: the env key in connector_secrets (e.g. "GH_APP_ACCESS_TOKEN")
+ * - For host/platform secrets: "platform:<ENV_KEY>" (e.g. "platform:DISCORD_BOT_TOKEN")
+ */
+export type ConnectorTokenRef = string;
+
+/**
+ * ConnectorOAuthRuntimeConfig
+ *
+ * Configuration under connector_templates.runtime_config.oauth.
+ * This is intentionally open-ended (extends Record) to support DB-driven providers.
+ */
+export interface ConnectorOAuthRuntimeConfig extends Record<string, unknown> {
+  // OAuth app credentials (host/platform secrets)
+  clientId?: string; // env key name holding the OAuth client id
+  clientSecret?: string; // env key name holding the OAuth client secret
+
+  // Stored credentials (per-starship connector_secrets) OR platform refs
+  accessToken?: ConnectorTokenRef;
+  refreshToken?: string; // env key name holding refresh token (per-starship)
+  apiKey?: string; // env key name holding api key (per-starship)
+
+  // OAuth endpoints + behavior
+  authorizeUrl?: string;
+  tokenUrl?: string;
+  redirectPath?: string;
+  scopes?: string[];
+  params?: Record<string, unknown>;
+  metadataFromQuery?: Record<string, unknown>;
+
+  // HostRuntime HTTP auth injection behavior
+  authHeaderName?: string;
+  authPrefix?: string; // e.g. "Bearer", "Bot", or "" for no prefix
+  requiresConnected?: boolean; // gate exposure to workflows unless connector.status === "connected"
+}
+
+/**
+ * ConnectorRuntimeConfig
+ *
+ * Root configuration for connector templates (connector_templates.runtime_config).
+ * Still open-ended, but with common keys typed.
+ */
+export interface ConnectorRuntimeConfig extends Record<string, unknown> {
+  apiBaseUrl?: string;
+  oauth?: ConnectorOAuthRuntimeConfig;
+
+  // Host-only special behavior
+  usesPlatformJwt?: boolean; // used by the internal "starships" connector
+  requiresConnected?: boolean; // optional top-level gate
+
+  // Custom connector helpers (e.g. GitHub App slug env key name)
+  appSlugEnvKey?: string;
+}
+
 /**
  * Core connector entity
  */
@@ -104,7 +164,7 @@ export interface ConnectorTemplateModel {
  * and (optional) inline autopilot blueprints.
  */
 export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
-  runtimeConfig: Record<string, unknown>;
+  runtimeConfig: ConnectorRuntimeConfig;
   connectBlueprint?: Record<string, unknown> | null;
   refreshBlueprint?: Record<string, unknown> | null;
   testBlueprint?: Record<string, unknown> | null;
@@ -129,7 +189,7 @@ export interface UpdateConnectorTemplateRequest {
   isEnabled?: boolean;
   version?: string;
   category?: string;
-  runtimeConfig?: Record<string, unknown>;
+  runtimeConfig?: ConnectorRuntimeConfig;
   connectBlueprint?: Record<string, unknown> | null;
   refreshBlueprint?: Record<string, unknown> | null;
   testBlueprint?: Record<string, unknown> | null;
@@ -183,7 +243,7 @@ export interface ConnectorConnectInput {
    * rely on this config for non-secret options such as env key names, OAuth
    * parameters, or other connector behavior hints.
    */
-  config?: Record<string, unknown>;
+  config?: ConnectorRuntimeConfig;
 }
 
 export interface ConnectorConnectOutput {
@@ -219,7 +279,7 @@ export interface ConnectorRefreshInput {
   provider: ConnectorProvider;
   envSnapshot: Record<string, string>;
   metadata?: Record<string, unknown>;
-  config?: Record<string, unknown>;
+  config?: ConnectorRuntimeConfig;
 }
 
 export interface ConnectorRefreshOutput {
@@ -234,7 +294,7 @@ export interface ConnectorTestInput {
   provider: ConnectorProvider;
   envSnapshot: Record<string, string>;
   metadata?: Record<string, unknown>;
-  config?: Record<string, unknown>;
+  config?: ConnectorRuntimeConfig;
 }
 
 export interface ConnectorTestOutput {

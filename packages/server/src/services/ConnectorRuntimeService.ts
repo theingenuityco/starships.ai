@@ -1,5 +1,5 @@
 import { ConnectorRepository, ConnectorTemplateRepository } from '@starships/models';
-import type { ConnectorProvider } from '@starships/protocol';
+import type { ConnectorProvider, ConnectorRuntimeConfig } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { generateJWT } from '@/utils/jwt';
@@ -85,11 +85,10 @@ export class ConnectorRuntimeService {
 
     for (const tpl of templates) {
       const provider = tpl.provider as ConnectorProvider;
-      const runtimeConfig = (tpl.runtimeConfig || {}) as Record<string, unknown>;
-      const oauthConfig =
-        runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
-          ? (runtimeConfig.oauth as Record<string, unknown>)
-          : ({} as Record<string, unknown>);
+      const runtimeConfig = (tpl.runtimeConfig || {}) as ConnectorRuntimeConfig;
+      const oauthConfig = (runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object' ? runtimeConfig.oauth : {}) as NonNullable<
+        ConnectorRuntimeConfig['oauth']
+      >;
 
       // Starships connector uses a platform JWT instead of a stored access token.
       if (runtimeConfig.usesPlatformJwt === true && provider === 'starships') {
@@ -142,15 +141,11 @@ export class ConnectorRuntimeService {
       }
 
       const authHeaderName =
-        (typeof oauthConfig.authHeaderName === 'string' && oauthConfig.authHeaderName.trim()
+        typeof oauthConfig.authHeaderName === 'string' && oauthConfig.authHeaderName.trim()
           ? oauthConfig.authHeaderName.trim()
-          : undefined) ||
-        (typeof oauthConfig.authHeader === 'string' && oauthConfig.authHeader.trim() ? oauthConfig.authHeader.trim() : 'Authorization');
+          : 'Authorization';
       const authPrefix =
-        (typeof oauthConfig.authPrefix === 'string' && oauthConfig.authPrefix.trim().length >= 0 ? oauthConfig.authPrefix : undefined) ||
-        (typeof oauthConfig.authHeaderPrefix === 'string' && oauthConfig.authHeaderPrefix.trim().length >= 0
-          ? oauthConfig.authHeaderPrefix
-          : 'Bearer');
+        typeof oauthConfig.authPrefix === 'string' && oauthConfig.authPrefix.trim().length >= 0 ? oauthConfig.authPrefix : 'Bearer';
 
       connectors[provider] = {
         baseUrl,
@@ -168,7 +163,7 @@ export class ConnectorRuntimeService {
    *
    * Source of truth is connector_templates.runtime_config.apiBaseUrl.
    */
-  private getApiBaseUrl(provider: string, runtimeConfig: Record<string, unknown>): string | undefined {
+  private getApiBaseUrl(provider: string, runtimeConfig: ConnectorRuntimeConfig): string | undefined {
     const rcBase = runtimeConfig.apiBaseUrl;
     if (typeof rcBase === 'string' && rcBase.trim().length > 0) {
       return rcBase.trim();

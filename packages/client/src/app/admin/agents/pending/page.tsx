@@ -16,6 +16,7 @@ import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 import { cn } from '@/lib/utils'
+import Link from 'next/link'
 
 interface RequestedByProfileProps {
   name: string
@@ -169,9 +170,22 @@ export default function PendingAgentsPage(): React.JSX.Element {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="shield-check" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Agent publish approvals</h1>
+                <h1 className="text-2xl font-bold">Admin</h1>
               </div>
-              <p className="text-muted-foreground mt-2">Review and approve or reject agents that owners have requested to publish.</p>
+              <div className="flex items-center justify-center gap-3 mt-2">
+                <Link href="/admin/connector-templates" className="text-sm font-medium underline underline-offset-4">
+                  Connector templates
+                </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
+                  Agent approvals
+                </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
+                  Platform secrets
+                </Link>
+              </div>
+              <p className="text-muted-foreground mt-3">Review pending publishes and manage instance-level encrypted secrets.</p>
             </div>
 
             <section className="space-y-6">

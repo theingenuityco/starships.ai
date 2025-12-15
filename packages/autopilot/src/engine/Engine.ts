@@ -681,7 +681,7 @@ export class Engine {
     if (partialPaths.length) {
       for (const p of partialPaths) {
         validationErrors.push(
-          `${node.ref}: Partial template usage not supported at ${p}; wrap the entire string in a single {{ ... }} expression that returns the final value.`
+          `${node.ref}: Partial template usage is not supported at ${p}. Build the entire value inside a single full-string template (e.g. "{{ ... }}") or compute it in a Code node and reference its output (e.g. "{{ lastOutputOf('build_url').url }}").`
         );
       }
     }

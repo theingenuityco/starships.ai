@@ -62,3 +62,10 @@ Common mistakes and how to fix them
   - Fix: Use a single expression that returns the final value:
     - Transform value example: "{{ input.user.first + ' ' + input.user.last }}"
     - Conditional example: "{{ state.retryCount < 3 ? 'retry' : 'stop' }}"
+
+- HttpRequest + connectors
+  - Problem: Using partial templates in `parameters.url` or `parameters.body` when calling external APIs (for example, `"/repos/{{ input.owner }}/{{ input.repo }}/issues?state={{ input.state || 'open' }}"`).
+  - Fix: Either:
+    - Use a single full-string template: `url: "{{ '/repos/' + input.owner + '/' + input.repo + '/issues?state=' + (input.state || 'open') }}"`, or
+    - Build `{ url }` in a Code node and reference it from HttpRequest: `url: "{{ (lastOutputOf('build_url') || {}).url }}"`.
+  - See `node-http-request.md`, `node-code.md`, and the connector docs (for example `connectors/github.md`) for end-to-end examples.

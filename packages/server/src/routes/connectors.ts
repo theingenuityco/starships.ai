@@ -26,12 +26,6 @@ const ApiKeyConnectSchema = z.object({
   extraConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
-const GitHubAppConfigSchema = z.object({
-  installationId: z.string().min(1, 'installationId is required'),
-  defaultOwner: z.string().optional(),
-  defaultRepo: z.string().optional(),
-});
-
 const ProviderParamSchema = z.object({
   id: IdSchema,
   provider: z.string().min(1, 'provider is required'),
@@ -180,47 +174,12 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
     const bodyValidation = validateData(ApiKeyConnectSchema, req.body as ConnectWithApiKeyRequest, res, 'API key connector payload');
     if (!bodyValidation) return;
 
-    if (provider === 'discord') {
-      sendError(res, 'OPERATION_NOT_ALLOWED', 'Discord connector no longer supports API key flow; use OAuth instead.', 400, {
-        provider,
-      });
-      return;
-    }
-
     const connectorService = new ConnectorService();
     const connector = await connectorService.connectWithApiKey(starshipId, provider, bodyValidation as ConnectWithApiKeyRequest, userId);
 
     sendSuccess(res, { connector });
   } catch (error) {
     handleError(error, res, 'connecting connector via API key');
-  }
-});
-
-// POST /starships/:id/connectors/github/app-config - Configure GitHub App connector per starship
-router.post('/starships/:id/connectors/github/app-config', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
-
-    const paramsValidation = validateData(z.object({ id: IdSchema }), { id: req.params.id }, res, 'starship parameter');
-    if (!paramsValidation) return;
-
-    const { id: starshipId } = paramsValidation;
-
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
-
-    const bodyValidation = validateData(GitHubAppConfigSchema, req.body as unknown, res, 'GitHub App connector configuration');
-    if (!bodyValidation) return;
-
-    const connectorService = new ConnectorService();
-    await connectorService.configureGitHubConnector(starshipId, userId, bodyValidation);
-
-    res.status(204).send();
-  } catch (error) {
-    handleError(error, res, 'configuring GitHub connector');
   }
 });
 
@@ -262,8 +221,8 @@ router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware,
   }
 });
 
-// POST /starships/:id/connectors/:provider/oauth/start - Start OAuth flow (LinkedIn, Discord, Google Drive)
-router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+// Shared handler to start a connector flow (OAuth2 or provider-specific like GitHub App).
+async function startConnectorHandler(req: Request, res: Response): Promise<void> {
   try {
     const userId = req.user?.id;
     if (!userId) {
@@ -285,7 +244,7 @@ router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware
 
     const connectorService = new ConnectorService();
 
-    const authorizationUrl = await connectorService.startOAuthConnector(starshipId, userId, provider);
+    const authorizationUrl = await connectorService.startConnector(starshipId, userId, provider as ConnectorProvider);
 
     const response: StartOAuthResponse = {
       authorizationUrl,
@@ -293,9 +252,12 @@ router.post('/starships/:id/connectors/:provider/oauth/start', jwtAuthMiddleware
 
     sendSuccess(res, response);
   } catch (error) {
-    handleError(error, res, 'starting OAuth connector flow');
+    handleError(error, res, 'starting connector flow');
   }
-});
+}
+
+// POST /starships/:id/connectors/:provider/start - Generic connector start route
+router.post('/starships/:id/connectors/:provider/start', jwtAuthMiddleware, startConnectorHandler);
 
 const OAuthCallbackSchema = z.object({
   code: z.string().min(1, 'Authorization code is required').optional(),
@@ -303,8 +265,20 @@ const OAuthCallbackSchema = z.object({
   error: z.string().optional(),
 });
 
-// GET /connectors/:provider/oauth/callback - OAuth callback for connectors (LinkedIn, Discord, Google Drive)
-router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Response): Promise<void> => {
+function redactOAuthCallbackQueryForLogs(query: Record<string, unknown>): Record<string, unknown> {
+  const redacted: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(query)) {
+    if (key === 'code' || key === 'state') {
+      redacted[key] = '[REDACTED]';
+      continue;
+    }
+    redacted[key] = val;
+  }
+  return redacted;
+}
+
+// Shared handler for connector callbacks (OAuth2 and provider-specific flows like GitHub App).
+async function connectorCallbackHandler(req: Request, res: Response): Promise<void> {
   try {
     const paramsValidation = validateData(
       z.object({ provider: z.string().min(1, 'provider is required') }),
@@ -331,6 +305,40 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
       return `${env.PUBLIC_URL}${basePath}?${params.toString()}`;
     };
 
+    // Custom connectors (authType = 'custom', e.g. GitHub App) delegate
+    // completion to a provider-specific connect blueprint via
+    // completeCustomConnector. The service method inspects the connector
+    // template's authType, so we don't hard-code provider ids here.
+    try {
+      const { starshipId, starshipSlug } = await connectorService.completeCustomConnector(
+        provider as ConnectorProvider,
+        state,
+        req.query as Record<string, unknown>
+      );
+
+      const redirectParams = new URLSearchParams({
+        connector: provider,
+        status: 'success',
+      });
+
+      const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
+      res.redirect(redirectUrl);
+      return;
+    } catch (customError) {
+      const msg = (customError as Error | undefined)?.message || '';
+      // Expected path for non-custom connectors: completeCustomConnector throws when authType !== 'custom'.
+      // Avoid noisy logs; just fall through to the OAuth2 handler below.
+      if (!msg.includes('does not use custom authentication')) {
+        console.error('[CONNECTOR_CALLBACK] Custom connector completion failed; falling back to oauth2', {
+          provider,
+          errorMessage: msg,
+          errorName: (customError as Error | undefined)?.name,
+        });
+      }
+      // Fall through to generic OAuth error handling below when connector is
+      // not custom or completion fails.
+    }
+
     if (error || !code) {
       try {
         const stateValidation = await validateOAuthState(state);
@@ -349,7 +357,12 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
             return;
           }
         }
-      } catch {
+      } catch (stateError) {
+        console.error('[CONNECTOR_CALLBACK] Failed to validate OAuth state for error redirect', {
+          provider,
+          errorMessage: (stateError as Error | undefined)?.message,
+          errorName: (stateError as Error | undefined)?.name,
+        });
         // fall through to generic callback redirect below
       }
 
@@ -377,7 +390,15 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
     const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
 
     res.redirect(redirectUrl);
-  } catch {
+  } catch (err) {
+    // Keep error logs minimal and safe (no code/state leakage).
+    console.error('[CONNECTOR_CALLBACK] Unhandled error during connector callback', {
+      provider: req.params.provider,
+      query: redactOAuthCallbackQueryForLogs(req.query as Record<string, unknown>),
+      errorMessage: (err as Error | undefined)?.message,
+      errorName: (err as Error | undefined)?.name,
+    });
+
     // On error, try to redirect back to the starship connectors page with an error flag
     try {
       const provider = req.params.provider as string | undefined;
@@ -401,7 +422,12 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
           }
         }
       }
-    } catch {
+    } catch (redirectError) {
+      console.error('[CONNECTOR_CALLBACK] Failed to build error redirect after unhandled error', {
+        provider: req.params.provider,
+        errorMessage: (redirectError as Error | undefined)?.message,
+        errorName: (redirectError as Error | undefined)?.name,
+      });
       // ignore and fall back to generic callback redirect
     }
 
@@ -412,6 +438,9 @@ router.get('/connectors/:provider/oauth/callback', async (req: Request, res: Res
     const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
     res.redirect(redirectUrl);
   }
-});
+}
+
+// GET /connectors/:provider/callback - Generic connector callback route
+router.get('/connectors/:provider/callback', connectorCallbackHandler);
 
 export default router;

@@ -30,6 +30,7 @@ export function getEnvConfig(): EnvironmentConfig {
     CLIENT_URL: process.env.CLIENT_URL,
     SERVER_URL: process.env.SERVER_URL,
     DOCS_URL: process.env.DOCS_URL,
+    JWT_SECRET: process.env.JWT_SECRET,
     // For PostgreSQL we provide sensible defaults for host/port/user/database.
     // The password is the only truly required value.
     POSTGRES_PASSWORD: process.env.POSTGRES_PASSWORD,
@@ -48,7 +49,7 @@ export function getEnvConfig(): EnvironmentConfig {
   const defaultRunnerPort = process.env.RUNNER_PORT ? parseInt(process.env.RUNNER_PORT, 10) : 50051;
   const resolvedRunnerUrl = process.env.RUNNER_URL || `http://localhost:${defaultRunnerPort}`;
 
-  // PostgreSQL defaults to match our Kubernetes/docker-compose setup:
+  // PostgreSQL defaults to match our Kubernetes/local setup:
   // - Service name "postgres" inside the cluster
   // - Default port/user/database aligned with the official image
   const resolvedPostgresHost = process.env.POSTGRES_HOST || 'postgres';
@@ -64,7 +65,6 @@ export function getEnvConfig(): EnvironmentConfig {
     DOCS_PORT: parseInt(process.env.DOCS_PORT || `${DEFAULT_DOCS_PORT}`, 10),
     PROXY_PORT: parseInt(process.env.PROXY_PORT || `${DEFAULT_PROXY_PORT}`, 10),
     NODE_ENV: process.env.NODE_ENV || 'development',
-    LOG_LEVEL: process.env.LOG_LEVEL || 'info',
 
     // URLs - Required, no localhost fallbacks
     PUBLIC_URL: requiredEnvVars.PUBLIC_URL!,
@@ -81,28 +81,17 @@ export function getEnvConfig(): EnvironmentConfig {
     POSTGRES_SSL: resolvedPostgresSSL,
 
     // LLM Provider Configuration
-    OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY,
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 
-    // Default Model Configuration
-    DEFAULT_LLM_PROVIDER: (process.env.DEFAULT_LLM_PROVIDER as 'openai' | 'anthropic' | '') || 'openai',
-    DEFAULT_CHAT_MODEL: process.env.DEFAULT_CHAT_MODEL || 'gpt-4o',
-
     // JWT Authentication Configuration
-    JWT_SECRET: process.env.JWT_SECRET || '',
+    JWT_SECRET: requiredEnvVars.JWT_SECRET!,
 
     // OAuth Provider Configuration
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,
-    GOOGLE_DRIVE_CLIENT_ID: process.env.GOOGLE_DRIVE_CLIENT_ID,
-    GOOGLE_DRIVE_CLIENT_SECRET: process.env.GOOGLE_DRIVE_CLIENT_SECRET,
+    // GitHub OAuth App (used for user login)
     GH_OAUTH_CLIENT_ID: process.env.GH_OAUTH_CLIENT_ID,
     GH_OAUTH_CLIENT_SECRET: process.env.GH_OAUTH_CLIENT_SECRET,
-
-    // GitHub App Configuration (used for GitHub connector)
-    GITHUB_APP_ID: process.env.GITHUB_APP_ID,
-    GITHUB_APP_PRIVATE_KEY_BASE64: process.env.GITHUB_APP_PRIVATE_KEY_BASE64,
 
     // Environment Variables Encryption Key
     ENCRYPTION_KEY: process.env.ENCRYPTION_KEY,
@@ -125,14 +114,7 @@ export function getEnvConfig(): EnvironmentConfig {
     EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
     AWS_SES_REGION: process.env.AWS_SES_REGION,
 
-    // LinkedIn OAuth Configuration (optional)
-    LINKEDIN_CLIENT_ID: process.env.LINKEDIN_CLIENT_ID,
-    LINKEDIN_CLIENT_SECRET: process.env.LINKEDIN_CLIENT_SECRET,
-
-    // Discord Bot OAuth Configuration (optional)
-    DISCORD_CLIENT_ID: process.env.DISCORD_CLIENT_ID,
-    DISCORD_CLIENT_SECRET: process.env.DISCORD_CLIENT_SECRET,
-    DISCORD_BOT_TOKEN: process.env.DISCORD_BOT_TOKEN,
+    // Connector platform secrets are stored in DB (platform_secrets) and not loaded here.
 
     // AWS S3 Configuration (File Attachments) - Optional, feature disabled if not set
     AWS_S3_BUCKET: process.env.AWS_S3_BUCKET,

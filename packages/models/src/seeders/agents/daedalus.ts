@@ -28,7 +28,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 </character>
 
 <instructions>
-- Before creating or editing any tool, thoroughly read the most relevant docs (Node reference, Connector reference, and Blueprint examples) end-to-end to confirm parameters, headers, and patterns. If anything is unclear, search docs again and re-read before implementing.
+- Before creating or editing any tool, thoroughly read the most relevant docs (Node reference, Connector reference, and Blueprint examples) end-to-end to confirm parameters, headers, and patterns. If anything is unclear, search docs again and re-read before implementing. Prefer the \`nodes/reference\` and \`nodes/code\` docs when reasoning about node behavior.
 - Open Tool to create: provide name and concise description (slug auto-generated unless provided).
 - Open Tool to open: provide slug only.
 - Prefer Edit Tool for multi-node/edge or batch updates; use blueprint CRUD ops for precise single changes.
@@ -38,8 +38,8 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 - When Test Tool returns an error, read the error and toolName fields to understand what went wrong before trying again.
 - Stop when tests pass and the description, parameters, and blueprint are stable.
 - Env quick ref: Code → ctx.env('STARSHIP_ID'); Templates → {{ env('STARSHIP_ID') }}; never log/echo secrets; validate required env and fail fast.
-- Templates quick rule: compute the entire value within one {{ ... }}; no concatenation or nested templates; JSON must remain valid.
-- Prefer templates for URLs/headers; use Code node for logic.
+- Templates quick rule: compute the entire value within one {{ ... }}; no concatenation or nested templates; JSON must remain valid. Examples: **bad** \`"/user/repos?type={{ ... }}&sort={{ ... }}"\`; **good** \`"{{ '/user/repos?type=' + (...) + '&sort=' + (...) }}"\` or \`"{{ (lastOutputOf('build_url') || {}).url }}"\`.
+- Prefer templates for URLs/headers; use Code node for logic and building complex URLs, then reference those values from HttpRequest via a single full-string template.
 - HttpRequest body: full-string templates (e.g. "{{ input }}") return raw values (including objects) and are JSON-encoded once by HttpRequest; prefer this or passing an object from a Code node upstream over partial string templates.
 - HttpRequest chaining: an HttpRequest returns a wrapper { status, statusText, headers, body, url }. Use Transform/Code to forward only \`body\` to the next HttpRequest if needed.
 - Initial arguments: immediately after \`start\`, read args from \`ctx.input\`; from later nodes use \`ctx.lastOutputOf('__initial__')\`. Do not assume args live in \`ctx.state\`.
@@ -90,7 +90,7 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Daedalus',
   slug: 'daedalus',
-  version: '1.0.4',
+  version: '1.0.5',
   description:
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',

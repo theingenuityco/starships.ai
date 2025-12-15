@@ -34,13 +34,13 @@ import type {
 import { generateUniqueAgentSlug } from '@starships/models';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
-import { EnvironmentService } from './EnvironmentService';
+import { ConnectorSecretService } from './ConnectorSecretService';
 import { UsageService } from './UsageService';
 import { BillingService } from './BillingService';
 import { ConversationService } from './ConversationService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
-import { generateJWT } from '@/utils/jwt';
+import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -71,13 +71,17 @@ export class AgentService {
   private agentRepository: AgentRepository;
   private starshipRepository: StarshipRepository;
   private messageService: MessageService;
-  private environmentService: EnvironmentService;
+  // Kept for future use (runtime secrets, connector context, etc.)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private connectorSecretService: ConnectorSecretService;
+  private connectorRuntimeService: ConnectorRuntimeService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
     this.starshipRepository = new StarshipRepository();
     this.messageService = new MessageService();
-    this.environmentService = new EnvironmentService();
+    this.connectorSecretService = new ConnectorSecretService();
+    this.connectorRuntimeService = new ConnectorRuntimeService();
   }
 
   /** Safely get starshipId from agent */
@@ -911,45 +915,7 @@ export class AgentService {
       const envConfig = getEnvConfig();
       let connectors: Record<string, { baseUrl: string; headers: Record<string, string> }> = {};
       try {
-        // Starships connector (same as ConversationService.buildConnectorHttpConfig)
-        try {
-          const token = await generateJWT({
-            id: userId,
-            starshipId,
-          });
-          const baseUrl = `${envConfig.SERVER_URL}/api/v1`;
-          connectors.starships = {
-            baseUrl,
-            headers: {
-              Authorization: `Bearer ${token}`,
-            },
-          };
-        } catch (error) {
-          console.error('[AGENT-TEST] Failed to build starships connector HTTP configuration:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
-
-        // Google Drive connector: mirror ConversationService so http_request
-        // nodes with connector: "google_drive" work in agent tests too.
-        try {
-          const envService = new EnvironmentService();
-          const decryptedEnv = await envService.getDecryptedEnvironment(starshipId);
-          const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
-
-          if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
-            connectors.google_drive = {
-              baseUrl: 'https://www.googleapis.com',
-              headers: {
-                Authorization: `Bearer ${googleDriveToken}`,
-              },
-            };
-          }
-        } catch (error) {
-          console.error('[AGENT-TEST] Failed to build google_drive connector HTTP configuration:', {
-            error: error instanceof Error ? error.message : String(error),
-          });
-        }
+        connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starshipId, userId);
       } catch (e) {
         console.error('[AGENT-TEST] Failed to build connector HTTP configuration:', e);
       }

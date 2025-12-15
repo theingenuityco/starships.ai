@@ -1,4 +1,3 @@
-import { getConnectorCatalog } from '@/config/connectors';
 import type {
   ConnectorCatalogItem,
   ConnectorConnectInput,
@@ -7,39 +6,88 @@ import type {
   ConnectorProvider,
   ConnectWithApiKeyRequest,
   ConnectorModel,
+  ConnectorRuntimeConfig,
+  ConnectorTokenRef,
 } from '@starships/protocol';
 import {
   ConnectorTemplateRepository,
   ConnectorRepository,
-  EnvironmentRepository,
+  ConnectorSecretRepository,
   StarshipRepository,
   ConnectorTemplateEntity,
 } from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
-import { EnvironmentService } from './EnvironmentService';
+import { ConnectorSecretService } from './ConnectorSecretService';
 import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
+import { PlatformSecretService } from './PlatformSecretService';
 
 /**
  * Connector Service - Layer 4
  *
  * Orchestrates connector configuration for starships while keeping
- * all runtime secrets in the existing environments table.
+ * all runtime secrets in the connector_secrets table.
  */
 export class ConnectorService {
   private connectorRepository: ConnectorRepository;
   private connectorTemplateRepository: ConnectorTemplateRepository;
-  private environmentRepository: EnvironmentRepository;
-  private environmentService: EnvironmentService;
+  private connectorSecretRepository: ConnectorSecretRepository;
+  private connectorSecretService: ConnectorSecretService;
   private starshipRepository: StarshipRepository;
+  private platformSecretService: PlatformSecretService;
 
   constructor() {
     this.connectorRepository = new ConnectorRepository();
     this.connectorTemplateRepository = new ConnectorTemplateRepository();
-    this.environmentRepository = new EnvironmentRepository();
-    this.environmentService = new EnvironmentService();
+    this.connectorSecretRepository = new ConnectorSecretRepository();
+    this.connectorSecretService = new ConnectorSecretService();
     this.starshipRepository = new StarshipRepository();
+    this.platformSecretService = new PlatformSecretService();
+  }
+
+  private parseSecretKeyForPlatformSecret(ref: unknown, label: string): string {
+    if (ref && typeof ref === 'object') {
+      const rec = ref as Record<string, unknown>;
+      const type = rec.type;
+      const key = rec.key;
+      if (type !== 'platform_secret') {
+        throw new Error(`${label} must be a platform_secret ref`);
+      }
+      if (typeof key !== 'string' || !key.trim()) {
+        throw new Error(`${label} must include a non-empty key`);
+      }
+      return key.trim();
+    }
+    throw new Error(`${label} is not configured`);
+  }
+
+  private parseSecretKeyForConnectorSecret(ref: unknown, label: string): string | undefined {
+    if (ref === undefined || ref === null) return undefined;
+    if (ref && typeof ref === 'object') {
+      const rec = ref as Record<string, unknown>;
+      const type = rec.type;
+      const key = rec.key;
+      // Some connectors intentionally use a platform secret for runtime auth
+      // and do not persist OAuth token responses as per-starship secrets.
+      if (type === 'platform_secret') {
+        return undefined;
+      }
+      if (type !== 'connector_secret') {
+        throw new Error(`${label} must be a connector_secret ref`);
+      }
+      if (typeof key !== 'string' || !key.trim()) {
+        throw new Error(`${label} must include a non-empty key`);
+      }
+      return key.trim();
+    }
+    throw new Error(`${label} must be a string or {type,key}`);
+  }
+
+  private async resolvePlatformSecret(envKey: string): Promise<string | undefined> {
+    const fromDb = await this.platformSecretService.getSecret(envKey);
+    if (fromDb && fromDb.trim()) return fromDb.trim();
+    return undefined;
   }
 
   /**
@@ -97,7 +145,7 @@ export class ConnectorService {
   /**
    * Apply the side effects described by a ConnectorConnectOutput:
    * - Persist/update the connector row (status, metadata, lastError, template link)
-   * - Persist any env vars returned in output.env to the environments table
+   * - Persist any secrets returned in output.env to the connector_secrets table
    *
    * Returns the connector id and optional starship slug for downstream use.
    */
@@ -143,13 +191,22 @@ export class ConnectorService {
 
     if (output.env) {
       for (const [key, value] of Object.entries(output.env)) {
-        await this.upsertEnvironmentVariable(starshipId, key, value, userId, connector.id);
+        await this.upsertConnectorSecret(starshipId, key, value, userId, connector.id);
       }
     }
 
     const starship = await this.starshipRepository.findById(starshipId);
 
     return { connector, starshipSlug: starship?.slug };
+  }
+
+  /**
+   * Build a decrypted snapshot of env vars for a connector.
+   *
+   * Source of truth is connector_secrets.connector_id linkage.
+   */
+  private async getConnectorEnvSnapshot(starshipId: string, connectorId: string): Promise<Record<string, string>> {
+    return this.connectorSecretRepository.getDecryptedSecretsByConnector(connectorId);
   }
 
   /**
@@ -168,15 +225,7 @@ export class ConnectorService {
       return null;
     }
 
-    // Snapshot env vars managed for this connector based on template configuration.
-    const envSnapshot: Record<string, string> = {};
-    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
-    for (const key of envKeys) {
-      const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
-      if (existing && typeof (existing as unknown as { decryptedValue?: string }).decryptedValue === 'string') {
-        envSnapshot[key] = (existing as unknown as { decryptedValue: string }).decryptedValue;
-      }
-    }
+    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id);
 
     const execution = ExecutionItemUtils.createExecution();
     const input = {
@@ -184,7 +233,7 @@ export class ConnectorService {
       provider,
       envSnapshot,
       metadata: connector.metadata || {},
-      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
     };
     const initialItems = ExecutionItemUtils.wrapSingle(input);
     execution.results.push({ nodeRef: '__initial__', items: initialItems });
@@ -208,7 +257,7 @@ export class ConnectorService {
     if (result.env) {
       for (const [key, value] of Object.entries(result.env)) {
         // No user context for refresh flows; attribute to system.
-        await this.upsertEnvironmentVariable(starshipId, key, value, 'system', connector.id);
+        await this.upsertConnectorSecret(starshipId, key, value, 'system', connector.id);
       }
     }
 
@@ -246,14 +295,7 @@ export class ConnectorService {
       return null;
     }
 
-    const envSnapshot: Record<string, string> = {};
-    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
-    for (const key of envKeys) {
-      const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
-      if (existing && typeof (existing as unknown as { decryptedValue?: string }).decryptedValue === 'string') {
-        envSnapshot[key] = (existing as unknown as { decryptedValue: string }).decryptedValue;
-      }
-    }
+    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id);
 
     const execution = ExecutionItemUtils.createExecution();
     const input = {
@@ -261,7 +303,7 @@ export class ConnectorService {
       provider,
       envSnapshot,
       metadata: connector.metadata || {},
-      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
     };
     const initialItems = ExecutionItemUtils.wrapSingle(input);
     execution.results.push({ nodeRef: '__initial__', items: initialItems });
@@ -286,64 +328,98 @@ export class ConnectorService {
   /**
    * Get the connector catalog.
    *
-   * Primary source of truth is the DB-backed connector_templates table.
-   * If the table is empty or unavailable (e.g. during migration), this
-   * falls back to the existing static CONNECTOR_CATALOG.
+   * Source of truth is the DB-backed connector_templates table.
    */
   async getConnectorCatalog(): Promise<ConnectorCatalogItem[]> {
-    try {
-      const templates = await this.connectorTemplateRepository.list();
-      if (templates.length) {
-        return templates.map(
-          (tpl): ConnectorCatalogItem => ({
-            provider: tpl.provider as ConnectorProvider,
-            displayName: tpl.displayName,
-            description: tpl.description,
-            authType: tpl.authType as ConnectorCatalogItem['authType'],
-            requiredEnvKeys: tpl.requiredEnvKeys || [],
-            optionalEnvKeys: tpl.optionalEnvKeys || [],
-            docsSlug: tpl.docsSlug ?? undefined,
-          })
-        );
-      }
-    } catch (error) {
-      console.warn('[ConnectorService] Failed to load connector templates from DB, falling back to static catalog', error);
-    }
-
-    return getConnectorCatalog();
+    const templates = await this.connectorTemplateRepository.list();
+    return templates
+      .filter((tpl) => tpl.isEnabled !== false)
+      .map(
+        (tpl): ConnectorCatalogItem => ({
+          provider: tpl.provider as ConnectorProvider,
+          displayName: tpl.displayName,
+          description: tpl.description,
+          authType: tpl.authType as ConnectorCatalogItem['authType'],
+        })
+      );
   }
 
   /**
-   * Start generic OAuth flow for a starship and return the authorization URL,
-   * driven by connector_templates configuration instead of per-provider
-   * hard-coded logic.
+   * Start a connector flow for a starship and return the authorization URL.
+   *
+   * For authType = 'oauth2', this builds a standard OAuth authorization URL
+   * driven by connector_templates configuration. For authType = 'custom'
+   * (e.g. GitHub App), this delegates URL construction to a provider-specific
+   * connect blueprint.
    */
-  async startOAuthConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
+  async startConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
     const template = await this.loadTemplateOrThrow(provider);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${provider} is disabled by the instance admin`);
+    }
+    const env = getEnvConfig();
+
+    const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
+    const oauthConfig =
+      runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+        ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+        : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
+    const oauthParams =
+      oauthConfig.params && typeof oauthConfig.params === 'object'
+        ? (oauthConfig.params as Record<string, unknown>)
+        : ({} as Record<string, unknown>);
+
+    // Custom connectors (authType = 'custom') are started via connect
+    // blueprints so that providers like GitHub can compute their own
+    // installation URLs while the host still owns secrets and state tokens.
+    if (template.authType === 'custom') {
+      const appSlugEnvKey = (runtimeConfig.appSlugEnvKey as string | undefined) || 'GITHUB_APP_SLUG';
+      const appSlug = await this.resolvePlatformSecret(appSlugEnvKey);
+
+      if (!appSlug) {
+        throw new Error(`Custom connector ${provider} is not configured. Missing env: ${appSlugEnvKey}`);
+      }
+
+      const state = await generateOAuthState(true, userId, {
+        starshipId,
+        provider,
+      });
+
+      const output = await this.runConnectBlueprint(template, {
+        starshipId,
+        provider,
+        authType: 'custom',
+        phase: 'start',
+        stateToken: state,
+        config: {
+          ...((template.runtimeConfig || {}) as Record<string, unknown>),
+          appSlug,
+        },
+      });
+
+      if (!output.authorizationUrl) {
+        throw new Error(`Custom connector ${provider} did not return an authorizationUrl from connect blueprint`);
+      }
+
+      return output.authorizationUrl;
+    }
 
     if (template.authType !== 'oauth2') {
-      throw new Error(`Connector ${provider} does not use OAuth2 authentication`);
+      throw new Error(`Connector ${provider} does not support start flow for authType ${template.authType}`);
     }
 
-    const env = getEnvConfig();
-    const runtimeConfig = (template.runtimeConfig || {}) as {
-      clientIdEnvKey?: string;
-      accessType?: string;
-      prompt?: string;
-      [key: string]: unknown;
-    };
+    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(oauthConfig.clientId as ConnectorTokenRef | undefined, `oauth.clientId`);
 
-    const clientIdEnvKey = runtimeConfig.clientIdEnvKey;
-    if (!clientIdEnvKey) {
-      throw new Error(`clientIdEnvKey is not configured for connector template ${template.id}`);
-    }
-
-    const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
-    const authorizeUrl = template.oauthAuthorizeUrl;
-    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${provider}/oauth/callback`;
+    const clientId = await this.resolvePlatformSecret(clientIdEnvKey);
+    const authorizeUrl = oauthConfig.authorizeUrl as string | undefined;
+    const redirectPath = oauthConfig.redirectPath as string | undefined;
 
     if (!authorizeUrl) {
-      throw new Error(`oauthAuthorizeUrl is not configured for connector template ${template.id}`);
+      throw new Error(`oauth.authorizeUrl is not configured for connector template ${template.id}`);
+    }
+
+    if (!redirectPath) {
+      throw new Error(`oauth.redirectPath is not configured for connector template ${template.id}`);
     }
 
     if (!clientId) {
@@ -364,43 +440,58 @@ export class ConnectorService {
       state,
     });
 
-    if (Array.isArray(template.oauthScopes) && template.oauthScopes.length) {
-      params.set('scope', template.oauthScopes.join(' '));
+    const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
+
+    if (scopes.length) {
+      params.set('scope', scopes.join(' '));
     }
 
-    if (runtimeConfig.accessType && typeof runtimeConfig.accessType === 'string') {
-      params.set('access_type', runtimeConfig.accessType);
+    const accessType = oauthParams.accessType as string | undefined;
+    if (accessType && typeof accessType === 'string') {
+      params.set('access_type', accessType);
     }
 
-    if (runtimeConfig.prompt && typeof runtimeConfig.prompt === 'string') {
-      params.set('prompt', runtimeConfig.prompt);
+    const prompt = oauthParams.prompt as string | undefined;
+    if (prompt && typeof prompt === 'string') {
+      params.set('prompt', prompt);
+    }
+
+    // Include provider-specific permission parameters when configured.
+    const permissionsRaw = oauthParams.permissions;
+    if (permissionsRaw !== undefined && permissionsRaw !== null) {
+      const permissionsValue = typeof permissionsRaw === 'number' ? String(permissionsRaw) : String(permissionsRaw);
+      if (permissionsValue) {
+        params.set('permissions', permissionsValue);
+      }
     }
 
     const baseAuthorizationUrl = `${authorizeUrl}?${params.toString()}`;
 
     // If a connect blueprint is configured, let it optionally refine the URL.
-    try {
-      const output = await this.runConnectBlueprint(template, {
-        starshipId,
-        provider,
-        authType: 'oauth2',
-        phase: 'start',
-        authorizeUrl: baseAuthorizationUrl,
-        redirectPath,
-        scopes: template.oauthScopes || [],
-        stateToken: state,
-        config: runtimeConfig as Record<string, unknown>,
-      });
+    if (template.connectBlueprint) {
+      try {
+        const output = await this.runConnectBlueprint(template, {
+          starshipId,
+          provider,
+          authType: 'oauth2',
+          phase: 'start',
+          authorizeUrl: baseAuthorizationUrl,
+          redirectPath,
+          scopes,
+          stateToken: state,
+          config: runtimeConfig,
+        });
 
-      if (output.authorizationUrl) {
-        return output.authorizationUrl;
+        if (output.authorizationUrl) {
+          return output.authorizationUrl;
+        }
+      } catch (error) {
+        // Fall back to the static TypeScript flow if blueprint execution fails.
+        console.warn('[ConnectorService] Connect blueprint failed for startOAuthConnector, falling back to static flow', {
+          provider,
+          error,
+        });
       }
-    } catch (error) {
-      // Fall back to the static TypeScript flow if blueprint execution fails.
-      console.warn('[ConnectorService] Connect blueprint failed for startOAuthConnector, falling back to static flow', {
-        provider,
-        error,
-      });
     }
 
     return baseAuthorizationUrl;
@@ -418,34 +509,38 @@ export class ConnectorService {
     callbackQuery: Record<string, unknown> | undefined
   ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
     const template = await this.loadTemplateOrThrow(providerFromCallback);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${providerFromCallback} is disabled by the instance admin`);
+    }
 
     if (template.authType !== 'oauth2') {
       throw new Error(`Connector ${providerFromCallback} does not use OAuth2 authentication`);
     }
 
     const env = getEnvConfig();
-    const runtimeConfig = (template.runtimeConfig || {}) as {
-      clientIdEnvKey?: string;
-      clientSecretEnvKey?: string;
-      accessTokenEnvKey?: string;
-      refreshTokenEnvKey?: string;
-      metadataFromQuery?: string[];
-      [key: string]: unknown;
-    };
+    const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
+    const oauthConfig =
+      runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+        ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+        : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
 
-    const clientIdEnvKey = runtimeConfig.clientIdEnvKey;
-    const clientSecretEnvKey = runtimeConfig.clientSecretEnvKey;
-    if (!clientIdEnvKey || !clientSecretEnvKey) {
-      throw new Error(`clientIdEnvKey/clientSecretEnvKey not configured for connector template ${template.id}`);
-    }
+    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(oauthConfig.clientId as ConnectorTokenRef | undefined, `oauth.clientId`);
+    const clientSecretEnvKey = this.parseSecretKeyForPlatformSecret(
+      oauthConfig.clientSecret as ConnectorTokenRef | undefined,
+      `oauth.clientSecret`
+    );
 
-    const clientId = (env as unknown as Record<string, string | undefined>)[clientIdEnvKey];
-    const clientSecret = (env as unknown as Record<string, string | undefined>)[clientSecretEnvKey];
-    const tokenUrl = template.oauthTokenUrl;
-    const redirectPath = template.oauthRedirectPath || `/api/v1/connectors/${providerFromCallback}/oauth/callback`;
+    const clientId = await this.resolvePlatformSecret(clientIdEnvKey);
+    const clientSecret = await this.resolvePlatformSecret(clientSecretEnvKey);
+    const tokenUrl = oauthConfig.tokenUrl as string | undefined;
+    const redirectPath = oauthConfig.redirectPath as string | undefined;
 
     if (!tokenUrl) {
-      throw new Error(`oauthTokenUrl is not configured for connector template ${template.id}`);
+      throw new Error(`oauth.tokenUrl is not configured for connector template ${template.id}`);
+    }
+
+    if (!redirectPath) {
+      throw new Error(`oauth.redirectPath is not configured for connector template ${template.id}`);
     }
 
     if (!clientId || !clientSecret) {
@@ -473,20 +568,53 @@ export class ConnectorService {
 
     const redirectUri = `${env.PUBLIC_URL}${redirectPath}`;
 
-    const tokenParams = new URLSearchParams({
+    const tokenPayload = {
       grant_type: 'authorization_code',
       code,
       redirect_uri: redirectUri,
       client_id: clientId,
       client_secret: clientSecret,
-    });
+    };
 
-    const tokenResponse = await axios.post(tokenUrl, tokenParams.toString(), {
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-    });
+    // Most OAuth2 token endpoints expect
+    // `application/x-www-form-urlencoded` for the token exchange.
+    const tokenForm = new URLSearchParams();
+    for (const [key, value] of Object.entries(tokenPayload)) {
+      tokenForm.set(key, String(value));
+    }
 
+    let tokenResponse;
+    try {
+      tokenResponse = await axios.post(tokenUrl, tokenForm, {
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+      });
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        // Keep error logs minimal and safe (no code/state/client_secret leakage).
+        console.error('[CONNECTOR_OAUTH] Token exchange failed', {
+          provider: providerFromCallback,
+          tokenUrl,
+          redirectUri,
+          status: err.response?.status,
+          responseData: err.response?.data,
+        });
+      } else {
+        console.error('[CONNECTOR_OAUTH] Token exchange failed with non-Axios error', {
+          provider: providerFromCallback,
+          tokenUrl,
+          redirectUri,
+          errorMessage: (err as Error | undefined)?.message,
+          errorName: (err as Error | undefined)?.name,
+        });
+      }
+      throw err;
+    }
+
+    // Normalise token response into a common shape. We expect providers to
+    // return JSON here; tokenResponse.data should already be the parsed object.
     const body = tokenResponse.data as {
       access_token?: string;
       refresh_token?: string;
@@ -497,11 +625,26 @@ export class ConnectorService {
 
     const envUpdates: Record<string, string> = {};
 
-    if (runtimeConfig.accessTokenEnvKey && body.access_token) {
-      envUpdates[runtimeConfig.accessTokenEnvKey] = String(body.access_token);
+    const accessTokenEnvKey = this.parseSecretKeyForConnectorSecret(
+      oauthConfig.accessToken as ConnectorTokenRef | undefined,
+      `oauth.accessToken`
+    );
+    const refreshTokenEnvKey = this.parseSecretKeyForConnectorSecret(
+      oauthConfig.refreshToken as ConnectorTokenRef | undefined,
+      `oauth.refreshToken`
+    );
+
+    if (accessTokenEnvKey && body.access_token) {
+      envUpdates[accessTokenEnvKey] = String(body.access_token);
+    } else if (!accessTokenEnvKey && body.access_token) {
+      // If oauth.accessToken is a platform_secret ref, parseSecretKeyForConnectorSecret returns undefined.
+      // This is expected for bot-style connectors (e.g. Discord) where runtime auth comes from a platform secret.
+      console.warn('[CONNECTOR_OAUTH] Skipping access_token persistence because oauth.accessToken is not a connector_secret ref', {
+        provider,
+      });
     }
-    if (runtimeConfig.refreshTokenEnvKey && body.refresh_token) {
-      envUpdates[runtimeConfig.refreshTokenEnvKey] = String(body.refresh_token);
+    if (refreshTokenEnvKey && body.refresh_token) {
+      envUpdates[refreshTokenEnvKey] = String(body.refresh_token);
     }
 
     const metadata: Record<string, unknown> = {
@@ -510,10 +653,12 @@ export class ConnectorService {
       ...(body.scope ? { scope: body.scope } : {}),
     };
 
-    // Optionally copy selected fields from callback query into metadata
-    if (Array.isArray(runtimeConfig.metadataFromQuery) && callbackQuery) {
-      for (const key of runtimeConfig.metadataFromQuery) {
-        const val = callbackQuery[key];
+    // Copy callback query fields into metadata (non-secret), excluding OAuth plumbing.
+    // This captures provider-specific extras like Discord's guild_id/permissions.
+    if (callbackQuery && typeof callbackQuery === 'object') {
+      const excluded = new Set(['code', 'state']);
+      for (const [key, val] of Object.entries(callbackQuery)) {
+        if (!key || excluded.has(key)) continue;
         if (val !== undefined) {
           metadata[key] = val;
         }
@@ -530,37 +675,39 @@ export class ConnectorService {
 
     let finalOutput = hostOutput;
 
-    try {
-      const blueprintOutput = await this.runConnectBlueprint(template, {
-        starshipId,
-        provider: providerFromCallback,
-        authType: 'oauth2',
-        phase: 'complete',
-        tokenUrl,
-        redirectPath,
-        stateToken,
-        code,
-        callbackQuery,
-        config: runtimeConfig as Record<string, unknown>,
-      });
+    if (template.connectBlueprint) {
+      try {
+        const blueprintOutput = await this.runConnectBlueprint(template, {
+          starshipId,
+          provider: providerFromCallback,
+          authType: 'oauth2',
+          phase: 'complete',
+          tokenUrl,
+          redirectPath,
+          stateToken,
+          code,
+          callbackQuery,
+          config: runtimeConfig,
+        });
 
-      finalOutput = {
-        ...hostOutput,
-        ...blueprintOutput,
-        env: {
-          ...(hostOutput.env || {}),
-          ...(blueprintOutput.env || {}),
-        },
-        metadata: {
-          ...(hostOutput.metadata || {}),
-          ...(blueprintOutput.metadata || {}),
-        },
-      };
-    } catch (error) {
-      console.warn('[ConnectorService] Connect blueprint failed for completeOAuthConnector, falling back to static flow', {
-        provider: providerFromCallback,
-        error,
-      });
+        finalOutput = {
+          ...hostOutput,
+          ...blueprintOutput,
+          env: {
+            ...(hostOutput.env || {}),
+            ...(blueprintOutput.env || {}),
+          },
+          metadata: {
+            ...(hostOutput.metadata || {}),
+            ...(blueprintOutput.metadata || {}),
+          },
+        };
+      } catch (error) {
+        console.warn('[ConnectorService] Connect blueprint failed for completeOAuthConnector, falling back to static flow', {
+          provider: providerFromCallback,
+          error,
+        });
+      }
     }
 
     const { starshipSlug } = await this.applyConnectOutput(starshipId, userId, providerFromCallback, template, finalOutput);
@@ -572,8 +719,68 @@ export class ConnectorService {
     };
   }
 
-  // NOTE: GitHub connector now uses a GitHub App installation token via
-  // ConnectorRuntimeService. There is no per-starship OAuth flow for GitHub.
+  /**
+   * Complete a custom connector flow driven by a connect blueprint.
+   *
+   * This is used for providers like GitHub where the external callback does
+   * not follow a traditional OAuth code exchange. The host validates the
+   * state token and delegates env/metadata/status computation to the
+   * connect blueprint, then applies the resulting ConnectorConnectOutput.
+   */
+  async completeCustomConnector(
+    providerFromCallback: ConnectorProvider,
+    stateToken: string,
+    callbackQuery: Record<string, unknown> | undefined
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+    const template = await this.loadTemplateOrThrow(providerFromCallback);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${providerFromCallback} is disabled by the instance admin`);
+    }
+
+    if (template.authType !== 'custom') {
+      throw new Error(`Connector ${providerFromCallback} does not use custom authentication`);
+    }
+
+    const stateValidation = await validateOAuthState(stateToken);
+    if (!stateValidation.valid) {
+      throw new Error('Invalid or expired connector state');
+    }
+
+    const { userId, context } = stateValidation;
+    if (!userId) {
+      throw new Error('Connector state missing user information');
+    }
+
+    const starshipId = context?.starshipId as string | undefined;
+    const provider = (context?.provider as string | undefined) || providerFromCallback;
+
+    if (!starshipId || provider !== providerFromCallback) {
+      throw new Error('Connector state missing starship context');
+    }
+
+    const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
+
+    const output = await this.runConnectBlueprint(template, {
+      starshipId,
+      provider: providerFromCallback,
+      authType: 'custom',
+      phase: 'complete',
+      stateToken,
+      callbackQuery,
+      config: runtimeConfig,
+    });
+
+    const { starshipSlug } = await this.applyConnectOutput(starshipId, userId, providerFromCallback, template, output);
+
+    return {
+      starshipId,
+      starshipSlug,
+      userId,
+    };
+  }
+
+  // NOTE: GitHub connector now uses a GitHub OAuth App user token with
+  // per-starship access/refresh tokens managed via the environments table.
 
   /**
    * List connectors for a starship, enriched with managed env key presence.
@@ -584,13 +791,21 @@ export class ConnectorService {
       this.connectorRepository.findByStarship(starshipId),
     ]);
     const byProvider = new Map(connectors.map((c) => [c.provider, c]));
+    const visibleTemplates = templates.filter((t) => t.isEnabled !== false || byProvider.has(t.provider));
 
     const now = new Date().toISOString();
 
-    return templates.map<ConnectorListItem>((template) => {
+    return visibleTemplates.map<ConnectorListItem>((template) => {
       const existing = byProvider.get(template.provider);
 
       if (existing) {
+        const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
+        const oauthConfig =
+          runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+            ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+            : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
+        const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
+
         return {
           id: existing.id,
           starshipId: existing.starshipId,
@@ -599,7 +814,10 @@ export class ConnectorService {
           lastError: existing.lastError,
           createdAt: existing.createdAt,
           updatedAt: existing.updatedAt,
-          scopes: template.oauthScopes || [],
+          // Keep list item schema consistent with virtual connectors.
+          scopes,
+          // Expose non-secret connector metadata to tools/agents.
+          metadata: existing.metadata || {},
         };
       }
 
@@ -608,6 +826,12 @@ export class ConnectorService {
       // starship; it reuses the platform's JWT + SERVER_URL and does not
       // require additional managed env vars.
       const status = template.provider === 'starships' ? 'connected' : 'disconnected';
+      const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
+      const oauthConfig =
+        runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
+          ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+          : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
+      const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
 
       return {
         id: `${starshipId}:${template.provider}`,
@@ -617,55 +841,10 @@ export class ConnectorService {
         lastError: undefined,
         createdAt: now,
         updatedAt: now,
-        scopes: template.oauthScopes || [],
+        scopes,
+        metadata: {},
       };
     });
-  }
-
-  /**
-   * Configure GitHub connector for a starship using a GitHub App installation.
-   * Stores non-secret configuration (installationId, defaults) in connector metadata.
-   */
-  async configureGitHubConnector(
-    starshipId: string,
-    userId: string,
-    payload: { installationId: string; defaultOwner?: string; defaultRepo?: string }
-  ) {
-    const baseMetadata: Record<string, unknown> = {
-      provider: 'github',
-      githubInstallationId: payload.installationId,
-      ...(payload.defaultOwner ? { defaultOwner: payload.defaultOwner } : {}),
-      ...(payload.defaultRepo ? { defaultRepo: payload.defaultRepo } : {}),
-    };
-
-    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, 'github');
-
-    if (!existing) {
-      await this.connectorRepository.create({
-        starshipId,
-        provider: 'github',
-        status: 'connected',
-        metadata: baseMetadata,
-        lastError: undefined,
-      });
-    } else {
-      await this.connectorRepository.update(existing.id, {
-        status: 'connected',
-        metadata: {
-          ...(existing.metadata || {}),
-          ...baseMetadata,
-        },
-        lastError: null,
-      });
-    }
-
-    // No env entries are managed for GitHub App; all auth is via app-level env.
-    const starship = await this.starshipRepository.findById(starshipId);
-    return {
-      starshipId,
-      starshipSlug: starship?.slug,
-      userId,
-    };
   }
 
   /**
@@ -675,6 +854,9 @@ export class ConnectorService {
    */
   async connectWithApiKey(starshipId: string, provider: ConnectorProvider, payload: ConnectWithApiKeyRequest, userId: string) {
     const template = await this.loadTemplateOrThrow(provider);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${provider} is disabled by the instance admin`);
+    }
 
     if (template.authType !== 'api_key') {
       throw new Error(`Connector ${provider} does not use API key authentication`);
@@ -689,7 +871,7 @@ export class ConnectorService {
         apiKey: payload.apiKey,
         extraConfig: payload.extraConfig,
       },
-      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
     };
 
     const output = await this.runConnectBlueprint(template, input);
@@ -698,9 +880,8 @@ export class ConnectorService {
     return connector;
   }
 
-  // Discord OAuth start/completion are now handled generically via
-  // startOAuthConnector / completeOAuthConnector and connector_templates
-  // configuration.
+  // OAuth start/completion are handled generically via startOAuthConnector /
+  // completeOAuthConnector and connector_templates configuration.
 
   /**
    * Disconnect a provider for a starship and clean up related env vars.
@@ -711,22 +892,14 @@ export class ConnectorService {
       throw new Error(`Connector template not found for provider: ${provider}`);
     }
 
-    // Remove managed env vars for this provider based on connector template configuration.
-    const envKeys = [...(template.requiredEnvKeys || []), ...(template.optionalEnvKeys || [])];
-    await Promise.all(
-      envKeys.map(async (key) => {
-        const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
-        if (existing) {
-          await this.environmentRepository.delete(existing.id);
-        }
-      })
-    );
-
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
     if (!existing) {
       // Nothing else to do
       return false;
     }
+
+    // Remove env vars managed by this connector (connector_id linkage).
+    await this.connectorSecretRepository.deleteByConnectorId(existing.id);
 
     let newMetadata = existing.metadata || {};
 
@@ -752,17 +925,11 @@ export class ConnectorService {
    * Helper to create or update an environment variable with encryption.
    * Optionally associates the variable with a connector.
    */
-  private async upsertEnvironmentVariable(
-    starshipId: string,
-    key: string,
-    value: string,
-    userId: string,
-    connectorId?: string
-  ): Promise<void> {
-    const existing = await this.environmentRepository.findByStarshipAndKey(starshipId, key);
+  private async upsertConnectorSecret(starshipId: string, key: string, value: string, userId: string, connectorId?: string): Promise<void> {
+    const existing = await this.connectorSecretRepository.findByStarshipAndKey(starshipId, key);
 
     if (!existing) {
-      await this.environmentRepository.create({
+      await this.connectorSecretRepository.create({
         starshipId,
         key,
         value,
@@ -773,9 +940,10 @@ export class ConnectorService {
       return;
     }
 
-    await this.environmentRepository.update(existing.id, {
+    await this.connectorSecretRepository.update(existing.id, {
       value,
       description: existing.description,
+      connectorId,
       updatedBy: userId,
     });
   }

@@ -1,14 +1,15 @@
 /**
- * Environment Entity - Layer 2
+ * ConnectorSecret Entity - Layer 2
  *
- * Environment variable entity with encryption support
+ * DB-backed encrypted secret scoped to a starship.
+ * (Formerly EnvironmentEntity / environments table)
  */
 
-import type { EnvironmentModel } from '@starships/protocol';
+import type { ConnectorSecretModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
 import { IsString, Length, IsISO8601, IsOptional, validate, ValidationError } from 'class-validator';
 
-export class EnvironmentEntity implements EnvironmentModel {
+export class ConnectorSecretEntity implements ConnectorSecretModel {
   @Expose()
   @IsString()
   @Length(1, 255)
@@ -62,7 +63,7 @@ export class EnvironmentEntity implements EnvironmentModel {
     }
 
     const dataRecord = data as Record<string, unknown>;
-    const entity = new EnvironmentEntity();
+    const entity = new ConnectorSecretEntity();
 
     if (operation === 'create') {
       Object.assign(entity, {

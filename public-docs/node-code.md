@@ -32,6 +32,12 @@ Execution behavior
 - Non-finite numbers (Infinity, -Infinity, NaN) are replaced with sentinel strings to ensure JSON-safe outputs.
 - Errors are wrapped with helpful context: "Code execution failed".
 
+### What Code cannot do (no direct HTTP/connector access)
+
+- Code nodes do **not** receive the HostRuntime or any HTTP helper surface.
+- There is **no** `ctx.hostRuntime.http` or equivalent; all outbound HTTP must go through `http_request` nodes.
+- Use Code to **prepare data** (URLs, bodies, headers, shapes) and then hand it to an `http_request` node, rather than calling external APIs directly from Code.
+
 Validation rules
 
 - `code` required and must compile.
@@ -66,11 +72,11 @@ Cross-links
 
 Use this table to decide how to read arguments and intermediate data:
 
-| Your node position            | Access pattern                      | Typical use case                              |
-|------------------------------|-------------------------------------|-----------------------------------------------|
-| Directly after `start`       | `ctx.input`                         | First node to process tool/workflow arguments |
-| Anywhere (need original args)| `ctx.lastOutputOf('__initial__')`   | Node far from `start` but needs raw args      |
-| After any upstream node      | `ctx.input`                         | Work with the previous node’s output          |
+| Your node position            | Access pattern                    | Typical use case                              |
+| ----------------------------- | --------------------------------- | --------------------------------------------- |
+| Directly after `start`        | `ctx.input`                       | First node to process tool/workflow arguments |
+| Anywhere (need original args) | `ctx.lastOutputOf('__initial__')` | Node far from `start` but needs raw args      |
+| After any upstream node       | `ctx.input`                       | Work with the previous node’s output          |
 
 Notes:
 
@@ -89,3 +95,56 @@ Notes:
   - You want to encapsulate non-trivial logic in JavaScript rather than long template expressions.
 
 You can often start with Transform for simple reshaping, and graduate to a Code node when the number or complexity of transforms becomes hard to read.
+
+### Recommended URL-building pattern for HttpRequest
+
+Because templates are evaluated in **full-string** mode, the recommended pattern for non-trivial URLs is:
+
+1. **Code node builds the URL**:
+
+```ts
+{
+  ref: "build_url",
+  type: "code",
+  name: "Build GitHub URL",
+  parameters: {
+    code: `
+      async function main(ctx) {
+        const input = ctx.input || {};
+        const type = input.type || "all";
+        const sort = input.sort || "updated";
+        return {
+          url: "/user/repos?type=" + encodeURIComponent(type) +
+               "&sort=" + encodeURIComponent(sort)
+        };
+      }
+    `,
+    timeout: 2000
+  }
+}
+```
+
+2. **Downstream HttpRequest uses a single full-string template**:
+
+```ts
+{
+  ref: "github_list_repos",
+  type: "http_request",
+  name: "GitHub List Repos",
+  parameters: {
+    method: "GET",
+    url: "{{ (lastOutputOf('build_url') || {}).url }}",
+    connector: "github",
+    timeout: 15000
+  }
+}
+```
+
+This pattern avoids invalid partial templates like:
+
+```ts
+// ❌ bad: mixed literal + {{ ... }} segments
+url: "/user/repos?type={{ ctx.input.type || 'all' }}&sort={{ ctx.input.sort || 'updated' }}";
+```
+
+and keeps all logic inside Code while letting HttpRequest + connectors handle URL resolution and auth injection.

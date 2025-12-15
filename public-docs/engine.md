@@ -78,3 +78,5 @@ Cross-links
 
 - See `eval.md` for template expression capabilities and context.
 - See each node’s doc for node-specific behavior and validation.
+- See `node-http-request.md` and `node-code.md` for concrete examples of full-string template rules (`"{{ ... }}"` only) and the recommended Code + HttpRequest URL-building pattern.
+- See `connectors/README.md` and `connectors/github.md` for connector behavior (relative URLs + auth injection) when using `connector` on HttpRequest nodes.

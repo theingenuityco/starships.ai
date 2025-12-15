@@ -188,7 +188,6 @@ jest.setTimeout(10000);
 
 // Mock environment variables for testing
 process.env.NODE_ENV = 'test';
-process.env.LOG_LEVEL = 'error'; // Reduce log noise in tests
 
 // Mock nanoid generation for predictable testing
 jest.mock('nanoid', () => ({

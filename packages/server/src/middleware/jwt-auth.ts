@@ -14,7 +14,7 @@ import { logger } from '@/utils/logger';
 const env = getEnvConfig();
 
 // JWT configuration
-const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET || 'starships-jwt-secret-key-change-in-production');
+const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET);
 const JWT_ISSUER = 'starships.ai';
 const JWT_AUDIENCE = 'starships-users';
 

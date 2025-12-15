@@ -60,8 +60,6 @@ spec:
             # Core Settings
             - name: NODE_ENV
               value: 'production' # Changed from 'development'
-            - name: AUTOPILOT_RUNNER
-              value: 'remote'
             - name: RUNNER_URL
               value: 'http://autopilot-runner.starships-prod.svc.cluster.local:50051'
             - name: RUNNER_AUTH_TOKEN
@@ -192,17 +190,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GH_OAUTH_CLIENT_SECRET
-            # GitHub App (used for GitHub connector)
-            - name: GITHUB_APP_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GITHUB_APP_ID
-            - name: GITHUB_APP_PRIVATE_KEY_BASE64
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GITHUB_APP_PRIVATE_KEY_BASE64
             - name: GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:

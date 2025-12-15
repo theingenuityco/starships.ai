@@ -19,12 +19,16 @@ export default function ShipLayout({ children }: LayoutProps) {
   const queryConv = searchParams.get('conversationId') || undefined
   const conversationId = routeConv || queryConv || null
 
-  if (!conversationId || !starship?.id) {
-    return <>{children}</>
-  }
-
+  // IMPORTANT:
+  // Always render the provider to avoid remounting the entire subtree when a conversationId
+  // is created mid-session (e.g. /conversations -> /conversations/:id). A remount resets local UI
+  // state and can cause loader/input flicker; after a hard reload the provider is present from the
+  // start, which is why it "works fine" on refresh.
+  //
+  // When conversationId is null, the stream hook is effectively disabled (no SSE connection),
+  // but the component tree remains stable across route changes.
   return (
-    <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id}>
+    <ConversationStreamProvider conversationId={conversationId} starshipId={starship?.id ?? null}>
       {children}
     </ConversationStreamProvider>
   )

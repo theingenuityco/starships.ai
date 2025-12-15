@@ -1,12 +1,13 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect, useState } from 'react'
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -654,6 +655,22 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
     case 'append': {
       const msg = chunk.message
       const messages = clone(acc)
+      // If we optimistically added a temp user message (on send), replace it with the
+      // server-persisted user message when it arrives to avoid duplicates.
+      try {
+        if (msg?.role === 'user' && messages.length > 0) {
+          const last: any = messages[messages.length - 1]
+          const lastIsTempUser = typeof last?.id === 'string' && last.id.startsWith('temp-user-')
+          const sameContent = typeof last?.content === 'string' && typeof (msg as any)?.content === 'string' && last.content === (msg as any).content
+          const lastTs = Date.parse(String(last?.createdAt || last?.updatedAt || ''))
+          const msgTs = Date.parse(String((msg as any)?.createdAt || (msg as any)?.updatedAt || ''))
+          const tsOk = !Number.isNaN(lastTs) && !Number.isNaN(msgTs) ? Math.abs(msgTs - lastTs) <= 30_000 : true
+          if (lastIsTempUser && sameContent && tsOk) {
+            messages[messages.length - 1] = { ...msg }
+            return messages
+          }
+        }
+      } catch {}
       if (msg?.id && messages.some(m => m.id === msg.id)) {
         return messages
       }
@@ -817,6 +834,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
 
   const enabledFlag = options?.enabled !== false
+  // Per-hook-instance guard key (do NOT use globals; multiple instances can exist).
+  const storeSyncKeyRef = useRef<string>('')
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
@@ -833,9 +852,22 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     gcTime: 2 * 60 * 1000,
   })
 
-  // Fold streamed chunks into final message array in-memory
+  // Fold streamed chunks into final message array in-memory.
+  //
+  // IMPORTANT: Some streaming/query implementations may mutate the underlying `chunks` array in-place
+  // (same reference, new length/content). If we memoize purely on `[chunks]`, derived state can go stale,
+  // causing loader state flicker (especially visible during route transitions).
+  //
+  // To make derived state robust, build a small "revision key" from length + last-chunk signature and
+  // memoize on that instead.
   const chunks = (messagesQuery.data as StreamedChunk[]) || []
-  const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunks])
+  const chunksLen = Array.isArray(chunks) ? chunks.length : 0
+  const lastChunkAny: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
+  const lastChunkSig =
+    lastChunkAny?.type === 'append' ? `append:${String(lastChunkAny?.message?.role || '')}:${String(lastChunkAny?.message?.id || '')}` : lastChunkAny?.type ? String(lastChunkAny.type) : 'none'
+  const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
+
+  const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunksRevisionKey])
 
   // Detect if current session has any live streaming signals (placeholder or deltas)
   const hasLiveStreamHint = useMemo(() => {
@@ -858,7 +890,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
     return false
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Track the start of the latest user turn and cap the pre-stream indicator duration
   const lastUserSerial = useMemo(() => {
@@ -891,7 +923,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (c?.type === 'ui_action') return c.payload ?? null
     }
     return null
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Invalidate usage totals when a turn completes.
   // Robust across both legacy 'complete' and newer 'turn_completed' SSE events.
@@ -908,7 +940,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
       }
     }
-  }, [chunks, conversationId, starshipId, queryClient])
+  }, [chunksRevisionKey, conversationId, starshipId, queryClient])
 
   // Check if we've received a 'turn_completed' event in the chunk stream
   const hasCompleteEvent = useMemo(() => {
@@ -919,7 +951,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (chunks[i].type === 'append' && (chunks[i] as any).message?.role === 'user') break
     }
     return false
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Server-authoritative turn state: derive from latest turn_* or turn_state events
   const serverTurnActive = useMemo(() => {
@@ -932,7 +964,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       if (c.type === 'turn_state') return Boolean(c.payload?.turnActive)
     }
     return false
-  }, [chunks])
+  }, [chunksRevisionKey])
 
   // Heuristic: detect if there's already a non-streaming assistant message after the last user message.
   // This protects against edge cases where turn lifecycle events are missing or out-of-order on reconnect.
@@ -968,13 +1000,45 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return computedMessages.some(m => (m as any)?.streaming === true)
   }, [computedMessages, hasCompleteEvent])
 
+  // Local pending-turn signal: we seed a local `turn_started` during the create->route-change gap.
+  // Some servers emit `turn_state.turnActive=false` until the agent actually starts; if we follow that
+  // strictly, the UI "responding" state flickers off. This keeps responding ON for a short window
+  // after a locally-initiated send, until streaming begins or the timeout expires.
+  const localTurnPendingActive = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    if (preStreamExpired) return false
+    // If we've already received a completion event for the current turn window, do not keep pending.
+    if (hasCompleteEvent) return false
+    // If assistant already finalized for the last user, do not keep pending.
+    if (hasFinalAssistantAfterLastUser) return false
+    // If assistant is streaming, the normal path will handle responding.
+    if (isAssistantStreaming) return false
+
+    // Scan backwards until we reach the most recent *server* turn completion.
+    // This works even if the server appends the user message after we seeded the local turn_started.
+    // (The previous logic broke early on the user append and missed the local marker.)
+    const maxScan = Math.min(chunks.length, 250)
+    for (let n = 1; n <= maxScan; n++) {
+      const c: any = chunks[chunks.length - n]
+      if (!c) continue
+      if (c.type === 'turn_completed') return false
+      if (c.type === 'turn_started' && c.payload?.local === true) return true
+    }
+    return false
+  }, [chunksRevisionKey, preStreamExpired, hasCompleteEvent, hasFinalAssistantAfterLastUser, isAssistantStreaming])
+
   // Awaiting assistant: prefer server turn state; show awaiting when turn is active but no streaming caret
   const isAwaitingAssistant = useMemo(() => {
     if (hasCompleteEvent) return false
     // If we already have a final assistant message for the last user turn, do not show loader
     if (hasFinalAssistantAfterLastUser) return false
-    return serverTurnActive && !isAssistantStreaming
-  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser])
+    // Cap the "awaiting" window so we never get stuck showing loaders if turn events are missed.
+    if (preStreamExpired) return false
+    // If server says the turn is active, we're awaiting unless assistant is already streaming.
+    if (serverTurnActive && !isAssistantStreaming) return true
+    // Otherwise, fall back to local pending-turn state to bridge create/route-change gaps.
+    return localTurnPendingActive
+  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser, preStreamExpired, localTurnPendingActive])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant
@@ -1013,6 +1077,74 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         attachmentIds: data.attachmentIds,
       })
       return response.data
+    },
+    onMutate: async variables => {
+      // Optimistically:
+      // - append the user message so the chat doesn't "go blank" during the /conversations -> /conversations/:id transition
+      // - mark the turn as started so the "assistant is typing..." gap loader stays visible
+      try {
+        const convId = (variables as any)?.conversationId as string | undefined
+        if (!convId) return
+
+        // If we've already injected an optimistic temp user + local turn_started for this send
+        // (e.g. during the "create conversation" -> upload attachments gap), do NOT inject again.
+        try {
+          const existing = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(convId)) as any[] | undefined
+          const existingArr = Array.isArray(existing) ? existing : []
+          const last = existingArr.length > 0 ? existingArr[existingArr.length - 1] : null
+          const prev = existingArr.length > 1 ? existingArr[existingArr.length - 2] : null
+          const hasLocalTurnStarted = last?.type === 'turn_started' && last?.payload?.local === true
+          const prevIsUserAppend = prev?.type === 'append' && prev?.message?.role === 'user'
+          const sameContent = prevIsUserAppend && String(prev?.message?.content ?? '') === String((variables as any)?.content ?? '')
+          const prevIsTemp = prevIsUserAppend && typeof prev?.message?.id === 'string' && String(prev.message.id).startsWith('temp-user-')
+          if (hasLocalTurnStarted && prevIsTemp && sameContent) {
+            // Ensure store flags are set, but skip duplicate stream-cache injections.
+            try {
+              useStarshipUIStore.getState().setConversationMeta(convId, {
+                isSending: true,
+                isResponding: true,
+                isAwaitingAssistant: true,
+                isAssistantStreaming: false,
+              })
+            } catch {}
+            return
+          }
+        } catch {}
+
+        const now = new Date().toISOString()
+        const tempUser: ClientMessage = {
+          id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+          role: 'user',
+          content: String((variables as any)?.content ?? ''),
+          createdAt: now,
+          updatedAt: now,
+          messageType: 'user_input',
+          // Best-effort: carry agentId through for UI (not required by protocol consumer)
+          ...(typeof (variables as any)?.agentId === 'string' ? ({ agentId: (variables as any).agentId } as any) : {}),
+          ...(Array.isArray((variables as any)?.attachmentIds) ? ({ attachmentIds: (variables as any).attachmentIds } as any) : {}),
+        }
+
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any[] | undefined) => {
+          const next = Array.isArray(old) ? old.slice() : []
+          // Ensure the optimistic user message exists before the local turn_started so lastUserSerial is stable.
+          next.push({ type: 'append', message: tempUser })
+          next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
+          return next
+        })
+
+        // ALSO update the central UI store immediately so UI stays consistent during route transitions.
+        try {
+          const ui = useStarshipUIStore.getState()
+          ui.appendMessage(convId, tempUser as any)
+          ui.setConversationMeta(convId, {
+            isSending: true,
+            isResponding: true,
+            isAwaitingAssistant: true,
+            isAssistantStreaming: false,
+            lastActivityAt: now,
+          })
+        } catch {}
+      } catch {}
     },
     onSuccess: (_res, variables) => {
       // Don't refetch - the SSE stream is already active and will receive new messages automatically
@@ -1063,6 +1195,98 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       toast.error('Failed to send message', { description: errorMessage })
     },
   })
+
+  // Keep the central UI store in sync with the streamed query state.
+  // This allows the entire conversation UI (messages + loaders) to be store-driven.
+  useEffect(() => {
+    if (!conversationId) return
+    // CRITICAL: Only the *enabled* stream hook instance should write to the store.
+    // We intentionally call `useConversationStreamed` in some places with enabled=false
+    // to satisfy rules-of-hooks (e.g. fallback hooks). Those instances must not sync.
+    if (!enabledFlag) return
+    // IMPORTANT: Guard against runaway update loops.
+    // Some streaming implementations may return a new `chunks` array reference on every render
+    // even when content is unchanged. If we write to Zustand unconditionally, it can create
+    // a render -> store set -> render loop (seen as "Maximum update depth exceeded").
+    try {
+      const chunksLen = Array.isArray(chunks) ? chunks.length : 0
+      const lastChunk: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
+      // Small, stable-ish signature of the latest streamed chunk
+      const lastChunkSig = lastChunk?.type === 'append' ? `append:${String(lastChunk?.message?.role || '')}:${String(lastChunk?.message?.id || '')}` : lastChunk?.type ? String(lastChunk.type) : 'none'
+
+      // IMPORTANT:
+      // Some initial connect / route-transition states can briefly produce a false-negative `isAwaitingAssistant`
+      // (e.g. the local turn_started marker exists, but turn_state/turn_started events haven't propagated through
+      // the streamedQuery cache yet). In those cases the UI store can be overwritten to "idle" and the loader
+      // disappears until a reload / next SSE chunk arrives.
+      //
+      // Make the store flags slightly "sticky" for the active turn: if the last message is a user message and we
+      // haven't seen completion/final assistant, treat it as awaiting (capped by preStreamExpired).
+      const lastMsg: any = Array.isArray(computedMessages) && computedMessages.length > 0 ? computedMessages[computedMessages.length - 1] : null
+      const fallbackAwaiting = !preStreamExpired && !hasCompleteEvent && !hasFinalAssistantAfterLastUser && lastMsg?.role === 'user'
+
+      const nextIsAwaitingAssistant = Boolean(isAwaitingAssistant || fallbackAwaiting)
+      const nextIsResponding = Boolean(isAssistantStreaming || nextIsAwaitingAssistant)
+      const nextIsSending = Boolean(sendMessageMutation.isPending)
+
+      const syncKey = [conversationId, chunksLen, lastChunkSig, nextIsSending ? 1 : 0, nextIsResponding ? 1 : 0, isAssistantStreaming ? 1 : 0, nextIsAwaitingAssistant ? 1 : 0].join('|')
+
+      if (storeSyncKeyRef.current === syncKey) return
+      storeSyncKeyRef.current = syncKey
+
+      const ui = useStarshipUIStore.getState()
+      const existing = ui.conversations?.[conversationId]
+      const computedLen = Array.isArray(computedMessages) ? computedMessages.length : 0
+
+      // IMPORTANT:
+      // During the /conversations -> /conversations/:id transition (and initial SSE connect),
+      // the streamed query can briefly report an empty `computedMessages` array even though we
+      // already optimistically seeded the UI store + query cache with a temp user message and
+      // marked the conversation as busy.
+      //
+      // If we sync an empty snapshot here, we clobber the optimistic messages + busy flags and
+      // the UI appears to "go blank" and drop the loader until the SSE stream catches up (works
+      // after reload because the conversationId is stable from first paint).
+      //
+      // So: if the store already has messages OR shows the conversation as busy, never overwrite
+      // it with an empty/idle snapshot.
+      if (
+        computedLen === 0 &&
+        existing &&
+        ((Array.isArray(existing.messages) && existing.messages.length > 0) ||
+          existing.isSending === true ||
+          existing.isResponding === true ||
+          existing.isAwaitingAssistant === true ||
+          existing.isAssistantStreaming === true)
+      ) {
+        return
+      }
+
+      const last = Array.isArray(computedMessages) && computedMessages.length > 0 ? (computedMessages[computedMessages.length - 1] as any) : null
+      const lastActivityAt = String(last?.updatedAt || last?.createdAt || '') || undefined
+      ui.setConversationSnapshot(conversationId, {
+        messages: (computedMessages as any) || [],
+        total: Array.isArray(computedMessages) ? computedMessages.length : 0,
+        lastActivityAt,
+        isSending: nextIsSending,
+        isResponding: nextIsResponding,
+        isAssistantStreaming: Boolean(isAssistantStreaming),
+        isAwaitingAssistant: nextIsAwaitingAssistant,
+      } as any)
+    } catch {}
+  }, [
+    conversationId,
+    enabledFlag,
+    chunks,
+    computedMessages,
+    isResponding,
+    isAssistantStreaming,
+    isAwaitingAssistant,
+    sendMessageMutation.isPending,
+    preStreamExpired,
+    hasCompleteEvent,
+    hasFinalAssistantAfterLastUser,
+  ])
 
   return {
     messages: computedMessages,

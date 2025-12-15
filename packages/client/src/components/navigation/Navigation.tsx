@@ -228,10 +228,10 @@ export function Navigation(props: NavigationProps) {
       ...(isAuthenticated && isInstanceAdmin
         ? [
             {
-              href: '/admin/agents/pending',
+              href: '/admin/connector-templates',
               label: 'Admin',
               icon: 'shield-check',
-              isActive: pathname.startsWith('/admin/agents'),
+              isActive: pathname.startsWith('/admin'),
             } as const,
           ]
         : []),

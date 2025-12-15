@@ -9,7 +9,7 @@ echo "Configuring runtime environment..."
 
 # These secrets should be provided when running the container:
 # docker run -e STRIPE_SECRET_KEY=xxx -e STRIPE_PUBLISHABLE_KEY=xxx image:tag
-# or via Kubernetes secrets, Docker Compose, or cloud provider secret managers
+# or via Kubernetes secrets, or cloud provider secret managers
 
 if [ -z "$STRIPE_PUBLISHABLE_KEY" ]; then
     echo "WARNING: STRIPE_PUBLISHABLE_KEY not provided. Payment UI may not work."
@@ -25,7 +25,7 @@ fi
 export STRIPE_PUBLISHABLE_KEY="${STRIPE_PUBLISHABLE_KEY:-}"
 export STRIPE_SECRET_KEY="${STRIPE_SECRET_KEY:-}"
 
-# Check if POSTGRES_HOST is already set (from K8s secrets, docker-compose, or environment)
+# Check if POSTGRES_HOST is already set (from K8s secrets or environment)
 if [ -z "$POSTGRES_HOST" ]; then
     echo "ERROR: POSTGRES_HOST environment variable is not set!"
     echo "Please set POSTGRES_HOST in your environment or deployment configuration."

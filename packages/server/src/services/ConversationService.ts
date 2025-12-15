@@ -1,6 +1,6 @@
 import { MessageService } from '@/services/MessageService';
 import { StreamingService } from '@/services/StreamingService';
-import { EnvironmentService } from '@/services/EnvironmentService';
+import { ConnectorSecretService } from '@/services/ConnectorSecretService';
 import { UsageService } from '@/services/UsageService';
 import { AttachmentService } from '@/services/AttachmentService';
 import { Agent, AutopilotEvent, ExecutionItemUtils, ChildProcessRunner, RunnerFactory } from '@starships/autopilot';
@@ -30,7 +30,7 @@ import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
-import { generateJWT } from '@/utils/jwt';
+import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 
 /**
  * Autopilot child process configuration
@@ -63,7 +63,9 @@ export class ConversationService {
   private streamingService!: StreamingService;
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
-  private environmentService!: EnvironmentService;
+  // Kept for future use (runtime secrets, connector context, etc.)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private connectorSecretService!: ConnectorSecretService;
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
@@ -128,74 +130,7 @@ export class ConversationService {
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: Runner;
 
-  /**
-   * Build connector-aware HTTP configuration for the current starship/user
-   * context. This configuration is passed to the remote Autopilot runner via
-   * EngineConfig and is ONLY consumed inside the runner HostRuntime.
-   *
-   * Workflows and blueprints never see this data; they only reference
-   * connectors by slug (e.g., "starships", "google_drive") on HttpRequest nodes.
-   */
-  private async buildConnectorHttpConfig(
-    starshipId: string,
-    authUserId?: string
-  ): Promise<Record<string, { baseUrl: string; headers: Record<string, string> }>> {
-    if (!authUserId) {
-      return {};
-    }
-
-    const env = getEnvConfig();
-
-    const connectors: Record<string, { baseUrl: string; headers: Record<string, string> }> = {};
-
-    // Generate a JWT representing the current user acting in the context of
-    // this starship. This token will be used by the runner when it performs
-    // HTTP requests via the "starships" connector.
-    try {
-      const token = await generateJWT({
-        id: authUserId,
-        starshipId,
-      });
-
-      const baseUrl = `${env.SERVER_URL}/api/v1`;
-
-      connectors.starships = {
-        baseUrl,
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      };
-    } catch (error) {
-      // If we fail to generate a JWT, fall back to no starships connector;
-      // tools that rely on it will fail explicitly when invoked.
-      console.error('[ConversationService] Failed to build starships connector HTTP configuration', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    // Google Drive connector: resolve relative URLs like "/drive/v3/..."
-    // against the Google APIs base URL and inject a bearer token managed in
-    // the starship environment (GOOGLE_DRIVE_ACCESS_TOKEN).
-    try {
-      const decryptedEnv = await this.environmentService.getDecryptedEnvironment(starshipId);
-      const googleDriveToken = decryptedEnv.GOOGLE_DRIVE_ACCESS_TOKEN;
-
-      if (googleDriveToken && typeof googleDriveToken === 'string' && googleDriveToken.trim().length > 0) {
-        connectors.google_drive = {
-          baseUrl: 'https://www.googleapis.com',
-          headers: {
-            Authorization: `Bearer ${googleDriveToken}`,
-          },
-        };
-      }
-    } catch (error) {
-      console.error('[ConversationService] Failed to build google_drive connector HTTP configuration', {
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-
-    return connectors;
-  }
+  private connectorRuntimeService!: ConnectorRuntimeService;
 
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
@@ -213,15 +148,17 @@ export class ConversationService {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
-    this.environmentService = new EnvironmentService();
+    this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
-    // Choose default runner based on AUTOPILOT_RUNNER:
-    // - 'remote' -> RemoteRunner via RunnerFactory (uses autopilot.setRunnerConfig)
-    // - anything else -> ChildProcessRunner with local process isolation and limits
-    const mode = process.env.AUTOPILOT_RUNNER || 'child';
-    if (mode === 'remote') {
+    this.connectorRuntimeService = new ConnectorRuntimeService();
+
+    // Choose default runner based on whether a remote runner is configured.
+    // When RUNNER_URL is set, server startup configures autopilot.setRunnerConfig({ url, token })
+    // and RunnerFactory will return a RemoteRunner. Otherwise we use a child process
+    // runner with local isolation and limits.
+    if (process.env.RUNNER_URL) {
       this.defaultRunner = RunnerFactory.getTopLevelRunner(0);
     } else {
       this.defaultRunner = new ChildProcessRunner(ConversationService.AUTOPILOT_CONFIG);
@@ -962,7 +899,7 @@ export class ConversationService {
         // This is only used by the remote runner HostRuntime and is not exposed
         // to workflows (runtimeEnv/state).
         const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
-        const connectors = await this.buildConnectorHttpConfig(starship.id, authUserId);
+        const connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starship.id, authUserId);
 
         // Build LLM runtime configuration from server env; this will be passed
         // to the remote runner so it does not need to read provider keys from

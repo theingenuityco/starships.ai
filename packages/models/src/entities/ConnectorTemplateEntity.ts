@@ -1,5 +1,17 @@
 import { Expose } from 'class-transformer';
-import { IsArray, IsIn, IsObject, IsOptional, IsString, Length, IsISO8601, IsInt, Min, validate, ValidationError } from 'class-validator';
+import {
+  IsBoolean,
+  IsIn,
+  IsObject,
+  IsOptional,
+  IsString,
+  Length,
+  IsISO8601,
+  IsInt,
+  Min,
+  validate,
+  ValidationError,
+} from 'class-validator';
 import type { Blueprint } from '@starships/autopilot';
 import type { ConnectorAuthType, ConnectorProvider } from '@starships/protocol';
 
@@ -39,44 +51,8 @@ export class ConnectorTemplateEntity {
 
   @Expose()
   @IsString()
-  @IsIn(['oauth2', 'api_key', 'none'])
+  @IsIn(['oauth2', 'api_key', 'custom', 'none'])
   authType!: ConnectorAuthType | 'none';
-
-  @Expose()
-  @IsArray()
-  requiredEnvKeys!: string[];
-
-  @Expose()
-  @IsArray()
-  @IsOptional()
-  optionalEnvKeys?: string[];
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  docsSlug?: string;
-
-  // OAuth2 configuration (for authType = 'oauth2')
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  oauthAuthorizeUrl?: string;
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  oauthTokenUrl?: string;
-
-  @Expose()
-  @IsArray()
-  @IsOptional()
-  oauthScopes?: string[];
-
-  @Expose()
-  @IsString()
-  @IsOptional()
-  oauthRedirectPath?: string;
 
   /**
    * runtimeConfig is an open-ended JSON object that can hold:
@@ -105,6 +81,10 @@ export class ConnectorTemplateEntity {
   @IsInt()
   @Min(0)
   usageCount!: number;
+
+  @Expose()
+  @IsBoolean()
+  isEnabled!: boolean;
 
   // Inline blueprints for connector flows
 
@@ -146,17 +126,11 @@ export class ConnectorTemplateEntity {
       displayName: dataRecord.displayName || '',
       description: dataRecord.description || '',
       authType: (dataRecord.authType as ConnectorAuthType) || 'oauth2',
-      requiredEnvKeys: dataRecord.requiredEnvKeys || [],
-      optionalEnvKeys: dataRecord.optionalEnvKeys || [],
-      docsSlug: dataRecord.docsSlug,
-      oauthAuthorizeUrl: dataRecord.oauthAuthorizeUrl,
-      oauthTokenUrl: dataRecord.oauthTokenUrl,
-      oauthScopes: dataRecord.oauthScopes || [],
-      oauthRedirectPath: dataRecord.oauthRedirectPath,
       runtimeConfig: dataRecord.runtimeConfig || {},
       version: (dataRecord.version as string) || '1.0.0',
       category: (dataRecord.category as string) || 'connector',
       usageCount: (dataRecord.usageCount as number) ?? 0,
+      isEnabled: (dataRecord.isEnabled as boolean) ?? true,
       connectBlueprint: dataRecord.connectBlueprint as Blueprint | undefined,
       refreshBlueprint: dataRecord.refreshBlueprint as Blueprint | undefined,
       testBlueprint: dataRecord.testBlueprint as Blueprint | undefined,
@@ -176,5 +150,3 @@ export class ConnectorTemplateEntity {
     }
   }
 }
-
-

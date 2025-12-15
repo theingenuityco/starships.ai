@@ -62,7 +62,7 @@
   - [x] [`AgentTemplateRepository`](packages/models/src/repositories/AgentTemplateRepository.ts) ✅ Completed (with junction table)
   - [x] [`ToolRepository`](packages/models/src/repositories/ToolRepository.ts) ✅ Completed (with foreign keys)
   - [x] [`ToolTemplateRepository`](packages/models/src/repositories/ToolTemplateRepository.ts) ✅ Completed (with relationships)
-  - [x] [`EnvironmentRepository`](packages/models/src/repositories/EnvironmentRepository.ts) ✅ Completed (with encryption)
+- [x] `ConnectorSecretRepository` ✅ Completed (with encryption)
   - [x] [`UsageRepository`](packages/models/src/repositories/UsageRepository.ts) ✅ Completed (with aggregations)
   - [x] [`WaitlistRepository`](packages/models/src/repositories/WaitlistRepository.ts) ✅ Completed (with validation)
 
@@ -248,7 +248,7 @@ interface PostgresConfig {
    ```bash
    # Convert remaining repositories in this order:
    1. ToolTemplateRepository (next priority - complex relationships)
-   2. EnvironmentRepository (encrypted API keys)
+   2. ConnectorSecretRepository (encrypted secrets)
    3. UsageRepository (analytics and tracking)
    4. WaitlistRepository (user onboarding)
    ```
@@ -353,7 +353,7 @@ interface PostgresConfig {
 
 ### **PostgreSQL Schema Summary**
 
-- **17 Tables**: users, starships, agents, agent_templates, tools, tool_templates, workflows, blueprints, nodes, edges, conversations, messages, executions, environments, usage, waitlist
+- **17 Tables**: users, starships, agents, agent_templates, tools, tool_templates, workflows, blueprints, nodes, edges, conversations, messages, executions, connector_secrets, usage, waitlist
 - **3 Junction Tables**: agent_tools, agent_template_tool_templates, conversation_agents
 - **35+ Indexes**: Including full-text search and performance indexes
 - **Auto-triggers**: For updated_at timestamps
@@ -404,7 +404,7 @@ For each repository conversion, follow the **UserRepository & StarshipRepository
 - ✅ ConversationRepository, MessageRepository, WorkflowRepository
 - ✅ ExecutionRepository, BlueprintRepository
 - ✅ AgentTemplateRepository, ToolRepository
-- ✅ ToolTemplateRepository, EnvironmentRepository, UsageRepository, WaitlistRepository
+- ✅ ToolTemplateRepository, ConnectorSecretRepository, UsageRepository, WaitlistRepository
 
 **Remaining Work**: Minor test file cleanup and health endpoint updates (95% → 100% complete).
 

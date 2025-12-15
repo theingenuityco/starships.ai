@@ -190,21 +190,8 @@ Below are canonical patterns to follow in blueprints.
       // Shown explicitly for clarity; the connector will inject this if omitted.
       "X-RestLi-Protocol-Version": "2.0.0"
     },
-    body: {
-      author: "{{ input.authorUrn }}", // e.g. "urn:li:person:..."
-      lifecycleState: "PUBLISHED",
-      specificContent: {
-        "com.linkedin.ugc.ShareContent": {
-          shareCommentary: {
-            text: "{{ input.commentary }}"
-          },
-          shareMediaCategory: "NONE"
-        }
-      },
-      visibility: {
-        "com.linkedin.ugc.MemberNetworkVisibility": "{{ input.visibility || 'PUBLIC' }}"
-      }
-    },
+    // full-string template returns the final JSON body object
+    body: "{{ { author: input.authorUrn, lifecycleState: 'PUBLISHED', specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text: input.commentary }, shareMediaCategory: 'NONE' } }, visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': (input.visibility || 'PUBLIC') } } }}",
     timeout: 20000
   }
 }
@@ -241,18 +228,7 @@ Below are canonical patterns to follow in blueprints.
       // Optional: override version if needed
       // "LinkedIn-Version": "202501"
     },
-    body: {
-      author: "{{ input.authorUrn }}",          // e.g. "urn:li:person:..." or "urn:li:organization:..."
-      commentary: "{{ input.commentary }}",     // plain text or little text format
-      visibility: "{{ input.visibility || 'PUBLIC' }}",
-      distribution: {
-        feedDistribution: "MAIN_FEED",
-        targetEntities: [],
-        thirdPartyDistributionChannels: []
-      },
-      lifecycleState: "PUBLISHED",
-      isReshareDisabledByAuthor: false
-    },
+    body: "{{ { author: input.authorUrn, commentary: input.commentary, visibility: (input.visibility || 'PUBLIC'), distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false } }}",
     timeout: 20000
   }
 }
@@ -292,24 +268,7 @@ Below are canonical patterns to follow in blueprints.
     headers: {
       "Content-Type": "application/json"
     },
-    body: {
-      author: "{{ input.authorUrn }}",
-      commentary: "{{ input.commentary }}",
-      visibility: "{{ input.visibility || 'PUBLIC' }}",
-      distribution: {
-        feedDistribution: "MAIN_FEED",
-        targetEntities: [],
-        thirdPartyDistributionChannels: []
-      },
-      content: {
-        media: {
-          title: "{{ input.mediaTitle || '' }}",
-          id: "{{ input.mediaUrn }}"      // e.g. "urn:li:video:..."
-        }
-      },
-      lifecycleState: "PUBLISHED",
-      isReshareDisabledByAuthor: false
-    },
+    body: "{{ { author: input.authorUrn, commentary: input.commentary, visibility: (input.visibility || 'PUBLIC'), distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, content: { media: { title: (input.mediaTitle || ''), id: input.mediaUrn } }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false } }}",
     timeout: 30000
   }
 }
@@ -329,26 +288,7 @@ Below are canonical patterns to follow in blueprints.
     headers: {
       "Content-Type": "application/json"
     },
-    body: {
-      author: "{{ input.authorUrn }}",
-      commentary: "{{ input.commentary }}",
-      visibility: "{{ input.visibility || 'PUBLIC' }}",
-      distribution: {
-        feedDistribution: "MAIN_FEED",
-        targetEntities: [],
-        thirdPartyDistributionChannels: []
-      },
-      content: {
-        article: {
-          source: "{{ input.url }}",
-          thumbnail: "{{ input.thumbnailUrn }}",   // from Images API
-          title: "{{ input.title }}",
-          description: "{{ input.description || '' }}"
-        }
-      },
-      lifecycleState: "PUBLISHED",
-      isReshareDisabledByAuthor: false
-    },
+    body: "{{ { author: input.authorUrn, commentary: input.commentary, visibility: (input.visibility || 'PUBLIC'), distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, content: { article: { source: input.url, thumbnail: input.thumbnailUrn, title: input.title, description: (input.description || '') } }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false } }}",
     timeout: 30000
   }
 }
@@ -377,21 +317,7 @@ Below are canonical patterns to follow in blueprints.
     headers: {
       "Content-Type": "application/json"
     },
-    body: {
-      author: "{{ input.authorUrn }}",
-      commentary: "{{ input.commentary || '' }}",
-      visibility: "{{ input.visibility || 'PUBLIC' }}",
-      distribution: {
-        feedDistribution: "MAIN_FEED",
-        targetEntities: [],
-        thirdPartyDistributionChannels: []
-      },
-      lifecycleState: "PUBLISHED",
-      isReshareDisabledByAuthor: false,
-      reshareContext: {
-        parent: "{{ input.parentPostUrn }}"   // e.g. "urn:li:share:..."
-      }
-    },
+    body: "{{ { author: input.authorUrn, commentary: (input.commentary || ''), visibility: (input.visibility || 'PUBLIC'), distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false, reshareContext: { parent: input.parentPostUrn } } }}",
     timeout: 20000
   }
 }
@@ -420,29 +346,7 @@ Below are canonical patterns to follow in blueprints.
     headers: {
       "Content-Type": "application/json"
     },
-    body: {
-      author: "{{ input.authorUrn }}",
-      commentary: "{{ input.commentary }}",
-      visibility: "PUBLIC",
-      distribution: {
-        feedDistribution: "MAIN_FEED",
-        targetEntities: [
-          {
-            geoLocations: "{{ input.geoLocations || [] }}",   // e.g. ["urn:li:geo:103644278"]
-            seniorities: "{{ input.seniorities || [] }}"      // e.g. ["urn:li:seniority:3"]
-          }
-        ],
-        thirdPartyDistributionChannels: []
-      },
-      content: {
-        media: {
-          title: "{{ input.mediaTitle || '' }}",
-          id: "{{ input.mediaUrn }}"
-        }
-      },
-      lifecycleState: "PUBLISHED",
-      isReshareDisabledByAuthor: false
-    },
+    body: "{{ { author: input.authorUrn, commentary: input.commentary, visibility: 'PUBLIC', distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [ { geoLocations: (input.geoLocations || []), seniorities: (input.seniorities || []) } ], thirdPartyDistributionChannels: [] }, content: { media: { title: (input.mediaTitle || ''), id: input.mediaUrn } }, lifecycleState: 'PUBLISHED', isReshareDisabledByAuthor: false } }}",
     timeout: 30000
   }
 }
@@ -475,7 +379,7 @@ Common read paths:
   name: "LinkedIn Get Post",
   parameters: {
     method: "GET",
-    url: "/rest/posts/{{ input.encodedPostUrn }}",
+    url: "{{ '/rest/posts/' + input.encodedPostUrn }}",
     connector: "linkedin",
     timeout: 15000
   }
@@ -491,7 +395,7 @@ Common read paths:
   name: "LinkedIn Batch Get Posts",
   parameters: {
     method: "GET",
-    url: "/rest/posts?ids=List({{ input.encodedPostUrns }})",
+    url: "{{ '/rest/posts?ids=List(' + input.encodedPostUrns + ')' }}",
     connector: "linkedin",
     headers: {
       "X-RestLi-Method": "BATCH_GET"
@@ -526,7 +430,7 @@ Tools should:
   name: "LinkedIn Update Post",
   parameters: {
     method: "POST",
-    url: "/rest/posts/{{ input.encodedPostUrn }}",
+    url: "{{ '/rest/posts/' + input.encodedPostUrn }}",
     connector: "linkedin",
     headers: {
       "Content-Type": "application/json",

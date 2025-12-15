@@ -79,11 +79,27 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       let finalUrl = url;
       let finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
-      // If a connector slug is provided and we have configuration for it,
-      // apply baseUrl + header injection. This keeps connector-specific
-      // behavior entirely inside the HostRuntime.
+      // If a connector slug is provided, apply connector-specific behavior:
+      // - Resolve relative URLs against connector.baseUrl
+      // - Inject connector headers (typically Authorization) unless the caller
+      //   explicitly set an Authorization header.
       if (connector && typeof connector === 'string') {
         const cfg = connectorConfigs[connector];
+
+        // If the workflow requested a connector but the embedding host did not
+        // provide configuration for it, surface a clear error up front instead
+        // of failing with a low-level "Failed to parse URL" from fetch when
+        // using a relative URL like "/user/repos".
+        if (!cfg) {
+          const isRelative = typeof finalUrl === 'string' && !/^https?:\/\//i.test(finalUrl);
+          if (isRelative) {
+            throw new Error(
+              `Connector "${connector}" has no HTTP configuration; cannot resolve relative URL "${finalUrl}". ` +
+                'Make sure the connector is connected and has an access token configured on the host.'
+            );
+          }
+        }
+
         if (cfg) {
           const { baseUrl, headers: connectorHeaders } = cfg;
 
@@ -94,12 +110,19 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
             finalUrl = `${normalizedBase}${normalizedPath}`;
           }
 
-          // Merge connector headers last so they can override generic ones.
+          // Merge connector headers last so they can override generic ones,
+          // EXCEPT for Authorization: if the caller explicitly set any
+          // Authorization header, we must not overwrite it (matches connector
+          // docs and keeps "escape hatches" predictable).
           if (connectorHeaders && typeof connectorHeaders === 'object') {
-            finalHeaders = {
-              ...finalHeaders,
-              ...connectorHeaders,
-            };
+            const hasCallerAuth = Object.keys(finalHeaders).some((key) => key.toLowerCase() === 'authorization');
+
+            for (const [key, value] of Object.entries(connectorHeaders)) {
+              if (key.toLowerCase() === 'authorization' && hasCallerAuth) {
+                continue;
+              }
+              finalHeaders[key] = value as unknown;
+            }
           }
         }
       }

@@ -93,8 +93,6 @@ jobs:
 
       - name: Update secrets
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -116,19 +114,10 @@ jobs:
           SENTRY_DSN_CLIENT: ${{ secrets.SENTRY_DSN_CLIENT }}
           SENTRY_DSN_SERVER: ${{ secrets.SENTRY_DSN_SERVER }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
-          GITHUB_APP_ID: ${{ secrets.GITHUB_APP_ID }}
-          GITHUB_APP_PRIVATE_KEY_BASE64: ${{ secrets.GITHUB_APP_PRIVATE_KEY_BASE64 }}
           GH_OAUTH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
           GH_OAUTH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
           GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
           GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
-          LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
-          GOOGLE_DRIVE_CLIENT_ID: ${{ secrets.GOOGLE_DRIVE_CLIENT_ID }}
-          GOOGLE_DRIVE_CLIENT_SECRET: ${{ secrets.GOOGLE_DRIVE_CLIENT_SECRET }}
-          DISCORD_CLIENT_ID: ${{ secrets.DISCORD_CLIENT_ID }}
-          DISCORD_CLIENT_SECRET: ${{ secrets.DISCORD_CLIENT_SECRET }}
-          DISCORD_BOT_TOKEN: ${{ secrets.DISCORD_BOT_TOKEN }}
           RUNNER_AUTH_TOKEN: ${{ secrets.RUNNER_AUTH_TOKEN }}
           EMAIL_FROM_ADDRESS: ${{ vars.EMAIL_FROM_ADDRESS }}
           EMAIL_FROM_NAME: ${{ vars.EMAIL_FROM_NAME }}
@@ -154,24 +143,13 @@ jobs:
 
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
-            --from-literal=OPENAI_API_KEY="$OPENAI_API_KEY" \
-            --from-literal=ANTHROPIC_API_KEY="$ANTHROPIC_API_KEY" \
             --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
             --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
-            --from-literal=GITHUB_APP_ID="$GITHUB_APP_ID" \
-            --from-literal=GITHUB_APP_PRIVATE_KEY_BASE64="$GITHUB_APP_PRIVATE_KEY_BASE64" \
             --from-literal=GH_OAUTH_CLIENT_ID="${GH_OAUTH_CLIENT_ID}" \
             --from-literal=GH_OAUTH_CLIENT_SECRET="${GH_OAUTH_CLIENT_SECRET}" \
             --from-literal=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID" \
             --from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" \
-            --from-literal=LINKEDIN_CLIENT_ID="$LINKEDIN_CLIENT_ID" \
-            --from-literal=LINKEDIN_CLIENT_SECRET="$LINKEDIN_CLIENT_SECRET" \
-            --from-literal=GOOGLE_DRIVE_CLIENT_ID="$GOOGLE_DRIVE_CLIENT_ID" \
-            --from-literal=GOOGLE_DRIVE_CLIENT_SECRET="$GOOGLE_DRIVE_CLIENT_SECRET" \
-            --from-literal=DISCORD_CLIENT_ID="$DISCORD_CLIENT_ID" \
-            --from-literal=DISCORD_CLIENT_SECRET="$DISCORD_CLIENT_SECRET" \
-            --from-literal=DISCORD_BOT_TOKEN="$DISCORD_BOT_TOKEN" \
             --from-literal=STRIPE_WEBHOOK_SECRET="$STRIPE_WEBHOOK_SECRET" \
             --from-literal=POSTGRES_HOST="$POSTGRES_HOST" \
             --from-literal=POSTGRES_PORT="$POSTGRES_PORT" \

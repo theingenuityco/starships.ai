@@ -6,12 +6,11 @@ import { PageLayout } from '@/components/layout/PageLayout'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 
-interface EnvironmentSettingsContentProps {
+interface ConnectorsSettingsContentProps {
   slug: string
 }
 
-export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentProps) {
-  // Fetch starship data
+export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentProps) {
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug)
 
   if (starshipLoading) {
@@ -49,7 +48,6 @@ export function EnvironmentSettingsContent({ slug }: EnvironmentSettingsContentP
       <div className="bg-background">
         <div className="flex flex-col items-center px-6 py-8">
           <div className="w-full max-w-6xl mx-auto space-y-8">
-            {/* Header */}
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="plug" className="h-6 w-6 text-primary" />

@@ -2,7 +2,7 @@ export { AgentRepository } from './AgentRepository';
 export { AgentTemplateRepository } from './AgentTemplateRepository';
 export { AttachmentRepository } from './AttachmentRepository';
 export { ConversationRepository } from './ConversationRepository';
-export { EnvironmentRepository } from './EnvironmentRepository';
+export { ConnectorSecretRepository } from './ConnectorSecretRepository';
 export { MessageRepository } from './MessageRepository';
 export { OAuthAccountRepository } from './OAuthAccountRepository';
 export { StarshipRepository } from './StarshipRepository';

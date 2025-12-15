@@ -54,8 +54,6 @@ spec:
           env:
             - name: NODE_ENV
               value: 'development'
-            - name: AUTOPILOT_RUNNER
-              value: 'remote'
             - name: RUNNER_URL
               value: 'http://autopilot-runner.starships-dev.svc.cluster.local:50051'
             - name: RUNNER_AUTH_TOKEN
@@ -122,16 +120,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: POSTGRES_SSL
-            - name: OPENAI_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: OPENAI_API_KEY
-            - name: ANTHROPIC_API_KEY
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: ANTHROPIC_API_KEY
             - name: OPENROUTER_API_KEY
               valueFrom:
                 secretKeyRef:
@@ -183,17 +171,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GH_OAUTH_CLIENT_SECRET
-            # GitHub App (used for GitHub connector)
-            - name: GITHUB_APP_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GITHUB_APP_ID
-            - name: GITHUB_APP_PRIVATE_KEY_BASE64
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GITHUB_APP_PRIVATE_KEY_BASE64
             - name: GOOGLE_CLIENT_ID
               valueFrom:
                 secretKeyRef:
@@ -204,41 +181,6 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: GOOGLE_CLIENT_SECRET
-            - name: LINKEDIN_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: LINKEDIN_CLIENT_ID
-            - name: LINKEDIN_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: LINKEDIN_CLIENT_SECRET
-            - name: GOOGLE_DRIVE_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GOOGLE_DRIVE_CLIENT_ID
-            - name: GOOGLE_DRIVE_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: GOOGLE_DRIVE_CLIENT_SECRET
-            - name: DISCORD_CLIENT_ID
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DISCORD_CLIENT_ID
-            - name: DISCORD_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DISCORD_CLIENT_SECRET
-            - name: DISCORD_BOT_TOKEN
-              valueFrom:
-                secretKeyRef:
-                  name: starships-secrets
-                  key: DISCORD_BOT_TOKEN
             - name: EMAIL_FROM_ADDRESS
               valueFrom:
                 secretKeyRef:

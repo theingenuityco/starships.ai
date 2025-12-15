@@ -19,6 +19,66 @@ export type ConnectorProvider = 'linkedin' | 'discord' | 'starships' | 'google_d
 
 export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
+// ============================================================================
+// CONNECTOR TEMPLATE RUNTIME CONFIG (runtime_config JSON)
+// ============================================================================
+
+/**
+ * ConnectorTokenRef
+ *
+ * References a secret used by connector runtime.
+ */
+export type ConnectorSecretRefType = 'platform_secret' | 'connector_secret';
+
+export interface ConnectorSecretRef {
+  type: ConnectorSecretRefType;
+  key: string;
+}
+
+export type ConnectorTokenRef = ConnectorSecretRef;
+
+/**
+ * ConnectorOAuthRuntimeConfig
+ *
+ * Configuration under connector_templates.runtime_config.oauth.
+ * This is intentionally open-ended (extends Record) to support DB-driven providers.
+ */
+export interface ConnectorOAuthRuntimeConfig extends Record<string, unknown> {
+  // OAuth app credentials (host/platform secrets)
+  clientId?: ConnectorTokenRef; // secret ref holding the OAuth client id
+  clientSecret?: ConnectorTokenRef; // secret ref holding the OAuth client secret
+
+  // Stored credentials (per-starship connector_secrets) OR platform refs
+  accessToken?: ConnectorTokenRef;
+  refreshToken?: ConnectorTokenRef; // secret ref holding refresh token
+  apiKey?: ConnectorTokenRef; // secret ref holding api key
+
+  // OAuth endpoints + behavior
+  authorizeUrl?: string;
+  tokenUrl?: string;
+  redirectPath?: string;
+  scopes?: string[];
+  params?: Record<string, unknown>;
+
+  // HostRuntime HTTP auth injection behavior
+  authHeaderName?: string;
+  authPrefix?: string; // e.g. "Bearer", "Bot", or "" for no prefix
+}
+
+/**
+ * ConnectorRuntimeConfig
+ *
+ * Root configuration for connector templates (connector_templates.runtime_config).
+ * Still open-ended, but with common keys typed.
+ */
+export interface ConnectorRuntimeConfig extends Record<string, unknown> {
+  apiBaseUrl?: string;
+  oauth?: ConnectorOAuthRuntimeConfig;
+
+  // Host-only special behavior
+  usesPlatformJwt?: boolean; // used by the internal "starships" connector
+}
+
 /**
  * Core connector entity
  */
@@ -52,22 +112,24 @@ export interface ConnectorListItem {
    * For non-OAuth connectors, this may be an empty array or undefined.
    */
   scopes?: string[];
+  /**
+   * Non-secret connector metadata from the connectors row.
+   * For example, Discord stores guild_id and permissions here.
+   */
+  metadata?: Record<string, unknown>;
 }
 
 export interface ConnectorListResponse {
   connectors: ConnectorListItem[];
 }
 
-export type ConnectorAuthType = 'oauth2' | 'api_key';
+export type ConnectorAuthType = 'oauth2' | 'api_key' | 'custom' | 'none';
 
 export interface ConnectorCatalogItem {
   provider: ConnectorProvider;
   displayName: string;
   description: string;
   authType: ConnectorAuthType;
-  requiredEnvKeys: string[];
-  optionalEnvKeys?: string[];
-  docsSlug?: string;
 }
 
 export interface ConnectorCatalogResponse {
@@ -87,14 +149,50 @@ export interface ConnectorTemplateModel {
   displayName: string;
   description: string;
   authType: ConnectorAuthType;
-  requiredEnvKeys: string[];
-  optionalEnvKeys?: string[];
-  docsSlug?: string;
+  isEnabled: boolean;
   version: string;
   category: string;
   usageCount: number;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * ConnectorTemplateAdminModel
+ *
+ * Instance-admin view of a connector template, including runtime configuration
+ * and (optional) inline autopilot blueprints.
+ */
+export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
+  runtimeConfig: ConnectorRuntimeConfig;
+  connectBlueprint?: Record<string, unknown> | null;
+  refreshBlueprint?: Record<string, unknown> | null;
+  testBlueprint?: Record<string, unknown> | null;
+}
+
+// ============================================================================
+// ADMIN (INSTANCE ADMIN ONLY) - CONNECTOR TEMPLATE MANAGEMENT
+// ============================================================================
+
+export interface AdminConnectorTemplateListResponse {
+  connectors: ConnectorTemplateModel[];
+}
+
+export interface AdminConnectorTemplateResponse {
+  connector: ConnectorTemplateAdminModel;
+}
+
+export interface UpdateConnectorTemplateRequest {
+  displayName?: string;
+  description?: string;
+  authType?: ConnectorAuthType;
+  isEnabled?: boolean;
+  version?: string;
+  category?: string;
+  runtimeConfig?: ConnectorRuntimeConfig;
+  connectBlueprint?: Record<string, unknown> | null;
+  refreshBlueprint?: Record<string, unknown> | null;
+  testBlueprint?: Record<string, unknown> | null;
 }
 
 export interface ConnectWithApiKeyRequest {
@@ -145,7 +243,7 @@ export interface ConnectorConnectInput {
    * rely on this config for non-secret options such as env key names, OAuth
    * parameters, or other connector behavior hints.
    */
-  config?: Record<string, unknown>;
+  config?: ConnectorRuntimeConfig;
 }
 
 export interface ConnectorConnectOutput {
@@ -181,7 +279,7 @@ export interface ConnectorRefreshInput {
   provider: ConnectorProvider;
   envSnapshot: Record<string, string>;
   metadata?: Record<string, unknown>;
-  config?: Record<string, unknown>;
+  config?: ConnectorRuntimeConfig;
 }
 
 export interface ConnectorRefreshOutput {
@@ -196,7 +294,7 @@ export interface ConnectorTestInput {
   provider: ConnectorProvider;
   envSnapshot: Record<string, string>;
   metadata?: Record<string, unknown>;
-  config?: Record<string, unknown>;
+  config?: ConnectorRuntimeConfig;
 }
 
 export interface ConnectorTestOutput {

@@ -88,8 +88,6 @@ curl -N -H "Accept: text/event-stream" \
 
 ## Deployment overview
 
-- Compose (all-in-one container defined in `docker-compose.yml`):
-  - Ports: 3000 (web), 4000 (API), 5432 (optional Postgres)
 - Kubernetes: manifests in `k8s/prod/`, IAM and cluster config in `infra/prod/`
 
 ## Security & observability

@@ -6,6 +6,7 @@ import type {
   ConnectorProvider,
   ConnectWithApiKeyRequest,
   ConnectorModel,
+  ConnectorRuntimeConfig,
 } from '@starships/protocol';
 import {
   ConnectorTemplateRepository,
@@ -197,7 +198,7 @@ export class ConnectorService {
       provider,
       envSnapshot,
       metadata: connector.metadata || {},
-      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
     };
     const initialItems = ExecutionItemUtils.wrapSingle(input);
     execution.results.push({ nodeRef: '__initial__', items: initialItems });
@@ -267,7 +268,7 @@ export class ConnectorService {
       provider,
       envSnapshot,
       metadata: connector.metadata || {},
-      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
     };
     const initialItems = ExecutionItemUtils.wrapSingle(input);
     execution.results.push({ nodeRef: '__initial__', items: initialItems });
@@ -323,11 +324,11 @@ export class ConnectorService {
     }
     const env = getEnvConfig();
 
-    const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+    const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
     const oauthConfig =
       runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
-        ? (runtimeConfig.oauth as Record<string, unknown>)
-        : ({} as Record<string, unknown>);
+        ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+        : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
     const oauthParams =
       oauthConfig.params && typeof oauthConfig.params === 'object'
         ? (oauthConfig.params as Record<string, unknown>)
@@ -446,7 +447,7 @@ export class ConnectorService {
           redirectPath,
           scopes,
           stateToken: state,
-          config: runtimeConfig as Record<string, unknown>,
+          config: runtimeConfig,
         });
 
         if (output.authorizationUrl) {
@@ -485,11 +486,11 @@ export class ConnectorService {
     }
 
     const env = getEnvConfig();
-    const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+    const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
     const oauthConfig =
       runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
-        ? (runtimeConfig.oauth as Record<string, unknown>)
-        : ({} as Record<string, unknown>);
+        ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+        : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
 
     const clientIdEnvKey = oauthConfig.clientId as string | undefined;
     const clientSecretEnvKey = oauthConfig.clientSecret as string | undefined;
@@ -644,7 +645,7 @@ export class ConnectorService {
           stateToken,
           code,
           callbackQuery,
-          config: runtimeConfig as Record<string, unknown>,
+          config: runtimeConfig,
         });
 
         finalOutput = {
@@ -715,7 +716,7 @@ export class ConnectorService {
       throw new Error('Connector state missing starship context');
     }
 
-    const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+    const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
 
     const output = await this.runConnectBlueprint(template, {
       starshipId,
@@ -756,11 +757,11 @@ export class ConnectorService {
       const existing = byProvider.get(template.provider);
 
       if (existing) {
-        const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+        const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
         const oauthConfig =
           runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
-            ? (runtimeConfig.oauth as Record<string, unknown>)
-            : ({} as Record<string, unknown>);
+            ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+            : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
         const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
 
         return {
@@ -783,11 +784,11 @@ export class ConnectorService {
       // starship; it reuses the platform's JWT + SERVER_URL and does not
       // require additional managed env vars.
       const status = template.provider === 'starships' ? 'connected' : 'disconnected';
-      const runtimeConfig = (template.runtimeConfig || {}) as Record<string, unknown>;
+      const runtimeConfig = (template.runtimeConfig || {}) as ConnectorRuntimeConfig;
       const oauthConfig =
         runtimeConfig.oauth && typeof runtimeConfig.oauth === 'object'
-          ? (runtimeConfig.oauth as Record<string, unknown>)
-          : ({} as Record<string, unknown>);
+          ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
+          : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
       const scopes = Array.isArray(oauthConfig.scopes) ? oauthConfig.scopes.map((s) => String(s)) : [];
 
       return {
@@ -828,7 +829,7 @@ export class ConnectorService {
         apiKey: payload.apiKey,
         extraConfig: payload.extraConfig,
       },
-      config: (template.runtimeConfig || {}) as Record<string, unknown>,
+      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
     };
 
     const output = await this.runConnectBlueprint(template, input);

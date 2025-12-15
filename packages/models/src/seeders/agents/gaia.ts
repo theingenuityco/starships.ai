@@ -7,6 +7,7 @@ function createGaiaDefaultBlueprint(): Blueprint {
   return createDefaultAgentBlueprint({
     name: 'Gaia',
     model: 'anthropic/claude-sonnet-4.5',
+    reasoningEffort: 'medium',
     temperature: 0.4,
     maxTokens: 3000,
   });

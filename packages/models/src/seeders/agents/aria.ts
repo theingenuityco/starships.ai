@@ -10,6 +10,7 @@ function createAriaDefaultBlueprint(): Blueprint {
   return createDefaultAgentBlueprint({
     name: 'Aria',
     model: 'anthropic/claude-sonnet-4.5',
+    reasoningEffort: 'medium',
     temperature: 0.4,
     maxTokens: 3000,
   });

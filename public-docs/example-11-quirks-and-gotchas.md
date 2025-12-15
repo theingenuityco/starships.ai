@@ -6,7 +6,7 @@
   - Use a Code node to parse strings before Tool.
 
 - LLM parallel tool calls disabled
-  - Node sets `parallel_tool_calls: false`. Expect at most one tool call per assistant response.
+  - Node sets `parallel_tool_calls: false` (provider hint). The default Agent blueprint can still safely handle multiple tool calls if a provider returns them anyway (it executes them sequentially).
 
 - `lastOutputOf(ref)` error surface
   - Throws with a detailed message if the ref hasn’t executed in current scope; don’t suppress.

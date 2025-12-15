@@ -329,6 +329,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     (conversationId: string) => {
       // Mark that we've moved beyond initial landing - prevent Gaia fallback
       hasEverSetAnyAgentRef.current = true
+      // IMPORTANT: update ref synchronously so route-transition guards can rely on it
+      // even before the next render/effect runs.
+      currentConversationIdRef.current = conversationId
       setCurrentConversationId(conversationId)
       pendingRouteConversationIdRef.current = conversationId
       onConversationChange?.(conversationId)
@@ -351,6 +354,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (externalConversationId === null && pendingRouteConversationIdRef.current) {
       // Only ignore the null if our current id matches the pending one (i.e. we're in the handoff window).
       if (currentConversationIdRef.current === pendingRouteConversationIdRef.current) {
+        return
+      }
+      // If we somehow got cleared to null during the transition, re-assert the pending id.
+      if (currentConversationIdRef.current === null) {
+        currentConversationIdRef.current = pendingRouteConversationIdRef.current
+        setCurrentConversationId(pendingRouteConversationIdRef.current)
         return
       }
     }

@@ -140,11 +140,11 @@ spec:
               subPath: postgres
           resources:
             requests:
-              cpu: '500m'
-              memory: '1Gi'
+              cpu: '250m'
+              memory: '512Mi'
             limits:
-              cpu: '2000m'
-              memory: '4Gi'
+              cpu: '1000m'
+              memory: '2Gi'
       volumes:
         # Old PVC from starships-app; used only for one-time data migration
         - name: old-postgres-data

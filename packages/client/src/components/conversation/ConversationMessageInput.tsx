@@ -171,7 +171,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Block input from the moment user sends until streaming completes (covers pre-stream gap)
     const isStreamingEffective = Boolean(isSending || preStreamPending || isResponding)
     const shouldShowStop = Boolean(preStreamPending || sending || isSending || isAssistantStreaming || isResponding)
-    const showLoaderRing = Boolean(isAssistantStreaming || isResponding)
+    // The ring should be visible for the full "user sent -> agent finished" lifecycle,
+    // including the pre-stream gap before the first server streaming/turn events arrive.
+    const showLoaderRing = Boolean(shouldShowStop)
 
     // Track last known conversationId to enable stop during pre-stream window
     const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
@@ -182,9 +184,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [conversationId])
     // Hide pre-stream indicator when not active
     useEffect(() => {
-      const anyActive = Boolean(isAssistantStreaming || isResponding)
-      if (!anyActive) setPreStreamPending(false)
-    }, [isAssistantStreaming, isResponding])
+      // IMPORTANT: Do NOT clear preStreamPending just because we haven't observed
+      // remote streaming/turn state yet. That pre-stream gap is exactly what this
+      // flag is meant to cover, and clearing it causes a flicker back to "Send".
+      //
+      // Instead, clear it only once we see the stream/turn actually become active;
+      // after that, the UI will remain driven by isResponding/isAssistantStreaming.
+      if (!preStreamPending) return
+      if (isAssistantStreaming || isResponding) {
+        setPreStreamPending(false)
+      }
+    }, [preStreamPending, isAssistantStreaming, isResponding])
 
     // Usage and context control
     const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)

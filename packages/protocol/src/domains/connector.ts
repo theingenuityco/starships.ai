@@ -26,10 +26,24 @@ export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error'
 /**
  * ConnectorTokenRef
  *
- * - For per-starship secrets: the env key in connector_secrets (e.g. "GH_APP_ACCESS_TOKEN")
- * - For host/platform secrets: "platform:<ENV_KEY>" (e.g. "platform:DISCORD_BOT_TOKEN")
+ * References a secret used by connector runtime.
+ *
+ * Supported formats:
+ * - Legacy string:
+ *   - Per-starship secret key: "GH_APP_ACCESS_TOKEN"
+ *   - Platform secret ref: "platform:DISCORD_BOT_TOKEN"
+ * - Explicit object (preferred):
+ *   - { type: "connector_secret", key: "GH_APP_ACCESS_TOKEN" }
+ *   - { type: "platform_secret",  key: "DISCORD_BOT_TOKEN" }
  */
-export type ConnectorTokenRef = string;
+export type ConnectorSecretRefType = 'platform_secret' | 'connector_secret';
+
+export interface ConnectorSecretRef {
+  type: ConnectorSecretRefType;
+  key: string;
+}
+
+export type ConnectorTokenRef = string | ConnectorSecretRef;
 
 /**
  * ConnectorOAuthRuntimeConfig
@@ -39,13 +53,13 @@ export type ConnectorTokenRef = string;
  */
 export interface ConnectorOAuthRuntimeConfig extends Record<string, unknown> {
   // OAuth app credentials (host/platform secrets)
-  clientId?: string; // env key name holding the OAuth client id
-  clientSecret?: string; // env key name holding the OAuth client secret
+  clientId?: ConnectorTokenRef; // secret ref holding the OAuth client id
+  clientSecret?: ConnectorTokenRef; // secret ref holding the OAuth client secret
 
   // Stored credentials (per-starship connector_secrets) OR platform refs
   accessToken?: ConnectorTokenRef;
-  refreshToken?: string; // env key name holding refresh token (per-starship)
-  apiKey?: string; // env key name holding api key (per-starship)
+  refreshToken?: ConnectorTokenRef; // secret ref holding refresh token
+  apiKey?: ConnectorTokenRef; // secret ref holding api key
 
   // OAuth endpoints + behavior
   authorizeUrl?: string;

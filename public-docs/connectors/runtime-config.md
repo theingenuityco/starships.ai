@@ -25,11 +25,11 @@ This document describes the **supported keys used by the current host runtime**.
 
 `runtime_config.oauth` is used both for OAuth flows *and* for HTTP auth injection at runtime.
 
-- **`oauth.clientId?: string`**
-  - Name of the **platform secret env key** containing the OAuth client id.
+- **`oauth.clientId?: string | { type: "platform_secret", key: string }`**
+  - Reference to the **platform secret** containing the OAuth client id.
 
-- **`oauth.clientSecret?: string`**
-  - Name of the **platform secret env key** containing the OAuth client secret.
+- **`oauth.clientSecret?: string | { type: "platform_secret", key: string }`**
+  - Reference to the **platform secret** containing the OAuth client secret.
 
 - **`oauth.authorizeUrl?: string`**, **`oauth.tokenUrl?: string`**, **`oauth.redirectPath?: string`**
   - OAuth endpoint configuration used by the host when performing code exchange.
@@ -43,7 +43,10 @@ This document describes the **supported keys used by the current host runtime**.
   - Where the host should read the token from when injecting auth for `http_request` with `connector: "<provider>"`.
   - Supported formats:
     - **Per-starship connector secret key** (typical OAuth): `"GH_APP_ACCESS_TOKEN"`
-    - **Platform secret ref**: `"platform:DISCORD_BOT_TOKEN"`
+    - **Platform secret ref (legacy)**: `"platform:DISCORD_BOT_TOKEN"`
+    - **Explicit ref (preferred)**:
+      - `{ "type": "connector_secret", "key": "GH_APP_ACCESS_TOKEN" }`
+      - `{ "type": "platform_secret", "key": "DISCORD_BOT_TOKEN" }`
 
 - **`oauth.authHeaderName?: string`**
   - HTTP header name to inject. Default: `"Authorization"`.
@@ -61,7 +64,7 @@ This document describes the **supported keys used by the current host runtime**.
 {
   "apiBaseUrl": "https://discord.com",
   "oauth": {
-    "accessToken": "platform:DISCORD_BOT_TOKEN",
+    "accessToken": { "type": "platform_secret", "key": "DISCORD_BOT_TOKEN" },
     "authPrefix": "Bot"
   }
 }
@@ -73,7 +76,7 @@ This document describes the **supported keys used by the current host runtime**.
 {
   "apiBaseUrl": "https://api.github.com",
   "oauth": {
-    "accessToken": "GH_APP_ACCESS_TOKEN",
+    "accessToken": { "type": "connector_secret", "key": "GH_APP_ACCESS_TOKEN" },
     "authPrefix": "Bearer"
   }
 }

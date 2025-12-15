@@ -134,7 +134,15 @@ export function createApiKeyConnectBlueprint(config: ApiKeyConnectBlueprintConfi
       // Legacy fallback: config.envKey
       const config = (input.config && typeof input.config === 'object') ? input.config : {};
       const oauth = (config.oauth && typeof config.oauth === 'object') ? config.oauth : {};
-      const envKey = oauth.apiKey || config.envKey || 'API_KEY';
+      const apiKeyRef = oauth.apiKey;
+      const envKey =
+        (typeof apiKeyRef === 'string'
+          ? apiKeyRef
+          : (apiKeyRef && typeof apiKeyRef === 'object' && typeof apiKeyRef.key === 'string'
+              ? apiKeyRef.key
+              : undefined)) ||
+        config.envKey ||
+        'API_KEY';
 
       if (typeof envKey !== 'string' || !envKey.trim()) {
         throw new Error('envKey must be provided in connector runtimeConfig for API key connector');

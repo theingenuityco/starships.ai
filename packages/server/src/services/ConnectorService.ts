@@ -7,6 +7,7 @@ import type {
   ConnectWithApiKeyRequest,
   ConnectorModel,
   ConnectorRuntimeConfig,
+  ConnectorTokenRef,
 } from '@starships/protocol';
 import {
   ConnectorTemplateRepository,
@@ -43,6 +44,50 @@ export class ConnectorService {
     this.connectorSecretService = new ConnectorSecretService();
     this.starshipRepository = new StarshipRepository();
     this.platformSecretService = new PlatformSecretService();
+  }
+
+  private parseSecretKeyForPlatformSecret(ref: unknown, label: string): string {
+    // Legacy format for oauth.clientId/clientSecret: plain string env key.
+    if (typeof ref === 'string') {
+      const key = ref.trim();
+      if (!key) throw new Error(`${label} must not be empty`);
+      return key;
+    }
+    if (ref && typeof ref === 'object') {
+      const rec = ref as Record<string, unknown>;
+      const type = rec.type;
+      const key = rec.key;
+      if (type !== 'platform_secret') {
+        throw new Error(`${label} must be a platform_secret ref`);
+      }
+      if (typeof key !== 'string' || !key.trim()) {
+        throw new Error(`${label} must include a non-empty key`);
+      }
+      return key.trim();
+    }
+    throw new Error(`${label} is not configured`);
+  }
+
+  private parseSecretKeyForConnectorSecret(ref: unknown, label: string): string | undefined {
+    // Legacy format for oauth.accessToken/refreshToken/apiKey storage keys: plain string env key.
+    if (ref === undefined || ref === null) return undefined;
+    if (typeof ref === 'string') {
+      const key = ref.trim();
+      return key ? key : undefined;
+    }
+    if (ref && typeof ref === 'object') {
+      const rec = ref as Record<string, unknown>;
+      const type = rec.type;
+      const key = rec.key;
+      if (type !== 'connector_secret') {
+        throw new Error(`${label} must be a connector_secret ref`);
+      }
+      if (typeof key !== 'string' || !key.trim()) {
+        throw new Error(`${label} must include a non-empty key`);
+      }
+      return key.trim();
+    }
+    throw new Error(`${label} must be a string or {type,key}`);
   }
 
   private async resolvePlatformSecret(envKey: string): Promise<string | undefined> {
@@ -373,10 +418,10 @@ export class ConnectorService {
       throw new Error(`Connector ${provider} does not support start flow for authType ${template.authType}`);
     }
 
-    const clientIdEnvKey = oauthConfig.clientId as string | undefined;
-    if (!clientIdEnvKey) {
-      throw new Error(`oauth.clientId is not configured for connector template ${template.id}`);
-    }
+    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(
+      oauthConfig.clientId as ConnectorTokenRef | undefined,
+      `oauth.clientId`
+    );
 
     const clientId = await this.resolvePlatformSecret(clientIdEnvKey);
     const authorizeUrl = oauthConfig.authorizeUrl as string | undefined;
@@ -492,11 +537,14 @@ export class ConnectorService {
         ? (runtimeConfig.oauth as NonNullable<ConnectorRuntimeConfig['oauth']>)
         : ({} as NonNullable<ConnectorRuntimeConfig['oauth']>);
 
-    const clientIdEnvKey = oauthConfig.clientId as string | undefined;
-    const clientSecretEnvKey = oauthConfig.clientSecret as string | undefined;
-    if (!clientIdEnvKey || !clientSecretEnvKey) {
-      throw new Error(`oauth.clientId/oauth.clientSecret not configured for connector template ${template.id}`);
-    }
+    const clientIdEnvKey = this.parseSecretKeyForPlatformSecret(
+      oauthConfig.clientId as ConnectorTokenRef | undefined,
+      `oauth.clientId`
+    );
+    const clientSecretEnvKey = this.parseSecretKeyForPlatformSecret(
+      oauthConfig.clientSecret as ConnectorTokenRef | undefined,
+      `oauth.clientSecret`
+    );
 
     const clientId = await this.resolvePlatformSecret(clientIdEnvKey);
     const clientSecret = await this.resolvePlatformSecret(clientSecretEnvKey);
@@ -593,8 +641,14 @@ export class ConnectorService {
 
     const envUpdates: Record<string, string> = {};
 
-    const accessTokenEnvKey = oauthConfig.accessToken as string | undefined;
-    const refreshTokenEnvKey = oauthConfig.refreshToken as string | undefined;
+    const accessTokenEnvKey = this.parseSecretKeyForConnectorSecret(
+      oauthConfig.accessToken as ConnectorTokenRef | undefined,
+      `oauth.accessToken`
+    );
+    const refreshTokenEnvKey = this.parseSecretKeyForConnectorSecret(
+      oauthConfig.refreshToken as ConnectorTokenRef | undefined,
+      `oauth.refreshToken`
+    );
 
     if (accessTokenEnvKey && body.access_token) {
       envUpdates[accessTokenEnvKey] = String(body.access_token);

@@ -2,25 +2,24 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useState, useEffect } from 'react'
-import { EnvironmentSummary } from '@starships/protocol'
+import { useEffect, useState } from 'react'
+import type { PlatformSecretSummary } from '@starships/protocol'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
-
 import { cn } from '@/lib/utils'
 
-interface EnvironmentVariableFormProps {
+interface PlatformSecretFormProps {
   isOpen: boolean
   onClose: () => void
   onSubmit: (data: { key: string; value?: string; description?: string }) => void
-  environmentVariable?: EnvironmentSummary
+  secret?: PlatformSecretSummary
   loading?: boolean
 }
 
-export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environmentVariable, loading = false }: EnvironmentVariableFormProps) {
+export function PlatformSecretForm({ isOpen, onClose, onSubmit, secret, loading = false }: PlatformSecretFormProps) {
   const [formData, setFormData] = useState({
     key: '',
     value: '',
@@ -28,33 +27,28 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
 
-  const isEdit = !!environmentVariable
+  const isEdit = !!secret
 
-  // Reset form when dialog opens/closes or environment variable changes
   useEffect(() => {
-    if (isOpen && environmentVariable) {
+    if (isOpen && secret) {
       setFormData({
-        key: environmentVariable.key,
-        value: '', // Value is never shown for security
-        description: environmentVariable.description || '',
+        key: secret.key,
+        value: '', // never show stored value
+        description: secret.description || '',
       })
-    } else if (isOpen && !environmentVariable) {
-      setFormData({
-        key: '',
-        value: '',
-        description: '',
-      })
+    } else if (isOpen && !secret) {
+      setFormData({ key: '', value: '', description: '' })
     }
     setErrors({})
-  }, [isOpen, environmentVariable])
+  }, [isOpen, secret])
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {}
 
     if (!formData.key.trim()) {
       newErrors.key = 'Key is required'
-    } else if (!/^[A-Z][A-Z0-9_]*$/.test(formData.key.trim())) {
-      newErrors.key = 'Environment key must be uppercase letters, numbers, and underscores only'
+    } else if (!/^[A-Z0-9_]+$/.test(formData.key.trim())) {
+      newErrors.key = 'Key must be uppercase letters, numbers, and underscores only'
     }
 
     if (!isEdit && !formData.value.trim()) {
@@ -74,7 +68,6 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
       description: formData.description || undefined,
     }
 
-    // Only include value if it's provided (for updates, empty value means no change)
     if (formData.value.trim() || !isEdit) {
       submitData.value = formData.value
     }
@@ -94,13 +87,12 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon name="key" className="h-5 w-5 text-primary" />
-            {isEdit ? 'Edit Environment Variable' : 'Add Environment Variable'}
+            {isEdit ? 'Edit Platform Secret' : 'Add Platform Secret'}
           </DialogTitle>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="space-y-4">
-            {/* Key Field */}
             <div className="space-y-2">
               <Label htmlFor="key" className="flex items-center gap-2">
                 <Icon name="key" className="h-4 w-4 text-muted-foreground" />
@@ -110,9 +102,9 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
                 id="key"
                 value={formData.key}
                 onChange={e => setFormData(prev => ({ ...prev, key: e.target.value.toUpperCase() }))}
-                placeholder="API_KEY"
+                placeholder="DISCORD_BOT_TOKEN"
                 className={cn('font-mono', errors.key && 'border-destructive focus:border-destructive')}
-                disabled={isEdit} // Don't allow key changes in edit mode
+                disabled={isEdit}
               />
               {errors.key && (
                 <p className="flex items-center gap-1 text-sm text-destructive">
@@ -120,10 +112,9 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
                   {errors.key}
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">Use uppercase letters, numbers, and underscores. Must start with a letter.</p>
+              <p className="text-xs text-muted-foreground">Use uppercase letters, numbers, and underscores.</p>
             </div>
 
-            {/* Value Field */}
             <div className="space-y-2">
               <Label htmlFor="value" className="flex items-center gap-2">
                 <Icon name="file-text" className="h-4 w-4 text-muted-foreground" />
@@ -143,23 +134,20 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
                   {errors.value}
                 </p>
               )}
-              <p className="text-xs text-muted-foreground">
-                {isEdit ? 'Only provide a value if you want to update it. Current value is not shown for security.' : 'This value will be encrypted and stored securely.'}
-              </p>
+              <p className="text-xs text-muted-foreground">Values are encrypted and never displayed after saving.</p>
             </div>
 
-            {/* Description Field */}
             <div className="space-y-2">
               <Label htmlFor="description">Description (optional)</Label>
               <Textarea
                 id="description"
                 value={formData.description}
                 onChange={e => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                placeholder="Brief description of what this variable is used for"
+                placeholder="What is this secret used for?"
                 className="min-h-[80px]"
                 rows={3}
               />
-              <p className="text-xs text-muted-foreground">Help others understand what this environment variable is for.</p>
+              <p className="text-xs text-muted-foreground">Help others understand what this secret is for.</p>
             </div>
           </div>
 
@@ -168,7 +156,7 @@ export function EnvironmentVariableForm({ isOpen, onClose, onSubmit, environment
               Cancel
             </Button>
             <Button type="submit" disabled={loading}>
-              {loading ? 'Saving...' : isEdit ? 'Update Variable' : 'Add Variable'}
+              {loading ? 'Saving...' : isEdit ? 'Update Secret' : 'Add Secret'}
             </Button>
           </DialogFooter>
         </form>

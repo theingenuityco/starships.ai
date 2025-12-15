@@ -200,21 +200,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const storeIsResponding = useStarshipUIStore(s => (effectiveConversationId ? Boolean(s.conversations[effectiveConversationId]?.isResponding) : false))
 
     // Block input from the moment user sends until streaming completes.
-    // When a conversation id exists, rely on the central store; otherwise fall back to local send state
-    // (covers "create conversation" window where we don't yet have an id).
-    const isStreamingEffective = Boolean(
-      // Always honor local "sending" to bridge the gap between conversation creation and first POST/turn events.
-      // This is critical when conversationId flips from null -> id before the send mutation starts.
-      sending ||
-        // When conversation id exists, use the store as the long-lived source of truth.
-        (effectiveConversationId && (storeIsSending || storeIsResponding)) ||
-        // Fallback to hook flags when we don't have a conversation id yet.
-        (!conversationId && (isSending || isResponding))
-    )
-    const shouldShowStop = Boolean(
-      // Once we have an id, keep the stop/loading UI visible through create->send gaps as well.
-      effectiveConversationId && (storeIsSending || storeIsResponding || sending || isSending || isResponding || isAssistantStreaming)
-    )
+    //
+    // IMPORTANT:
+    // During the /conversations -> /conversations/:id route handoff, the *new* input instance can render
+    // before the UI store receives the optimistic `setConversationMeta(busy)` call. In that window,
+    // store flags can be false even though streamedQuery already indicates responding.
+    //
+    // So we treat hook-level flags as a fallback even when an id exists.
+    const hookBusy = Boolean(isSending || isResponding || isAssistantStreaming)
+    const storeBusy = Boolean(effectiveConversationId && (storeIsSending || storeIsResponding))
+    const isStreamingEffective = Boolean(sending || storeBusy || hookBusy)
+    const shouldShowStop = Boolean(sending || storeBusy || hookBusy)
     const showLoaderRing = Boolean(shouldShowStop)
 
     // Usage and context control
@@ -399,6 +395,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       try {
         // Create conversation if one doesn't exist
         let currentConversationId = conversationId
+        let createdNewConversation = false
         if (!currentConversationId) {
           dbg('createConversation:start')
           const newConversation = await createConversation.mutateAsync({
@@ -409,7 +406,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           currentConversationId = newConversation.id
           sendConversationId = currentConversationId
           dbg('createConversation:success', { newConversationId: currentConversationId })
-          onConversationStart?.(currentConversationId!)
+          createdNewConversation = true
         }
         sendConversationId = currentConversationId!
         dbg('submit:haveConversationId', { sendConversationId })
@@ -472,6 +469,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           })
           dbg('cache:seedStream(localTurnStarted)', { cid: currentConversationId })
         } catch {}
+
+        // IMPORTANT: only after we seed store + cache do we trigger the route transition.
+        // This ensures the /conversations/:id page mounts into an already-busy conversation.
+        if (createdNewConversation) {
+          dbg('route:push(delayedAfterSeed)', { cid: currentConversationId })
+          onConversationStart?.(currentConversationId!)
+        }
 
         // Clear only the text content, preserve the mention
         setMessage('')
@@ -634,6 +638,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         setSending(true)
 
         let sendConversationId: string | null = conversationId ?? null
+        let createdNewConversation = false
 
         // Helper to reset flags if validation fails
         const resetFlags = () => {
@@ -682,9 +687,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             })
             currentConversationId = newConversation.id
             sendConversationId = currentConversationId
-            onConversationStart?.(currentConversationId!)
+            createdNewConversation = true
           }
           sendConversationId = currentConversationId!
+          // Ensure local ref is updated immediately for stop button usability
+          lastConversationIdRef.current = currentConversationId!
 
           // Set agent information in store
           const { setConversationAgent } = useStarshipUIStore.getState()
@@ -700,6 +707,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               lastActivityAt: new Date().toISOString(),
             })
           } catch {}
+
+          // Trigger the route transition only after marking store busy.
+          if (createdNewConversation) {
+            onConversationStart?.(currentConversationId!)
+          }
 
           /* optimistic append skipped (server-SSE will add user message) */
 

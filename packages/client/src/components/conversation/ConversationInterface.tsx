@@ -964,9 +964,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     <div className="relative flex flex-col h-screen">
       {/* Content container */}
       <div className="relative z-[2] flex flex-col h-full">
-        {/* Main Content Area - Conversation only; builders use dedicated routes */}
-        {/* Key prop forces provider to remount and create fresh stream when conversation changes */}
+        {/* Single streaming provider for BOTH message list and input to avoid duplicate SSE subscriptions
+            (and to keep the stop/loading UI in sync everywhere). */}
         <ConversationStreamProvider key={currentConversationId || 'no-conversation'} conversationId={currentConversationId} starshipId={starshipId}>
+          {/* Main Content Area - Conversation only; builders use dedicated routes */}
           {/* Messages Area */}
           {showMessagesArea ? (
             <>
@@ -978,144 +979,145 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               <StreamSideEffects />
             </>
           ) : null}
-        </ConversationStreamProvider>
 
-        {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
-        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
-          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
-            {!showMessagesArea && (
-              <div className="mb-8 text-center opacity-100">
-                <h1 className="text-3xl font-normal mb-4 text-foreground">{starterGreeting}</h1>
-              </div>
-            )}
-            <ConversationMessageInput
-              key={inputKey}
-              ref={messageInputRef}
-              selectedAgent={selectedAgent}
-              starshipId={starshipId}
-              conversationId={currentConversationId}
-              onConversationStart={handleConversationStart}
-              onToggleToolForm={handleToggleToolBuilder}
-              isToolFormOpen={false}
-              disabled={false}
-              minimal={isInputDocked}
-              onFocus={() => {}}
-              onBlur={() => {}}
-              onToggleOverlay={handleToggleOverlay}
-              showExpandableOverlay={false}
-              isOverlayExpanded={false}
-              budgetTokens={budgetTokens}
-              onAgentChange={handleAgentChange}
-              starshipSlug={starshipSlug}
-            ></ConversationMessageInput>
-            {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
-            {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
-              <div className="mt-12">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="text-left">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select an agent</p>
-                  </div>
-                  {starshipSlug && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try {
-                          router.push(`/ship/${starshipSlug}/agents`)
-                        } catch {}
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      See all agents
-                      <Icon name="chevron-right" className="h-3 w-3" />
-                    </button>
-                  )}
+          {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
+          <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
+            <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
+              {!showMessagesArea && (
+                <div className="mb-8 text-center opacity-100">
+                  <h1 className="text-3xl font-normal mb-4 text-foreground">{starterGreeting}</h1>
                 </div>
-                <div className="flex gap-3 overflow-x-auto custom-scrollbar">
-                  {starshipAgentsData.map((agent: any) => (
-                    <button
-                      key={agent.id}
-                      type="button"
-                      onClick={() => {
-                        // Delegate agent selection + leading mention insertion to the input's
-                        // TipTap-aware helper, which also calls onAgentChange under the hood.
-                        try {
-                          messageInputRef.current?.setLeadingMentionAgent?.(agent as any)
-                        } catch {}
-                      }}
-                      className={cn(
-                        'group flex-shrink-0 w-[260px] rounded-2xl border bg-card/80 px-4 py-4 text-left transition-colors shadow-sm hover:bg-primary/5 hover:border-primary/40',
-                        selectedAgent?.id === agent.id ? 'border-primary/70 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]' : 'border-border/60'
-                      )}
-                    >
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-end gap-3">
-                          <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full">
-                            <AgentAvatar seed={agent.name} size={32} rounded />
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex flex-col gap-[2px]">
-                              <p className="text-base font-semibold text-foreground truncate group-hover:text-primary">{agent.name}</p>
-                            </div>
-                          </div>
-                        </div>
-                        {agent.description && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{agent.description}</p>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
-            {!showMessagesArea && agentSuggestionCards.length >= 3 && (
-              <div className="mt-12 absolute inset-x-0 top-full">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="text-left">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
-                  </div>
-                  {agentSuggestionCards.length > 3 && (
-                    <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                      {showAllSuggestions ? (
-                        <>
-                          Show fewer
-                          <Icon name="chevron-up" className="h-3 w-3 translate-y-px" />
-                        </>
-                      ) : (
-                        <>
-                          Explore all
-                          <Icon name="chevron-down" className="h-3 w-3" />
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-                <ul className="space-y-3">
-                  {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
-                    <li key={item.id}>
+              )}
+              <ConversationMessageInput
+                key={inputKey}
+                ref={messageInputRef}
+                selectedAgent={selectedAgent}
+                starshipId={starshipId}
+                conversationId={currentConversationId}
+                onConversationStart={handleConversationStart}
+                onToggleToolForm={handleToggleToolBuilder}
+                isToolFormOpen={false}
+                disabled={false}
+                minimal={isInputDocked}
+                onFocus={() => {}}
+                onBlur={() => {}}
+                onToggleOverlay={handleToggleOverlay}
+                showExpandableOverlay={false}
+                isOverlayExpanded={false}
+                budgetTokens={budgetTokens}
+                onAgentChange={handleAgentChange}
+                starshipSlug={starshipSlug}
+              ></ConversationMessageInput>
+              {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
+              {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
+                <div className="mt-12">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select an agent</p>
+                    </div>
+                    {starshipSlug && (
                       <button
                         type="button"
                         onClick={() => {
                           try {
-                            messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
-                            messageInputRef.current?.focusInput?.()
+                            router.push(`/ship/${starshipSlug}/agents`)
                           } catch {}
                         }}
-                        className="group flex w-full rounded-2xl border border-border/60 bg-card px-3 py-2 text-left transition-colors hover:bg-primary/5 hover:border-primary/40"
+                        className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
                       >
-                        <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-primary break-words">
-                          <span className="mr-1 text-base align-top text-primary/70">“</span>
-                          {item.text}
-                          <span className="ml-1 text-base align-baseline text-primary/70">”</span>
-                        </p>
+                        See all agents
+                        <Icon name="chevron-right" className="h-3 w-3" />
                       </button>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+                    )}
+                  </div>
+                  <div className="flex gap-3 overflow-x-auto custom-scrollbar">
+                    {starshipAgentsData.map((agent: any) => (
+                      <button
+                        key={agent.id}
+                        type="button"
+                        onClick={() => {
+                          // Delegate agent selection + leading mention insertion to the input's
+                          // TipTap-aware helper, which also calls onAgentChange under the hood.
+                          try {
+                            messageInputRef.current?.setLeadingMentionAgent?.(agent as any)
+                          } catch {}
+                        }}
+                        className={cn(
+                          'group flex-shrink-0 w-[260px] rounded-2xl border bg-card/80 px-4 py-4 text-left transition-colors shadow-sm hover:bg-primary/5 hover:border-primary/40',
+                          selectedAgent?.id === agent.id ? 'border-primary/70 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]' : 'border-border/60'
+                        )}
+                      >
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-end gap-3">
+                            <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full">
+                              <AgentAvatar seed={agent.name} size={32} rounded />
+                            </Avatar>
+                            <div className="min-w-0 flex-1">
+                              <div className="mb-1 flex flex-col gap-[2px]">
+                                <p className="text-base font-semibold text-foreground truncate group-hover:text-primary">{agent.name}</p>
+                              </div>
+                            </div>
+                          </div>
+                          {agent.description && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{agent.description}</p>}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
+              {!showMessagesArea && agentSuggestionCards.length >= 3 && (
+                <div className="mt-12 absolute inset-x-0 top-full">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-left">
+                      <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
+                    </div>
+                    {agentSuggestionCards.length > 3 && (
+                      <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                        {showAllSuggestions ? (
+                          <>
+                            Show fewer
+                            <Icon name="chevron-up" className="h-3 w-3 translate-y-px" />
+                          </>
+                        ) : (
+                          <>
+                            Explore all
+                            <Icon name="chevron-down" className="h-3 w-3" />
+                          </>
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  <ul className="space-y-3">
+                    {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
+                      <li key={item.id}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            try {
+                              messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
+                              messageInputRef.current?.focusInput?.()
+                            } catch {}
+                          }}
+                          className="group flex w-full rounded-2xl border border-border/60 bg-card px-3 py-2 text-left transition-colors hover:bg-primary/5 hover:border-primary/40"
+                        >
+                          <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-primary break-words">
+                            <span className="mr-1 text-base align-top text-primary/70">“</span>
+                            {item.text}
+                            <span className="ml-1 text-base align-baseline text-primary/70">”</span>
+                          </p>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-        {/* Extra space at the bottom so the page can scroll past the last card on the welcome view */}
-        {!showMessagesArea && <div className="h-64" />}
+
+          {/* Extra space at the bottom so the page can scroll past the last card on the welcome view */}
+          {!showMessagesArea && <div className="h-64" />}
+        </ConversationStreamProvider>
       </div>
     </div>
   )

@@ -7,7 +7,6 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
-import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -834,8 +833,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
 
   const enabledFlag = options?.enabled !== false
-  // Per-hook-instance guard key (do NOT use globals; multiple instances can exist).
-  const storeSyncKeyRef = useRef<string>('')
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
@@ -1098,15 +1095,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const sameContent = prevIsUserAppend && String(prev?.message?.content ?? '') === String((variables as any)?.content ?? '')
           const prevIsTemp = prevIsUserAppend && typeof prev?.message?.id === 'string' && String(prev.message.id).startsWith('temp-user-')
           if (hasLocalTurnStarted && prevIsTemp && sameContent) {
-            // Ensure store flags are set, but skip duplicate stream-cache injections.
-            try {
-              useStarshipUIStore.getState().setConversationMeta(convId, {
-                isSending: true,
-                isResponding: true,
-                isAwaitingAssistant: true,
-                isAssistantStreaming: false,
-              })
-            } catch {}
             return
           }
         } catch {}
@@ -1131,19 +1119,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
           return next
         })
-
-        // ALSO update the central UI store immediately so UI stays consistent during route transitions.
-        try {
-          const ui = useStarshipUIStore.getState()
-          ui.appendMessage(convId, tempUser as any)
-          ui.setConversationMeta(convId, {
-            isSending: true,
-            isResponding: true,
-            isAwaitingAssistant: true,
-            isAssistantStreaming: false,
-            lastActivityAt: now,
-          })
-        } catch {}
       } catch {}
     },
     onSuccess: (_res, variables) => {
@@ -1195,98 +1170,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       toast.error('Failed to send message', { description: errorMessage })
     },
   })
-
-  // Keep the central UI store in sync with the streamed query state.
-  // This allows the entire conversation UI (messages + loaders) to be store-driven.
-  useEffect(() => {
-    if (!conversationId) return
-    // CRITICAL: Only the *enabled* stream hook instance should write to the store.
-    // We intentionally call `useConversationStreamed` in some places with enabled=false
-    // to satisfy rules-of-hooks (e.g. fallback hooks). Those instances must not sync.
-    if (!enabledFlag) return
-    // IMPORTANT: Guard against runaway update loops.
-    // Some streaming implementations may return a new `chunks` array reference on every render
-    // even when content is unchanged. If we write to Zustand unconditionally, it can create
-    // a render -> store set -> render loop (seen as "Maximum update depth exceeded").
-    try {
-      const chunksLen = Array.isArray(chunks) ? chunks.length : 0
-      const lastChunk: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
-      // Small, stable-ish signature of the latest streamed chunk
-      const lastChunkSig = lastChunk?.type === 'append' ? `append:${String(lastChunk?.message?.role || '')}:${String(lastChunk?.message?.id || '')}` : lastChunk?.type ? String(lastChunk.type) : 'none'
-
-      // IMPORTANT:
-      // Some initial connect / route-transition states can briefly produce a false-negative `isAwaitingAssistant`
-      // (e.g. the local turn_started marker exists, but turn_state/turn_started events haven't propagated through
-      // the streamedQuery cache yet). In those cases the UI store can be overwritten to "idle" and the loader
-      // disappears until a reload / next SSE chunk arrives.
-      //
-      // Make the store flags slightly "sticky" for the active turn: if the last message is a user message and we
-      // haven't seen completion/final assistant, treat it as awaiting (capped by preStreamExpired).
-      const lastMsg: any = Array.isArray(computedMessages) && computedMessages.length > 0 ? computedMessages[computedMessages.length - 1] : null
-      const fallbackAwaiting = !preStreamExpired && !hasCompleteEvent && !hasFinalAssistantAfterLastUser && lastMsg?.role === 'user'
-
-      const nextIsAwaitingAssistant = Boolean(isAwaitingAssistant || fallbackAwaiting)
-      const nextIsResponding = Boolean(isAssistantStreaming || nextIsAwaitingAssistant)
-      const nextIsSending = Boolean(sendMessageMutation.isPending)
-
-      const syncKey = [conversationId, chunksLen, lastChunkSig, nextIsSending ? 1 : 0, nextIsResponding ? 1 : 0, isAssistantStreaming ? 1 : 0, nextIsAwaitingAssistant ? 1 : 0].join('|')
-
-      if (storeSyncKeyRef.current === syncKey) return
-      storeSyncKeyRef.current = syncKey
-
-      const ui = useStarshipUIStore.getState()
-      const existing = ui.conversations?.[conversationId]
-      const computedLen = Array.isArray(computedMessages) ? computedMessages.length : 0
-
-      // IMPORTANT:
-      // During the /conversations -> /conversations/:id transition (and initial SSE connect),
-      // the streamed query can briefly report an empty `computedMessages` array even though we
-      // already optimistically seeded the UI store + query cache with a temp user message and
-      // marked the conversation as busy.
-      //
-      // If we sync an empty snapshot here, we clobber the optimistic messages + busy flags and
-      // the UI appears to "go blank" and drop the loader until the SSE stream catches up (works
-      // after reload because the conversationId is stable from first paint).
-      //
-      // So: if the store already has messages OR shows the conversation as busy, never overwrite
-      // it with an empty/idle snapshot.
-      if (
-        computedLen === 0 &&
-        existing &&
-        ((Array.isArray(existing.messages) && existing.messages.length > 0) ||
-          existing.isSending === true ||
-          existing.isResponding === true ||
-          existing.isAwaitingAssistant === true ||
-          existing.isAssistantStreaming === true)
-      ) {
-        return
-      }
-
-      const last = Array.isArray(computedMessages) && computedMessages.length > 0 ? (computedMessages[computedMessages.length - 1] as any) : null
-      const lastActivityAt = String(last?.updatedAt || last?.createdAt || '') || undefined
-      ui.setConversationSnapshot(conversationId, {
-        messages: (computedMessages as any) || [],
-        total: Array.isArray(computedMessages) ? computedMessages.length : 0,
-        lastActivityAt,
-        isSending: nextIsSending,
-        isResponding: nextIsResponding,
-        isAssistantStreaming: Boolean(isAssistantStreaming),
-        isAwaitingAssistant: nextIsAwaitingAssistant,
-      } as any)
-    } catch {}
-  }, [
-    conversationId,
-    enabledFlag,
-    chunks,
-    computedMessages,
-    isResponding,
-    isAssistantStreaming,
-    isAwaitingAssistant,
-    sendMessageMutation.isPending,
-    preStreamExpired,
-    hasCompleteEvent,
-    hasFinalAssistantAfterLastUser,
-  ])
 
   return {
     messages: computedMessages,

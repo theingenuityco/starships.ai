@@ -35,11 +35,8 @@ github_webhook_secret = "YOUR_WEBHOOK_SECRET"
 github_installation_id = "YOUR_INSTALLATION_ID"
 
 # Recommended: pin AMIs per architecture (required for arm64 runners)
-# runner_ami_id_x64 = "ami-xxxxxxxxx"
-# runner_ami_id_arm64 = "ami-yyyyyyyyy"
-
-# Optional: legacy (x64) AMI override (kept for backwards compatibility)
-# runner_ami_id = "ami-xxxxxxxxx"
+runner_ami_id_x64 = "ami-0ecb62995f68bb549"
+runner_ami_id_arm64 = "ami-01b9f1e7dc427266e"
 ```
 
 ### Finding the right Ubuntu AMIs (recommended)

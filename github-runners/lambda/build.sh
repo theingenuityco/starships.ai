@@ -51,3 +51,6 @@ TF_DIR="$SCRIPT_DIR/../terraform"
 mkdir -p "$TF_DIR"
 cp lambda_function.zip "$TF_DIR/"
 echo "📋 Copied to terraform directory: $TF_DIR/lambda_function.zip"
+
+# Clean up local build artifacts to avoid committing large/stale files.
+rm -rf "$SCRIPT_DIR/package" "$SCRIPT_DIR/lambda_function.zip"

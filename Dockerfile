@@ -44,6 +44,11 @@ RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
 ENV DOCKER_BUILD=true
 
+# Increase Node heap for monorepo builds in Docker (configurable)
+# Can be overridden at build time: --build-arg NODE_MAX_OLD_SPACE_SIZE=8192
+ARG NODE_MAX_OLD_SPACE_SIZE=8192
+ENV NODE_OPTIONS="--no-node-snapshot --max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}"
+
 # Install dependencies
 RUN pnpm install --frozen-lockfile
 

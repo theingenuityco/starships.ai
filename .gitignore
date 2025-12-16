@@ -23,6 +23,12 @@ node_modules/
 # Logs
 *.log
 
+# Terraform state (never commit)
+*.tfstate
+*.tfstate.*
+.terraform/
+.terraform.lock.hcl
+
 # Environment files
 .env
 # Ignore all env files except example template
@@ -64,3 +70,7 @@ do-deployment/*secret*.yaml
 do-deployment/*.secret
 k8s/**/secrets/
 k8s/**/*-secrets.yaml
+
+# github-runners build artifacts (never commit)
+github-runners/**/lambda_function.zip
+github-runners/lambda/package/

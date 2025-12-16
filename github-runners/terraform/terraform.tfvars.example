@@ -10,12 +10,9 @@ github_app_private_key_base64 = "YOUR_BASE64_ENCODED_PRIVATE_KEY"
 github_webhook_secret = "YOUR_WEBHOOK_SECRET"
 github_installation_id = "YOUR_INSTALLATION_ID"
 
-# Optional: Override default AMI (x64 Ubuntu 22.04 LTS)
-# runner_ami_id = "ami-xxxxxxxxx"
-#
-# Optional: Override AMI per-architecture (recommended if you want arm64 runners)
-# runner_ami_id_x64 = "ami-xxxxxxxxx"
-# runner_ami_id_arm64 = "ami-yyyyyyyyy"
+# AMIs per-architecture (required if you want arm64 runners)
+runner_ami_id_x64 = "ami-0ecb62995f68bb549"
+runner_ami_id_arm64 = "ami-01b9f1e7dc427266e"
 
 # Optional: Specify subnet ID (uses default VPC if not specified)
 # runner_subnet_id = "subnet-xxxxxxxxx"

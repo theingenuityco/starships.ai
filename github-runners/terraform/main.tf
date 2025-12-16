@@ -220,19 +220,20 @@ resource "aws_lambda_function" "webhook" {
   layers = var.lambda_cryptography_layer != "" ? [var.lambda_cryptography_layer] : []
 
   environment {
-    variables = {
-      GITHUB_APP_ID                  = var.github_app_id
-      GITHUB_APP_PRIVATE_KEY_BASE64  = var.github_app_private_key_base64
-      GITHUB_WEBHOOK_SECRET           = var.github_webhook_secret
-      GITHUB_INSTALLATION_ID          = var.github_installation_id
-      RUNNER_SECURITY_GROUP_ID        = aws_security_group.github_runner.id
-      RUNNER_INSTANCE_PROFILE_NAME    = aws_iam_instance_profile.github_runner.name
-      # Back-compat: RUNNER_AMI_ID remains supported (used as x64 default)
-      RUNNER_AMI_ID                   = var.runner_ami_id
-      RUNNER_AMI_ID_X64               = var.runner_ami_id_x64 != "" ? var.runner_ami_id_x64 : var.runner_ami_id
-      RUNNER_AMI_ID_ARM64             = var.runner_ami_id_arm64
-      RUNNER_SUBNET_ID               = var.runner_subnet_id != "" ? var.runner_subnet_id : data.aws_subnets.default.ids[0]
-    }
+    # Important: do NOT set empty-string env vars for AMIs; it would override handler defaults.
+    variables = merge(
+      {
+        GITHUB_APP_ID                 = var.github_app_id
+        GITHUB_APP_PRIVATE_KEY_BASE64 = var.github_app_private_key_base64
+        GITHUB_WEBHOOK_SECRET          = var.github_webhook_secret
+        GITHUB_INSTALLATION_ID         = var.github_installation_id
+        RUNNER_SECURITY_GROUP_ID       = aws_security_group.github_runner.id
+        RUNNER_INSTANCE_PROFILE_NAME   = aws_iam_instance_profile.github_runner.name
+        RUNNER_SUBNET_ID              = var.runner_subnet_id != "" ? var.runner_subnet_id : data.aws_subnets.default.ids[0]
+      },
+      var.runner_ami_id_x64 != "" ? { RUNNER_AMI_ID_X64 = var.runner_ami_id_x64 } : {},
+      var.runner_ami_id_arm64 != "" ? { RUNNER_AMI_ID_ARM64 = var.runner_ami_id_arm64 } : {}
+    )
   }
 
   depends_on = [

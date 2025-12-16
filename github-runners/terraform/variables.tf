@@ -34,14 +34,8 @@ variable "github_installation_id" {
   sensitive   = true
 }
 
-variable "runner_ami_id" {
-  description = "AMI ID for runner instances (defaults to Ubuntu 22.04 LTS)"
-  type        = string
-  default     = ""  # Will be set based on region in main.tf
-}
-
 variable "runner_ami_id_x64" {
-  description = "AMI ID for x64 runner instances (optional; defaults to runner_ami_id)"
+  description = "AMI ID for x64 runner instances"
   type        = string
   default     = ""
 }

@@ -19,9 +19,10 @@ GITHUB_WEBHOOK_SECRET = os.environ['GITHUB_WEBHOOK_SECRET']
 GITHUB_INSTALLATION_ID = os.environ['GITHUB_INSTALLATION_ID']
 RUNNER_SECURITY_GROUP_ID = os.environ['RUNNER_SECURITY_GROUP_ID']
 RUNNER_INSTANCE_PROFILE_NAME = os.environ['RUNNER_INSTANCE_PROFILE_NAME']
-RUNNER_AMI_ID = os.environ.get('RUNNER_AMI_ID', 'ami-0e2c8caa4b6378d8c')  # Back-compat default (x64 Ubuntu 22.04 LTS in us-east-1)
-RUNNER_AMI_ID_X64 = os.environ.get('RUNNER_AMI_ID_X64', RUNNER_AMI_ID)
-RUNNER_AMI_ID_ARM64 = os.environ.get('RUNNER_AMI_ID_ARM64', '')
+# Default AMIs (us-east-1, Ubuntu 24.04 LTS "noble", 2025-10-22)
+# These can be overridden via Lambda environment variables.
+RUNNER_AMI_ID_X64 = os.environ.get('RUNNER_AMI_ID_X64', 'ami-0ecb62995f68bb549')
+RUNNER_AMI_ID_ARM64 = os.environ.get('RUNNER_AMI_ID_ARM64', 'ami-01b9f1e7dc427266e')
 RUNNER_SUBNET_ID = os.environ.get('RUNNER_SUBNET_ID')  # Optional, uses default if not specified
 
 def lambda_handler(event, context):
@@ -243,7 +244,7 @@ def select_instance_type(labels, arch: str) -> str:
 def get_ami_id_for_arch(arch: str) -> str:
     """
     Select AMI based on arch.
-    - x64:  RUNNER_AMI_ID_X64 (or legacy RUNNER_AMI_ID)
+    - x64:  RUNNER_AMI_ID_X64
     - arm64: RUNNER_AMI_ID_ARM64 (recommended) else fallback to x64 AMI (will likely fail to boot)
     """
     if arch == 'arm64':

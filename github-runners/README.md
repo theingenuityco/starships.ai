@@ -59,10 +59,10 @@ aws ec2 describe-instances \
 
 ### Instance types & architecture
 
-Instance type is selected from workflow `runs-on` labels (e.g. `t3.medium`, `m6a.large`, `m6g.large`).
+Instance type is selected from workflow `runs-on` labels (e.g. `t3.medium`, `t3.large`, `t4g.large`).
 
-- **x64**: use x64 instance families (e.g. `t3.*`, `m6a.*`, `c6a.*`)
-- **arm64**: use Graviton families (e.g. `t4g.*`, `m6g.*`, `c7g.*`) and include the `arm64` label
+- **x64**: use x64 instance families (e.g. `t3.*`, `t3.*`, `c6a.*`)
+- **arm64**: use Graviton families (e.g. `t4g.*`, `t4g.*`, `c7g.*`) and include the `arm64` label
 
 To support arm64 runners, you must set **`runner_ami_id_arm64`** in Terraform to an ARM64 Ubuntu AMI.
 

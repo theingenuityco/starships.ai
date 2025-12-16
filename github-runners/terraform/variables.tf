@@ -40,6 +40,18 @@ variable "runner_ami_id" {
   default     = ""  # Will be set based on region in main.tf
 }
 
+variable "runner_ami_id_x64" {
+  description = "AMI ID for x64 runner instances (optional; defaults to runner_ami_id)"
+  type        = string
+  default     = ""
+}
+
+variable "runner_ami_id_arm64" {
+  description = "AMI ID for arm64 runner instances (required if you want [self-hosted, linux, arm64] runners)"
+  type        = string
+  default     = ""
+}
+
 variable "runner_subnet_id" {
   description = "Subnet ID for runner instances (optional, uses default VPC if not specified)"
   type        = string

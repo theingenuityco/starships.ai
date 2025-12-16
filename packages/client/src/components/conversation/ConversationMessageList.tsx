@@ -3,21 +3,16 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 
-import { useStarshipUIStore } from '@/store/starship-ui-store'
-import { cn } from '@/lib/utils'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
+import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
-
-// Stable empty array to prevent re-render storms when no conversationId is present.
-// Returning a new array literal from the selector causes a new reference on every store change.
-const EMPTY_MESSAGES: ReadonlyArray<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = Object.freeze([])
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -26,32 +21,13 @@ interface ConversationMessageListProps {
 }
 
 export function ConversationMessageList({ conversationId, starshipId, bottomPaddingPx }: ConversationMessageListProps) {
-  // Render purely from the Zustand UI store.
-  // SSE + streamedQuery subscriptions are driven elsewhere (ConversationStreamProvider / input),
-  // and are responsible for syncing messages + responding state into the store.
-  const isLoading = false
-  const error: any = null
+  // Render directly from the stream context (TanStack streamedQuery).
+  const { messages, isResponding, isAssistantStreaming, isAwaitingToolResults } = useConversationStreamContext()
 
-  const messages = useStarshipUIStore(state => {
-    if (!conversationId) return EMPTY_MESSAGES as any
-    return (state.conversations[conversationId]?.messages as any) || EMPTY_MESSAGES
-  })
-
-  // Use stable selectors to avoid returning new objects each render
-  const storeAgentName = useStarshipUIStore(state => {
-    if (!conversationId) return undefined
-    return state.conversations[conversationId]?.agentName
-  })
-  const isResponding = useStarshipUIStore(state => {
-    if (!conversationId) return false
-    return Boolean(state.conversations[conversationId]?.isResponding)
-  })
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
-  const agentName = storeAgentName || agentObj?.name
-  const isFetching = false
-  const hasCompleteEvent = false
+  const agentName = agentObj?.name
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -304,12 +280,16 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   //  - no assistant text progress yet after the user (first response is pending), or
   //  - we are waiting for the assistant to resume after tool results.
   const shouldShowGapLoader = useMemo(() => {
-    // Show while actively responding (pre-first tokens or during resume after tools),
-    // OR during a tool gap while the turn is still in progress.
-    const responding = isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
+    // We want the gap loader whenever the turn is active but we are not currently streaming text.
+    // - Show before first tokens
+    // - Show between assistant messages (assistant finished one message but turn is still active)
+    // - Show for “resume after tools” gaps
+    // - Do NOT show while awaiting tool results (tool UI shows its own spinner)
+    const betweenMessages = isResponding && !isAssistantStreaming && !awaitingResumeAfterTools
+    const responding = !isAwaitingToolResults && isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools || betweenMessages)
     const toolGapFetching = awaitingResumeAfterTools && isResponding
     return responding || toolGapFetching
-  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
+  }, [isAwaitingToolResults, isResponding, isAssistantStreaming, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {
@@ -377,22 +357,6 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
 
   if (!conversationId) {
     return <EmptyState />
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-muted-foreground">Loading conversation...</div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-red-500">Failed to load conversation</div>
-      </div>
-    )
   }
 
   return (

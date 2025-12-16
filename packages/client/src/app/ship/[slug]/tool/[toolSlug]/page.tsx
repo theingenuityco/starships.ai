@@ -13,8 +13,8 @@ import { ConversationMessageInput } from '@/components/conversation/Conversation
 import type { ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationAgents, useConversationStreamed } from '@/hooks/useConversations'
-import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
+import { useConversationAgents } from '@/hooks/useConversations'
+import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
@@ -52,9 +52,8 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     return agents[0] || null
   }, [convAgents, agents])
 
-  // Keep conversation streaming active and capture live messages/UI actions
-  const stream = useConversationStreamed(conversationId, starship?.id || null, { enabled: true })
-  const { messages: liveMessages = [], lastUIAction, isResponding } = stream
+  // Keep conversation streaming state via the ship-layout provider
+  const { messages: liveMessages = [], lastUIAction, isResponding } = useConversationStreamContext()
   const deferredAgentCreate = useDeferredAgentCreationModal({
     liveMessages,
     isStreaming: isResponding,
@@ -701,30 +700,28 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       )}
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.templateId} />
       {conversationId && (
-        <ConversationStreamProvider conversationId={conversationId} starshipId={starship.id} value={stream}>
-          <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
-            <div className="max-w-2xl mx-auto pointer-events-auto">
-              <ConversationMessageInput
-                ref={messageInputRef}
-                selectedAgent={selectedAgent}
-                starshipId={starship.id}
-                conversationId={conversationId}
-                isToolFormOpen={true}
-                minimal={true}
-                showExpandableOverlay={true}
-                isOverlayExpanded={isOverlayExpanded}
-                onFocus={() => {
-                  if (!isResponding) setIsOverlayExpanded(true)
-                }}
-                onBlur={() => setIsOverlayExpanded(false)}
-                onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
-                starshipSlug={slug}
-              >
-                <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
-              </ConversationMessageInput>
-            </div>
+        <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
+          <div className="max-w-2xl mx-auto pointer-events-auto">
+            <ConversationMessageInput
+              ref={messageInputRef}
+              selectedAgent={selectedAgent}
+              starshipId={starship.id}
+              conversationId={conversationId}
+              isToolFormOpen={true}
+              minimal={true}
+              showExpandableOverlay={true}
+              isOverlayExpanded={isOverlayExpanded}
+              onFocus={() => {
+                if (!isResponding) setIsOverlayExpanded(true)
+              }}
+              onBlur={() => setIsOverlayExpanded(false)}
+              onToggleOverlay={() => setIsOverlayExpanded(prev => !prev)}
+              starshipSlug={slug}
+            >
+              <AgentSelector selectedAgent={selectedAgent} onAgentChange={() => {}} starshipId={starship.id} compact={true} />
+            </ConversationMessageInput>
           </div>
-        </ConversationStreamProvider>
+        </div>
       )}
     </div>
   )

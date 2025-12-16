@@ -7,7 +7,6 @@ import { fetchEventSource } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
-import { useStarshipUIStore } from '@/store/starship-ui-store'
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -834,8 +833,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
 
   const enabledFlag = options?.enabled !== false
-  // Per-hook-instance guard key (do NOT use globals; multiple instances can exist).
-  const storeSyncKeyRef = useRef<string>('')
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
@@ -1027,21 +1024,68 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return false
   }, [chunksRevisionKey, preStreamExpired, hasCompleteEvent, hasFinalAssistantAfterLastUser, isAssistantStreaming])
 
+  // Awaiting tool results: detect in-flight tool calls after the last user message that do not yet
+  // have corresponding tool_result/tool role messages. This is part of the same turn and should keep
+  // the input in a loading state even if the assistant isn't currently streaming text.
+  const isAwaitingToolResults = useMemo(() => {
+    try {
+      if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
+      if (hasCompleteEvent) return false
+
+      let lastUserIdx = -1
+      for (let i = computedMessages.length - 1; i >= 0; i--) {
+        if ((computedMessages[i] as any)?.role === 'user') {
+          lastUserIdx = i
+          break
+        }
+      }
+      if (lastUserIdx === -1) return false
+
+      // Build a set of tool result ids present after the last user.
+      const toolResultIds = new Set<string>()
+      for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
+        const m: any = computedMessages[i]
+        if (!m) continue
+        const isToolResult = m?.messageType === 'tool_result' || m?.role === 'tool'
+        if (!isToolResult) continue
+        const rid = m?.toolCallId ?? m?.call_id ?? m?.id
+        if (rid != null) toolResultIds.add(String(rid))
+      }
+
+      // If any assistant tool call after the last user lacks a result, we are awaiting tools.
+      for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
+        const m: any = computedMessages[i]
+        if (!m || m.role !== 'assistant') continue
+        const calls = Array.isArray(m.toolCalls) ? (m.toolCalls as any[]) : []
+        if (calls.length === 0) continue
+        for (const tc of calls) {
+          const id = tc?.id ?? tc?.call_id ?? tc?.toolCallId ?? tc?.function?.id
+          if (id == null) continue
+          if (!toolResultIds.has(String(id))) {
+            return true
+          }
+        }
+      }
+      return false
+    } catch {
+      return false
+    }
+  }, [computedMessages, hasCompleteEvent])
+
   // Awaiting assistant: prefer server turn state; show awaiting when turn is active but no streaming caret
   const isAwaitingAssistant = useMemo(() => {
     if (hasCompleteEvent) return false
-    // If we already have a final assistant message for the last user turn, do not show loader
-    if (hasFinalAssistantAfterLastUser) return false
-    // Cap the "awaiting" window so we never get stuck showing loaders if turn events are missed.
+    // If server says the turn is active, we're awaiting whenever the assistant isn't streaming text
+    // AND we are not currently waiting on tool results (tools panel/widget handles its own spinner).
+    if (serverTurnActive && !isAssistantStreaming && !isAwaitingToolResults) return true
+    // Cap only the local pre-stream window (when turn_state events may be missing).
     if (preStreamExpired) return false
-    // If server says the turn is active, we're awaiting unless assistant is already streaming.
-    if (serverTurnActive && !isAssistantStreaming) return true
     // Otherwise, fall back to local pending-turn state to bridge create/route-change gaps.
     return localTurnPendingActive
-  }, [serverTurnActive, isAssistantStreaming, hasCompleteEvent, hasFinalAssistantAfterLastUser, preStreamExpired, localTurnPendingActive])
+  }, [serverTurnActive, isAssistantStreaming, isAwaitingToolResults, hasCompleteEvent, preStreamExpired, localTurnPendingActive])
 
   // Unified responder state for UI (input gating and gap loader)
-  const isResponding = isAssistantStreaming || isAwaitingAssistant
+  const isResponding = isAssistantStreaming || isAwaitingAssistant || isAwaitingToolResults
 
   // Fallback: if after connection there are no messages yet, fetch baseline once via REST
   useEffect(() => {
@@ -1098,15 +1142,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const sameContent = prevIsUserAppend && String(prev?.message?.content ?? '') === String((variables as any)?.content ?? '')
           const prevIsTemp = prevIsUserAppend && typeof prev?.message?.id === 'string' && String(prev.message.id).startsWith('temp-user-')
           if (hasLocalTurnStarted && prevIsTemp && sameContent) {
-            // Ensure store flags are set, but skip duplicate stream-cache injections.
-            try {
-              useStarshipUIStore.getState().setConversationMeta(convId, {
-                isSending: true,
-                isResponding: true,
-                isAwaitingAssistant: true,
-                isAssistantStreaming: false,
-              })
-            } catch {}
             return
           }
         } catch {}
@@ -1131,19 +1166,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
           return next
         })
-
-        // ALSO update the central UI store immediately so UI stays consistent during route transitions.
-        try {
-          const ui = useStarshipUIStore.getState()
-          ui.appendMessage(convId, tempUser as any)
-          ui.setConversationMeta(convId, {
-            isSending: true,
-            isResponding: true,
-            isAwaitingAssistant: true,
-            isAssistantStreaming: false,
-            lastActivityAt: now,
-          })
-        } catch {}
       } catch {}
     },
     onSuccess: (_res, variables) => {
@@ -1196,98 +1218,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     },
   })
 
-  // Keep the central UI store in sync with the streamed query state.
-  // This allows the entire conversation UI (messages + loaders) to be store-driven.
-  useEffect(() => {
-    if (!conversationId) return
-    // CRITICAL: Only the *enabled* stream hook instance should write to the store.
-    // We intentionally call `useConversationStreamed` in some places with enabled=false
-    // to satisfy rules-of-hooks (e.g. fallback hooks). Those instances must not sync.
-    if (!enabledFlag) return
-    // IMPORTANT: Guard against runaway update loops.
-    // Some streaming implementations may return a new `chunks` array reference on every render
-    // even when content is unchanged. If we write to Zustand unconditionally, it can create
-    // a render -> store set -> render loop (seen as "Maximum update depth exceeded").
-    try {
-      const chunksLen = Array.isArray(chunks) ? chunks.length : 0
-      const lastChunk: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
-      // Small, stable-ish signature of the latest streamed chunk
-      const lastChunkSig = lastChunk?.type === 'append' ? `append:${String(lastChunk?.message?.role || '')}:${String(lastChunk?.message?.id || '')}` : lastChunk?.type ? String(lastChunk.type) : 'none'
-
-      // IMPORTANT:
-      // Some initial connect / route-transition states can briefly produce a false-negative `isAwaitingAssistant`
-      // (e.g. the local turn_started marker exists, but turn_state/turn_started events haven't propagated through
-      // the streamedQuery cache yet). In those cases the UI store can be overwritten to "idle" and the loader
-      // disappears until a reload / next SSE chunk arrives.
-      //
-      // Make the store flags slightly "sticky" for the active turn: if the last message is a user message and we
-      // haven't seen completion/final assistant, treat it as awaiting (capped by preStreamExpired).
-      const lastMsg: any = Array.isArray(computedMessages) && computedMessages.length > 0 ? computedMessages[computedMessages.length - 1] : null
-      const fallbackAwaiting = !preStreamExpired && !hasCompleteEvent && !hasFinalAssistantAfterLastUser && lastMsg?.role === 'user'
-
-      const nextIsAwaitingAssistant = Boolean(isAwaitingAssistant || fallbackAwaiting)
-      const nextIsResponding = Boolean(isAssistantStreaming || nextIsAwaitingAssistant)
-      const nextIsSending = Boolean(sendMessageMutation.isPending)
-
-      const syncKey = [conversationId, chunksLen, lastChunkSig, nextIsSending ? 1 : 0, nextIsResponding ? 1 : 0, isAssistantStreaming ? 1 : 0, nextIsAwaitingAssistant ? 1 : 0].join('|')
-
-      if (storeSyncKeyRef.current === syncKey) return
-      storeSyncKeyRef.current = syncKey
-
-      const ui = useStarshipUIStore.getState()
-      const existing = ui.conversations?.[conversationId]
-      const computedLen = Array.isArray(computedMessages) ? computedMessages.length : 0
-
-      // IMPORTANT:
-      // During the /conversations -> /conversations/:id transition (and initial SSE connect),
-      // the streamed query can briefly report an empty `computedMessages` array even though we
-      // already optimistically seeded the UI store + query cache with a temp user message and
-      // marked the conversation as busy.
-      //
-      // If we sync an empty snapshot here, we clobber the optimistic messages + busy flags and
-      // the UI appears to "go blank" and drop the loader until the SSE stream catches up (works
-      // after reload because the conversationId is stable from first paint).
-      //
-      // So: if the store already has messages OR shows the conversation as busy, never overwrite
-      // it with an empty/idle snapshot.
-      if (
-        computedLen === 0 &&
-        existing &&
-        ((Array.isArray(existing.messages) && existing.messages.length > 0) ||
-          existing.isSending === true ||
-          existing.isResponding === true ||
-          existing.isAwaitingAssistant === true ||
-          existing.isAssistantStreaming === true)
-      ) {
-        return
-      }
-
-      const last = Array.isArray(computedMessages) && computedMessages.length > 0 ? (computedMessages[computedMessages.length - 1] as any) : null
-      const lastActivityAt = String(last?.updatedAt || last?.createdAt || '') || undefined
-      ui.setConversationSnapshot(conversationId, {
-        messages: (computedMessages as any) || [],
-        total: Array.isArray(computedMessages) ? computedMessages.length : 0,
-        lastActivityAt,
-        isSending: nextIsSending,
-        isResponding: nextIsResponding,
-        isAssistantStreaming: Boolean(isAssistantStreaming),
-        isAwaitingAssistant: nextIsAwaitingAssistant,
-      } as any)
-    } catch {}
-  }, [
-    conversationId,
-    enabledFlag,
-    chunks,
-    computedMessages,
-    isResponding,
-    isAssistantStreaming,
-    isAwaitingAssistant,
-    sendMessageMutation.isPending,
-    preStreamExpired,
-    hasCompleteEvent,
-    hasFinalAssistantAfterLastUser,
-  ])
-
   return {
     messages: computedMessages,
     isLoading: messagesQuery.isLoading,
@@ -1298,6 +1228,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isResponding,
     isAssistantStreaming,
     isAwaitingAssistant,
+    isAwaitingToolResults,
     // Expose whether a turn-completion event has been received since the last user message
     hasCompleteEvent,
     // Expose last UI action payload from SSE

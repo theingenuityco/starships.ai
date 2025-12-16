@@ -51,18 +51,7 @@ interface MessageContentProps {
 }
 
 // Known widget types from public-docs
-const KNOWN_WIDGET_TYPES = new Set([
-  'StatCard',
-  'DataTable',
-  'MetricGrid',
-  'BarChart',
-  'LineChart',
-  'AreaChart',
-  'PieChart',
-  'DonutChart',
-  'RadarChart',
-  'RadialChart'
-])
+const KNOWN_WIDGET_TYPES = new Set(['StatCard', 'DataTable', 'MetricGrid', 'BarChart', 'LineChart', 'AreaChart', 'PieChart', 'DonutChart', 'RadarChart', 'RadialChart'])
 
 // Helper to safely parse JSON
 function tryParseJSON(value: any): any {
@@ -368,7 +357,7 @@ export function ConversationMessageContent({
           description: data.description,
           toolName: toolResult.toolName,
           toolCallId: toolResult.toolCallId,
-          index
+          index,
         }
       })
       .filter((w): w is NonNullable<typeof w> => w !== null)
@@ -442,7 +431,7 @@ export function ConversationMessageContent({
           {/* Tools panel: keep collapsed by default and preserve user toggle state */}
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+              {hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Icon name="loading" className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (
                 <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />
@@ -607,16 +596,18 @@ export function ConversationMessageContent({
       {/* Widget rendering: Display widgets inline when created/updated */}
       {widgetResults.length > 0 && messageType !== 'tool_result' && (
         <div className="space-y-4 mt-3 w-full max-w-none">
-          {widgetResults.map((widget) => {
+          {widgetResults.map(widget => {
             // Check if widget creation is pending (tool called but no result yet)
             const matchingToolCall = normalizedToolCalls.find((tc: any) => {
               const callId = tc?.id ?? tc?.call_id ?? tc?.toolCallId
               return callId && String(callId) === widget.toolCallId
             })
-            const isPending = matchingToolCall && !toolResults?.some((r: any) => {
-              const rid = r?.toolCallId ?? r?.call_id ?? r?.id
-              return rid && String(rid) === widget.toolCallId
-            })
+            const isPending =
+              matchingToolCall &&
+              !toolResults?.some((r: any) => {
+                const rid = r?.toolCallId ?? r?.call_id ?? r?.id
+                return rid && String(rid) === widget.toolCallId
+              })
 
             const isUpdate = widget.toolName?.toLowerCase().includes('update')
 
@@ -625,16 +616,10 @@ export function ConversationMessageContent({
                 {/* Conversational widget header - looks like text */}
                 <div className="text-sm w-full mb-4">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-muted-foreground">
-                      {isUpdate ? 'Updated' : 'Created'}
-                    </span>
+                    <span className="text-muted-foreground">{isUpdate ? 'Updated' : 'Created'}</span>
                     <span className="font-medium">{widget.name}</span>
                   </div>
-                  {widget.description && (
-                    <div className="text-muted-foreground text-xs mt-1">
-                      {widget.description}
-                    </div>
-                  )}
+                  {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
                 </div>
 
                 {/* Widget visualization - minimal styling, full width */}
@@ -643,16 +628,14 @@ export function ConversationMessageContent({
                     <div className="h-[420px] flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2">
                         <LoadingSpinner className="w-5 h-5" />
-                        <span className="text-xs text-muted-foreground">
-                          {isUpdate ? 'Updating...' : 'Creating...'}
-                        </span>
+                        <span className="text-xs text-muted-foreground">{isUpdate ? 'Updating...' : 'Creating...'}</span>
                       </div>
                     </div>
                   ) : (
                     <InlineWidgetRenderer
                       widget={{
                         widgetType: widget.widgetType,
-                        props: widget.props
+                        props: widget.props,
                       }}
                       compactMode={true}
                       className="w-full"

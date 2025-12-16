@@ -22,7 +22,7 @@ interface ConversationMessageListProps {
 
 export function ConversationMessageList({ conversationId, starshipId, bottomPaddingPx }: ConversationMessageListProps) {
   // Render directly from the stream context (TanStack streamedQuery).
-  const { messages, isResponding } = useConversationStreamContext()
+  const { messages, isResponding, isAssistantStreaming, isAwaitingToolResults } = useConversationStreamContext()
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
@@ -280,12 +280,16 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   //  - no assistant text progress yet after the user (first response is pending), or
   //  - we are waiting for the assistant to resume after tool results.
   const shouldShowGapLoader = useMemo(() => {
-    // Show while actively responding (pre-first tokens or during resume after tools),
-    // OR during a tool gap while the turn is still in progress.
-    const responding = isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools)
+    // We want the gap loader whenever the turn is active but we are not currently streaming text.
+    // - Show before first tokens
+    // - Show between assistant messages (assistant finished one message but turn is still active)
+    // - Show for “resume after tools” gaps
+    // - Do NOT show while awaiting tool results (tool UI shows its own spinner)
+    const betweenMessages = isResponding && !isAssistantStreaming && !awaitingResumeAfterTools
+    const responding = !isAwaitingToolResults && isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools || betweenMessages)
     const toolGapFetching = awaitingResumeAfterTools && isResponding
     return responding || toolGapFetching
-  }, [isResponding, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
+  }, [isAwaitingToolResults, isResponding, isAssistantStreaming, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {

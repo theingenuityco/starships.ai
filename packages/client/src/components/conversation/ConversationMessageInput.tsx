@@ -163,7 +163,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [selectedAgent])
 
     // Stream state must come from the (single) ship-layout provider; no fallbacks.
-    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isAwaitingAssistant } = useConversationStreamContext()
+    const { sendMessage: sendMessageFn, isSending, isResponding, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults } = useConversationStreamContext()
     const stopConversation = useConversationStop()
     // Track last known conversationId to enable stop during pre-stream window and to bridge route transitions
     const lastConversationIdRef = useRef<string | null>(conversationId ?? null)
@@ -181,7 +181,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // store flags can be false even though streamedQuery already indicates responding.
     //
     // So we treat hook-level flags as a fallback even when an id exists.
-    const hookBusy = Boolean(isSending || isResponding || isAssistantStreaming || isAwaitingAssistant)
+    const hookBusy = Boolean(isSending || isResponding || isAssistantStreaming || isAwaitingAssistant || isAwaitingToolResults)
     const isStreamingEffective = Boolean(sending || hookBusy)
     const shouldShowStop = Boolean(sending || hookBusy)
     const showLoaderRing = Boolean(shouldShowStop)

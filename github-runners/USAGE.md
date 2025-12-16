@@ -17,6 +17,24 @@ jobs:
       - run: echo "Running on t3.medium (default)"
 ```
 
+## ARM64 (native) runners
+
+To run jobs on native ARM64 EC2 instances (AWS Graviton), add the `arm64` label **and** use an ARM instance type (e.g. `t4g.*`, `c7g.*`, `m7g.*`):
+
+```yaml
+jobs:
+  docker-build-arm:
+    runs-on: [self-hosted, linux, arm64, t4g.large, docker]
+    steps:
+      - uses: actions/checkout@v4
+      - run: uname -m   # should print aarch64
+```
+
+Notes:
+- The runner controller will download the correct GitHub runner binary (`actions-runner-linux-arm64`) when `arm64` is present.
+- Set `runner_ami_id_arm64` in Terraform to an **ARM64 Ubuntu AMI**.
+- Add the `docker` label if the job needs Docker installed on the ephemeral instance.
+
 ## Specifying Instance Types
 
 ### Using Custom Instance Types

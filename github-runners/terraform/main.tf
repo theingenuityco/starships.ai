@@ -227,7 +227,10 @@ resource "aws_lambda_function" "webhook" {
       GITHUB_INSTALLATION_ID          = var.github_installation_id
       RUNNER_SECURITY_GROUP_ID        = aws_security_group.github_runner.id
       RUNNER_INSTANCE_PROFILE_NAME    = aws_iam_instance_profile.github_runner.name
+      # Back-compat: RUNNER_AMI_ID remains supported (used as x64 default)
       RUNNER_AMI_ID                   = var.runner_ami_id
+      RUNNER_AMI_ID_X64               = var.runner_ami_id_x64 != "" ? var.runner_ami_id_x64 : var.runner_ami_id
+      RUNNER_AMI_ID_ARM64             = var.runner_ami_id_arm64
       RUNNER_SUBNET_ID               = var.runner_subnet_id != "" ? var.runner_subnet_id : data.aws_subnets.default.ids[0]
     }
   }

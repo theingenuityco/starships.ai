@@ -19,7 +19,9 @@ GITHUB_WEBHOOK_SECRET = os.environ['GITHUB_WEBHOOK_SECRET']
 GITHUB_INSTALLATION_ID = os.environ['GITHUB_INSTALLATION_ID']
 RUNNER_SECURITY_GROUP_ID = os.environ['RUNNER_SECURITY_GROUP_ID']
 RUNNER_INSTANCE_PROFILE_NAME = os.environ['RUNNER_INSTANCE_PROFILE_NAME']
-RUNNER_AMI_ID = os.environ.get('RUNNER_AMI_ID', 'ami-0e2c8caa4b6378d8c')  # Ubuntu 22.04 LTS in us-east-1
+RUNNER_AMI_ID = os.environ.get('RUNNER_AMI_ID', 'ami-0e2c8caa4b6378d8c')  # Back-compat default (x64 Ubuntu 22.04 LTS in us-east-1)
+RUNNER_AMI_ID_X64 = os.environ.get('RUNNER_AMI_ID_X64', RUNNER_AMI_ID)
+RUNNER_AMI_ID_ARM64 = os.environ.get('RUNNER_AMI_ID_ARM64', '')
 RUNNER_SUBNET_ID = os.environ.get('RUNNER_SUBNET_ID')  # Optional, uses default if not specified
 
 def lambda_handler(event, context):
@@ -191,10 +193,70 @@ def get_instance_type_from_labels(labels):
     print("No instance type label found, defaulting to t3.medium")
     return 't3.medium'
 
+def is_arm_instance_type(instance_type: str) -> bool:
+    """
+    Best-effort detection of ARM/Graviton instance types.
+    Examples: t4g.*, m6g.*, c7g.*, r6g.*, a1.* are ARM.
+    """
+    if not instance_type:
+        return False
+    family = instance_type.split('.')[0]
+    return family.endswith('g') or family in {'a1'}
+
+def get_arch_from_labels(labels):
+    """
+    Determine architecture requested by workflow labels.
+    Priority:
+      1) Explicit label: arm64/aarch64/x64/amd64
+      2) Infer from instance type label (e.g., t4g.* => arm64)
+      3) Default: x64
+    """
+    lowered = [str(l).lower() for l in (labels or [])]
+    if 'arm64' in lowered or 'aarch64' in lowered:
+        return 'arm64'
+    if 'x64' in lowered or 'amd64' in lowered:
+        return 'x64'
+
+    instance_type = get_instance_type_from_labels(labels or [])
+    if is_arm_instance_type(instance_type):
+        return 'arm64'
+    return 'x64'
+
+def select_instance_type(labels, arch: str) -> str:
+    """
+    Choose instance type from labels, but keep it consistent with requested arch.
+    Defaults:
+      - x64   => t3.medium
+      - arm64 => t4g.medium
+    """
+    requested = get_instance_type_from_labels(labels or [])
+    if arch == 'arm64':
+        if requested and is_arm_instance_type(requested):
+            return requested
+        return 't4g.medium'
+
+    # x64
+    if requested and not is_arm_instance_type(requested):
+        return requested
+    return 't3.medium'
+
+def get_ami_id_for_arch(arch: str) -> str:
+    """
+    Select AMI based on arch.
+    - x64:  RUNNER_AMI_ID_X64 (or legacy RUNNER_AMI_ID)
+    - arm64: RUNNER_AMI_ID_ARM64 (recommended) else fallback to x64 AMI (will likely fail to boot)
+    """
+    if arch == 'arm64':
+        return RUNNER_AMI_ID_ARM64 or RUNNER_AMI_ID_X64
+    return RUNNER_AMI_ID_X64
+
 def create_user_data_script(repo_url, registration_token, labels, job_id):
     """Create user data script for EC2 instance"""
     runner_name = f"ephemeral-runner-{job_id}"
     labels_str = ','.join(labels)
+    arch = get_arch_from_labels(labels)
+    runner_arch = "x64" if arch == "x64" else "arm64"
+    install_docker = 'docker' in [str(l).lower() for l in (labels or [])]
 
     script = f"""#!/bin/bash
 set -e  # Exit on error
@@ -202,6 +264,7 @@ set -e  # Exit on error
 echo "=== Starting GitHub Runner Setup ==="
 echo "Repository: {repo_url}"
 echo "Runner name: {runner_name}"
+echo "Runner arch: {arch}"
 
 # Update system
 echo "Updating system packages..."
@@ -217,8 +280,8 @@ useradd -m -s /bin/bash runner || echo "User already exists"
 echo "Downloading GitHub Actions runner..."
 cd /home/runner
 RUNNER_VERSION="2.321.0"
-wget -q -O actions-runner-linux-x64.tar.gz https://github.com/actions/runner/releases/download/v${{RUNNER_VERSION}}/actions-runner-linux-x64-${{RUNNER_VERSION}}.tar.gz
-tar xzf actions-runner-linux-x64.tar.gz
+wget -q -O actions-runner-linux-{runner_arch}.tar.gz https://github.com/actions/runner/releases/download/v${{RUNNER_VERSION}}/actions-runner-linux-{runner_arch}-${{RUNNER_VERSION}}.tar.gz
+tar xzf actions-runner-linux-{runner_arch}.tar.gz
 chown -R runner:runner /home/runner
 
 # Install runner dependencies
@@ -240,6 +303,28 @@ echo "Installing Node.js 22..."
 curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
 apt-get install -y nodejs
 npm install -g pnpm
+"""
+
+    if install_docker:
+        script += f"""
+
+# Optional: Install Docker for workflows that build images
+echo "Installing Docker..."
+apt-get install -y ca-certificates gnupg
+install -m 0755 -d /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+echo \
+  "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+  $(. /etc/os-release && echo "$VERSION_CODENAME") stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+apt-get update -qq
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+usermod -aG docker runner || true
+systemctl enable docker
+systemctl start docker
+"""
+
+    script += f"""
 
 # Start runner and wait for completion
 echo "Starting runner..."
@@ -257,16 +342,19 @@ shutdown -h now
 def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels=None):
     """Launch EC2 Spot instance for runner"""
 
-    # Determine instance type from labels
     if labels is None:
         labels = []
-    instance_type = get_instance_type_from_labels(labels)
+    arch = get_arch_from_labels(labels)
+    instance_type = select_instance_type(labels, arch)
+    ami_id = get_ami_id_for_arch(arch)
 
     print(f"Launching instance with type: {instance_type}")
+    print(f"Launching instance arch: {arch}")
+    print(f"Using AMI: {ami_id}")
 
     # Instance configuration
     instance_params = {
-        'ImageId': RUNNER_AMI_ID,
+        'ImageId': ami_id,
         'InstanceType': instance_type,
         'MaxCount': 1,
         'MinCount': 1,

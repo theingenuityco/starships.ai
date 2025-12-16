@@ -91,7 +91,7 @@ jobs:
   # Build and Push to GHCR
   build-dev-amd64:
     name: Build Dev Image (amd64)
-    runs-on: [self-hosted, linux, x64, t3.large, docker]
+    runs-on: [self-hosted, linux, x64, t3.xlarge, docker]
     needs: [calculate-version]
     if: |
       needs.calculate-version.outputs.should_build == 'true' &&
@@ -157,7 +157,7 @@ jobs:
 
   build-dev-arm64:
     name: Build Dev Image (arm64)
-    runs-on: [self-hosted, linux, arm64, t4g.large, docker]
+    runs-on: [self-hosted, linux, arm64, t4g.xlarge, docker]
     needs: [calculate-version]
     if: |
       needs.calculate-version.outputs.should_build == 'true' &&
@@ -261,12 +261,11 @@ jobs:
               continue
             fi
 
-            # Ensure idempotency if the manifest tag already exists from a prior run.
-            docker manifest rm "$tag" >/dev/null 2>&1 || true
-            docker manifest create "$tag" \
+            # Use buildx imagetools to create multi-arch manifest
+            # This handles cases where source images might be manifest lists
+            docker buildx imagetools create --tag "$tag" \
               "${tag}-amd64" \
               "${tag}-arm64"
-            docker manifest push "$tag"
           done
 
   build-autopilot-runner-amd64:
@@ -422,11 +421,11 @@ jobs:
               continue
             fi
 
-            docker manifest rm "$tag" >/dev/null 2>&1 || true
-            docker manifest create "$tag" \
+            # Use buildx imagetools to create multi-arch manifest
+            # This handles cases where source images might be manifest lists
+            docker buildx imagetools create --tag "$tag" \
               "${tag}-amd64" \
               "${tag}-arm64"
-            docker manifest push "$tag"
           done
 
   # Create Release and Tag (AFTER successful build)

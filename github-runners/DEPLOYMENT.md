@@ -33,6 +33,31 @@ github_app_id = "YOUR_APP_ID"
 github_app_private_key_base64 = "YOUR_BASE64_KEY"
 github_webhook_secret = "YOUR_WEBHOOK_SECRET"
 github_installation_id = "YOUR_INSTALLATION_ID"
+
+# Recommended: pin AMIs per architecture (required for arm64 runners)
+# runner_ami_id_x64 = "ami-xxxxxxxxx"
+# runner_ami_id_arm64 = "ami-yyyyyyyyy"
+
+# Optional: legacy (x64) AMI override (kept for backwards compatibility)
+# runner_ami_id = "ami-xxxxxxxxx"
+```
+
+### Finding the right Ubuntu AMIs (recommended)
+
+Canonical publishes Ubuntu AMI IDs to SSM Parameter Store. Example (us-east-1):
+
+```bash
+# Ubuntu 22.04 arm64 (Graviton)
+aws ssm get-parameter \
+  --name /aws/service/canonical/ubuntu/server/22.04/stable/current/arm64/hvm/ebs-gp2/ami-id \
+  --region us-east-1 \
+  --query 'Parameter.Value' --output text
+
+# Ubuntu 22.04 amd64/x64
+aws ssm get-parameter \
+  --name /aws/service/canonical/ubuntu/server/22.04/stable/current/amd64/hvm/ebs-gp2/ami-id \
+  --region us-east-1 \
+  --query 'Parameter.Value' --output text
 ```
 
 To encode your private key:

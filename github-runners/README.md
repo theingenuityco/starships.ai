@@ -57,13 +57,16 @@ aws ec2 describe-instances \
 
 ## 🔧 Configuration
 
-### Change Instance Type
+### Instance types & architecture
 
-Edit `lambda/handler.py` line 247:
+Instance type is selected from workflow `runs-on` labels (e.g. `t3.medium`, `m6a.large`, `m6g.large`).
 
-```python
-'InstanceType': 't3.medium',  # Change to t3.medium if needed
-```
+- **x64**: use x64 instance families (e.g. `t3.*`, `m6a.*`, `c6a.*`)
+- **arm64**: use Graviton families (e.g. `t4g.*`, `m6g.*`, `c7g.*`) and include the `arm64` label
+
+To support arm64 runners, you must set **`runner_ami_id_arm64`** in Terraform to an ARM64 Ubuntu AMI.
+
+If a job needs Docker (image builds), include the `docker` label so the ephemeral instance installs Docker during bootstrap.
 
 ### Update Runner Version
 

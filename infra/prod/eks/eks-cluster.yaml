@@ -16,7 +16,7 @@ availabilityZones:
   - ap-south-1b
 
 managedNodeGroups:
-  - name: starships-nodes
+  - name: starships-nodes-m8g
     instanceType: m8g.medium
     desiredCapacity: 3
     minSize: 1

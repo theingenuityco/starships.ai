@@ -7,6 +7,7 @@ import hashlib
 import time
 import jwt
 import requests
+from botocore.exceptions import ClientError
 
 # AWS clients
 ec2 = boto3.client('ec2', region_name=os.environ.get('AWS_REGION', 'us-east-1'))
@@ -24,6 +25,36 @@ RUNNER_INSTANCE_PROFILE_NAME = os.environ['RUNNER_INSTANCE_PROFILE_NAME']
 RUNNER_AMI_ID_X64 = os.environ.get('RUNNER_AMI_ID_X64', 'ami-0ecb62995f68bb549')
 RUNNER_AMI_ID_ARM64 = os.environ.get('RUNNER_AMI_ID_ARM64', 'ami-01b9f1e7dc427266e')
 RUNNER_SUBNET_ID = os.environ.get('RUNNER_SUBNET_ID')  # Optional, uses default if not specified
+RUNNER_SUBNET_IDS = os.environ.get('RUNNER_SUBNET_IDS')  # Optional CSV list; overrides RUNNER_SUBNET_ID
+
+RETRYABLE_EC2_LAUNCH_ERRORS = {
+    # Capacity / placement
+    'InsufficientInstanceCapacity',
+    'InsufficientSpotInstanceCapacity',
+    'InsufficientCapacity',
+    'InsufficientFreeAddressesInSubnet',
+    'Unsupported',  # sometimes returned for certain spot placement combinations
+    # Quotas / throttling / transient AWS issues
+    'RequestLimitExceeded',
+    'ServiceUnavailable',
+    'InternalError',
+    'Unavailable',
+    'Throttling',
+    'ThrottlingException',
+    'TooManyRequestsException',
+}
+
+def _is_retryable_launch_error(code: str, message: str) -> bool:
+    if code in RETRYABLE_EC2_LAUNCH_ERRORS:
+        return True
+    msg = (message or '').lower()
+    # AWS sometimes reports AZ/placement limitations as InvalidParameterValue/Combination.
+    if code in {'InvalidParameterValue', 'InvalidParameterCombination'}:
+        if 'not supported' in msg or 'currently not supported' in msg:
+            return True
+        if 'availability zone' in msg and ('not supported' in msg or 'unsupported' in msg):
+            return True
+    return False
 
 def lambda_handler(event, context):
     """Main Lambda handler for GitHub webhook events"""
@@ -204,6 +235,116 @@ def is_arm_instance_type(instance_type: str) -> bool:
     family = instance_type.split('.')[0]
     return family.endswith('g') or family in {'a1'}
 
+def _parse_csv_ids(value: str):
+    if not value:
+        return []
+    return [p.strip() for p in str(value).split(',') if p.strip()]
+
+def _get_default_vpc_id():
+    try:
+        resp = ec2.describe_vpcs(Filters=[{'Name': 'isDefault', 'Values': ['true']}])
+        vpcs = resp.get('Vpcs', [])
+        if not vpcs:
+            return None
+        return vpcs[0].get('VpcId')
+    except Exception:
+        return None
+
+def _describe_subnets(subnet_ids=None, vpc_id=None):
+    # Returns list of subnet dicts in "available" state.
+    if subnet_ids:
+        resp = ec2.describe_subnets(SubnetIds=subnet_ids)
+        subnets = resp.get('Subnets', [])
+    else:
+        filters = [{'Name': 'state', 'Values': ['available']}]
+        if vpc_id:
+            filters.append({'Name': 'vpc-id', 'Values': [vpc_id]})
+        resp = ec2.describe_subnets(Filters=filters)
+        subnets = resp.get('Subnets', [])
+
+    return [s for s in subnets if s.get('State') == 'available']
+
+def _get_security_group_vpc_id():
+    # Best-effort: if SG isn't set / can't be described, return None.
+    if not RUNNER_SECURITY_GROUP_ID:
+        return None
+    try:
+        resp = ec2.describe_security_groups(GroupIds=[RUNNER_SECURITY_GROUP_ID])
+        sgs = resp.get('SecurityGroups', [])
+        if not sgs:
+            return None
+        return sgs[0].get('VpcId')
+    except Exception:
+        return None
+
+def _round_robin_by_az(subnets):
+    """
+    Deterministic ordering that "covers all AZs" by round-robining subnets
+    grouped by AvailabilityZone.
+    """
+    az_to_ids = {}
+    for s in subnets:
+        az = s.get('AvailabilityZone') or 'unknown'
+        az_to_ids.setdefault(az, []).append(s.get('SubnetId'))
+
+    # Sort within each AZ for stable output
+    for az in az_to_ids:
+        az_to_ids[az] = sorted([sid for sid in az_to_ids[az] if sid])
+
+    candidates = []
+    azs = sorted(az_to_ids.keys())
+    while True:
+        progressed = False
+        for az in azs:
+            if az_to_ids[az]:
+                candidates.append(az_to_ids[az].pop(0))
+                progressed = True
+        if not progressed:
+            break
+    return candidates
+
+def get_candidate_subnet_ids():
+    """
+    Determine candidate subnets to try, covering all AZs.
+
+    Priority:
+      1) RUNNER_SUBNET_IDS (CSV list) if provided
+      2) Expand RUNNER_SUBNET_ID to all subnets in its VPC
+      3) All subnets in the default VPC
+    """
+    sg_vpc_id = _get_security_group_vpc_id()
+
+    explicit_ids = _parse_csv_ids(RUNNER_SUBNET_IDS)
+    if explicit_ids:
+        subnets = _describe_subnets(subnet_ids=explicit_ids)
+        if sg_vpc_id:
+            subnets = [s for s in subnets if s.get('VpcId') == sg_vpc_id]
+        # Preserve user order when possible, but still validate existence.
+        present = {s.get('SubnetId'): s for s in subnets}
+        ordered = [sid for sid in explicit_ids if sid in present]
+        # If some IDs were invalid/missing, fall back to the discovered list.
+        if not ordered:
+            ordered = _round_robin_by_az(subnets)
+        return ordered
+
+    if RUNNER_SUBNET_ID:
+        seed = _describe_subnets(subnet_ids=[RUNNER_SUBNET_ID])
+        if seed:
+            vpc_id = seed[0].get('VpcId')
+            if vpc_id:
+                subnets = _describe_subnets(vpc_id=vpc_id)
+                if sg_vpc_id:
+                    subnets = [s for s in subnets if s.get('VpcId') == sg_vpc_id]
+                return _round_robin_by_az(subnets)
+
+    default_vpc_id = _get_default_vpc_id()
+    if not default_vpc_id:
+        return []
+    subnets = _describe_subnets(vpc_id=default_vpc_id)
+    if sg_vpc_id:
+        subnets = [s for s in subnets if s.get('VpcId') == sg_vpc_id]
+    return _round_robin_by_az(subnets)
+
 def get_arch_from_labels(labels):
     """
     Determine architecture requested by workflow labels.
@@ -353,8 +494,22 @@ def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels=None):
     print(f"Launching instance arch: {arch}")
     print(f"Using AMI: {ami_id}")
 
-    # Instance configuration
-    instance_params = {
+    candidate_subnet_ids = get_candidate_subnet_ids()
+    if not candidate_subnet_ids:
+        # Keep prior behavior (let AWS choose) only if we truly can't discover subnets.
+        # In practice, for default VPCs this should not happen.
+        candidate_subnet_ids = [None]
+
+    last_error = None
+    # Try each subnet once (covers all AZs); only fail after exhausting candidates.
+    for idx, subnet_id in enumerate(candidate_subnet_ids, start=1):
+        if subnet_id:
+            print(f"[launch attempt {idx}/{len(candidate_subnet_ids)}] Trying subnet {subnet_id}")
+        else:
+            print(f"[launch attempt {idx}/{len(candidate_subnet_ids)}] Trying without explicit SubnetId")
+
+        # Instance configuration
+        instance_params = {
         'ImageId': ami_id,
         'InstanceType': instance_type,
         'MaxCount': 1,
@@ -396,14 +551,30 @@ def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels=None):
             }
         ],
         'InstanceInitiatedShutdownBehavior': 'terminate'
-    }
+        }
 
-    # Add subnet if specified
-    if RUNNER_SUBNET_ID:
-        instance_params['SubnetId'] = RUNNER_SUBNET_ID
+        if subnet_id:
+            instance_params['SubnetId'] = subnet_id
 
-    # Launch instance
-    response = ec2.run_instances(**instance_params)
-    instance_id = response['Instances'][0]['InstanceId']
-    print(f"Successfully launched {instance_type} instance {instance_id} for job {job_id}")
-    return instance_id
+        try:
+            response = ec2.run_instances(**instance_params)
+            instance_id = response['Instances'][0]['InstanceId']
+            print(f"Successfully launched {instance_type} instance {instance_id} for job {job_id} (subnet={subnet_id})")
+            return instance_id
+        except ClientError as e:
+            last_error = e
+            code = (e.response.get('Error') or {}).get('Code', 'Unknown')
+            msg = (e.response.get('Error') or {}).get('Message', str(e))
+            print(f"EC2 launch failed in subnet={subnet_id} with {code}: {msg}")
+
+            if _is_retryable_launch_error(code, msg):
+                # Move to next subnet/AZ to try to find capacity.
+                continue
+            raise
+
+    # Exhausted all subnets/AZs
+    if last_error:
+        code = (last_error.response.get('Error') or {}).get('Code', 'Unknown')
+        msg = (last_error.response.get('Error') or {}).get('Message', str(last_error))
+        raise Exception(f"Failed to launch runner after trying {len(candidate_subnet_ids)} subnets/AZs. Last error: {code}: {msg}")
+    raise Exception(f"Failed to launch runner after trying {len(candidate_subnet_ids)} subnets/AZs.")

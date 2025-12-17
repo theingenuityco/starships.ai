@@ -74,3 +74,6 @@ k8s/**/*-secrets.yaml
 # github-runners build artifacts (never commit)
 github-runners/**/lambda_function.zip
 github-runners/lambda/package/
+
+# github-runners terraform configuration (contains secrets)
+github-runners/**/terraform.tfvars

@@ -45,7 +45,7 @@ RUN --mount=type=secret,id=stripe_secret_key \
     --mount=type=secret,id=stripe_publishable_key \
     STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
     STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
-    pnpm run build
+    NODE_OPTIONS="--no-node-snapshot --max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" pnpm run build
 
 
 FROM node:20-alpine AS runtime

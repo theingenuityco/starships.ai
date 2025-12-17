@@ -523,7 +523,7 @@ def launch_ec2_instance(user_data, job_id, run_id, repo_url, labels=None):
             {
                 'DeviceName': '/dev/sda1',
                 'Ebs': {
-                    'VolumeSize': 20,  # 20GB instead of default 8GB
+                    'VolumeSize': 40,  # 40GB instead of default 8GB
                     'VolumeType': 'gp3',
                     'DeleteOnTermination': True
                 }

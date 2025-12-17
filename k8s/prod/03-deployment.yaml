@@ -235,11 +235,11 @@ spec:
 
           resources:
             requests:
-              memory: '1Gi' # Guaranteed minimum
-              cpu: '500m' # 0.5 cores guaranteed
+              cpu: '250m'
+              memory: '512Mi'
             limits:
-              memory: '6Gi' # Use 75% of node RAM (leave 2GB for OS/K8s)
-              cpu: '1800m' # Use 90% of node CPU (leave 0.2 for system)
+              cpu: '1000m'
+              memory: '2Gi'
           # Production health checks (updated to use /api/health)
           readinessProbe:
             httpGet:

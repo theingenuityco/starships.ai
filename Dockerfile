@@ -43,7 +43,7 @@ RUN --mount=type=secret,id=stripe_secret_key \
     --mount=type=secret,id=stripe_publishable_key \
     STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
     STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
-    pnpm run build
+    pnpm turbo run build --concurrency=1
 
 
 FROM node:20-alpine AS runtime

@@ -889,7 +889,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return false
   }, [chunksRevisionKey])
 
-  // Track the start of the latest user turn and cap the pre-stream indicator duration
+  // Track the start of the latest user turn and cap the pre-stream indicator duration.
+  //
+  // IMPORTANT:
+  // We seed a local `turn_started` chunk to keep the UI in a "responding" state during the
+  // create-conversation -> route transition. Some turns can legitimately take >7s before
+  // the first assistant tokens arrive (cold start, tool warm-up, upstream latency).
+  //
+  // If we expire too aggressively, the loader/stop state flickers off mid-turn and never comes
+  // back until content arrives, which looks like the agent is "not typing" even though it is.
   const lastUserSerial = useMemo(() => {
     if (!Array.isArray(computedMessages) || computedMessages.length === 0) return null
     for (let i = computedMessages.length - 1; i >= 0; i--) {
@@ -901,6 +909,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return null
   }, [computedMessages])
 
+  // Max time we allow the UI to show "awaiting assistant" before first tokens arrive.
+  // This is a safety valve to avoid an infinite loader if a turn gets stuck.
+  const PRE_STREAM_MAX_MS = 60_000
+
   const [preStreamExpired, setPreStreamExpired] = useState(false)
   useEffect(() => {
     if (!lastUserSerial) {
@@ -908,9 +920,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return
     }
     setPreStreamExpired(false)
-    const t = setTimeout(() => setPreStreamExpired(true), 7000)
+    const t = setTimeout(() => setPreStreamExpired(true), PRE_STREAM_MAX_MS)
     return () => clearTimeout(t)
-  }, [lastUserSerial])
+    // Reset the expiry timer when *any* new stream chunk arrives for the same turn (e.g. turn_state).
+  }, [lastUserSerial, chunksRevisionKey])
 
   // Extract last UI action payload (from 'ui_action' SSE events) for consumers
   const lastUIAction = useMemo(() => {

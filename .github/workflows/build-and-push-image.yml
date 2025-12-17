@@ -14,6 +14,8 @@ on:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: theingenuityco/starships.ai
+  # Increase Node heap for Docker image builds (MB)
+  NODE_MAX_OLD_SPACE_SIZE: 8192
 
 permissions:
   contents: write
@@ -150,7 +152,7 @@ jobs:
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VERSION=dev-${{ github.sha }}
             ENVIRONMENT=development
-            NODE_MAX_OLD_SPACE_SIZE=8192
+            NODE_MAX_OLD_SPACE_SIZE=${{ env.NODE_MAX_OLD_SPACE_SIZE }}
           secrets: |
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
             stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}
@@ -216,7 +218,7 @@ jobs:
             BUILD_DATE=${{ fromJSON(steps.meta.outputs.json).labels['org.opencontainers.image.created'] }}
             VERSION=dev-${{ github.sha }}
             ENVIRONMENT=development
-            NODE_MAX_OLD_SPACE_SIZE=8192
+            NODE_MAX_OLD_SPACE_SIZE=${{ env.NODE_MAX_OLD_SPACE_SIZE }}
           secrets: |
             stripe_secret_key=${{ secrets.STRIPE_SECRET_KEY }}
             stripe_publishable_key=${{ secrets.STRIPE_PUBLISHABLE_KEY }}

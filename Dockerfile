@@ -79,6 +79,7 @@ COPY --from=builder --chown=nodejs:node /app/package.json /app/package.json
 COPY --from=builder --chown=nodejs:node /app/pnpm-workspace.yaml /app/pnpm-workspace.yaml
 COPY --from=builder --chown=nodejs:node /app/turbo.json /app/turbo.json
 COPY --from=builder --chown=nodejs:node /app/pnpm-lock.yaml /app/pnpm-lock.yaml
+COPY --from=builder --chown=nodejs:node /app/tsconfig.nodejs.json /app/tsconfig.nodejs.json
 COPY --from=builder --chown=nodejs:node /app/node_modules /app/node_modules
 COPY --from=builder --chown=nodejs:node /app/packages /app/packages
 

@@ -170,6 +170,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const { data: starshipData } = useStarship(starshipId || '', !!starshipId)
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
+  const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
 
   // Build suggestion cards from the selected agent's preview/example prompts
   const agentSuggestionCards = useMemo(() => {
@@ -339,9 +340,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       currentConversationIdRef.current = conversationId
       setCurrentConversationId(conversationId)
       pendingRouteConversationIdRef.current = conversationId
+      // CRITICAL: Bridge the ship-layout stream provider during the route handoff.
+      // Without this, the provider stays on "null conversation" until the URL param updates,
+      // which makes the loader/avatar briefly disappear and then reappear.
+      try {
+        setPendingConversationId(conversationId)
+      } catch {}
       onConversationChange?.(conversationId)
     },
-    [onConversationChange]
+    [onConversationChange, setPendingConversationId]
   )
 
   // Overlay disabled; keep a no-op for prop compatibility

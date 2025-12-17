@@ -21,10 +21,8 @@ RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
 ENV DOCKER_BUILD=true
 
-# Increase Node heap for monorepo builds in Docker (configurable)
-# Can be overridden at build time: --build-arg NODE_MAX_OLD_SPACE_SIZE=8192
-ARG NODE_MAX_OLD_SPACE_SIZE=8192
-ENV NODE_OPTIONS="--no-node-snapshot --max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}"
+# Node runtime flags (kept minimal; heap sizing is configured externally if needed)
+ENV NODE_OPTIONS="--no-node-snapshot"
 
 # Prime pnpm store from lockfile (cacheable) then do an offline install after full source copy.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
@@ -45,7 +43,7 @@ RUN --mount=type=secret,id=stripe_secret_key \
     --mount=type=secret,id=stripe_publishable_key \
     STRIPE_SECRET_KEY=$(cat /run/secrets/stripe_secret_key 2>/dev/null || echo "") \
     STRIPE_PUBLISHABLE_KEY=$(cat /run/secrets/stripe_publishable_key 2>/dev/null || echo "") \
-    NODE_OPTIONS="--no-node-snapshot --max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}" pnpm run build
+    pnpm run build
 
 
 FROM node:20-alpine AS runtime

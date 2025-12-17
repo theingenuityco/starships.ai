@@ -3,21 +3,12 @@ set -e
 
 echo "Starting Starships.ai application..."
 
-# Ensure builds inside the container have enough JS heap.
-# You can override with NODE_OPTIONS and/or NODE_MAX_OLD_SPACE_SIZE.
-DEFAULT_MAX_OLD_SPACE_SIZE="${NODE_MAX_OLD_SPACE_SIZE:-8192}"
-DEFAULT_NODE_OPTIONS="--no-node-snapshot --max-old-space-size=${DEFAULT_MAX_OLD_SPACE_SIZE}"
-
 if [ -z "${NODE_OPTIONS:-}" ]; then
-    export NODE_OPTIONS="${DEFAULT_NODE_OPTIONS}"
+    export NODE_OPTIONS="--no-node-snapshot"
 else
     case "${NODE_OPTIONS}" in
         *"--no-node-snapshot"*) ;;
         *) export NODE_OPTIONS="--no-node-snapshot ${NODE_OPTIONS}" ;;
-    esac
-    case "${NODE_OPTIONS}" in
-        *"max-old-space-size="*) ;;
-        *) export NODE_OPTIONS="${NODE_OPTIONS} --max-old-space-size=${DEFAULT_MAX_OLD_SPACE_SIZE}" ;;
     esac
 fi
 

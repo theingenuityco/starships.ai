@@ -41,6 +41,9 @@ interface StarshipUIState {
   // UI-only state
   activeStarshipId: string | null
   currentRoute: string
+  // Pending conversation id used to bridge route transitions (e.g. /conversations -> /conversations/:id).
+  // This is intentionally NOT persisted.
+  pendingConversationId: string | null
 
   // Conversations data (authoritative UI source)
   conversations: Record<string, ConversationData>
@@ -48,6 +51,7 @@ interface StarshipUIState {
   // UI actions
   setActiveStarship: (id: string | null) => void
   navigateTo: (route: string) => void
+  setPendingConversationId: (id: string | null) => void
 
   // Conversation data actions (UI-driven from TanStack and SSE)
   setConversationSnapshot: (conversationId: string, data: ConversationData) => void
@@ -67,6 +71,7 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         // Initial state
         activeStarshipId: null,
         currentRoute: '/',
+        pendingConversationId: null,
         conversations: {},
 
         // UI actions
@@ -84,6 +89,7 @@ export const useStarshipUIStore = create<StarshipUIState>()(
         },
 
         navigateTo: (route: string) => set({ currentRoute: route }, false, 'ui/navigate'),
+        setPendingConversationId: (id: string | null) => set({ pendingConversationId: id }, false, 'ui/setPendingConversationId'),
 
         // Conversation data actions
         setConversationSnapshot: (conversationId: string, data: ConversationData) =>
@@ -101,14 +107,8 @@ export const useStarshipUIStore = create<StarshipUIState>()(
               // chunks are growing, which makes the UI only update at completion.
               const lastChunksLen = last?.role === 'assistant' && Array.isArray((last as any)?.chunks) ? Number((last as any).chunks.length) : 0
               const lastRChunksLen = last?.role === 'assistant' && Array.isArray((last as any)?.reasoningChunks) ? Number((last as any).reasoningChunks.length) : 0
-              const lastChunkTs =
-                lastChunksLen > 0 && last?.role === 'assistant'
-                  ? String((last as any)?.chunks?.[lastChunksLen - 1]?.timestamp ?? '')
-                  : ''
-              const lastRChunkTs =
-                lastRChunksLen > 0 && last?.role === 'assistant'
-                  ? String((last as any)?.reasoningChunks?.[lastRChunksLen - 1]?.timestamp ?? '')
-                  : ''
+              const lastChunkTs = lastChunksLen > 0 && last?.role === 'assistant' ? String((last as any)?.chunks?.[lastChunksLen - 1]?.timestamp ?? '') : ''
+              const lastRChunkTs = lastRChunksLen > 0 && last?.role === 'assistant' ? String((last as any)?.reasoningChunks?.[lastRChunksLen - 1]?.timestamp ?? '') : ''
               const nextSig = [
                 'v1',
                 nextTotal,

@@ -49,16 +49,27 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install pnpm
+      - name: Enable Corepack (pnpm)
         run: |
-          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
-          chmod +x pnpm
-          sudo mv pnpm /usr/local/bin/
+          corepack enable
           pnpm --version
           pnpm config set registry https://registry.npmjs.org
 
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Calculate Semantic Version (Dry Run)
         id: semantic
@@ -159,7 +170,7 @@ jobs:
 
   build-dev-arm64:
     name: Build Dev Image (arm64)
-    runs-on: [self-hosted, linux, arm64, m6g.xlarge, docker]
+    runs-on: [self-hosted, linux, arm64, m7g.xlarge, docker]
     needs: [calculate-version]
     if: |
       needs.calculate-version.outputs.should_build == 'true' &&
@@ -329,7 +340,7 @@ jobs:
 
   build-autopilot-runner-arm64:
     name: Build Autopilot Runner Image (arm64)
-    runs-on: [self-hosted, linux, arm64, m6g.medium, docker]
+    runs-on: [self-hosted, linux, arm64, m7g.medium, docker]
     needs: [calculate-version]
     if: |
       needs.calculate-version.outputs.should_build == 'true' &&
@@ -451,15 +462,27 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Install pnpm
+      - name: Enable Corepack (pnpm)
         run: |
-          curl -fsSL https://github.com/pnpm/pnpm/releases/download/v10.12.4/pnpm-linux-x64 -o pnpm
-          chmod +x pnpm
-          sudo mv pnpm /usr/local/bin/
+          corepack enable
+          pnpm --version
           pnpm config set registry https://registry.npmjs.org
 
+      - name: Get pnpm store path
+        id: pnpm-store
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Restore pnpm store cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Create Release and Tag
         env:

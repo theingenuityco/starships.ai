@@ -195,7 +195,7 @@ describe('LLM Node Handler', () => {
               },
               finish_reason: null,
               logprobs: null,
-            } as any,
+            } as unknown as OpenAI.Chat.Completions.ChatCompletionChunk['choices'][number],
           ],
         } as OpenAI.Chat.Completions.ChatCompletionChunk,
         {
@@ -214,8 +214,9 @@ describe('LLM Node Handler', () => {
       const response = responseItems[0].json as LLMResponse;
 
       expect(response.choices[0].message.content).toContain('Here you go.');
-      expect((response.choices[0].message as any).images).toBeDefined();
-      expect((response.choices[0].message as any).images[0].image_url.url).toBe(dataUrl);
+      const msg = response.choices[0].message as unknown as { images?: Array<{ image_url?: { url?: string } }> };
+      expect(msg.images).toBeDefined();
+      expect(msg.images?.[0]?.image_url?.url).toBe(dataUrl);
     });
   });
 

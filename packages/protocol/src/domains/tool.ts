@@ -74,8 +74,9 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
   // Foreign key relationships
   starshipId: string; // Tool belongs to a starship
 
-  // Template relationship (optional)
-  templateId?: string;
+  /** Template relationships (optional) */
+  sourceTemplateId?: string;
+  publishedTemplateId?: string;
 
   // ToolParams fields (made optional for draft support)
   parameters?: ToolParams['parameters'];
@@ -163,7 +164,9 @@ export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blue
   configuration?: Record<string, unknown>;
   isEnabled?: boolean;
   status?: ToolStatus; // Tool status: 'draft' or 'active'
-  templateId?: string; // optional template reference when creating directly from a template
+  // Template linkage (optional)
+  sourceTemplateId?: string;
+  publishedTemplateId?: string;
   version?: string; // Semantic version (defaults to '1.0.0' if not provided)
   templateSnapshotAt?: string; // When tool was created/synced from template
 }
@@ -172,7 +175,8 @@ export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blue
  * Request to update a tool instance
  */
 export type UpdateToolRequest = Partial<CreateToolRequest> & {
-  templateId?: string;
+  sourceTemplateId?: string;
+  publishedTemplateId?: string;
   version?: string;
   templateSnapshotAt?: string;
 };

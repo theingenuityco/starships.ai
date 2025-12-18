@@ -39,12 +39,11 @@ export class ToolRepository extends BaseRepository {
         const tool = fromDatabase(ToolEntity, result);
 
         // If tool has a template, fetch it and populate updateInfo
-        if (tool.templateId) {
+        if (tool.sourceTemplateId) {
           const connection = this.getConnection();
-          const templateResult = await connection.queryOne<Record<string, unknown>>(
-            'SELECT * FROM tool_templates WHERE id = $1',
-            [tool.templateId]
-          );
+          const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE id = $1', [
+            tool.sourceTemplateId,
+          ]);
 
           if (templateResult) {
             const template = fromDatabase(ToolTemplateEntity, templateResult);
@@ -89,7 +88,7 @@ export class ToolRepository extends BaseRepository {
         const tools = fromDatabaseArray(ToolEntity, result);
 
         // Collect unique template IDs
-        const templateIds = [...new Set(tools.filter(t => t.templateId).map(t => t.templateId))];
+        const templateIds = [...new Set(tools.filter((t) => t.sourceTemplateId).map((t) => t.sourceTemplateId))];
 
         // If there are templates, fetch them in a single query
         if (templateIds.length > 0) {
@@ -108,8 +107,8 @@ export class ToolRepository extends BaseRepository {
 
           // Populate updateInfo for each tool with a template
           for (const tool of tools) {
-            if (tool.templateId) {
-              const template = templateMap.get(tool.templateId);
+            if (tool.sourceTemplateId) {
+              const template = templateMap.get(tool.sourceTemplateId);
               if (template) {
                 const comparison = compareVersions(tool.version, template.version);
                 tool.updateInfo = {
@@ -142,11 +141,10 @@ export class ToolRepository extends BaseRepository {
         const tool = fromDatabase(ToolEntity, result);
 
         // If tool has a template, fetch it and populate updateInfo
-        if (tool.templateId) {
-          const templateResult = await connection.queryOne<Record<string, unknown>>(
-            'SELECT * FROM tool_templates WHERE id = $1',
-            [tool.templateId]
-          );
+        if (tool.sourceTemplateId) {
+          const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE id = $1', [
+            tool.sourceTemplateId,
+          ]);
 
           if (templateResult) {
             const template = fromDatabase(ToolTemplateEntity, templateResult);
@@ -183,7 +181,7 @@ export class ToolRepository extends BaseRepository {
         }
 
         const result = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM tools WHERE template_id = $1 AND starship_id = $2 ORDER BY created_at DESC LIMIT 1',
+          'SELECT * FROM tools WHERE source_template_id = $1 AND starship_id = $2 ORDER BY created_at DESC LIMIT 1',
           [template.id, starshipId]
         );
 
@@ -249,6 +247,9 @@ export class ToolRepository extends BaseRepository {
       async () => {
         const now = new Date().toISOString();
 
+        const sourceTemplateId = data.sourceTemplateId;
+        const publishedTemplateId = (data as any).publishedTemplateId as string | undefined;
+
         // Determine a globally-unique slug
         // Creation no longer accepts client-provided slug; derive from name and ensure uniqueness with suffix
         const baseFromName = (data.name || 'tool')
@@ -278,7 +279,8 @@ export class ToolRepository extends BaseRepository {
 
           // Relationship field
           starshipId: starshipId,
-          ...(data.templateId ? { templateId: data.templateId } : {}),
+          ...(sourceTemplateId ? { sourceTemplateId } : {}),
+          ...(publishedTemplateId ? { publishedTemplateId } : {}),
 
           // Versioning fields
           version: (data as UpdateToolRequest).version || '1.0.0',
@@ -307,8 +309,10 @@ export class ToolRepository extends BaseRepository {
   async update(id: string, updates: UpdateToolRequest): Promise<ToolModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        const sourceTemplateId = updates.sourceTemplateId;
         const updateProps = {
           ...updates,
+          ...(sourceTemplateId !== undefined ? { sourceTemplateId } : {}),
           updatedAt: new Date().toISOString(),
         };
 
@@ -393,7 +397,7 @@ export class ToolRepository extends BaseRepository {
           condition: template.condition,
           // Use unique slug derived from template slug (always suffix like agents)
           slug: await generateUniqueToolSlug(template.slug, this),
-          templateId: template.id,
+          sourceTemplateId: template.id,
           configuration: configuration || {},
           isEnabled: true,
           version: template.version, // Copy template version
@@ -427,7 +431,7 @@ export class ToolRepository extends BaseRepository {
         const result = await connection.queryOne<Record<string, unknown>>(
           `SELECT tt.*
            FROM tool_templates tt
-           JOIN tools t ON t.template_id = tt.id
+           JOIN tools t ON t.source_template_id = tt.id
            WHERE t.id = $1`,
           [toolId]
         );
@@ -448,7 +452,8 @@ export class ToolRepository extends BaseRepository {
         const tool = await this.findById(toolId);
 
         // No template = no updates available
-        if (!tool?.templateId) {
+        const sourceTemplateId = tool?.sourceTemplateId;
+        if (!tool || !sourceTemplateId) {
           return {
             needsUpdate: false,
             currentVersion: tool?.version || '1.0.0',
@@ -457,7 +462,7 @@ export class ToolRepository extends BaseRepository {
         }
 
         const templateRepo = new ToolTemplateRepository();
-        const template = await templateRepo.findById(tool.templateId);
+        const template = await templateRepo.findById(sourceTemplateId);
 
         if (!template) {
           return {
@@ -482,7 +487,7 @@ export class ToolRepository extends BaseRepository {
         }
 
         if (!isValidVersion(latestVersion)) {
-          console.warn(`Invalid template version format for template ${tool.templateId}: ${latestVersion}`);
+          console.warn(`Invalid template version format for template ${sourceTemplateId}: ${latestVersion}`);
           return {
             needsUpdate: false,
             currentVersion,
@@ -527,15 +532,16 @@ export class ToolRepository extends BaseRepository {
           this.handleNotFound('Tool', toolId);
         }
 
-        if (!tool.templateId) {
+        const sourceTemplateId = tool.sourceTemplateId;
+        if (!sourceTemplateId) {
           throw new Error('Tool is not linked to a template');
         }
 
         const templateRepo = new ToolTemplateRepository();
-        const template = await templateRepo.findById(tool.templateId);
+        const template = await templateRepo.findById(sourceTemplateId);
 
         if (!template) {
-          this.handleNotFound('ToolTemplate', tool.templateId);
+          this.handleNotFound('ToolTemplate', sourceTemplateId);
         }
 
         // Copy current template data to tool
@@ -653,7 +659,7 @@ export class ToolRepository extends BaseRepository {
         const toolsWithUpdates: ToolModel[] = [];
 
         for (const tool of tools) {
-          if (!tool.templateId) continue;
+          if (!tool.sourceTemplateId) continue;
 
           const updateCheck = await this.checkForUpdate(tool.id);
           if (updateCheck.needsUpdate) {

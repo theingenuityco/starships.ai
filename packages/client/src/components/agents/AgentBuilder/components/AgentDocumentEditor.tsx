@@ -162,7 +162,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
       if (!hasParams || !hasBlueprint) return false
 
-      const isNewTemplate = !tool.templateId
+      const isNewTemplate = !tool.publishedTemplateId
       const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
       return isNewTemplate || hasTemplateUpdate
     })
@@ -1012,7 +1012,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                           }
                           if (existing.changelog && existing.changelog.trim()) continue
 
-                          const isNewTemplate = !tool.templateId
+                          const isNewTemplate = !tool.publishedTemplateId
                           const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
 
                           let defaultLog: string

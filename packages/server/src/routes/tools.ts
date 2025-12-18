@@ -722,8 +722,8 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
       nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
     }
 
-    // Determine target template (templateId or new template)
-    let targetTemplateId = tool.templateId;
+    // Determine target template (publishedTemplateId or new template)
+    let targetTemplateId = (tool as any).publishedTemplateId as string | undefined;
 
     if (targetTemplateId) {
       const existingTemplate = await templateRepository.findById(targetTemplateId);
@@ -765,8 +765,7 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
     // Persist publication metadata on tool
     const updated = await toolRepository.update(toolId, {
       version: nextVersion,
-      templateId: targetTemplateId,
-      templateSnapshotAt: new Date().toISOString(),
+      publishedTemplateId: targetTemplateId,
       publicationStatus: 'published',
       publicationApprovedBy: adminUserId,
       publicationApprovedAt: new Date().toISOString(),

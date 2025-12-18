@@ -98,7 +98,7 @@ async function removeLegacyBlueprintTools(starshipId: string): Promise<{
 
     // Find all tools in this starship that were created from any legacy template
     const allTools = await toolRepo.findByStarship(starshipId);
-    const toolsToRemove = allTools.filter((tool) => tool.templateId && legacyTemplateIds.includes(tool.templateId));
+    const toolsToRemove = allTools.filter((tool) => tool.sourceTemplateId && legacyTemplateIds.includes(tool.sourceTemplateId));
 
     if (toolsToRemove.length === 0) {
       logger.info(`No legacy blueprint tools to remove from starship ${starshipId}`);
@@ -215,8 +215,8 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
     const existingTools = await toolRepo.findByStarship(starshipId);
 
     // Ensure modify-node tool exists
-    const hasModifyNode = existingTools.some((tool) => tool.templateId === modifyNodeTemplate.id);
-    let modifyNodeTool = existingTools.find((tool) => tool.templateId === modifyNodeTemplate.id);
+    const hasModifyNode = existingTools.some((tool) => tool.sourceTemplateId === modifyNodeTemplate.id);
+    let modifyNodeTool = existingTools.find((tool) => tool.sourceTemplateId === modifyNodeTemplate.id);
 
     if (!hasModifyNode) {
       try {
@@ -235,8 +235,8 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
     }
 
     // Ensure modify-edge tool exists
-    const hasModifyEdge = existingTools.some((tool) => tool.templateId === modifyEdgeTemplate.id);
-    let modifyEdgeTool = existingTools.find((tool) => tool.templateId === modifyEdgeTemplate.id);
+    const hasModifyEdge = existingTools.some((tool) => tool.sourceTemplateId === modifyEdgeTemplate.id);
+    let modifyEdgeTool = existingTools.find((tool) => tool.sourceTemplateId === modifyEdgeTemplate.id);
 
     if (!hasModifyEdge) {
       try {
@@ -255,8 +255,8 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
     }
 
     // Ensure list-connectors tool exists
-    const hasConnectorsList = existingTools.some((tool) => tool.templateId === connectorsListTemplate.id);
-    let connectorsListTool = existingTools.find((tool) => tool.templateId === connectorsListTemplate.id);
+    const hasConnectorsList = existingTools.some((tool) => tool.sourceTemplateId === connectorsListTemplate.id);
+    let connectorsListTool = existingTools.find((tool) => tool.sourceTemplateId === connectorsListTemplate.id);
 
     if (!hasConnectorsList) {
       try {

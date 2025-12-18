@@ -115,7 +115,9 @@ export class AvatarGenerationService {
       // IMPORTANT: We intentionally do NOT inject any system prompt.
       // The agent blueprint reads messages from state.messages; we provide only the mirror prompt as input.
       messages: [{ role: 'user', content: user }],
-      tools: Array.isArray(options.agentTools) ? options.agentTools : [],
+      // IMPORTANT: Do NOT provide tools for mirror generation.
+      // This should be a pure text completion so tool calling can't interfere.
+      tools: [],
     };
 
     const engineConfig = {
@@ -300,6 +302,27 @@ export class AvatarGenerationService {
     } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
 
     let lastDebug: Record<string, unknown> | undefined;
+    const safeStringifyForDebug = (value: unknown, maxChars = 8000): string => {
+      try {
+        const s = JSON.stringify(value, (_k, v) => {
+          if (typeof v === 'string') {
+            // Never dump full data URLs into logs.
+            if (v.startsWith('data:image/')) {
+              return `<data:image/... len=${v.length}>`;
+            }
+            // Avoid flooding logs with huge strings.
+            if (v.length > 800) {
+              return `${v.slice(0, 800)}…(len=${v.length})`;
+            }
+          }
+          return v;
+        });
+        if (typeof s !== 'string') return String(s);
+        return s.length > maxChars ? `${s.slice(0, maxChars)}…(len=${s.length})` : s;
+      } catch (err) {
+        return `[unstringifiable:${err instanceof Error ? err.message : String(err)}]`;
+      }
+    };
 
     const buildBlueprint = (messages: Array<{ role: string; content: string }>): Blueprint => ({
       nodes: [
@@ -421,6 +444,13 @@ export class AvatarGenerationService {
       const choices = responseRec?.choices;
       const choice0 = Array.isArray(choices) ? choices[0] : undefined;
       const choice0Rec = isRecord(choice0) ? choice0 : undefined;
+      const finishReason =
+        (choice0Rec && typeof (choice0Rec as AnyRecord).finishReason === 'string'
+          ? ((choice0Rec as AnyRecord).finishReason as string)
+          : undefined) ??
+        (choice0Rec && typeof (choice0Rec as AnyRecord).finish_reason === 'string'
+          ? ((choice0Rec as AnyRecord).finish_reason as string)
+          : undefined);
 
       // Prefer: choice.message → choice.delta → choice itself (some providers flatten)
       const msgCandidate =
@@ -463,6 +493,7 @@ export class AvatarGenerationService {
         llmNodeJsonKeys: isRecord(llmNodeJson) ? Object.keys(llmNodeJson) : [],
         hasChoices: isRecord(response) && Array.isArray((response as AnyRecord).choices),
         choice0Keys: isRecord(choice0) ? Object.keys(choice0) : [],
+        finishReason,
         hasMessage: !!message,
         messageKeys: isRecord(message) ? Object.keys(message) : [],
         contentType:
@@ -470,6 +501,10 @@ export class AvatarGenerationService {
         imagesCount: isRecord(message) && Array.isArray(message.images) ? message.images.length : 0,
         textPreview: typeof text === 'string' ? text.slice(0, 160) : undefined,
         responseModel: isRecord(response) ? (response as AnyRecord).model : undefined,
+        // Raw payload previews (truncated/sanitized) for debugging provider behavior.
+        responsePreview: safeStringifyForDebug(response),
+        choice0Preview: safeStringifyForDebug(choice0),
+        messagePreview: safeStringifyForDebug(message),
       };
     }
 

@@ -36,23 +36,46 @@ export class ToolRepository extends BaseRepository {
         const result = await super.findEntityById<Record<string, unknown>>('tools', id);
         if (!result) return null;
 
-        const tool = fromDatabase(ToolEntity, result);
+        const tool = fromDatabase(ToolEntity, result) as ToolModel;
 
-        // If tool has a template, fetch it and populate updateInfo
-        if (tool.sourceTemplateId) {
-          const connection = this.getConnection();
-          const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE id = $1', [
-            tool.sourceTemplateId,
-          ]);
+        // If tool has template relationships, fetch templates and populate:
+        // - sourceTemplateSlug / publishedTemplateSlug
+        // - updateInfo (prefer published template; fallback to source template)
+        const connection = this.getConnection();
+        const templateIds = [tool.sourceTemplateId, tool.publishedTemplateId].filter((v): v is string => !!v);
+        if (templateIds.length > 0) {
+          const placeholders = templateIds.map((_, idx) => `$${idx + 1}`).join(', ');
+          const templates = await connection.query<Record<string, unknown>>(
+            `SELECT * FROM tool_templates WHERE id IN (${placeholders})`,
+            templateIds
+          );
 
-          if (templateResult) {
-            const template = fromDatabase(ToolTemplateEntity, templateResult);
-            const comparison = compareVersions(tool.version, template.version);
-            tool.updateInfo = {
-              needsUpdate: comparison < 0,
-              latestVersion: template.version,
-              templateUpdatedAt: template.updatedAt,
-            };
+          const templateMap = new Map<string, ToolTemplateModel>();
+          for (const row of templates) {
+            const t = fromDatabase(ToolTemplateEntity, row);
+            templateMap.set(t.id, t);
+          }
+
+          if (tool.sourceTemplateId) {
+            const t = templateMap.get(tool.sourceTemplateId);
+            if (t) tool.sourceTemplateSlug = t.slug;
+          }
+          if (tool.publishedTemplateId) {
+            const t = templateMap.get(tool.publishedTemplateId);
+            if (t) tool.publishedTemplateSlug = t.slug;
+          }
+
+          const preferredTemplateId = tool.publishedTemplateId || tool.sourceTemplateId;
+          if (preferredTemplateId) {
+            const preferred = templateMap.get(preferredTemplateId);
+            if (preferred) {
+              const comparison = compareVersions(tool.version, preferred.version);
+              tool.updateInfo = {
+                needsUpdate: comparison < 0,
+                latestVersion: preferred.version,
+                templateUpdatedAt: preferred.updatedAt,
+              };
+            }
           }
         }
 
@@ -85,10 +108,10 @@ export class ToolRepository extends BaseRepository {
           'SELECT * FROM tools WHERE starship_id = $1 ORDER BY created_at DESC',
           [starshipId]
         );
-        const tools = fromDatabaseArray(ToolEntity, result);
+        const tools = fromDatabaseArray(ToolEntity, result) as ToolModel[];
 
-        // Collect unique template IDs
-        const templateIds = [...new Set(tools.filter((t) => t.sourceTemplateId).map((t) => t.sourceTemplateId))];
+        // Collect unique template IDs (source + published)
+        const templateIds = [...new Set(tools.flatMap((t) => [t.sourceTemplateId, t.publishedTemplateId]).filter((v): v is string => !!v))];
 
         // If there are templates, fetch them in a single query
         if (templateIds.length > 0) {
@@ -105,19 +128,34 @@ export class ToolRepository extends BaseRepository {
             templateMap.set(templateModel.id, templateModel);
           }
 
-          // Populate updateInfo for each tool with a template
+          // Populate template slugs + updateInfo for each tool.
+          // For updateInfo, prefer publishedTemplateId (if present) so "current template"
+          // reflects the template the tool is actually published to; otherwise use sourceTemplateId.
           for (const tool of tools) {
-            if (tool.sourceTemplateId) {
-              const template = templateMap.get(tool.sourceTemplateId);
-              if (template) {
-                const comparison = compareVersions(tool.version, template.version);
-                tool.updateInfo = {
-                  needsUpdate: comparison < 0,
-                  latestVersion: template.version,
-                  templateUpdatedAt: template.updatedAt,
-                };
-              }
+            const sourceTemplateId = tool.sourceTemplateId;
+            const publishedTemplateId = tool.publishedTemplateId;
+
+            if (sourceTemplateId) {
+              const t = templateMap.get(sourceTemplateId);
+              if (t) tool.sourceTemplateSlug = t.slug;
             }
+            if (publishedTemplateId) {
+              const t = templateMap.get(publishedTemplateId);
+              if (t) tool.publishedTemplateSlug = t.slug;
+            }
+
+            const preferredTemplateId = publishedTemplateId || sourceTemplateId;
+            if (!preferredTemplateId) continue;
+
+            const preferred = templateMap.get(preferredTemplateId);
+            if (!preferred) continue;
+
+            const comparison = compareVersions(tool.version, preferred.version);
+            tool.updateInfo = {
+              needsUpdate: comparison < 0,
+              latestVersion: preferred.version,
+              templateUpdatedAt: preferred.updatedAt,
+            };
           }
         }
 
@@ -138,22 +176,43 @@ export class ToolRepository extends BaseRepository {
         ]);
         if (!result) return null;
 
-        const tool = fromDatabase(ToolEntity, result);
+        const tool = fromDatabase(ToolEntity, result) as ToolModel;
 
-        // If tool has a template, fetch it and populate updateInfo
-        if (tool.sourceTemplateId) {
-          const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE id = $1', [
-            tool.sourceTemplateId,
-          ]);
+        // Populate template slugs + updateInfo (prefer published template; fallback to source template)
+        const templateIds = [tool.sourceTemplateId, tool.publishedTemplateId].filter((v): v is string => !!v);
+        if (templateIds.length > 0) {
+          const placeholders = templateIds.map((_, idx) => `$${idx + 1}`).join(', ');
+          const templates = await connection.query<Record<string, unknown>>(
+            `SELECT * FROM tool_templates WHERE id IN (${placeholders})`,
+            templateIds
+          );
 
-          if (templateResult) {
-            const template = fromDatabase(ToolTemplateEntity, templateResult);
-            const comparison = compareVersions(tool.version, template.version);
-            tool.updateInfo = {
-              needsUpdate: comparison < 0,
-              latestVersion: template.version,
-              templateUpdatedAt: template.updatedAt,
-            };
+          const templateMap = new Map<string, ToolTemplateModel>();
+          for (const row of templates) {
+            const t = fromDatabase(ToolTemplateEntity, row);
+            templateMap.set(t.id, t);
+          }
+
+          if (tool.sourceTemplateId) {
+            const t = templateMap.get(tool.sourceTemplateId);
+            if (t) tool.sourceTemplateSlug = t.slug;
+          }
+          if (tool.publishedTemplateId) {
+            const t = templateMap.get(tool.publishedTemplateId);
+            if (t) tool.publishedTemplateSlug = t.slug;
+          }
+
+          const preferredTemplateId = tool.publishedTemplateId || tool.sourceTemplateId;
+          if (preferredTemplateId) {
+            const preferred = templateMap.get(preferredTemplateId);
+            if (preferred) {
+              const comparison = compareVersions(tool.version, preferred.version);
+              tool.updateInfo = {
+                needsUpdate: comparison < 0,
+                latestVersion: preferred.version,
+                templateUpdatedAt: preferred.updatedAt,
+              };
+            }
           }
         }
 
@@ -248,7 +307,7 @@ export class ToolRepository extends BaseRepository {
         const now = new Date().toISOString();
 
         const sourceTemplateId = data.sourceTemplateId;
-        const publishedTemplateId = (data as any).publishedTemplateId as string | undefined;
+        const publishedTemplateId = data.publishedTemplateId;
 
         // Determine a globally-unique slug
         // Creation no longer accepts client-provided slug; derive from name and ensure uniqueness with suffix

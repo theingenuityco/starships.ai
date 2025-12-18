@@ -188,6 +188,7 @@ export class LLM extends BaseNode<LlmParams> {
       // the host returns an AsyncIterable of provider-native chunks.
       const modalities = this.coerceMaybeJson<Array<'text' | 'image'>>(params.modalities);
       const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
+      const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
       const stream = await hostRuntime.llm({
         model: params.model,
         messages: this.convertMessagesToOpenAI(sourceMessages),
@@ -198,6 +199,7 @@ export class LLM extends BaseNode<LlmParams> {
         frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
         presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
         reasoning: params.reasoning,
+        ...(typeof streamFlag === 'boolean' ? { stream: streamFlag } : {}),
         ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
         ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),
       });
@@ -504,6 +506,37 @@ export class LLM extends BaseNode<LlmParams> {
           content += piece;
         }
 
+        // Non-stream compatibility: when the host runtime wraps a non-stream completion as a
+        // single "chunk-like" object, there may be no delta at all and the full content only
+        // exists on choice.message.content. In that case, populate our accumulator from the
+        // message snapshot.
+        //
+        // NOTE: We only do this when we haven't accumulated any content yet, so we don't
+        // overwrite a genuine streaming accumulation.
+        if (!content) {
+          const msg = (choice as unknown as { message?: unknown }).message as unknown;
+          if (msg && typeof msg === 'object') {
+            const msgRec = msg as Record<string, unknown>;
+            const msgContent = msgRec.content;
+            if (typeof msgContent === 'string') {
+              content = msgContent;
+            } else if (Array.isArray(msgContent)) {
+              // OpenAI/OpenRouter multimodal content blocks; extract text blocks only
+              const textParts: string[] = [];
+              for (const part of msgContent as unknown[]) {
+                if (!part || typeof part !== 'object') continue;
+                const p = part as Record<string, unknown>;
+                if (p.type === 'text' && typeof p.text === 'string') {
+                  textParts.push(p.text);
+                }
+              }
+              if (textParts.length > 0) {
+                content = textParts.join('');
+              }
+            }
+          }
+        }
+
         // Capture image generation outputs.
         // OpenRouter image models may return:
         // - message.images[] (OpenRouter extension)
@@ -693,6 +726,36 @@ export class LLM extends BaseNode<LlmParams> {
                 });
               }
             }
+          }
+        }
+
+        // Non-stream compatibility: tool calls may be present only on the message snapshot
+        // (choice.message.tool_calls) when stream=false.
+        if (toolCalls.length === 0) {
+          try {
+            const msg = (choice as unknown as { message?: unknown }).message as unknown;
+            if (msg && typeof msg === 'object') {
+              const msgRec = msg as Record<string, unknown>;
+              const rawToolCalls = msgRec.tool_calls as unknown;
+              if (Array.isArray(rawToolCalls) && rawToolCalls.length > 0) {
+                for (const raw of rawToolCalls) {
+                  if (!raw || typeof raw !== 'object') continue;
+                  const tc = raw as Record<string, unknown>;
+                  const fn = tc.function as unknown;
+                  const fnRec = fn && typeof fn === 'object' ? (fn as Record<string, unknown>) : undefined;
+                  const name = fnRec && typeof fnRec.name === 'string' ? fnRec.name : '';
+                  const args = fnRec && typeof fnRec.arguments === 'string' ? fnRec.arguments : '';
+                  if (!name) continue;
+                  toolCalls.push({
+                    id: typeof tc.id === 'string' ? tc.id : undefined,
+                    type: 'function',
+                    function: { name, arguments: args },
+                  });
+                }
+              }
+            }
+          } catch {
+            // Non-fatal: ignore tool call extraction failures
           }
         }
 

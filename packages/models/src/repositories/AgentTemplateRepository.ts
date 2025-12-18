@@ -10,11 +10,29 @@ export class AgentTemplateRepository extends BaseRepository {
     super('AgentTemplateRepository');
   }
 
+  private toPublicModel(model: AgentTemplateModel & Record<string, unknown>): AgentTemplateModel {
+    const hasAvatar = typeof (model as any).avatarS3Key === 'string' && String((model as any).avatarS3Key).length > 0;
+    const avatarUrl = hasAvatar ? `/api/v1/agent-templates/${model.id}/avatar` : undefined;
+    const avatarUpdatedAt =
+      typeof (model as any).avatarUpdatedAt === 'string' && (model as any).avatarUpdatedAt.length > 0
+        ? (model as any).avatarUpdatedAt
+        : undefined;
+
+    // Never expose raw S3 pointers to clients
+    const { avatarS3Key: _k, avatarMimeType: _m, ...rest } = model as any;
+    return {
+      ...(rest as AgentTemplateModel),
+      ...(avatarUrl ? { avatarUrl } : {}),
+      ...(avatarUpdatedAt ? { avatarUpdatedAt } : {}),
+    };
+  }
+
   async findAll(): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         const result = await super.findAllEntities<Record<string, unknown>>('agent_templates', 'created_at DESC');
-        return fromDatabaseArray(AgentTemplateEntity, result);
+        const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
+        return templates.map((t) => this.toPublicModel(t));
       },
       'findAll',
       'AgentTemplate'
@@ -33,7 +51,7 @@ export class AgentTemplateRepository extends BaseRepository {
           return null;
         }
 
-        const baseTemplate = fromDatabase(AgentTemplateEntity, result);
+        const baseTemplate = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
 
         // Get assigned tool template slugs from junction table
         const connection = this.getConnection();
@@ -48,10 +66,10 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const assignedToolSlugs = toolResults.map((result) => result.slug);
 
-        return {
+        return this.toPublicModel({
           ...baseTemplate,
           assignedToolSlugs,
-        };
+        } as AgentTemplateModel & Record<string, unknown>);
       },
       'findById',
       'AgentTemplate',
@@ -68,7 +86,9 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE slug = $1', [slug]);
-        return result ? fromDatabase(AgentTemplateEntity, result) : null;
+        if (!result) return null;
+        const template = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
+        return this.toPublicModel(template);
       },
       'findBySlug',
       'AgentTemplate',

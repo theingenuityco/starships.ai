@@ -16,6 +16,9 @@ export { MessageService } from './MessageService';
 // Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';
 
+// Avatar generation (OpenRouter image models via Autopilot runner)
+export { AvatarGenerationService } from './AvatarGenerationService';
+
 // Agent execution services (replacing agents/ directory)
 export { ToolService } from './ToolService';
 

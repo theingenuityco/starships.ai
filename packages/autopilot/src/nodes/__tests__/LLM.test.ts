@@ -159,6 +159,64 @@ describe('LLM Node Handler', () => {
         })
       );
     });
+
+    it('should preserve OpenRouter image generation outputs (message.images)', async () => {
+      const params: LlmParams = {
+        model: 'google/gemini-2.5-flash-image',
+        messages: [{ role: 'user', content: 'Generate a square avatar image.' }],
+        // These are passed through by the LLM node; runner adds image_config snake_case
+        modalities: ['image', 'text'],
+        imageConfig: { aspect_ratio: '1:1' },
+      };
+
+      const dataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAAB';
+
+      const mockStream = createMockStream([
+        {
+          id: 'img-1',
+          model: 'google/gemini-2.5-flash-image',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'Here you go.' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+        {
+          id: 'img-1',
+          model: 'google/gemini-2.5-flash-image',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [
+            {
+              index: 0,
+              delta: {},
+              // OpenRouter extension: images on message snapshot
+              message: {
+                role: 'assistant',
+                images: [{ type: 'image_url', image_url: { url: dataUrl } }],
+              },
+              finish_reason: null,
+              logprobs: null,
+            } as any,
+          ],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+        {
+          id: 'img-1',
+          model: 'google/gemini-2.5-flash-image',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+      ]);
+
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
+
+      const llm = new LLM(params, { hostRuntime });
+      const responseItems = await llm.execute();
+      const response = responseItems[0].json as LLMResponse;
+
+      expect(response.choices[0].message.content).toContain('Here you go.');
+      expect((response.choices[0].message as any).images).toBeDefined();
+      expect((response.choices[0].message as any).images[0].image_url.url).toBe(dataUrl);
+    });
   });
 
   describe('Error Handling', () => {

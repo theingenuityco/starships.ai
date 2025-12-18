@@ -75,6 +75,12 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
    * - publishedTemplateId: where this agent is promoted to on publish.
    */
   publishedTemplateId?: string;
+
+  /**
+   * Optional avatar image for the agent, stored as an Attachment (S3-backed).
+   * This is auth-scoped via starship access and served through the attachments endpoints.
+   */
+  avatarAttachmentId?: string;
 }
 
 // ============================================================================

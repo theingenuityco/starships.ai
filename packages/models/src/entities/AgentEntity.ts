@@ -46,6 +46,13 @@ export class AgentEntity implements AgentModel {
   @Length(1, 255)
   starshipId!: string;
 
+  // Optional avatar attachment ID (S3-backed image stored via AttachmentService)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  avatarAttachmentId?: string;
+
   @Expose()
   @IsOptional()
   @IsString()

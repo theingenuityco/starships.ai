@@ -14,6 +14,7 @@ import {
   Cacheable,
   CacheableSystemMessage,
   ContentBlock,
+  GeneratedImage,
   LLMMessageRole,
   LLMResponse,
   LLMUsage,
@@ -439,6 +440,7 @@ export class LLM extends BaseNode<LlmParams> {
     let usage: LLMUsage | undefined;
     let content = '';
     let reasoning = '';
+    let images: GeneratedImage[] = [];
     let toolCalls: Array<{
       id?: string;
       type: 'function';
@@ -500,6 +502,37 @@ export class LLM extends BaseNode<LlmParams> {
         if (choice.delta?.content) {
           const piece = choice.delta.content;
           content += piece;
+        }
+
+        // Capture image generation outputs (OpenRouter extension: message.images[])
+        try {
+          const extractImages = (node: unknown): GeneratedImage[] => {
+            if (!node || typeof node !== 'object') return [];
+            const rec = node as Record<string, unknown>;
+            const imgs = (rec as { images?: unknown }).images;
+            if (!Array.isArray(imgs) || imgs.length === 0) return [];
+            const out: GeneratedImage[] = [];
+            for (const it of imgs) {
+              if (!it || typeof it !== 'object') continue;
+              const item = it as Record<string, unknown>;
+              const type = item.type;
+              const imageUrl = (item as { image_url?: unknown }).image_url;
+              if (type !== 'image_url' || !imageUrl || typeof imageUrl !== 'object') continue;
+              const url = (imageUrl as { url?: unknown }).url;
+              if (typeof url !== 'string' || url.length === 0) continue;
+              out.push({ type: 'image_url', image_url: { url } });
+            }
+            return out;
+          };
+
+          const fromDelta = extractImages((choice as unknown as { delta?: unknown }).delta);
+          const fromMessage = extractImages((choice as unknown as { message?: unknown }).message);
+          const next = fromDelta.length > 0 ? fromDelta : fromMessage;
+          if (next.length > 0) {
+            images = next;
+          }
+        } catch {
+          // Non-fatal: ignore image extraction failures
         }
 
         // Accumulate reasoning text from OpenRouter reasoning-capable models
@@ -689,6 +722,10 @@ export class LLM extends BaseNode<LlmParams> {
               const existing = (choice0 as unknown as { message?: NormalizedMessage }).message ?? ({} as NormalizedMessage);
               const nextMessage: NormalizedMessage = { ...(existing as NormalizedMessage) } as NormalizedMessage;
               (nextMessage as unknown as { content?: string }).content = content;
+              // If we have images and provider didn't supply them, synthesize them for consumers
+              if (images.length > 0 && !(existing as unknown as { images?: unknown }).images) {
+                (nextMessage as unknown as { images?: GeneratedImage[] }).images = images;
+              }
               // Only synthesize toolCalls if provider didn't supply them
               if (!existing.toolCalls || (Array.isArray(existing.toolCalls) && existing.toolCalls.length === 0)) {
                 if (current.length > 0) nextMessage.toolCalls = current;
@@ -784,6 +821,7 @@ export class LLM extends BaseNode<LlmParams> {
               role: 'assistant' as LLMMessageRole,
               content,
               ...(reasoning ? { reasoning } : {}),
+              ...(images.length > 0 ? { images } : {}),
               ...(parsedToolCalls.length > 0 ? { toolCalls: parsedToolCalls } : {}),
             },
             finishReason: finishReason || 'stop',

@@ -23,6 +23,7 @@ import { createConnection } from '@/helpers/database';
 import { logger } from '@/helpers/logging';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
+import { ToolRepository } from '@/repositories/ToolRepository';
 import { ALL_AGENT_TEMPLATES } from '@/seeders/agents';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
 
@@ -112,6 +113,7 @@ async function resolveTargetStarship(db: ReturnType<typeof createConnection>, ar
 }
 
 type ParentCheckRow = { id: string; slug: string; starship_id: string | null };
+type ChildOnStarshipRow = { id: string; slug: string; deployed_at: string | null; created_at: string };
 
 export async function migrateSeededTemplateParents(args: Args): Promise<void> {
   const env = getEnvConfig();
@@ -141,12 +143,38 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
       metadata: { starshipId: target.id, ownerId: target.owner_id },
     });
 
+    // publication_approved_by is a FK → users(id). For publication flows we want
+    // a real instance admin user id (mirrors the service-level approve logic).
+    const instanceAdmin = await db.queryOne<{ id: string; email?: string | null }>(
+      `
+      SELECT id, email
+      FROM users
+      WHERE is_instance_admin = true
+      ORDER BY created_at ASC
+      LIMIT 1
+      `
+    );
+    if (!instanceAdmin?.id) {
+      throw new Error(
+        'No instance admin user found (users.is_instance_admin = true). Create/mark an instance admin user first, then re-run.'
+      );
+    }
+    const approverUserId = instanceAdmin.id;
+    logger.info(`Using instance admin for publication approval`, {
+      component: 'migrate-seeded-template-parents',
+      metadata: { approverUserId, approverEmail: instanceAdmin.email ?? undefined },
+    });
+
     const agentRepo = new AgentRepository();
     const templateRepo = new AgentTemplateRepository();
+    const toolRepo = new ToolRepository();
 
     let templatesFound = 0;
     let alreadyHadParent = 0;
+    let promotedExisting = 0;
     let parentsCreated = 0;
+    let toolsDeployed = 0;
+    let agentToolLinksEnsured = 0;
     let skippedMissingTemplate = 0;
     let errors = 0;
 
@@ -164,6 +192,10 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
         }
         templatesFound++;
 
+        // Reload via findById so assignedToolSlugs is reliably populated from relationships.
+        const templateWithTools = await templateRepo.findById(template.id);
+        const assignedToolTemplateSlugs = templateWithTools?.assignedToolSlugs || [];
+
         const existingParent = await db.queryOne<ParentCheckRow>(
           'SELECT id, slug, starship_id FROM agents WHERE published_template_id = $1 LIMIT 1',
           [template.id]
@@ -179,6 +211,131 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
         }
 
         const now = new Date().toISOString();
+
+        // Ensure tool instances exist on the target starship for every tool template
+        // referenced by this AgentTemplate, and collect the deployed tool ids.
+        const deployedToolIds: string[] = [];
+        for (const toolTemplateSlug of assignedToolTemplateSlugs) {
+          try {
+            let existingTool = await toolRepo.findByTemplateSlugAndStarship(toolTemplateSlug, target.id);
+            if (!existingTool) {
+              if (args.dryRun) {
+                logger.info(`[DRY-RUN] Would deploy tool from template "${toolTemplateSlug}" to starship ${target.slug}`, {
+                  component: 'migrate-seeded-template-parents',
+                  operation: 'deployToolFromTemplate',
+                  metadata: { toolTemplateSlug, starshipId: target.id, templateSlug: template.slug },
+                });
+              } else {
+                existingTool = await toolRepo.createFromTemplate(toolTemplateSlug, target.id);
+                toolsDeployed++;
+                logger.info(`✅ Deployed tool from template "${toolTemplateSlug}" to starship ${target.slug}`, {
+                  component: 'migrate-seeded-template-parents',
+                  operation: 'deployToolFromTemplate',
+                  metadata: { toolTemplateSlug, toolId: existingTool.id, starshipId: target.id, templateSlug: template.slug },
+                });
+              }
+            }
+
+            if (existingTool) {
+              deployedToolIds.push(existingTool.id);
+            }
+          } catch (toolErr) {
+            // Tool failures should not block agent parent backfill; log and continue.
+            logger.warn(
+              `Failed to ensure tool instance for tool template "${toolTemplateSlug}"`,
+              {
+                component: 'migrate-seeded-template-parents',
+                operation: 'deployToolFromTemplate',
+                metadata: { toolTemplateSlug, starshipId: target.id, templateSlug: template.slug },
+              },
+              toolErr as Error
+            );
+          }
+        }
+
+        // If this template is already deployed on the target starship as a child agent instance,
+        // "promote" that existing agent into the parent by only updating the linkage fields.
+        // This avoids creating a new agent and avoids overwriting any user customizations.
+        const existingChildOnTarget = await db.queryOne<ChildOnStarshipRow>(
+          `
+          SELECT id, slug, deployed_at, created_at
+          FROM agents
+          WHERE starship_id = $1 AND source_template_id = $2
+          ORDER BY created_at ASC
+          LIMIT 1
+          `,
+          [target.id, template.id]
+        );
+
+        if (existingChildOnTarget) {
+          if (args.dryRun) {
+            promotedExisting++;
+            logger.info(
+              `[DRY-RUN] Would promote existing deployed agent "${existingChildOnTarget.slug}" to parent for template "${template.slug}"`,
+              {
+                component: 'migrate-seeded-template-parents',
+                metadata: {
+                  templateId: template.id,
+                  agentId: existingChildOnTarget.id,
+                  agentSlug: existingChildOnTarget.slug,
+                  starshipId: target.id,
+                },
+              }
+            );
+            continue;
+          }
+
+          // IMPORTANT: Repository update cannot set sourceTemplateId to NULL (it omits undefined),
+          // so we do a direct SQL update to truly promote the child → parent.
+          await db.query(
+            `
+            UPDATE agents
+            SET
+              source_template_id = NULL,
+              template_snapshot_at = NULL,
+              publication_status = 'published',
+              publication_approved_by = $2,
+              publication_approved_at = $3,
+              published_template_id = $4,
+              publication_changelog = $5,
+              updated_at = NOW()
+            WHERE id = $1
+            `,
+            [
+              existingChildOnTarget.id,
+              approverUserId,
+              now,
+              template.id,
+              'Backfilled parent agent for seeded marketplace template (promoted existing deployed instance)',
+            ]
+          );
+
+          promotedExisting++;
+          logger.info(`✅ Promoted existing agent "${existingChildOnTarget.slug}" to parent for template "${template.slug}"`, {
+            component: 'migrate-seeded-template-parents',
+            metadata: { templateId: template.id, agentId: existingChildOnTarget.id, starshipId: target.id },
+          });
+
+          // Ensure the promoted parent has relationships to the deployed tool instances
+          // required by the template.
+          for (const toolId of deployedToolIds) {
+            try {
+              await agentRepo.addToolRelationship(existingChildOnTarget.id, toolId);
+              agentToolLinksEnsured++;
+            } catch (relErr) {
+              logger.warn(
+                `Failed to ensure agent-tool relationship for promoted parent agent`,
+                {
+                  component: 'migrate-seeded-template-parents',
+                  operation: 'addAgentToolRelationship',
+                  metadata: { agentId: existingChildOnTarget.id, toolId, templateSlug: template.slug, starshipId: target.id },
+                },
+                relErr as Error
+              );
+            }
+          }
+          continue;
+        }
 
         // Prefer using the template slug verbatim for the "parent" when available.
         // If taken, fall back to the normal unique slug pattern ({base}-{suffix}).
@@ -221,7 +378,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
           version: template.version,
           templateSnapshotAt: now,
           publicationStatus: 'published',
-          publicationApprovedBy: 'system',
+          publicationApprovedBy: approverUserId,
           publicationApprovedAt: now,
           publishedTemplateId: template.id,
           publicationChangelog: 'Backfilled parent agent for seeded marketplace template',
@@ -236,6 +393,24 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
           component: 'migrate-seeded-template-parents',
           metadata: { templateId: template.id, agentId: published.id, agentSlug: published.slug, starshipId: target.id },
         });
+
+        // Ensure new parent agent has relationships to the deployed tool instances required by the template.
+        for (const toolId of deployedToolIds) {
+          try {
+            await agentRepo.addToolRelationship(published.id, toolId);
+            agentToolLinksEnsured++;
+          } catch (relErr) {
+            logger.warn(
+              `Failed to ensure agent-tool relationship for created parent agent`,
+              {
+                component: 'migrate-seeded-template-parents',
+                operation: 'addAgentToolRelationship',
+                metadata: { agentId: published.id, toolId, templateSlug: template.slug, starshipId: target.id },
+              },
+              relErr as Error
+            );
+          }
+        }
       } catch (e) {
         errors++;
         logger.warn(
@@ -252,7 +427,10 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
     logger.info(`  Templates found in DB: ${templatesFound}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Missing templates skipped: ${skippedMissingTemplate}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Already had parent: ${alreadyHadParent}`, { component: 'migrate-seeded-template-parents' });
+    logger.info(`  Existing deployed agents promoted: ${promotedExisting}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Parent agents created: ${parentsCreated}`, { component: 'migrate-seeded-template-parents' });
+    logger.info(`  Tools deployed: ${toolsDeployed}`, { component: 'migrate-seeded-template-parents' });
+    logger.info(`  Agent→Tool links ensured: ${agentToolLinksEnsured}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Errors: ${errors}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Duration: ${Date.now() - startedAt}ms`, { component: 'migrate-seeded-template-parents' });
     logger.info('═══════════════════════════════════════════════════════════');

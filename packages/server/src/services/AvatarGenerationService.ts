@@ -25,10 +25,10 @@ export class AvatarGenerationService {
    * This is later persisted per-agent and fed into avatar generation.
    */
   async generateMirrorDescription(options: {
-    agentModel: string;
     agentName: string;
     agentDescription?: string;
-    agentSystemPrompt?: string;
+    agentBlueprint: Blueprint;
+    agentTools?: unknown[];
     starshipId: string;
     runtimeEnv?: Record<string, unknown>;
   }): Promise<{ description: string; model: string }> {
@@ -37,65 +37,69 @@ export class AvatarGenerationService {
       throw new Error('OPENROUTER_API_KEY not configured on server');
     }
 
-    const truncate = (s: unknown, max = 6000): string => {
+    const truncate = (s: unknown, max = 3000): string => {
       const v = typeof s === 'string' ? s : '';
       if (!v) return '';
       return v.length > max ? `${v.slice(0, max)}…` : v;
     };
 
-    const model = options.agentModel;
-
     const user = [
-      'You are the AI agent described below.',
-      '',
-      'AGENT SYSTEM PROMPT (your identity/persona):',
-      options.agentSystemPrompt ? truncate(options.agentSystemPrompt) : '(none provided)',
+      'You are writing an appearance prompt for your avatar.',
       '',
       'AGENT METADATA:',
       `- Name: ${options.agentName}`,
       options.agentDescription ? `- Description: ${truncate(options.agentDescription, 1200)}` : undefined,
       '',
       'TASK:',
-      'Look into a mirror and reply with what it sees.',
+      'Look into a mirror and reply with what it sees (your face).',
       '',
       'OUTPUT FORMAT (strict):',
-      '- 6–10 short bullet points describing your FACE for an anime character illustrator.',
-      '- Use anime-friendly descriptors (feature-focused): eye shape/size, iris color, eyebrow shape, nose/mouth simplicity, face shape, hair style/texture/color, and any subtle accessories.',
-      '- Include: gender presentation (if not specified elsewhere, choose one), age (adult), skin tone.',
-      '- Keep it friendly and professional. No NSFW. No real-person likeness or celebrity references.',
-      '- Do not mention camera settings, rendering, or "anime style" as a style choice; only describe what you look like (as a character).',
+      '- Output ONLY 6–10 bullet points. Each line must start with "- " (dash + space).',
+      '- The FIRST bullet must be exactly: "Gender: <male|female>".',
+      '- Choose exactly ONE of those two options. Do not add any other gender labels.',
+      '- Keep bullets short (phrases, not paragraphs). No preamble. No extra sections.',
+      '',
+      'WHAT TO DESCRIBE (required slots across the bullets):',
+      '- Adult age range (e.g. late 20s / early 30s)',
+      '- Skin tone',
+      '- Face shape + jawline',
+      '- Eyes: very large expressive eyes, eye shape, iris color, catchlights; bold upper lash line',
+      '- Eyebrows: thickness/shape',
+      '- Nose + mouth: simplified features (small nose, small mouth; minimal detail)',
+      '- Hair: style + texture + color + bangs/fringe if any',
+      '- Optional: ONE subtle accessory (e.g. small earrings, glasses) OR none',
+      '',
+      'CONSTRAINTS:',
+      '- Friendly and professional. No NSFW.',
+      '- No real-person likeness, no celebrity references, no copyrighted character references.',
+      '- Do NOT mention camera settings, rendering engines, or art styles. Only describe what you look like as a character.',
     ]
       .filter(Boolean)
       .join('\n');
 
-    const blueprint: Blueprint = {
-      nodes: [
-        { ref: 'start_1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        {
-          ref: 'llm_1',
-          type: 'llm',
-          name: 'Mirror description',
-          description: 'Ask agent to describe its appearance',
-          parameters: {
-            model,
-            messages: [{ role: 'user', content: user }],
-            maxTokens: 256,
-            temperature: 0.8,
-          },
-        },
-        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
-      ],
-      edges: [
-        { ref: 'e1', from: 'start_1', to: 'llm_1' },
-        { ref: 'e2', from: 'llm_1', to: 'end_1' },
-      ],
-      metadata: {},
-    };
+    const blueprint = options.agentBlueprint;
+    if (!blueprint || !Array.isArray(blueprint.nodes) || blueprint.nodes.length === 0) {
+      throw new Error('Agent blueprint is missing or empty; cannot generate avatarPrompt via agent blueprint');
+    }
+
+    // Pick a primary LLM node to extract text from. For default agent blueprints this is usually "ai_assistant".
+    const llmRefs = blueprint.nodes
+      .filter((n) => n && typeof n === 'object' && (n as { type?: unknown }).type === 'llm')
+      .map((n) => (n as { ref?: unknown }).ref)
+      .filter((r): r is string => typeof r === 'string' && r.trim().length > 0);
+    const llmNodeRef = llmRefs.length > 0 ? llmRefs[llmRefs.length - 1] : undefined;
+    if (!llmNodeRef) {
+      throw new Error('Agent blueprint contains no LLM node; cannot generate avatarPrompt via agent blueprint');
+    }
 
     const exec = ExecutionItemUtils.createExecution();
     exec.state = {
       ...(exec.state ?? {}),
       starshipId: options.starshipId,
+      // IMPORTANT: We intentionally do NOT inject any system prompt.
+      // The agent blueprint reads messages from state.messages; we provide only the mirror prompt as input.
+      messages: [{ role: 'user', content: user }],
+      tools: Array.isArray(options.agentTools) ? options.agentTools : [],
     };
 
     const engineConfig = {
@@ -109,29 +113,33 @@ export class AvatarGenerationService {
     const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
     const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
     if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
-      throw new Error(`Mirror description LLM node failed: ${firstError}`);
+      throw new Error(`Mirror description agent blueprint failed: ${firstError}`);
     }
 
     const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
       if (!Array.isArray(value)) return undefined;
-      for (const entry of value) {
+      // Take the last recorded output for the nodeRef
+      for (let i = value.length - 1; i >= 0; i--) {
+        const entry = value[i];
         if (!entry || typeof entry !== 'object') continue;
         const rec = entry as Record<string, unknown>;
         if (rec.nodeRef !== nodeRef) continue;
         const items = rec.items;
         if (!Array.isArray(items) || items.length === 0) return undefined;
-        const first = items[0];
-        if (!first || typeof first !== 'object') return undefined;
-        return (first as Record<string, unknown>).json;
+        const last = items[items.length - 1];
+        if (!last || typeof last !== 'object') return undefined;
+        return (last as Record<string, unknown>).json;
       }
       return undefined;
     };
 
     let llmNodeJson: unknown = llmJson;
     if (Array.isArray(llmJson)) {
-      const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
+      const extracted = extractNodeJsonFromExecutionResults(llmJson, llmNodeRef);
       if (typeof extracted === 'undefined') {
-        throw new Error('Mirror description workflow returned execution.results but did not include llm_1 output');
+        throw new Error(
+          `Mirror description agent blueprint returned execution.results but did not include output for nodeRef "${llmNodeRef}"`
+        );
       }
       llmNodeJson = extracted;
     }
@@ -162,7 +170,16 @@ export class AvatarGenerationService {
       throw new Error('Mirror description returned empty text');
     }
 
-    return { description: text, model };
+    // Model is not always present in responses; return the blueprint's primary llm node model if present.
+    const modelFromBlueprint = (() => {
+      const node = blueprint.nodes.find((n) => (n as { ref?: unknown })?.ref === llmNodeRef) as
+        | { parameters?: Record<string, unknown> }
+        | undefined;
+      const m = node?.parameters?.model;
+      return typeof m === 'string' ? m : '';
+    })();
+
+    return { description: text, model: modelFromBlueprint || 'unknown' };
   }
 
   /**
@@ -183,41 +200,66 @@ export class AvatarGenerationService {
 
     const model = 'google/gemini-2.5-flash-image';
 
+    const detectGender = (avatarPrompt: string | undefined): 'male' | 'female' | undefined => {
+      if (!avatarPrompt) return undefined;
+      const firstLine = avatarPrompt
+        .split('\n')
+        .map((l) => l.trim())
+        .find((l) => l.length > 0);
+      if (!firstLine) return undefined;
+      const m = firstLine.match(/^-\s*Gender:\s*(male|female)\s*$/i);
+      if (!m) return undefined;
+      const val = m[1].toLowerCase();
+      return val === 'male' || val === 'female' ? (val as 'male' | 'female') : undefined;
+    };
+
+    const gender = detectGender(options.subjectAvatarPrompt);
+
     const user = [
       'Generate a 1:1 (square) avatar image.',
       '',
-      'STARSHIPS ANIME AVATAR FRAMEWORK (must follow exactly):',
+      'STARSHIPS AVATAR SPEC (STRICT CHECKLIST — must satisfy all):',
       '',
-      'NON-NEGOTIABLE STYLE:',
-      '- 2D anime character portrait illustration (NOT photorealistic, NOT 3D).',
-      '- Clean, confident lineart; simplified shapes; no noisy texture.',
-      '- Strong anime facial features: larger expressive eyes, simplified nose/mouth, clean eyebrows.',
-      '- Cel shading ONLY: 2–3 tone shading max; no painterly rendering; no complex face gradients.',
-      '- Minimal detail: no skin pores, no micro-texture, no hyper-detailed rendering.',
-      '- Limited palette; high readability at 32–64px; crisp silhouette.',
+      '[STYLE — MUST]',
+      '- 2D anime character portrait illustration (NOT photorealistic; NOT 3D/CGI).',
+      '- Extra-anime facial features: very large expressive eyes; bold upper lash line; simplified small nose; simplified small mouth.',
+      '- Clean lineart: crisp outlines; simplified shapes; no painterly brushwork; no texture noise.',
+      '- Cel shading only: 2–3 shading tones max; clean shading bands; no smooth realistic gradients on skin.',
+      '- No skin micro-detail: no pores, no freckles-as-texture, no wrinkles detail, no realistic subsurface scattering.',
       '',
-      'COMPOSITION:',
-      '- Head-and-shoulders portrait; single subject only.',
-      '- Tight crop with NO margins: make the face large in frame with minimal background.',
-      '- Keep the full face visible (do NOT clip/cut off hairline/forehead/ears/chin).',
-      '- Eyes in upper third; crop above chest.',
+      '[COMPOSITION — MUST]',
+      '- Single subject only: one face/head-and-shoulders.',
+      '- Tight crop with NO margins: face fills the frame; minimal background visible.',
+      '- No clipping: do NOT cut off hairline/forehead/ears/chin.',
+      '- Eyes placed in the upper third. Crop above chest.',
       '- Neutral or slight 10° three-quarter view; no extreme angles; no wide-angle distortion.',
-      '- Background: clean minimal gradient only; no scenery, props, or clutter.',
-      '- IMPORTANT: No inner container/inset. The portrait must fill the full square canvas with a normal background (no circular mask, no rounded-rectangle frame, no mat border, no picture-in-picture).',
       '',
-      'FORBIDDEN / NEGATIVES:',
+      '[BACKGROUND — MUST]',
+      '- Background is a SOLID flat color only: exactly #F3EFE6.',
+      '- No gradients. No patterns. No textures. No vignette. No shadows cast onto background.',
+      '',
+      '[NO CONTAINERS — MUST]',
+      '- The portrait must be drawn directly on the full square canvas.',
+      '- No inner frame/inset, no circular mask, no rounded-rectangle, no matte/border, no picture-in-picture.',
+      '',
+      '[SAFETY — MUST]',
+      '- Fictional character only. No real-person likeness. No celebrity. No copyrighted character. No brand marks/logos.',
+      '- No NSFW. No gore. No violence. No hate. No illegal content.',
+      '',
+      '[NEGATIVE PROMPT — MUST AVOID]',
       '- photorealistic, hyperrealistic, ultra-detailed, highly detailed skin, pores, microtexture',
-      '- 3D render, CGI, realistic shading, dramatic film grain, complex textures',
+      '- 3d, cgi, render, octane, unreal engine, realistic lighting, subsurface scattering',
+      '- painterly, oil paint, watercolor, airbrush, soft realism, high frequency detail, skin texture',
+      '- gradient background, patterned background, textured paper, vignette, background shadow',
       '- text, watermark, signature, logo, UI frame, border',
-      '- inset portrait, inner frame, circular crop, avatar mask, matte, vignette border, picture frame',
-      '- real person likeness, celebrity, copyrighted character, brand marks/logos',
-      '- multiple faces/characters, full body, hands dominating frame, heavy headwear obscuring face',
-      '- NSFW, gore, violence, hate, illegal content',
+      '- inset portrait, inner frame, circular crop, avatar mask, matte, picture frame',
       '',
-      'DIVERSITY + VARIATION (important):',
-      '- If the identity inputs do NOT explicitly specify gender, choose a gender presentation at random with an even spread across feminine, masculine, and androgynous.',
-      '- Be creative and vary: skin tone, hair (style/texture/color), eye shape, face shape, age (adult), accessories (subtle), and wardrobe collar/neckline.',
-      '- Avoid stereotypes or sexualization; keep it professional and friendly.',
+      '[IDENTITY INPUTS]',
+      '- Use the agent avatar prompt below as the PRIMARY source of appearance details (including gender presentation).',
+      '- If the agent avatar prompt is missing, do NOT guess; the server should regenerate it via the full-chain flow.',
+      '',
+      '[GENDER RENDER RULE]',
+      gender ? `- Render as ${gender.toUpperCase()} as specified by the agent avatar prompt.` : undefined,
       '',
       'AGENT IDENTITY (use these to design the character):',
       `Name: ${options.subjectName}`,

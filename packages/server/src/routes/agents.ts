@@ -462,11 +462,18 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     const generator = new AvatarGenerationService();
     let avatarPrompt = agent.avatarPrompt;
     if (mode === 'full_chain' || !avatarPrompt || avatarPrompt.trim().length === 0) {
+      if (!agent.blueprint) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent blueprint is missing; cannot regenerate avatar prompt', 400);
+        return;
+      }
       const mirrorResult = await generator.generateMirrorDescription({
-        agentModel: agent.model,
         agentName: agent.name,
         agentDescription: agent.description,
-        agentSystemPrompt: agent.systemPrompt,
+        agentBlueprint: agent.blueprint,
+        agentTools:
+          agent.state && typeof agent.state === 'object' && Array.isArray((agent.state as { tools?: unknown }).tools)
+            ? ((agent.state as { tools: unknown[] }).tools as unknown[])
+            : [],
         starshipId: agent.starshipId,
       });
       avatarPrompt = mirrorResult.description;

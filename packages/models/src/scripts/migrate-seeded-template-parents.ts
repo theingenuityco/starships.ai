@@ -24,6 +24,7 @@ import { logger } from '@/helpers/logging';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
 import { ToolRepository } from '@/repositories/ToolRepository';
+import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
 import { ALL_AGENT_TEMPLATES } from '@/seeders/agents';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
 
@@ -114,6 +115,7 @@ async function resolveTargetStarship(db: ReturnType<typeof createConnection>, ar
 
 type ParentCheckRow = { id: string; slug: string; starship_id: string | null };
 type ChildOnStarshipRow = { id: string; slug: string; deployed_at: string | null; created_at: string };
+type ToolParentCheckRow = { id: string };
 
 export async function migrateSeededTemplateParents(args: Args): Promise<void> {
   const env = getEnvConfig();
@@ -168,12 +170,14 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
     const agentRepo = new AgentRepository();
     const templateRepo = new AgentTemplateRepository();
     const toolRepo = new ToolRepository();
+    const toolTemplateRepo = new ToolTemplateRepository();
 
     let templatesFound = 0;
     let alreadyHadParent = 0;
     let promotedExisting = 0;
     let parentsCreated = 0;
     let toolsDeployed = 0;
+    let toolParentsCreated = 0;
     let agentToolLinksEnsured = 0;
     let skippedMissingTemplate = 0;
     let errors = 0;
@@ -217,6 +221,89 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
         const deployedToolIds: string[] = [];
         for (const toolTemplateSlug of assignedToolTemplateSlugs) {
           try {
+            // 1) Ensure there is a *parent Tool* for the tool template (Tool.published_template_id -> tool_templates.id).
+            // This mirrors the agent-template parent backfill: seeders create tool_templates without a parent Tool.
+            //
+            // NOTE: We create a dedicated parent Tool (no sourceTemplateId) so we don't mutate the deployed-from-template
+            // Tool instances that starships rely on for update checks.
+            const toolTemplate = await toolTemplateRepo.findBySlug(toolTemplateSlug);
+            if (toolTemplate) {
+              const existingToolParent = await db.queryOne<ToolParentCheckRow>(
+                'SELECT id FROM tools WHERE published_template_id = $1 LIMIT 1',
+                [toolTemplate.id]
+              );
+
+              if (!existingToolParent) {
+                if (args.dryRun) {
+                  toolParentsCreated++;
+                  logger.info(`[DRY-RUN] Would create parent tool for tool template "${toolTemplateSlug}" on starship ${target.slug}`, {
+                    component: 'migrate-seeded-template-parents',
+                    operation: 'createParentTool',
+                    metadata: { toolTemplateSlug, toolTemplateId: toolTemplate.id, starshipId: target.id },
+                  });
+                } else {
+                  const createdParentTool = await toolRepo.create(
+                    {
+                      name: toolTemplate.name,
+                      // ToolRepository.create ignores the provided slug and generates a globally-unique one,
+                      // but the API type requires a slug, so we provide the template slug as a base.
+                      slug: toolTemplate.slug,
+                      description: toolTemplate.description,
+                      parameters: toolTemplate.parameters,
+                      blueprint: toolTemplate.blueprint,
+                      transforms: toolTemplate.transforms,
+                      mutations: toolTemplate.mutations,
+                      condition: toolTemplate.condition,
+                      configuration: {},
+                      isEnabled: true,
+                      status: 'active',
+                      version: toolTemplate.version,
+                      publishedTemplateId: toolTemplate.id,
+                    },
+                    target.id
+                  );
+
+                  // Mark it as published for auditability/consistency (FK fields require an instance admin user).
+                  await db.query(
+                    `
+                    UPDATE tools
+                    SET
+                      publication_status = 'published',
+                      publication_approved_by = $2,
+                      publication_approved_at = $3,
+                      publication_changelog = $4,
+                      published_template_id = $5,
+                      version = $6,
+                      updated_at = NOW()
+                    WHERE id = $1
+                    `,
+                    [
+                      createdParentTool.id,
+                      approverUserId,
+                      now,
+                      'Backfilled parent tool for seeded marketplace tool template',
+                      toolTemplate.id,
+                      toolTemplate.version,
+                    ]
+                  );
+
+                  toolParentsCreated++;
+                  logger.info(`✅ Created parent tool for tool template "${toolTemplateSlug}"`, {
+                    component: 'migrate-seeded-template-parents',
+                    operation: 'createParentTool',
+                    metadata: { toolTemplateSlug, toolTemplateId: toolTemplate.id, toolId: createdParentTool.id, starshipId: target.id },
+                  });
+                }
+              }
+            } else {
+              logger.warn(`Tool template not found by slug "${toolTemplateSlug}" (skipping parent tool backfill)`, {
+                component: 'migrate-seeded-template-parents',
+                operation: 'loadToolTemplate',
+                metadata: { toolTemplateSlug, starshipId: target.id, templateSlug: template.slug },
+              });
+            }
+
+            // 2) Ensure a deployed Tool instance exists on the starship for this tool template slug
             let existingTool = await toolRepo.findByTemplateSlugAndStarship(toolTemplateSlug, target.id);
             if (!existingTool) {
               if (args.dryRun) {
@@ -430,6 +517,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
     logger.info(`  Existing deployed agents promoted: ${promotedExisting}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Parent agents created: ${parentsCreated}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Tools deployed: ${toolsDeployed}`, { component: 'migrate-seeded-template-parents' });
+    logger.info(`  Parent tools created: ${toolParentsCreated}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Agent→Tool links ensured: ${agentToolLinksEnsured}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Errors: ${errors}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Duration: ${Date.now() - startedAt}ms`, { component: 'migrate-seeded-template-parents' });
@@ -449,7 +537,7 @@ if (require.main === module) {
     .then(() => process.exit(0))
     .catch((err) => {
       // Prefer a clean, operator-friendly message in CLI usage
-      // eslint-disable-next-line no-console
+
       console.error('❌ Seeded template parent backfill failed:', err?.message || err);
       process.exit(1);
     });

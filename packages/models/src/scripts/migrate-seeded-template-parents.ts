@@ -117,6 +117,16 @@ type ParentCheckRow = { id: string; slug: string; starship_id: string | null };
 type ChildOnStarshipRow = { id: string; slug: string; deployed_at: string | null; created_at: string };
 type ToolParentCheckRow = { id: string };
 
+function toolSlugBaseFromName(name: string | undefined): string {
+  // Must match ToolRepository.create() slug base logic exactly.
+  return (name || 'tool')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .replace(/--+/g, '-');
+}
+
 export async function migrateSeededTemplateParents(args: Args): Promise<void> {
   const env = getEnvConfig();
   const db = createConnection({
@@ -177,7 +187,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
     let promotedExisting = 0;
     let parentsCreated = 0;
     let toolsDeployed = 0;
-    let toolParentsCreated = 0;
+    let toolsPromotedToParents = 0;
     let agentToolLinksEnsured = 0;
     let skippedMissingTemplate = 0;
     let errors = 0;
@@ -221,111 +231,109 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
         const deployedToolIds: string[] = [];
         for (const toolTemplateSlug of assignedToolTemplateSlugs) {
           try {
-            // 1) Ensure there is a *parent Tool* for the tool template (Tool.published_template_id -> tool_templates.id).
-            // This mirrors the agent-template parent backfill: seeders create tool_templates without a parent Tool.
-            //
-            // NOTE: We create a dedicated parent Tool (no sourceTemplateId) so we don't mutate the deployed-from-template
-            // Tool instances that starships rely on for update checks.
             const toolTemplate = await toolTemplateRepo.findBySlug(toolTemplateSlug);
-            if (toolTemplate) {
-              const existingToolParent = await db.queryOne<ToolParentCheckRow>(
-                'SELECT id FROM tools WHERE published_template_id = $1 LIMIT 1',
-                [toolTemplate.id]
-              );
-
-              if (!existingToolParent) {
-                if (args.dryRun) {
-                  toolParentsCreated++;
-                  logger.info(`[DRY-RUN] Would create parent tool for tool template "${toolTemplateSlug}" on starship ${target.slug}`, {
-                    component: 'migrate-seeded-template-parents',
-                    operation: 'createParentTool',
-                    metadata: { toolTemplateSlug, toolTemplateId: toolTemplate.id, starshipId: target.id },
-                  });
-                } else {
-                  const createdParentTool = await toolRepo.create(
-                    {
-                      name: toolTemplate.name,
-                      // ToolRepository.create ignores the provided slug and generates a globally-unique one,
-                      // but the API type requires a slug, so we provide the template slug as a base.
-                      slug: toolTemplate.slug,
-                      description: toolTemplate.description,
-                      parameters: toolTemplate.parameters,
-                      blueprint: toolTemplate.blueprint,
-                      transforms: toolTemplate.transforms,
-                      mutations: toolTemplate.mutations,
-                      condition: toolTemplate.condition,
-                      configuration: {},
-                      isEnabled: true,
-                      status: 'active',
-                      version: toolTemplate.version,
-                      publishedTemplateId: toolTemplate.id,
-                    },
-                    target.id
-                  );
-
-                  // Mark it as published for auditability/consistency (FK fields require an instance admin user).
-                  await db.query(
-                    `
-                    UPDATE tools
-                    SET
-                      publication_status = 'published',
-                      publication_approved_by = $2,
-                      publication_approved_at = $3,
-                      publication_changelog = $4,
-                      published_template_id = $5,
-                      version = $6,
-                      updated_at = NOW()
-                    WHERE id = $1
-                    `,
-                    [
-                      createdParentTool.id,
-                      approverUserId,
-                      now,
-                      'Backfilled parent tool for seeded marketplace tool template',
-                      toolTemplate.id,
-                      toolTemplate.version,
-                    ]
-                  );
-
-                  toolParentsCreated++;
-                  logger.info(`✅ Created parent tool for tool template "${toolTemplateSlug}"`, {
-                    component: 'migrate-seeded-template-parents',
-                    operation: 'createParentTool',
-                    metadata: { toolTemplateSlug, toolTemplateId: toolTemplate.id, toolId: createdParentTool.id, starshipId: target.id },
-                  });
-                }
-              }
-            } else {
-              logger.warn(`Tool template not found by slug "${toolTemplateSlug}" (skipping parent tool backfill)`, {
+            if (!toolTemplate) {
+              logger.warn(`Tool template not found by slug "${toolTemplateSlug}" (skipping)`, {
                 component: 'migrate-seeded-template-parents',
                 operation: 'loadToolTemplate',
                 metadata: { toolTemplateSlug, starshipId: target.id, templateSlug: template.slug },
               });
+              continue;
             }
 
-            // 2) Ensure a deployed Tool instance exists on the starship for this tool template slug
-            let existingTool = await toolRepo.findByTemplateSlugAndStarship(toolTemplateSlug, target.id);
-            if (!existingTool) {
+            // Root cause of duplicates:
+            // - Some tools exist on a starship but aren't linked via source_template_id
+            // - Also, tool slugs are not guaranteed to be based on template slug; ToolRepository.create derives slugs from NAME.
+            //
+            // Therefore, we treat a tool as "already present" if we find ANY tool on the target starship that:
+            // - is linked by source_template_id, OR
+            // - is linked by published_template_id (already promoted), OR
+            // - has a slug that starts with template.slug, OR
+            // - has a slug that starts with baseFromName(template.name)
+            const baseFromName = toolSlugBaseFromName(toolTemplate.name);
+            const existingToolIdRow = await db.queryOne<{ id: string }>(
+              `
+              SELECT id
+              FROM tools
+              WHERE starship_id = $1
+                AND (
+                  source_template_id = $2 OR
+                  published_template_id = $2 OR
+                  slug LIKE $3 OR
+                  slug LIKE $4
+                )
+              ORDER BY created_at DESC
+              LIMIT 1
+              `,
+              [target.id, toolTemplate.id, `${toolTemplate.slug}%`, `${baseFromName}%`]
+            );
+
+            let toolOnStarship = existingToolIdRow?.id ? await toolRepo.findById(existingToolIdRow.id) : null;
+
+            if (!toolOnStarship) {
               if (args.dryRun) {
-                logger.info(`[DRY-RUN] Would deploy tool from template "${toolTemplateSlug}" to starship ${target.slug}`, {
+                logger.info(`[DRY-RUN] Would deploy tool for template "${toolTemplateSlug}" to starship ${target.slug}`, {
                   component: 'migrate-seeded-template-parents',
                   operation: 'deployToolFromTemplate',
                   metadata: { toolTemplateSlug, starshipId: target.id, templateSlug: template.slug },
                 });
-              } else {
-                existingTool = await toolRepo.createFromTemplate(toolTemplateSlug, target.id);
-                toolsDeployed++;
-                logger.info(`✅ Deployed tool from template "${toolTemplateSlug}" to starship ${target.slug}`, {
+                continue;
+              }
+
+              toolOnStarship = await toolRepo.createFromTemplate(toolTemplateSlug, target.id);
+              toolsDeployed++;
+              logger.info(`✅ Deployed tool for template "${toolTemplateSlug}" to starship ${target.slug}`, {
+                component: 'migrate-seeded-template-parents',
+                operation: 'deployToolFromTemplate',
+                metadata: { toolTemplateSlug, toolId: toolOnStarship.id, starshipId: target.id, templateSlug: template.slug },
+              });
+            }
+
+            // If the marketplace template has no parent tool anywhere yet, promote the starship's tool into the parent.
+            // This avoids creating a second "duplicate" tool on the starship.
+            const existingToolParent = await db.queryOne<ToolParentCheckRow>(
+              'SELECT id FROM tools WHERE published_template_id = $1 LIMIT 1',
+              [toolTemplate.id]
+            );
+
+            if (!existingToolParent) {
+              if (args.dryRun) {
+                toolsPromotedToParents++;
+                logger.info(`[DRY-RUN] Would promote tool "${toolOnStarship.slug}" to parent for tool template "${toolTemplateSlug}"`, {
                   component: 'migrate-seeded-template-parents',
-                  operation: 'deployToolFromTemplate',
-                  metadata: { toolTemplateSlug, toolId: existingTool.id, starshipId: target.id, templateSlug: template.slug },
+                  operation: 'promoteToolToParent',
+                  metadata: { toolTemplateSlug, toolTemplateId: toolTemplate.id, toolId: toolOnStarship.id, starshipId: target.id },
                 });
+              } else {
+                await db.query(
+                  `
+                  UPDATE tools
+                  SET
+                    source_template_id = NULL,
+                    template_snapshot_at = NULL,
+                    publication_status = 'published',
+                    publication_approved_by = $2,
+                    publication_approved_at = $3,
+                    publication_changelog = $4,
+                    published_template_id = $5,
+                    version = $6,
+                    updated_at = NOW()
+                  WHERE id = $1
+                  `,
+                  [
+                    toolOnStarship.id,
+                    approverUserId,
+                    now,
+                    'Backfilled parent tool for seeded marketplace tool template (promoted existing tool)',
+                    toolTemplate.id,
+                    toolTemplate.version,
+                  ]
+                );
+                toolsPromotedToParents++;
               }
             }
 
-            if (existingTool) {
-              deployedToolIds.push(existingTool.id);
-            }
+            deployedToolIds.push(toolOnStarship.id);
           } catch (toolErr) {
             // Tool failures should not block agent parent backfill; log and continue.
             logger.warn(
@@ -517,7 +525,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
     logger.info(`  Existing deployed agents promoted: ${promotedExisting}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Parent agents created: ${parentsCreated}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Tools deployed: ${toolsDeployed}`, { component: 'migrate-seeded-template-parents' });
-    logger.info(`  Parent tools created: ${toolParentsCreated}`, { component: 'migrate-seeded-template-parents' });
+    logger.info(`  Tools promoted to parents: ${toolsPromotedToParents}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Agent→Tool links ensured: ${agentToolLinksEnsured}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Errors: ${errors}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Duration: ${Date.now() - startedAt}ms`, { component: 'migrate-seeded-template-parents' });

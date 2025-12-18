@@ -82,6 +82,20 @@ export class LLM extends BaseNode<LlmParams> {
     super(params, options);
   }
 
+  private coerceMaybeJson<T = unknown>(value: unknown): T | undefined {
+    if (value == null) return undefined;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return undefined;
+      try {
+        return JSON.parse(trimmed) as T;
+      } catch {
+        return undefined;
+      }
+    }
+    return value as T;
+  }
+
   /**
    * Compute a non-overlapping append by trimming any prefix of 'fragment' that
    * already exists as a suffix of 'base'. This mirrors the ConversationService
@@ -171,6 +185,8 @@ export class LLM extends BaseNode<LlmParams> {
 
       // Delegate provider selection and credential management to HostRuntime;
       // the host returns an AsyncIterable of provider-native chunks.
+      const modalities = this.coerceMaybeJson<Array<'text' | 'image'>>(params.modalities);
+      const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
       const stream = await hostRuntime.llm({
         model: params.model,
         messages: this.convertMessagesToOpenAI(sourceMessages),
@@ -181,6 +197,8 @@ export class LLM extends BaseNode<LlmParams> {
         frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
         presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
         reasoning: params.reasoning,
+        ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
+        ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),
       });
 
       const llmResponse = await this.processOpenAIStream(stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>);

@@ -78,6 +78,9 @@ export class Agent implements NodeHandler {
         model: this.params.model,
         messages: '{{ state.messages }}',
         tools: '{{ state.tools }}',
+        // Optional OpenRouter multimodal output controls (set by the embedding host via state)
+        modalities: '{{ state.modalities }}',
+        imageConfig: '{{ state.imageConfig }}',
         ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
         ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
         ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),

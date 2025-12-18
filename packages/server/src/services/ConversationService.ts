@@ -85,6 +85,9 @@ export class ConversationService {
   private ringBuffer: Map<string, Array<{ position: number; content: string; ts: number }>> = new Map();
   // Track accumulated toolCalls during streaming per conversation
   private streamingToolCalls: Map<string, StreamingToolCallAccum[]> = new Map();
+  // Track generated image attachments for the current streaming assistant placeholder
+  private streamingGeneratedAttachmentIds: Map<string, string[]> = new Map();
+  private streamingGeneratedImageUrlSeen: Map<string, Set<string>> = new Map();
 
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
@@ -177,6 +180,8 @@ export class ConversationService {
     this.streamingContent.delete(conversationId);
     this.streamingToolCalls.delete(conversationId);
     this.streamingReasoning.delete(conversationId);
+    this.streamingGeneratedAttachmentIds.delete(conversationId);
+    this.streamingGeneratedImageUrlSeen.delete(conversationId);
     this.ringBuffer.delete(conversationId);
     this.latestStreamingUsage.delete(conversationId);
     this.streamSeq.delete(conversationId);
@@ -247,9 +252,16 @@ export class ConversationService {
       });
     }
 
+    const pendingAttachmentIds = this.streamingGeneratedAttachmentIds.get(conversationId) || [];
+
     // Only persist if we have something meaningful
-    if ((partialContent && partialContent.trim().length > 0) || (partialReasoning && partialReasoning.trim().length > 0)) {
+    if (
+      (partialContent && partialContent.trim().length > 0) ||
+      (partialReasoning && partialReasoning.trim().length > 0) ||
+      pendingAttachmentIds.length > 0
+    ) {
       const agent = this.currentAgentForConversation.get(conversationId);
+      const starship = await this.getConversationStarship(conversationId);
       const persistedMsg = await this.messageService.createMessage({
         conversationId,
         role: 'assistant',
@@ -257,7 +269,20 @@ export class ConversationService {
         messageType: 'agent_response',
         ...(partialReasoning ? { reasoning: partialReasoning } : {}),
         ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
+        ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
       });
+
+      // Link generated attachments to the persisted message (best-effort)
+      try {
+        if (starship && pendingAttachmentIds.length > 0) {
+          const attachmentService = new AttachmentService();
+          await Promise.all(
+            pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
+          );
+        }
+      } catch {
+        // Non-fatal
+      }
       // Mark both per-turn and active-stream persisted flags
       this.assistantPersistedThisTurn.add(conversationId);
       this.activeStreamPersisted.add(conversationId);
@@ -267,10 +292,27 @@ export class ConversationService {
       this.streamingToolCalls.delete(conversationId);
       this.streamingReasoning.delete(conversationId);
       this.ringBuffer.delete(conversationId);
+      this.streamingGeneratedAttachmentIds.delete(conversationId);
+      this.streamingGeneratedImageUrlSeen.delete(conversationId);
 
       return persistedMsg;
     }
     return null;
+  }
+
+  private static parseBase64ImageDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
+    if (typeof dataUrl !== 'string') return null;
+    const m = dataUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\n\r]+)$/i);
+    if (!m) return null;
+    const mimeType = m[1].toLowerCase();
+    const b64 = m[2].replace(/\s+/g, '');
+    try {
+      const buffer = Buffer.from(b64, 'base64');
+      if (!buffer || buffer.length === 0) return null;
+      return { mimeType, buffer };
+    } catch {
+      return null;
+    }
   }
 
   /**
@@ -702,7 +744,13 @@ export class ConversationService {
   }
 
   async addConversationMessage(
-    data: Message & { conversationId: string; attachmentIds?: string[] },
+    data: Message & {
+      conversationId: string;
+      attachmentIds?: string[];
+      // OpenRouter image generation (optional, per message)
+      modalities?: Array<'image' | 'text'>;
+      imageConfig?: Record<string, unknown>;
+    },
     ctx?: { authContext?: { userId: string; agentId?: string; starshipId?: string } }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
@@ -940,6 +988,13 @@ export class ConversationService {
         }
         (exec.state as Record<string, unknown>)['messages'] = orderedForState;
         (exec.state as Record<string, unknown>)['tools'] = (agentWithTools.state as any)?.tools ?? [];
+        // Optional per-turn multimodal output configuration (OpenRouter image generation)
+        if (Array.isArray((data as any).modalities) && (data as any).modalities.length > 0) {
+          (exec.state as Record<string, unknown>)['modalities'] = (data as any).modalities;
+        }
+        if ((data as any).imageConfig && typeof (data as any).imageConfig === 'object') {
+          (exec.state as Record<string, unknown>)['imageConfig'] = (data as any).imageConfig;
+        }
 
         const ctl = (runner as any).runWithController?.(blueprint, exec, engineConfig);
         if (ctl && typeof ctl.cancel === 'function') {
@@ -1388,6 +1443,8 @@ export class ConversationService {
         this.latestStreamingUsage.delete(conversationId);
         this.streamingToolCalls.delete(conversationId);
         this.streamingReasoning.delete(conversationId);
+        this.streamingGeneratedAttachmentIds.delete(conversationId);
+        this.streamingGeneratedImageUrlSeen.delete(conversationId);
         // Reset per-stream sequence when a new turn begins (will be set on first placeholder)
         this.streamSeq.delete(conversationId);
         // Clear assistant-persisted flag at the start of a new top-level turn
@@ -1553,6 +1610,15 @@ export class ConversationService {
               : [];
             const hasToolCalls = toolCallsFromDelta.length > 0 || toolCallsFromMessage.length > 0;
 
+            // OpenRouter image generation output: delta.images / message.images
+            const imagesFromDelta: unknown[] = Array.isArray((delta as { images?: unknown[] }).images)
+              ? ((delta as any).images as unknown[])
+              : [];
+            const imagesFromMessage: unknown[] = Array.isArray((messageNode as { images?: unknown[] }).images)
+              ? ((messageNode as any).images as unknown[])
+              : [];
+            const hasImages = imagesFromDelta.length > 0 || imagesFromMessage.length > 0;
+
             // Extract reasoning from OpenRouter unified fields (reasoning and reasoning_details)
             // IMPORTANT: Many providers send BOTH a cumulative snapshot (reasoning.content) AND token deltas (reasoning.tokens).
             // Concatenating both will double the text. Prefer a single source in priority order:
@@ -1621,13 +1687,16 @@ export class ConversationService {
 
             // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
             // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
-            if ((hasContent || hasToolCalls || hasReasoning) && !this.streamingContent.has(conversationId)) {
+            if ((hasContent || hasToolCalls || hasReasoning || hasImages) && !this.streamingContent.has(conversationId)) {
               if (this.streamingService.isActive(conversationId)) {
                 // Acquire lock upfront to avoid race between parallel content_chunk events
                 this.streamingContent.set(conversationId, '');
                 this.placeholderEmitted.set(conversationId, true);
                 // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
                 this.streamingToolCalls.delete(conversationId);
+                // Reset generated image attachment tracking for this new stream
+                this.streamingGeneratedAttachmentIds.set(conversationId, []);
+                this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
                 // Initialize per-stream sequence counter
                 this.streamSeq.set(conversationId, 0);
                 this.snapshotPreferred.delete(conversationId);
@@ -1653,6 +1722,7 @@ export class ConversationService {
                     chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
                     reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
                     toolCalls: [], // Initialize empty toolCalls array for replace operations
+                    attachmentIds: [], // Generated images (and other attachments) can be added during streaming
                   },
                 };
                 await this.streamingService.broadcastDelta(conversationId, shell);
@@ -1679,8 +1749,96 @@ export class ConversationService {
                 this.streamingContent.set(conversationId, '');
                 this.placeholderEmitted.set(conversationId, true);
                 this.streamingToolCalls.delete(conversationId);
+                this.streamingGeneratedAttachmentIds.set(conversationId, []);
+                this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
                 if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
                 // Skip shell broadcast; continue accumulating for persistence
+              }
+            }
+
+            // Process generated images (OpenRouter: images[].image_url.url is a data URL)
+            if (hasImages) {
+              const all = [...imagesFromDelta, ...imagesFromMessage];
+              const urls: string[] = [];
+              for (const raw of all) {
+                if (!raw || typeof raw !== 'object') continue;
+                const rec = raw as Record<string, unknown>;
+                // Support both snake_case and camelCase
+                const imageUrlNode =
+                  (rec.image_url && typeof rec.image_url === 'object' ? (rec.image_url as Record<string, unknown>) : null) ||
+                  (rec.imageUrl && typeof rec.imageUrl === 'object' ? (rec.imageUrl as Record<string, unknown>) : null);
+                const u = imageUrlNode && typeof imageUrlNode.url === 'string' ? imageUrlNode.url : '';
+                if (u && u.startsWith('data:image/')) {
+                  urls.push(u);
+                }
+              }
+
+              if (urls.length > 0) {
+                // Ensure tracking containers exist (covers edge case where images arrive before placeholder init)
+                if (!this.streamingGeneratedAttachmentIds.has(conversationId)) this.streamingGeneratedAttachmentIds.set(conversationId, []);
+                if (!this.streamingGeneratedImageUrlSeen.has(conversationId))
+                  this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
+
+                const seen = this.streamingGeneratedImageUrlSeen.get(conversationId)!;
+                const acc = this.streamingGeneratedAttachmentIds.get(conversationId)!;
+
+                // Resolve starship once for uploads
+                const starship = await this.getConversationStarship(conversationId);
+                if (starship) {
+                  const attachmentService = new AttachmentService();
+
+                  for (let idx = 0; idx < urls.length; idx++) {
+                    const url = urls[idx];
+                    if (seen.has(url)) continue;
+                    seen.add(url);
+
+                    const parsed = ConversationService.parseBase64ImageDataUrl(url);
+                    if (!parsed) continue;
+
+                    const ext =
+                      parsed.mimeType === 'image/png'
+                        ? 'png'
+                        : parsed.mimeType === 'image/jpeg'
+                          ? 'jpg'
+                          : parsed.mimeType === 'image/webp'
+                            ? 'webp'
+                            : 'png';
+                    const filename = `generated_${Date.now()}_${idx}.${ext}`;
+
+                    try {
+                      const attachment = await attachmentService.createAttachment({
+                        starshipId: starship.id,
+                        conversationId,
+                        filename,
+                        mimeType: parsed.mimeType,
+                        buffer: parsed.buffer,
+                      });
+
+                      acc.push(attachment.id);
+                      this.streamingGeneratedAttachmentIds.set(conversationId, acc);
+
+                      if (this.streamingService && this.streamingService.isActive(conversationId)) {
+                        try {
+                          await this.streamingService.broadcastDelta(conversationId, {
+                            op: 'add',
+                            path: '/messages/-1/attachmentIds/-',
+                            value: attachment.id,
+                          });
+                        } catch (err) {
+                          console.warn('[STREAMING] Failed to broadcast generated image attachment id', {
+                            conversationId,
+                            error: err instanceof Error ? err.message : String(err),
+                          });
+                        }
+                      }
+                    } catch (err) {
+                      console.warn('[STREAMING] Failed to persist generated image attachment', {
+                        conversationId,
+                        error: err instanceof Error ? err.message : String(err),
+                      });
+                    }
+                  }
+                }
               }
             }
 
@@ -2177,6 +2335,9 @@ export class ConversationService {
                 const messageType = role === 'tool' ? 'tool_result' : 'agent_response';
                 // For assistant messages, include agent attribution
                 const agent = role === 'assistant' ? this.currentAgentForConversation.get(conversationId) : undefined;
+                const pendingAttachmentIds =
+                  role === 'assistant' ? this.streamingGeneratedAttachmentIds.get(conversationId) || [] : ([] as string[]);
+                const starship = pendingAttachmentIds.length > 0 ? await this.getConversationStarship(conversationId) : null;
 
                 // Extract string content (LLM responses are always string, not ContentBlock[])
                 const contentString =
@@ -2191,7 +2352,20 @@ export class ConversationService {
                   ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
                   ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
                   ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
+                  ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
                 });
+
+                // Link generated attachments to the persisted assistant message (best-effort)
+                if (role === 'assistant' && pendingAttachmentIds.length > 0 && starship) {
+                  try {
+                    const attachmentService = new AttachmentService();
+                    await Promise.all(
+                      pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
+                    );
+                  } catch {
+                    // Non-fatal
+                  }
+                }
 
                 // Mark that an assistant message has been persisted for this turn
                 if (role === 'assistant') {
@@ -2204,6 +2378,8 @@ export class ConversationService {
                   this.ringBuffer.delete(conversationId);
                   this.streamSeq.delete(conversationId);
                   this.activeStreamPersisted.delete(conversationId);
+                  this.streamingGeneratedAttachmentIds.delete(conversationId);
+                  this.streamingGeneratedImageUrlSeen.delete(conversationId);
                 }
 
                 // Broadcast via SSE if streaming is active

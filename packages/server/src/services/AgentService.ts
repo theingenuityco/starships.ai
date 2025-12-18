@@ -85,6 +85,21 @@ export class AgentService {
     this.connectorRuntimeService = new ConnectorRuntimeService();
   }
 
+  /**
+   * Guard: agents deployed from marketplace templates are immutable.
+   * We treat any agent with a sourceTemplateId as "deployed from marketplace".
+   *
+   * NOTE: This intentionally does not block `updateFromTemplate()` which is the
+   * supported way to bring a deployed agent forward to the latest template.
+   */
+  private assertAgentIsEditable(agent: AgentModel, action: string): void {
+    if (typeof agent.sourceTemplateId === 'string' && agent.sourceTemplateId.trim().length > 0) {
+      throw new ValidationError(
+        `Cannot ${action} agent "${agent.name}" because it was deployed from the marketplace. Create a copy to customize it.`
+      );
+    }
+  }
+
   /** Safely get starshipId from agent */
   private async getAgentStarshipIdOrThrow(agentId: string): Promise<string> {
     const agent = await this.agentRepository.findById(agentId);
@@ -187,6 +202,10 @@ export class AgentService {
    * Update agent and return as AgentModel
    */
   async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
+    const current = await this.agentRepository.findById(agentId);
+    if (!current) return null;
+    this.assertAgentIsEditable(current, 'edit');
+
     return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
   }
 
@@ -235,6 +254,7 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
 
+    this.assertAgentIsEditable(agent, 'move');
     return await this.agentRepository.updateStarship(agentId, starshipId);
   }
 
@@ -581,6 +601,12 @@ export class AgentService {
    * Assign multiple tools to an agent via relationships (replaces existing assignments)
    */
   async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    this.assertAgentIsEditable(agent, 'edit');
+
     // Use the new relationship-based approach
     await this.agentRepository.assignToolsToAgent(agentId, toolSlugs, starshipId);
 
@@ -608,6 +634,12 @@ export class AgentService {
    * Add a single tool to an agent's existing assignments via relationships
    */
   async addToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    this.assertAgentIsEditable(agent, 'edit');
+
     // Find the deployed tool instance by slug and starship
     const { ToolRepository } = await import('@starships/models');
     const toolRepository = new ToolRepository();
@@ -644,6 +676,12 @@ export class AgentService {
    * Remove a single tool from an agent's assignments via relationships
    */
   async removeToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    this.assertAgentIsEditable(agent, 'edit');
+
     // Find the deployed tool instance by slug and starship
     const { ToolRepository } = await import('@starships/models');
     const toolRepository = new ToolRepository();
@@ -1106,6 +1144,9 @@ export class AgentService {
     if (!agent) {
       throw new NotFoundError('Agent', agentId);
     }
+
+    // Deployed marketplace agents cannot be modified/published directly; copy first.
+    this.assertAgentIsEditable(agent, 'publish');
 
     // Enforce that only the owner of the agent's starship or an instance admin
     // can request publication. Routes already gate this, but we repeat the

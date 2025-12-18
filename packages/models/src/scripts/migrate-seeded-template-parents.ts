@@ -188,6 +188,8 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
     let parentsCreated = 0;
     let toolsDeployed = 0;
     let toolsPromotedToParents = 0;
+    let agentVersionsSynced = 0;
+    let toolVersionsSynced = 0;
     let agentToolLinksEnsured = 0;
     let skippedMissingTemplate = 0;
     let errors = 0;
@@ -210,20 +212,6 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
         const templateWithTools = await templateRepo.findById(template.id);
         const assignedToolTemplateSlugs = templateWithTools?.assignedToolSlugs || [];
 
-        const existingParent = await db.queryOne<ParentCheckRow>(
-          'SELECT id, slug, starship_id FROM agents WHERE published_template_id = $1 LIMIT 1',
-          [template.id]
-        );
-
-        if (existingParent) {
-          alreadyHadParent++;
-          logger.debug(`Template already has parent agent: ${template.slug} → ${existingParent.slug}`, {
-            component: 'migrate-seeded-template-parents',
-            metadata: { templateId: template.id, agentId: existingParent.id, agentStarshipId: existingParent.starship_id },
-          });
-          continue;
-        }
-
         const now = new Date().toISOString();
 
         // Ensure tool instances exist on the target starship for every tool template
@@ -239,6 +227,31 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
                 metadata: { toolTemplateSlug, starshipId: target.id, templateSlug: template.slug },
               });
               continue;
+            }
+
+            // Always ensure any existing "parent tool" for this template is on the same version.
+            // Previously this script skipped syncing versions for already-existing parents.
+            if (!args.dryRun) {
+              const syncedParentTools =
+                (await db.query<{ id: string }>(
+                  `
+                  UPDATE tools
+                  SET
+                    source_template_id = NULL,
+                    template_snapshot_at = $3,
+                    version = $2,
+                    updated_at = NOW()
+                  WHERE published_template_id = $1
+                    AND (
+                      version IS DISTINCT FROM $2 OR
+                      template_snapshot_at IS NULL OR
+                      source_template_id IS NOT NULL
+                    )
+                  RETURNING id
+                  `,
+                  [toolTemplate.id, toolTemplate.version, now]
+                )) || [];
+              toolVersionsSynced += syncedParentTools.length;
             }
 
             // Root cause of duplicates:
@@ -289,6 +302,28 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
               });
             }
 
+            // Normalize version + snapshot + source link for reused tools.
+            // - If the tool already exists (likely from older seed logic) it may not have source_template_id set.
+            // - Ensure template_snapshot_at and version are aligned with the template for consistent update behavior.
+            if (!args.dryRun) {
+              await db.query(
+                `
+                UPDATE tools
+                SET
+                  -- Never force a published (parent) tool to have a source template id.
+                  source_template_id = CASE
+                    WHEN published_template_id IS NOT NULL THEN NULL
+                    ELSE COALESCE(source_template_id, $2)
+                  END,
+                  template_snapshot_at = $3,
+                  version = $4,
+                  updated_at = NOW()
+                WHERE id = $1
+                `,
+                [toolOnStarship.id, toolTemplate.id, now, toolTemplate.version]
+              );
+            }
+
             // If the marketplace template has no parent tool anywhere yet, promote the starship's tool into the parent.
             // This avoids creating a second "duplicate" tool on the starship.
             const existingToolParent = await db.queryOne<ToolParentCheckRow>(
@@ -310,7 +345,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
                   UPDATE tools
                   SET
                     source_template_id = NULL,
-                    template_snapshot_at = NULL,
+                    template_snapshot_at = $7,
                     publication_status = 'published',
                     publication_approved_by = $2,
                     publication_approved_at = $3,
@@ -327,6 +362,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
                     'Backfilled parent tool for seeded marketplace tool template (promoted existing tool)',
                     toolTemplate.id,
                     toolTemplate.version,
+                    now,
                   ]
                 );
                 toolsPromotedToParents++;
@@ -346,6 +382,100 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
               toolErr as Error
             );
           }
+        }
+
+        // Always sync versions for existing deployed agents on the target starship.
+        // Older seed logic sometimes created agents from templates without setting version.
+        if (!args.dryRun) {
+          const syncedAgents =
+            (await db.query<{ id: string }>(
+              `
+              UPDATE agents
+              SET
+                version = $4,
+                template_snapshot_at = $3,
+                updated_at = NOW()
+              WHERE starship_id = $1
+                AND source_template_id = $2
+                AND (
+                  version IS DISTINCT FROM $4 OR
+                  template_snapshot_at IS NULL
+                )
+              RETURNING id
+              `,
+              [target.id, template.id, now, template.version]
+            )) || [];
+          agentVersionsSynced += syncedAgents.length;
+        }
+
+        const existingParent = await db.queryOne<ParentCheckRow>(
+          'SELECT id, slug, starship_id FROM agents WHERE published_template_id = $1 LIMIT 1',
+          [template.id]
+        );
+
+        if (existingParent) {
+          alreadyHadParent++;
+
+          if (args.dryRun) {
+            logger.info(`[DRY-RUN] Would sync existing parent agent version for template "${template.slug}"`, {
+              component: 'migrate-seeded-template-parents',
+              metadata: {
+                templateId: template.id,
+                agentId: existingParent.id,
+                agentSlug: existingParent.slug,
+                agentStarshipId: existingParent.starship_id,
+                targetVersion: template.version,
+              },
+            });
+          } else {
+            const syncedParent = await db.queryOne<{ id: string }>(
+              `
+              UPDATE agents
+              SET
+                version = $2,
+                template_snapshot_at = $3,
+                updated_at = NOW()
+              WHERE id = $1
+                AND (
+                  version IS DISTINCT FROM $2 OR
+                  template_snapshot_at IS NULL
+                )
+              RETURNING id
+              `,
+              [existingParent.id, template.version, now]
+            );
+            if (syncedParent?.id) {
+              agentVersionsSynced++;
+            }
+          }
+
+          logger.debug(`Template already has parent agent: ${template.slug} → ${existingParent.slug}`, {
+            component: 'migrate-seeded-template-parents',
+            metadata: { templateId: template.id, agentId: existingParent.id, agentStarshipId: existingParent.starship_id },
+          });
+
+          // If the existing parent is on the target starship, ensure it has relationships
+          // to any tool instances we deployed/identified for this template.
+          if (existingParent.starship_id === target.id) {
+            for (const toolId of deployedToolIds) {
+              try {
+                await agentRepo.addToolRelationship(existingParent.id, toolId);
+                agentToolLinksEnsured++;
+              } catch (relErr) {
+                logger.warn(
+                  `Failed to ensure agent-tool relationship for existing parent agent`,
+                  {
+                    component: 'migrate-seeded-template-parents',
+                    operation: 'addAgentToolRelationship',
+                    metadata: { agentId: existingParent.id, toolId, templateSlug: template.slug, starshipId: target.id },
+                  },
+                  relErr as Error
+                );
+              }
+            }
+          }
+
+          continue;
         }
 
         // If this template is already deployed on the target starship as a child agent instance,
@@ -387,7 +517,8 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
             UPDATE agents
             SET
               source_template_id = NULL,
-              template_snapshot_at = NULL,
+              template_snapshot_at = $6,
+              version = $7,
               publication_status = 'published',
               publication_approved_by = $2,
               publication_approved_at = $3,
@@ -402,6 +533,8 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
               now,
               template.id,
               'Backfilled parent agent for seeded marketplace template (promoted existing deployed instance)',
+              now,
+              template.version,
             ]
           );
 
@@ -526,6 +659,8 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
     logger.info(`  Parent agents created: ${parentsCreated}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Tools deployed: ${toolsDeployed}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Tools promoted to parents: ${toolsPromotedToParents}`, { component: 'migrate-seeded-template-parents' });
+    logger.info(`  Agent versions synced: ${agentVersionsSynced}`, { component: 'migrate-seeded-template-parents' });
+    logger.info(`  Tool versions synced: ${toolVersionsSynced}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Agent→Tool links ensured: ${agentToolLinksEnsured}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Errors: ${errors}`, { component: 'migrate-seeded-template-parents' });
     logger.info(`  Duration: ${Date.now() - startedAt}ms`, { component: 'migrate-seeded-template-parents' });

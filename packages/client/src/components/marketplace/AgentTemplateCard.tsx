@@ -120,7 +120,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         <div className="flex items-start gap-4 mb-4">
           <div className="flex-shrink-0">
             <Avatar className="h-12 w-12 ring-2 ring-background shadow-md">
-              <AgentAvatar seed={template.name} size={48} />
+              <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={48} />
             </Avatar>
           </div>
 
@@ -208,7 +208,7 @@ export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCar
       <CardHeader className="pb-3 relative z-10">
         <div className="mb-1 flex items-center gap-2">
           <Avatar className="h-6 w-6 ring-1 ring-border/40">
-            <AgentAvatar seed={template.name} size={24} />
+            <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={24} />
           </Avatar>
           <CardTitle className="truncate text-base font-semibold">{template.name}</CardTitle>
         </div>

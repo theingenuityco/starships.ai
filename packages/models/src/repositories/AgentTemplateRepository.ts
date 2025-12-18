@@ -10,6 +10,64 @@ export class AgentTemplateRepository extends BaseRepository {
     super('AgentTemplateRepository');
   }
 
+  /**
+   * INTERNAL: Load template avatar storage fields.
+   * These fields are not exposed in the public AgentTemplateModel returned by findById/findAll.
+   */
+  async getAvatarStorageById(id: string): Promise<{ avatarS3Key?: string; avatarMimeType?: string; avatarUpdatedAt?: string } | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{
+          avatar_s3_key?: string | null;
+          avatar_mime_type?: string | null;
+          avatar_updated_at?: Date | string | null;
+        }>(
+          `SELECT avatar_s3_key, avatar_mime_type, avatar_updated_at
+           FROM agent_templates
+           WHERE id = $1`,
+          [id]
+        );
+        if (!row) return null;
+        return {
+          avatarS3Key: row.avatar_s3_key ?? undefined,
+          avatarMimeType: row.avatar_mime_type ?? undefined,
+          avatarUpdatedAt: row.avatar_updated_at ? new Date(row.avatar_updated_at as any).toISOString() : undefined,
+        };
+      },
+      'getAvatarStorageById',
+      'AgentTemplate',
+      id
+    );
+  }
+
+  /**
+   * INTERNAL: Update template avatar storage fields.
+   */
+  async updateAvatarStorage(
+    id: string,
+    updates: { avatarS3Key: string; avatarMimeType: string; avatarUpdatedAt: string }
+  ): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        await connection.query(
+          `UPDATE agent_templates
+           SET avatar_s3_key = $2,
+               avatar_mime_type = $3,
+               avatar_updated_at = $4,
+               updated_at = NOW()
+           WHERE id = $1`,
+          [id, updates.avatarS3Key, updates.avatarMimeType, updates.avatarUpdatedAt]
+        );
+        return true;
+      },
+      'updateAvatarStorage',
+      'AgentTemplate',
+      id
+    );
+  }
+
   private toPublicModel(model: AgentTemplateModel & Record<string, unknown>): AgentTemplateModel {
     const hasAvatar = typeof (model as any).avatarS3Key === 'string' && String((model as any).avatarS3Key).length > 0;
     const avatarUrl = hasAvatar ? `/api/v1/agent-templates/${model.id}/avatar` : undefined;

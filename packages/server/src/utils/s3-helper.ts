@@ -111,6 +111,59 @@ export async function generatePresignedUrl(s3Key: string, expiresIn = 60): Promi
 }
 
 /**
+ * Generate presigned URL for inline preview (e.g. images).
+ *
+ * @param s3Key - S3 object key
+ * @param expiresIn - Expiration time in seconds (default: 1 minute)
+ */
+export async function generatePresignedUrlInline(s3Key: string, expiresIn = 60): Promise<string> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const filename = s3Key.split('/').pop() || 'preview';
+
+  const command = new GetObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+    ResponseContentDisposition: `inline; filename="${filename}"`,
+  });
+
+  return getSignedUrl(getS3Client(), command, { expiresIn });
+}
+
+/**
+ * Upload a public avatar image for an agent template.
+ * These are served via API routes and stored in S3 under a stable prefix.
+ */
+export async function uploadAgentTemplateAvatarToS3(options: {
+  templateId: string;
+  filename: string;
+  mimeType: string;
+  buffer: Buffer;
+}): Promise<string> {
+  const bucket = env.AWS_S3_BUCKET;
+  if (!bucket) {
+    throw new Error('AWS_S3_BUCKET not configured');
+  }
+
+  const timestamp = Date.now();
+  const sanitizedFilename = options.filename.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const s3Key = `public/agent-templates/${options.templateId}/avatar_${timestamp}_${sanitizedFilename}`;
+
+  const command = new PutObjectCommand({
+    Bucket: bucket,
+    Key: s3Key,
+    Body: options.buffer,
+    ContentType: options.mimeType,
+  });
+
+  await getS3Client().send(command);
+  return s3Key;
+}
+
+/**
  * Delete file from S3
  *
  * @param s3Key - S3 object key to delete

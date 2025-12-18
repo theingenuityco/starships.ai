@@ -41,6 +41,9 @@ import { ConversationService } from './ConversationService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+import { AvatarGenerationService } from './AvatarGenerationService';
+import { AttachmentService } from './AttachmentService';
+import { uploadAgentTemplateAvatarToS3 } from '@/utils/s3-helper';
 
 export interface ConversationRequest {
   agentId: string;
@@ -72,7 +75,7 @@ export class AgentService {
   private starshipRepository: StarshipRepository;
   private messageService: MessageService;
   // Kept for future use (runtime secrets, connector context, etc.)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   private connectorSecretService: ConnectorSecretService;
   private connectorRuntimeService: ConnectorRuntimeService;
 
@@ -1454,6 +1457,78 @@ export class AgentService {
       } catch (err) {
         // Tool synchronization should never block agent publication; log and continue.
         console.error('[AGENT-PUBLICATION] Failed to synchronize tools for agent template:', err);
+      }
+    }
+
+    // 3b. Ensure template has a public avatar
+    if (targetTemplateId) {
+      try {
+        const templateRepoInternal = new AgentTemplateRepository();
+        const existingAvatar = await templateRepoInternal.getAvatarStorageById(targetTemplateId);
+        const hasAvatar = !!existingAvatar?.avatarS3Key;
+
+        if (!hasAvatar) {
+          // Prefer copying the agent's avatar attachment when present
+          let buffer: Buffer | undefined;
+          let mimeType: string | undefined;
+
+          const agentAvatarAttachmentId = (agent as any).avatarAttachmentId as string | undefined;
+          if (agentAvatarAttachmentId) {
+            const attachmentService = new AttachmentService();
+            const attachment = await attachmentService.getAttachmentWithUrl(agentAvatarAttachmentId, agent.starshipId);
+            if (attachment?.url) {
+              const resp = await fetch(attachment.url);
+              if (resp.ok) {
+                const ab = await resp.arrayBuffer();
+                buffer = Buffer.from(ab);
+                mimeType = attachment.mimeType || resp.headers.get('content-type') || 'image/png';
+              }
+            }
+          }
+
+          // If the agent doesn't have an avatar yet (or fetch failed), generate one now
+          if (!buffer) {
+            const generator = new AvatarGenerationService();
+            const gen = await generator.generateAvatar({
+              subjectName: agent.name,
+              subjectDescription: agent.description,
+              starshipId: agent.starshipId,
+            });
+            buffer = gen.buffer;
+            mimeType = gen.mimeType;
+
+            // Also persist the agent's avatar attachment for consistency
+            try {
+              const attachmentService = new AttachmentService();
+              const created = await attachmentService.createAttachment({
+                starshipId: agent.starshipId,
+                conversationId: `agent-avatar-${agent.id}`,
+                filename: `agent-${agent.slug || agent.id}-avatar.${mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') ? 'jpg' : 'img'}`,
+                mimeType,
+                buffer,
+              });
+              await this.agentRepository.update(agent.id, { avatarAttachmentId: created.id } as any);
+            } catch (e) {
+              console.warn('[AGENT-PUBLICATION] Failed to persist agent avatar attachment during publish:', e);
+            }
+          }
+
+          if (buffer && mimeType) {
+            const s3Key = await uploadAgentTemplateAvatarToS3({
+              templateId: targetTemplateId,
+              filename: `template-${targetTemplateId}-avatar.${mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') ? 'jpg' : 'img'}`,
+              mimeType,
+              buffer,
+            });
+            await templateRepoInternal.updateAvatarStorage(targetTemplateId, {
+              avatarS3Key: s3Key,
+              avatarMimeType: mimeType,
+              avatarUpdatedAt: new Date().toISOString(),
+            });
+          }
+        }
+      } catch (err) {
+        console.error('[AGENT-PUBLICATION] Failed to ensure template avatar:', err);
       }
     }
 

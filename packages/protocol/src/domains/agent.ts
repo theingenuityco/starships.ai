@@ -121,6 +121,12 @@ export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> 
   publicationVersionBump?: 'patch' | 'minor' | 'major';
   publicationRequestedVersion?: string;
   publicationChangelog?: string;
+
+  /**
+   * Optional avatar image for the agent, stored as an Attachment (S3-backed).
+   * Generally set by server-side avatar generation flows.
+   */
+  avatarAttachmentId?: string;
 }
 
 /**

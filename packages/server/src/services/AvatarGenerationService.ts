@@ -212,7 +212,7 @@ export class AvatarGenerationService {
       '- Style: clean crisp lineart + cel shading (2–3 tones); simplified shapes; NO photorealism; NO 3D/CGI; NO painterly texture; NO skin micro-detail/pores; NO SSS.',
       '- Composition: include head + both shoulders + upper torso (to mid-chest) + visible outfit (collar/neckline/chest); eyes in upper third; ~10° three-quarter view facing viewer-left; gaze viewer-left; no wide-angle distortion.',
       '- Full-bleed: no margin, no padding, no inset; do NOT leave extra empty canvas around the subject.',
-      '- Background: solid flat background (single uniform color). No gradients/patterns/vignette/shadows.',
+      '- Background: simple natural-looking, unobtrusive background (single uniform, neutral tone). No scene/environment. No gradients/patterns/textures/vignette/shadows.',
       '- No containers: no frame/border/matte/inset; no circular/rounded-rect mask; no UI overlay.',
       '- No text/watermark/signature/logo.',
       '- Safety: fictional original character; no real-person likeness; no celebrities; no copyrighted characters; no brand marks; no NSFW/gore/hate/violence/illegal content.',

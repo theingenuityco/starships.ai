@@ -37,11 +37,6 @@ export class AvatarGenerationService {
 
     const model = 'google/gemini-2.5-flash-image';
 
-    const system = [
-      'You generate high-quality square avatar images.',
-      'Return an image. Text output (if any) must be <= 1 short sentence.',
-    ].join('\n');
-
     const user = [
       'Generate a 1:1 (square) avatar image.',
       '',
@@ -91,10 +86,7 @@ export class AvatarGenerationService {
           description: 'Generate avatar image using OpenRouter image model',
           parameters: {
             model,
-            messages: [
-              { role: 'system', content: system },
-              { role: 'user', content: user },
-            ],
+            messages: [{ role: 'user', content: user }],
             modalities: ['image', 'text'],
             imageConfig: { aspect_ratio: '1:1' },
             // Keep text short; primary output is the image

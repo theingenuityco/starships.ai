@@ -168,6 +168,17 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     })
   }, [starshipTools, selectedToolSlugs])
 
+  // Publish/template semantics: only non-draft tools with a complete definition (params + blueprint)
+  // are synchronized onto the published AgentTemplate. The "diff vs published template" UI must
+  // compare on the same basis, otherwise tools can appear "changed" forever even after publishing.
+  const isToolPublishableForTemplate = (tool: ToolModel | undefined | null): boolean => {
+    if (!tool) return false
+    if (tool.status === 'draft') return false
+    const hasParams = !!tool.parameters && tool.parameters.type === 'object' && !!tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0
+    const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
+    return hasParams && hasBlueprint
+  }
+
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
   useEffect(() => {
     if (typeof window === 'undefined' || typeof document === 'undefined') return
@@ -565,8 +576,30 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
     const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
 
-    // Tool comparison: compare current assignedToolSlugs in the form against the baseline tools from the template.
-    const currentTools = normalizeSlugs((value.assignedToolSlugs as string[] | undefined) || [])
+    // Tool comparison:
+    // - Template baseline contains tool *template slugs* and only includes tools that are publishable at template level.
+    // - Current form contains tool *instance slugs* and may include draft/incomplete tools.
+    // To avoid perpetual "Tools changed" after publish, compare only the publishable subset of current assignments.
+    const allCurrentTools = normalizeSlugs((value.assignedToolSlugs as string[] | undefined) || [])
+    const toolsBySlug = new Map<string, ToolModel>()
+    for (const t of Array.isArray(starshipTools) ? starshipTools : []) {
+      if (t?.slug) toolsBySlug.set(t.slug, t)
+    }
+    const currentTools = normalizeSlugs(
+      allCurrentTools
+        .map(slug => {
+          const tool = toolsBySlug.get(slug)
+          // If we can't resolve, keep raw slug so we don't incorrectly hide a diff.
+          if (!tool) return slug
+          if (!isToolPublishableForTemplate(tool)) return null
+
+          // The published AgentTemplate stores tool *template* slugs.
+          // Prefer the tool's published template slug when available; fallback to the tool slug.
+          // (Fallback handles older API responses and/or tools that haven't been promoted.)
+          return tool.publishedTemplateSlug || tool.slug || slug
+        })
+        .filter((s): s is string => typeof s === 'string' && s.length > 0)
+    )
     const baselineTools = normalizeSlugs(((publishedTemplate as any).assignedToolSlugs as string[] | undefined) || [])
     const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
 
@@ -606,6 +639,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         templatePreviewPrompts: templateCore.previewPrompts,
         agentBlueprintLen: agentBlueprintStr.length,
         templateBlueprintLen: templateBlueprintStr.length,
+        allCurrentTools,
         currentTools,
         baselineTools,
       })
@@ -628,7 +662,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     )
 
     return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
-  }, [fullAgent, publishedTemplate, value.assignedToolSlugs])
+  }, [fullAgent, publishedTemplate, value.assignedToolSlugs, starshipTools])
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)

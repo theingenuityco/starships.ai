@@ -78,6 +78,14 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
   sourceTemplateId?: string;
   publishedTemplateId?: string;
 
+  /**
+   * Convenience fields populated by some listing endpoints.
+   * These allow clients to reason about template-backed behavior without
+   * additional round trips.
+   */
+  sourceTemplateSlug?: string;
+  publishedTemplateSlug?: string;
+
   // ToolParams fields (made optional for draft support)
   parameters?: ToolParams['parameters'];
   blueprint?: ToolParams['blueprint'];

@@ -1456,9 +1456,10 @@ export class AgentService {
           }
         }
 
-        if (toolTemplateSlugs.length > 0) {
-          await templateRepo.update(targetTemplateId, { assignedToolSlugs: toolTemplateSlugs });
-        }
+        // Always synchronize tool assignments onto the AgentTemplate, even when empty.
+        // Otherwise, removing all publishable tools can never "clear" the template baseline,
+        // which makes the builder perpetually think tools have changed after publishing.
+        await templateRepo.update(targetTemplateId, { assignedToolSlugs: toolTemplateSlugs });
       } catch (err) {
         // Tool synchronization should never block agent publication; log and continue.
         console.error('[AGENT-PUBLICATION] Failed to synchronize tools for agent template:', err);

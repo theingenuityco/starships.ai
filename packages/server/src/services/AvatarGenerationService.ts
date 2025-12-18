@@ -5,7 +5,7 @@
  * (executed through the remote runner).
  */
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
-import type { Blueprint, EngineConfig, LLMResponse } from '@starships/autopilot';
+import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 
 export type AvatarGenerationResult = {
@@ -99,18 +99,121 @@ export class AvatarGenerationService {
     } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
 
     const runner = RunnerFactory.getTopLevelRunner(exec.depth ?? 0);
-    await runner.run(blueprint, exec, engineConfig);
+    // IMPORTANT: RemoteRunner/ChildProcessRunner execute out-of-process, so `exec.results`
+    // in this process will not be populated. Always use the returned items.
+    const resultItems = await runner.run(blueprint, exec, engineConfig);
+    const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
+    const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
+    if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
+      throw new Error(`Avatar generation LLM node failed: ${firstError}`);
+    }
 
-    const llmResult = [...(exec.results || [])].reverse().find((r) => r.nodeRef === 'llm_1');
-    const llmJson = llmResult?.items?.[0]?.json as unknown;
-    const response = llmJson as LLMResponse | undefined;
+    // When the blueprint ends without an explicit End.output, Engine returns:
+    // ExecutionItemUtils.wrapSingle(execution.results)
+    // i.e. llmJson may be an array of node results, not an LLMResponse directly.
+    const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
+      if (!Array.isArray(value)) return undefined;
+      for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        return (first as Record<string, unknown>).json;
+      }
+      return undefined;
+    };
 
-    const message = response?.choices?.[0]?.message as any;
-    const text = typeof message?.content === 'string' ? message.content : undefined;
-    const images = Array.isArray(message?.images) ? message.images : [];
-    const firstUrl = images?.[0]?.image_url?.url;
+    let llmNodeJson: unknown = llmJson;
+    if (Array.isArray(llmJson)) {
+      // Per Engine.executeLoop, when End did not return an explicit `{ result: ... }`,
+      // the final output is `execution.results` (array of { nodeRef, items }).
+      const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
+      if (typeof extracted === 'undefined') {
+        const nodeRefs = llmJson
+          .map((e) => (e && typeof e === 'object' ? (e as Record<string, unknown>).nodeRef : undefined))
+          .filter((x): x is string => typeof x === 'string');
+        throw new Error(
+          `Avatar generation workflow returned execution.results, but no output was found for nodeRef "llm_1". ` +
+            `nodeRefs=${JSON.stringify(nodeRefs)}`
+        );
+      }
+      llmNodeJson = extracted;
+    }
+
+    // Autopilot's LLM node returns an aggregated LLMResponse, but defensively handle
+    // variants where the response may be nested or where only a streamed "delta" exists.
+    type AnyRecord = Record<string, unknown>;
+    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
+
+    const unwrapResponse = (value: unknown): unknown => {
+      if (!isRecord(value)) return value;
+      const topChoices = value.choices;
+      if (Array.isArray(topChoices)) return value;
+
+      for (const key of ['response', 'data', 'result'] as const) {
+        const nested = value[key];
+        if (isRecord(nested) && Array.isArray(nested.choices)) {
+          return nested;
+        }
+      }
+      return value;
+    };
+
+    const response = unwrapResponse(llmNodeJson) as unknown;
+    const responseRec = isRecord(response) ? response : undefined;
+    const choices = responseRec?.choices;
+    const choice0 = Array.isArray(choices) ? choices[0] : undefined;
+    const choice0Rec = isRecord(choice0) ? choice0 : undefined;
+
+    // Prefer: choice.message → choice.delta → choice itself (some providers flatten)
+    const msgCandidate =
+      (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ??
+      (choice0Rec && isRecord(choice0Rec.delta) ? (choice0Rec.delta as AnyRecord) : undefined) ??
+      choice0Rec ??
+      undefined;
+
+    const message = msgCandidate;
+    const text = isRecord(message) && typeof message.content === 'string' ? (message.content as string) : undefined;
+    const images = isRecord(message) && Array.isArray(message.images) ? (message.images as unknown[]) : [];
+    let firstUrl =
+      isRecord(images?.[0]) && isRecord((images[0] as AnyRecord).image_url)
+        ? (((images[0] as AnyRecord).image_url as AnyRecord).url as unknown)
+        : undefined;
+
+    // Fallback: some providers may return image_url blocks inside message.content (array)
+    if ((!firstUrl || typeof firstUrl !== 'string') && isRecord(message) && Array.isArray(message.content)) {
+      const parts = message.content as unknown[];
+      const imgPart = parts.find((p) => {
+        if (!isRecord(p)) return false;
+        if (p.type !== 'image_url') return false;
+        if (!isRecord(p.image_url)) return false;
+        return typeof p.image_url.url === 'string';
+      }) as AnyRecord | undefined;
+      if (imgPart && isRecord(imgPart.image_url) && typeof imgPart.image_url.url === 'string') {
+        firstUrl = imgPart.image_url.url;
+      }
+    }
+
     if (typeof firstUrl !== 'string' || firstUrl.length === 0) {
-      throw new Error('Image generation returned no images');
+      const debug = {
+        llmJsonType: llmJson === null ? 'null' : Array.isArray(llmJson) ? 'array' : typeof llmJson,
+        llmJsonKeys: isRecord(llmJson) ? Object.keys(llmJson) : [],
+        llmNodeJsonType: llmNodeJson === null ? 'null' : Array.isArray(llmNodeJson) ? 'array' : typeof llmNodeJson,
+        llmNodeJsonKeys: isRecord(llmNodeJson) ? Object.keys(llmNodeJson) : [],
+        hasChoices: isRecord(response) && Array.isArray((response as AnyRecord).choices),
+        choice0Keys: isRecord(choice0) ? Object.keys(choice0) : [],
+        hasMessage: !!message,
+        messageKeys: isRecord(message) ? Object.keys(message) : [],
+        contentType:
+          isRecord(message) && Array.isArray(message.content) ? 'array' : isRecord(message) ? typeof message.content : typeof message,
+        imagesCount: isRecord(message) && Array.isArray(message.images) ? message.images.length : 0,
+        textPreview: typeof text === 'string' ? text.slice(0, 160) : undefined,
+        model: isRecord(response) ? response.model : undefined,
+      };
+      throw new Error(`Image generation returned no images. Debug: ${JSON.stringify(debug)}`);
     }
 
     const { buffer, mimeType } = this.decodeDataUrl(firstUrl);

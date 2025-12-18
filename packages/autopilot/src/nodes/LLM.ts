@@ -498,29 +498,51 @@ export class LLM extends BaseNode<LlmParams> {
         const choice = chunk.choices[0];
         if (!choice) continue;
 
-        // Accumulate content
-        if (choice.delta?.content) {
+        // Accumulate content (providers may send non-string content blocks; only append strings)
+        if (typeof choice.delta?.content === 'string') {
           const piece = choice.delta.content;
           content += piece;
         }
 
-        // Capture image generation outputs (OpenRouter extension: message.images[])
+        // Capture image generation outputs.
+        // OpenRouter image models may return:
+        // - message.images[] (OpenRouter extension)
+        // - or image_url blocks inside message.content (array)
         try {
           const extractImages = (node: unknown): GeneratedImage[] => {
             if (!node || typeof node !== 'object') return [];
             const rec = node as Record<string, unknown>;
-            const imgs = (rec as { images?: unknown }).images;
-            if (!Array.isArray(imgs) || imgs.length === 0) return [];
             const out: GeneratedImage[] = [];
-            for (const it of imgs) {
-              if (!it || typeof it !== 'object') continue;
-              const item = it as Record<string, unknown>;
-              const type = item.type;
-              const imageUrl = (item as { image_url?: unknown }).image_url;
-              if (type !== 'image_url' || !imageUrl || typeof imageUrl !== 'object') continue;
-              const url = (imageUrl as { url?: unknown }).url;
-              if (typeof url !== 'string' || url.length === 0) continue;
-              out.push({ type: 'image_url', image_url: { url } });
+
+            // 1) OpenRouter extension: images[]
+            const imgs = (rec as { images?: unknown }).images;
+            if (Array.isArray(imgs) && imgs.length > 0) {
+              for (const it of imgs) {
+                if (!it || typeof it !== 'object') continue;
+                const item = it as Record<string, unknown>;
+                const type = item.type;
+                const imageUrl = (item as { image_url?: unknown }).image_url;
+                if (type !== 'image_url' || !imageUrl || typeof imageUrl !== 'object') continue;
+                const url = (imageUrl as { url?: unknown }).url;
+                if (typeof url !== 'string' || url.length === 0) continue;
+                out.push({ type: 'image_url', image_url: { url } });
+              }
+              if (out.length > 0) return out;
+            }
+
+            // 2) OpenAI-style content blocks: content: [{type:'image_url', image_url:{url}}]
+            const contentVal = (rec as { content?: unknown }).content;
+            if (Array.isArray(contentVal) && contentVal.length > 0) {
+              for (const part of contentVal) {
+                if (!part || typeof part !== 'object') continue;
+                const p = part as Record<string, unknown>;
+                if (p.type !== 'image_url') continue;
+                const imageUrl = (p as { image_url?: unknown }).image_url;
+                if (!imageUrl || typeof imageUrl !== 'object') continue;
+                const url = (imageUrl as { url?: unknown }).url;
+                if (typeof url !== 'string' || url.length === 0) continue;
+                out.push({ type: 'image_url', image_url: { url } });
+              }
             }
             return out;
           };

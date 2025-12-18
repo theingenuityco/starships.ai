@@ -7,6 +7,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 
@@ -26,6 +27,21 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
 
   // Memoize agents array to prevent unnecessary rerenders
   const agents = useMemo(() => agentsData, [agentsData])
+
+  const avatarAttachmentIds = useMemo(() => {
+    const ids = agents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    return Array.from(new Set(ids))
+  }, [agents])
+
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+
+  const avatarUrlById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const a of avatarAttachments) {
+      if (a.previewUrl) map.set(a.id, a.previewUrl)
+    }
+    return map
+  }, [avatarAttachments])
 
   // Auto-select first agent when agents are loaded
   useEffect(() => {
@@ -76,7 +92,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                 >
                   <div className="flex items-center gap-3">
                     <Avatar className={cn('h-7 w-7 ring-1 ring-border/40 rounded-full')}>
-                      <AgentAvatar seed={agent.name} size={28} rounded />
+                      <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={28} rounded />
                     </Avatar>
                     <div className="min-w-0">
                       <div className="font-medium leading-5">{agent.name}</div>

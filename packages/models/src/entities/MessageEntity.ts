@@ -56,7 +56,9 @@ export class MessageEntity implements MessageModel {
     (o: MessageEntity) =>
       !(
         o.role === 'assistant' &&
-        ((Array.isArray(o.toolCalls) && o.toolCalls.length > 0) || (typeof o.reasoning === 'string' && o.reasoning.length > 0))
+        ((Array.isArray(o.toolCalls) && o.toolCalls.length > 0) ||
+          (typeof o.reasoning === 'string' && o.reasoning.length > 0) ||
+          (Array.isArray(o.attachmentIds) && o.attachmentIds.length > 0))
       )
   )
   @MinLength(1) // Ensure non-empty when required; no max length cap

@@ -297,6 +297,14 @@ router.post(
           content: z.string().min(1, 'content is required'),
           agentId: z.string().optional(),
           attachmentIds: z.array(z.string()).optional(),
+          // OpenRouter image generation (optional)
+          modalities: z.array(z.enum(['image', 'text'])).optional(),
+          imageConfig: z
+            .object({
+              aspect_ratio: z.string().optional(),
+            })
+            .passthrough()
+            .optional(),
           // baselineLength is no longer used on POST (streaming happens over GET SSE)
           baselineLength: z.coerce.number().int().min(0).optional(),
           // When true, wait for the turn to fully complete and return the last message
@@ -309,7 +317,7 @@ router.post(
       if (!bodyValidation) return;
 
       const { conversationId } = paramValidation;
-      const { content, agentId, attachmentIds, sync } = bodyValidation;
+      const { content, agentId, attachmentIds, sync, modalities, imageConfig } = bodyValidation;
 
       const isInternal = isInternalScheduleRequest(req);
 
@@ -403,6 +411,8 @@ router.post(
               messageType: 'user_input',
               ...(agentId && { agentId }),
               ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
+              ...(modalities && modalities.length > 0 && { modalities }),
+              ...(imageConfig && { imageConfig }),
             },
             { authContext: req.authContext }
           );
@@ -436,6 +446,8 @@ router.post(
             messageType: 'user_input',
             ...(agentId && { agentId }),
             ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
+            ...(modalities && modalities.length > 0 && { modalities }),
+            ...(imageConfig && { imageConfig }),
           },
           { authContext: req.authContext }
         )

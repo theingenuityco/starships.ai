@@ -14,15 +14,17 @@ import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 interface DeployedAgentCardProps {
   agent: AgentModel
+  avatarUrl?: string
   onClick: () => void
   onChat?: (agent: AgentModel) => void
   onEdit?: (agent: AgentModel) => void
   onDelete?: (agent: AgentModel) => void
+  onGenerateAvatar?: (agent: AgentModel, options?: { mode?: 'avatar_only' | 'full_chain' }) => void
   showActions?: boolean
   hideChatControl?: boolean
 }
 
-export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
+export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, onDelete, onGenerateAvatar, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
   // Check if this is a template-based agent (has sourceTemplateId) - these are protected
   const isTemplateAgent = !!agent.sourceTemplateId
 
@@ -78,7 +80,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
         </div>
 
         {/* Actions dropdown */}
-        {showActions && onDelete && (
+        {showActions && (onDelete || onGenerateAvatar) && (
           <div className="absolute top-3 right-3 z-30">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -92,6 +94,32 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
+                {onGenerateAvatar && (
+                  <DropdownMenuItem
+                    onClick={e => {
+                      e.stopPropagation()
+                      onGenerateAvatar(agent, { mode: 'full_chain' })
+                    }}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                  >
+                    <Icon name="image" className="w-4 h-4 text-muted-foreground" />
+                    <span>Generate Avatar</span>
+                  </DropdownMenuItem>
+                )}
+
+                {onGenerateAvatar && (
+                  <DropdownMenuItem
+                    onClick={e => {
+                      e.stopPropagation()
+                      onGenerateAvatar(agent, { mode: 'avatar_only' })
+                    }}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                  >
+                    <Icon name="refresh" className="w-4 h-4 text-muted-foreground" />
+                    <span>Regenerate (same prompt)</span>
+                  </DropdownMenuItem>
+                )}
+
                 {onDelete && !isTemplateAgent && (
                   <DropdownMenuItem
                     onClick={e => {
@@ -141,7 +169,7 @@ export function DeployedAgentCard({ agent, onClick, onChat, onEdit, onDelete, sh
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 }}
               >
-                <AgentAvatar seed={agent.name} size={48} />
+                <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={48} />
               </Avatar>
               {/* Animated amber border ring - only on hover */}
               <motion.div

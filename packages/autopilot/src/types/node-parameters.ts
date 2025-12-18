@@ -202,6 +202,20 @@ export interface LlmParams extends BaseParams {
     exclude?: boolean;
     enabled?: boolean;
   };
+  /**
+   * Optional OpenRouter multimodal output configuration.
+   * Example (image generation): ['image','text']
+   *
+   * Supports template expressions via string (e.g. '{{ state.modalities }}').
+   */
+  modalities?: Array<'text' | 'image'> | string;
+  /**
+   * Optional OpenRouter image configuration (passed as `image_config` to OpenRouter).
+   * Example: { aspect_ratio: '16:9' }
+   *
+   * Supports template expressions via string (e.g. '{{ state.imageConfig }}').
+   */
+  imageConfig?: Record<string, unknown> | string;
 }
 
 /**

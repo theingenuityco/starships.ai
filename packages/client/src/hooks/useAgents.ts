@@ -195,6 +195,35 @@ export function useAgentAnalytics(agentId: string, enabled: boolean = true) {
 }
 
 /**
+ * Generate an agent avatar (OpenRouter image model) and persist it server-side.
+ */
+export function useGenerateAgentAvatar() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { agentId: string; mode?: 'avatar_only' | 'full_chain' }): Promise<AgentModel> => {
+      const response: FetchResponse<ApiResponse<{ agent: AgentModel }>> = await api.post(`/api/v1/agents/${input.agentId}/avatar/generate`, {
+        mode: input.mode,
+      })
+      return response.data.data.agent
+    },
+    onSuccess: agent => {
+      // Refresh agent lists + detail
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(agent.id) })
+      if (agent.starshipId) {
+        queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(agent.starshipId) })
+      }
+      toast.success('Avatar generated', { description: `Updated avatar for ${agent.name}` })
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate avatar'
+      toast.error('Avatar generation failed', { description: message })
+    },
+  })
+}
+
+/**
  * Create a new agent
  */
 export function useCreateAgent() {

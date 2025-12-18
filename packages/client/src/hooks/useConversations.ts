@@ -45,6 +45,12 @@ interface CreateMessageRequest {
   messageType?: 'user_input' | 'agent_response' | 'system_notification' | 'system_instruction' | 'workflow_output' | 'error'
   stream?: boolean
   attachmentIds?: string[]
+  // OpenRouter image generation (optional)
+  modalities?: Array<'image' | 'text'>
+  imageConfig?: {
+    aspect_ratio?: string
+    [key: string]: any
+  }
 }
 
 // Centralized query keys
@@ -1132,6 +1138,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         content: data.content,
         agentId: data.agentId,
         attachmentIds: data.attachmentIds,
+        modalities: data.modalities,
+        imageConfig: data.imageConfig,
       })
       return response.data
     },

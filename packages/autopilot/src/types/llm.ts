@@ -53,6 +53,20 @@ export type ContentBlock =
 
 export type MessageContent = string | ContentBlock[];
 
+/**
+ * OpenRouter image generation output.
+ *
+ * When using OpenRouter image models with `modalities: ['image','text']`,
+ * providers may return an `images` array on the assistant message.
+ * The URL is typically a data URL: "data:image/png;base64,...".
+ */
+export type GeneratedImage = {
+  type: 'image_url';
+  image_url: {
+    url: string;
+  };
+};
+
 export interface LlmMessage {
   role: LLMMessageRole;
   content: MessageContent; // Support both string and multimodal content
@@ -60,6 +74,8 @@ export interface LlmMessage {
   reasoning?: string;
   // Optional unified reasoning details (OpenRouter normalized)
   reasoningDetails?: ReasoningDetail[];
+  // Optional image generation outputs (OpenRouter extension)
+  images?: GeneratedImage[];
   /**
    * The ID of the tool call this message is a result of.
    * For tool role messages emitted after executing a function/tool, providers use this to link

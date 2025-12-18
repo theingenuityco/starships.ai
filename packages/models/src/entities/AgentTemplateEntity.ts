@@ -149,6 +149,35 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @Length(1, 10)
   icon?: string;
 
+  /**
+   * Public avatar URL (computed by repository/service).
+   * Note: We do not store this in the DB; we store avatarS3Key/avatarMimeType/avatarUpdatedAt
+   * and expose a stable API route URL.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 2000)
+  avatarUrl?: string;
+
+  // Internal persistence fields (do not expose raw S3 key to clients)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 1000)
+  avatarS3Key?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  avatarMimeType?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  avatarUpdatedAt?: string;
+
   @Expose()
   @IsOptional()
   @IsArray()

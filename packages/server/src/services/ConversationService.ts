@@ -541,7 +541,9 @@ export class ConversationService {
     }
 
     const persistable: Record<string, unknown> = {};
-    const blacklist = new Set(['messages', 'tools']);
+    // Persist most execution state to conversation.state, but keep certain keys ephemeral
+    // (per-turn/per-request) so they don't "stick" across turns.
+    const blacklist = new Set(['messages', 'tools', 'modalities', 'imageConfig']);
 
     // Blacklist: Store everything except messages and tools
     for (const [key, value] of Object.entries(executionState)) {

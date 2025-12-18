@@ -349,7 +349,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
               onClick={() => onAgentSelect(agent)}
               onChat={() => handleChatWithAgent(agent)}
               onDelete={handleDeleteAgent}
-              onGenerateAvatar={a => generateAvatarMutation.mutate(a.id)}
+              onGenerateAvatar={(a, options) => generateAvatarMutation.mutate({ agentId: a.id, mode: options?.mode })}
               showActions={true}
             />
           ))}

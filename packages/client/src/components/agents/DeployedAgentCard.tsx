@@ -19,7 +19,7 @@ interface DeployedAgentCardProps {
   onChat?: (agent: AgentModel) => void
   onEdit?: (agent: AgentModel) => void
   onDelete?: (agent: AgentModel) => void
-  onGenerateAvatar?: (agent: AgentModel) => void
+  onGenerateAvatar?: (agent: AgentModel, options?: { mode?: 'avatar_only' | 'full_chain' }) => void
   showActions?: boolean
   hideChatControl?: boolean
 }
@@ -98,12 +98,25 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
                   <DropdownMenuItem
                     onClick={e => {
                       e.stopPropagation()
-                      onGenerateAvatar(agent)
+                      onGenerateAvatar(agent, { mode: 'full_chain' })
                     }}
                     className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
                   >
                     <Icon name="image" className="w-4 h-4 text-muted-foreground" />
                     <span>Generate Avatar</span>
+                  </DropdownMenuItem>
+                )}
+
+                {onGenerateAvatar && (
+                  <DropdownMenuItem
+                    onClick={e => {
+                      e.stopPropagation()
+                      onGenerateAvatar(agent, { mode: 'avatar_only' })
+                    }}
+                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                  >
+                    <Icon name="refresh" className="w-4 h-4 text-muted-foreground" />
+                    <span>Regenerate (same prompt)</span>
                   </DropdownMenuItem>
                 )}
 

@@ -201,8 +201,10 @@ export function useGenerateAgentAvatar() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (agentId: string): Promise<AgentModel> => {
-      const response: FetchResponse<ApiResponse<{ agent: AgentModel }>> = await api.post(`/api/v1/agents/${agentId}/avatar/generate`)
+    mutationFn: async (input: { agentId: string; mode?: 'avatar_only' | 'full_chain' }): Promise<AgentModel> => {
+      const response: FetchResponse<ApiResponse<{ agent: AgentModel }>> = await api.post(`/api/v1/agents/${input.agentId}/avatar/generate`, {
+        mode: input.mode,
+      })
       return response.data.data.agent
     },
     onSuccess: agent => {

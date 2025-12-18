@@ -429,6 +429,24 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     if (!paramValidation) return;
     const { id: agentId } = paramValidation;
 
+    const bodyValidation =
+      validateData(
+        z.object({
+          /**
+           * avatar_only: generate a new avatar using the existing saved avatarPrompt
+           * (will generate/save avatarPrompt only if missing).
+           *
+           * full_chain: regenerate avatarPrompt by asking the agent ("mirror"), save it,
+           * then generate a new avatar using that regenerated prompt.
+           */
+          mode: z.enum(['avatar_only', 'full_chain']).optional(),
+        }),
+        (req.body ?? {}) as unknown,
+        res,
+        'avatar generation options'
+      ) ?? {};
+    const mode = bodyValidation.mode ?? 'avatar_only';
+
     const agentService = new AgentService();
     const agent = await agentService.getAgent(agentId);
     if (!agent) {
@@ -442,18 +460,18 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
 
     // Ensure we have an agent-authored "mirror" description saved for this agent.
     const generator = new AvatarGenerationService();
-    let avatarPrompt = (agent as any).avatarPrompt as string | undefined;
-    if (!avatarPrompt || avatarPrompt.trim().length === 0) {
+    let avatarPrompt = agent.avatarPrompt;
+    if (mode === 'full_chain' || !avatarPrompt || avatarPrompt.trim().length === 0) {
       const mirrorResult = await generator.generateMirrorDescription({
         agentModel: agent.model,
         agentName: agent.name,
         agentDescription: agent.description,
-        agentSystemPrompt: (agent as any).systemPrompt as string | undefined,
+        agentSystemPrompt: agent.systemPrompt,
         starshipId: agent.starshipId,
       });
       avatarPrompt = mirrorResult.description;
       // Persist on agent for future avatar generations
-      await agentService.updateAgent(agent.id, { avatarPrompt } as any);
+      await agentService.updateAgent(agent.id, { avatarPrompt });
     }
 
     // Generate avatar via Autopilot runner/OpenRouter
@@ -476,7 +494,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     });
 
     // Persist link on agent
-    const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: attachment.id } as any);
+    const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: attachment.id });
 
     sendSuccess(res, {
       agent: updated,
@@ -507,7 +525,7 @@ router.delete('/agents/:id/avatar', jwtAuthMiddleware, async (req: Request, res:
     const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
     if (!hasAccess) return;
 
-    const attachmentId = (agent as any).avatarAttachmentId as string | undefined;
+    const attachmentId = agent.avatarAttachmentId;
     if (attachmentId) {
       const attachmentService = new AttachmentService();
       try {
@@ -518,7 +536,7 @@ router.delete('/agents/:id/avatar', jwtAuthMiddleware, async (req: Request, res:
       }
     }
 
-    const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: undefined } as any);
+    const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: undefined });
 
     sendSuccess(res, { agent: updated });
   } catch (error) {

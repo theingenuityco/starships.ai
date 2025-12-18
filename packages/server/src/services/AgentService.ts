@@ -1473,19 +1473,35 @@ export class AgentService {
         const existingAvatar = await templateRepoInternal.getAvatarStorageById(targetTemplateId);
         const hasAvatar = !!existingAvatar?.avatarS3Key;
 
-        if (!hasAvatar) {
-          // Only reuse an existing agent avatar if present.
-          // If the agent has no avatar, do NOT generate one during approval.
-          if (agent.avatarAttachmentId) {
-            const attachmentService = new AttachmentService();
-            const existingAttachment = await attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
-            if (existingAttachment?.s3Key) {
-              await templateRepoInternal.updateAvatarStorage(targetTemplateId, {
-                avatarS3Key: existingAttachment.s3Key,
-                avatarMimeType: existingAttachment.mimeType || 'image/png',
-                avatarUpdatedAt: new Date().toISOString(),
-              });
-            }
+        // Only reuse an existing agent avatar if present.
+        // If the agent has no avatar, do NOT generate one during approval.
+        //
+        // IMPORTANT: For re-publish flows, we should also refresh the template avatar
+        // when the agent's avatar is newer than what's currently stored on the template.
+        if (agent.avatarAttachmentId) {
+          const attachmentService = new AttachmentService();
+          const existingAttachment = await attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
+
+          const toMs = (s?: string) => {
+            if (!s) return NaN;
+            const t = new Date(s).getTime();
+            return Number.isFinite(t) ? t : NaN;
+          };
+
+          const templateAvatarMs = toMs(existingAvatar?.avatarUpdatedAt);
+          const attachmentCreatedMs = toMs(existingAttachment?.createdAt);
+          const shouldUpdateAvatar =
+            !hasAvatar ||
+            (Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs) && attachmentCreatedMs > templateAvatarMs) ||
+            (!Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs));
+
+          if (shouldUpdateAvatar && existingAttachment?.s3Key) {
+            await templateRepoInternal.updateAvatarStorage(targetTemplateId, {
+              avatarS3Key: existingAttachment.s3Key,
+              avatarMimeType: existingAttachment.mimeType || 'image/png',
+              // Use the attachment creation time when available so client diffs can compare reliably.
+              avatarUpdatedAt: existingAttachment.createdAt || new Date().toISOString(),
+            });
           }
         }
       } catch (err) {

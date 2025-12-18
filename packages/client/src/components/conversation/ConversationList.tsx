@@ -36,7 +36,6 @@ function CompactConversationAgents({ conversationId, starshipId }: { conversatio
   const { data: convAgents = [] } = useConversationAgents(conversationId || null)
 
   const agents = Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []
-  if (!agents.length) return null
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
   const remaining = agents.length - visibleAgents.length
@@ -47,6 +46,8 @@ function CompactConversationAgents({ conversationId, starshipId }: { conversatio
   }, [visibleAgents])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  if (!agents.length) return null
 
   return (
     <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-foreground">

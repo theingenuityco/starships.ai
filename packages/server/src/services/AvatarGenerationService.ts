@@ -44,7 +44,7 @@ export class AvatarGenerationService {
     };
 
     const user = [
-      'Write a compact avatar appearance prompt for yourself (anime character). You may invent details to be memorable.',
+      'Write a compact avatar appearance prompt for yourself (original fictional character). You may invent details to be memorable.',
       '',
       `Name: ${options.agentName}`,
       options.agentDescription ? `Description: ${truncate(options.agentDescription, 800)}` : undefined,
@@ -54,13 +54,12 @@ export class AvatarGenerationService {
       '',
       'Lines 2–8 (keep each short, vivid, and concrete):',
       '- Age: adult (20s–40s)',
-      '- Skin: tone/undertone',
-      '- Face: shape + jawline',
-      '- Eyes: very large expressive anime eyes; shape + iris color + catchlights; bold upper lash line',
-      '- Brows/Nose/Mouth: brows style + simplified small nose + simplified small mouth',
+      '- Face/Skin: face shape + jawline + skin tone/undertone + one defining facial feature',
+      '- Eyes: shape + iris color + catchlights; slightly exaggerated for readability (bigger eyes/clear shapes)',
       '- Hair: style + texture + color (allow one unusual accent like a streak)',
       '- Outfit: collar/neckline/top colors (visible in head-and-shoulders avatar)',
-      '- Signature: ONE distinctive detail (small accessory or subtle mark); or "none"',
+      '- Apparatus: 1–2 role-related items visible in a portrait (no brands/logos). REQUIRED.',
+      '- Background: their workplace environment (1 short phrase). REQUIRED. No text, no logos, no UI.',
       '',
       'Constraints: adult; fictional original; no real-person likeness; no celebrities; no copyrighted characters; no brands/logos; no NSFW; do not mention camera/rendering/engine/art-style terms.',
     ]
@@ -234,13 +233,13 @@ export class AvatarGenerationService {
     const gender = detectGender(options.subjectAvatarPrompt);
 
     const user = [
-      'Create a square (1:1) full-bleed 2D anime head-and-upper-torso avatar (single subject; show to mid-chest). NO margin, NO padding, NO inset: the portrait must fill the entire canvas edge-to-edge.',
+      'Create a square (1:1) full-bleed 2D illustrated head-and-upper-torso avatar (single subject; show to mid-chest). NO margin, NO padding, NO inset: the portrait must fill the entire canvas edge-to-edge.',
       '',
       'Constraints:',
-      '- Style: clean crisp lineart + cel shading (2–3 tones); simplified shapes; NO photorealism; NO 3D/CGI; NO painterly texture; NO skin micro-detail/pores; NO SSS.',
+      '- Style: simple iconic 2D illustration with a slight anime influence (NOT fully anime): bold clean lines; flat colors or 1–2 tone cel shading; minimal texture. Exaggerated features for readability (slightly larger eyes, simplified nose/mouth, clear silhouettes). NO photorealism; NO 3D/CGI; NO painterly texture; NO skin micro-detail/pores; NO subsurface scattering.',
       '- Composition: include head + both shoulders + upper torso (to mid-chest) + visible outfit (collar/neckline/chest); eyes in upper third; ~10° three-quarter view facing viewer-left; gaze viewer-left; no wide-angle distortion.',
       '- Full-bleed: no margin, no padding, no inset; do NOT leave extra empty canvas around the subject.',
-      '- Background: simple natural-looking, unobtrusive background (single uniform, neutral tone). No scene/environment. No gradients/patterns/textures/vignette/shadows.',
+      '- Background: a simple, unobtrusive workplace environment matching the subject’s role (lightly suggested, not a full scene). No readable text, no logos, no UI. Avoid busy details; keep focus on the subject.',
       '- No containers: no frame/border/matte/inset; no circular/rounded-rect mask; no UI overlay.',
       '- No text/watermark/signature/logo.',
       '- Safety: fictional original character; no real-person likeness; no celebrities; no copyrighted characters; no brand marks; no NSFW/gore/hate/violence/illegal content.',

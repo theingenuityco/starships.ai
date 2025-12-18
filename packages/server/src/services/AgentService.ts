@@ -41,9 +41,7 @@ import { ConversationService } from './ConversationService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
-import { AvatarGenerationService } from './AvatarGenerationService';
 import { AttachmentService } from './AttachmentService';
-import { uploadAgentTemplateAvatarToS3 } from '@/utils/s3-helper';
 
 export interface ConversationRequest {
   agentId: string;
@@ -186,30 +184,9 @@ export class AgentService {
   }
 
   /**
-   * Check if an agent is a system agent (Gaia, Daedalus, Aria)
-   */
-  private isSystemAgent(agent: AgentModel): boolean {
-    const systemAgentNames = ['Gaia', 'Daedalus', 'Aria'];
-    return systemAgentNames.includes(agent.name);
-  }
-
-  /**
    * Update agent and return as AgentModel
    */
   async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
-    // First get the current agent to check if it's a system agent
-    const currentAgent = await this.agentRepository.findById(agentId);
-    if (!currentAgent) {
-      return null;
-    }
-
-    // Prevent editing system agents
-    if (this.isSystemAgent(currentAgent)) {
-      throw new ValidationError(
-        `Cannot edit system agent "${currentAgent.name}". System agents (Gaia and Daedalus) are protected and cannot be modified.`
-      );
-    }
-
     return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
   }
 
@@ -245,19 +222,6 @@ export class AgentService {
    * Delete agent
    */
   async deleteAgent(agentId: string): Promise<boolean> {
-    // First get the current agent to check if it's a system agent
-    const currentAgent = await this.agentRepository.findById(agentId);
-    if (!currentAgent) {
-      return false;
-    }
-
-    // Prevent deleting system agents
-    if (this.isSystemAgent(currentAgent)) {
-      throw new ValidationError(
-        `Cannot delete system agent "${currentAgent.name}". System agents (Gaia and Daedalus) are protected and cannot be deleted.`
-      );
-    }
-
     return await this.agentRepository.delete(agentId);
   }
 
@@ -585,10 +549,10 @@ export class AgentService {
 
       if (!hasParams || !hasBlueprint) continue;
 
-      const isNewTemplate = !(tool as any).publishedTemplateId;
+      const publishedTemplateId = (tool as unknown as { publishedTemplateId?: string }).publishedTemplateId;
+      const isNewTemplate = !publishedTemplateId;
       let hasTemplateUpdate = false;
 
-      const publishedTemplateId = (tool as any).publishedTemplateId as string | undefined;
       if (publishedTemplateId) {
         let template = templateCache.get(publishedTemplateId);
         if (template === undefined) {
@@ -1394,7 +1358,7 @@ export class AgentService {
 
           if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
 
-          let templateId = (tool as any).publishedTemplateId as string | undefined;
+          let templateId = (tool as unknown as { publishedTemplateId?: string }).publishedTemplateId;
           let templateSlug: string | undefined;
 
           // Determine next tool version, honoring any publicationRequestedVersion from the request flow
@@ -1468,64 +1432,18 @@ export class AgentService {
         const hasAvatar = !!existingAvatar?.avatarS3Key;
 
         if (!hasAvatar) {
-          // Prefer copying the agent's avatar attachment when present
-          let buffer: Buffer | undefined;
-          let mimeType: string | undefined;
-
-          const agentAvatarAttachmentId = (agent as any).avatarAttachmentId as string | undefined;
-          if (agentAvatarAttachmentId) {
+          // Only reuse an existing agent avatar if present.
+          // If the agent has no avatar, do NOT generate one during approval.
+          if (agent.avatarAttachmentId) {
             const attachmentService = new AttachmentService();
-            const attachment = await attachmentService.getAttachmentWithUrl(agentAvatarAttachmentId, agent.starshipId);
-            if (attachment?.url) {
-              const resp = await fetch(attachment.url);
-              if (resp.ok) {
-                const ab = await resp.arrayBuffer();
-                buffer = Buffer.from(ab);
-                mimeType = attachment.mimeType || resp.headers.get('content-type') || 'image/png';
-              }
-            }
-          }
-
-          // If the agent doesn't have an avatar yet (or fetch failed), generate one now
-          if (!buffer) {
-            const generator = new AvatarGenerationService();
-            const gen = await generator.generateAvatar({
-              subjectName: agent.name,
-              subjectDescription: agent.description,
-              subjectAvatarPrompt: (agent as any).avatarPrompt as string | undefined,
-              starshipId: agent.starshipId,
-            });
-            buffer = gen.buffer;
-            mimeType = gen.mimeType;
-
-            // Also persist the agent's avatar attachment for consistency
-            try {
-              const attachmentService = new AttachmentService();
-              const created = await attachmentService.createAttachment({
-                starshipId: agent.starshipId,
-                conversationId: `agent-avatar-${agent.id}`,
-                filename: `agent-${agent.slug || agent.id}-avatar.${mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') ? 'jpg' : 'img'}`,
-                mimeType,
-                buffer,
+            const existingAttachment = await attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
+            if (existingAttachment?.s3Key) {
+              await templateRepoInternal.updateAvatarStorage(targetTemplateId, {
+                avatarS3Key: existingAttachment.s3Key,
+                avatarMimeType: existingAttachment.mimeType || 'image/png',
+                avatarUpdatedAt: new Date().toISOString(),
               });
-              await this.agentRepository.update(agent.id, { avatarAttachmentId: created.id } as any);
-            } catch (e) {
-              console.warn('[AGENT-PUBLICATION] Failed to persist agent avatar attachment during publish:', e);
             }
-          }
-
-          if (buffer && mimeType) {
-            const s3Key = await uploadAgentTemplateAvatarToS3({
-              templateId: targetTemplateId,
-              filename: `template-${targetTemplateId}-avatar.${mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') ? 'jpg' : 'img'}`,
-              mimeType,
-              buffer,
-            });
-            await templateRepoInternal.updateAvatarStorage(targetTemplateId, {
-              avatarS3Key: s3Key,
-              avatarMimeType: mimeType,
-              avatarUpdatedAt: new Date().toISOString(),
-            });
           }
         }
       } catch (err) {

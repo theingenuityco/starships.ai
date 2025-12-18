@@ -838,7 +838,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           {/* Page header - mirrors ship agents/tools overview pages */}
           <div id="agent-page-header" className="text-center mt-10">
             <div className="flex flex-col items-center justify-center gap-2 mb-2">
-              <AgentAvatar seed={headerAgentName} imageUrl={headerAvatarUrl} size={80} rounded className="h-20 w-20 rounded-2xl overflow-hidden ring-2 ring-primary/60 shadow-lg bg-background/80" />
+              <AgentAvatar seed={headerAgentName} imageUrl={headerAvatarUrl} size={80} rounded className="h-20 w-20 rounded-2xl overflow-hidden shadow-lg bg-background/80" />
               <div className="flex flex-col items-center">
                 <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentName}</h1>
               </div>

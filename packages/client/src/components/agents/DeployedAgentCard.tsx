@@ -34,51 +34,9 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
       <Card
-        className="frosted-glass-card shadow-frosted-lg group relative overflow-hidden transition-all duration-300 cursor-pointer border border-border/50 hover:border-primary/50 backdrop-blur-xl h-full flex flex-col"
+        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md"
         onClick={onClick}
       >
-        {/* Space-themed radial gradient overlay - matching landing screen */}
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{
-            backgroundImage: [
-              // Core glow - amber/yellow (brightest)
-              'radial-gradient(ellipse 400px 300px at 50% 0%, rgba(245,158,11,0.25), transparent 60%)',
-              // Secondary layer - softer amber blend
-              'radial-gradient(ellipse 500px 350px at 50% 0%, rgba(251,191,36,0.18), transparent 65%)',
-              // Outer spread - subtle warm glow
-              'radial-gradient(ellipse 600px 400px at 50% 0%, rgba(252,211,77,0.12), transparent 70%)',
-            ].join(', '),
-          }}
-        />
-
-        {/* Space-themed decorative corner accent with amber gradient */}
-        <div
-          className="absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse 80px 80px at top right, rgba(245,158,11,0.35), transparent 70%)',
-          }}
-        />
-
-        {/* Animated border glow on hover with amber hue */}
-        <div
-          className="absolute inset-0 rounded-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          style={{
-            border: '2px solid transparent',
-            background: 'linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box, linear-gradient(135deg, rgba(245,158,11,0.3), rgba(251,191,36,0.4), rgba(252,211,77,0.3)) border-box',
-          }}
-        />
-
-        {/* Shimmer effect on hover with amber tint */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div
-            className="absolute inset-y-0 w-1/2 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-700 ease-in-out"
-            style={{
-              background: 'linear-gradient(to right, transparent, rgba(245,158,11,0.15), rgba(251,191,36,0.1), transparent)',
-            }}
-          />
-        </div>
-
         {/* Actions dropdown */}
         {showActions && (onDelete || onGenerateAvatar) && (
           <div className="absolute top-3 right-3 z-30">
@@ -145,24 +103,9 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
         )}
 
         <CardHeader className="pb-4 relative z-10 pt-5">
-          <div className="flex items-start gap-3 mb-3">
-            {/* Enhanced Avatar */}
+          {/* First row: Avatar */}
+          <div className="flex items-start justify-start mb-3">
             <div className="relative flex-shrink-0">
-              {/* Animated amber glow ring - only on hover */}
-              <motion.div
-                className="absolute inset-0 rounded-full blur-xl pointer-events-none hidden group-hover:block"
-                style={{
-                  background: 'radial-gradient(circle, rgba(245,158,11,0.4), rgba(251,191,36,0.2), transparent 70%)',
-                }}
-                animate={{
-                  scale: [1, 1.15, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
               <Avatar
                 className="h-12 w-12 transition-all duration-300 relative z-10 shadow-lg"
                 style={{
@@ -171,91 +114,76 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
               >
                 <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={48} />
               </Avatar>
-              {/* Animated amber border ring - only on hover */}
-              <motion.div
-                className="absolute inset-0 rounded-full pointer-events-none hidden group-hover:block"
-                style={{
-                  boxShadow: '0 0 0 3px rgba(245,158,11,0.4)',
-                }}
-                animate={{
-                  scale: [1, 1.15, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
               {/* Online/Active indicator */}
               <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
                 <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
               </div>
             </div>
+          </div>
 
-            {/* Agent name and badge */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{agent.name}</CardTitle>
-                {/* Show version badge next to name */}
-                {agent.version && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
-                    v{agent.version}
-                  </Badge>
-                )}
-              </div>
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                {isTemplateAgent && (
+          {/* Second row: Name, badges, description */}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 mb-2 min-w-0">
+              <CardTitle className="truncate text-lg font-bold transition-colors duration-200 group-hover:text-foreground">{agent.name}</CardTitle>
+              {/* Show version badge next to name */}
+              {agent.version && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                  v{agent.version}
+                </Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {isTemplateAgent && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0.5 flex items-center"
+                  style={{
+                    borderColor: 'rgba(245,158,11,0.4)',
+                    backgroundColor: 'rgba(245,158,11,0.15)',
+                    color: 'rgba(245,158,11,1)',
+                  }}
+                >
+                  <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
+                  System
+                </Badge>
+              )}
+              {/* Premium update available indicator with subtle animation */}
+              {needsUpdate && (
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
                   <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 py-0.5 flex items-center"
+                    className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
                     style={{
-                      borderColor: 'rgba(245,158,11,0.4)',
-                      backgroundColor: 'rgba(245,158,11,0.15)',
-                      color: 'rgba(245,158,11,1)',
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
+                      borderColor: 'rgba(139, 92, 246, 0.3)',
+                      color: 'rgb(139, 92, 246)',
+                      boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
                     }}
                   >
-                    <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
-                    System
-                  </Badge>
-                )}
-                {/* Premium update available indicator with subtle animation */}
-                {needsUpdate && (
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
-                    <Badge
-                      className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
+                    <motion.div
+                      className="absolute inset-0"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
-                        borderColor: 'rgba(139, 92, 246, 0.3)',
-                        color: 'rgb(139, 92, 246)',
-                        boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
+                        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
                       }}
-                    >
-                      <motion.div
-                        className="absolute inset-0"
-                        style={{
-                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
-                        }}
-                        animate={{
-                          x: ['-100%', '100%'],
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: 'linear',
-                        }}
-                      />
-                      <span className="relative z-10 flex items-center gap-1">
-                        <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-                        NEW UPDATE AVAILABLE
-                      </span>
-                    </Badge>
-                  </motion.div>
-                )}
-              </div>
-              <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
-                {agent.description || 'No description provided'}
-              </CardDescription>
+                      animate={{
+                        x: ['-100%', '100%'],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: 'linear',
+                      }}
+                    />
+                    <span className="relative z-10 flex items-center gap-1">
+                      <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
+                      NEW UPDATE AVAILABLE
+                    </span>
+                  </Badge>
+                </motion.div>
+              )}
             </div>
+            <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
+              {agent.description || 'No description provided'}
+            </CardDescription>
           </div>
         </CardHeader>
 

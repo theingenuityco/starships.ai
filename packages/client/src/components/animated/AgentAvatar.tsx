@@ -8,6 +8,7 @@ import { normalizeAvatarSeed } from '@/lib/avatar'
 
 export type AgentAvatarProps = {
   seed?: string | null
+  imageUrl?: string | null
   size?: number
   className?: string
   emphasis?: boolean
@@ -22,8 +23,9 @@ const FRIENDLY_AVATAAR_OPTIONS: Pick<AvataaarsOptions, 'eyes' | 'eyebrows' | 'mo
   accessories: ['kurt', 'prescription01', 'prescription02', 'round'],
 }
 
-export default function AgentAvatar({ seed, size = 40, className, emphasis = false, animation = 'none', rounded = false }: AgentAvatarProps) {
+export default function AgentAvatar({ seed, imageUrl, size = 40, className, emphasis = false, animation = 'none', rounded = false }: AgentAvatarProps) {
   const hasSeed = typeof seed === 'string' && seed.trim().length > 0
+  const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0
 
   const svg = useMemo(() => {
     if (!hasSeed) return ''
@@ -36,7 +38,13 @@ export default function AgentAvatar({ seed, size = 40, className, emphasis = fal
 
   return (
     <div className={className} style={{ width: size, height: size, position: 'relative', borderRadius: rounded ? '9999px' : undefined, overflow: rounded ? 'hidden' : undefined }}>
-      {hasSeed ? <div style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} /> : <div style={{ width: size, height: size }} />}
+      {hasImage ? (
+        <img src={imageUrl as string} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: 'cover', display: 'block' }} />
+      ) : hasSeed ? (
+        <div style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} />
+      ) : (
+        <div style={{ width: size, height: size }} />
+      )}
     </div>
   )
 }

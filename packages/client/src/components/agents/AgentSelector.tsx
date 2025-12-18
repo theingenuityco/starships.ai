@@ -12,9 +12,10 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { AGENT_TEXT, ERROR_TEXT, LOADING_TEXT } from '@/constants/text'
-import { useDeleteAgent, useStarshipAgents } from '@/hooks/useAgents'
+import { useDeleteAgent, useGenerateAgentAvatar, useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateConversation } from '@/hooks/useConversations'
 import type { AgentModel } from '@starships/protocol'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
@@ -42,6 +43,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
   const { data, isLoading: loading, error: agentsError } = useStarshipAgents(starshipId || '', !!starshipId)
   const agents = useMemo(() => data ?? [], [data])
   const deleteAgentMutation = useDeleteAgent()
+  const generateAvatarMutation = useGenerateAgentAvatar()
   const createConversationMutation = useCreateConversation()
 
   const [filteredAgents, setFilteredAgents] = useState<AgentModel[]>([])
@@ -93,6 +95,21 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
 
     setFilteredAgents(filtered)
   }, [agents, filters.category, filters.searchQuery])
+
+  const avatarAttachmentIds = useMemo(() => {
+    const ids = filteredAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    return Array.from(new Set(ids))
+  }, [filteredAgents])
+
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+
+  const avatarUrlById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const a of avatarAttachments) {
+      if (a.previewUrl) map.set(a.id, a.previewUrl)
+    }
+    return map
+  }, [avatarAttachments])
 
   // Notify parent of agents count change
   useEffect(() => {
@@ -325,12 +342,14 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 mt-4">
           {filteredAgents.map(agent => (
-            <DeployedAgentCard 
-              key={agent.id} 
-              agent={agent} 
-              onClick={() => onAgentSelect(agent)} 
+            <DeployedAgentCard
+              key={agent.id}
+              agent={agent}
+              avatarUrl={avatarUrlById.get((agent as any).avatarAttachmentId)}
+              onClick={() => onAgentSelect(agent)}
               onChat={() => handleChatWithAgent(agent)}
               onDelete={handleDeleteAgent}
+              onGenerateAvatar={(a, options) => generateAvatarMutation.mutate({ agentId: a.id, mode: options?.mode })}
               showActions={true}
             />
           ))}
@@ -375,11 +394,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
             <Button variant="outline" onClick={handleCancelDelete}>
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
-              onClick={handleConfirmDelete}
-              disabled={deleteAgentMutation.isPending}
-            >
+            <Button variant="destructive" onClick={handleConfirmDelete} disabled={deleteAgentMutation.isPending}>
               {deleteAgentMutation.isPending ? (
                 <>
                   <Icon name="loading" className="w-4 h-4 mr-2 animate-spin" />

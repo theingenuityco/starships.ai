@@ -38,6 +38,18 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
   // Template preview
   icon?: string;
   previewPrompts?: string[]; // Example prompts to show what the template can do
+
+  /**
+   * Optional public avatar URL for marketplace display.
+   * Served by the API (not a raw S3 URL).
+   */
+  avatarUrl?: string;
+
+  /**
+   * Optional timestamp indicating when the avatar last changed.
+   * Useful for cache-busting.
+   */
+  avatarUpdatedAt?: string;
 }
 
 // ============================================================================

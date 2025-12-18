@@ -11,6 +11,8 @@ import type { AuthUser } from '@starships/protocol';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { StarshipService } from '@/services/StarshipService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { AvatarGenerationService } from '@/services/AvatarGenerationService';
+import { AttachmentService } from '@/services/AttachmentService';
 
 const router: Router = Router();
 
@@ -414,6 +416,138 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
   } catch (error) {
     console.error('[AGENTS] Error creating agent:', error);
     handleError(error, res, 'creating agent');
+  }
+});
+
+/**
+ * POST /agents/:id/avatar/generate
+ * Generates an agent avatar image via OpenRouter image model and stores it as an attachment.
+ */
+router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+    const { id: agentId } = paramValidation;
+
+    const bodyValidation =
+      validateData(
+        z.object({
+          /**
+           * avatar_only: generate a new avatar using the existing saved avatarPrompt
+           * (will generate/save avatarPrompt only if missing).
+           *
+           * full_chain: regenerate avatarPrompt by asking the agent ("mirror"), save it,
+           * then generate a new avatar using that regenerated prompt.
+           */
+          mode: z.enum(['avatar_only', 'full_chain']).optional(),
+        }),
+        (req.body ?? {}) as unknown,
+        res,
+        'avatar generation options'
+      ) ?? {};
+    const mode = bodyValidation.mode ?? 'avatar_only';
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    // Access check: caller must have access to the agent's starship
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    // Ensure we have an agent-authored "mirror" description saved for this agent.
+    const generator = new AvatarGenerationService();
+    let avatarPrompt = agent.avatarPrompt;
+    if (mode === 'full_chain' || !avatarPrompt || avatarPrompt.trim().length === 0) {
+      if (!agent.blueprint) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent blueprint is missing; cannot regenerate avatar prompt', 400);
+        return;
+      }
+      const mirrorResult = await generator.generateMirrorDescription({
+        agentName: agent.name,
+        agentDescription: agent.description,
+        agentBlueprint: agent.blueprint,
+        agentTools:
+          agent.state && typeof agent.state === 'object' && Array.isArray((agent.state as { tools?: unknown }).tools)
+            ? ((agent.state as { tools: unknown[] }).tools as unknown[])
+            : [],
+        starshipId: agent.starshipId,
+      });
+      avatarPrompt = mirrorResult.description;
+      // Persist on agent for future avatar generations
+      await agentService.updateAgent(agent.id, { avatarPrompt });
+    }
+
+    // Generate avatar via Autopilot runner/OpenRouter
+    const gen = await generator.generateAvatar({
+      subjectName: agent.name,
+      subjectDescription: agent.description,
+      subjectAvatarPrompt: avatarPrompt,
+      starshipId: agent.starshipId,
+    });
+
+    // Store as attachment (auth-scoped)
+    const attachmentService = new AttachmentService();
+    const filename = `agent-${agent.slug || agent.id}-avatar.${gen.mimeType.includes('png') ? 'png' : gen.mimeType.includes('jpeg') ? 'jpg' : 'img'}`;
+    const attachment = await attachmentService.createAttachment({
+      starshipId: agent.starshipId,
+      conversationId: `agent-avatar-${agent.id}`,
+      filename,
+      mimeType: gen.mimeType,
+      buffer: gen.buffer,
+    });
+
+    // Persist link on agent
+    const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: attachment.id });
+
+    sendSuccess(res, {
+      agent: updated,
+      attachment,
+    });
+  } catch (error) {
+    handleError(error, res, 'generating agent avatar');
+  }
+});
+
+/**
+ * DELETE /agents/:id/avatar
+ * Removes the stored avatar reference (and deletes the attachment).
+ */
+router.delete('/agents/:id/avatar', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+    const { id: agentId } = paramValidation;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    const attachmentId = agent.avatarAttachmentId;
+    if (attachmentId) {
+      const attachmentService = new AttachmentService();
+      try {
+        await attachmentService.deleteAttachment(attachmentId, agent.starshipId);
+      } catch (e) {
+        // Non-fatal; proceed to detach
+        console.warn('[AGENT-AVATAR] Failed to delete attachment:', e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    const updated = await agentService.updateAgent(agent.id, { avatarAttachmentId: undefined });
+
+    sendSuccess(res, { agent: updated });
+  } catch (error) {
+    handleError(error, res, 'deleting agent avatar');
   }
 });
 

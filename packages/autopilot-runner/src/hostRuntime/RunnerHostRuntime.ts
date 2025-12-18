@@ -217,6 +217,24 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       stream_options: { include_usage: true },
     };
 
+    // OpenRouter image generation (OpenRouter extension):
+    // - modalities: ['image','text']
+    // - image_config: { aspect_ratio: '16:9', ... }
+    try {
+      const anyReq = openaiRequest as unknown as Record<string, unknown>;
+      const modalities = (request as unknown as { modalities?: unknown }).modalities;
+      if (Array.isArray(modalities) && modalities.length > 0) {
+        anyReq.modalities = modalities;
+      }
+      const imageConfig = (request as unknown as { imageConfig?: unknown }).imageConfig;
+      if (imageConfig && typeof imageConfig === 'object') {
+        // OpenRouter expects snake_case
+        anyReq.image_config = imageConfig;
+      }
+    } catch {
+      // Non-fatal: ignore unsupported fields
+    }
+
     if (typeof request.temperature === 'number') {
       openaiRequest.temperature = request.temperature;
     }
@@ -270,7 +288,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
       openaiRequest.tools = tools;
     }
-
+    console.log('openaiRequest', openaiRequest);
     const stream = await client.chat.completions.create(openaiRequest);
     return stream as AsyncIterable<unknown>;
   };

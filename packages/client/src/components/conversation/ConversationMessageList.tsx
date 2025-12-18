@@ -85,8 +85,9 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
         const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
         const hasReasoning = typeof cur?.reasoning === 'string' && cur.reasoning.trim().length > 0
         const hasToolCalls = Array.isArray(cur?.toolCalls) && cur.toolCalls.length > 0
+        const hasAttachments = Array.isArray((cur as any)?.attachmentIds) && (cur as any).attachmentIds.length > 0
 
-        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls)) {
+        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments)) {
           // Keep actively streaming assistant shells visible
           if (streaming) {
             collapsedMessages.push(cur)
@@ -168,7 +169,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       const hasRChunks = Array.isArray(a?.reasoningChunks) && a.reasoningChunks.length > 0
       const hasReasoning = typeof a?.reasoning === 'string' && a.reasoning.trim().length > 0
       const hasToolCalls = Array.isArray(a?.toolCalls) && a.toolCalls.length > 0
-      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls
+      const hasAttachments = Array.isArray(a?.attachmentIds) && a.attachmentIds.length > 0
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments
     })
 
     return pruned
@@ -302,7 +304,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
       const hasReasoning = typeof (msg as any)?.reasoning === 'string' && (msg as any).reasoning.trim().length > 0
       const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0
       const hasToolResults = Array.isArray((msg as any)?.toolResults) && (msg as any).toolResults.length > 0
-      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults
+      const hasAttachments = Array.isArray((msg as any)?.attachmentIds) && (msg as any).attachmentIds.length > 0
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments
     }
     return displayMessages.filter(canRenderAssistant)
   }, [displayMessages])

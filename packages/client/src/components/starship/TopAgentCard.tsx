@@ -11,6 +11,8 @@ import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { cn } from '@/lib/utils'
 import { useConversationAgents } from '@/hooks/useConversations'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { useMemo } from 'react'
 
 type TopAgentCardProps = {
   starshipSlug: string
@@ -21,6 +23,10 @@ type TopAgentCardProps = {
 export function TopAgentCard({ starshipSlug, recentConversationId, className }: TopAgentCardProps): React.JSX.Element {
   const { data: convAgents = [] } = useConversationAgents(recentConversationId || null)
   const topAgent = Array.isArray(convAgents) && convAgents.length > 0 ? convAgents[0] : null
+  const avatarAttachmentId = (topAgent as any)?.avatarAttachmentId as string | undefined
+  const ids = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
+  const { data: avatarAttachments = [] } = useMessageAttachments(ids, topAgent?.starshipId)
+  const avatarUrl = avatarAttachments?.[0]?.previewUrl
 
   return (
     <Card className={cn('frosted-glass-card shadow-frosted-lg flex flex-col h-full', className)}>
@@ -35,7 +41,7 @@ export function TopAgentCard({ starshipSlug, recentConversationId, className }: 
           <>
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10 ring-1 ring-border/40">
-                <AgentAvatar seed={topAgent.name} size={40} />
+                <AgentAvatar seed={topAgent.name} imageUrl={avatarUrl} size={40} />
               </Avatar>
               <div className="min-w-0">
                 <div className="text-lg font-semibold leading-tight truncate">{topAgent.name}</div>

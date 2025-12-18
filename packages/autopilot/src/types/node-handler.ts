@@ -39,6 +39,17 @@ export interface LlmHostRequest {
   frequencyPenalty?: number;
   presencePenalty?: number;
   reasoning?: unknown;
+  /**
+   * OpenRouter multimodal output configuration.
+   * For image generation, include: ['image', 'text']
+   */
+  modalities?: Array<'text' | 'image'>;
+  /**
+   * Provider-specific image configuration.
+   * OpenRouter uses snake_case `image_config` in the HTTP payload; we keep camelCase here
+   * and the host runtime will map it.
+   */
+  imageConfig?: Record<string, unknown>;
 }
 
 /**

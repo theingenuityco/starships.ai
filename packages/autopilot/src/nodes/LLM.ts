@@ -14,6 +14,7 @@ import {
   Cacheable,
   CacheableSystemMessage,
   ContentBlock,
+  GeneratedImage,
   LLMMessageRole,
   LLMResponse,
   LLMUsage,
@@ -80,6 +81,20 @@ export class LLM extends BaseNode<LlmParams> {
 
   constructor(params: LlmParams, options?: NodeHandlerOptions) {
     super(params, options);
+  }
+
+  private coerceMaybeJson<T = unknown>(value: unknown): T | undefined {
+    if (value == null) return undefined;
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (!trimmed) return undefined;
+      try {
+        return JSON.parse(trimmed) as T;
+      } catch {
+        return undefined;
+      }
+    }
+    return value as T;
   }
 
   /**
@@ -171,6 +186,8 @@ export class LLM extends BaseNode<LlmParams> {
 
       // Delegate provider selection and credential management to HostRuntime;
       // the host returns an AsyncIterable of provider-native chunks.
+      const modalities = this.coerceMaybeJson<Array<'text' | 'image'>>(params.modalities);
+      const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
       const stream = await hostRuntime.llm({
         model: params.model,
         messages: this.convertMessagesToOpenAI(sourceMessages),
@@ -181,6 +198,8 @@ export class LLM extends BaseNode<LlmParams> {
         frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
         presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
         reasoning: params.reasoning,
+        ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
+        ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),
       });
 
       const llmResponse = await this.processOpenAIStream(stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>);
@@ -421,6 +440,7 @@ export class LLM extends BaseNode<LlmParams> {
     let usage: LLMUsage | undefined;
     let content = '';
     let reasoning = '';
+    let images: GeneratedImage[] = [];
     let toolCalls: Array<{
       id?: string;
       type: 'function';
@@ -478,10 +498,63 @@ export class LLM extends BaseNode<LlmParams> {
         const choice = chunk.choices[0];
         if (!choice) continue;
 
-        // Accumulate content
-        if (choice.delta?.content) {
+        // Accumulate content (providers may send non-string content blocks; only append strings)
+        if (typeof choice.delta?.content === 'string') {
           const piece = choice.delta.content;
           content += piece;
+        }
+
+        // Capture image generation outputs.
+        // OpenRouter image models may return:
+        // - message.images[] (OpenRouter extension)
+        // - or image_url blocks inside message.content (array)
+        try {
+          const extractImages = (node: unknown): GeneratedImage[] => {
+            if (!node || typeof node !== 'object') return [];
+            const rec = node as Record<string, unknown>;
+            const out: GeneratedImage[] = [];
+
+            // 1) OpenRouter extension: images[]
+            const imgs = (rec as { images?: unknown }).images;
+            if (Array.isArray(imgs) && imgs.length > 0) {
+              for (const it of imgs) {
+                if (!it || typeof it !== 'object') continue;
+                const item = it as Record<string, unknown>;
+                const type = item.type;
+                const imageUrl = (item as { image_url?: unknown }).image_url;
+                if (type !== 'image_url' || !imageUrl || typeof imageUrl !== 'object') continue;
+                const url = (imageUrl as { url?: unknown }).url;
+                if (typeof url !== 'string' || url.length === 0) continue;
+                out.push({ type: 'image_url', image_url: { url } });
+              }
+              if (out.length > 0) return out;
+            }
+
+            // 2) OpenAI-style content blocks: content: [{type:'image_url', image_url:{url}}]
+            const contentVal = (rec as { content?: unknown }).content;
+            if (Array.isArray(contentVal) && contentVal.length > 0) {
+              for (const part of contentVal) {
+                if (!part || typeof part !== 'object') continue;
+                const p = part as Record<string, unknown>;
+                if (p.type !== 'image_url') continue;
+                const imageUrl = (p as { image_url?: unknown }).image_url;
+                if (!imageUrl || typeof imageUrl !== 'object') continue;
+                const url = (imageUrl as { url?: unknown }).url;
+                if (typeof url !== 'string' || url.length === 0) continue;
+                out.push({ type: 'image_url', image_url: { url } });
+              }
+            }
+            return out;
+          };
+
+          const fromDelta = extractImages((choice as unknown as { delta?: unknown }).delta);
+          const fromMessage = extractImages((choice as unknown as { message?: unknown }).message);
+          const next = fromDelta.length > 0 ? fromDelta : fromMessage;
+          if (next.length > 0) {
+            images = next;
+          }
+        } catch {
+          // Non-fatal: ignore image extraction failures
         }
 
         // Accumulate reasoning text from OpenRouter reasoning-capable models
@@ -671,6 +744,10 @@ export class LLM extends BaseNode<LlmParams> {
               const existing = (choice0 as unknown as { message?: NormalizedMessage }).message ?? ({} as NormalizedMessage);
               const nextMessage: NormalizedMessage = { ...(existing as NormalizedMessage) } as NormalizedMessage;
               (nextMessage as unknown as { content?: string }).content = content;
+              // If we have images and provider didn't supply them, synthesize them for consumers
+              if (images.length > 0 && !(existing as unknown as { images?: unknown }).images) {
+                (nextMessage as unknown as { images?: GeneratedImage[] }).images = images;
+              }
               // Only synthesize toolCalls if provider didn't supply them
               if (!existing.toolCalls || (Array.isArray(existing.toolCalls) && existing.toolCalls.length === 0)) {
                 if (current.length > 0) nextMessage.toolCalls = current;
@@ -766,6 +843,7 @@ export class LLM extends BaseNode<LlmParams> {
               role: 'assistant' as LLMMessageRole,
               content,
               ...(reasoning ? { reasoning } : {}),
+              ...(images.length > 0 ? { images } : {}),
               ...(parsedToolCalls.length > 0 ? { toolCalls: parsedToolCalls } : {}),
             },
             finishReason: finishReason || 'stop',

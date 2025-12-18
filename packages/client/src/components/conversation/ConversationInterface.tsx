@@ -7,6 +7,7 @@ import { ConversationMessageList } from '@/components/conversation/ConversationM
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
@@ -167,6 +168,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
+  const starshipAgentAvatarAttachmentIds = useMemo(() => {
+    return (Array.isArray(starshipAgentsData) ? starshipAgentsData : [])
+      .map(a => (a as any).avatarAttachmentId as string | undefined)
+      .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+  }, [starshipAgentsData])
+  const { data: starshipAgentAvatarAttachments = [] } = useMessageAttachments(starshipAgentAvatarAttachmentIds, starshipId)
+  const starshipAgentAvatarUrlById = useMemo(() => new Map(starshipAgentAvatarAttachments.map(a => [a.id, a.previewUrl] as const)), [starshipAgentAvatarAttachments])
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const { data: starshipData } = useStarship(starshipId || '', !!starshipId)
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
@@ -1079,7 +1087,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                       <div className="flex flex-col gap-2">
                         <div className="flex items-end gap-3">
                           <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full">
-                            <AgentAvatar seed={agent.name} size={32} rounded />
+                            <AgentAvatar seed={agent.name} imageUrl={starshipAgentAvatarUrlById.get((agent as any).avatarAttachmentId)} size={32} rounded />
                           </Avatar>
                           <div className="min-w-0 flex-1">
                             <div className="mb-1 flex flex-col gap-[2px]">

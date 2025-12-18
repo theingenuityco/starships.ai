@@ -32,7 +32,7 @@ export class AgentTemplateRepository extends BaseRepository {
         return {
           avatarS3Key: row.avatar_s3_key ?? undefined,
           avatarMimeType: row.avatar_mime_type ?? undefined,
-          avatarUpdatedAt: row.avatar_updated_at ? new Date(row.avatar_updated_at as any).toISOString() : undefined,
+          avatarUpdatedAt: row.avatar_updated_at ? new Date(row.avatar_updated_at).toISOString() : undefined,
         };
       },
       'getAvatarStorageById',
@@ -69,15 +69,14 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   private toPublicModel(model: AgentTemplateModel & Record<string, unknown>): AgentTemplateModel {
-    const hasAvatar = typeof (model as any).avatarS3Key === 'string' && String((model as any).avatarS3Key).length > 0;
+    const hasAvatar = typeof model.avatarS3Key === 'string' && String(model.avatarS3Key).length > 0;
     const avatarUrl = hasAvatar ? `/api/v1/agent-templates/${model.id}/avatar` : undefined;
     const avatarUpdatedAt =
-      typeof (model as any).avatarUpdatedAt === 'string' && (model as any).avatarUpdatedAt.length > 0
-        ? (model as any).avatarUpdatedAt
-        : undefined;
+      typeof model.avatarUpdatedAt === 'string' && model.avatarUpdatedAt.length > 0 ? model.avatarUpdatedAt : undefined;
 
     // Never expose raw S3 pointers to clients
-    const { avatarS3Key: _k, avatarMimeType: _m, ...rest } = model as any;
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { avatarS3Key: _k, avatarMimeType: _m, ...rest } = model;
     return {
       ...(rest as AgentTemplateModel),
       ...(avatarUrl ? { avatarUrl } : {}),

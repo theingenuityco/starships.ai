@@ -69,7 +69,7 @@ async function removeOldDocTools(starshipId: string): Promise<{
     // Find all tools in this starship that match these templates
     const allTools = await toolRepo.findByStarship(starshipId);
     const toolsToRemove = allTools.filter(
-      (tool) => tool.templateId === blueprintExamplesTemplate.id || tool.templateId === nodeSchemaTemplate.id
+      (tool) => tool.sourceTemplateId === blueprintExamplesTemplate.id || tool.sourceTemplateId === nodeSchemaTemplate.id
     );
 
     logger.info(`Found ${toolsToRemove.length} old doc tools to remove from starship ${starshipId}`);
@@ -103,20 +103,16 @@ async function removeOldDocTools(starshipId: string): Promise<{
         // Delete the tool
         const deleted = await toolRepo.delete(tool.id);
         if (deleted) {
-          if (tool.templateId === blueprintExamplesTemplate.id) {
+          if (tool.sourceTemplateId === blueprintExamplesTemplate.id) {
             stats.blueprintExamplesRemoved++;
-          } else if (tool.templateId === nodeSchemaTemplate.id) {
+          } else if (tool.sourceTemplateId === nodeSchemaTemplate.id) {
             stats.nodeSchemaRemoved++;
           }
           logger.info(`Deleted tool "${tool.name}" (${tool.slug})`);
         }
       } catch (error) {
         stats.errors++;
-        logger.warn(
-          `Failed to remove tool ${tool.id}`,
-          { component: 'migrate-doc-tools', operation: 'removeTool' },
-          error as Error
-        );
+        logger.warn(`Failed to remove tool ${tool.id}`, { component: 'migrate-doc-tools', operation: 'removeTool' }, error as Error);
       }
     }
   } catch (error) {
@@ -168,8 +164,8 @@ async function deployNewDocTools(starshipId: string): Promise<{
     const existingTools = await toolRepo.findByStarship(starshipId);
 
     // Check if search-docs exists
-    const hasSearchDocs = existingTools.some((tool) => tool.templateId === searchDocsTemplate.id);
-    let searchDocsTool = existingTools.find((tool) => tool.templateId === searchDocsTemplate.id);
+    const hasSearchDocs = existingTools.some((tool) => tool.sourceTemplateId === searchDocsTemplate.id);
+    let searchDocsTool = existingTools.find((tool) => tool.sourceTemplateId === searchDocsTemplate.id);
 
     if (!hasSearchDocs) {
       try {
@@ -188,8 +184,8 @@ async function deployNewDocTools(starshipId: string): Promise<{
     }
 
     // Check if get-doc exists
-    const hasGetDoc = existingTools.some((tool) => tool.templateId === getDocTemplate.id);
-    let getDocTool = existingTools.find((tool) => tool.templateId === getDocTemplate.id);
+    const hasGetDoc = existingTools.some((tool) => tool.sourceTemplateId === getDocTemplate.id);
+    let getDocTool = existingTools.find((tool) => tool.sourceTemplateId === getDocTemplate.id);
 
     if (!hasGetDoc) {
       try {

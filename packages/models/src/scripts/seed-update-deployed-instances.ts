@@ -83,9 +83,7 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
         } else if (comparison === 0) {
           logger.debug(`Agent "${agent.name}" (${agent.slug}) is already up-to-date (v${agent.version})`);
         } else {
-          logger.warn(
-            `Agent "${agent.name}" (${agent.slug}) version (v${agent.version}) is newer than template (v${template.version})`
-          );
+          logger.warn(`Agent "${agent.name}" (${agent.slug}) version (v${agent.version}) is newer than template (v${template.version})`);
         }
       } catch (error) {
         stats.agentErrors++;
@@ -111,19 +109,19 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
   // Process tools
   try {
     const tools = await toolRepo.findByStarship(starshipId);
-    const templateTools = tools.filter((tool) => tool.templateId);
+    const templateTools = tools.filter((tool) => tool.sourceTemplateId);
 
     stats.toolsChecked = templateTools.length;
 
     for (const tool of templateTools) {
       try {
-        if (!tool.templateId) continue;
+        if (!tool.sourceTemplateId) continue;
 
         // Fetch the template to compare versions
-        const template = await toolTemplateRepo.findById(tool.templateId);
+        const template = await toolTemplateRepo.findById(tool.sourceTemplateId);
 
         if (!template) {
-          logger.warn(`Tool template not found for tool ${tool.id} (templateId: ${tool.templateId})`);
+          logger.warn(`Tool template not found for tool ${tool.id} (sourceTemplateId: ${tool.sourceTemplateId})`);
           continue;
         }
 

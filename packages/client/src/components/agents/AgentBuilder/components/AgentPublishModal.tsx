@@ -224,7 +224,7 @@ export function AgentPublishModal({
               <div className="space-y-3 pr-1">
                 {assignedToolsForOverrides.map(tool => {
                   const override = toolOverrides[tool.id] || { versionBump: 'patch' as const, changelog: '' }
-                  const isNewTemplate = !tool.templateId
+                  const isNewTemplate = !tool.publishedTemplateId
                   const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
                   const changeLabel = isNewTemplate
                     ? 'New tool will be published for this agent.'
@@ -387,4 +387,3 @@ export function AgentPublishModal({
     </Dialog>
   )
 }
-

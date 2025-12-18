@@ -585,18 +585,19 @@ export class AgentService {
 
       if (!hasParams || !hasBlueprint) continue;
 
-      const isNewTemplate = !tool.templateId;
+      const isNewTemplate = !(tool as any).publishedTemplateId;
       let hasTemplateUpdate = false;
 
-      if (tool.templateId) {
-        let template = templateCache.get(tool.templateId);
+      const publishedTemplateId = (tool as any).publishedTemplateId as string | undefined;
+      if (publishedTemplateId) {
+        let template = templateCache.get(publishedTemplateId);
         if (template === undefined) {
           try {
-            template = await templateRepo.findById(tool.templateId);
+            template = await templateRepo.findById(publishedTemplateId);
           } catch {
             template = null;
           }
-          templateCache.set(tool.templateId, template);
+          templateCache.set(publishedTemplateId, template);
         }
 
         if (template && template.version && tool.version && template.version !== tool.version) {
@@ -1393,7 +1394,7 @@ export class AgentService {
 
           if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
 
-          let templateId = tool.templateId;
+          let templateId = (tool as any).publishedTemplateId as string | undefined;
           let templateSlug: string | undefined;
 
           // Determine next tool version, honoring any publicationRequestedVersion from the request flow
@@ -1442,8 +1443,7 @@ export class AgentService {
           // Link tool back to its template, bump version and clear publication metadata
           await toolRepo.update(tool.id, {
             version: nextToolVersion,
-            templateId,
-            templateSnapshotAt: new Date().toISOString(),
+            publishedTemplateId: templateId,
           });
 
           if (templateSlug && !toolTemplateSlugs.includes(templateSlug)) {

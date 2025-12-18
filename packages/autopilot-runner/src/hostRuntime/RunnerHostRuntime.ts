@@ -288,7 +288,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
       openaiRequest.tools = tools;
     }
-
+    console.log('openaiRequest', openaiRequest);
     const stream = await client.chat.completions.create(openaiRequest);
     return stream as AsyncIterable<unknown>;
   };

@@ -53,6 +53,13 @@ export class AgentEntity implements AgentModel {
   @Length(1, 255)
   avatarAttachmentId?: string;
 
+  // Optional agent-authored avatar prompt used to guide avatar generation
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(0, 8000)
+  avatarPrompt?: string;
+
   @Expose()
   @IsOptional()
   @IsString()

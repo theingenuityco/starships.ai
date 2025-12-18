@@ -21,11 +21,156 @@ export type AvatarGenerationResult = {
 
 export class AvatarGenerationService {
   /**
+   * Ask the agent to describe its own appearance ("mirror" prompt).
+   * This is later persisted per-agent and fed into avatar generation.
+   */
+  async generateMirrorDescription(options: {
+    agentModel: string;
+    agentName: string;
+    agentDescription?: string;
+    agentSystemPrompt?: string;
+    starshipId: string;
+    runtimeEnv?: Record<string, unknown>;
+  }): Promise<{ description: string; model: string }> {
+    const env = getEnvConfig();
+    if (!env.OPENROUTER_API_KEY) {
+      throw new Error('OPENROUTER_API_KEY not configured on server');
+    }
+
+    const truncate = (s: unknown, max = 6000): string => {
+      const v = typeof s === 'string' ? s : '';
+      if (!v) return '';
+      return v.length > max ? `${v.slice(0, max)}…` : v;
+    };
+
+    const model = options.agentModel;
+
+    const user = [
+      'You are the AI agent described below.',
+      '',
+      'AGENT SYSTEM PROMPT (your identity/persona):',
+      options.agentSystemPrompt ? truncate(options.agentSystemPrompt) : '(none provided)',
+      '',
+      'AGENT METADATA:',
+      `- Name: ${options.agentName}`,
+      options.agentDescription ? `- Description: ${truncate(options.agentDescription, 1200)}` : undefined,
+      '',
+      'TASK:',
+      'Look into a mirror and reply with what it sees.',
+      '',
+      'OUTPUT FORMAT (strict):',
+      '- 6–10 short bullet points describing your FACE for an illustrator.',
+      '- Include: gender presentation (if not specified elsewhere, choose one), age (adult), skin tone, face shape, eyes, eyebrows, hair (style/texture/color), any subtle accessories.',
+      '- Keep it friendly and professional. No NSFW. No real-person likeness or celebrity references.',
+      '- Do not mention camera settings or art style; only describe what you look like.',
+    ]
+      .filter(Boolean)
+      .join('\n');
+
+    const blueprint: Blueprint = {
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+        {
+          ref: 'llm_1',
+          type: 'llm',
+          name: 'Mirror description',
+          description: 'Ask agent to describe its appearance',
+          parameters: {
+            model,
+            messages: [{ role: 'user', content: user }],
+            maxTokens: 256,
+            temperature: 0.8,
+          },
+        },
+        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
+      ],
+      edges: [
+        { ref: 'e1', from: 'start_1', to: 'llm_1' },
+        { ref: 'e2', from: 'llm_1', to: 'end_1' },
+      ],
+      metadata: {},
+    };
+
+    const exec = ExecutionItemUtils.createExecution();
+    exec.state = {
+      ...(exec.state ?? {}),
+      starshipId: options.starshipId,
+    };
+
+    const engineConfig = {
+      runtimeEnv: { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) },
+      llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
+      failOnNodeError: true,
+    } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
+
+    const runner = RunnerFactory.getTopLevelRunner(exec.depth ?? 0);
+    const resultItems = await runner.run(blueprint, exec, engineConfig);
+    const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
+    const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
+    if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
+      throw new Error(`Mirror description LLM node failed: ${firstError}`);
+    }
+
+    const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
+      if (!Array.isArray(value)) return undefined;
+      for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        return (first as Record<string, unknown>).json;
+      }
+      return undefined;
+    };
+
+    let llmNodeJson: unknown = llmJson;
+    if (Array.isArray(llmJson)) {
+      const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
+      if (typeof extracted === 'undefined') {
+        throw new Error('Mirror description workflow returned execution.results but did not include llm_1 output');
+      }
+      llmNodeJson = extracted;
+    }
+
+    type AnyRecord = Record<string, unknown>;
+    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
+
+    const unwrapResponse = (value: unknown): unknown => {
+      if (!isRecord(value)) return value;
+      const topChoices = value.choices;
+      if (Array.isArray(topChoices)) return value;
+      for (const key of ['response', 'data', 'result'] as const) {
+        const nested = value[key];
+        if (isRecord(nested) && Array.isArray(nested.choices)) return nested;
+      }
+      return value;
+    };
+
+    const response = unwrapResponse(llmNodeJson);
+    const responseRec = isRecord(response) ? response : undefined;
+    const choices = responseRec?.choices;
+    const choice0 = Array.isArray(choices) ? choices[0] : undefined;
+    const choice0Rec = isRecord(choice0) ? choice0 : undefined;
+    const msg = (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ?? undefined;
+    const text = isRecord(msg) && typeof msg.content === 'string' ? (msg.content as string).trim() : '';
+
+    if (!text) {
+      throw new Error('Mirror description returned empty text');
+    }
+
+    return { description: text, model };
+  }
+
+  /**
    * Generate a 1:1 avatar for an agent-like entity.
    */
   async generateAvatar(options: {
     subjectName: string;
     subjectDescription?: string;
+    subjectAvatarPrompt?: string;
     styleHint?: string;
     starshipId: string;
     runtimeEnv?: Record<string, unknown>;
@@ -71,6 +216,9 @@ export class AvatarGenerationService {
       'AGENT IDENTITY (use these to design the character):',
       `Name: ${options.subjectName}`,
       options.subjectDescription ? `Description: ${options.subjectDescription}` : undefined,
+      options.subjectAvatarPrompt
+        ? ['Agent avatar prompt (agent-authored; treat as primary source of appearance):', options.subjectAvatarPrompt].join('\n')
+        : undefined,
       options.styleHint ? `Extra hint (optional): ${options.styleHint}` : undefined,
     ]
       .filter(Boolean)

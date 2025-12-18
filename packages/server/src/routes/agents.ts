@@ -440,11 +440,27 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
     if (!hasAccess) return;
 
-    // Generate avatar via Autopilot runner/OpenRouter
+    // Ensure we have an agent-authored "mirror" description saved for this agent.
     const generator = new AvatarGenerationService();
+    let avatarPrompt = (agent as any).avatarPrompt as string | undefined;
+    if (!avatarPrompt || avatarPrompt.trim().length === 0) {
+      const mirrorResult = await generator.generateMirrorDescription({
+        agentModel: agent.model,
+        agentName: agent.name,
+        agentDescription: agent.description,
+        agentSystemPrompt: (agent as any).systemPrompt as string | undefined,
+        starshipId: agent.starshipId,
+      });
+      avatarPrompt = mirrorResult.description;
+      // Persist on agent for future avatar generations
+      await agentService.updateAgent(agent.id, { avatarPrompt } as any);
+    }
+
+    // Generate avatar via Autopilot runner/OpenRouter
     const gen = await generator.generateAvatar({
       subjectName: agent.name,
       subjectDescription: agent.description,
+      subjectAvatarPrompt: avatarPrompt,
       starshipId: agent.starshipId,
     });
 

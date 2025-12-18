@@ -1492,6 +1492,7 @@ export class AgentService {
             const gen = await generator.generateAvatar({
               subjectName: agent.name,
               subjectDescription: agent.description,
+              subjectAvatarPrompt: (agent as any).avatarPrompt as string | undefined,
               starshipId: agent.starshipId,
             });
             buffer = gen.buffer;

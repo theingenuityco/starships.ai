@@ -14,6 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbList, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { cn } from '@/lib/utils'
 import { scheduleAPI } from '@/lib/api'
 import type { ScheduleModel, AgentModel } from '@starships/protocol'
@@ -151,6 +152,14 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
     }
     return map
   }, [agents])
+
+  const agentAvatarAttachmentIds = useMemo(() => {
+    return (Array.isArray(agents) ? (agents as AgentModel[]) : [])
+      .map(a => (a as any)?.avatarAttachmentId as string | undefined)
+      .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+  }, [agents])
+  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
+  const agentAvatarUrlById = useMemo(() => new Map(agentAvatarAttachments.map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
 
   const now = new Date()
   const todayKey = formatDateKey(startOfDay(now))
@@ -464,7 +473,12 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                                     <>
                                                       <div className="flex items-center gap-1 mb-1">
                                                         <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                                          <AgentAvatar seed={latestAgent?.name || latestLabel} size={16} rounded />
+                                                          <AgentAvatar
+                                                            seed={latestAgent?.name || latestLabel}
+                                                            imageUrl={latestAgent ? agentAvatarUrlById.get((latestAgent as any).avatarAttachmentId) : undefined}
+                                                            size={16}
+                                                            rounded
+                                                          />
                                                         </Avatar>
                                                         <span className="font-medium truncate">{latestLabel}</span>
                                                         {extraCount > 0 && <span className="ml-auto text-[9px] text-muted-foreground">+{extraCount}</span>}
@@ -489,7 +503,12 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                                 >
                                                   <div className="flex items-center gap-1 mb-1">
                                                     <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                                      <AgentAvatar seed={agent?.name || label} size={16} rounded />
+                                                      <AgentAvatar
+                                                        seed={agent?.name || label}
+                                                        imageUrl={agent ? agentAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined}
+                                                        size={16}
+                                                        rounded
+                                                      />
                                                     </Avatar>
                                                     <span className="font-medium truncate">{label}</span>
                                                   </div>
@@ -589,7 +608,12 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                                       <>
                                                         <div className="flex items-center gap-1 mb-1">
                                                           <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                                            <AgentAvatar seed={agent?.name || label} size={16} rounded />
+                                                            <AgentAvatar
+                                                              seed={agent?.name || label}
+                                                              imageUrl={agent ? agentAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined}
+                                                              size={16}
+                                                              rounded
+                                                            />
                                                           </Avatar>
                                                           <span className="font-medium truncate">{label}</span>
                                                           {extraCount > 0 && <span className="ml-auto text-[9px] text-muted-foreground">+{extraCount}</span>}
@@ -617,7 +641,12 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                                               >
                                                 <div className="flex items-center gap-1 mb-1">
                                                   <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                                    <AgentAvatar seed={agent?.name || label} size={16} rounded />
+                                                    <AgentAvatar
+                                                      seed={agent?.name || label}
+                                                      imageUrl={agent ? agentAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined}
+                                                      size={16}
+                                                      rounded
+                                                    />
                                                   </Avatar>
                                                   <span className="font-medium truncate">{label}</span>
                                                 </div>

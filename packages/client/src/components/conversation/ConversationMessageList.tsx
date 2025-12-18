@@ -28,6 +28,10 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
   const agentName = agentObj?.name
+  const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
+  const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
+  const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
+  const agentAvatarUrl = agentAvatarAttachments?.[0]?.previewUrl
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -371,6 +375,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
               key={message.id}
               message={message}
               agentName={message.agentName || agentName}
+              agentAvatarUrl={agentAvatarUrl}
               isStreamingActive={message.id === activeRenderedStreamingAssistantId}
               starshipId={starshipId}
             />
@@ -380,7 +385,7 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
             <div className="flex justify-start">
               <div className="flex items-start gap-3 w-full">
                 <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                  <AgentAvatar seed={agentName} size={32} />
+                  <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
@@ -421,6 +426,7 @@ interface ExtendedMessage extends MessageModel {
 interface ConversationMessageBubbleProps {
   message: ExtendedMessage
   agentName?: string
+  agentAvatarUrl?: string
   isStreamingActive?: boolean
   starshipId?: string
 }
@@ -454,7 +460,7 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName, isStreamingActive, starshipId }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
 
     if (isUser) {
@@ -487,7 +493,7 @@ const MemoizedMessageBubble = memo(
         <div className="flex justify-start">
           <div className="flex items-start gap-3 w-full">
             <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
-              <AgentAvatar seed={agentName} size={32} />
+              <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
             </div>
             <div className="flex-1 w-full">
               <ConversationMessageContent
@@ -523,6 +529,9 @@ const MemoizedMessageBubble = memo(
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false
+
+    // Re-render if the agent avatar URL changes (e.g. after attachments load)
+    if ((prevProps.agentAvatarUrl || '') !== (nextProps.agentAvatarUrl || '')) return false
 
     // Re-render when text (assistant content) changes
     if (prevProps.message.content !== nextProps.message.content) return false

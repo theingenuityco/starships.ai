@@ -14,6 +14,7 @@ import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { StandardSelect } from './StandardSelect'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
@@ -77,6 +78,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Store full agent data including version info
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
   const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
+
+  const avatarAttachmentId = (fullAgent as any)?.avatarAttachmentId as string | undefined
+  const avatarIds = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
+  const avatarUrl = avatarAttachments?.[0]?.previewUrl
 
   // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
   // It appears only after the main page header scrolls away.
@@ -901,7 +907,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             {/* Avatar + name/slug on the far left */}
             {showIdentityInBanner && (
               <div className="flex items-center gap-3">
-                <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={36} rounded className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
+                <AgentAvatar
+                  seed={fullAgent?.name || value.name || value.slug || 'Agent'}
+                  imageUrl={avatarUrl}
+                  size={36}
+                  rounded
+                  className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
+                />
                 <div className="flex flex-col leading-tight min-w-0">
                   <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
                   {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}

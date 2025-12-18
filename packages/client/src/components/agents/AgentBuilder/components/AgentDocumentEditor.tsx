@@ -83,6 +83,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const avatarIds = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
   const avatarUrl = avatarAttachments?.[0]?.previewUrl
+  const avatarCreatedAt = avatarAttachments?.[0]?.createdAt
 
   // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
   // It appears only after the main page header scrolls away.
@@ -576,6 +577,24 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
     const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
 
+    // Avatar comparison:
+    // - Agent avatar is starship-scoped (Attachment) and has createdAt.
+    // - Published template avatar is public and tracked via avatarUpdatedAt (cache-busting timestamp).
+    // We treat the avatar as "same" if the agent has no avatar and the template has none,
+    // or if the agent avatar was created at/before the template's avatarUpdatedAt.
+    const templateAvatarUpdatedAt = (publishedTemplate as any)?.avatarUpdatedAt as string | undefined
+    const agentHasAvatar = typeof avatarAttachmentId === 'string' && avatarAttachmentId.trim().length > 0
+    const templateHasAvatar = typeof (publishedTemplate as any)?.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
+    const toMs = (s?: string) => {
+      if (!s) return NaN
+      const t = new Date(s).getTime()
+      return Number.isFinite(t) ? t : NaN
+    }
+    const agentAvatarMs = toMs(avatarCreatedAt)
+    const templateAvatarMs = toMs(templateAvatarUpdatedAt)
+    const sameAvatar =
+      (!agentHasAvatar && !templateHasAvatar) || (agentHasAvatar && templateHasAvatar && Number.isFinite(agentAvatarMs) && Number.isFinite(templateAvatarMs) && agentAvatarMs <= templateAvatarMs)
+
     // Tool comparison:
     // - Template baseline contains tool *template slugs* and only includes tools that are publishable at template level.
     // - Current form contains tool *instance slugs* and may include draft/incomplete tools.
@@ -617,6 +636,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!sameTimeout) changes.push('Timeout')
     if (!sameSystemPrompt) changes.push('System prompt')
     if (!samePreviewPrompts) changes.push('Preview prompts')
+    if (!sameAvatar) changes.push('Avatar')
     if (!sameTools) changes.push('Tools')
     if (!sameBlueprint) changes.push('Blueprint')
 
@@ -633,8 +653,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         sameTimeout,
         sameSystemPrompt,
         samePreviewPrompts,
+        sameAvatar,
         sameTools,
         sameBlueprint,
+        avatarAttachmentId,
+        avatarCreatedAt,
+        templateAvatarUpdatedAt,
         agentPreviewPrompts: agentCore.previewPrompts,
         templatePreviewPrompts: templateCore.previewPrompts,
         agentBlueprintLen: agentBlueprintStr.length,
@@ -657,12 +681,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       sameTimeout &&
       sameSystemPrompt &&
       samePreviewPrompts &&
+      sameAvatar &&
       sameTools &&
       sameBlueprint
     )
 
     return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
-  }, [fullAgent, publishedTemplate, value.assignedToolSlugs, starshipTools])
+  }, [fullAgent, publishedTemplate, value.assignedToolSlugs, starshipTools, avatarAttachmentId, avatarCreatedAt])
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)

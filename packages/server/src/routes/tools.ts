@@ -238,7 +238,10 @@ router.post('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Resp
     const template = await toolTemplateRepository.create(bodyValidation as any);
 
     console.log(`[TOOLS] Tool template created successfully: ${template.slug}`);
-    sendSuccess(res, template, 201);
+    // Do not return executable blueprints in template responses
+    const rest: Record<string, unknown> = { ...((template ?? {}) as unknown as Record<string, unknown>) };
+    delete rest['blueprint'];
+    sendSuccess(res, rest, 201);
   } catch (error) {
     console.error('[TOOLS] Error creating tool template:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create tool template');

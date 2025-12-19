@@ -9,15 +9,105 @@
 import { AgentParams, ValidationResult, ValidationError, NodeHandlerOptions, ExecutionItem, LlmMessage } from '@/types';
 import { NodeHandler } from '@/types/node-handler';
 import { Blueprint } from '@/types/blueprint';
+import type { Execution } from '@/types';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { EngineConfig } from '@/engine/Engine';
 import { RunnerFactory } from '@/runner/RunnerFactory';
 import { BlueprintBuilder } from '@/BlueprintBuilder';
+import type { Runner } from '@/runner/Runner';
 
 export class Agent implements NodeHandler {
   private params: AgentParams;
   private options?: NodeHandlerOptions;
   private nodeCounter: number = 1;
+
+  /**
+   * Ensure runtime-configurable LLM settings are present in execution state.
+   *
+   * The default Agent blueprint resolves these from templates like:
+   * - {{ state.model }}
+   * - {{ state.temperature }}
+   * - {{ state.maxTokens }}
+   * - {{ state.timeout }}
+   * - {{ state.reasoning }}
+   *
+   * If a host bypasses Agent.execute() and runs the blueprint directly,
+   * it should still call this helper before Engine validates the LLM node.
+   */
+  static seedRuntimeConfigIntoState(
+    state: Record<string, unknown>,
+    params: Pick<AgentParams, 'model' | 'temperature' | 'maxTokens' | 'timeout' | 'reasoning'>
+  ): void {
+    if (typeof state.model !== 'string' || state.model.trim().length === 0) {
+      state.model = params.model;
+    }
+    if (state.temperature === undefined && params.temperature !== undefined) {
+      state.temperature = params.temperature;
+    }
+    if (state.maxTokens === undefined && params.maxTokens !== undefined) {
+      state.maxTokens = params.maxTokens;
+    }
+    if (state.timeout === undefined && params.timeout !== undefined) {
+      state.timeout = params.timeout;
+    }
+    if (state.reasoning === undefined && params.reasoning !== undefined) {
+      state.reasoning = params.reasoning;
+    }
+  }
+
+  /**
+   * Seed all execution.state keys that Agent derives from params + input.
+   *
+   * This centralizes:
+   * - AgentParams.state merge (starshipId, etc.)
+   * - Runtime LLM config (model/temperature/maxTokens/timeout/reasoning)
+   * - Ordered message construction (systemPrompt -> memory -> input)
+   * - Tools placement for {{ state.tools }}
+   */
+  static seedExecutionStateIntoState(
+    state: Record<string, unknown>,
+    params: Pick<AgentParams, 'state' | 'systemPrompt' | 'model' | 'temperature' | 'maxTokens' | 'timeout' | 'reasoning'>,
+    input?: ExecutionItem[]
+  ): void {
+    // Merge agent state fields into execution.state so tools/nodes can read context (e.g., starshipId).
+    if (params.state && typeof params.state === 'object') {
+      Object.assign(state, params.state);
+    }
+
+    // Seed runtime-configurable LLM settings into state so the default blueprint can resolve them via templates.
+    Agent.seedRuntimeConfigIntoState(state, params);
+
+    // Build ordered messages snapshot: systemPrompt -> memory -> input
+    const orderedMessages: LlmMessage[] = [];
+    if (typeof params.systemPrompt === 'string' && params.systemPrompt.length > 0) {
+      orderedMessages.push({ role: 'system', content: params.systemPrompt });
+    }
+    if (params.state?.messages?.length) {
+      orderedMessages.push(...params.state.messages);
+    }
+
+    const isLlmMessageArray = (val: unknown): val is LlmMessage[] => {
+      return (
+        Array.isArray(val) &&
+        val.every((m) => {
+          if (typeof m !== 'object' || m === null) return false;
+          const obj = m as Record<string, unknown>;
+          return typeof obj.role === 'string' && typeof obj.content === 'string';
+        })
+      );
+    };
+
+    if (input && input.length > 0) {
+      const inputData = ExecutionItemUtils.unwrapSingle(input);
+      if (isLlmMessageArray(inputData)) {
+        orderedMessages.push(...inputData);
+      }
+      // Silently ignore non-LlmMessage inputs
+    }
+
+    state['messages'] = orderedMessages;
+    state['tools'] = params.state?.tools || [];
+  }
 
   /**
    * Create the default tool-enabled blueprint used by Agent when none is provided.
@@ -332,59 +422,11 @@ export class Agent implements NodeHandler {
       const parentExecution = this.options?.execution;
       const execution = ExecutionItemUtils.createExecution(undefined, parentExecution);
 
-      // Merge agent state fields into execution.state so tools can read context (e.g., starshipId)
-      if (this.params.state && typeof this.params.state === 'object') {
-        Object.assign(execution.state, this.params.state);
-      }
-
-      // Seed runtime-configurable LLM settings into state so the default blueprint can resolve them via templates.
-      // Use ??= so callers can override per-execution by pre-populating execution.state.
-      const s = execution.state as Record<string, unknown>;
-      (s as Record<string, unknown>)['model'] ??= this.params.model;
-      if (this.params.temperature !== undefined) (s as Record<string, unknown>)['temperature'] ??= this.params.temperature;
-      if (this.params.maxTokens !== undefined) (s as Record<string, unknown>)['maxTokens'] ??= this.params.maxTokens;
-      if (this.params.timeout !== undefined) (s as Record<string, unknown>)['timeout'] ??= this.params.timeout;
-      if (this.params.reasoning !== undefined) (s as Record<string, unknown>)['reasoning'] ??= this.params.reasoning;
-      const orderedMessages: LlmMessage[] = [];
-
-      // Add system prompt from params root first
-      if (this.params.systemPrompt) {
-        orderedMessages.push({ role: 'system', content: this.params.systemPrompt });
-      }
-
-      // Add state messages
-      if (this.params.state?.messages?.length) {
-        orderedMessages.push(...this.params.state.messages);
-      }
-
-      // Type guard to detect LlmMessage[]
-      const isLlmMessageArray = (val: unknown): val is LlmMessage[] => {
-        return (
-          Array.isArray(val) &&
-          val.every((m) => {
-            if (typeof m !== 'object' || m === null) return false;
-            const obj = m as Record<string, unknown>;
-            return typeof obj.role === 'string' && typeof obj.content === 'string';
-          })
-        );
-      };
-
-      // Add input messages (conversation messages from ConversationService)
-      if (input && input.length > 0) {
-        const inputData = ExecutionItemUtils.unwrapSingle(input);
-        if (isLlmMessageArray(inputData)) {
-          orderedMessages.push(...inputData);
-        }
-        // Silently ignore non-LlmMessage inputs
-      }
-
-      // Commit ordered messages to execution state
-      (execution.state as Record<string, unknown>)['messages'] = orderedMessages;
-      // Store tools in state so LLM nodes can reference them via {{ state.tools }}
-      (execution.state as Record<string, unknown>)['tools'] = this.params.state?.tools || [];
+      Agent.seedExecutionStateIntoState(execution.state as Record<string, unknown>, this.params, input);
 
       // Prepare engine config with event callback
-      const engineConfig: EngineConfig = {
+      const engineConfig: EngineConfig & Record<string, unknown> = {
+        ...(this.options?.runnerConfig || {}),
         eventCallback: this.options?.eventCallback,
         failOnNodeError: false,
         runtimeEnv: this.options?.runtimeEnv,
@@ -394,7 +436,23 @@ export class Agent implements NodeHandler {
       // Execute using runner chosen by current execution depth
       const blueprint = this.getCurrentBlueprint();
       const depth = execution.depth ?? 0;
-      const runner = RunnerFactory.getTopLevelRunner(depth);
+      const runner: Runner = this.options?.runner ?? RunnerFactory.getTopLevelRunner(depth);
+
+      // If the runner supports cancellation controllers, prefer that path so callers can stop a turn.
+      type RunnerController = { promise: Promise<ExecutionItem[]>; cancel: () => void };
+      type RunnerWithController = Runner & {
+        runWithController: (bp: Blueprint, exec: Execution, cfg?: EngineConfig) => RunnerController;
+      };
+      const ctl = (runner as Runner & Partial<RunnerWithController>).runWithController?.(blueprint, execution, engineConfig);
+      if (ctl && typeof ctl.cancel === 'function') {
+        try {
+          this.options?.onCancel?.(ctl.cancel);
+        } catch {
+          // ignore cancel registration failures
+        }
+        return await ctl.promise;
+      }
+
       return await runner.run(blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

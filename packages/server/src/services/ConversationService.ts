@@ -937,14 +937,6 @@ export class ConversationService {
         // Attribute streamed content to the current agent
         this.currentAgentForConversation.set(data.conversationId, { id: agentModel.id, name: agentModel.name });
 
-        const agent = new Agent(agentWithTools, {
-          eventCallback: (event) => this.eventCallback(data.conversationId, event),
-          runtimeEnv,
-        });
-        // Execute with cancellation controller at top level (depth=0 implied inside Agent)
-        // Use ChildProcessRunner directly to capture cancel handle
-        const runner = this.defaultRunner;
-
         // Build connector HTTP configuration for this starship/user context.
         // This is only used by the remote runner HostRuntime and is not exposed
         // to workflows (runtimeEnv/state).
@@ -972,44 +964,33 @@ export class ConversationService {
           connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
           llm?: { apiKey: string; baseUrl?: string };
         };
-        const blueprint = agent.getCurrentBlueprint();
-        const exec = ExecutionItemUtils.createExecution();
-        // Seed execution state with ordered messages: systemPrompt -> agent state messages -> conversation messages
-        const orderedForState: LlmMessage[] = [];
-        if (agentWithTools.systemPrompt && typeof agentWithTools.systemPrompt === 'string' && agentWithTools.systemPrompt.length > 0) {
-          orderedForState.push({ role: 'system', content: agentWithTools.systemPrompt } as LlmMessage);
-        }
-        if (Array.isArray((agentWithTools as { state?: { messages?: unknown[] } }).state?.messages)) {
-          const stateMsgs = ((agentWithTools as { state?: { messages?: LlmMessage[] } }).state?.messages || []).filter(
-            (m): m is LlmMessage => !!m && typeof (m as any).role === 'string' && typeof (m as any).content === 'string'
-          );
-          if (stateMsgs.length > 0) orderedForState.push(...stateMsgs);
-        }
-        if (Array.isArray(llmMessages) && llmMessages.length > 0) {
-          orderedForState.push(...llmMessages);
-        }
-        (exec.state as Record<string, unknown>)['messages'] = orderedForState;
-        (exec.state as Record<string, unknown>)['tools'] = (agentWithTools.state as any)?.tools ?? [];
-        // Optional per-turn multimodal output configuration (OpenRouter image generation)
+
+        // Optional per-turn multimodal output configuration (OpenRouter image generation):
+        // Agent.execute merges params.state into execution.state, so attach to agent params.state BEFORE construction.
         if (Array.isArray((data as any).modalities) && (data as any).modalities.length > 0) {
-          (exec.state as Record<string, unknown>)['modalities'] = (data as any).modalities;
+          (agentWithTools.state as any).modalities = (data as any).modalities;
         }
         if ((data as any).imageConfig && typeof (data as any).imageConfig === 'object') {
-          (exec.state as Record<string, unknown>)['imageConfig'] = (data as any).imageConfig;
+          (agentWithTools.state as any).imageConfig = (data as any).imageConfig;
         }
 
-        const ctl = (runner as any).runWithController?.(blueprint, exec, engineConfig);
-        if (ctl && typeof ctl.cancel === 'function') {
-          ConversationService.activeCancellations.set(data.conversationId, ctl.cancel);
-          try {
-            await ctl.promise;
-          } finally {
-            ConversationService.activeCancellations.delete(data.conversationId);
-          }
-        } else {
-          // Fallback: no controller available - keep placeholder to block duplicates until completion
-          await runner.run(blueprint, exec, engineConfig as any);
-        }
+        const agent = new Agent(agentWithTools, {
+          eventCallback: (event) => this.eventCallback(data.conversationId, event),
+          runtimeEnv,
+          // Ensure ConversationService can still choose isolation strategy (child vs remote) and support cancellation.
+          runner: this.defaultRunner,
+          runnerConfig: engineConfig as unknown as Record<string, unknown>,
+          onCancel: (cancel) => {
+            ConversationService.activeCancellations.set(data.conversationId, cancel);
+          },
+        });
+
+        // Execute the agent. Provide the full conversation snapshot as input so Agent.execute can
+        // construct the correct ordered message list (systemPrompt -> memory -> conversation).
+        await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
+
+        // Clear cancellation handle after completion
+        ConversationService.activeCancellations.delete(data.conversationId);
 
         // Refresh messages after this agent's turn so subsequent agents (if any)
         // see the updated conversation state, but do not perform mention-based handoffs

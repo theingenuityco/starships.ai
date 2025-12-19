@@ -102,37 +102,53 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
           </div>
         )}
 
-        <CardHeader className="pb-4 relative z-10 pt-5">
-          {/* First row: Avatar */}
-          <div className="flex items-start justify-start mb-3">
+        <CardHeader className="pb-4 relative z-10 pt-5 space-y-4">
+          <div className="flex items-start gap-4">
+            {/* Avatar (same row as title) */}
             <div className="relative flex-shrink-0">
               <Avatar
-                className="h-12 w-12 transition-all duration-300 relative z-10 shadow-lg"
+                className="h-14 w-14 rounded-full transition-all duration-300 relative z-10 shadow-lg"
                 style={{
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 }}
               >
-                <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={48} />
+                <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={56} rounded />
               </Avatar>
               {/* Online/Active indicator */}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
+              <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
                 <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
               </div>
             </div>
+
+            {/* Text content */}
+            <div className="min-w-0 flex-1">
+              <div className="mb-0.5 min-w-0">
+                <CardTitle className="truncate text-xl font-bold transition-colors duration-200 group-hover:text-foreground">{agent.name}</CardTitle>
+              </div>
+              {/* Slug row (below title) */}
+              {(agent as any)?.slug && (
+                <div className="-mt-0.5 mb-2 min-w-0">
+                  <span className="font-mono text-sm text-muted-foreground truncate">{(agent as any).slug}</span>
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Second row: Name, badges, description */}
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 mb-2 min-w-0">
-              <CardTitle className="truncate text-lg font-bold transition-colors duration-200 group-hover:text-foreground">{agent.name}</CardTitle>
-              {/* Show version badge next to name */}
+          {/* New section: badges + description (below avatar/name/slug) */}
+          <div className="mt-0">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {/* Version + model badges */}
               {agent.version && (
                 <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
                   v{agent.version}
                 </Badge>
               )}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {agent.model && (
+                <Badge variant="secondary" className="text-[10px] flex items-center gap-1.5 px-2 py-0.5 transition-all duration-200 min-w-0">
+                  <Icon name="brain" className="w-3.5 h-3.5" />
+                  <span className="font-mono text-[10px] truncate">{agent.model}</span>
+                </Badge>
+              )}
               {isTemplateAgent && (
                 <Badge
                   variant="outline"
@@ -188,13 +204,7 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
         </CardHeader>
 
         <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
-          <div className="flex items-center justify-between">
-            {/* Model badge */}
-            <Badge variant="secondary" className="text-xs flex items-center gap-1.5 px-2.5 py-1 transition-all duration-200">
-              <Icon name="brain" className="w-3.5 h-3.5" />
-              <span className="font-mono text-xs">{agent.model || 'N/A'}</span>
-            </Badge>
-
+          <div className="flex items-center justify-end">
             {/* Chat button */}
             {onChat ? (
               <Button

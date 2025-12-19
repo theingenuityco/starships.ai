@@ -666,6 +666,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         sameTemperature,
         sameMaxTokens,
         sameTimeout,
+        sameReasoning,
         sameSystemPrompt,
         samePreviewPrompts,
         sameAvatar,
@@ -694,6 +695,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       sameTemperature &&
       sameMaxTokens &&
       sameTimeout &&
+      sameReasoning &&
       sameSystemPrompt &&
       samePreviewPrompts &&
       sameAvatar &&

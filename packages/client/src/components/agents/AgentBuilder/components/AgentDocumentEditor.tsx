@@ -64,7 +64,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const reasoningDirtyRef = useRef<boolean>(false)
   const systemPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null)
   const selectLikeFieldClass =
-    'rounded-xl border border-border/50 bg-background/80 px-2 transition-colors hover:bg-muted/30 hover:shadow-sm hover:border-border/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 focus-visible:border-ring'
+    'rounded-lg border border-border/70 bg-background/80 px-2 transition-colors hover:bg-muted/30 hover:shadow-sm hover:border-border/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 focus-visible:border-ring'
 
   const availableModels = useMemo(() => {
     return openRouterModels?.map(m => m.id) || []
@@ -1233,7 +1233,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
               <Icon name="tag" className="w-4 h-4" />
               <span className="text-xs font-semibold">Category</span>
             </div>
@@ -1266,7 +1266,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Model section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
             </div>
@@ -1298,7 +1298,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Tools section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
               <Icon name="wrench" className="w-4 h-4" />
               <span className="text-xs font-semibold">Assigned Tools</span>
             </div>
@@ -1347,7 +1347,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Description */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-2">
               <Icon name="file-text" className="w-4 h-4" />
               <span className="text-xs font-semibold">Description</span>
             </div>
@@ -1366,7 +1366,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* System Prompt */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-2">
               <Icon name="sparkles" className="w-4 h-4" />
               <span className="text-xs font-semibold">System Prompt</span>
             </div>
@@ -1396,7 +1396,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       {/* Examples (Preview Prompts) */}
       <div className="border-b border-border/10 pb-2 mt-2">
         <div className="flex items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
             <Icon name="list-bullet" className="w-4 h-4" />
             <span className="text-xs font-semibold">Examples</span>
           </div>
@@ -1406,7 +1406,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 {(value.previewPrompts || []).length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">No preview prompts yet. Add a few examples to help users get started.</p>
                 ) : (
-                  <ul className="space-y-1">
+                  <ul className="space-y-2">
                     {(value.previewPrompts || []).map((prompt, idx) => (
                       <li key={idx} className="flex items-start gap-2">
                         <Input
@@ -1464,7 +1464,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 <Button
                   type="button"
                   size="sm"
-                  className="text-xs"
+                  className="h-7 px-2 rounded-lg text-[11px]"
                   disabled={isTemplateAgent || readOnly || !newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
                   onClick={() => {
                     if (isTemplateAgent || readOnly) return
@@ -1503,7 +1503,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             {/* Blueprint first */}
             <div>
               <div className="flex items-start gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
                   <Icon name="network" className="w-4 h-4" />
                   <span className="text-xs font-semibold">Blueprint</span>
                 </div>
@@ -1528,7 +1528,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             <div className="space-y-2 border-t border-border/10 pt-2">
               {/* Reasoning */}
               <div className="flex items-start gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
                   <Icon name="brain" className="w-4 h-4" />
                   <span className="text-xs font-semibold">Reasoning</span>
                 </div>
@@ -1562,7 +1562,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
               {/* Temperature */}
               <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
                   <span className="text-xs font-semibold">Temperature</span>
                 </div>
                 <div className="w-[260px]">
@@ -1575,14 +1575,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     value={value.temperature}
                     onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
                     disabled={isTemplateAgent || readOnly}
-                    className="text-xs"
+                    className={cn('text-sm h-7', selectLikeFieldClass)}
                   />
                 </div>
               </div>
 
               {/* Max Tokens */}
               <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
                   <span className="text-xs font-semibold">Max Tokens</span>
                 </div>
                 <div className="w-[260px]">
@@ -1594,14 +1594,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     value={value.maxTokens}
                     onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
                     disabled={isTemplateAgent || readOnly}
-                    className="text-xs"
+                    className={cn('text-sm h-7', selectLikeFieldClass)}
                   />
                 </div>
               </div>
 
               {/* Timeout */}
               <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
                   <span className="text-xs font-semibold">Timeout (ms)</span>
                 </div>
                 <div className="w-[260px]">
@@ -1613,7 +1613,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     value={value.timeout}
                     onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
                     disabled={isTemplateAgent || readOnly}
-                    className="text-xs"
+                    className={cn('text-sm h-7', selectLikeFieldClass)}
                   />
                 </div>
               </div>

@@ -127,7 +127,7 @@ export const StandardSelect: React.FC<StandardSelectProps> = ({
             type="button"
             aria-label={ariaLabel}
             className={cn(
-              'flex items-center justify-between rounded-xl h-7 px-2 border border-border/70 bg-background/80 text-left text-xs transition-colors',
+              'flex items-center justify-between rounded-lg h-7 px-2 border border-border/70 bg-background/80 text-left text-xs transition-colors',
               'hover:bg-muted/30 hover:shadow-sm hover:border-border/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-ring',
               disabled && 'opacity-60 cursor-not-allowed hover:bg-background/80 hover:shadow-none',
               triggerClassName
@@ -138,7 +138,7 @@ export const StandardSelect: React.FC<StandardSelectProps> = ({
             <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-1 shrink-0" />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-[360px] max-w-[90vw] p-1 frosted-glass-card rounded-xl shadow-frosted-lg">
+        <PopoverContent align="start" className="w-[360px] max-w-[90vw] p-1 frosted-glass-card rounded-lg shadow-frosted-lg">
           <Command className="bg-transparent">
             <CommandInput placeholder={searchPlaceholder} />
             <CommandEmpty className="text-xs">{emptyLabel}</CommandEmpty>

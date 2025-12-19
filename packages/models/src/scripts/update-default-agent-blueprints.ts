@@ -5,11 +5,10 @@
  * - agents.blueprint
  * - agent_templates.blueprint
  *
- * It preserves per-record LLM configuration by generating the default blueprint using each row's:
- * - model
- * - temperature (optional)
- * - maxTokens (optional)
- * - timeout (optional)
+ * NOTE:
+ * The default Agent blueprint is runtime-configurable via template evaluation (Engine/Eval) and
+ * reads LLM settings from execution.state at runtime (e.g. state.model, state.temperature, ...).
+ * Because of that, the "default blueprint" itself is now identical across agents/templates.
  *
  * IMPORTANT:
  * - This script updates ONLY the blueprint columns (no updated_at writes).
@@ -28,8 +27,6 @@
  *   --starship=<id>     Only update agents for a specific starship_id (templates are global and unaffected)
  *   --limit=<n>         Limit number of rows processed per table (for safe testing)
  *   --batch=<n>         Batch size for updates (default: 100)
- *   --reasoning-effort=<low|medium|high>  Override reasoning effort (default: medium).
- *   --no-reasoning      Disable reasoning (do not include reasoning config in the LLM node).
  */
 
 import { Agent } from '@starships/autopilot';
@@ -39,7 +36,6 @@ import { logger } from '@/helpers/logging';
 import { createConnection } from '@/helpers/database';
 
 type OnlyMode = 'agents' | 'templates' | 'all';
-type ReasoningEffort = 'low' | 'medium' | 'high';
 
 type AgentRow = {
   id: string;
@@ -70,13 +66,11 @@ function parseArgs(argv: string[]) {
     starshipId?: string;
     limit?: number;
     batchSize: number;
-    reasoningEffort?: ReasoningEffort;
   } = {
     apply: false,
     dryRun: true,
     only: 'all',
     batchSize: 100,
-    reasoningEffort: 'medium',
   };
 
   for (const arg of args) {
@@ -109,26 +103,9 @@ function parseArgs(argv: string[]) {
       if (Number.isFinite(n) && n > 0) out.batchSize = Math.floor(n);
       continue;
     }
-    if (arg.startsWith('--reasoning-effort=')) {
-      const v = String(arg.split('=')[1] || '').trim();
-      if (v === 'low' || v === 'medium' || v === 'high') {
-        out.reasoningEffort = v;
-      }
-      continue;
-    }
-    if (arg === '--no-reasoning') {
-      out.reasoningEffort = undefined;
-      continue;
-    }
   }
 
   return out;
-}
-
-function toOptionalNumber(v: unknown): number | undefined {
-  if (v == null) return undefined;
-  const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
-  return Number.isFinite(n) ? n : undefined;
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -180,25 +157,9 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(normalize(value));
 }
 
-function buildDefaultBlueprintForRow(input: {
-  name: string;
-  model: string;
-  temperature?: number;
-  maxTokens?: number;
-  timeout?: number;
-  reasoningEffort?: ReasoningEffort;
-}): Blueprint {
-  // IMPORTANT: The default blueprint is generated in the Agent constructor when blueprint is omitted.
-  const agent = new Agent({
-    name: input.name || 'Agent',
-    model: input.model,
-    ...(typeof input.temperature === 'number' ? { temperature: input.temperature } : {}),
-    ...(typeof input.maxTokens === 'number' ? { maxTokens: input.maxTokens } : {}),
-    ...(typeof input.timeout === 'number' ? { timeout: input.timeout } : {}),
-    ...(input.reasoningEffort ? { reasoning: { enabled: true, effort: input.reasoningEffort } } : {}),
-    state: { messages: [], tools: [] },
-  });
-  return agent.getCurrentBlueprint();
+function buildDefaultBlueprint(): Blueprint {
+  // IMPORTANT: Default blueprint is a stable definition that reads runtime configuration from execution.state.
+  return Agent.defaultAgentBlueprint();
 }
 
 async function updateInBatches(
@@ -233,7 +194,6 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
       starshipId: opts.starshipId,
       limit: opts.limit,
       batchSize: opts.batchSize,
-      reasoningEffort: opts.reasoningEffort,
     },
   });
 
@@ -266,16 +226,9 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
       const updates: Array<{ id: string; blueprint: Blueprint }> = [];
       let skipped = 0;
 
+      const generated = buildDefaultBlueprint();
       for (const r of rows) {
         const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
-        const generated = buildDefaultBlueprintForRow({
-          name: r.name,
-          model: r.model,
-          temperature: toOptionalNumber(r.temperature),
-          maxTokens: toOptionalNumber(r.max_tokens),
-          timeout: toOptionalNumber(r.timeout),
-          reasoningEffort: opts.reasoningEffort,
-        });
         const next = setBlueprintCreatedAt(generated, existingCreatedAt);
 
         // Only update if the blueprint meaningfully changes.
@@ -311,16 +264,9 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
       const updates: Array<{ id: string; blueprint: Blueprint }> = [];
       let skipped = 0;
 
+      const generated = buildDefaultBlueprint();
       for (const r of rows) {
         const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
-        const generated = buildDefaultBlueprintForRow({
-          name: r.name,
-          model: r.model,
-          temperature: toOptionalNumber(r.temperature),
-          maxTokens: toOptionalNumber(r.max_tokens),
-          timeout: toOptionalNumber(r.timeout),
-          reasoningEffort: opts.reasoningEffort,
-        });
         const next = setBlueprintCreatedAt(generated, existingCreatedAt);
 
         if (stableStringify(r.blueprint) === stableStringify(next)) {

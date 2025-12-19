@@ -77,8 +77,8 @@ export function AgentTemplateDetailsModalContent({ template, onDeploy, onRequest
       <div className="p-6 space-y-6">
         {/* Header */}
         <div className="flex items-start gap-4">
-          <Avatar className="h-14 w-14 ring-2 ring-background shadow-md">
-            <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={56} />
+          <Avatar className="h-14 w-14 rounded-full ring-2 ring-background shadow-md">
+            <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={56} rounded />
           </Avatar>
           <div className="min-w-0 flex-1">
             <div className="flex items-start justify-between gap-3">

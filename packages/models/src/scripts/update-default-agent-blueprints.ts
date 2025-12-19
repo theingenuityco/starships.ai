@@ -11,6 +11,11 @@
  * - maxTokens (optional)
  * - timeout (optional)
  *
+ * IMPORTANT:
+ * - This script updates ONLY the blueprint columns (no updated_at writes).
+ * - It preserves existing blueprint.metadata.createdAt when present, so reruns are idempotent
+ *   unless the underlying blueprint shape changes.
+ *
  * Usage (from repo root):
  *   pnpm --filter @starships/models update:default-agent-blueprints -- --dry-run
  *   pnpm --filter @starships/models update:default-agent-blueprints -- --apply
@@ -43,6 +48,7 @@ type AgentRow = {
   temperature: string | number | null;
   max_tokens: number | null;
   timeout: number;
+  blueprint: unknown;
 };
 
 type AgentTemplateRow = {
@@ -52,6 +58,7 @@ type AgentTemplateRow = {
   temperature: string | number | null;
   max_tokens: number | null;
   timeout: number;
+  blueprint: unknown;
 };
 
 function parseArgs(argv: string[]) {
@@ -122,6 +129,55 @@ function toOptionalNumber(v: unknown): number | undefined {
   if (v == null) return undefined;
   const n = typeof v === 'number' ? v : typeof v === 'string' ? Number(v) : NaN;
   return Number.isFinite(n) ? n : undefined;
+}
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function getBlueprintCreatedAt(blueprint: unknown): string | undefined {
+  if (!isRecord(blueprint)) return undefined;
+  const md = blueprint['metadata'];
+  if (!isRecord(md)) return undefined;
+  const createdAt = md['createdAt'];
+  return typeof createdAt === 'string' && createdAt.length > 0 ? createdAt : undefined;
+}
+
+function setBlueprintCreatedAt(blueprint: Blueprint, createdAt?: string): Blueprint {
+  if (!createdAt) return blueprint;
+  return {
+    ...blueprint,
+    metadata: {
+      ...(blueprint.metadata || {}),
+      createdAt,
+    },
+  };
+}
+
+/**
+ * Deterministic JSON stringify for deep equality checks.
+ * Ensures objects are sorted by key, arrays are preserved.
+ */
+function stableStringify(value: unknown): string {
+  const seen = new WeakSet<object>();
+
+  const normalize = (v: unknown): unknown => {
+    if (v === null) return null;
+    if (typeof v !== 'object') return v;
+    if (seen.has(v as object)) return '[Circular]';
+    seen.add(v as object);
+
+    if (Array.isArray(v)) return v.map((x) => normalize(x));
+
+    const obj = v as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const k of Object.keys(obj).sort()) {
+      out[k] = normalize(obj[k]);
+    }
+    return out;
+  };
+
+  return JSON.stringify(normalize(value));
 }
 
 function buildDefaultBlueprintForRow(input: {
@@ -198,7 +254,7 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
       const where = opts.starshipId ? 'WHERE starship_id = $1' : '';
       const limit = opts.limit ? `LIMIT ${opts.limit}` : '';
       const sql = `
-        SELECT id, name, model, temperature, max_tokens, timeout
+        SELECT id, name, model, temperature, max_tokens, timeout, blueprint
         FROM agents
         ${where}
         ORDER BY created_at ASC
@@ -207,35 +263,44 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
       const rows = (await db.query<AgentRow>(sql, opts.starshipId ? [opts.starshipId] : [])) || [];
       logger.info(`Loaded ${rows.length} agent(s)`, { component: 'update-default-agent-blueprints' });
 
-      const updates = rows.map((r) => ({
-        id: r.id,
-        blueprint: buildDefaultBlueprintForRow({
+      const updates: Array<{ id: string; blueprint: Blueprint }> = [];
+      let skipped = 0;
+
+      for (const r of rows) {
+        const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
+        const generated = buildDefaultBlueprintForRow({
           name: r.name,
           model: r.model,
           temperature: toOptionalNumber(r.temperature),
           maxTokens: toOptionalNumber(r.max_tokens),
           timeout: toOptionalNumber(r.timeout),
           reasoningEffort: opts.reasoningEffort,
-        }),
-      }));
+        });
+        const next = setBlueprintCreatedAt(generated, existingCreatedAt);
+
+        // Only update if the blueprint meaningfully changes.
+        if (stableStringify(r.blueprint) === stableStringify(next)) {
+          skipped++;
+          continue;
+        }
+
+        updates.push({ id: r.id, blueprint: next });
+      }
 
       if (opts.dryRun) {
-        logger.info(`Dry run: would update ${updates.length} agent blueprint(s)`, { component: 'update-default-agent-blueprints' });
+        logger.info(`Dry run: would update ${updates.length} agent blueprint(s) (skipped ${skipped})`, {
+          component: 'update-default-agent-blueprints',
+        });
       } else {
-        const updated = await updateInBatches(
-          db,
-          { batchSize: opts.batchSize },
-          updates,
-          'UPDATE agents SET blueprint = $2, updated_at = NOW() WHERE id = $1'
-        );
-        logger.info(`✅ Updated ${updated} agent blueprint(s)`, { component: 'update-default-agent-blueprints' });
+        const updated = await updateInBatches(db, { batchSize: opts.batchSize }, updates, 'UPDATE agents SET blueprint = $2 WHERE id = $1');
+        logger.info(`✅ Updated ${updated} agent blueprint(s) (skipped ${skipped})`, { component: 'update-default-agent-blueprints' });
       }
     }
 
     if (opts.only === 'all' || opts.only === 'templates') {
       const limit = opts.limit ? `LIMIT ${opts.limit}` : '';
       const sql = `
-        SELECT id, name, model, temperature, max_tokens, timeout
+        SELECT id, name, model, temperature, max_tokens, timeout, blueprint
         FROM agent_templates
         ORDER BY created_at ASC
         ${limit}
@@ -243,20 +308,31 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
       const rows = (await db.query<AgentTemplateRow>(sql)) || [];
       logger.info(`Loaded ${rows.length} agent template(s)`, { component: 'update-default-agent-blueprints' });
 
-      const updates = rows.map((r) => ({
-        id: r.id,
-        blueprint: buildDefaultBlueprintForRow({
+      const updates: Array<{ id: string; blueprint: Blueprint }> = [];
+      let skipped = 0;
+
+      for (const r of rows) {
+        const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
+        const generated = buildDefaultBlueprintForRow({
           name: r.name,
           model: r.model,
           temperature: toOptionalNumber(r.temperature),
           maxTokens: toOptionalNumber(r.max_tokens),
           timeout: toOptionalNumber(r.timeout),
           reasoningEffort: opts.reasoningEffort,
-        }),
-      }));
+        });
+        const next = setBlueprintCreatedAt(generated, existingCreatedAt);
+
+        if (stableStringify(r.blueprint) === stableStringify(next)) {
+          skipped++;
+          continue;
+        }
+
+        updates.push({ id: r.id, blueprint: next });
+      }
 
       if (opts.dryRun) {
-        logger.info(`Dry run: would update ${updates.length} agent_template blueprint(s)`, {
+        logger.info(`Dry run: would update ${updates.length} agent_template blueprint(s) (skipped ${skipped})`, {
           component: 'update-default-agent-blueprints',
         });
       } else {
@@ -264,9 +340,11 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
           db,
           { batchSize: opts.batchSize },
           updates,
-          'UPDATE agent_templates SET blueprint = $2, updated_at = NOW() WHERE id = $1'
+          'UPDATE agent_templates SET blueprint = $2 WHERE id = $1'
         );
-        logger.info(`✅ Updated ${updated} agent_template blueprint(s)`, { component: 'update-default-agent-blueprints' });
+        logger.info(`✅ Updated ${updated} agent_template blueprint(s) (skipped ${skipped})`, {
+          component: 'update-default-agent-blueprints',
+        });
       }
     }
   } finally {

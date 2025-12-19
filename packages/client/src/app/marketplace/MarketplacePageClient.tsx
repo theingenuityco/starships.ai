@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
+import { AgentDetailsModal } from '@/components/marketplace/AgentDetailsModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -31,6 +32,9 @@ export default function MarketplacePageClient() {
     setSelectedCategory(categoryFromUrl)
   }, [categoryFromUrl])
 
+  const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
+  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false)
+
   // Fetch templates data
   const { data: agentTemplates = [], isLoading: agentTemplatesLoading } = useAgentTemplates()
 
@@ -50,6 +54,16 @@ export default function MarketplacePageClient() {
   // Handle template deployment/installation
   const handleAgentDeploy = (_template: AgentTemplateModel) => {
     // Handle successful deployment - could show a success message or redirect
+  }
+
+  const handleAgentClick = (template: AgentTemplateModel) => {
+    setSelectedAgent(template)
+    setIsAgentModalOpen(true)
+  }
+
+  const handleAgentModalOpenChange = (open: boolean) => {
+    setIsAgentModalOpen(open)
+    if (!open) setSelectedAgent(null)
   }
 
   return (
@@ -125,7 +139,7 @@ export default function MarketplacePageClient() {
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {filteredAgentTemplates.map((template: AgentTemplateModel, idx: number) => (
                       <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
-                        <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} />
+                        <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                       </motion.div>
                     ))}
                   </div>
@@ -140,6 +154,8 @@ export default function MarketplacePageClient() {
             </div>
           </div>
         </div>
+
+        <AgentDetailsModal template={selectedAgent} open={isAgentModalOpen} onOpenChange={handleAgentModalOpenChange} onDeploy={handleAgentDeploy} />
       </PageLayout>
     </>
   )

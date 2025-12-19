@@ -22,6 +22,7 @@ export interface AgentBuilderViewProps {
   starshipId?: string
   initialSlug?: string
   errorMessage?: string
+  readOnly?: boolean
 }
 
 export interface AgentBuilderViewRef {

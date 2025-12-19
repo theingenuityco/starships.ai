@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
@@ -62,6 +62,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Track whether the user explicitly changed the Reasoning dropdown.
   // Important: we must NOT mutate agent reasoning/blueprint just by opening the editor.
   const reasoningDirtyRef = useRef<boolean>(false)
+  const systemPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const selectLikeFieldClass =
+    'rounded-xl border border-border/50 bg-background/80 px-2 transition-colors hover:bg-muted/30 hover:shadow-sm hover:border-border/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 focus-visible:border-ring'
 
   const availableModels = useMemo(() => {
     return openRouterModels?.map(m => m.id) || []
@@ -221,6 +224,19 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       observer.disconnect()
     }
   }, [])
+
+  // Auto-grow the System Prompt textarea to fit content
+  useEffect(() => {
+    const el = systemPromptTextareaRef.current
+    if (!el) return
+    try {
+      el.style.height = 'auto'
+      const nextHeight = Math.max(el.scrollHeight, 200)
+      el.style.height = `${nextHeight}px`
+    } catch {
+      // ignore
+    }
+  }, [value.systemPrompt])
 
   const formatUpdatedAt = (dateString: string) => {
     if (!dateString) return ''
@@ -1336,13 +1352,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <span className="text-xs font-semibold">Description</span>
             </div>
             <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-              <RichMarkdownEditor
+              <Textarea
                 value={value.description}
-                onChange={val => onFieldChange?.('description', val)}
-                placeholder="Write a clear description. Markdown supported."
-                className="pl-2"
-                noMinHeight
-                readOnly={readOnly}
+                onChange={e => onFieldChange?.('description', e.target.value)}
+                placeholder="Write a clear description."
+                className={cn('text-sm min-h-[80px] resize-none', selectLikeFieldClass)}
+                disabled={isTemplateAgent || readOnly}
               />
             </div>
           </div>
@@ -1356,13 +1371,22 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               <span className="text-xs font-semibold">System Prompt</span>
             </div>
             <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-              <RichMarkdownEditor
+              <Textarea
+                ref={systemPromptTextareaRef}
                 value={value.systemPrompt}
-                onChange={val => onFieldChange?.('systemPrompt', val)}
+                onChange={e => {
+                  onFieldChange?.('systemPrompt', e.target.value)
+                  try {
+                    e.currentTarget.style.height = 'auto'
+                    const nextHeight = Math.max(e.currentTarget.scrollHeight, 200)
+                    e.currentTarget.style.height = `${nextHeight}px`
+                  } catch {
+                    // ignore
+                  }
+                }}
                 placeholder="Define the agent's character, mission, and behavior..."
-                className="pl-2"
-                minHeightPx={200}
-                readOnly={readOnly}
+                className={cn('text-sm min-h-[200px] resize-none overflow-hidden', selectLikeFieldClass)}
+                disabled={isTemplateAgent || readOnly}
               />
             </div>
           </div>
@@ -1386,7 +1410,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     {(value.previewPrompts || []).map((prompt, idx) => (
                       <li key={idx} className="flex items-start gap-2">
                         <Input
-                          className="text-xs flex-1"
+                          className={cn('text-sm flex-1 h-7', selectLikeFieldClass)}
                           value={prompt}
                           disabled={isTemplateAgent || readOnly}
                           onChange={e => {
@@ -1420,7 +1444,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </div>
               <div className="flex items-center gap-2">
                 <Input
-                  className="text-xs flex-1"
+                  className={cn('text-sm flex-1 h-7', selectLikeFieldClass)}
                   placeholder="Add a sample user prompt…"
                   value={newPreviewPrompt}
                   disabled={isTemplateAgent || readOnly}

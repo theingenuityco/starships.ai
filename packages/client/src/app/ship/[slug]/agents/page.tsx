@@ -5,7 +5,6 @@ import Icon from '@/components/primitives/Icon'
 import React, { useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Badge } from '@/components/ui/badge'
@@ -52,54 +51,19 @@ export default function StarshipAgentsPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">Manage and view all agents in this starship</p>
             </div>
 
-            {/* Tabs header mirrors overview page, but routes per tab */}
-            <Tabs
-              value="agents"
-              onValueChange={value => {
-                if (value === 'ship') router.push(`/ship/${slug}`)
-                else if (value === 'agents') router.push(`/ship/${slug}/agents`)
-                else if (value === 'tools') router.push(`/ship/${slug}/tools`)
-                else if (value === 'schedules') router.push(`/ship/${slug}/schedules`)
-              }}
-              className="space-y-6"
-            >
-              <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
-                  <TabsTrigger value="ship" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="rocket" className="h-4 w-4" />
-                    <span>Ship</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="head-circuit" className="h-4 w-4" />
-                    <span>Agents</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="tools" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="wrench" className="h-4 w-4" />
-                    <span>Tools</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="schedules" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="clock" className="h-4 w-4" />
-                    <span>Schedules</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
-
-              <TabsContent value="agents">
-                <section aria-label="Agents list">
-                  <AgentSelector
-                    selectedAgent={selectedAgent}
-                    onAgentSelect={agent => {
-                      setSelectedAgent(agent)
-                      router.push(`/ship/${slug}/agent/${agent.slug}`)
-                    }}
-                    onAgentsCountChange={() => {}}
-                    showCreateButton={false}
-                    showFilters={true}
-                    starshipId={starshipId}
-                  />
-                </section>
-              </TabsContent>
-            </Tabs>
+            <section aria-label="Agents list">
+              <AgentSelector
+                selectedAgent={selectedAgent}
+                onAgentSelect={agent => {
+                  setSelectedAgent(agent)
+                  router.push(`/ship/${slug}/agent/${agent.slug}`)
+                }}
+                onAgentsCountChange={() => {}}
+                showCreateButton={false}
+                showFilters={true}
+                starshipId={starshipId}
+              />
+            </section>
           </div>
         </div>
       </div>

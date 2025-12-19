@@ -7,6 +7,7 @@
 import { Execution, NodeParameters, ValidationResult, ExecutionItem } from '@/types';
 import type { ToolParams } from './node-parameters';
 import { EventCallback } from '@/types/events';
+import type { Runner } from '@/runner/Runner';
 
 /**
  * Base interface for workflow node handlers
@@ -122,6 +123,28 @@ export interface NodeHandlerOptions {
    * This replaces the legacy callConnector hook with a typed interface.
    */
   hostRuntime?: HostRuntime;
+
+  /**
+   * Optional runner override for Agent execution.
+   * Useful when the embedding host wants explicit isolation/cancellation behavior
+   * (e.g., ChildProcessRunner with runWithController).
+   */
+  runner?: Runner;
+
+  /**
+   * Extra runner/engine configuration to pass through to the selected Runner.
+   *
+   * Note: This intentionally allows arbitrary keys (e.g. remote-runner-only config),
+   * while Agent.execute() still sets canonical EngineConfig fields like eventCallback,
+   * runtimeEnv, and hostRuntime.
+   */
+  runnerConfig?: Record<string, unknown>;
+
+  /**
+   * Optional hook for cancellation support when the runner exposes a cancel handle.
+   * (e.g. ChildProcessRunner.runWithController()).
+   */
+  onCancel?: (cancel: () => void) => void;
 }
 /**
  * Constructor type for handlers that accept the full node object

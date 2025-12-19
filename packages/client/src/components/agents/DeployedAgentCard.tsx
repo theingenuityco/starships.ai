@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, type ButtonProps } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 interface DeployedAgentCardProps {
   agent: AgentModel
@@ -22,9 +22,38 @@ interface DeployedAgentCardProps {
   onGenerateAvatar?: (agent: AgentModel, options?: { mode?: 'avatar_only' | 'full_chain' }) => void
   showActions?: boolean
   hideChatControl?: boolean
+  /**
+   * Optional override for the bottom-right CTA (e.g. Marketplace wants "Deploy"
+   * instead of the default "Chat" CTA).
+   */
+  primaryAction?: {
+    label: string
+    iconName?: string
+    onAction: (agent: AgentModel) => void
+    disabled?: boolean
+    variant?: ButtonProps['variant']
+    className?: string
+  }
+  /**
+   * When true, skip motion wrappers/animations (useful when the parent already
+   * wraps with its own motion container).
+   */
+  disableMotion?: boolean
 }
 
-export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, onDelete, onGenerateAvatar, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
+export function DeployedAgentCard({
+  agent,
+  avatarUrl,
+  onClick,
+  onChat,
+  onEdit,
+  onDelete,
+  onGenerateAvatar,
+  showActions = false,
+  hideChatControl = false,
+  primaryAction,
+  disableMotion = false,
+}: DeployedAgentCardProps) {
   // Check if this is a template-based agent (has sourceTemplateId) - these are protected
   const isTemplateAgent = !!agent.sourceTemplateId
 
@@ -32,7 +61,13 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
   const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
 
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+    <motion.div
+      initial={disableMotion ? undefined : { opacity: 0, y: 10 }}
+      animate={disableMotion ? undefined : { opacity: 1, y: 0 }}
+      whileHover={disableMotion ? undefined : { y: -4 }}
+      transition={disableMotion ? undefined : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      className="h-full"
+    >
       <Card
         className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md"
         onClick={onClick}
@@ -205,8 +240,22 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
 
         <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
           <div className="flex items-center justify-end">
-            {/* Chat button */}
-            {onChat ? (
+            {/* Primary action (optional override) */}
+            {primaryAction ? (
+              <Button
+                size="sm"
+                variant={primaryAction.variant ?? 'default'}
+                disabled={primaryAction.disabled}
+                className={primaryAction.className}
+                onClick={e => {
+                  e.stopPropagation()
+                  primaryAction.onAction(agent)
+                }}
+              >
+                {primaryAction.iconName ? <Icon name={primaryAction.iconName} className="mr-1.5 h-4 w-4" /> : null}
+                {primaryAction.label}
+              </Button>
+            ) : onChat ? (
               <Button
                 size="sm"
                 variant="ghost"

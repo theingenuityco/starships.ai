@@ -7,6 +7,7 @@ import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useToolTemplates } from '@/hooks/useTemplates'
+import { getCategoryColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
 
 interface AgentTemplateDetailsModalContentProps {
   template: AgentTemplateModel
@@ -57,7 +58,7 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
             </Badge>
           ) : null}
           {template.category ? (
-            <Badge variant="secondary" className="capitalize">
+            <Badge variant="outline" className={`capitalize border font-medium ${getCategoryColor(template.category as any)}`}>
               {template.category}
             </Badge>
           ) : null}
@@ -91,7 +92,7 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
                   return (
                     <div key={slug} className="relative rounded-lg border border-muted-foreground/20 bg-muted/10 hover:bg-muted/20 transition-colors px-3 py-2">
                       {version ? (
-                        <div className="absolute top-2 left-2">
+                        <div className="absolute top-2 right-2">
                           <Badge variant="outline" className="font-mono text-[9px] px-1.5 py-0.5 leading-none">
                             v{version}
                           </Badge>

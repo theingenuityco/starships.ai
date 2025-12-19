@@ -45,10 +45,10 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 rounded-full font-medium transition-all duration-200 border border-transparent text-primary hover:text-primary hover:border-[hsl(var(--primary)/0.25)] hover:bg-[linear-gradient(135deg,hsl(var(--primary)/0.10),hsl(var(--primary)/0.06))] hover:shadow-[0_0_4px_hsl(var(--primary)/0.10)]"
+                  className="h-7 w-7 p-0 rounded-full font-medium transition-all duration-200 border border-transparent text-muted-foreground hover:text-foreground hover:border-[hsl(var(--foreground)/0.15)] hover:bg-[linear-gradient(135deg,hsl(var(--foreground)/0.06),hsl(var(--foreground)/0.03))] hover:shadow-[0_0_4px_hsl(var(--foreground)/0.06)]"
                   onClick={e => e.stopPropagation()}
                 >
-                  <Icon name="dots-vertical" className="h-4 w-4" />
+                  <Icon name="dots-vertical" className="h-8 w-8" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">

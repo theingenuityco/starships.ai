@@ -14,6 +14,7 @@ import { DeploymentConfirmationModal } from '@/components/marketplace/Deployment
 
 import { useAuth } from '@/hooks/useAuth'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
+import { useToolTemplates } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
@@ -43,6 +44,23 @@ export function AgentTemplateDetailsModalContent({ template, onDeploy, onRequest
   const toolSlugs: string[] = Array.isArray((template as any)?.assignedToolSlugs)
     ? ((template as any).assignedToolSlugs as unknown[]).filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
     : []
+
+  const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
+  const toolInfoBySlug = useMemo(() => {
+    const map = new Map<string, { name: string; description: string }>()
+    for (const t of toolTemplates as any[]) {
+      const slug = (t as any)?.slug
+      const name = (t as any)?.name
+      const description = (t as any)?.description
+      if (typeof slug === 'string' && slug.trim()) {
+        map.set(slug, {
+          name: typeof name === 'string' && name.trim() ? name : slug,
+          description: typeof description === 'string' ? description : '',
+        })
+      }
+    }
+    return map
+  }, [toolTemplates])
 
   const handleDeployClick = () => {
     if (!isAuthenticated) {
@@ -127,12 +145,32 @@ export function AgentTemplateDetailsModalContent({ template, onDeploy, onRequest
             <h3 className="text-sm font-semibold">Tools</h3>
           </div>
           {toolSlugs.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {toolSlugs.map(slug => (
-                <Badge key={slug} variant="secondary" className="font-mono text-[11px]">
-                  {slug}
-                </Badge>
-              ))}
+            <div className="grid grid-cols-1 gap-3">
+              {toolSlugs.map(slug => {
+                const info = toolInfoBySlug.get(slug)
+                const name = info?.name ?? slug
+                const description = info?.description ?? ''
+                const oneLineDescription = (description.split(/\r?\n/)[0] ?? '').trim()
+                return (
+                  <div key={slug} className="rounded-xl border border-muted-foreground/20 bg-muted/10 hover:bg-muted/20 transition-colors px-4 py-3">
+                    <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-2">
+                      {/* Header row */}
+                      <div className="mt-0.5 p-2 rounded-lg bg-primary/10 border border-primary/15">
+                        <Icon name="wrench" className="w-4 h-4 text-primary" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold truncate">{name}</div>
+                        <div className="mt-0.5 text-[10px] font-mono text-muted-foreground truncate">{slug}</div>
+                      </div>
+
+                      {/* Description row (full width) */}
+                      <div className="col-span-2 text-xs text-muted-foreground leading-relaxed line-clamp-2" title={oneLineDescription || undefined}>
+                        {oneLineDescription || 'No description provided.'}
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">No tools listed.</p>

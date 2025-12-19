@@ -1,12 +1,11 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React, { useMemo, useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
 
 import Icon from '@/components/primitives/Icon'
-import AgentAvatar from '@/components/animated/AgentAvatar'
-import { Avatar } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { useToolTemplates } from '@/hooks/useTemplates'
 
 interface AgentTemplateDetailsModalContentProps {
@@ -14,9 +13,12 @@ interface AgentTemplateDetailsModalContentProps {
 }
 
 export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDetailsModalContentProps) {
+  const [isToolsExpanded, setIsToolsExpanded] = useState(false)
+
   const toolSlugs: string[] = Array.isArray((template as any)?.assignedToolSlugs)
     ? ((template as any).assignedToolSlugs as unknown[]).filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
     : []
+  const canCollapseTools = toolSlugs.length > 3
 
   const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
   const toolInfoBySlug = useMemo(() => {
@@ -36,49 +38,35 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
   }, [toolTemplates])
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="space-y-3">
-        {/* Row 1: avatar + title/slug */}
-        <div className="flex items-start gap-4">
-          <Avatar className="h-14 w-14 rounded-full ring-2 ring-background shadow-md">
-            <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={56} rounded />
-          </Avatar>
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-bold leading-tight truncate">{template.name}</h2>
-            {(template as any)?.slug ? <div className="font-mono text-xs text-muted-foreground truncate mt-1">{(template as any).slug}</div> : null}
-          </div>
+    <div className="px-6 pb-6 space-y-6">
+      {/* Tags + description */}
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {(template as any)?.version ? (
+            <Badge variant="outline" className="font-mono text-xs">
+              <Icon name="hash" className="w-3.5 h-3.5 mr-1.5" />v{String((template as any).version)}
+            </Badge>
+          ) : null}
+          {template.model ? (
+            <Badge variant="outline" className="font-mono text-xs">
+              <Icon name="brain" className="w-3.5 h-3.5 mr-1.5" />
+              {template.model}
+            </Badge>
+          ) : null}
+          {template.category ? (
+            <Badge variant="secondary" className="capitalize">
+              {template.category}
+            </Badge>
+          ) : null}
+          {typeof template.usageCount === 'number' ? (
+            <Badge variant="outline" className="text-xs">
+              <Icon name="download" className="w-3.5 h-3.5 mr-1.5" />
+              {template.usageCount} deployments
+            </Badge>
+          ) : null}
         </div>
 
-        {/* Row 2: tags + description (below avatar row) */}
-        <div className="space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            {(template as any)?.version ? (
-              <Badge variant="outline" className="font-mono text-xs">
-                <Icon name="hash" className="w-3.5 h-3.5 mr-1.5" />v{String((template as any).version)}
-              </Badge>
-            ) : null}
-            {template.model ? (
-              <Badge variant="outline" className="font-mono text-xs">
-                <Icon name="brain" className="w-3.5 h-3.5 mr-1.5" />
-                {template.model}
-              </Badge>
-            ) : null}
-            {template.category ? (
-              <Badge variant="secondary" className="capitalize">
-                {template.category}
-              </Badge>
-            ) : null}
-            {typeof template.usageCount === 'number' ? (
-              <Badge variant="outline" className="text-xs">
-                <Icon name="download" className="w-3.5 h-3.5 mr-1.5" />
-                {template.usageCount} deployments
-              </Badge>
-            ) : null}
-          </div>
-
-          {template.description ? <p className="text-sm text-muted-foreground leading-relaxed">{template.description}</p> : null}
-        </div>
+        {template.description ? <p className="text-sm text-muted-foreground leading-relaxed">{template.description}</p> : null}
       </div>
 
       {/* Tools */}
@@ -88,32 +76,46 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
           <h3 className="text-sm font-semibold">Tools</h3>
         </div>
         {toolSlugs.length > 0 ? (
-          <div className="grid grid-cols-1 gap-3">
-            {toolSlugs.map(slug => {
-              const info = toolInfoBySlug.get(slug)
-              const name = info?.name ?? slug
-              const description = info?.description ?? ''
-              const oneLineDescription = (description.split(/\r?\n/)[0] ?? '').trim()
-              return (
-                <div key={slug} className="rounded-xl border border-muted-foreground/20 bg-muted/10 hover:bg-muted/20 transition-colors px-4 py-3">
-                  <div className="grid grid-cols-[auto,1fr] gap-x-3 gap-y-2">
-                    {/* Header row */}
-                    <div className="mt-0.5 p-2 rounded-lg bg-primary/10 border border-primary/15">
-                      <Icon name="wrench" className="w-4 h-4 text-primary" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="text-sm font-semibold truncate">{name}</div>
-                      <div className="mt-0.5 text-[10px] font-mono text-muted-foreground truncate">{slug}</div>
-                    </div>
+          <div className="space-y-3">
+            <div className={canCollapseTools && !isToolsExpanded ? 'relative max-h-52 overflow-hidden' : 'relative'}>
+              <div className="grid grid-cols-1 gap-3">
+                {toolSlugs.map(slug => {
+                  const info = toolInfoBySlug.get(slug)
+                  const name = info?.name ?? slug
+                  const description = info?.description ?? ''
+                  const oneLineDescription = (description.split(/\r?\n/)[0] ?? '').trim()
+                  return (
+                    <div key={slug} className="rounded-lg border border-muted-foreground/20 bg-muted/10 hover:bg-muted/20 transition-colors px-3 py-2">
+                      <div className="grid grid-cols-[auto,1fr] gap-x-2.5 gap-y-1.5">
+                        {/* Header row */}
+                        <div className="mt-0.5 p-1.5 rounded-md bg-primary/10 border border-primary/15">
+                          <Icon name="wrench" className="w-3.5 h-3.5 text-primary" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[13px] font-semibold truncate leading-snug">{name}</div>
+                          <div className="mt-0.5 text-[9px] font-mono text-muted-foreground truncate leading-snug">{slug}</div>
+                        </div>
 
-                    {/* Description row (full width) */}
-                    <div className="col-span-2 text-xs text-muted-foreground leading-relaxed line-clamp-2" title={oneLineDescription || undefined}>
-                      {oneLineDescription || 'No description provided.'}
+                        {/* Description row (full width) */}
+                        <div className="col-span-2 text-[11px] text-muted-foreground leading-snug line-clamp-2" title={oneLineDescription || undefined}>
+                          {oneLineDescription || 'No description provided.'}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              )
-            })}
+                  )
+                })}
+              </div>
+
+              {canCollapseTools && !isToolsExpanded ? <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background to-transparent" /> : null}
+            </div>
+
+            {canCollapseTools ? (
+              <div className="flex justify-center">
+                <Button size="sm" variant="ghost" onClick={() => setIsToolsExpanded(v => !v)}>
+                  {isToolsExpanded ? 'Show less' : 'Show more'}
+                </Button>
+              </div>
+            ) : null}
           </div>
         ) : (
           <p className="text-sm text-muted-foreground">No tools listed.</p>

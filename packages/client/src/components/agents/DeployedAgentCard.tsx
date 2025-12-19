@@ -11,7 +11,7 @@ import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button, type ButtonProps } from '@/components/ui/button'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 const CHAT_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -76,9 +76,7 @@ export function DeployedAgentCard({
   isGeneratingAvatar = false,
   onClick,
   onChat,
-  onEdit,
   onDelete,
-  onGenerateAvatar,
   showStatusIndicator = true,
   showActions = false,
   hideChatControl = false,
@@ -110,49 +108,20 @@ export function DeployedAgentCard({
         onClick={onClick}
       >
         {/* Actions dropdown */}
-        {showActions && (onDelete || onGenerateAvatar) && (
+        {showActions && onDelete && (
           <div className="absolute top-3 right-3 z-30">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
                   size="sm"
                   variant="ghost"
-                  disabled={isGeneratingAvatar}
                   className="h-7 w-7 p-0 rounded-full font-medium transition-all duration-200 border border-transparent text-muted-foreground hover:text-foreground hover:border-[hsl(var(--foreground)/0.15)] hover:bg-[linear-gradient(135deg,hsl(var(--foreground)/0.06),hsl(var(--foreground)/0.03))] hover:shadow-[0_0_4px_hsl(var(--foreground)/0.06)]"
                   onClick={e => e.stopPropagation()}
                 >
-                  {isGeneratingAvatar ? <Icon name="loading" className="h-4 w-4 animate-spin" /> : <Icon name="dots-vertical" className="h-8 w-8" />}
+                  <Icon name="dots-vertical" className="h-8 w-8" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                {onGenerateAvatar && (
-                  <DropdownMenuItem
-                    disabled={isGeneratingAvatar}
-                    onClick={e => {
-                      e.stopPropagation()
-                      onGenerateAvatar(agent, { mode: 'full_chain' })
-                    }}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
-                  >
-                    {isGeneratingAvatar ? <Icon name="loading" className="w-4 h-4 text-muted-foreground animate-spin" /> : <Icon name="image" className="w-4 h-4 text-muted-foreground" />}
-                    <span>{isGeneratingAvatar ? 'Generating…' : 'Generate Avatar'}</span>
-                  </DropdownMenuItem>
-                )}
-
-                {onGenerateAvatar && (
-                  <DropdownMenuItem
-                    disabled={isGeneratingAvatar}
-                    onClick={e => {
-                      e.stopPropagation()
-                      onGenerateAvatar(agent, { mode: 'avatar_only' })
-                    }}
-                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
-                  >
-                    {isGeneratingAvatar ? <Icon name="loading" className="w-4 h-4 text-muted-foreground animate-spin" /> : <Icon name="refresh" className="w-4 h-4 text-muted-foreground" />}
-                    <span>{isGeneratingAvatar ? 'Generating…' : 'Regenerate (same prompt)'}</span>
-                  </DropdownMenuItem>
-                )}
-
                 {onDelete && !isTemplateAgent && (
                   <DropdownMenuItem
                     onClick={e => {

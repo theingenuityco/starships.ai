@@ -4,8 +4,8 @@
  * Generates square avatar images via OpenRouter image models using the Autopilot LLM node
  * (executed through the remote runner).
  */
-import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
-import type { Blueprint, EngineConfig } from '@starships/autopilot';
+import { Agent, ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import type { AgentParams, Blueprint, EngineConfig, LlmMessage } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 
 export type AvatarGenerationResult = {
@@ -27,6 +27,12 @@ export class AvatarGenerationService {
   async generateMirrorDescription(options: {
     agentName: string;
     agentDescription?: string;
+    /**
+     * The agent's configured model. Required for Agent default blueprints which use `{{ state.model }}`.
+     * When executing a blueprint directly (bypassing Agent.execute()), callers must seed runtime config
+     * into execution.state for template resolution and node validation.
+     */
+    agentModel: string;
     agentBlueprint: Blueprint;
     agentTools?: unknown[];
     starshipId: string;
@@ -81,52 +87,41 @@ export class AvatarGenerationService {
       throw new Error('Agent blueprint contains no LLM node; cannot generate avatarPrompt via agent blueprint');
     }
 
-    // Override temperature for the mirror generation LLM node to encourage creative but consistent identity details.
-    const blueprint: Blueprint = {
-      ...inputBlueprint,
-      nodes: inputBlueprint.nodes.map((n) => {
-        if (!n || typeof n !== 'object') return n;
-        // `Node` is not index-signature compatible; cast via `unknown` for safe structural access.
-        const rec = n as unknown as Record<string, unknown>;
-        if (rec.type !== 'llm' || rec.ref !== llmNodeRef) return n;
-        const params = (
-          rec.parameters && typeof rec.parameters === 'object' && !Array.isArray(rec.parameters)
-            ? (rec.parameters as Record<string, unknown>)
-            : {}
-        ) as Record<string, unknown>;
-        return {
-          ...rec,
-          parameters: {
-            ...params,
-            temperature: 1.1,
-            // IMPORTANT: Gemini 3 variants can split "final" content across turns;
-            // disable streaming so we only parse a complete response.
-            stream: false,
-          },
-        } as unknown as typeof n;
-      }),
+    // IMPORTANT:
+    // Use Agent.execute() (the same contract ConversationService uses) rather than calling runner.run() directly.
+    // This ensures the Agent node seeds runtime config into execution.state, which the default agent blueprint
+    // expects (e.g. LLM node model: `{{ state.model }}`).
+    //
+    // We intentionally do NOT inject any system prompt here. Mirror generation should be driven purely by the
+    // user prompt and the agent's blueprint behavior.
+    const agentParams: AgentParams = {
+      name: options.agentName,
+      description: options.agentDescription,
+      model: options.agentModel,
+      // Encourage creative but consistent identity details
+      temperature: 1.1,
+      // Hard-disable tool calling by providing no tools
+      state: { messages: [], tools: [] },
+      blueprint: inputBlueprint,
     };
 
-    const exec = ExecutionItemUtils.createExecution();
-    exec.state = {
-      ...(exec.state ?? {}),
-      starshipId: options.starshipId,
-      // IMPORTANT: We intentionally do NOT inject any system prompt.
-      // The agent blueprint reads messages from state.messages; we provide only the mirror prompt as input.
-      messages: [{ role: 'user', content: user }],
-      // IMPORTANT: Do NOT provide tools for mirror generation.
-      // This should be a pure text completion so tool calling can't interfere.
-      tools: [],
-    };
-
+    const runtimeEnv = { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) };
     const engineConfig = {
-      runtimeEnv: { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) },
+      runtimeEnv,
       llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
       failOnNodeError: true,
     } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
 
-    const runner = RunnerFactory.getTopLevelRunner(exec.depth ?? 0);
-    const resultItems = await runner.run(blueprint, exec, engineConfig);
+    const runner = RunnerFactory.getTopLevelRunner(0);
+    const agent = new Agent(agentParams, {
+      runtimeEnv,
+      runner,
+      // Forward remote-runner configuration (llm credentials, etc.)
+      runnerConfig: engineConfig as unknown as Record<string, unknown>,
+    });
+
+    const inputMessages: LlmMessage[] = [{ role: 'user', content: user }];
+    const resultItems = await agent.execute(ExecutionItemUtils.wrapSingle(inputMessages));
     const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
     const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
     if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
@@ -187,16 +182,9 @@ export class AvatarGenerationService {
       throw new Error('Mirror description returned empty text');
     }
 
-    // Model is not always present in responses; return the blueprint's primary llm node model if present.
-    const modelFromBlueprint = (() => {
-      const node = blueprint.nodes.find((n) => (n as { ref?: unknown })?.ref === llmNodeRef) as
-        | { parameters?: Record<string, unknown> }
-        | undefined;
-      const m = node?.parameters?.model;
-      return typeof m === 'string' ? m : '';
-    })();
-
-    return { description: text, model: modelFromBlueprint || 'unknown' };
+    // Autopilot Agent execution resolves the LLM model from `state.model`.
+    // For mirror generation we require agentModel, so report it as the effective model used.
+    return { description: text, model: options.agentModel };
   }
 
   /**

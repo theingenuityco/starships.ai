@@ -1,34 +1,14 @@
-import { useEffect, useMemo, useState, useCallback } from 'react'
+import { useState, useCallback } from 'react'
 import type { AgentFormData, FormErrors } from '../types'
 import { INITIAL_FORM_DATA } from '../constants'
 
 interface UseAgentFormProps {
   onSave?: (data: AgentFormData) => void
-  initialData?: Partial<AgentFormData>
 }
 
-export const useAgentForm = ({ onSave, initialData }: UseAgentFormProps) => {
-  // Normalize initialData to keep referential stability and avoid accidental resets.
-  const normalizedInitialData = useMemo(() => initialData ?? null, [initialData])
-
-  const [formData, setFormData] = useState<AgentFormData>(() => {
-    return {
-      ...INITIAL_FORM_DATA,
-      ...(normalizedInitialData ?? {}),
-    }
-  })
+export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
+  const [formData, setFormData] = useState<AgentFormData>(INITIAL_FORM_DATA)
   const [errors, setErrors] = useState<FormErrors>({})
-
-  // When initialData changes (e.g. modal opens a different template), merge it in.
-  // This is intentionally a shallow merge; callers should provide fully-formed fields.
-  useEffect(() => {
-    if (!normalizedInitialData) return
-    setFormData(prev => ({
-      ...prev,
-      ...normalizedInitialData,
-    }))
-    setErrors({})
-  }, [normalizedInitialData])
 
   const handleFieldChange = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
     try {

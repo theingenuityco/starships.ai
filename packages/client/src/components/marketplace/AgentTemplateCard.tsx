@@ -122,7 +122,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         onClick={handleCardClick}
         hideChatControl={true}
         showActions={false}
-        disableMotion={true}
+        disableEntranceMotion={true}
         belowDescription={
           toolSlugs.length > 0 ? (
             <div className="flex flex-wrap items-center gap-1.5">

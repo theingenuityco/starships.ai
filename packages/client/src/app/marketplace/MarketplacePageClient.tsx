@@ -141,14 +141,7 @@ export default function MarketplacePageClient() {
                 ) : filteredAgentTemplates.length > 0 ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {filteredAgentTemplates.map((template: AgentTemplateModel, idx: number) => (
-                      <motion.div
-                        key={template.id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: idx * 0.1, duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                        // Ensure hover in/out is NOT affected by the enter stagger delay
-                        whileHover={{ y: -4, transition: { delay: 0, duration: 0.2, ease: [0.4, 0, 0.2, 1] } }}
-                      >
+                      <motion.div key={template.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
                         <AgentTemplateCard template={template} onDeploy={handleAgentDeploy} onClick={handleAgentClick} />
                       </motion.div>
                     ))}

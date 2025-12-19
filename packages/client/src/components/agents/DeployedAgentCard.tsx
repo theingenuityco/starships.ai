@@ -44,6 +44,15 @@ interface DeployedAgentCardProps {
    * wraps with its own motion container).
    */
   disableMotion?: boolean
+  /**
+   * When true, disable ONLY entrance animation (initial/animate), while keeping hover lift.
+   * Useful when a parent provides a staggered entry animation.
+   */
+  disableEntranceMotion?: boolean
+  /**
+   * When true, disable ONLY hover lift, while keeping entrance animation.
+   */
+  disableHoverMotion?: boolean
 }
 
 export function DeployedAgentCard({
@@ -59,6 +68,8 @@ export function DeployedAgentCard({
   belowDescription,
   primaryAction,
   disableMotion = false,
+  disableEntranceMotion = false,
+  disableHoverMotion = false,
 }: DeployedAgentCardProps) {
   // Check if this is a template-based agent (has sourceTemplateId) - these are protected
   const isTemplateAgent = !!agent.sourceTemplateId
@@ -66,12 +77,15 @@ export function DeployedAgentCard({
   // Get update info from agent object (populated by API)
   const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
 
+  const entranceOff = disableMotion || disableEntranceMotion
+  const hoverOff = disableMotion || disableHoverMotion
+
   return (
     <motion.div
-      initial={disableMotion ? undefined : { opacity: 0, y: 10 }}
-      animate={disableMotion ? undefined : { opacity: 1, y: 0 }}
-      whileHover={disableMotion ? undefined : { y: -4 }}
-      transition={disableMotion ? undefined : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      initial={entranceOff ? undefined : { opacity: 0, y: 10 }}
+      animate={entranceOff ? undefined : { opacity: 1, y: 0 }}
+      whileHover={hoverOff ? undefined : { y: -4 }}
+      transition={entranceOff && hoverOff ? undefined : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
       className="h-full"
     >
       <Card

@@ -17,6 +17,7 @@ import { useCreateConversation } from '@/hooks/useConversations'
 import type { AgentModel } from '@starships/protocol'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 
+import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 
@@ -341,17 +342,19 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3 mt-4">
-          {filteredAgents.map(agent => (
-            <DeployedAgentCard
-              key={agent.id}
-              agent={agent}
-              avatarUrl={avatarUrlById.get((agent as any).avatarAttachmentId)}
-              onClick={() => onAgentSelect(agent)}
-              onChat={() => handleChatWithAgent(agent)}
-              onDelete={handleDeleteAgent}
-              onGenerateAvatar={(a, options) => generateAvatarMutation.mutate({ agentId: a.id, mode: options?.mode })}
-              showActions={true}
-            />
+          {filteredAgents.map((agent, idx) => (
+            <motion.div key={agent.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.1 }}>
+              <DeployedAgentCard
+                agent={agent}
+                avatarUrl={avatarUrlById.get((agent as any).avatarAttachmentId)}
+                onClick={() => onAgentSelect(agent)}
+                onChat={() => handleChatWithAgent(agent)}
+                onDelete={handleDeleteAgent}
+                onGenerateAvatar={(a, options) => generateAvatarMutation.mutate({ agentId: a.id, mode: options?.mode })}
+                showActions={true}
+                disableEntranceMotion={true}
+              />
+            </motion.div>
           ))}
         </div>
       )}

@@ -162,7 +162,7 @@ export function DeployedAgentCard({
           </div>
         )}
 
-        <CardHeader className="pb-4 relative z-10 pt-5 space-y-4">
+        <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
           <div className="flex items-start gap-4">
             {/* Avatar (same row as title) */}
             <div className="relative flex-shrink-0">

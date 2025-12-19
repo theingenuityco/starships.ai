@@ -169,7 +169,7 @@ export function DeployedAgentCard({
         )}
 
         <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
-          <div className="flex items-start gap-4">
+          <div className="flex items-center gap-4">
             {/* Avatar (same row as title) */}
             <div className="relative flex-shrink-0">
               <Avatar
@@ -195,7 +195,7 @@ export function DeployedAgentCard({
               </div>
               {/* Slug row (below title) */}
               {(agent as any)?.slug && (
-                <div className="-mt-1 mb-2 min-w-0">
+                <div className="-mt-1 mb-0 min-w-0">
                   <span className="font-mono text-sm text-muted-foreground truncate">{(agent as any).slug}</span>
                 </div>
               )}

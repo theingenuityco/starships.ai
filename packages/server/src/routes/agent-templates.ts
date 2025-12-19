@@ -52,7 +52,7 @@ router.get('/agent-templates', async (req: Request, res: Response): Promise<void
 
     // Defensive: repository already strips sensitive fields, but ensure we never leak them from this route.
     const sanitized = paginatedTemplates.map((t) => {
-      const rest: Record<string, unknown> = { ...((t ?? {}) as Record<string, unknown>) };
+      const rest: Record<string, unknown> = { ...((t ?? {}) as unknown as Record<string, unknown>) };
       delete rest['systemPrompt'];
       delete rest['blueprint'];
       delete rest['state'];

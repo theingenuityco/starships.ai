@@ -120,6 +120,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         agent={agentLike}
         avatarUrl={(template as any).avatarUrl}
         onClick={handleCardClick}
+        showStatusIndicator={false}
         hideChatControl={true}
         showActions={false}
         disableEntranceMotion={true}

@@ -24,6 +24,11 @@ interface DeployedAgentCardProps {
   onEdit?: (agent: AgentModel) => void
   onDelete?: (agent: AgentModel) => void
   onGenerateAvatar?: (agent: AgentModel, options?: { mode?: 'avatar_only' | 'full_chain' }) => void
+  /**
+   * When true (default), shows the small green "online/active" dot on the avatar.
+   * Marketplace template cards should typically turn this off.
+   */
+  showStatusIndicator?: boolean
   showActions?: boolean
   hideChatControl?: boolean
   /**
@@ -68,6 +73,7 @@ export function DeployedAgentCard({
   onEdit,
   onDelete,
   onGenerateAvatar,
+  showStatusIndicator = true,
   showActions = false,
   hideChatControl = false,
   belowDescription,
@@ -175,9 +181,11 @@ export function DeployedAgentCard({
                 <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={56} rounded />
               </Avatar>
               {/* Online/Active indicator */}
-              <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
-                <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
-              </div>
+              {showStatusIndicator ? (
+                <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
+                  <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
+                </div>
+              ) : null}
             </div>
 
             {/* Text content */}
@@ -187,7 +195,7 @@ export function DeployedAgentCard({
               </div>
               {/* Slug row (below title) */}
               {(agent as any)?.slug && (
-                <div className="-mt-0.5 mb-2 min-w-0">
+                <div className="-mt-1 mb-2 min-w-0">
                   <span className="font-mono text-sm text-muted-foreground truncate">{(agent as any).slug}</span>
                 </div>
               )}

@@ -12,6 +12,9 @@ import { ValidationError } from '@/types/validation';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { EngineConfig } from '@/engine/Engine';
 import { RunnerFactory } from '@/runner/RunnerFactory';
+import type { Runner } from '@/runner/Runner';
+import type { Blueprint } from '@/types/blueprint';
+import type { Execution } from '@/types';
 
 export class Workflow extends BaseNode<WorkflowParams> {
   constructor(params: WorkflowParams, options?: NodeHandlerOptions) {
@@ -34,15 +37,25 @@ export class Workflow extends BaseNode<WorkflowParams> {
 
     try {
       // Execute the workflow's blueprint using depth-aware Runner selection
-      const engineConfig: EngineConfig = {
+      const engineConfig: EngineConfig & Record<string, unknown> = {
+        ...(this.options?.runnerConfig || {}),
         eventCallback: this.options?.eventCallback,
         failOnNodeError: true,
+        runner: this.options?.runner,
+        onCancel: this.options?.onCancel,
         runtimeEnv: this.getOptions()?.runtimeEnv,
         hostRuntime: this.getOptions()?.hostRuntime,
       };
       const depth = execution.depth ?? 0;
-      const runner = RunnerFactory.getTopLevelRunner(depth);
-      return await runner.run(params.blueprint, execution, engineConfig);
+      const selectedRunner: Runner =
+        depth === 0 ? (this.options?.runner ?? RunnerFactory.getTopLevelRunner(depth)) : RunnerFactory.getTopLevelRunner(depth);
+
+      type RunnerController = { promise: Promise<ExecutionItem[]>; cancel: () => void };
+      type RunnerWithController = Runner & {
+        runWithController: (bp: Blueprint, exec: Execution, cfg?: EngineConfig) => RunnerController;
+      };
+      const ctl = (selectedRunner as Runner & Partial<RunnerWithController>).runWithController?.(params.blueprint, execution, engineConfig);
+      return ctl ? await ctl.promise : await selectedRunner.run(params.blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Workflow execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

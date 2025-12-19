@@ -147,8 +147,8 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
           label: isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
           iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
           disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
-          variant: isAlreadyDeployed || isPublishedFromThisStarship ? 'outline' : 'default',
-          className: 'h-9 px-3',
+          // Match the Chat CTA style from DeployedAgentCard
+          variant: 'ghost',
           onAction: () => requestDeploy(),
         }}
       />

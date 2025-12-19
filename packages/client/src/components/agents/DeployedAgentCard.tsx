@@ -12,6 +12,10 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+
+const CHAT_CTA_BUTTON_CLASS =
+  'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
+const CHAT_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
 interface DeployedAgentCardProps {
   agent: AgentModel
   avatarUrl?: string
@@ -34,6 +38,7 @@ interface DeployedAgentCardProps {
   primaryAction?: {
     label: string
     iconName?: string
+    iconClassName?: string
     onAction: (agent: AgentModel) => void
     disabled?: boolean
     variant?: ButtonProps['variant']
@@ -265,28 +270,28 @@ export function DeployedAgentCard({
             {primaryAction ? (
               <Button
                 size="sm"
-                variant={primaryAction.variant ?? 'default'}
+                variant={primaryAction.variant ?? 'ghost'}
                 disabled={primaryAction.disabled}
-                className={primaryAction.className}
+                className={primaryAction.className ?? CHAT_CTA_BUTTON_CLASS}
                 onClick={e => {
                   e.stopPropagation()
                   primaryAction.onAction(agent)
                 }}
               >
-                {primaryAction.iconName ? <Icon name={primaryAction.iconName} className="mr-1.5 h-4 w-4" /> : null}
+                {primaryAction.iconName ? <Icon name={primaryAction.iconName} className={primaryAction.iconClassName ?? CHAT_CTA_ICON_CLASS} /> : null}
                 {primaryAction.label}
               </Button>
             ) : onChat ? (
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)]"
+                className={CHAT_CTA_BUTTON_CLASS}
                 onClick={e => {
                   e.stopPropagation()
                   onChat(agent)
                 }}
               >
-                <Icon name="message-square" className="mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)]" />
+                <Icon name="message-square" className={CHAT_CTA_ICON_CLASS} />
                 Chat
               </Button>
             ) : hideChatControl ? null : (

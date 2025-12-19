@@ -188,6 +188,16 @@ export interface ToolParams extends BaseParams {
 export interface LlmParams extends BaseParams {
   model: string;
   messages: { role: string; content: string }[] | string;
+  /**
+   * Optional streaming control.
+   *
+   * - When true/omitted: execute as a streaming request (default behavior).
+   * - When false: execute as a non-stream request (useful for providers/models that
+   *   only include full payloads like images in the final response).
+   *
+   * Supports template expressions via string (e.g. '{{ state.stream }}').
+   */
+  stream?: boolean | string;
   temperature?: number | string; // Supports template expressions
   maxTokens?: number | string; // Supports template expressions
   timeout?: number | string; // Supports template expressions

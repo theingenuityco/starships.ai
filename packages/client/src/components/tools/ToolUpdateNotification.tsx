@@ -18,7 +18,7 @@ export function ToolUpdateNotification({ tool }: ToolUpdateNotificationProps) {
   const [showDialog, setShowDialog] = useState(false)
 
   // Don't show if no template or no update available
-  if (!tool.templateId || !tool.updateInfo?.needsUpdate) {
+  if (!tool.sourceTemplateId || !tool.updateInfo?.needsUpdate) {
     return null
   }
 
@@ -80,8 +80,7 @@ export function ToolUpdateNotification({ tool }: ToolUpdateNotificationProps) {
                 color: 'rgb(139, 92, 246)',
               }}
             >
-              <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-              v{tool.updateInfo.latestVersion}
+              <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />v{tool.updateInfo.latestVersion}
             </Badge>
           </div>
           <Button
@@ -120,9 +119,7 @@ export function ToolUpdateNotification({ tool }: ToolUpdateNotificationProps) {
             </div>
 
             <div className="text-sm bg-muted/50 p-4 rounded-lg border">
-              <p className="text-muted-foreground">
-                This will update your tool with the latest template configuration, including parameters, blueprint, and description.
-              </p>
+              <p className="text-muted-foreground">This will update your tool with the latest template configuration, including parameters, blueprint, and description.</p>
             </div>
 
             {tool.updateInfo.templateUpdatedAt && (

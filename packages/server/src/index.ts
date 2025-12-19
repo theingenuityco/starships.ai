@@ -9,7 +9,7 @@ import * as Sentry from '@sentry/node';
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection, migrationRunner, seedToolTemplates, seedAgentTemplates, seedUpdateDeployedInstances } from '@starships/models';
+import { createConnection, migrationRunner } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -150,30 +150,6 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
-
-    // Initialize Tool Templates (seeds default templates)
-    try {
-      await seedToolTemplates();
-    } catch (error) {
-      console.error('⚠️ Failed to seed tool templates:', error);
-      // Continue - seeding is not critical for startup
-    }
-
-    // Initialize Agent Templates (seeds default templates)
-    try {
-      await seedAgentTemplates();
-    } catch (error) {
-      console.error('⚠️ Failed to seed agent templates:', error);
-      // Continue - seeding is not critical for startup
-    }
-
-    // Update deployed instances to match latest template versions
-    try {
-      await seedUpdateDeployedInstances();
-    } catch (error) {
-      console.error('⚠️ Failed to update deployed instances:', error);
-      // Continue - seeding is not critical for startup
-    }
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

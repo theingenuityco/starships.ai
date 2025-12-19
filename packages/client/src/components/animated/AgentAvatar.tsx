@@ -1,10 +1,7 @@
 'use client'
 
 import React, { useMemo } from 'react'
-import { createAvatar } from '@dicebear/core'
-import { avataaars } from '@dicebear/collection'
-import type { Options as AvataaarsOptions } from '@dicebear/avataaars/lib/types'
-import { normalizeAvatarSeed } from '@/lib/avatar'
+import { cn } from '@/lib/utils'
 
 export type AgentAvatarProps = {
   seed?: string | null
@@ -16,32 +13,34 @@ export type AgentAvatarProps = {
   rounded?: boolean
 }
 
-const FRIENDLY_AVATAAR_OPTIONS: Pick<AvataaarsOptions, 'eyes' | 'eyebrows' | 'mouth' | 'accessories'> = {
-  eyes: ['default', 'happy', 'wink'],
-  eyebrows: ['default', 'defaultNatural', 'flatNatural', 'raisedExcited', 'raisedExcitedNatural'],
-  mouth: ['default', 'eating', 'smile', 'twinkle'],
-  accessories: ['kurt', 'prescription01', 'prescription02', 'round'],
-}
-
 export default function AgentAvatar({ seed, imageUrl, size = 40, className, emphasis = false, animation = 'none', rounded = false }: AgentAvatarProps) {
   const hasSeed = typeof seed === 'string' && seed.trim().length > 0
   const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0
 
-  const svg = useMemo(() => {
+  const initials = useMemo(() => {
     if (!hasSeed) return ''
-    const normalized = normalizeAvatarSeed(seed as string)
-    return createAvatar(avataaars, {
-      seed: normalized,
-      ...FRIENDLY_AVATAAR_OPTIONS,
-    }).toString()
+    const parts = String(seed).trim().split(/\s+/).filter(Boolean)
+    if (parts.length === 0) return ''
+    const first = parts[0]?.[0] ?? ''
+    const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : ''
+    return (first + last).toUpperCase().slice(0, 2)
   }, [seed, hasSeed])
 
   return (
-    <div className={className} style={{ width: size, height: size, position: 'relative', borderRadius: rounded ? '9999px' : undefined, overflow: rounded ? 'hidden' : undefined }}>
+    <div
+      className={cn(className, animation !== 'none' && 'animate-pulse')}
+      style={{ width: size, height: size, position: 'relative', borderRadius: rounded ? '9999px' : undefined, overflow: rounded ? 'hidden' : undefined }}
+    >
       {hasImage ? (
         <img src={imageUrl as string} alt="" width={size} height={size} style={{ width: size, height: size, objectFit: 'cover', display: 'block' }} />
       ) : hasSeed ? (
-        <div style={{ width: size, height: size }} dangerouslySetInnerHTML={{ __html: svg }} />
+        <div
+          className={cn('flex items-center justify-center bg-muted text-muted-foreground font-semibold select-none', emphasis && 'text-foreground', rounded ? 'rounded-full' : 'rounded-lg')}
+          style={{ width: size, height: size, fontSize: Math.max(10, Math.floor(size * 0.38)) }}
+          aria-hidden="true"
+        >
+          {initials}
+        </div>
       ) : (
         <div style={{ width: size, height: size }} />
       )}

@@ -5,19 +5,17 @@ import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useCreateAgentFromTemplate, useToolTemplates } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
+import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 
-import { motion } from 'motion/react'
-import { useState } from 'react'
-import type { AgentTemplateModel } from '@starships/protocol'
+import { useMemo, useState } from 'react'
+import type { AgentModel, AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -36,8 +34,13 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
 
   // Get deployed agents to check if this template is already deployed
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship)
-  // Note: We use name matching since agents don't store templateId
-  const isAlreadyDeployed = deployedAgents.some(agent => agent.name === template.name)
+
+  // If this template was published from this starship, disable deploy CTA (it already "lives" here)
+  const isPublishedFromThisStarship = deployedAgents.some(agent => agent.publishedTemplateId === template.id)
+
+  // Already deployed when this template has already been deployed to this starship.
+  // Server-provided linkage is `sourceTemplateId`.
+  const isAlreadyDeployed = deployedAgents.some(agent => agent.sourceTemplateId === template.id)
 
   // Deployment mutation
   const createAgentMutation = useCreateAgentFromTemplate()
@@ -46,34 +49,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
   const pathname = usePathname()
   const searchParams = useSearchParams()
 
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'coding':
-        return <Icon name="code" className="w-4 h-4" />
-      case 'creative':
-        return <Icon name="lightbulb" className="w-4 h-4" />
-      case 'analysis':
-        return <Icon name="bar-chart3" className="w-4 h-4" />
-      case 'support':
-        return <Icon name="heart-pulse" className="w-4 h-4" />
-      default:
-        return <Icon name="bot" className="w-4 h-4" />
-    }
-  }
-
-  const getCategoryColor = (category: string) => {
-    const colors = {
-      general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
-      coding: 'bg-gradient-to-r from-blue-500/10 to-blue-500/20 text-blue-700 dark:text-blue-300 border-blue-500/30',
-      creative: 'bg-gradient-to-r from-purple-500/10 to-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30',
-      analysis: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
-      support: 'bg-gradient-to-r from-orange-500/10 to-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30',
-    }
-    return colors[category as keyof typeof colors] || colors.general
-  }
-
-  const handleDeployClick = (e: React.MouseEvent) => {
-    e.stopPropagation() // Prevent card click from triggering
+  const requestDeploy = () => {
     if (!isAuthenticated) {
       const current = `${pathname}${searchParams && searchParams.toString() ? `?${searchParams.toString()}` : ''}`
       const params = new URLSearchParams({ returnUrl: current })
@@ -90,6 +66,34 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
   const handleCardClick = () => {
     onClick?.(template)
   }
+
+  const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s => typeof s === 'string' && s.trim().length > 0) : []
+  const visibleToolSlugs = toolSlugs.slice(0, 4)
+  const hiddenToolsCount = Math.max(0, toolSlugs.length - visibleToolSlugs.length)
+
+  const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
+
+  const toolTemplateNameBySlug = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const t of toolTemplates) {
+      const slug = (t as any)?.slug
+      const name = (t as any)?.name
+      if (typeof slug === 'string' && slug.trim() && typeof name === 'string' && name.trim()) {
+        map.set(slug, name)
+      }
+    }
+    return map
+  }, [toolTemplates])
+
+  const agentLike: AgentModel = {
+    // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
+    id: template.id,
+    name: template.name,
+    slug: template.slug,
+    description: template.description,
+    model: template.model,
+    version: template.version as any,
+  } as unknown as AgentModel
 
   const handleConfirmDeploy = async () => {
     if (!primaryStarship) {
@@ -111,88 +115,56 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
   }
 
   return (
-    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -2 }} transition={{ duration: 0.2 }}>
-      <Card
-        className="h-full min-h-[320px] max-h-[380px] p-6 cursor-pointer transition-all duration-300 frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group flex flex-col hover:bg-primary/5"
+    <>
+      <DeployedAgentCard
+        agent={agentLike}
+        avatarUrl={(template as any).avatarUrl}
         onClick={handleCardClick}
-      >
-        {/* Header */}
-        <div className="flex items-start gap-4 mb-4">
-          <div className="flex-shrink-0">
-            <Avatar className="h-12 w-12 ring-2 ring-background shadow-md">
-              <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={48} />
-            </Avatar>
-          </div>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-start gap-2 mb-2">
-              <h3 className="font-semibold text-lg leading-tight group-hover:text-primary transition-colors line-clamp-2">{template.name}</h3>
-            </div>
-            <Badge className={`text-xs ${getCategoryColor(template.category)} flex items-center gap-1 border font-medium w-fit`}>
-              {getCategoryIcon(template.category)}
-              {template.category}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Description */}
-        <div className="flex-1">
-          <p className="text-sm text-muted-foreground mb-4 line-clamp-3 leading-relaxed">{template.description}</p>
-        </div>
-
-        {/* Stats */}
-        <div className="flex items-center justify-between mb-4 text-sm text-muted-foreground">
-          <div className="flex items-center gap-1 flex-1 min-w-0">
-            <Icon name="bot" className="w-4 h-4 flex-shrink-0" />
-            <span className="font-mono text-xs truncate">{template.model}</span>
-          </div>
-          <div className="flex items-center gap-1 flex-shrink-0">
-            <Icon name="download" className="w-4 h-4" />
-            <span>{template.usageCount}</span>
-          </div>
-        </div>
-
-        {/* Preview Prompts */}
-        {template.previewPrompts && template.previewPrompts.length > 0 && (
-          <div className="mb-4">
-            <p className="text-xs text-muted-foreground mb-2">Try asking:</p>
-            <div className="space-y-1">
-              {template.previewPrompts.slice(0, 2).map((prompt, idx) => (
-                <div key={idx} className="text-xs bg-muted/30 px-2 py-1 rounded border border-muted-foreground/20 truncate">
-                  &quot;{prompt.length > 40 ? `${prompt.slice(0, 40)}...` : prompt}&quot;
-                </div>
+        showStatusIndicator={false}
+        hideChatControl={true}
+        showActions={false}
+        disableEntranceMotion={true}
+        belowDescription={
+          toolSlugs.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground mr-1">
+                <Icon name="wrench" className="w-3.5 h-3.5" />
+                Tools:
+              </span>
+              {visibleToolSlugs.map(slug => (
+                <Badge key={slug} variant="secondary" className="text-[10px] px-1.5 py-0.5" title={slug}>
+                  {toolTemplateNameBySlug.get(slug) ?? slug}
+                </Badge>
               ))}
+              {hiddenToolsCount > 0 ? (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium">
+                  +{hiddenToolsCount} more
+                </Badge>
+              ) : null}
             </div>
-          </div>
-        )}
+          ) : null
+        }
+        primaryAction={{
+          label: isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
+          iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
+          disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
+          // Match the Chat CTA style from DeployedAgentCard
+          variant: 'ghost',
+          onAction: () => requestDeploy(),
+        }}
+      />
 
-        {/* Action Button */}
-        <div className="mt-auto">
-          {isAlreadyDeployed ? (
-            <Button size="sm" variant="outline" className="w-full transition-colors" disabled onClick={e => e.stopPropagation()}>
-              <Icon name="check-circle" className="w-4 h-4 mr-2" />
-              <span className="truncate">Already deployed on {primaryStarship?.name || 'starship'}</span>
-            </Button>
-          ) : (
-            <Button size="sm" variant="default" className="w-full transition-colors" onClick={handleDeployClick} disabled={isDeploying || (isAuthenticated && !primaryStarship)}>
-              <Icon name="sparkles" className="w-4 h-4 mr-2" />
-              {isDeploying ? 'Deploying...' : 'Deploy'}
-            </Button>
-          )}
-        </div>
-
-        {/* Confirmation Modal */}
-        <DeploymentConfirmationModal
-          isOpen={showConfirmationModal}
-          onOpenChange={setShowConfirmationModal}
-          onConfirm={handleConfirmDeploy}
-          isProcessing={isDeploying}
-          type="agent"
-          template={template}
-          starshipName={primaryStarship?.name || 'Unknown Starship'}
-        />
-      </Card>
-    </motion.div>
+      {/* Confirmation Modal */}
+      <DeploymentConfirmationModal
+        isOpen={showConfirmationModal}
+        onOpenChange={setShowConfirmationModal}
+        onConfirm={handleConfirmDeploy}
+        isProcessing={isDeploying}
+        type="agent"
+        template={template}
+        starshipName={primaryStarship?.name || 'Unknown Starship'}
+      />
+    </>
   )
 }
 

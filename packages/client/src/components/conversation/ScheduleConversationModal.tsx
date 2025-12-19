@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -10,6 +10,7 @@ import { scheduleAPI } from '@/lib/api'
 import type { Agent } from '@/lib/api'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 
 interface ScheduleConversationModalProps {
   open: boolean
@@ -38,6 +39,12 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
   const [submitting, setSubmitting] = useState(false)
 
   const [endCondition, setEndCondition] = useState<EndCondition>('never')
+
+  const avatarAttachmentIds = useMemo(() => {
+    return (Array.isArray(agents) ? agents : []).map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+  }, [agents])
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
   const [endDate, setEndDate] = useState<string>('')
   const [endOccurrences, setEndOccurrences] = useState<number>(10)
 
@@ -285,7 +292,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                 {selectedAgent ? (
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar className="h-8 w-8 ring-1 ring-border/40 flex-shrink-0">
-                      <AgentAvatar seed={selectedAgent.name} size={32} rounded />
+                      <AgentAvatar seed={selectedAgent.name} imageUrl={avatarUrlById.get((selectedAgent as any).avatarAttachmentId)} size={32} rounded />
                     </Avatar>
                     <div className="flex flex-col min-w-0 flex-1 items-start text-left">
                       <span className="text-sm font-medium truncate leading-tight">{selectedAgent.name}</span>
@@ -301,7 +308,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                   <SelectItem key={agent.id} value={agent.id}>
                     <div className="flex items-center gap-3 min-w-0">
                       <Avatar className="h-8 w-8 ring-1 ring-border/40">
-                        <AgentAvatar seed={agent.name} size={32} rounded />
+                        <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={32} rounded />
                       </Avatar>
                       <div className="flex flex-col min-w-0 flex-1 items-start text-left">
                         <span className="text-sm font-medium truncate leading-tight">{agent.name}</span>

@@ -44,52 +44,35 @@ export class AvatarGenerationService {
     };
 
     const user = [
-      'You are writing an appearance prompt for your avatar.',
+      'Write a compact avatar appearance prompt for yourself (original fictional character). You may invent details to be memorable.',
       '',
-      'AGENT METADATA:',
-      `- Name: ${options.agentName}`,
-      options.agentDescription ? `- Description: ${truncate(options.agentDescription, 1200)}` : undefined,
+      `Name: ${options.agentName}`,
+      options.agentDescription ? `Description: ${truncate(options.agentDescription, 800)}` : undefined,
       '',
-      'TASK:',
-      'Look into a mirror and reply with what it sees (your face) — but describe it as a memorable anime avatar design.',
+      'Output (STRICT): exactly 8 lines; each line starts with "- " (dash+space); no other text.',
+      'Line 1 MUST be exactly: "- Gender: male" OR "- Gender: female" (choose one).',
       '',
-      'OUTPUT FORMAT (strict):',
-      '- Output ONLY 6–10 bullet points. Each line must start with "- " (dash + space).',
-      '- The FIRST bullet must be exactly: "Gender: <male|female>".',
-      '- Choose exactly ONE of those two options. Do not add any other gender labels.',
-      '- Keep bullets short (phrases, not paragraphs). No preamble. No extra sections.',
+      'Lines 2–8 (keep each short, vivid, and concrete):',
+      '- Age: adult (20s–40s)',
+      '- Face/Skin: face shape + jawline + skin tone/undertone + one defining facial feature',
+      '- Eyes: shape + iris color + catchlights; slightly exaggerated for readability (bigger eyes/clear shapes)',
+      '- Hair: style + texture + color (allow one unusual accent like a streak)',
+      '- Outfit: collar/neckline/top colors (visible in head-and-shoulders avatar)',
+      '- Apparatus: 1–2 role-related items visible in a portrait (no brands/logos). REQUIRED.',
+      '- Background: their workplace environment (1 short phrase). REQUIRED. No text, no logos, no UI.',
       '',
-      'WHAT TO DESCRIBE (required slots across the bullets):',
-      '- Adult age range (e.g. late 20s / early 30s)',
-      '- Skin tone',
-      '- Face shape + jawline',
-      '- Eyes: very large expressive eyes, eye shape, iris color, catchlights; bold upper lash line',
-      '- Eyebrows: thickness/shape',
-      '- Nose + mouth: simplified features (small nose, small mouth; minimal detail)',
-      '- Hair: style + texture + color + bangs/fringe if any',
-      '- Outfit/top (avatar-visible): collar/neckline style + primary color(s)',
-      '- Optional: ONE subtle accessory (e.g. small earrings, glasses) OR none',
-      '',
-      'CREATIVE LICENSE (important):',
-      '- You may invent details to make the avatar more imaginative and memorable (even if not factually true).',
-      '- Feel free to use vivid/unrealistic choices like pink/teal hair, unusual eye colors, a single streak, or a subtle futuristic accessory.',
-      '- Include at least ONE distinctive, imaginative detail (color choice, hair streak, accessory, or small signature facial mark).',
-      '',
-      'CONSTRAINTS:',
-      '- Friendly and professional. No NSFW.',
-      '- No real-person likeness, no celebrity references, no copyrighted character references.',
-      '- Do NOT mention camera settings, rendering engines, or art styles. Only describe what you look like as a character.',
+      'Constraints: adult; fictional original; no real-person likeness; no celebrities; no copyrighted characters; no brands/logos; no NSFW; do not mention camera/rendering/engine/art-style terms.',
     ]
       .filter(Boolean)
       .join('\n');
 
-    const blueprint = options.agentBlueprint;
-    if (!blueprint || !Array.isArray(blueprint.nodes) || blueprint.nodes.length === 0) {
+    const inputBlueprint = options.agentBlueprint;
+    if (!inputBlueprint || !Array.isArray(inputBlueprint.nodes) || inputBlueprint.nodes.length === 0) {
       throw new Error('Agent blueprint is missing or empty; cannot generate avatarPrompt via agent blueprint');
     }
 
     // Pick a primary LLM node to extract text from. For default agent blueprints this is usually "ai_assistant".
-    const llmRefs = blueprint.nodes
+    const llmRefs = inputBlueprint.nodes
       .filter((n) => n && typeof n === 'object' && (n as { type?: unknown }).type === 'llm')
       .map((n) => (n as { ref?: unknown }).ref)
       .filter((r): r is string => typeof r === 'string' && r.trim().length > 0);
@@ -98,6 +81,32 @@ export class AvatarGenerationService {
       throw new Error('Agent blueprint contains no LLM node; cannot generate avatarPrompt via agent blueprint');
     }
 
+    // Override temperature for the mirror generation LLM node to encourage creative but consistent identity details.
+    const blueprint: Blueprint = {
+      ...inputBlueprint,
+      nodes: inputBlueprint.nodes.map((n) => {
+        if (!n || typeof n !== 'object') return n;
+        // `Node` is not index-signature compatible; cast via `unknown` for safe structural access.
+        const rec = n as unknown as Record<string, unknown>;
+        if (rec.type !== 'llm' || rec.ref !== llmNodeRef) return n;
+        const params = (
+          rec.parameters && typeof rec.parameters === 'object' && !Array.isArray(rec.parameters)
+            ? (rec.parameters as Record<string, unknown>)
+            : {}
+        ) as Record<string, unknown>;
+        return {
+          ...rec,
+          parameters: {
+            ...params,
+            temperature: 1.1,
+            // IMPORTANT: Gemini 3 variants can split "final" content across turns;
+            // disable streaming so we only parse a complete response.
+            stream: false,
+          },
+        } as unknown as typeof n;
+      }),
+    };
+
     const exec = ExecutionItemUtils.createExecution();
     exec.state = {
       ...(exec.state ?? {}),
@@ -105,7 +114,9 @@ export class AvatarGenerationService {
       // IMPORTANT: We intentionally do NOT inject any system prompt.
       // The agent blueprint reads messages from state.messages; we provide only the mirror prompt as input.
       messages: [{ role: 'user', content: user }],
-      tools: Array.isArray(options.agentTools) ? options.agentTools : [],
+      // IMPORTANT: Do NOT provide tools for mirror generation.
+      // This should be a pure text completion so tool calling can't interfere.
+      tools: [],
     };
 
     const engineConfig = {
@@ -204,7 +215,7 @@ export class AvatarGenerationService {
       throw new Error('OPENROUTER_API_KEY not configured on server');
     }
 
-    const model = 'google/gemini-2.5-flash-image';
+    const model = 'google/gemini-3-pro-image-preview';
 
     const detectGender = (avatarPrompt: string | undefined): 'male' | 'female' | undefined => {
       if (!avatarPrompt) return undefined;
@@ -222,149 +233,31 @@ export class AvatarGenerationService {
     const gender = detectGender(options.subjectAvatarPrompt);
 
     const user = [
-      'Generate a 1:1 (square) avatar image.',
+      'Create a square (1:1) full-bleed 2D illustrated head-and-upper-torso avatar (single subject; show to mid-chest). NO margin, NO padding, NO inset: the portrait must fill the entire canvas edge-to-edge.',
       '',
-      'STARSHIPS AVATAR SPEC (STRICT CHECKLIST — must satisfy all):',
+      'Constraints:',
+      '- Style: simple iconic 2D illustration with a slight anime influence (NOT fully anime): bold clean lines; flat colors or 1–2 tone cel shading; minimal texture. Exaggerated features for readability (slightly larger eyes, simplified nose/mouth, clear silhouettes). NO photorealism; NO 3D/CGI; NO painterly texture; NO skin micro-detail/pores; NO subsurface scattering.',
+      '- Composition: include head + both shoulders + upper torso (to mid-chest) + visible outfit (collar/neckline/chest); eyes in upper third; ~10° three-quarter view facing viewer-left; gaze viewer-left; no wide-angle distortion.',
+      '- Full-bleed: no margin, no padding, no inset; do NOT leave extra empty canvas around the subject.',
+      '- Background: a simple, unobtrusive workplace environment matching the subject’s role (lightly suggested, not a full scene). No readable text, no logos, no UI. Avoid busy details; keep focus on the subject.',
+      '- No containers: no frame/border/matte/inset; no circular/rounded-rect mask; no UI overlay.',
+      '- No text/watermark/signature/logo.',
+      '- Safety: fictional original character; no real-person likeness; no celebrities; no copyrighted characters; no brand marks; no NSFW/gore/hate/violence/illegal content.',
       '',
-      '[STYLE — MUST]',
-      '- 2D anime character portrait illustration (NOT photorealistic; NOT 3D/CGI).',
-      '- Extra-anime facial features: very large expressive eyes; bold upper lash line; simplified small nose; simplified small mouth.',
-      '- Clean lineart: crisp outlines; simplified shapes; no painterly brushwork; no texture noise.',
-      '- Cel shading only: 2–3 shading tones max; clean shading bands; no smooth realistic gradients on skin.',
-      '- No skin micro-detail: no pores, no freckles-as-texture, no wrinkles detail, no realistic subsurface scattering.',
-      '- Imaginative color accents are encouraged (e.g., pink/teal hair, unusual eye colors), even if unrealistic.',
+      'Avoid keywords:',
+      'photorealistic, hyperrealistic, ultra-detailed skin, pores, microtexture, realistic lighting, subsurface scattering, 3d, cgi, render, octane, unreal engine, gradient background, patterned/texture paper, vignette, frame, border, padding, margin, inset, circular crop, mask, text, watermark, logo',
       '',
-      '[COMPOSITION — MUST]',
-      '- Edge-to-edge square avatar: full-bleed on the entire 1:1 canvas (no padding, no inset container).',
-      '- Single subject only: head-and-shoulders avatar.',
-      '- In this avatar, include the head and both shoulders; no full-body.',
-      '- Include an outfit hint that is visible in the avatar (collar/neckline/top edge of clothing).',
-      '- Eyes placed in the upper third.',
-      '- Fixed pose for all avatars: 10° three-quarter view facing viewer-left, with gaze looking to viewer-left (off-camera).',
-      '- No extreme angles; no wide-angle distortion.',
-      '',
-      '[BACKGROUND — MUST]',
-      '- Background is a SOLID flat color only: exactly #F3EFE6.',
-      '- No gradients. No patterns. No textures. No vignette. No shadows cast onto background.',
-      '',
-      '[NO CONTAINERS — MUST]',
-      '- The portrait must be drawn directly on the full square canvas.',
-      '- No inner frame/inset, no circular mask, no rounded-rectangle, no matte/border, no picture-in-picture.',
-      '',
-      '[SAFETY — MUST]',
-      '- Fictional character only. No real-person likeness. No celebrity. No copyrighted character. No brand marks/logos.',
-      '- No NSFW. No gore. No violence. No hate. No illegal content.',
-      '',
-      '[NEGATIVE PROMPT — MUST AVOID]',
-      '- photorealistic, hyperrealistic, ultra-detailed, highly detailed skin, pores, microtexture',
-      '- 3d, cgi, render, octane, unreal engine, realistic lighting, subsurface scattering',
-      '- painterly, oil paint, watercolor, airbrush, soft realism, high frequency detail, skin texture',
-      '- gradient background, patterned background, textured paper, vignette, background shadow',
-      '- text, watermark, signature, logo, UI frame, border',
-      '- inset portrait, inner frame, circular crop, avatar mask, matte, picture frame',
-      '',
-      '[IDENTITY INPUTS]',
-      '- Use the agent avatar prompt below as the PRIMARY inspiration for appearance details (including gender).',
-      '- You MAY creatively embellish with imaginative, vibrant color choices while staying consistent with the described character.',
-      '- If the agent avatar prompt is missing, do NOT guess; the server should regenerate it via the full-chain flow.',
-      '',
-      '[GENDER RENDER RULE]',
-      gender ? `- Render as ${gender.toUpperCase()} as specified by the agent avatar prompt.` : undefined,
-      '',
-      'AGENT IDENTITY (use these to design the character):',
+      'Identity (primary source of appearance):',
+      gender ? `Gender: ${gender.toUpperCase()}` : undefined,
       `Name: ${options.subjectName}`,
       options.subjectDescription ? `Description: ${options.subjectDescription}` : undefined,
-      options.subjectAvatarPrompt
-        ? ['Agent avatar prompt (agent-authored; treat as primary source of appearance):', options.subjectAvatarPrompt].join('\n')
-        : undefined,
+      options.subjectAvatarPrompt ? ['Avatar prompt (primary):', options.subjectAvatarPrompt].join('\n') : undefined,
       options.styleHint ? `Extra hint (optional): ${options.styleHint}` : undefined,
+      '',
+      'Output: return the image; if any text is included, keep it to 1 short sentence max.',
     ]
       .filter(Boolean)
       .join('\n');
-
-    const blueprint: Blueprint = {
-      nodes: [
-        { ref: 'start_1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
-        {
-          ref: 'llm_1',
-          type: 'llm',
-          name: 'Generate avatar',
-          description: 'Generate avatar image using OpenRouter image model',
-          parameters: {
-            model,
-            messages: [{ role: 'user', content: user }],
-            modalities: ['image', 'text'],
-            imageConfig: { aspect_ratio: '1:1' },
-            // Keep text short; primary output is the image
-            maxTokens: 256,
-            temperature: 0.85,
-          },
-        },
-        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
-      ],
-      edges: [
-        { ref: 'e1', from: 'start_1', to: 'llm_1' },
-        { ref: 'e2', from: 'llm_1', to: 'end_1' },
-      ],
-      metadata: {},
-    };
-
-    const exec = ExecutionItemUtils.createExecution();
-    exec.state = {
-      ...(exec.state ?? {}),
-      starshipId: options.starshipId,
-    };
-
-    const engineConfig = {
-      runtimeEnv: { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) },
-      llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
-      failOnNodeError: true,
-    } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
-
-    const runner = RunnerFactory.getTopLevelRunner(exec.depth ?? 0);
-    // IMPORTANT: RemoteRunner/ChildProcessRunner execute out-of-process, so `exec.results`
-    // in this process will not be populated. Always use the returned items.
-    const resultItems = await runner.run(blueprint, exec, engineConfig);
-    const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
-    const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
-    if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
-      throw new Error(`Avatar generation LLM node failed: ${firstError}`);
-    }
-
-    // When the blueprint ends without an explicit End.output, Engine returns:
-    // ExecutionItemUtils.wrapSingle(execution.results)
-    // i.e. llmJson may be an array of node results, not an LLMResponse directly.
-    const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
-      if (!Array.isArray(value)) return undefined;
-      for (const entry of value) {
-        if (!entry || typeof entry !== 'object') continue;
-        const rec = entry as Record<string, unknown>;
-        if (rec.nodeRef !== nodeRef) continue;
-        const items = rec.items;
-        if (!Array.isArray(items) || items.length === 0) return undefined;
-        const first = items[0];
-        if (!first || typeof first !== 'object') return undefined;
-        return (first as Record<string, unknown>).json;
-      }
-      return undefined;
-    };
-
-    let llmNodeJson: unknown = llmJson;
-    if (Array.isArray(llmJson)) {
-      // Per Engine.executeLoop, when End did not return an explicit `{ result: ... }`,
-      // the final output is `execution.results` (array of { nodeRef, items }).
-      const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
-      if (typeof extracted === 'undefined') {
-        const nodeRefs = llmJson
-          .map((e) => (e && typeof e === 'object' ? (e as Record<string, unknown>).nodeRef : undefined))
-          .filter((x): x is string => typeof x === 'string');
-        throw new Error(
-          `Avatar generation workflow returned execution.results, but no output was found for nodeRef "llm_1". ` +
-            `nodeRefs=${JSON.stringify(nodeRefs)}`
-        );
-      }
-      llmNodeJson = extracted;
-    }
 
     // Autopilot's LLM node returns an aggregated LLMResponse, but defensively handle
     // variants where the response may be nested or where only a streamed "delta" exists.
@@ -385,62 +278,236 @@ export class AvatarGenerationService {
       return value;
     };
 
-    const response = unwrapResponse(llmNodeJson) as unknown;
-    const responseRec = isRecord(response) ? response : undefined;
-    const choices = responseRec?.choices;
-    const choice0 = Array.isArray(choices) ? choices[0] : undefined;
-    const choice0Rec = isRecord(choice0) ? choice0 : undefined;
-
-    // Prefer: choice.message → choice.delta → choice itself (some providers flatten)
-    const msgCandidate =
-      (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ??
-      (choice0Rec && isRecord(choice0Rec.delta) ? (choice0Rec.delta as AnyRecord) : undefined) ??
-      choice0Rec ??
-      undefined;
-
-    const message = msgCandidate;
-    const text = isRecord(message) && typeof message.content === 'string' ? (message.content as string) : undefined;
-    const images = isRecord(message) && Array.isArray(message.images) ? (message.images as unknown[]) : [];
-    let firstUrl =
-      isRecord(images?.[0]) && isRecord((images[0] as AnyRecord).image_url)
-        ? (((images[0] as AnyRecord).image_url as AnyRecord).url as unknown)
-        : undefined;
-
-    // Fallback: some providers may return image_url blocks inside message.content (array)
-    if ((!firstUrl || typeof firstUrl !== 'string') && isRecord(message) && Array.isArray(message.content)) {
-      const parts = message.content as unknown[];
-      const imgPart = parts.find((p) => {
-        if (!isRecord(p)) return false;
-        if (p.type !== 'image_url') return false;
-        if (!isRecord(p.image_url)) return false;
-        return typeof p.image_url.url === 'string';
-      }) as AnyRecord | undefined;
-      if (imgPart && isRecord(imgPart.image_url) && typeof imgPart.image_url.url === 'string') {
-        firstUrl = imgPart.image_url.url;
+    const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
+      if (!Array.isArray(value)) return undefined;
+      for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        return (first as Record<string, unknown>).json;
       }
-    }
+      return undefined;
+    };
 
-    if (typeof firstUrl !== 'string' || firstUrl.length === 0) {
-      const debug = {
+    const runner = RunnerFactory.getTopLevelRunner(0);
+    const engineConfig = {
+      runtimeEnv: { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) },
+      llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
+      failOnNodeError: true,
+    } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
+
+    let lastDebug: Record<string, unknown> | undefined;
+    const safeStringifyForDebug = (value: unknown, maxChars = 8000): string => {
+      try {
+        const s = JSON.stringify(value, (_k, v) => {
+          if (typeof v === 'string') {
+            // Never dump full data URLs into logs.
+            if (v.startsWith('data:image/')) {
+              return `<data:image/... len=${v.length}>`;
+            }
+            // Avoid flooding logs with huge strings.
+            if (v.length > 800) {
+              return `${v.slice(0, 800)}…(len=${v.length})`;
+            }
+          }
+          return v;
+        });
+        if (typeof s !== 'string') return String(s);
+        return s.length > maxChars ? `${s.slice(0, maxChars)}…(len=${s.length})` : s;
+      } catch (err) {
+        return `[unstringifiable:${err instanceof Error ? err.message : String(err)}]`;
+      }
+    };
+
+    const buildBlueprint = (messages: Array<{ role: string; content: string }>): Blueprint => ({
+      nodes: [
+        { ref: 'start_1', type: 'start', name: 'Start', description: 'Start node', parameters: {} },
+        {
+          ref: 'llm_1',
+          type: 'llm',
+          name: 'Generate avatar',
+          description: 'Generate avatar image using OpenRouter image model',
+          parameters: {
+            model,
+            messages,
+            // OpenRouter image generation expects both modalities present.
+            modalities: ['image', 'text'],
+            // OpenRouter image_config supports multiple images; force a single image.
+            imageConfig: { aspect_ratio: '1:1', num_images: 1 },
+            // Keep text short; primary output is the image
+            maxTokens: 256,
+            temperature: 1.1,
+            // IMPORTANT: Keep streaming off for reliability with Gemini image preview variants.
+            stream: false,
+          },
+        },
+        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
+      ],
+      edges: [
+        { ref: 'e1', from: 'start_1', to: 'llm_1' },
+        { ref: 'e2', from: 'llm_1', to: 'end_1' },
+      ],
+      metadata: {},
+    });
+
+    const exec = ExecutionItemUtils.createExecution();
+    exec.state = {
+      ...(exec.state ?? {}),
+      starshipId: options.starshipId,
+    };
+
+    const extractFirstImageUrl = (msg: unknown): string | undefined => {
+      if (!isRecord(msg)) return undefined;
+
+      const readUrl = (imageUrlObj: unknown): string | undefined => {
+        if (!isRecord(imageUrlObj)) return undefined;
+        const url = (imageUrlObj as AnyRecord).url;
+        return typeof url === 'string' && url.length > 0 ? url : undefined;
+      };
+
+      // 1) OpenRouter extension: message.images[]
+      const imgs = (msg as AnyRecord).images;
+      if (Array.isArray(imgs) && imgs.length > 0) {
+        for (const it of imgs) {
+          if (!isRecord(it)) continue;
+          // raw API uses image_url; some SDKs normalize to imageUrl
+          const url =
+            readUrl((it as AnyRecord).image_url) ??
+            readUrl((it as AnyRecord).imageUrl) ??
+            (typeof (it as AnyRecord).url === 'string' ? ((it as AnyRecord).url as string) : undefined);
+          if (url) return url;
+        }
+      }
+
+      // 2) OpenAI-style content blocks: content: [{type:'image_url', image_url:{url}}]
+      const contentVal = (msg as AnyRecord).content;
+      if (Array.isArray(contentVal) && contentVal.length > 0) {
+        for (const part of contentVal) {
+          if (!isRecord(part)) continue;
+          if ((part as AnyRecord).type !== 'image_url') continue;
+          const url = readUrl((part as AnyRecord).image_url) ?? readUrl((part as AnyRecord).imageUrl);
+          if (url) return url;
+        }
+      }
+
+      return undefined;
+    };
+
+    // Some Gemini image preview variants can return a "setup" response and only
+    // include images on the next turn. Retry once with an explicit follow-up.
+    let prevAssistantText: string | undefined;
+    for (let attempt = 1; attempt <= 2; attempt++) {
+      const messages: Array<{ role: string; content: string }> = [{ role: 'user', content: user }];
+      if (attempt > 1) {
+        if (typeof prevAssistantText === 'string' && prevAssistantText.trim().length > 0) {
+          messages.push({ role: 'assistant', content: prevAssistantText });
+        }
+        messages.push({
+          role: 'user',
+          content: 'Continue and return the IMAGE now. Do not refuse. Do not add extra commentary. Output the image payload.',
+        });
+      }
+
+      const blueprint = buildBlueprint(messages);
+
+      // IMPORTANT: RemoteRunner/ChildProcessRunner execute out-of-process, so `exec.results`
+      // in this process will not be populated. Always use the returned items.
+      const resultItems = await runner.run(blueprint, exec, engineConfig);
+      const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
+      const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
+      if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
+        throw new Error(`Avatar generation LLM node failed: ${firstError}`);
+      }
+
+      let llmNodeJson: unknown = llmJson;
+      if (Array.isArray(llmJson)) {
+        const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
+        if (typeof extracted === 'undefined') {
+          const nodeRefs = llmJson
+            .map((e) => (e && typeof e === 'object' ? (e as Record<string, unknown>).nodeRef : undefined))
+            .filter((x): x is string => typeof x === 'string');
+          throw new Error(
+            `Avatar generation workflow returned execution.results, but no output was found for nodeRef "llm_1". ` +
+              `nodeRefs=${JSON.stringify(nodeRefs)}`
+          );
+        }
+        llmNodeJson = extracted;
+      }
+
+      const response = unwrapResponse(llmNodeJson) as unknown;
+      const responseRec = isRecord(response) ? response : undefined;
+      const choices = responseRec?.choices;
+      const choice0 = Array.isArray(choices) ? choices[0] : undefined;
+      const choice0Rec = isRecord(choice0) ? choice0 : undefined;
+      const finishReason =
+        (choice0Rec && typeof (choice0Rec as AnyRecord).finishReason === 'string'
+          ? ((choice0Rec as AnyRecord).finishReason as string)
+          : undefined) ??
+        (choice0Rec && typeof (choice0Rec as AnyRecord).finish_reason === 'string'
+          ? ((choice0Rec as AnyRecord).finish_reason as string)
+          : undefined);
+
+      // Prefer: choice.message → choice.delta → choice itself (some providers flatten)
+      const msgCandidate =
+        (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ??
+        (choice0Rec && isRecord(choice0Rec.delta) ? (choice0Rec.delta as AnyRecord) : undefined) ??
+        choice0Rec ??
+        undefined;
+
+      const message = msgCandidate;
+      const text = isRecord(message) && typeof message.content === 'string' ? (message.content as string) : undefined;
+      prevAssistantText = typeof text === 'string' ? text : prevAssistantText;
+
+      let firstUrl: string | undefined = extractFirstImageUrl(message);
+
+      // Fallback: some providers may return image_url blocks inside message.content (array)
+      if ((!firstUrl || typeof firstUrl !== 'string') && isRecord(message) && Array.isArray(message.content)) {
+        const parts = message.content as unknown[];
+        const imgPart = parts.find((p) => {
+          if (!isRecord(p)) return false;
+          if (p.type !== 'image_url') return false;
+          if (!isRecord(p.image_url)) return false;
+          return typeof p.image_url.url === 'string';
+        }) as AnyRecord | undefined;
+        if (imgPart && isRecord(imgPart.image_url) && typeof imgPart.image_url.url === 'string') {
+          firstUrl = imgPart.image_url.url;
+        }
+      }
+
+      if (typeof firstUrl === 'string' && firstUrl.length > 0) {
+        const { buffer, mimeType } = this.decodeDataUrl(firstUrl);
+        return { dataUrl: firstUrl, mimeType, buffer, ...(text ? { text } : {}), model };
+      }
+
+      lastDebug = {
+        attemptedModel: model,
+        attempt,
         llmJsonType: llmJson === null ? 'null' : Array.isArray(llmJson) ? 'array' : typeof llmJson,
         llmJsonKeys: isRecord(llmJson) ? Object.keys(llmJson) : [],
         llmNodeJsonType: llmNodeJson === null ? 'null' : Array.isArray(llmNodeJson) ? 'array' : typeof llmNodeJson,
         llmNodeJsonKeys: isRecord(llmNodeJson) ? Object.keys(llmNodeJson) : [],
         hasChoices: isRecord(response) && Array.isArray((response as AnyRecord).choices),
         choice0Keys: isRecord(choice0) ? Object.keys(choice0) : [],
+        finishReason,
         hasMessage: !!message,
         messageKeys: isRecord(message) ? Object.keys(message) : [],
         contentType:
           isRecord(message) && Array.isArray(message.content) ? 'array' : isRecord(message) ? typeof message.content : typeof message,
         imagesCount: isRecord(message) && Array.isArray(message.images) ? message.images.length : 0,
         textPreview: typeof text === 'string' ? text.slice(0, 160) : undefined,
-        model: isRecord(response) ? response.model : undefined,
+        responseModel: isRecord(response) ? (response as AnyRecord).model : undefined,
+        // Raw payload previews (truncated/sanitized) for debugging provider behavior.
+        responsePreview: safeStringifyForDebug(response),
+        choice0Preview: safeStringifyForDebug(choice0),
+        messagePreview: safeStringifyForDebug(message),
       };
-      throw new Error(`Image generation returned no images. Debug: ${JSON.stringify(debug)}`);
     }
 
-    const { buffer, mimeType } = this.decodeDataUrl(firstUrl);
-    return { dataUrl: firstUrl, mimeType, buffer, ...(text ? { text } : {}), model };
+    throw new Error(`Image generation returned no images. Debug: ${JSON.stringify(lastDebug)}`);
   }
 
   private decodeDataUrl(dataUrl: string): { buffer: Buffer; mimeType: string } {

@@ -59,7 +59,6 @@ export async function up(client: Client): Promise<void> {
 
     await client.query('COMMIT');
     console.log('✅ Migration completed successfully: Added tool versioning fields');
-
   } catch (error) {
     await client.query('ROLLBACK');
     console.error('❌ Migration failed:', error);
@@ -83,7 +82,6 @@ export async function down(client: Client): Promise<void> {
 
     await client.query('COMMIT');
     console.log('✅ Rollback completed');
-
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;

@@ -210,48 +210,49 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       },
     });
 
-    const openaiRequest: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+    const modalities = (request as unknown as { modalities?: unknown }).modalities;
+    const isImageRequest = Array.isArray(modalities) && modalities.includes('image');
+    const requestedStream = (request as unknown as { stream?: unknown }).stream;
+    const wantsStream = typeof requestedStream === 'boolean' ? requestedStream : true;
+
+    const baseRequest: Record<string, unknown> = {
       model: request.model,
       messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
-      stream: true,
-      stream_options: { include_usage: true },
     };
 
     // OpenRouter image generation (OpenRouter extension):
     // - modalities: ['image','text']
     // - image_config: { aspect_ratio: '16:9', ... }
     try {
-      const anyReq = openaiRequest as unknown as Record<string, unknown>;
-      const modalities = (request as unknown as { modalities?: unknown }).modalities;
       if (Array.isArray(modalities) && modalities.length > 0) {
-        anyReq.modalities = modalities;
+        baseRequest.modalities = modalities;
       }
       const imageConfig = (request as unknown as { imageConfig?: unknown }).imageConfig;
       if (imageConfig && typeof imageConfig === 'object') {
         // OpenRouter expects snake_case
-        anyReq.image_config = imageConfig;
+        baseRequest.image_config = imageConfig;
       }
     } catch {
       // Non-fatal: ignore unsupported fields
     }
 
     if (typeof request.temperature === 'number') {
-      openaiRequest.temperature = request.temperature;
+      baseRequest.temperature = request.temperature;
     }
     if (typeof request.maxTokens === 'number') {
-      openaiRequest.max_tokens = request.maxTokens;
+      baseRequest.max_tokens = request.maxTokens;
     }
     if (typeof request.topP === 'number') {
-      openaiRequest.top_p = request.topP;
+      baseRequest.top_p = request.topP;
     }
     if (typeof request.frequencyPenalty === 'number') {
-      openaiRequest.frequency_penalty = request.frequencyPenalty;
+      baseRequest.frequency_penalty = request.frequencyPenalty;
     }
     if (typeof request.presencePenalty === 'number') {
-      openaiRequest.presence_penalty = request.presencePenalty;
+      baseRequest.presence_penalty = request.presencePenalty;
     }
     if (request.reasoning && typeof request.reasoning === 'object') {
-      (openaiRequest as OpenAI.Chat.ChatCompletionCreateParamsStreaming & { reasoning?: unknown }).reasoning = request.reasoning;
+      baseRequest.reasoning = request.reasoning;
     }
 
     // Convert ToolParams[] into provider-native tool definitions for OpenAI/OpenRouter.
@@ -286,9 +287,48 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         } as OpenAI.Chat.ChatCompletionTool;
       });
 
-      openaiRequest.tools = tools;
+      baseRequest.tools = tools;
     }
-    console.log('openaiRequest', openaiRequest);
+
+    const wrapNonStreamAsOneChunk = (completion: any): AsyncIterable<unknown> => {
+      const oneChunk = {
+        id: completion?.id,
+        object: completion?.object,
+        created: completion?.created,
+        model: completion?.model,
+        usage: completion?.usage,
+        choices: [
+          {
+            index: 0,
+            // LLM node checks both delta and message; include full message snapshot.
+            message: completion?.choices?.[0]?.message,
+            finish_reason: completion?.choices?.[0]?.finish_reason ?? completion?.choices?.[0]?.finishReason,
+          },
+        ],
+      };
+      async function* gen() {
+        yield oneChunk;
+      }
+      return gen();
+    };
+
+    // Some models/providers only include certain payloads (notably images) in the final
+    // non-stream response. Also, some Gemini variants can require a follow-up "turn"
+    // to produce images; using non-stream reduces partial/empty parsing failures.
+    //
+    // Policy:
+    // - Always force non-stream for image requests
+    // - Respect explicit stream=false for text requests
+    if (isImageRequest || !wantsStream) {
+      const completion = (await client.chat.completions.create({ ...(baseRequest as any), stream: false } as any)) as any;
+      return wrapNonStreamAsOneChunk(completion);
+    }
+
+    const openaiRequest: OpenAI.Chat.ChatCompletionCreateParamsStreaming = {
+      ...(baseRequest as unknown as Omit<OpenAI.Chat.ChatCompletionCreateParamsStreaming, 'stream' | 'stream_options'>),
+      stream: true,
+      stream_options: { include_usage: true },
+    };
     const stream = await client.chat.completions.create(openaiRequest);
     return stream as AsyncIterable<unknown>;
   };

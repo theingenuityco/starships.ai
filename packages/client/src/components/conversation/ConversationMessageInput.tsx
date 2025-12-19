@@ -30,7 +30,7 @@ import { ExpandableMessageOverlay } from './ExpandableMessageOverlay'
 import Link from 'next/link'
 import { toast } from 'sonner'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useFileUpload, type PendingFile } from '@/hooks/useFileUpload'
+import { useFileUpload, useMessageAttachments, type PendingFile } from '@/hooks/useFileUpload'
 import { generateId } from '@/lib/utils'
 import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
 
@@ -148,6 +148,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Load agents for @mention parsing
     const { data: starshipAgents = [] } = useStarshipAgents(starshipId, !!starshipId)
+    const mentionAvatarAttachmentIds = useMemo(() => {
+      return (Array.isArray(starshipAgents) ? (starshipAgents as AgentModel[]) : [])
+        .map(a => (a as any)?.avatarAttachmentId as string | undefined)
+        .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    }, [starshipAgents])
+    const { data: mentionAvatarAttachments = [] } = useMessageAttachments(mentionAvatarAttachmentIds, starshipId)
+    const mentionAvatarUrlById = useMemo(() => new Map(mentionAvatarAttachments.map(a => [a.id, a.previewUrl] as const)), [mentionAvatarAttachments])
+
     const agentsRef = useRef<AgentModel[]>([])
     const mentionAgentsSnapshotRef = useRef<AgentModel[] | null>(null)
     // Track the most current agent immediately on local changes to avoid one-tick lag
@@ -748,7 +756,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               }}
             >
               <Avatar className={cn('h-7 w-7 ring-1 ring-border/40')}>
-                <AgentAvatar seed={agent.name} size={28} />
+                <AgentAvatar seed={agent.name} imageUrl={mentionAvatarUrlById.get((agent as any).avatarAttachmentId)} size={28} />
               </Avatar>
               <div className="min-w-0">
                 <div className="font-medium leading-5">{agent.name}</div>
@@ -1183,7 +1191,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             }}
           >
             <span className="flex-shrink-0 h-4 w-4 rounded-sm overflow-hidden">
-              <AgentAvatar seed={display} size={16} />
+              <AgentAvatar seed={display} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={16} />
             </span>
             <span className="font-medium text-sm">@{display}</span>
           </span>

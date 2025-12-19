@@ -40,6 +40,14 @@ export interface LlmHostRequest {
   presencePenalty?: number;
   reasoning?: unknown;
   /**
+   * Optional streaming control.
+   *
+   * - When true/omitted: host may stream tokens/chunks.
+   * - When false: host should perform a non-stream completion and return a single "chunk-like"
+   *   item wrapped as an AsyncIterable for compatibility with the LLM node's accumulator.
+   */
+  stream?: boolean;
+  /**
    * OpenRouter multimodal output configuration.
    * For image generation, include: ['image', 'text']
    */

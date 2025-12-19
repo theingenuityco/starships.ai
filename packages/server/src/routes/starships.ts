@@ -16,7 +16,6 @@ import { z } from 'zod';
 
 const router: Router = Router();
 
-
 // Helper function for authentication check
 const checkAuth = (req: Request, res: Response): boolean => {
   const user = (req as any).user;
@@ -378,7 +377,7 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
   }
 });
 
-// GET /starships/:id/agents - Get detailed agent information for starship (OpenAPI pattern)
+// GET /starships/:id/agents - Get deployed agents for starship (OpenAPI pattern)
 router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
@@ -405,18 +404,12 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
       return;
     }
 
-    // Get deployed agents and available slots
+    // Get deployed agents
     const deployedAgents = await starshipService.getDeployedAgents(starshipId);
-    const availableSlots = await starshipService.getAvailableSlots(starshipId);
 
-    sendSuccess(res, {
-      starshipId,
-      starshipName: starship.name,
-      maxAgents: starship.maxAgents,
-      deployedAgents,
-      availableSlots,
-      deployedCount: deployedAgents.length,
-    });
+    // NOTE: This endpoint returns an AgentModel[] directly (wrapped in ApiResponse),
+    // because the client expects a list in many places.
+    sendSuccess(res, deployedAgents);
   } catch (error) {
     handleError(error, res, 'fetching starship agents');
   }

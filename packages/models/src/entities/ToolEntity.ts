@@ -40,7 +40,14 @@ export class ToolEntity implements ToolModel {
   @IsOptional()
   @IsString()
   @Length(1, 255)
-  templateId?: string;
+  sourceTemplateId?: string;
+
+  // Published template linkage (Tool → ToolTemplate)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  publishedTemplateId?: string;
 
   // Core ToolParams fields
   @Expose()
@@ -189,7 +196,8 @@ export class ToolEntity implements ToolModel {
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         starshipId: dataRecord.starshipId || '',
-        templateId: dataRecord.templateId,
+        sourceTemplateId: dataRecord.sourceTemplateId,
+        publishedTemplateId: dataRecord.publishedTemplateId,
         name: dataRecord.name || '',
         description: dataRecord.description || '',
         parameters: dataRecord.parameters,

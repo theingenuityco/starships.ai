@@ -41,9 +41,7 @@ import { ConversationService } from './ConversationService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
-import { AvatarGenerationService } from './AvatarGenerationService';
 import { AttachmentService } from './AttachmentService';
-import { uploadAgentTemplateAvatarToS3 } from '@/utils/s3-helper';
 
 export interface ConversationRequest {
   agentId: string;
@@ -85,6 +83,21 @@ export class AgentService {
     this.messageService = new MessageService();
     this.connectorSecretService = new ConnectorSecretService();
     this.connectorRuntimeService = new ConnectorRuntimeService();
+  }
+
+  /**
+   * Guard: agents deployed from marketplace templates are immutable.
+   * We treat any agent with a sourceTemplateId as "deployed from marketplace".
+   *
+   * NOTE: This intentionally does not block `updateFromTemplate()` which is the
+   * supported way to bring a deployed agent forward to the latest template.
+   */
+  private assertAgentIsEditable(agent: AgentModel, action: string): void {
+    if (typeof agent.sourceTemplateId === 'string' && agent.sourceTemplateId.trim().length > 0) {
+      throw new ValidationError(
+        `Cannot ${action} agent "${agent.name}" because it was deployed from the marketplace. Create a copy to customize it.`
+      );
+    }
   }
 
   /** Safely get starshipId from agent */
@@ -186,29 +199,12 @@ export class AgentService {
   }
 
   /**
-   * Check if an agent is a system agent (Gaia, Daedalus, Aria)
-   */
-  private isSystemAgent(agent: AgentModel): boolean {
-    const systemAgentNames = ['Gaia', 'Daedalus', 'Aria'];
-    return systemAgentNames.includes(agent.name);
-  }
-
-  /**
    * Update agent and return as AgentModel
    */
   async updateAgent(agentId: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
-    // First get the current agent to check if it's a system agent
-    const currentAgent = await this.agentRepository.findById(agentId);
-    if (!currentAgent) {
-      return null;
-    }
-
-    // Prevent editing system agents
-    if (this.isSystemAgent(currentAgent)) {
-      throw new ValidationError(
-        `Cannot edit system agent "${currentAgent.name}". System agents (Gaia and Daedalus) are protected and cannot be modified.`
-      );
-    }
+    const current = await this.agentRepository.findById(agentId);
+    if (!current) return null;
+    this.assertAgentIsEditable(current, 'edit');
 
     return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
   }
@@ -245,19 +241,6 @@ export class AgentService {
    * Delete agent
    */
   async deleteAgent(agentId: string): Promise<boolean> {
-    // First get the current agent to check if it's a system agent
-    const currentAgent = await this.agentRepository.findById(agentId);
-    if (!currentAgent) {
-      return false;
-    }
-
-    // Prevent deleting system agents
-    if (this.isSystemAgent(currentAgent)) {
-      throw new ValidationError(
-        `Cannot delete system agent "${currentAgent.name}". System agents (Gaia and Daedalus) are protected and cannot be deleted.`
-      );
-    }
-
     return await this.agentRepository.delete(agentId);
   }
 
@@ -271,6 +254,7 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
 
+    this.assertAgentIsEditable(agent, 'move');
     return await this.agentRepository.updateStarship(agentId, starshipId);
   }
 
@@ -585,18 +569,19 @@ export class AgentService {
 
       if (!hasParams || !hasBlueprint) continue;
 
-      const isNewTemplate = !tool.templateId;
+      const publishedTemplateId = (tool as unknown as { publishedTemplateId?: string }).publishedTemplateId;
+      const isNewTemplate = !publishedTemplateId;
       let hasTemplateUpdate = false;
 
-      if (tool.templateId) {
-        let template = templateCache.get(tool.templateId);
+      if (publishedTemplateId) {
+        let template = templateCache.get(publishedTemplateId);
         if (template === undefined) {
           try {
-            template = await templateRepo.findById(tool.templateId);
+            template = await templateRepo.findById(publishedTemplateId);
           } catch {
             template = null;
           }
-          templateCache.set(tool.templateId, template);
+          templateCache.set(publishedTemplateId, template);
         }
 
         if (template && template.version && tool.version && template.version !== tool.version) {
@@ -616,6 +601,12 @@ export class AgentService {
    * Assign multiple tools to an agent via relationships (replaces existing assignments)
    */
   async assignToolSlugs(agentId: string, toolSlugs: string[], starshipId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    this.assertAgentIsEditable(agent, 'edit');
+
     // Use the new relationship-based approach
     await this.agentRepository.assignToolsToAgent(agentId, toolSlugs, starshipId);
 
@@ -643,6 +634,12 @@ export class AgentService {
    * Add a single tool to an agent's existing assignments via relationships
    */
   async addToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    this.assertAgentIsEditable(agent, 'edit');
+
     // Find the deployed tool instance by slug and starship
     const { ToolRepository } = await import('@starships/models');
     const toolRepository = new ToolRepository();
@@ -679,6 +676,12 @@ export class AgentService {
    * Remove a single tool from an agent's assignments via relationships
    */
   async removeToolSlug(agentId: string, toolSlug: string, starshipId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+    this.assertAgentIsEditable(agent, 'edit');
+
     // Find the deployed tool instance by slug and starship
     const { ToolRepository } = await import('@starships/models');
     const toolRepository = new ToolRepository();
@@ -1142,6 +1145,9 @@ export class AgentService {
       throw new NotFoundError('Agent', agentId);
     }
 
+    // Deployed marketplace agents cannot be modified/published directly; copy first.
+    this.assertAgentIsEditable(agent, 'publish');
+
     // Enforce that only the owner of the agent's starship or an instance admin
     // can request publication. Routes already gate this, but we repeat the
     // check here for defense-in-depth in case the service is called directly.
@@ -1393,7 +1399,7 @@ export class AgentService {
 
           if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
 
-          let templateId = tool.templateId;
+          let templateId = (tool as unknown as { publishedTemplateId?: string }).publishedTemplateId;
           let templateSlug: string | undefined;
 
           // Determine next tool version, honoring any publicationRequestedVersion from the request flow
@@ -1442,8 +1448,7 @@ export class AgentService {
           // Link tool back to its template, bump version and clear publication metadata
           await toolRepo.update(tool.id, {
             version: nextToolVersion,
-            templateId,
-            templateSnapshotAt: new Date().toISOString(),
+            publishedTemplateId: templateId,
           });
 
           if (templateSlug && !toolTemplateSlugs.includes(templateSlug)) {
@@ -1451,9 +1456,10 @@ export class AgentService {
           }
         }
 
-        if (toolTemplateSlugs.length > 0) {
-          await templateRepo.update(targetTemplateId, { assignedToolSlugs: toolTemplateSlugs });
-        }
+        // Always synchronize tool assignments onto the AgentTemplate, even when empty.
+        // Otherwise, removing all publishable tools can never "clear" the template baseline,
+        // which makes the builder perpetually think tools have changed after publishing.
+        await templateRepo.update(targetTemplateId, { assignedToolSlugs: toolTemplateSlugs });
       } catch (err) {
         // Tool synchronization should never block agent publication; log and continue.
         console.error('[AGENT-PUBLICATION] Failed to synchronize tools for agent template:', err);
@@ -1467,64 +1473,34 @@ export class AgentService {
         const existingAvatar = await templateRepoInternal.getAvatarStorageById(targetTemplateId);
         const hasAvatar = !!existingAvatar?.avatarS3Key;
 
-        if (!hasAvatar) {
-          // Prefer copying the agent's avatar attachment when present
-          let buffer: Buffer | undefined;
-          let mimeType: string | undefined;
+        // Only reuse an existing agent avatar if present.
+        // If the agent has no avatar, do NOT generate one during approval.
+        //
+        // IMPORTANT: For re-publish flows, we should also refresh the template avatar
+        // when the agent's avatar is newer than what's currently stored on the template.
+        if (agent.avatarAttachmentId) {
+          const attachmentService = new AttachmentService();
+          const existingAttachment = await attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
 
-          const agentAvatarAttachmentId = (agent as any).avatarAttachmentId as string | undefined;
-          if (agentAvatarAttachmentId) {
-            const attachmentService = new AttachmentService();
-            const attachment = await attachmentService.getAttachmentWithUrl(agentAvatarAttachmentId, agent.starshipId);
-            if (attachment?.url) {
-              const resp = await fetch(attachment.url);
-              if (resp.ok) {
-                const ab = await resp.arrayBuffer();
-                buffer = Buffer.from(ab);
-                mimeType = attachment.mimeType || resp.headers.get('content-type') || 'image/png';
-              }
-            }
-          }
+          const toMs = (s?: string) => {
+            if (!s) return NaN;
+            const t = new Date(s).getTime();
+            return Number.isFinite(t) ? t : NaN;
+          };
 
-          // If the agent doesn't have an avatar yet (or fetch failed), generate one now
-          if (!buffer) {
-            const generator = new AvatarGenerationService();
-            const gen = await generator.generateAvatar({
-              subjectName: agent.name,
-              subjectDescription: agent.description,
-              subjectAvatarPrompt: (agent as any).avatarPrompt as string | undefined,
-              starshipId: agent.starshipId,
-            });
-            buffer = gen.buffer;
-            mimeType = gen.mimeType;
+          const templateAvatarMs = toMs(existingAvatar?.avatarUpdatedAt);
+          const attachmentCreatedMs = toMs(existingAttachment?.createdAt);
+          const shouldUpdateAvatar =
+            !hasAvatar ||
+            (Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs) && attachmentCreatedMs > templateAvatarMs) ||
+            (!Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs));
 
-            // Also persist the agent's avatar attachment for consistency
-            try {
-              const attachmentService = new AttachmentService();
-              const created = await attachmentService.createAttachment({
-                starshipId: agent.starshipId,
-                conversationId: `agent-avatar-${agent.id}`,
-                filename: `agent-${agent.slug || agent.id}-avatar.${mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') ? 'jpg' : 'img'}`,
-                mimeType,
-                buffer,
-              });
-              await this.agentRepository.update(agent.id, { avatarAttachmentId: created.id } as any);
-            } catch (e) {
-              console.warn('[AGENT-PUBLICATION] Failed to persist agent avatar attachment during publish:', e);
-            }
-          }
-
-          if (buffer && mimeType) {
-            const s3Key = await uploadAgentTemplateAvatarToS3({
-              templateId: targetTemplateId,
-              filename: `template-${targetTemplateId}-avatar.${mimeType.includes('png') ? 'png' : mimeType.includes('jpeg') ? 'jpg' : 'img'}`,
-              mimeType,
-              buffer,
-            });
+          if (shouldUpdateAvatar && existingAttachment?.s3Key) {
             await templateRepoInternal.updateAvatarStorage(targetTemplateId, {
-              avatarS3Key: s3Key,
-              avatarMimeType: mimeType,
-              avatarUpdatedAt: new Date().toISOString(),
+              avatarS3Key: existingAttachment.s3Key,
+              avatarMimeType: existingAttachment.mimeType || 'image/png',
+              // Use the attachment creation time when available so client diffs can compare reliably.
+              avatarUpdatedAt: existingAttachment.createdAt || new Date().toISOString(),
             });
           }
         }

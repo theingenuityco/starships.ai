@@ -14,6 +14,7 @@ import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { StandardSelect } from './StandardSelect'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
@@ -77,6 +78,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   // Store full agent data including version info
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
   const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
+
+  const avatarAttachmentId = (fullAgent as any)?.avatarAttachmentId as string | undefined
+  const avatarIds = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
+  const avatarUrl = avatarAttachments?.[0]?.previewUrl
+  const avatarCreatedAt = avatarAttachments?.[0]?.createdAt
 
   // Control whether mini identity (avatar + name + slug) is shown in the sticky banner.
   // It appears only after the main page header scrolls away.
@@ -156,11 +163,22 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
       if (!hasParams || !hasBlueprint) return false
 
-      const isNewTemplate = !tool.templateId
+      const isNewTemplate = !tool.publishedTemplateId
       const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
       return isNewTemplate || hasTemplateUpdate
     })
   }, [starshipTools, selectedToolSlugs])
+
+  // Publish/template semantics: only non-draft tools with a complete definition (params + blueprint)
+  // are synchronized onto the published AgentTemplate. The "diff vs published template" UI must
+  // compare on the same basis, otherwise tools can appear "changed" forever even after publishing.
+  const isToolPublishableForTemplate = (tool: ToolModel | undefined | null): boolean => {
+    if (!tool) return false
+    if (tool.status === 'draft') return false
+    const hasParams = !!tool.parameters && tool.parameters.type === 'object' && !!tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0
+    const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
+    return hasParams && hasBlueprint
+  }
 
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
   useEffect(() => {
@@ -559,8 +577,48 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
     const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
 
-    // Tool comparison: compare current assignedToolSlugs in the form against the baseline tools from the template.
-    const currentTools = normalizeSlugs((value.assignedToolSlugs as string[] | undefined) || [])
+    // Avatar comparison:
+    // - Agent avatar is starship-scoped (Attachment) and has createdAt.
+    // - Published template avatar is public and tracked via avatarUpdatedAt (cache-busting timestamp).
+    // We treat the avatar as "same" if the agent has no avatar and the template has none,
+    // or if the agent avatar was created at/before the template's avatarUpdatedAt.
+    const templateAvatarUpdatedAt = (publishedTemplate as any)?.avatarUpdatedAt as string | undefined
+    const agentHasAvatar = typeof avatarAttachmentId === 'string' && avatarAttachmentId.trim().length > 0
+    const templateHasAvatar = typeof (publishedTemplate as any)?.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
+    const toMs = (s?: string) => {
+      if (!s) return NaN
+      const t = new Date(s).getTime()
+      return Number.isFinite(t) ? t : NaN
+    }
+    const agentAvatarMs = toMs(avatarCreatedAt)
+    const templateAvatarMs = toMs(templateAvatarUpdatedAt)
+    const sameAvatar =
+      (!agentHasAvatar && !templateHasAvatar) || (agentHasAvatar && templateHasAvatar && Number.isFinite(agentAvatarMs) && Number.isFinite(templateAvatarMs) && agentAvatarMs <= templateAvatarMs)
+
+    // Tool comparison:
+    // - Template baseline contains tool *template slugs* and only includes tools that are publishable at template level.
+    // - Current form contains tool *instance slugs* and may include draft/incomplete tools.
+    // To avoid perpetual "Tools changed" after publish, compare only the publishable subset of current assignments.
+    const allCurrentTools = normalizeSlugs((value.assignedToolSlugs as string[] | undefined) || [])
+    const toolsBySlug = new Map<string, ToolModel>()
+    for (const t of Array.isArray(starshipTools) ? starshipTools : []) {
+      if (t?.slug) toolsBySlug.set(t.slug, t)
+    }
+    const currentTools = normalizeSlugs(
+      allCurrentTools
+        .map(slug => {
+          const tool = toolsBySlug.get(slug)
+          // If we can't resolve, keep raw slug so we don't incorrectly hide a diff.
+          if (!tool) return slug
+          if (!isToolPublishableForTemplate(tool)) return null
+
+          // The published AgentTemplate stores tool *template* slugs.
+          // Prefer the tool's published template slug when available; fallback to the tool slug.
+          // (Fallback handles older API responses and/or tools that haven't been promoted.)
+          return tool.publishedTemplateSlug || tool.slug || slug
+        })
+        .filter((s): s is string => typeof s === 'string' && s.length > 0)
+    )
     const baselineTools = normalizeSlugs(((publishedTemplate as any).assignedToolSlugs as string[] | undefined) || [])
     const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
 
@@ -578,6 +636,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!sameTimeout) changes.push('Timeout')
     if (!sameSystemPrompt) changes.push('System prompt')
     if (!samePreviewPrompts) changes.push('Preview prompts')
+    if (!sameAvatar) changes.push('Avatar')
     if (!sameTools) changes.push('Tools')
     if (!sameBlueprint) changes.push('Blueprint')
 
@@ -594,12 +653,17 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         sameTimeout,
         sameSystemPrompt,
         samePreviewPrompts,
+        sameAvatar,
         sameTools,
         sameBlueprint,
+        avatarAttachmentId,
+        avatarCreatedAt,
+        templateAvatarUpdatedAt,
         agentPreviewPrompts: agentCore.previewPrompts,
         templatePreviewPrompts: templateCore.previewPrompts,
         agentBlueprintLen: agentBlueprintStr.length,
         templateBlueprintLen: templateBlueprintStr.length,
+        allCurrentTools,
         currentTools,
         baselineTools,
       })
@@ -617,12 +681,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       sameTimeout &&
       sameSystemPrompt &&
       samePreviewPrompts &&
+      sameAvatar &&
       sameTools &&
       sameBlueprint
     )
 
     return { differsFromPublishedTemplate: differs, publishedChangeDetails: changes }
-  }, [fullAgent, publishedTemplate, value.assignedToolSlugs])
+  }, [fullAgent, publishedTemplate, value.assignedToolSlugs, starshipTools, avatarAttachmentId, avatarCreatedAt])
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
@@ -901,7 +966,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             {/* Avatar + name/slug on the far left */}
             {showIdentityInBanner && (
               <div className="flex items-center gap-3">
-                <AgentAvatar seed={fullAgent?.name || value.name || value.slug || 'Agent'} size={36} rounded className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background" />
+                <AgentAvatar
+                  seed={fullAgent?.name || value.name || value.slug || 'Agent'}
+                  imageUrl={avatarUrl}
+                  size={36}
+                  rounded
+                  className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
+                />
                 <div className="flex flex-col leading-tight min-w-0">
                   <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
                   {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
@@ -1000,7 +1071,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                           }
                           if (existing.changelog && existing.changelog.trim()) continue
 
-                          const isNewTemplate = !tool.templateId
+                          const isNewTemplate = !tool.publishedTemplateId
                           const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
 
                           let defaultLog: string

@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
@@ -28,6 +28,7 @@ import { ShipHero } from '@/components/starship/ShipHero'
 import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 
 export default function StarshipOverviewPage(): React.JSX.Element {
   const router = useRouter()
@@ -37,6 +38,11 @@ export default function StarshipOverviewPage(): React.JSX.Element {
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false)
 
   const starshipId = starship?.id || ''
+
+  const selectedAgentAvatarAttachmentId = (selectedAgent as any)?.avatarAttachmentId as string | undefined
+  const selectedAgentAvatarIds = useMemo(() => (selectedAgentAvatarAttachmentId ? [selectedAgentAvatarAttachmentId] : []), [selectedAgentAvatarAttachmentId])
+  const { data: selectedAgentAvatarAttachments = [] } = useMessageAttachments(selectedAgentAvatarIds, starshipId)
+  const selectedAgentAvatarUrl = selectedAgentAvatarAttachments?.[0]?.previewUrl
 
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipId || '', !!starshipId)
   const { data: convData, isLoading: convLoading } = useStarshipConversations(starshipId || '', !!starshipId)
@@ -199,7 +205,7 @@ export default function StarshipOverviewPage(): React.JSX.Element {
             <DialogTitle className="flex items-center gap-2">
               {selectedAgent ? (
                 <Avatar className="h-6 w-6 ring-1 ring-border/40">
-                  <AgentAvatar seed={selectedAgent.name} size={24} />
+                  <AgentAvatar seed={selectedAgent.name} imageUrl={selectedAgentAvatarUrl} size={24} />
                 </Avatar>
               ) : (
                 <Icon name="user-cog" className="h-5 w-5 text-primary" />

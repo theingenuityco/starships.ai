@@ -17,7 +17,11 @@ const router: Router = Router();
 
 const CreateToolSchema = z
   .object({
-    name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+    name: z
+      .string()
+      .min(1, 'Name is required')
+      .max(100, 'Name must be less than 100 characters')
+      .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
     description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional().default(''),
     parameters: z
       .object({
@@ -56,7 +60,11 @@ const PublishRequestSchema = z.object({
 });
 
 const CreateToolTemplateSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be less than 100 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
   description: z.string().min(1, 'Description is required').max(4000, 'Description must be less than 4000 characters'),
   parameters: z.object({
     type: z.literal('object'),
@@ -68,7 +76,10 @@ const CreateToolTemplateSchema = z.object({
     edges: z.array(z.unknown()),
   }),
   category: z.enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation']),
-  exampleUsage: z.string().optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  exampleUsage: z
+    .string()
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   requiresApiKey: z.boolean().optional(),
   configurationFields: z
     .array(
@@ -84,7 +95,12 @@ const CreateToolTemplateSchema = z.object({
 
 // Separate schema for updates without defaults to avoid overwriting unspecified fields
 const UpdateToolSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(100, 'Name must be less than 100 characters').optional().refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  name: z
+    .string()
+    .min(1, 'Name is required')
+    .max(100, 'Name must be less than 100 characters')
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional(),
   slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters').optional(),
   parameters: z
@@ -174,7 +190,14 @@ router.get('/tool-templates', async (req: Request, res: Response): Promise<void>
       requiresApiKey: queryValidation.requiresApiKey,
     });
 
-    sendSuccess(res, templates);
+    // Public template routes should not expose executable blueprints
+    const sanitized = templates.map((t) => {
+      const rest: Record<string, unknown> = { ...((t ?? {}) as unknown as Record<string, unknown>) };
+      delete rest['blueprint'];
+      return rest;
+    });
+
+    sendSuccess(res, sanitized);
   } catch (error) {
     console.error('[TOOLS] Error fetching tool templates:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch tool templates');
@@ -195,7 +218,10 @@ router.get('/tool-templates/:slug', async (req: Request, res: Response): Promise
       return;
     }
 
-    sendSuccess(res, template);
+    // Public template routes should not expose executable blueprints
+    const rest: Record<string, unknown> = { ...((template ?? {}) as unknown as Record<string, unknown>) };
+    delete rest['blueprint'];
+    sendSuccess(res, rest);
   } catch (error) {
     console.error('[TOOLS] Error getting tool template:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get tool template');
@@ -212,7 +238,10 @@ router.post('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Resp
     const template = await toolTemplateRepository.create(bodyValidation as any);
 
     console.log(`[TOOLS] Tool template created successfully: ${template.slug}`);
-    sendSuccess(res, template, 201);
+    // Do not return executable blueprints in template responses
+    const rest: Record<string, unknown> = { ...((template ?? {}) as unknown as Record<string, unknown>) };
+    delete rest['blueprint'];
+    sendSuccess(res, rest, 201);
   } catch (error) {
     console.error('[TOOLS] Error creating tool template:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create tool template');
@@ -615,11 +644,13 @@ router.get('/admin/tools/pending', jwtAuthMiddleware, async (req: Request, res: 
     }> = [];
 
     for (const tool of paginatedTools) {
-      let requestedBy: {
-        id: string;
-        name?: string;
-        avatar?: string;
-      } | undefined;
+      let requestedBy:
+        | {
+            id: string;
+            name?: string;
+            avatar?: string;
+          }
+        | undefined;
       let requestedByStarship:
         | {
             id: string;
@@ -722,8 +753,8 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
       nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
     }
 
-    // Determine target template (templateId or new template)
-    let targetTemplateId = tool.templateId;
+    // Determine target template (publishedTemplateId or new template)
+    let targetTemplateId = (tool as any).publishedTemplateId as string | undefined;
 
     if (targetTemplateId) {
       const existingTemplate = await templateRepository.findById(targetTemplateId);
@@ -765,8 +796,7 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
     // Persist publication metadata on tool
     const updated = await toolRepository.update(toolId, {
       version: nextVersion,
-      templateId: targetTemplateId,
-      templateSnapshotAt: new Date().toISOString(),
+      publishedTemplateId: targetTemplateId,
       publicationStatus: 'published',
       publicationApprovedBy: adminUserId,
       publicationApprovedAt: new Date().toISOString(),

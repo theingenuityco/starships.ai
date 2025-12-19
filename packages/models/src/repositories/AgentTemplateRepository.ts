@@ -75,8 +75,22 @@ export class AgentTemplateRepository extends BaseRepository {
       typeof model.avatarUpdatedAt === 'string' && model.avatarUpdatedAt.length > 0 ? model.avatarUpdatedAt : undefined;
 
     // Never expose raw S3 pointers to clients
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { avatarS3Key: _k, avatarMimeType: _m, ...rest } = model;
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const {
+      avatarS3Key: _k,
+      avatarMimeType: _m,
+      // Never expose sensitive agent configuration on marketplace/public template responses
+      systemPrompt: _systemPrompt,
+      blueprint: _blueprint,
+      state: _state,
+      // Never expose model/execution tuning details (keep only `model` name)
+      temperature: _temperature,
+      maxTokens: _maxTokens,
+      reasoning: _reasoning,
+      timeout: _timeout,
+      ...rest
+    } = model;
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     return {
       ...(rest as AgentTemplateModel),
       ...(avatarUrl ? { avatarUrl } : {}),
@@ -89,7 +103,37 @@ export class AgentTemplateRepository extends BaseRepository {
       async () => {
         const result = await super.findAllEntities<Record<string, unknown>>('agent_templates', 'created_at DESC');
         const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
-        return templates.map((t) => this.toPublicModel(t));
+
+        // Populate assignedToolSlugs for list views (Marketplace cards need this)
+        const templateIds = templates.map((t) => t.id).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+
+        const assignedToolSlugsByTemplateId = new Map<string, string[]>();
+        if (templateIds.length > 0) {
+          const connection = this.getConnection();
+          const toolResults = await connection.query<{ agent_template_id: string; slug: string }>(
+            `SELECT attt.agent_template_id, tt.slug
+             FROM agent_template_tool_templates attt
+             JOIN tool_templates tt ON tt.id = attt.tool_template_id
+             WHERE attt.agent_template_id = ANY($1)
+             ORDER BY attt.agent_template_id, tt.name`,
+            [templateIds]
+          );
+
+          for (const row of toolResults) {
+            if (!row?.agent_template_id || !row?.slug) continue;
+            const key = row.agent_template_id;
+            const list = assignedToolSlugsByTemplateId.get(key) ?? [];
+            list.push(row.slug);
+            assignedToolSlugsByTemplateId.set(key, list);
+          }
+        }
+
+        return templates.map((t) =>
+          this.toPublicModel({
+            ...t,
+            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
+          } as AgentTemplateModel & Record<string, unknown>)
+        );
       },
       'findAll',
       'AgentTemplate'

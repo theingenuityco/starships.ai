@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import React from 'react'
 import type { AgentModel } from '@starships/protocol'
+import { useMemo } from 'react'
 
 import { Card } from '@/components/ui/card'
 import { Avatar } from '@/components/ui/avatar'
@@ -11,6 +12,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 
 interface AgentCardProps {
   agent: AgentModel
@@ -24,6 +26,11 @@ interface AgentCardProps {
 }
 
 export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest, onAnalytics, showActions = false }: AgentCardProps) {
+  const avatarAttachmentId = (agent as any)?.avatarAttachmentId as string | undefined
+  const ids = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
+  const { data: avatarAttachments = [] } = useMessageAttachments(ids, agent.starshipId)
+  const avatarUrl = avatarAttachments?.[0]?.previewUrl
+
   const inferCategoryFromName = (agentName: string): 'general' | 'coding' | 'creative' | 'analysis' | 'support' => {
     const name = agentName.toLowerCase()
     if (name.includes('support')) {
@@ -114,7 +121,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
               <div className="relative">
                 <div className={`absolute inset-0 ${isSelected ? 'bg-primary/10' : 'bg-muted/10'} blur-sm`} />
                 <Avatar className="h-10 w-10 ring-2 ring-background shadow-lg relative">
-                  <AgentAvatar seed={agent.name} size={40} emphasis={isSelected} />
+                  <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={40} emphasis={isSelected} />
                 </Avatar>
                 {/* Online indicator */}
                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-background animate-pulse" />
@@ -265,7 +272,6 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
         {/* Hover effect overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       </Card>
-
     </div>
   )
 }

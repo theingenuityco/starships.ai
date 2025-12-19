@@ -698,7 +698,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
           <ToolUpdateNotification tool={existingTool} />
         </div>
       )}
-      <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.templateId} />
+      <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.sourceTemplateId} />
       {conversationId && (
         <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">
           <div className="max-w-2xl mx-auto pointer-events-auto">

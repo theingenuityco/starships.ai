@@ -61,7 +61,7 @@ describe('ToolEntity', () => {
       tool.blueprint = { nodes: [], edges: [] };
       tool.createdAt = '2024-01-01T00:00:00.000Z';
       tool.updatedAt = '2024-01-02T12:00:00.000Z';
-      tool.templateId = 'template-789';
+      tool.sourceTemplateId = 'template-789';
       tool.transforms = [{ path: 'input', operation: 'replace', value: 'transformed' }];
       tool.mutations = [{ path: 'output', operation: 'replace', value: 'mutated' }];
       tool.condition = 'state.ready === true';
@@ -69,7 +69,7 @@ describe('ToolEntity', () => {
 
       const serialized = toDatabase(tool);
 
-      expect(serialized.template_id).toBe('template-789');
+      expect(serialized.source_template_id).toBe('template-789');
       expect(serialized.transforms).toEqual([{ path: 'input', operation: 'replace', value: 'transformed' }]);
       expect(serialized.mutations).toEqual([{ path: 'output', operation: 'replace', value: 'mutated' }]);
       expect(serialized.condition).toBe('state.ready === true');
@@ -115,7 +115,7 @@ describe('ToolEntity', () => {
         id: 'tool-123',
         slug: 'complex-tool',
         starshipId: 'starship-456',
-        templateId: 'template-789',
+        sourceTemplateId: 'template-789',
         name: 'Complex Tool',
         description: 'A complex tool',
         parameters: { type: 'object', properties: {} },
@@ -131,7 +131,7 @@ describe('ToolEntity', () => {
 
       const entity = fromDatabase(ToolEntity, databaseRecord);
 
-      expect(entity.templateId).toBe('template-789');
+      expect(entity.sourceTemplateId).toBe('template-789');
       expect(entity.transforms).toEqual([{ path: 'input', operation: 'replace', value: 'transformed' }]);
       expect(entity.mutations).toEqual([{ path: 'output', operation: 'replace', value: 'mutated' }]);
       expect(entity.condition).toBe('state.ready === true');

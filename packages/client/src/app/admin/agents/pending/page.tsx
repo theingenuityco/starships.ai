@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
 import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication, usePendingAgentTools, type PendingAgentSummary } from '@/hooks/useAdminAgents'
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
@@ -68,6 +69,12 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
   const [selectedAgent, setSelectedAgent] = useState<PendingAgentSummary | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+
+  const selectedAgentAvatarAttachmentId = (selectedAgent as any)?.agent?.avatarAttachmentId as string | undefined
+  const selectedAgentStarshipId = (selectedAgent as any)?.agent?.starshipId as string | undefined
+  const selectedAgentAvatarIds = useMemo(() => (selectedAgentAvatarAttachmentId ? [selectedAgentAvatarAttachmentId] : []), [selectedAgentAvatarAttachmentId])
+  const { data: selectedAgentAvatarAttachments = [] } = useMessageAttachments(selectedAgentAvatarIds, selectedAgentStarshipId)
+  const selectedAgentAvatarUrl = selectedAgentAvatarAttachments?.[0]?.previewUrl
 
   const selectedAgentId = selectedAgent?.agent.id
   const { data: pendingTools = [], isLoading: isLoadingTools } = usePendingAgentTools(selectedAgentId)
@@ -426,7 +433,13 @@ export default function PendingAgentsPage(): React.JSX.Element {
                             {/* Identity row */}
                             <div className="flex items-center gap-2.5">
                               <div className="relative">
-                                <AgentAvatar seed={selectedAgent.agent.name} size={32} rounded className="h-8 w-8 rounded-md overflow-hidden ring-1 ring-border/40 shadow-sm bg-background/80" />
+                                <AgentAvatar
+                                  seed={selectedAgent.agent.name}
+                                  imageUrl={selectedAgentAvatarUrl}
+                                  size={32}
+                                  rounded
+                                  className="h-8 w-8 rounded-md overflow-hidden ring-1 ring-border/40 shadow-sm bg-background/80"
+                                />
                               </div>
                               <div className="flex flex-col min-w-0">
                                 <span className="text-xs font-semibold truncate">{selectedAgent.agent.name}</span>

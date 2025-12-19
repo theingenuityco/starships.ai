@@ -10,8 +10,12 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, type ButtonProps } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+
+const CHAT_CTA_BUTTON_CLASS =
+  'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
+const CHAT_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
 interface DeployedAgentCardProps {
   agent: AgentModel
   avatarUrl?: string
@@ -20,65 +24,85 @@ interface DeployedAgentCardProps {
   onEdit?: (agent: AgentModel) => void
   onDelete?: (agent: AgentModel) => void
   onGenerateAvatar?: (agent: AgentModel, options?: { mode?: 'avatar_only' | 'full_chain' }) => void
+  /**
+   * When true (default), shows the small green "online/active" dot on the avatar.
+   * Marketplace template cards should typically turn this off.
+   */
+  showStatusIndicator?: boolean
   showActions?: boolean
   hideChatControl?: boolean
+  /**
+   * Optional content rendered directly under the description line.
+   * Useful for Marketplace to show assigned tool badges.
+   */
+  belowDescription?: React.ReactNode
+  /**
+   * Optional override for the bottom-right CTA (e.g. Marketplace wants "Deploy"
+   * instead of the default "Chat" CTA).
+   */
+  primaryAction?: {
+    label: string
+    iconName?: string
+    iconClassName?: string
+    onAction: (agent: AgentModel) => void
+    disabled?: boolean
+    variant?: ButtonProps['variant']
+    className?: string
+  }
+  /**
+   * When true, skip motion wrappers/animations (useful when the parent already
+   * wraps with its own motion container).
+   */
+  disableMotion?: boolean
+  /**
+   * When true, disable ONLY entrance animation (initial/animate), while keeping hover lift.
+   * Useful when a parent provides a staggered entry animation.
+   */
+  disableEntranceMotion?: boolean
+  /**
+   * When true, disable ONLY hover lift, while keeping entrance animation.
+   */
+  disableHoverMotion?: boolean
 }
 
-export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, onDelete, onGenerateAvatar, showActions = false, hideChatControl = false }: DeployedAgentCardProps) {
+export function DeployedAgentCard({
+  agent,
+  avatarUrl,
+  onClick,
+  onChat,
+  onEdit,
+  onDelete,
+  onGenerateAvatar,
+  showStatusIndicator = true,
+  showActions = false,
+  hideChatControl = false,
+  belowDescription,
+  primaryAction,
+  disableMotion = false,
+  disableEntranceMotion = false,
+  disableHoverMotion = false,
+}: DeployedAgentCardProps) {
   // Check if this is a template-based agent (has sourceTemplateId) - these are protected
   const isTemplateAgent = !!agent.sourceTemplateId
 
   // Get update info from agent object (populated by API)
   const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
 
+  const entranceOff = disableMotion || disableEntranceMotion
+  const hoverOff = disableMotion || disableHoverMotion
+
   return (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+    <motion.div
+      initial={entranceOff ? undefined : { opacity: 0, y: 10 }}
+      animate={entranceOff ? undefined : { opacity: 1, y: 0 }}
+      whileHover={hoverOff ? undefined : { y: -4 }}
+      transition={entranceOff && hoverOff ? undefined : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+      className="h-full"
+    >
       <Card
-        className="frosted-glass-card shadow-frosted-lg group relative overflow-hidden transition-all duration-300 cursor-pointer border border-border/50 hover:border-primary/50 backdrop-blur-xl h-full flex flex-col"
+        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md"
         onClick={onClick}
       >
-        {/* Space-themed radial gradient overlay - matching landing screen */}
-        <div
-          className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{
-            backgroundImage: [
-              // Core glow - amber/yellow (brightest)
-              'radial-gradient(ellipse 400px 300px at 50% 0%, rgba(245,158,11,0.25), transparent 60%)',
-              // Secondary layer - softer amber blend
-              'radial-gradient(ellipse 500px 350px at 50% 0%, rgba(251,191,36,0.18), transparent 65%)',
-              // Outer spread - subtle warm glow
-              'radial-gradient(ellipse 600px 400px at 50% 0%, rgba(252,211,77,0.12), transparent 70%)',
-            ].join(', '),
-          }}
-        />
-
-        {/* Space-themed decorative corner accent with amber gradient */}
-        <div
-          className="absolute top-0 right-0 w-24 h-24 rounded-bl-full opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none"
-          style={{
-            background: 'radial-gradient(ellipse 80px 80px at top right, rgba(245,158,11,0.35), transparent 70%)',
-          }}
-        />
-
-        {/* Animated border glow on hover with amber hue */}
-        <div
-          className="absolute inset-0 rounded-lg pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-          style={{
-            border: '2px solid transparent',
-            background: 'linear-gradient(hsl(var(--card)), hsl(var(--card))) padding-box, linear-gradient(135deg, rgba(245,158,11,0.3), rgba(251,191,36,0.4), rgba(252,211,77,0.3)) border-box',
-          }}
-        />
-
-        {/* Shimmer effect on hover with amber tint */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          <div
-            className="absolute inset-y-0 w-1/2 -translate-x-full group-hover:translate-x-[300%] transition-transform duration-700 ease-in-out"
-            style={{
-              background: 'linear-gradient(to right, transparent, rgba(245,158,11,0.15), rgba(251,191,36,0.1), transparent)',
-            }}
-          />
-        </div>
-
         {/* Actions dropdown */}
         {showActions && (onDelete || onGenerateAvatar) && (
           <div className="absolute top-3 right-3 z-30">
@@ -87,10 +111,10 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 bg-background/80 hover:bg-background/90 backdrop-blur-sm rounded-full border border-border/40 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="h-7 w-7 p-0 rounded-full font-medium transition-all duration-200 border border-transparent text-muted-foreground hover:text-foreground hover:border-[hsl(var(--foreground)/0.15)] hover:bg-[linear-gradient(135deg,hsl(var(--foreground)/0.06),hsl(var(--foreground)/0.03))] hover:shadow-[0_0_4px_hsl(var(--foreground)/0.06)]"
                   onClick={e => e.stopPropagation()}
                 >
-                  <Icon name="dots-vertical" className="h-4 w-4" />
+                  <Icon name="dots-vertical" className="h-8 w-8" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
@@ -144,155 +168,138 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
           </div>
         )}
 
-        <CardHeader className="pb-4 relative z-10 pt-5">
-          <div className="flex items-start gap-3 mb-3">
-            {/* Enhanced Avatar */}
+        <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
+          <div className="flex items-center gap-4">
+            {/* Avatar (same row as title) */}
             <div className="relative flex-shrink-0">
-              {/* Animated amber glow ring - only on hover */}
-              <motion.div
-                className="absolute inset-0 rounded-full blur-xl pointer-events-none hidden group-hover:block"
-                style={{
-                  background: 'radial-gradient(circle, rgba(245,158,11,0.4), rgba(251,191,36,0.2), transparent 70%)',
-                }}
-                animate={{
-                  scale: [1, 1.15, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
               <Avatar
-                className="h-12 w-12 transition-all duration-300 relative z-10 shadow-lg"
+                className="h-14 w-14 rounded-full transition-all duration-300 relative z-10 shadow-lg"
                 style={{
                   boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                 }}
               >
-                <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={48} />
+                <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={56} rounded />
               </Avatar>
-              {/* Animated amber border ring - only on hover */}
-              <motion.div
-                className="absolute inset-0 rounded-full pointer-events-none hidden group-hover:block"
-                style={{
-                  boxShadow: '0 0 0 3px rgba(245,158,11,0.4)',
-                }}
-                animate={{
-                  scale: [1, 1.15, 1],
-                }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: 'easeInOut',
-                }}
-              />
               {/* Online/Active indicator */}
-              <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
-                <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
-              </div>
+              {showStatusIndicator ? (
+                <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
+                  <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
+                </div>
+              ) : null}
             </div>
 
-            {/* Agent name and badge */}
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-2">
-                <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{agent.name}</CardTitle>
-                {/* Show version badge next to name */}
-                {agent.version && (
-                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
-                    v{agent.version}
-                  </Badge>
-                )}
+            {/* Text content */}
+            <div className="min-w-0 flex-1">
+              <div className="mb-0.5 min-w-0">
+                <CardTitle className="truncate text-xl font-bold transition-colors duration-200 group-hover:text-foreground">{agent.name}</CardTitle>
               </div>
-              <div className="flex items-center gap-2 flex-wrap mb-2">
-                {isTemplateAgent && (
+              {/* Slug row (below title) */}
+              {(agent as any)?.slug && (
+                <div className="-mt-1 mb-0 min-w-0">
+                  <span className="font-mono text-sm text-muted-foreground truncate">{(agent as any).slug}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* New section: badges + description (below avatar/name/slug) */}
+          <div className="mt-0">
+            <div className="flex items-center gap-2 flex-wrap mb-2">
+              {/* Version + model badges */}
+              {agent.version && (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                  v{agent.version}
+                </Badge>
+              )}
+              {agent.model && (
+                <Badge variant="outline" className="text-[10px] flex items-center gap-1.5 px-2 py-0.5 transition-all duration-200 min-w-0">
+                  <Icon name="brain" className="w-3.5 h-3.5" />
+                  <span className="font-mono text-[10px] truncate">{agent.model}</span>
+                </Badge>
+              )}
+              {isTemplateAgent && (
+                <Badge
+                  variant="outline"
+                  className="text-[10px] px-1.5 py-0.5 flex items-center"
+                  style={{
+                    borderColor: 'rgba(245,158,11,0.4)',
+                    backgroundColor: 'rgba(245,158,11,0.15)',
+                    color: 'rgba(245,158,11,1)',
+                  }}
+                >
+                  <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
+                  System
+                </Badge>
+              )}
+              {/* Premium update available indicator with subtle animation */}
+              {needsUpdate && (
+                <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
                   <Badge
-                    variant="outline"
-                    className="text-[10px] px-1.5 py-0.5 flex items-center"
+                    className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
                     style={{
-                      borderColor: 'rgba(245,158,11,0.4)',
-                      backgroundColor: 'rgba(245,158,11,0.15)',
-                      color: 'rgba(245,158,11,1)',
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
+                      borderColor: 'rgba(139, 92, 246, 0.3)',
+                      color: 'rgb(139, 92, 246)',
+                      boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
                     }}
                   >
-                    <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
-                    System
-                  </Badge>
-                )}
-                {/* Premium update available indicator with subtle animation */}
-                {needsUpdate && (
-                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
-                    <Badge
-                      className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
+                    <motion.div
+                      className="absolute inset-0"
                       style={{
-                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
-                        borderColor: 'rgba(139, 92, 246, 0.3)',
-                        color: 'rgb(139, 92, 246)',
-                        boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
+                        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
                       }}
-                    >
-                      <motion.div
-                        className="absolute inset-0"
-                        style={{
-                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
-                        }}
-                        animate={{
-                          x: ['-100%', '100%'],
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: 'linear',
-                        }}
-                      />
-                      <span className="relative z-10 flex items-center gap-1">
-                        <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-                        NEW UPDATE AVAILABLE
-                      </span>
-                    </Badge>
-                  </motion.div>
-                )}
-              </div>
-              <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
-                {agent.description || 'No description provided'}
-              </CardDescription>
+                      animate={{
+                        x: ['-100%', '100%'],
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: 'linear',
+                      }}
+                    />
+                    <span className="relative z-10 flex items-center gap-1">
+                      <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
+                      NEW UPDATE AVAILABLE
+                    </span>
+                  </Badge>
+                </motion.div>
+              )}
             </div>
+            <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
+              {agent.description || 'No description provided'}
+            </CardDescription>
+            {belowDescription ? <div className="mt-3">{belowDescription}</div> : null}
           </div>
         </CardHeader>
 
         <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
-          <div className="flex items-center justify-between">
-            {/* Model badge */}
-            <Badge variant="secondary" className="text-xs flex items-center gap-1.5 px-2.5 py-1 transition-all duration-200">
-              <Icon name="brain" className="w-3.5 h-3.5" />
-              <span className="font-mono text-xs">{agent.model || 'N/A'}</span>
-            </Badge>
-
-            {/* Chat button */}
-            {onChat ? (
+          <div className="flex items-center justify-end">
+            {/* Primary action (optional override) */}
+            {primaryAction ? (
+              <Button
+                size="sm"
+                variant={primaryAction.variant ?? 'ghost'}
+                disabled={primaryAction.disabled}
+                className={primaryAction.className ?? CHAT_CTA_BUTTON_CLASS}
+                onClick={e => {
+                  e.stopPropagation()
+                  primaryAction.onAction(agent)
+                }}
+              >
+                {primaryAction.iconName ? <Icon name={primaryAction.iconName} className={primaryAction.iconClassName ?? CHAT_CTA_ICON_CLASS} /> : null}
+                {primaryAction.label}
+              </Button>
+            ) : onChat ? (
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-9 px-3 font-medium transition-all duration-200 text-[rgba(245,158,11,0.8)]"
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(251,191,36,0.06))'
-                  e.currentTarget.style.borderColor = 'rgba(245,158,11,0.25)'
-                  e.currentTarget.style.boxShadow = '0 0 4px rgba(245,158,11,0.1)'
-                  e.currentTarget.style.color = 'rgba(245,158,11,0.8)'
-                  e.currentTarget.style.border = '1px solid rgba(245,158,11,0.25)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = ''
-                  e.currentTarget.style.borderColor = ''
-                  e.currentTarget.style.boxShadow = ''
-                  e.currentTarget.style.color = ''
-                  e.currentTarget.style.border = ''
-                }}
+                className={CHAT_CTA_BUTTON_CLASS}
                 onClick={e => {
                   e.stopPropagation()
                   onChat(agent)
                 }}
               >
-                <Icon name="message-square" className="mr-1.5 h-4 w-4" style={{ color: 'rgba(245,158,11,0.85)' }} />
+                <Icon name="message-square" className={CHAT_CTA_ICON_CLASS} />
                 Chat
               </Button>
             ) : hideChatControl ? null : (

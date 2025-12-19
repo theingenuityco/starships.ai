@@ -20,8 +20,8 @@ interface DeployedToolCardProps {
 }
 
 export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, showActions = false }: DeployedToolCardProps) {
-  // Check if this is a template-based tool (has templateId)
-  const isTemplateTool = !!tool.templateId
+  // Check if this is a template-based tool (deployed from a template)
+  const isTemplateTool = !!tool.sourceTemplateId
 
   // Get update info from tool object (populated by API)
   const needsUpdate = isTemplateTool && tool.updateInfo?.needsUpdate
@@ -72,154 +72,150 @@ export function DeployedToolCard({ tool, onClick, onOpen, onEdit, onDelete, show
             }}
           />
         </div>
-      <CardHeader className="pb-3 relative z-10 pt-5">
-        <div className="flex items-start gap-3 mb-3">
-          {/* Enhanced wrench icon */}
-          <div className="relative flex-shrink-0">
-            {/* Animated amber glow ring - only on hover */}
-            <motion.div
-              className="absolute inset-0 rounded-full blur-xl pointer-events-none hidden group-hover:block"
-              style={{
-                background: 'radial-gradient(circle, rgba(245,158,11,0.4), rgba(251,191,36,0.2), transparent 70%)',
-              }}
-              animate={{
-                scale: [1, 1.15, 1],
-              }}
-              transition={{
-                duration: 2,
-                repeat: Infinity,
-                ease: 'easeInOut',
-              }}
-            />
-            <div className="h-12 w-12 rounded-full ring-1 ring-border/40 flex items-center justify-center bg-muted/20 relative z-10 shadow-lg">
-              <Icon name="wrench" className="w-5 h-5" />
+        <CardHeader className="pb-3 relative z-10 pt-5">
+          <div className="flex items-start gap-3 mb-3">
+            {/* Enhanced wrench icon */}
+            <div className="relative flex-shrink-0">
+              {/* Animated amber glow ring - only on hover */}
+              <motion.div
+                className="absolute inset-0 rounded-full blur-xl pointer-events-none hidden group-hover:block"
+                style={{
+                  background: 'radial-gradient(circle, rgba(245,158,11,0.4), rgba(251,191,36,0.2), transparent 70%)',
+                }}
+                animate={{
+                  scale: [1, 1.15, 1],
+                }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: 'easeInOut',
+                }}
+              />
+              <div className="h-12 w-12 rounded-full ring-1 ring-border/40 flex items-center justify-center bg-muted/20 relative z-10 shadow-lg">
+                <Icon name="wrench" className="w-5 h-5" />
+              </div>
             </div>
-          </div>
 
-          {/* Tool name and badges */}
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-2">
-              <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{tool.name}</CardTitle>
-              {/* Show version badge next to name */}
-              {tool.version && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
-                  v{tool.version}
-                </Badge>
-              )}
-            </div>
-            <div className="flex items-center gap-2 flex-wrap mb-2">
-              {tool.templateId && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] px-1.5 py-0.5 flex items-center"
-                  style={{
-                    borderColor: 'rgba(245,158,11,0.4)',
-                    backgroundColor: 'rgba(245,158,11,0.15)',
-                    color: 'rgba(245,158,11,1)',
-                  }}
-                >
-                  <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
-                  System
-                </Badge>
-              )}
-              {/* Premium update available indicator with subtle animation */}
-              {needsUpdate && (
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  transition={{ duration: 0.3, ease: 'easeOut' }}
-                >
+            {/* Tool name and badges */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2">
+                <CardTitle className="truncate text-lg font-bold transition-all duration-300 group-hover:[color:rgba(245,158,11,1)]">{tool.name}</CardTitle>
+                {/* Show version badge next to name */}
+                {tool.version && (
+                  <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                    v{tool.version}
+                  </Badge>
+                )}
+              </div>
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                {tool.sourceTemplateId && (
                   <Badge
-                    className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
+                    variant="outline"
+                    className="text-[10px] px-1.5 py-0.5 flex items-center"
                     style={{
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
-                      borderColor: 'rgba(139, 92, 246, 0.3)',
-                      color: 'rgb(139, 92, 246)',
-                      boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
+                      borderColor: 'rgba(245,158,11,0.4)',
+                      backgroundColor: 'rgba(245,158,11,0.15)',
+                      color: 'rgba(245,158,11,1)',
                     }}
                   >
-                    <motion.div
-                      className="absolute inset-0"
-                      style={{
-                        background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
-                      }}
-                      animate={{
-                        x: ['-100%', '100%'],
-                      }}
-                      transition={{
-                        duration: 2,
-                        repeat: Infinity,
-                        ease: 'linear',
-                      }}
-                    />
-                    <span className="relative z-10 flex items-center gap-1">
-                      <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
-                      NEW UPDATE AVAILABLE
-                    </span>
+                    <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
+                    System
                   </Badge>
-                </motion.div>
-              )}
+                )}
+                {/* Premium update available indicator with subtle animation */}
+                {needsUpdate && (
+                  <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
+                    <Badge
+                      className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
+                        borderColor: 'rgba(139, 92, 246, 0.3)',
+                        color: 'rgb(139, 92, 246)',
+                        boxShadow: '0 0 8px rgba(139, 92, 246, 0.15)',
+                      }}
+                    >
+                      <motion.div
+                        className="absolute inset-0"
+                        style={{
+                          background: 'linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.15), transparent)',
+                        }}
+                        animate={{
+                          x: ['-100%', '100%'],
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: 'linear',
+                        }}
+                      />
+                      <span className="relative z-10 flex items-center gap-1">
+                        <Icon name="arrow-up-circle" className="w-2.5 h-2.5" />
+                        NEW UPDATE AVAILABLE
+                      </span>
+                    </Badge>
+                  </motion.div>
+                )}
+              </div>
+              <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
+                {tool.description || 'No description provided'}
+              </CardDescription>
             </div>
-            <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
-              {tool.description || 'No description provided'}
-            </CardDescription>
           </div>
-        </div>
 
-        {/* Actions button */}
-        {showActions && onEdit && (
-          <div className="absolute top-3 right-3 z-30">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-7 w-7 p-0 bg-background/80 hover:bg-background/90 backdrop-blur-sm rounded-full border border-border/40 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
-              onClick={e => {
-                e.stopPropagation()
-                onEdit(tool)
-              }}
-            >
-              <Icon name="pencil" className="w-3.5 h-3.5" />
-            </Button>
+          {/* Actions button */}
+          {showActions && onEdit && (
+            <div className="absolute top-3 right-3 z-30">
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 w-7 p-0 bg-background/80 hover:bg-background/90 backdrop-blur-sm rounded-full border border-border/40 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                onClick={e => {
+                  e.stopPropagation()
+                  onEdit(tool)
+                }}
+              >
+                <Icon name="pencil" className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          )}
+        </CardHeader>
+        <CardContent className="relative z-10 pt-0 pb-4 mt-auto">
+          <div className="flex items-center justify-between">
+            <Badge variant="secondary" className="text-xs flex items-center gap-1.5 px-2.5 py-1 transition-all duration-200">
+              <Icon name="fingerprint" className="w-3 h-3" />
+              <span className="font-mono">{(tool as any)?.id?.slice?.(0, 6) || 'tool'}</span>
+            </Badge>
+            {onOpen ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-9 px-3 font-medium transition-all duration-200 text-[rgba(245,158,11,0.8)]"
+                onMouseEnter={e => {
+                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(251,191,36,0.06))'
+                  e.currentTarget.style.borderColor = 'rgba(245,158,11,0.25)'
+                  e.currentTarget.style.boxShadow = '0 0 4px rgba(245,158,11,0.1)'
+                  e.currentTarget.style.color = 'rgba(245,158,11,0.8)'
+                  e.currentTarget.style.border = '1px solid rgba(245,158,11,0.25)'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.background = ''
+                  e.currentTarget.style.borderColor = ''
+                  e.currentTarget.style.boxShadow = ''
+                  e.currentTarget.style.color = ''
+                  e.currentTarget.style.border = ''
+                }}
+                onClick={e => {
+                  e.stopPropagation()
+                  onOpen(tool)
+                }}
+              >
+                <Icon name="external-link" className="mr-1.5 h-4 w-4" style={{ color: 'rgba(245,158,11,0.85)' }} />
+                Open
+              </Button>
+            ) : null}
           </div>
-        )}
-      </CardHeader>
-      <CardContent className="relative z-10 pt-0 pb-4 mt-auto">
-        <div className="flex items-center justify-between">
-          <Badge variant="secondary" className="text-xs flex items-center gap-1.5 px-2.5 py-1 transition-all duration-200">
-            <Icon name="fingerprint" className="w-3 h-3" />
-            <span className="font-mono">{(tool as any)?.id?.slice?.(0, 6) || 'tool'}</span>
-          </Badge>
-          {onOpen ? (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="h-9 px-3 font-medium transition-all duration-200 text-[rgba(245,158,11,0.8)]"
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(251,191,36,0.06))'
-                e.currentTarget.style.borderColor = 'rgba(245,158,11,0.25)'
-                e.currentTarget.style.boxShadow = '0 0 4px rgba(245,158,11,0.1)'
-                e.currentTarget.style.color = 'rgba(245,158,11,0.8)'
-                e.currentTarget.style.border = '1px solid rgba(245,158,11,0.25)'
-              }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = ''
-                e.currentTarget.style.borderColor = ''
-                e.currentTarget.style.boxShadow = ''
-                e.currentTarget.style.color = ''
-                e.currentTarget.style.border = ''
-              }}
-              onClick={e => {
-                e.stopPropagation()
-                onOpen(tool)
-              }}
-            >
-              <Icon name="external-link" className="mr-1.5 h-4 w-4" style={{ color: 'rgba(245,158,11,0.85)' }} />
-              Open
-            </Button>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
     </motion.div>
   )
 }

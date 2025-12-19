@@ -8,13 +8,14 @@ import type { ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Button } from '../ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
 import { ScrollArea } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Avatar } from '../ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 
 interface ConversationListProps {
   starshipId: string
@@ -28,23 +29,32 @@ interface ConversationAgent {
   name: string
   slug?: string
   model?: string
+  avatarAttachmentId?: string
 }
 
-function CompactConversationAgents({ conversationId }: { conversationId: string }) {
+function CompactConversationAgents({ conversationId, starshipId }: { conversationId: string; starshipId: string }) {
   const { data: convAgents = [] } = useConversationAgents(conversationId || null)
 
   const agents = Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []
-  if (!agents.length) return null
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
   const remaining = agents.length - visibleAgents.length
+
+  const avatarAttachmentIds = useMemo(() => {
+    const ids = visibleAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    return ids
+  }, [visibleAgents])
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  if (!agents.length) return null
 
   return (
     <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-foreground">
       {visibleAgents.map(agent => (
         <div key={agent.id ?? agent.slug ?? agent.name} className="flex items-center gap-1 max-w-[6.5rem]">
           <Avatar className="h-4 w-4 ring-1 ring-border/40">
-            <AgentAvatar seed={agent.name} size={16} />
+            <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={16} />
           </Avatar>
           <span className="truncate">{agent.name}</span>
         </div>
@@ -121,62 +131,62 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   // Helper render function for compact list (flat, but with visual indentation for children)
   const renderCompactConversation = (conversation: ConversationModel, isChild: boolean) => {
-            const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
-            const isActive = conversation.id === currentConversationId
+    const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
+    const isActive = conversation.id === currentConversationId
 
-            return (
-              <div
-                key={conversation.id}
-                className={cn(
-                  'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
-                  isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
-                )}
+    return (
+      <div
+        key={conversation.id}
+        className={cn(
+          'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
+          isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
+        )}
         style={isChild ? { paddingLeft: '1.75rem' } : undefined}
-              >
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-                  <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
-                  <CompactConversationAgents conversationId={conversation.id} />
-                </div>
-                {/* Delete button - appears on hover */}
-                {onConversationDelete && (
-                  <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
-                    <DropdownMenu modal={false}>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                          onClick={e => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          onMouseDown={e => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                          }}
-                          type="button"
-                        >
-                          <Icon name="dots-vertical" className="h-3 w-3" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
-                        <DropdownMenuItem
-                          className="text-destructive focus:text-destructive"
-                          onClick={e => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onConversationDelete(conversation.id)
-                          }}
-                        >
-                          <Icon name="trash" className="mr-2 h-3 w-3" />
-                          <span className="text-xs">Delete</span>
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                )}
-              </div>
-            )
+      >
+        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
+          <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
+          <CompactConversationAgents conversationId={conversation.id} starshipId={starshipId} />
+        </div>
+        {/* Delete button - appears on hover */}
+        {onConversationDelete && (
+          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
+            <DropdownMenu modal={false}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  onMouseDown={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                  }}
+                  type="button"
+                >
+                  <Icon name="dots-vertical" className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
+                <DropdownMenuItem
+                  className="text-destructive focus:text-destructive"
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    onConversationDelete(conversation.id)
+                  }}
+                >
+                  <Icon name="trash" className="mr-2 h-3 w-3" />
+                  <span className="text-xs">Delete</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
+      </div>
+    )
   }
 
   const handleConversationClick = (conversationId: string) => {
@@ -270,44 +280,44 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
                         return (
                           <div key={conversation.id}>
-                          <div
-                            className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
-                            onClick={() => handleConversationClick(conversation.id)}
-                          >
-                            {/* Conversation Info */}
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center justify-between mb-1">
-                                <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
-                                <span className="text-xs text-muted-foreground">
-                                  {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
-                                    addSuffix: false,
-                                  })}
-                                </span>
+                            <div
+                              className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
+                              onClick={() => handleConversationClick(conversation.id)}
+                            >
+                              {/* Conversation Info */}
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center justify-between mb-1">
+                                  <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
+                                  <span className="text-xs text-muted-foreground">
+                                    {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
+                                      addSuffix: false,
+                                    })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
                               </div>
-                              <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
-                            </div>
 
-                            {/* Actions Menu */}
-                            {onConversationDelete && (
-                              <DropdownMenu>
-                                <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <Icon name="dots-vertical" className="h-4 w-4" />
-                                  </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-48">
-                                  <DropdownMenuItem
-                                    className="text-destructive"
-                                    onClick={e => {
-                                      e.stopPropagation()
-                                      onConversationDelete(conversation.id)
-                                    }}
-                                  >
-                                    <Icon name="trash" className="mr-2 h-4 w-4" />
-                                    Delete
-                                  </DropdownMenuItem>
-                                </DropdownMenuContent>
-                              </DropdownMenu>
+                              {/* Actions Menu */}
+                              {onConversationDelete && (
+                                <DropdownMenu>
+                                  <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                      <Icon name="dots-vertical" className="h-4 w-4" />
+                                    </Button>
+                                  </DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end" className="w-48">
+                                    <DropdownMenuItem
+                                      className="text-destructive"
+                                      onClick={e => {
+                                        e.stopPropagation()
+                                        onConversationDelete(conversation.id)
+                                      }}
+                                    >
+                                      <Icon name="trash" className="mr-2 h-4 w-4" />
+                                      Delete
+                                    </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                </DropdownMenu>
                               )}
                             </div>
 

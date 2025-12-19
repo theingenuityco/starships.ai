@@ -64,7 +64,7 @@ export class ConversationService {
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   private connectorSecretService!: ConnectorSecretService;
   private usageService!: UsageService;
   private billingService!: BillingService;

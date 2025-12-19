@@ -34,8 +34,13 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
 
   // Get deployed agents to check if this template is already deployed
   const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship)
-  // Note: We use name matching since agents don't store templateId
-  const isAlreadyDeployed = deployedAgents.some(agent => agent.name === template.name)
+
+  // If this template was published from this starship, disable deploy CTA (it already "lives" here)
+  const isPublishedFromThisStarship = deployedAgents.some(agent => agent.publishedTemplateId === template.id)
+
+  // Already deployed when this template has already been deployed to this starship.
+  // Server-provided linkage is `sourceTemplateId`.
+  const isAlreadyDeployed = deployedAgents.some(agent => agent.sourceTemplateId === template.id)
 
   // Deployment mutation
   const createAgentMutation = useCreateAgentFromTemplate()
@@ -139,10 +144,10 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
           ) : null
         }
         primaryAction={{
-          label: isAlreadyDeployed ? 'Already deployed' : isDeploying ? 'Deploying...' : 'Deploy',
-          iconName: isAlreadyDeployed ? 'check-circle' : 'sparkles',
-          disabled: isAlreadyDeployed || isDeploying || (isAuthenticated && !primaryStarship),
-          variant: isAlreadyDeployed ? 'outline' : 'default',
+          label: isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
+          iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
+          disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
+          variant: isAlreadyDeployed || isPublishedFromThisStarship ? 'outline' : 'default',
           className: 'h-9 px-3',
           onAction: () => requestDeploy(),
         }}

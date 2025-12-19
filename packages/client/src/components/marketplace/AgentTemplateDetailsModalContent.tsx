@@ -22,15 +22,18 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
 
   const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
   const toolInfoBySlug = useMemo(() => {
-    const map = new Map<string, { name: string; description: string }>()
+    const map = new Map<string, { name: string; description: string; version?: string }>()
     for (const t of toolTemplates as any[]) {
       const slug = (t as any)?.slug
       const name = (t as any)?.name
       const description = (t as any)?.description
+      const versionRaw = (t as any)?.version
+      const version = typeof versionRaw === 'string' || typeof versionRaw === 'number' ? String(versionRaw) : undefined
       if (typeof slug === 'string' && slug.trim()) {
         map.set(slug, {
           name: typeof name === 'string' && name.trim() ? name : slug,
           description: typeof description === 'string' ? description : '',
+          version: version && version.trim().length > 0 ? version : undefined,
         })
       }
     }
@@ -38,7 +41,7 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
   }, [toolTemplates])
 
   return (
-    <div className="px-6 pb-6 space-y-6">
+    <div className="px-6 pb-0 space-y-6">
       {/* Tags + description */}
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-2">
@@ -83,9 +86,17 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
                   const info = toolInfoBySlug.get(slug)
                   const name = info?.name ?? slug
                   const description = info?.description ?? ''
+                  const version = info?.version
                   const oneLineDescription = (description.split(/\r?\n/)[0] ?? '').trim()
                   return (
-                    <div key={slug} className="rounded-lg border border-muted-foreground/20 bg-muted/10 hover:bg-muted/20 transition-colors px-3 py-2">
+                    <div key={slug} className="relative rounded-lg border border-muted-foreground/20 bg-muted/10 hover:bg-muted/20 transition-colors px-3 py-2">
+                      {version ? (
+                        <div className="absolute top-2 left-2">
+                          <Badge variant="outline" className="font-mono text-[9px] px-1.5 py-0.5 leading-none">
+                            v{version}
+                          </Badge>
+                        </div>
+                      ) : null}
                       <div className="grid grid-cols-[auto,1fr] gap-x-2.5 gap-y-1.5">
                         {/* Header row */}
                         <div className="mt-0.5 p-1.5 rounded-md bg-primary/10 border border-primary/15">

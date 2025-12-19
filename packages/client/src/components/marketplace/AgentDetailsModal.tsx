@@ -77,7 +77,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden flex flex-col">
-        <div className="px-6 pt-4 pb-3 pr-14 flex items-start gap-4">
+        <div className="px-6 pt-4 pb-0 pr-14 flex items-center gap-4">
           <Avatar className="h-14 w-14 rounded-full ring-1 ring-border/40 shadow-lg">
             <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={56} rounded />
           </Avatar>
@@ -89,7 +89,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         <div className="flex-1 min-h-0 overflow-y-auto">
           <AgentTemplateDetailsModalContent template={template} />
         </div>
-        <div className="shrink-0 bg-card/60 backdrop-blur-sm px-6 py-4 flex items-center justify-end gap-2">
+        <div className="shrink-0 bg-card/60 backdrop-blur-sm px-6 pt-0 pb-4 flex items-center justify-end gap-2">
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>

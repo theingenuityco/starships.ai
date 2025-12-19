@@ -45,7 +45,7 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="h-7 w-7 p-0 bg-background/80 hover:bg-background/90 backdrop-blur-sm rounded-full border border-border/40 hover:border-primary/50 transition-all duration-200 shadow-sm hover:shadow-md"
+                  className="h-7 w-7 p-0 rounded-full font-medium transition-all duration-200 border border-transparent text-primary hover:text-primary hover:border-[hsl(var(--primary)/0.25)] hover:bg-[linear-gradient(135deg,hsl(var(--primary)/0.10),hsl(var(--primary)/0.06))] hover:shadow-[0_0_4px_hsl(var(--primary)/0.10)]"
                   onClick={e => e.stopPropagation()}
                 >
                   <Icon name="dots-vertical" className="h-4 w-4" />
@@ -210,27 +210,13 @@ export function DeployedAgentCard({ agent, avatarUrl, onClick, onChat, onEdit, o
               <Button
                 size="sm"
                 variant="ghost"
-                className="h-9 px-3 font-medium transition-all duration-200 text-[rgba(245,158,11,0.8)]"
-                onMouseEnter={e => {
-                  e.currentTarget.style.background = 'linear-gradient(135deg, rgba(245,158,11,0.1), rgba(251,191,36,0.06))'
-                  e.currentTarget.style.borderColor = 'rgba(245,158,11,0.25)'
-                  e.currentTarget.style.boxShadow = '0 0 4px rgba(245,158,11,0.1)'
-                  e.currentTarget.style.color = 'rgba(245,158,11,0.8)'
-                  e.currentTarget.style.border = '1px solid rgba(245,158,11,0.25)'
-                }}
-                onMouseLeave={e => {
-                  e.currentTarget.style.background = ''
-                  e.currentTarget.style.borderColor = ''
-                  e.currentTarget.style.boxShadow = ''
-                  e.currentTarget.style.color = ''
-                  e.currentTarget.style.border = ''
-                }}
+                className="h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)]"
                 onClick={e => {
                   e.stopPropagation()
                   onChat(agent)
                 }}
               >
-                <Icon name="message-square" className="mr-1.5 h-4 w-4" style={{ color: 'rgba(245,158,11,0.85)' }} />
+                <Icon name="message-square" className="mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)]" />
                 Chat
               </Button>
             ) : hideChatControl ? null : (

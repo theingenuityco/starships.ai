@@ -59,6 +59,9 @@ interface AgentDocumentEditorProps {
 export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false }: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
   const queryClient = useQueryClient()
+  // Track whether the user explicitly changed the Reasoning dropdown.
+  // Important: we must NOT mutate agent reasoning/blueprint just by opening the editor.
+  const reasoningDirtyRef = useRef<boolean>(false)
 
   const availableModels = useMemo(() => {
     return openRouterModels?.map(m => m.id) || []
@@ -815,29 +818,18 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       }
 
       // Reasoning (effort select)
-      if (nextEffort === 'none') {
-        // Avoid infinite autosave loops:
-        // - Only send a clear when there's actually something to clear (agent reasoning set OR blueprint has reasoning).
-        const baseHasReasoning = baseReasoning != null
-        const blueprintHasReasoning = (() => {
-          const bp = base.blueprint as unknown
-          const nodes = bp && typeof bp === 'object' && Array.isArray((bp as any).nodes) ? ((bp as any).nodes as unknown[]) : []
-          return nodes.some(n => {
-            if (!n || typeof n !== 'object') return false
-            const nn = n as { type?: unknown; parameters?: unknown }
-            if (nn.type !== 'llm') return false
-            if (!nn.parameters || typeof nn.parameters !== 'object') return false
-            return Object.prototype.hasOwnProperty.call(nn.parameters as object, 'reasoning')
-          })
-        })()
-        if (baseHasReasoning || blueprintHasReasoning) {
+      // Only persist reasoning changes when the user explicitly changed the dropdown.
+      if (reasoningDirtyRef.current) {
+        if (nextEffort === 'none') {
+          // If user picked "none", explicitly clear reasoning so the backend can reconcile
+          // any historical blueprint defaults.
           ;(updates as any).reasoning = null
-        }
-      } else {
-        const nextObj = { enabled: true, effort: nextEffort }
-        const baseEffort = baseReasoning?.effort
-        if (baseEffort !== nextEffort) {
-          ;(updates as any).reasoning = nextObj
+        } else {
+          const nextObj = { enabled: true, effort: nextEffort }
+          const baseEffort = baseReasoning?.effort
+          if (baseEffort !== nextEffort) {
+            ;(updates as any).reasoning = nextObj
+          }
         }
       }
 
@@ -889,6 +881,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           setFullAgent(updated)
           // Keep React Query cache in sync for this agent
           queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+          // If we successfully persisted a reasoning change, clear the dirty flag
+          if (Object.prototype.hasOwnProperty.call(updates as object, 'reasoning')) {
+            reasoningDirtyRef.current = false
+          }
         }
       } catch (error: any) {
         if (!cancelled) {
@@ -1531,6 +1527,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                         if (isTemplateAgent || readOnly) return
 
                         const nextEffort = val as AgentFormData['reasoning']
+                        reasoningDirtyRef.current = true
                         onFieldChange?.('reasoning', nextEffort as any)
 
                         // Keep the form blueprint JSON consistent with reasoning selection

@@ -1,11 +1,9 @@
 'use client'
 
-import React, { useMemo } from 'react'
+import React from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AgentBuilderView } from '@/components/agents/AgentBuilder'
-import { useAuth } from '@/hooks/useAuth'
-import { useUserStarships } from '@/hooks/useStarships'
+import { AgentTemplateDetailsModalContent } from '@/components/marketplace/AgentTemplateDetailsModalContent'
 
 interface AgentDetailsModalProps {
   template: AgentTemplateModel | null
@@ -15,39 +13,6 @@ interface AgentDetailsModalProps {
 }
 
 export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: AgentDetailsModalProps) {
-  // Prefer the user's primary starship if authenticated; allows the underlying
-  // agent builder component to resolve tools + avatars (even in read-only mode).
-  const { userId } = useAuth()
-  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
-  const primaryStarshipId = starships?.[0]?.id
-
-  const initialForm = useMemo(() => {
-    if (!template) return null
-    const blueprintStr = (() => {
-      try {
-        return JSON.stringify((template as any)?.blueprint ?? { nodes: [], edges: [] }, null, 2)
-      } catch {
-        return JSON.stringify({ nodes: [], edges: [] }, null, 2)
-      }
-    })()
-
-    return {
-      name: template.name ?? '',
-      slug: template.slug ?? '',
-      description: template.description ?? '',
-      category: (template.category as any) ?? 'general',
-      model: template.model ?? '',
-      temperature: typeof (template as any).temperature === 'number' ? (template as any).temperature : 0.7,
-      maxTokens: typeof (template as any).maxTokens === 'number' ? (template as any).maxTokens : 2048,
-      systemPrompt: template.systemPrompt ?? '',
-      previewPrompts: Array.isArray((template as any).previewPrompts) ? ((template as any).previewPrompts as string[]) : [],
-      assignedToolSlugs: Array.isArray((template as any).assignedToolSlugs) ? ((template as any).assignedToolSlugs as string[]) : [],
-      blueprint: blueprintStr,
-      timeout: typeof (template as any).timeout === 'number' ? (template as any).timeout : 60,
-      icon: typeof (template as any).icon === 'string' ? ((template as any).icon as string) : '',
-    }
-  }, [template])
-
   if (!template) return null
 
   return (
@@ -57,16 +22,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
           <DialogTitle>{template.name ? `${template.name} details` : 'Agent details'}</DialogTitle>
         </DialogHeader>
         <div className="flex-1 min-h-0 overflow-y-auto">
-          <AgentBuilderView
-            starshipId={primaryStarshipId}
-            initialSlug={template.slug}
-            readOnly={true}
-            initialData={initialForm ?? undefined}
-            onCancel={() => onOpenChange(false)}
-            // Marketplace details modal is read-only; deploy is handled elsewhere.
-            onSave={undefined}
-            key={template.id}
-          />
+          <AgentTemplateDetailsModalContent template={template} onDeploy={onDeploy} onRequestClose={() => onOpenChange(false)} />
         </div>
       </DialogContent>
     </Dialog>

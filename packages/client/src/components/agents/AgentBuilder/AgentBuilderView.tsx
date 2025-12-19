@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button'
 import { AgentDocumentEditor } from './components/AgentDocumentEditor'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 
-export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId, initialSlug, errorMessage, readOnly = false, initialData }, ref) => {
-  const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave, initialData })
+export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId, initialSlug, errorMessage }, ref) => {
+  const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave })
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -51,7 +51,6 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
             onSave={handleSave}
             onCancel={onCancel}
             starshipId={starshipId}
-            readOnly={readOnly}
             // If editor mounts with empty slug, pre-seed from props
             key={`agent-editor-${initialSlug || 'none'}`}
           />

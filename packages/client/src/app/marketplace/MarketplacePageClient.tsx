@@ -125,7 +125,7 @@ export default function MarketplacePageClient() {
               {/* Agents Section */}
               <div className="space-y-4 sm:space-y-6">
                 <div className="flex items-center gap-3">
-                  <Icon name="bot" className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
+                  <Icon name="head-circuit" className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
                   <h2 className="text-lg sm:text-xl font-semibold">Agents</h2>
                   <Badge variant="outline" className="ml-2">
                     {filteredAgentTemplates.length}
@@ -148,7 +148,7 @@ export default function MarketplacePageClient() {
                   </div>
                 ) : (
                   <div className="text-center py-8 border border-dashed border-muted-foreground/30 rounded-xl bg-muted/20">
-                    <Icon name="bot" className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                    <Icon name="head-circuit" className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                     <h3 className="text-lg font-medium mb-2">No agent templates found</h3>
                     <p className="text-sm text-muted-foreground">Try adjusting your search or category filter.</p>
                   </div>

@@ -204,7 +204,7 @@ export function DeployedAgentCard({
                 </Badge>
               )}
               {agent.model && (
-                <Badge variant="secondary" className="text-[10px] flex items-center gap-1.5 px-2 py-0.5 transition-all duration-200 min-w-0">
+                <Badge variant="outline" className="text-[10px] flex items-center gap-1.5 px-2 py-0.5 transition-all duration-200 min-w-0">
                   <Icon name="brain" className="w-3.5 h-3.5" />
                   <span className="font-mono text-[10px] truncate">{agent.model}</span>
                 </Badge>

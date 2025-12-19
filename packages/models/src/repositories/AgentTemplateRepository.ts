@@ -11,6 +11,66 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Resolve the "creator" (user id) for one or more templates.
+   *
+   * We define creator as:
+   * - The user who requested publication of the parent Agent into this template (agents.publication_requested_by), OR
+   * - If that field is missing (older data / seeded backfills), the owner of the parent Agent's starship (starships.owner_id).
+   *
+   * Notes:
+   * - A template may have 0 parent agents (seeded templates before backfill) → no creator.
+   * - A template may (rarely) have multiple parent agents; we take the earliest by created_at.
+   */
+  async getCreatorUserIdsByTemplateIds(templateIds: string[]): Promise<Map<string, string>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const ids = (templateIds || []).map((t) => String(t)).filter((t) => t.trim().length > 0);
+        if (ids.length === 0) return new Map();
+
+        const connection = this.getConnection();
+
+        const rows = await connection.query<{
+          template_id: string;
+          creator_user_id: string | null;
+        }>(
+          `
+          SELECT
+            a.published_template_id AS template_id,
+            COALESCE(a.publication_requested_by, s.owner_id) AS creator_user_id
+          FROM agents a
+          LEFT JOIN starships s ON s.id = a.starship_id
+          WHERE a.published_template_id = ANY($1)
+          ORDER BY a.created_at ASC
+          `,
+          [ids]
+        );
+
+        const map = new Map<string, string>();
+        for (const row of rows || []) {
+          if (!row?.template_id) continue;
+          if (!row?.creator_user_id) continue;
+          // First row wins (ordered by created_at asc)
+          if (!map.has(row.template_id)) {
+            map.set(row.template_id, row.creator_user_id);
+          }
+        }
+
+        return map;
+      },
+      'getCreatorUserIdsByTemplateIds',
+      'AgentTemplate'
+    );
+  }
+
+  /**
+   * Convenience wrapper to fetch a single template creator user id.
+   */
+  async getCreatorUserIdByTemplateId(templateId: string): Promise<string | null> {
+    const map = await this.getCreatorUserIdsByTemplateIds([templateId]);
+    return map.get(templateId) ?? null;
+  }
+
+  /**
    * INTERNAL: Load a template including sensitive configuration fields
    * (systemPrompt/state/blueprint + tuning params).
    *

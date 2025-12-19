@@ -135,6 +135,46 @@ describe('AgentTemplateRepository', () => {
     });
   });
 
+  describe('getCreatorUserIdsByTemplateIds', () => {
+    it('should return a map of templateId -> creatorUserId (first row wins)', async () => {
+      mockConnection.query.mockResolvedValueOnce([
+        { template_id: 'template-123', creator_user_id: 'user-1' },
+        { template_id: 'template-123', creator_user_id: 'user-2' }, // should be ignored
+        { template_id: 'template-456', creator_user_id: 'user-3' },
+      ]);
+
+      const map = await repository.getCreatorUserIdsByTemplateIds(['template-123', 'template-456']);
+
+      expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('FROM agents a'), expect.any(Array));
+      expect(map.get('template-123')).toBe('user-1');
+      expect(map.get('template-456')).toBe('user-3');
+    });
+
+    it('should return empty map for empty input', async () => {
+      const map = await repository.getCreatorUserIdsByTemplateIds([]);
+      expect(map.size).toBe(0);
+      expect(mockConnection.query).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('getCreatorUserIdByTemplateId', () => {
+    it('should return single creator user id', async () => {
+      mockConnection.query.mockResolvedValueOnce([{ template_id: 'template-123', creator_user_id: 'user-1' }]);
+
+      const creatorId = await repository.getCreatorUserIdByTemplateId('template-123');
+
+      expect(creatorId).toBe('user-1');
+    });
+
+    it('should return null when no creator found', async () => {
+      mockConnection.query.mockResolvedValueOnce([]);
+
+      const creatorId = await repository.getCreatorUserIdByTemplateId('template-123');
+
+      expect(creatorId).toBeNull();
+    });
+  });
+
   describe('findById', () => {
     it('should return template when found', async () => {
       const mockRawTemplate = createMockRawTemplate();

@@ -1,4 +1,4 @@
-import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
+import { jwtAuthMiddleware, optionalJwtAuth } from '@/middleware/jwt-auth';
 import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
@@ -9,6 +9,18 @@ import { AgentTemplateRepository } from '@starships/models';
 import { generatePresignedUrlInline } from '@/utils/s3-helper';
 
 const router: Router = Router();
+
+function toCreatorSafeTemplateModel(template: Record<string, unknown>): Record<string, unknown> {
+  // Never expose raw S3 pointers even to creators (serve via API route).
+  const hasAvatar = typeof template['avatarS3Key'] === 'string' && String(template['avatarS3Key']).length > 0;
+  const id = typeof template['id'] === 'string' ? template['id'] : undefined;
+  if (hasAvatar && id) {
+    template['avatarUrl'] = `/api/v1/agent-templates/${id}/avatar`;
+  }
+  delete template['avatarS3Key'];
+  delete template['avatarMimeType'];
+  return template;
+}
 
 // Zod schemas for validation
 // Using standard pagination schema for consistency
@@ -28,7 +40,7 @@ function getAgentTemplateService(): AgentTemplateService | null {
 }
 
 // GET /agent-templates - Get all templates (public)
-router.get('/agent-templates', async (req: Request, res: Response): Promise<void> => {
+router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const templateService = getAgentTemplateService();
     if (!templateService) {
@@ -50,27 +62,51 @@ router.get('/agent-templates', async (req: Request, res: Response): Promise<void
 
     const paginationMeta = createPaginationMeta(page, limit, paginatedTemplates.length);
 
-    // Defensive: repository already strips sensitive fields, but ensure we never leak them from this route.
-    const sanitized = paginatedTemplates.map((t) => {
-      const rest: Record<string, unknown> = { ...((t ?? {}) as unknown as Record<string, unknown>) };
-      delete rest['systemPrompt'];
-      delete rest['blueprint'];
-      delete rest['state'];
-      delete rest['temperature'];
-      delete rest['maxTokens'];
-      delete rest['reasoning'];
-      delete rest['timeout'];
-      return rest;
-    });
+    const requesterUserId = req.user?.id;
+    const repo = new AgentTemplateRepository();
 
-    sendSuccess(res, sanitized, 200, paginationMeta);
+    // Only creators can see sensitive fields. Everyone else gets the public-stripped model.
+    const creatorIdsByTemplateId =
+      requesterUserId && paginatedTemplates.length > 0
+        ? await repo.getCreatorUserIdsByTemplateIds(
+            paginatedTemplates.map((t) => (t as any)?.id).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
+          )
+        : new Map<string, string>();
+
+    const hydrated = await Promise.all(
+      paginatedTemplates.map(async (t) => {
+        const publicModel: Record<string, unknown> = { ...((t ?? {}) as unknown as Record<string, unknown>) };
+        const templateId = typeof publicModel['id'] === 'string' ? (publicModel['id'] as string) : undefined;
+
+        const creatorUserId = templateId ? creatorIdsByTemplateId.get(templateId) : undefined;
+        const isCreator = !!requesterUserId && !!creatorUserId && requesterUserId === creatorUserId;
+
+        if (!isCreator || !templateId) {
+          // Defensive: repository already strips sensitive fields, but ensure we never leak them from this route.
+          delete publicModel['systemPrompt'];
+          delete publicModel['blueprint'];
+          delete publicModel['state'];
+          delete publicModel['temperature'];
+          delete publicModel['maxTokens'];
+          delete publicModel['reasoning'];
+          delete publicModel['timeout'];
+          return publicModel;
+        }
+
+        const internal = await repo.findInternalById(templateId);
+        if (!internal) return publicModel;
+        return toCreatorSafeTemplateModel({ ...(internal as unknown as Record<string, unknown>) });
+      })
+    );
+
+    sendSuccess(res, hydrated, 200, paginationMeta);
   } catch (error) {
     handleError(error, res, 'loading templates');
   }
 });
 
 // GET /agent-templates/:id - Get template by ID (public)
-router.get('/agent-templates/:id', async (req: Request, res: Response): Promise<void> => {
+router.get('/agent-templates/:id', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
 
@@ -84,7 +120,12 @@ router.get('/agent-templates/:id', async (req: Request, res: Response): Promise<
       return;
     }
 
-    const template = await templateService.getTemplateById(id);
+    const repo = new AgentTemplateRepository();
+    const requesterUserId = req.user?.id;
+    const creatorUserId = requesterUserId ? await repo.getCreatorUserIdByTemplateId(id) : null;
+    const isCreator = !!requesterUserId && !!creatorUserId && requesterUserId === creatorUserId;
+
+    const template = isCreator ? await repo.findInternalById(id) : await templateService.getTemplateById(id);
 
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, {
@@ -94,17 +135,23 @@ router.get('/agent-templates/:id', async (req: Request, res: Response): Promise<
       return;
     }
 
-    // Defensive: repository already strips sensitive fields, but ensure we never leak them from this route.
-    const rest: Record<string, unknown> = { ...((template ?? {}) as unknown as Record<string, unknown>) };
-    delete rest['systemPrompt'];
-    delete rest['blueprint'];
-    delete rest['state'];
-    delete rest['temperature'];
-    delete rest['maxTokens'];
-    delete rest['reasoning'];
-    delete rest['timeout'];
+    if (isCreator) {
+      const creatorModel = toCreatorSafeTemplateModel({ ...((template ?? {}) as unknown as Record<string, unknown>) });
+      sendSuccess(res, creatorModel, 200);
+      return;
+    }
 
-    sendSuccess(res, rest, 200);
+    // Defensive: repository already strips sensitive fields, but ensure we never leak them from this route.
+    const publicModel: Record<string, unknown> = { ...((template ?? {}) as unknown as Record<string, unknown>) };
+    delete publicModel['systemPrompt'];
+    delete publicModel['blueprint'];
+    delete publicModel['state'];
+    delete publicModel['temperature'];
+    delete publicModel['maxTokens'];
+    delete publicModel['reasoning'];
+    delete publicModel['timeout'];
+
+    sendSuccess(res, publicModel, 200);
   } catch (error) {
     handleError(error, res, 'loading template');
   }

@@ -11,6 +11,73 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
+   * INTERNAL: Load a template including sensitive configuration fields
+   * (systemPrompt/state/blueprint + tuning params).
+   *
+   * Public repository methods (findById/findBySlug/findAll) intentionally strip these
+   * fields via toPublicModel() for marketplace/client consumption.
+   */
+  async findInternalById(id: string): Promise<AgentTemplateModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!id?.trim()) {
+          throw new Error('ID is required for findInternalById operation');
+        }
+
+        const result = await super.findEntityById<Record<string, unknown>>('agent_templates', id);
+        if (!result) {
+          return null;
+        }
+
+        const baseTemplate = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
+
+        // Populate assigned tool template slugs from junction table (authoritative source).
+        const connection = this.getConnection();
+        const toolResults = await connection.query<{ slug: string }>(
+          `SELECT tt.slug
+           FROM tool_templates tt
+           JOIN agent_template_tool_templates attt ON tt.id = attt.tool_template_id
+           WHERE attt.agent_template_id = $1
+           ORDER BY tt.name`,
+          [id]
+        );
+
+        const assignedToolSlugs = toolResults.map((row) => row.slug).filter(Boolean);
+
+        return {
+          ...(baseTemplate as AgentTemplateModel),
+          assignedToolSlugs,
+        };
+      },
+      'findInternalById',
+      'AgentTemplate',
+      id
+    );
+  }
+
+  /**
+   * INTERNAL: Convenience wrapper to load a template by slug including config fields.
+   */
+  async findInternalBySlug(slug: string): Promise<AgentTemplateModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!slug?.trim()) {
+          throw new Error('Slug is required for findInternalBySlug operation');
+        }
+
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ id: string }>('SELECT id FROM agent_templates WHERE slug = $1', [slug]);
+        if (!row?.id) return null;
+
+        return await this.findInternalById(row.id);
+      },
+      'findInternalBySlug',
+      'AgentTemplate',
+      slug
+    );
+  }
+
+  /**
    * INTERNAL: Load template avatar storage fields.
    * These fields are not exposed in the public AgentTemplateModel returned by findById/findAll.
    */

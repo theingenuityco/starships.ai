@@ -196,7 +196,9 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
 
     for (const slug of seededSlugs) {
       try {
-        const template = await templateRepo.findBySlug(slug);
+        // Use INTERNAL loader to ensure we have sensitive config fields (state/blueprint/systemPrompt)
+        // required for creating parent agents.
+        const template = await templateRepo.findInternalBySlug(slug);
         if (!template) {
           skippedMissingTemplate++;
           logger.warn(`Seeded template slug missing from DB: ${slug}`, {
@@ -208,9 +210,8 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
         }
         templatesFound++;
 
-        // Reload via findById so assignedToolSlugs is reliably populated from relationships.
-        const templateWithTools = await templateRepo.findById(template.id);
-        const assignedToolTemplateSlugs = templateWithTools?.assignedToolSlugs || [];
+        // assignedToolSlugs is populated from relationships by findInternalBySlug/findInternalById.
+        const assignedToolTemplateSlugs = template.assignedToolSlugs || [];
 
         const now = new Date().toISOString();
 

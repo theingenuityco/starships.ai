@@ -6,14 +6,14 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
+import { useCreateAgentFromTemplate, useToolTemplates } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { AgentModel, AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
@@ -62,6 +62,24 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
     onClick?.(template)
   }
 
+  const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s => typeof s === 'string' && s.trim().length > 0) : []
+  const visibleToolSlugs = toolSlugs.slice(0, 4)
+  const hiddenToolsCount = Math.max(0, toolSlugs.length - visibleToolSlugs.length)
+
+  const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
+
+  const toolTemplateNameBySlug = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const t of toolTemplates) {
+      const slug = (t as any)?.slug
+      const name = (t as any)?.name
+      if (typeof slug === 'string' && slug.trim() && typeof name === 'string' && name.trim()) {
+        map.set(slug, name)
+      }
+    }
+    return map
+  }, [toolTemplates])
+
   const agentLike: AgentModel = {
     // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
     id: template.id,
@@ -100,6 +118,26 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         hideChatControl={true}
         showActions={false}
         disableMotion={true}
+        belowDescription={
+          toolSlugs.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground mr-1">
+                <Icon name="wrench" className="w-3.5 h-3.5" />
+                Tools:
+              </span>
+              {visibleToolSlugs.map(slug => (
+                <Badge key={slug} variant="secondary" className="text-[10px] px-1.5 py-0.5" title={slug}>
+                  {toolTemplateNameBySlug.get(slug) ?? slug}
+                </Badge>
+              ))}
+              {hiddenToolsCount > 0 ? (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium">
+                  +{hiddenToolsCount} more
+                </Badge>
+              ) : null}
+            </div>
+          ) : null
+        }
         primaryAction={{
           label: isAlreadyDeployed ? 'Already deployed' : isDeploying ? 'Deploying...' : 'Deploy',
           iconName: isAlreadyDeployed ? 'check-circle' : 'sparkles',

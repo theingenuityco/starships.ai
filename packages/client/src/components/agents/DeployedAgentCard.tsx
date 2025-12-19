@@ -23,6 +23,11 @@ interface DeployedAgentCardProps {
   showActions?: boolean
   hideChatControl?: boolean
   /**
+   * Optional content rendered directly under the description line.
+   * Useful for Marketplace to show assigned tool badges.
+   */
+  belowDescription?: React.ReactNode
+  /**
    * Optional override for the bottom-right CTA (e.g. Marketplace wants "Deploy"
    * instead of the default "Chat" CTA).
    */
@@ -51,6 +56,7 @@ export function DeployedAgentCard({
   onGenerateAvatar,
   showActions = false,
   hideChatControl = false,
+  belowDescription,
   primaryAction,
   disableMotion = false,
 }: DeployedAgentCardProps) {
@@ -235,6 +241,7 @@ export function DeployedAgentCard({
             <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
               {agent.description || 'No description provided'}
             </CardDescription>
+            {belowDescription ? <div className="mt-3">{belowDescription}</div> : null}
           </div>
         </CardHeader>
 

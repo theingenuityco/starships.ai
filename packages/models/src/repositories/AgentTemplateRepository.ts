@@ -89,7 +89,39 @@ export class AgentTemplateRepository extends BaseRepository {
       async () => {
         const result = await super.findAllEntities<Record<string, unknown>>('agent_templates', 'created_at DESC');
         const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
-        return templates.map((t) => this.toPublicModel(t));
+
+        // Populate assignedToolSlugs for list views (Marketplace cards need this)
+        const templateIds = templates
+          .map((t) => (t as any)?.id as string | undefined)
+          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+
+        const assignedToolSlugsByTemplateId = new Map<string, string[]>();
+        if (templateIds.length > 0) {
+          const connection = this.getConnection();
+          const toolResults = await connection.query<{ agent_template_id: string; slug: string }>(
+            `SELECT attt.agent_template_id, tt.slug
+             FROM agent_template_tool_templates attt
+             JOIN tool_templates tt ON tt.id = attt.tool_template_id
+             WHERE attt.agent_template_id = ANY($1)
+             ORDER BY attt.agent_template_id, tt.name`,
+            [templateIds]
+          );
+
+          for (const row of toolResults) {
+            if (!row?.agent_template_id || !row?.slug) continue;
+            const key = row.agent_template_id;
+            const list = assignedToolSlugsByTemplateId.get(key) ?? [];
+            list.push(row.slug);
+            assignedToolSlugsByTemplateId.set(key, list);
+          }
+        }
+
+        return templates.map((t) =>
+          this.toPublicModel({
+            ...t,
+            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String((t as any).id)) ?? [],
+          } as AgentTemplateModel & Record<string, unknown>)
+        );
       },
       'findAll',
       'AgentTemplate'

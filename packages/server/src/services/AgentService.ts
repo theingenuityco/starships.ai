@@ -557,10 +557,9 @@ export class AgentService {
       if (tool.status === 'draft') continue;
 
       const hasParams =
-        !!tool.parameters &&
-        tool.parameters.type === 'object' &&
-        !!tool.parameters.properties &&
-        Object.keys(tool.parameters.properties).length > 0;
+        // Tools can be valid/publishable even with **no parameters**.
+        // Treat any object-typed JSON schema as acceptable (properties may be empty or omitted).
+        !!tool.parameters && tool.parameters.type === 'object';
 
       const hasBlueprint =
         !!tool.blueprint &&
@@ -1387,10 +1386,9 @@ export class AgentService {
         for (const tool of agentTools) {
           // Only consider non-draft tools with a complete definition
           const hasParams =
-            !!tool.parameters &&
-            tool.parameters.type === 'object' &&
-            !!tool.parameters.properties &&
-            Object.keys(tool.parameters.properties).length > 0;
+            // Tools can be valid/publishable even with **no parameters**.
+            // Treat any object-typed JSON schema as acceptable (properties may be empty or omitted).
+            !!tool.parameters && tool.parameters.type === 'object';
           const hasBlueprint = !!(
             tool.blueprint &&
             typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&

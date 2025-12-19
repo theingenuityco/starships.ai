@@ -159,7 +159,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     // - Either have no template yet (new tool) or have updateInfo.needsUpdate === true (template has newer version)
     return allAssigned.filter(tool => {
       if (tool.status === 'draft') return false
-      const hasParams = !!tool.parameters && tool.parameters.type === 'object' && !!tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0
+      // A tool can be valid/publishable even if it has **no parameters**.
+      // In that case, `properties` may be an empty object (or sometimes omitted).
+      const hasParams = !!tool.parameters && tool.parameters.type === 'object'
       const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
       if (!hasParams || !hasBlueprint) return false
 
@@ -175,7 +177,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const isToolPublishableForTemplate = (tool: ToolModel | undefined | null): boolean => {
     if (!tool) return false
     if (tool.status === 'draft') return false
-    const hasParams = !!tool.parameters && tool.parameters.type === 'object' && !!tool.parameters.properties && Object.keys(tool.parameters.properties).length > 0
+    // Allow no-argument tools (empty or missing `properties`).
+    const hasParams = !!tool.parameters && tool.parameters.type === 'object'
     const hasBlueprint = !!tool.blueprint && typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' && Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
     return hasParams && hasBlueprint
   }

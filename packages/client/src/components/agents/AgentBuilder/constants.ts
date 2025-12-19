@@ -9,7 +9,7 @@ export const INITIAL_FORM_DATA: AgentFormData = {
   model: 'openai/gpt-4o-mini',
   temperature: 0.7,
   maxTokens: 2048,
-  reasoning: '',
+  reasoning: 'none',
   systemPrompt: '',
   previewPrompts: [],
   assignedToolSlugs: [],

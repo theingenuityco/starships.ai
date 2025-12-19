@@ -370,14 +370,29 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (typeof src?.temperature === 'number') compose.temperature = src.temperature
         if (typeof src?.maxTokens === 'number') compose.maxTokens = src.maxTokens
         if (src?.reasoning !== undefined) {
-          if (typeof src.reasoning === 'string') compose.reasoning = src.reasoning
-          else if (src.reasoning && typeof src.reasoning === 'object') {
-            try {
-              compose.reasoning = JSON.stringify(src.reasoning, null, 2)
-            } catch {
-              // ignore
+          const tryCoerceEffort = (v: unknown): string | undefined => {
+            if (typeof v === 'string') {
+              const s = v.trim().toLowerCase()
+              if (s === 'none' || s === 'low' || s === 'medium' || s === 'high') return s
+              // Sometimes tools send JSON as string
+              try {
+                const parsed = JSON.parse(v)
+                return tryCoerceEffort(parsed)
+              } catch {
+                return undefined
+              }
             }
+            if (v && typeof v === 'object') {
+              const effort = (v as any).effort
+              if (typeof effort === 'string') {
+                const s = effort.trim().toLowerCase()
+                if (s === 'low' || s === 'medium' || s === 'high') return s
+              }
+            }
+            return undefined
           }
+          const effort = tryCoerceEffort(src.reasoning)
+          if (effort) compose.reasoning = effort
         }
         if (typeof src?.systemPrompt === 'string') compose.systemPrompt = src.systemPrompt
         if (Array.isArray(src?.previewPrompts)) compose.previewPrompts = (src.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
@@ -641,12 +656,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
               agentBuilderRef.current.updateField('description', agent.description || '')
               agentBuilderRef.current.updateField('model', agent.model || '')
-              if ((agent as any).reasoning) {
-                try {
-                  agentBuilderRef.current.updateField('reasoning', JSON.stringify((agent as any).reasoning, null, 2))
-                } catch {
-                  // ignore
-                }
+              const effort = (agent as any)?.reasoning?.effort
+              if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
+                agentBuilderRef.current.updateField('reasoning', effort)
+              } else {
+                agentBuilderRef.current.updateField('reasoning', 'none' as any)
               }
               agentBuilderRef.current.updateField('systemPrompt', agent.systemPrompt || '')
               if (agent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', agent.temperature as any)
@@ -823,10 +837,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (existingAgent.slug) agentBuilderRef.current.updateField('slug', existingAgent.slug)
     if (existingAgent.description) agentBuilderRef.current.updateField('description', existingAgent.description)
     if (existingAgent.model) agentBuilderRef.current.updateField('model', existingAgent.model)
-    if ((existingAgent as any).reasoning) {
-      try {
-        agentBuilderRef.current.updateField('reasoning', JSON.stringify((existingAgent as any).reasoning, null, 2))
-      } catch {}
+    {
+      const effort = (existingAgent as any)?.reasoning?.effort
+      if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
+        agentBuilderRef.current.updateField('reasoning', effort)
+      } else {
+        agentBuilderRef.current.updateField('reasoning', 'none' as any)
+      }
     }
     if (existingAgent.systemPrompt) agentBuilderRef.current.updateField('systemPrompt', existingAgent.systemPrompt)
     if (existingAgent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', existingAgent.temperature as any)

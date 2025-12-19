@@ -5,13 +5,7 @@ import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
  * Create Data Analyst default blueprint using the standard Agent constructor
  */
 function createDataAnalystDefaultBlueprint(): Blueprint {
-  return createDefaultAgentBlueprint({
-    name: 'DataAnalyst',
-    model: 'anthropic/claude-sonnet-4.5',
-    reasoningEffort: 'high',
-    temperature: 0.3,
-    maxTokens: 4000,
-  });
+  return createDefaultAgentBlueprint();
 }
 
 import type { AgentTemplateModel } from '@starships/protocol';

@@ -113,6 +113,7 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
     const execution = ExecutionItemUtils.createExecution();
     // Seed state as the Agent default blueprint expects (LLM node templates read state.messages/state.tools)
     execution.state = {
+      model: 'test-model',
       messages: [{ role: 'user', content: 'hi' }],
       tools: [toolA, toolB],
     };

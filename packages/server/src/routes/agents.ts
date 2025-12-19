@@ -39,6 +39,17 @@ const PreviewPromptsSchema = z
     message: 'Preview prompts must be unique (case-insensitive)',
   });
 
+// Optional structured reasoning configuration forwarded to the underlying LLM node.
+// Mirrors @starships/autopilot AgentParams.reasoning.
+const ReasoningConfigSchema = z
+  .object({
+    effort: z.enum(['low', 'medium', 'high']).optional(),
+    max_tokens: z.number().int().min(1).max(100000).optional(),
+    exclude: z.boolean().optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
 const CreateAgentSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
   name: z
@@ -57,6 +68,7 @@ const CreateAgentSchema = z.object({
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
+  reasoning: ReasoningConfigSchema.optional(),
   timeout: z.number().min(1000).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
   sourceTemplateId: z.string().min(1).optional(),
@@ -81,6 +93,7 @@ const UpdateAgentSchema = z.object({
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
+  reasoning: z.union([ReasoningConfigSchema, z.null()]).optional(),
   timeout: z.number().min(1000).optional(),
   sourceTemplateId: z.string().min(1).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
@@ -93,21 +106,6 @@ const StarshipAssignmentSchema = z.object({
 
 const ToolAssignmentSchema = z.object({
   toolSlugs: z.array(z.string().min(1)).min(1, 'At least one tool slug is required'),
-});
-
-const TestAgentSchema = z.object({
-  input: z.union([
-    z.string(), // Simple text input
-    z.array(
-      z.object({
-        // Messages array
-        role: z.enum(['user', 'assistant', 'system', 'tool']),
-        content: z.string(),
-        reasoning: z.string().optional(),
-      })
-    ),
-  ]),
-  parentConversationId: z.string().min(1).optional(),
 });
 
 const ToolPublishOverrideSchema = z.object({
@@ -466,9 +464,14 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
         sendError(res, 'VALIDATION_ERROR', 'Agent blueprint is missing; cannot regenerate avatar prompt', 400);
         return;
       }
+      if (!agent.model || typeof agent.model !== 'string' || agent.model.trim().length === 0) {
+        sendError(res, 'VALIDATION_ERROR', 'Agent model is missing; cannot regenerate avatar prompt', 400);
+        return;
+      }
       const mirrorResult = await generator.generateMirrorDescription({
         agentName: agent.name,
         agentDescription: agent.description,
+        agentModel: agent.model,
         agentBlueprint: agent.blueprint,
         agentTools:
           agent.state && typeof agent.state === 'object' && Array.isArray((agent.state as { tools?: unknown }).tools)
@@ -661,64 +664,6 @@ router.delete('/agents/:id', jwtAuthMiddleware, async (req: Request, res: Respon
   } catch (error) {
     console.error('[AGENTS] Error deleting agent:', error);
     handleError(error, res, 'deleting agent');
-  }
-});
-
-// POST /starships/:starshipId/agents/:slug/test - Test agent execution
-router.post('/starships/:starshipId/agents/:slug/test', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    // Validate parameters
-    const paramValidation = validateData(
-      z.object({
-        starshipId: IdSchema,
-        slug: z.string().min(1).max(255),
-      }),
-      req.params,
-      res,
-      'starship and slug parameters'
-    );
-    if (!paramValidation) return;
-
-    // Validate test input
-    const bodyValidation = validateData(TestAgentSchema, req.body, res, 'test input data');
-    if (!bodyValidation) return;
-
-    const { starshipId, slug } = paramValidation;
-    const { input, parentConversationId } = bodyValidation;
-    const userId = req.user!.id;
-
-    const agentService = new AgentService();
-
-    // Validate access to the starship
-    const hasAccess = await agentService.validateStarshipAccess(starshipId, userId);
-    if (!hasAccess) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
-      return;
-    }
-
-    // Get agent by slug
-    const starshipAgents = await agentService.getAgentsByStarship(starshipId);
-    const agent = starshipAgents.find((a) => a.slug === slug);
-
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, {
-        resource: 'agent',
-        slug,
-        starshipId,
-      });
-      return;
-    }
-
-    // Execute agent test
-    const testResult = await agentService.testAgent(agent.id, input, starshipId, userId, parentConversationId);
-
-    sendSuccess(res, {
-      success: testResult.success,
-      data: testResult,
-    });
-  } catch (error) {
-    console.error('[AGENTS] Error testing agent:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to test agent');
   }
 });
 

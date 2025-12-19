@@ -32,7 +32,21 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
 export interface EngineConfig {
   eventCallback?: EventCallback;
   failOnNodeError?: boolean;
+  /**
+   * Optional runner override to propagate to node handlers that execute sub-blueprints
+   * (Tool/Workflow/Agent nodes).
+   */
   runner?: Runner;
+  /**
+   * Extra runner/engine configuration to propagate to node handlers. This is especially
+   * useful for remote-runner-only settings that need to be forwarded when a Tool/Workflow
+   * node executes a sub-blueprint.
+   */
+  runnerConfig?: Record<string, unknown>;
+  /**
+   * Optional hook for cancellation support when the runner exposes a cancel handle.
+   */
+  onCancel?: (cancel: () => void) => void;
   /**
    * Non-secret runtime environment values that may be safely exposed to
    * templates and user-authored code (Code/Mutate). Secrets MUST NOT be
@@ -46,12 +60,18 @@ export class Engine {
   private eventCallback?: EventCallback;
   private eval: Eval;
   private failOnNodeError: boolean;
+  private runner?: Runner;
+  private runnerConfig?: Record<string, unknown>;
+  private onCancel?: (cancel: () => void) => void;
   private runtimeEnv?: Record<string, unknown>;
   private hostRuntime?: HostRuntime;
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
     this.failOnNodeError = config.failOnNodeError ?? true;
+    this.runner = config.runner;
+    this.runnerConfig = config.runnerConfig;
+    this.onCancel = config.onCancel;
     this.runtimeEnv = config.runtimeEnv;
     this.hostRuntime = config.hostRuntime;
     this.eval = new Eval(this.runtimeEnv);
@@ -67,6 +87,9 @@ export class Engine {
     const handlerOptions = {
       eventCallback: this.eventCallback,
       execution: execution,
+      runner: this.runner,
+      runnerConfig: this.runnerConfig,
+      onCancel: this.onCancel,
       runtimeEnv: this.runtimeEnv,
       hostRuntime: this.hostRuntime,
     } as NodeHandlerOptions;

@@ -109,6 +109,11 @@ export class AgentEntity implements AgentModel {
   maxTokens?: number;
 
   @Expose()
+  @IsOptional()
+  @IsObject()
+  reasoning?: AgentModel['reasoning'];
+
+  @Expose()
   @IsNumber()
   @Min(1000)
   @Max(600000)
@@ -230,6 +235,7 @@ export class AgentEntity implements AgentModel {
         model: dataRecord.model || '',
         temperature: dataRecord.temperature,
         maxTokens: dataRecord.maxTokens,
+        reasoning: dataRecord.reasoning,
         timeout: dataRecord.timeout ?? DEFAULT_AGENT_TIMEOUT_MS,
         systemPrompt: dataRecord.systemPrompt,
         state: dataRecord.state || { messages: [], tools: [] },

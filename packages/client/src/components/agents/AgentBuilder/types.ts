@@ -8,6 +8,12 @@ export interface AgentFormData {
   model: string
   temperature: number
   maxTokens: number
+  /**
+   * Reasoning effort level.
+   * - none: do not send a reasoning config (or explicitly clear it on existing agents)
+   * - low/medium/high: send `{ enabled: true, effort }` to the backend
+   */
+  reasoning: 'none' | 'low' | 'medium' | 'high'
   systemPrompt: string
   previewPrompts?: string[]
   assignedToolSlugs: string[] // Array of tool slugs

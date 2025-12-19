@@ -23,13 +23,19 @@ import { AGENT_QUERY_KEYS, useAgentBySlugOrId, useStarshipAgents } from '@/hooks
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
+import { useAuth } from '@/hooks/useAuth'
 import { Badge } from '@/components/ui/badge'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
+import { LoadingSpinner } from '@/components/primitives/LoadingSpinner'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { isInstanceAdmin } = useAuth()
 
   const { data: starship } = useStarshipBySlug(slug, true)
   const agentBuilderRef = useRef<AgentBuilderViewRef>(null)
@@ -86,6 +92,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
+
+  // Avatar preview/regenerate modal
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState<boolean>(false)
+  const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState<boolean>(false)
+  const [avatarRegenMode, setAvatarRegenMode] = useState<'avatar_only' | 'full_chain' | null>(null)
 
   // Track applied tool call keys to avoid duplicate writes
   const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
@@ -334,6 +345,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       model: undefined as undefined | string,
       temperature: undefined as undefined | number,
       maxTokens: undefined as undefined | number,
+      reasoning: undefined as undefined | string,
       systemPrompt: undefined as undefined | string,
       previewPrompts: undefined as undefined | string[],
       assignedToolSlugs: undefined as undefined | string[],
@@ -368,6 +380,31 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (typeof src?.model === 'string') compose.model = src.model
         if (typeof src?.temperature === 'number') compose.temperature = src.temperature
         if (typeof src?.maxTokens === 'number') compose.maxTokens = src.maxTokens
+        if (src?.reasoning !== undefined) {
+          const tryCoerceEffort = (v: unknown): string | undefined => {
+            if (typeof v === 'string') {
+              const s = v.trim().toLowerCase()
+              if (s === 'none' || s === 'low' || s === 'medium' || s === 'high') return s
+              // Sometimes tools send JSON as string
+              try {
+                const parsed = JSON.parse(v)
+                return tryCoerceEffort(parsed)
+              } catch {
+                return undefined
+              }
+            }
+            if (v && typeof v === 'object') {
+              const effort = (v as any).effort
+              if (typeof effort === 'string') {
+                const s = effort.trim().toLowerCase()
+                if (s === 'low' || s === 'medium' || s === 'high') return s
+              }
+            }
+            return undefined
+          }
+          const effort = tryCoerceEffort(src.reasoning)
+          if (effort) compose.reasoning = effort
+        }
         if (typeof src?.systemPrompt === 'string') compose.systemPrompt = src.systemPrompt
         if (Array.isArray(src?.previewPrompts)) compose.previewPrompts = (src.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
         if (typeof src?.icon === 'string') compose.icon = src.icon
@@ -489,6 +526,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (compose.model !== undefined) agentBuilderRef.current?.updateField('model', compose.model)
     if (compose.temperature !== undefined) agentBuilderRef.current?.updateField('temperature', compose.temperature as any)
     if (compose.maxTokens !== undefined) agentBuilderRef.current?.updateField('maxTokens', compose.maxTokens as any)
+    if (compose.reasoning !== undefined) agentBuilderRef.current?.updateField('reasoning', compose.reasoning)
     if (compose.systemPrompt !== undefined) agentBuilderRef.current?.updateField('systemPrompt', compose.systemPrompt)
     if (compose.icon !== undefined) agentBuilderRef.current?.updateField('icon', compose.icon)
     if (compose.timeout !== undefined) agentBuilderRef.current?.updateField('timeout', compose.timeout as any)
@@ -629,6 +667,12 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
               agentBuilderRef.current.updateField('description', agent.description || '')
               agentBuilderRef.current.updateField('model', agent.model || '')
+              const effort = (agent as any)?.reasoning?.effort
+              if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
+                agentBuilderRef.current.updateField('reasoning', effort)
+              } else {
+                agentBuilderRef.current.updateField('reasoning', 'none' as any)
+              }
               agentBuilderRef.current.updateField('systemPrompt', agent.systemPrompt || '')
               if (agent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', agent.temperature as any)
               if (agent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', agent.maxTokens as any)
@@ -804,6 +848,14 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (existingAgent.slug) agentBuilderRef.current.updateField('slug', existingAgent.slug)
     if (existingAgent.description) agentBuilderRef.current.updateField('description', existingAgent.description)
     if (existingAgent.model) agentBuilderRef.current.updateField('model', existingAgent.model)
+    {
+      const effort = (existingAgent as any)?.reasoning?.effort
+      if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
+        agentBuilderRef.current.updateField('reasoning', effort)
+      } else {
+        agentBuilderRef.current.updateField('reasoning', 'none' as any)
+      }
+    }
     if (existingAgent.systemPrompt) agentBuilderRef.current.updateField('systemPrompt', existingAgent.systemPrompt)
     if (existingAgent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', existingAgent.temperature as any)
     if (existingAgent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', existingAgent.maxTokens as any)
@@ -831,6 +883,27 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   if (!starship?.id) return null
 
+  const canRegenerateAvatar = !!existingAgent?.id
+
+  const handleRegenerateAvatar = async (mode: 'avatar_only' | 'full_chain') => {
+    if (!existingAgent?.id) return
+    try {
+      setIsRegeneratingAvatar(true)
+      setAvatarRegenMode(mode)
+      await api.post(`/api/v1/agents/${existingAgent.id}/avatar/generate`, { mode })
+      toast.success(mode === 'full_chain' ? 'Avatar reset & regenerated' : headerAvatarUrl ? 'Avatar regenerated' : 'Avatar generated')
+      // Refresh agent + attachments
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.bySlugOrId(String(agentSlug)), exact: true })
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(existingAgent.id), exact: true })
+    } catch (err: any) {
+      const message = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to regenerate avatar'
+      toast.error('Avatar regeneration failed', { description: message })
+    } finally {
+      setIsRegeneratingAvatar(false)
+      setAvatarRegenMode(null)
+    }
+  }
+
   return (
     <div className="bg-background min-h-screen">
       <div className="flex flex-col items-center px-6 py-6">
@@ -838,7 +911,23 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           {/* Page header - mirrors ship agents/tools overview pages */}
           <div id="agent-page-header" className="text-center mt-10">
             <div className="flex flex-col items-center justify-center gap-2 mb-2">
-              <AgentAvatar seed={headerAgentName} imageUrl={headerAvatarUrl} size={80} rounded className="h-20 w-20 rounded-2xl overflow-hidden shadow-lg bg-background/80" />
+              <button
+                type="button"
+                className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ring-offset-background"
+                onClick={() => {
+                  setIsAvatarModalOpen(true)
+                }}
+                disabled={!headerAvatarUrl && !headerAgentName}
+                aria-label="Open agent avatar preview"
+              >
+                <AgentAvatar
+                  seed={headerAgentName}
+                  imageUrl={headerAvatarUrl}
+                  size={112}
+                  rounded
+                  className="h-28 w-28 rounded-2xl overflow-hidden shadow-lg bg-background/80 transition-transform group-hover:scale-[1.02]"
+                />
+              </button>
               <div className="flex flex-col items-center">
                 <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentName}</h1>
               </div>
@@ -873,6 +962,44 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               </Breadcrumb>
             </div>
           </div>
+
+          {/* Avatar Preview / Regenerate Modal */}
+          <Dialog open={isAvatarModalOpen} onOpenChange={setIsAvatarModalOpen}>
+            <DialogContent className="sm:max-w-xl rounded-lg">
+              <DialogHeader>
+                <DialogTitle>Agent Avatar</DialogTitle>
+                <DialogDescription>{canRegenerateAvatar ? 'Preview the avatar and regenerate it if you want a new look.' : 'Preview the avatar.'}</DialogDescription>
+              </DialogHeader>
+
+              <div className="flex items-center justify-center py-2">
+                <div className="relative rounded-2xl overflow-hidden bg-background/80 shadow-lg ring-1 ring-border/70">
+                  <AgentAvatar seed={headerAgentName} imageUrl={headerAvatarUrl} size={384} rounded={false} className="h-96 w-96 rounded-2xl" />
+                  {isRegeneratingAvatar && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
+                      <LoadingSpinner size={28} className="text-foreground" label="Regenerating avatar" />
+                      <div className="mt-2 text-xs font-medium text-foreground/80">
+                        {avatarRegenMode === 'full_chain' ? 'Resetting & generating…' : headerAvatarUrl ? 'Regenerating…' : 'Generating…'}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsAvatarModalOpen(false)} disabled={isRegeneratingAvatar}>
+                  Close
+                </Button>
+                {isInstanceAdmin && (
+                  <Button variant="outline" onClick={() => void handleRegenerateAvatar('full_chain')} disabled={!canRegenerateAvatar || isRegeneratingAvatar}>
+                    {isRegeneratingAvatar && avatarRegenMode === 'full_chain' ? 'Resetting…' : 'Reset & Generate'}
+                  </Button>
+                )}
+                <Button onClick={() => void handleRegenerateAvatar('avatar_only')} disabled={!canRegenerateAvatar || isRegeneratingAvatar}>
+                  {isRegeneratingAvatar && avatarRegenMode === 'avatar_only' ? (headerAvatarUrl ? 'Regenerating…' : 'Generating…') : headerAvatarUrl ? 'Regenerate' : 'Generate'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
 
           <div className="relative w-full rounded-2xl bg-background/80 shadow-sm min-h-[600px] mb-16">
             <AgentCreatedModal

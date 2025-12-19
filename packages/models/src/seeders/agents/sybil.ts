@@ -7,12 +7,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
  * Tools will be resolved at runtime via assignedToolSlugs
  */
 function createStarshipNavigatorBlueprint(): Blueprint {
-  return createDefaultAgentBlueprint({
-    name: 'Sybil Navigator',
-    model: 'anthropic/claude-sonnet-4.5',
-    temperature: 0.4,
-    maxTokens: 2000,
-  });
+  return createDefaultAgentBlueprint();
 }
 
 /**

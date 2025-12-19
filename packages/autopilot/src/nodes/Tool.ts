@@ -12,6 +12,8 @@ import { NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import type { EngineConfig } from '@/engine/Engine';
 import { RunnerFactory } from '@/runner/RunnerFactory';
+import type { Runner } from '@/runner/Runner';
+import type { Blueprint } from '@/types/blueprint';
 
 export class Tool extends BaseNode<ToolParams> {
   constructor(params: ToolParams, options?: NodeHandlerOptions) {
@@ -60,15 +62,27 @@ export class Tool extends BaseNode<ToolParams> {
       const parentExecution = this.getOptions()?.execution;
       subExec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle(toolArgs), parentExecution);
 
-      const engineConfig: EngineConfig = {
+      const engineConfig: EngineConfig & Record<string, unknown> = {
+        ...(this.getOptions()?.runnerConfig || {}),
         eventCallback: this.getEventCallback(),
         failOnNodeError: true,
+        // Propagate runner override to nested engines; Tool.execute() will only use it at depth===0
+        runner: this.getOptions()?.runner,
+        onCancel: this.getOptions()?.onCancel,
         runtimeEnv: this.getOptions()?.runtimeEnv,
         hostRuntime: this.getOptions()?.hostRuntime,
       };
       const depth = subExec.depth ?? 0;
-      const runner = RunnerFactory.getTopLevelRunner(depth);
-      const items = await runner.run(params.blueprint, subExec, engineConfig);
+      const selectedRunner: Runner =
+        depth === 0 ? (this.getOptions()?.runner ?? RunnerFactory.getTopLevelRunner(depth)) : RunnerFactory.getTopLevelRunner(depth);
+
+      // If the runner supports cancellation controllers, prefer that path so hosts can stop execution.
+      type RunnerController = { promise: Promise<ExecutionItem[]>; cancel: () => void };
+      type RunnerWithController = Runner & {
+        runWithController: (bp: Blueprint, exec: Execution, cfg?: EngineConfig) => RunnerController;
+      };
+      const ctl = (selectedRunner as Runner & Partial<RunnerWithController>).runWithController?.(params.blueprint, subExec, engineConfig);
+      const items = ctl ? await ctl.promise : await selectedRunner.run(params.blueprint, subExec, engineConfig);
       const result = ExecutionItemUtils.unwrapSingle(items);
 
       // Emit tool_complete event

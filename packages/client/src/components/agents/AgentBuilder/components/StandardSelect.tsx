@@ -76,10 +76,7 @@ export const StandardSelect: React.FC<StandardSelectProps> = ({
     return map
   }, [options])
 
-  const selectedOptions = React.useMemo(
-    () => selectedValues.map(v => byValue.get(v)).filter(Boolean) as StandardSelectOption[],
-    [selectedValues, byValue]
-  )
+  const selectedOptions = React.useMemo(() => selectedValues.map(v => byValue.get(v)).filter(Boolean) as StandardSelectOption[], [selectedValues, byValue])
 
   const handleSelect = (val: string) => {
     if (disabled) return
@@ -110,18 +107,10 @@ export const StandardSelect: React.FC<StandardSelectProps> = ({
 
     if (mode === 'single') {
       const first = selectedOptions[0]
-      return (
-        <span className="text-xs truncate max-w-full">
-          {first.label ?? first.value}
-        </span>
-      )
+      return <span className="text-xs truncate max-w-full">{first.label ?? first.value}</span>
     }
 
-    return (
-      <span className="text-xs truncate max-w-full">
-        {selectedOptions.map(o => (typeof o.label === 'string' ? o.label : o.value)).join(', ')}
-      </span>
-    )
+    return <span className="text-xs truncate max-w-full">{selectedOptions.map(o => (typeof o.label === 'string' ? o.label : o.value)).join(', ')}</span>
   }
 
   return (
@@ -138,23 +127,18 @@ export const StandardSelect: React.FC<StandardSelectProps> = ({
             type="button"
             aria-label={ariaLabel}
             className={cn(
-              'flex items-center justify-between rounded-xl h-7 px-2 border border-border/20 bg-background/80 text-left text-xs transition-colors',
-              'hover:bg-muted/30 hover:shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring',
+              'flex items-center justify-between rounded-lg h-7 px-2 border border-border/70 bg-background/80 text-left text-xs transition-colors',
+              'hover:bg-muted/30 hover:shadow-sm hover:border-border/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:border-ring',
               disabled && 'opacity-60 cursor-not-allowed hover:bg-background/80 hover:shadow-none',
               triggerClassName
             )}
             disabled={disabled}
           >
-            <div className="flex min-w-0 flex-1 items-center gap-1">
-              {renderTriggerLabel ? renderTriggerLabel({ selectedOptions, mode }) : defaultTriggerContent()}
-            </div>
+            <div className="flex min-w-0 flex-1 items-center gap-1">{renderTriggerLabel ? renderTriggerLabel({ selectedOptions, mode }) : defaultTriggerContent()}</div>
             <Icon name="chevron-down" className="w-3 h-3 opacity-60 ml-1 shrink-0" />
           </button>
         </PopoverTrigger>
-        <PopoverContent
-          align="start"
-          className="w-[360px] max-w-[90vw] p-1 frosted-glass-card rounded-xl shadow-frosted-lg"
-        >
+        <PopoverContent align="start" className="w-[360px] max-w-[90vw] p-1 frosted-glass-card rounded-lg shadow-frosted-lg">
           <Command className="bg-transparent">
             <CommandInput placeholder={searchPlaceholder} />
             <CommandEmpty className="text-xs">{emptyLabel}</CommandEmpty>
@@ -171,25 +155,12 @@ export const StandardSelect: React.FC<StandardSelectProps> = ({
                   const searchValue = [opt.value, fallbackText, opt.keywords || ''].join(' ').trim()
 
                   return (
-                    <CommandItem
-                      key={opt.value}
-                      value={searchValue}
-                      onSelect={() => handleSelect(opt.value)}
-                      className="text-xs px-2 py-1"
-                    >
+                    <CommandItem key={opt.value} value={searchValue} onSelect={() => handleSelect(opt.value)} className="text-xs px-2 py-1">
                       {renderOptionLabel ? (
                         renderOptionLabel(opt, isSelected)
                       ) : (
                         <div className="flex items-center gap-1">
-                          {mode === 'multiple' && (
-                            <Icon
-                              name="check"
-                              className={cn(
-                                'w-3 h-3 text-primary transition-opacity',
-                                isSelected ? 'opacity-100' : 'opacity-0'
-                              )}
-                            />
-                          )}
+                          {mode === 'multiple' && <Icon name="check" className={cn('w-3 h-3 text-primary transition-opacity', isSelected ? 'opacity-100' : 'opacity-0')} />}
                           <span>{opt.label ?? opt.value}</span>
                         </div>
                       )}
@@ -204,5 +175,3 @@ export const StandardSelect: React.FC<StandardSelectProps> = ({
     </div>
   )
 }
-
-

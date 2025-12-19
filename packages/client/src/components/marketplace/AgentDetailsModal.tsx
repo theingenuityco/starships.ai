@@ -2,10 +2,12 @@
 
 import React, { useMemo, useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AgentTemplateDetailsModalContent } from '@/components/marketplace/AgentTemplateDetailsModalContent'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
@@ -75,9 +77,15 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden flex flex-col">
-        <DialogHeader className="sr-only">
-          <DialogTitle>{template.name ? `${template.name} details` : 'Agent details'}</DialogTitle>
-        </DialogHeader>
+        <div className="px-6 pt-4 pb-3 pr-14 flex items-start gap-4">
+          <Avatar className="h-14 w-14 rounded-full ring-1 ring-border/40 shadow-lg">
+            <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={56} rounded />
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <DialogTitle className="text-xl font-bold leading-tight truncate">{template.name}</DialogTitle>
+            {(template as any)?.slug ? <div className="mt-0.5 font-mono text-sm text-muted-foreground truncate">{(template as any).slug}</div> : null}
+          </div>
+        </div>
         <div className="flex-1 min-h-0 overflow-y-auto">
           <AgentTemplateDetailsModalContent template={template} />
         </div>

@@ -736,6 +736,24 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     // Build update payload from current form value
     const buildUpdates = (): UpdateAgentRequest => {
+      // JSONB objects coming from Postgres don't have stable key ordering.
+      // Using JSON.stringify for comparisons can cause infinite autosave loops.
+      const stableStringify = (input: unknown): string => {
+        const sortKeys = (v: unknown): unknown => {
+          if (Array.isArray(v)) return v.map(sortKeys)
+          if (v && typeof v === 'object') {
+            const rec = v as Record<string, unknown>
+            const out: Record<string, unknown> = {}
+            for (const k of Object.keys(rec).sort()) {
+              out[k] = sortKeys(rec[k])
+            }
+            return out
+          }
+          return v
+        }
+        return JSON.stringify(sortKeys(input))
+      }
+
       let blueprintObj: any | undefined
       if (value.blueprint && value.blueprint.trim() !== '') {
         try {
@@ -796,8 +814,21 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       // Reasoning (effort select)
       if (nextEffort === 'none') {
-        // Explicitly clear if it was previously set
-        if (baseReasoning != null) {
+        // Avoid infinite autosave loops:
+        // - Only send a clear when there's actually something to clear (agent reasoning set OR blueprint has reasoning).
+        const baseHasReasoning = baseReasoning != null
+        const blueprintHasReasoning = (() => {
+          const bp = base.blueprint as unknown
+          const nodes = bp && typeof bp === 'object' && Array.isArray((bp as any).nodes) ? ((bp as any).nodes as unknown[]) : []
+          return nodes.some(n => {
+            if (!n || typeof n !== 'object') return false
+            const nn = n as { type?: unknown; parameters?: unknown }
+            if (nn.type !== 'llm') return false
+            if (!nn.parameters || typeof nn.parameters !== 'object') return false
+            return Object.prototype.hasOwnProperty.call(nn.parameters as object, 'reasoning')
+          })
+        })()
+        if (baseHasReasoning || blueprintHasReasoning) {
           ;(updates as any).reasoning = null
         }
       } else {
@@ -828,8 +859,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       if (blueprintObj) {
         const baseBlueprint = base.blueprint ?? { nodes: [], edges: [] }
-        const nextStr = JSON.stringify(blueprintObj)
-        const baseStr = JSON.stringify(baseBlueprint)
+        const nextStr = stableStringify(blueprintObj)
+        const baseStr = stableStringify(baseBlueprint)
         if (nextStr !== baseStr) {
           ;(updates as any).blueprint = blueprintObj
         }
@@ -1494,7 +1525,39 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                       placeholder="Select reasoning"
                       triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
                       onChange={val => {
-                        if (typeof val === 'string') onFieldChange?.('reasoning', val as any)
+                        if (typeof val !== 'string') return
+                        if (isTemplateAgent || readOnly) return
+
+                        const nextEffort = val as AgentFormData['reasoning']
+                        onFieldChange?.('reasoning', nextEffort as any)
+
+                        // Keep the form blueprint JSON consistent with reasoning selection
+                        // to avoid "flip-flop" autosave loops (blueprint hardcodes reasoning).
+                        try {
+                          const parsed = JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                          if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as any).nodes)) return
+
+                          const nextReasoning =
+                            nextEffort === 'none'
+                              ? null
+                              : {
+                                  enabled: true,
+                                  effort: nextEffort,
+                                }
+
+                          ;(parsed as any).nodes = ((parsed as any).nodes as any[]).map((n: any) => {
+                            if (!n || typeof n !== 'object') return n
+                            if (n.type !== 'llm') return n
+                            const params = n.parameters && typeof n.parameters === 'object' ? { ...(n.parameters as any) } : {}
+                            if (nextReasoning == null) delete (params as any).reasoning
+                            else (params as any).reasoning = nextReasoning
+                            return { ...n, parameters: params }
+                          })
+
+                          onFieldChange?.('blueprint', JSON.stringify(parsed, null, 2))
+                        } catch {
+                          // ignore invalid blueprint JSON
+                        }
                       }}
                     />
                   </div>

@@ -5,7 +5,6 @@ import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/primitives/Icon'
@@ -505,12 +504,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
-        if (!value.reasoning && (agent as any).reasoning) {
-          try {
-            onFieldChange?.('reasoning', JSON.stringify((agent as any).reasoning, null, 2))
-          } catch {
-            // ignore stringify errors
+        if ((value.reasoning === 'none' || !value.reasoning) && (agent as any).reasoning) {
+          const effort = (agent as any)?.reasoning?.effort as AgentFormData['reasoning'] | undefined
+          if (effort === 'low' || effort === 'medium' || effort === 'high') {
+            onFieldChange?.('reasoning', effort as any)
           }
+        } else if (!value.reasoning) {
+          onFieldChange?.('reasoning', 'none' as any)
         }
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
         if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
@@ -749,25 +749,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       // Only send fields that are actually different from the current persisted agent
       const base = fullAgent
-      const baseReasoning = (base as any)?.reasoning
-
-      let reasoningObj: any | null | undefined
-      if (typeof value.reasoning === 'string') {
-        const trimmed = value.reasoning.trim()
-        if (trimmed.length === 0) {
-          // Allow clearing reasoning config if a base exists
-          if (baseReasoning != null) reasoningObj = null
-        } else {
-          try {
-            const parsed = JSON.parse(trimmed)
-            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-              reasoningObj = parsed
-            }
-          } catch {
-            // ignore invalid JSON; do not update
-          }
-        }
-      }
+      const baseReasoning = (base as any)?.reasoning as { effort?: string } | undefined
+      const nextEffort = value.reasoning as AgentFormData['reasoning']
 
       if (value.name && value.name.trim().length > 0 && value.name !== base.name) {
         updates.name = value.name
@@ -811,17 +794,17 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         }
       }
 
-      // Reasoning (optional structured LLM config)
-      if (reasoningObj === null) {
-        // Explicitly clear
+      // Reasoning (effort select)
+      if (nextEffort === 'none') {
+        // Explicitly clear if it was previously set
         if (baseReasoning != null) {
           ;(updates as any).reasoning = null
         }
-      } else if (reasoningObj !== undefined) {
-        const nextStr = JSON.stringify(reasoningObj)
-        const baseStr = JSON.stringify(baseReasoning ?? null)
-        if (nextStr !== baseStr) {
-          ;(updates as any).reasoning = reasoningObj
+      } else {
+        const nextObj = { enabled: true, effort: nextEffort }
+        const baseEffort = baseReasoning?.effort
+        if (baseEffort !== nextEffort) {
+          ;(updates as any).reasoning = nextObj
         }
       }
 
@@ -1355,26 +1338,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             </div>
           </div>
         </div>
-
-        {/* Reasoning */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
-              <Icon name="brain" className="w-4 h-4" />
-              <span className="text-xs font-semibold">Reasoning</span>
-            </div>
-            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-              <Textarea
-                value={value.reasoning || ''}
-                onChange={e => onFieldChange?.('reasoning', e.target.value)}
-                disabled={isTemplateAgent || readOnly}
-                placeholder={`{\n  "enabled": true,\n  "effort": "medium"\n}`}
-                className="text-xs font-mono min-h-[120px] resize-y"
-              />
-              <p className="text-[10px] text-muted-foreground mt-1">Optional structured reasoning config (OpenRouter/OpenAI compatible). Leave blank to use provider defaults.</p>
-            </div>
-          </div>
-        </div>
       </div>
 
       {/* Examples (Preview Prompts) */}
@@ -1510,6 +1473,35 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
             {/* Then numeric advanced controls */}
             <div className="space-y-2 border-t border-border/10 pt-2">
+              {/* Reasoning */}
+              <div className="flex items-start gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+                  <Icon name="brain" className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Reasoning</span>
+                </div>
+                <div className="flex-1">
+                  <div className="w-[260px]">
+                    <StandardSelect
+                      aria-label="Select reasoning effort"
+                      disabled={isTemplateAgent || readOnly}
+                      value={value.reasoning}
+                      options={[
+                        { value: 'none', label: <span className="text-xs text-muted-foreground">None</span>, keywords: 'none off disabled' },
+                        { value: 'low', label: <span className="text-xs">Low</span>, keywords: 'low' },
+                        { value: 'medium', label: <span className="text-xs">Medium</span>, keywords: 'medium' },
+                        { value: 'high', label: <span className="text-xs">High</span>, keywords: 'high' },
+                      ]}
+                      placeholder="Select reasoning"
+                      triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
+                      onChange={val => {
+                        if (typeof val === 'string') onFieldChange?.('reasoning', val as any)
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">Controls the model’s reasoning effort (when supported).</p>
+                </div>
+              </div>
+
               {/* Temperature */}
               <div className="flex items-center gap-2 px-3">
                 <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">

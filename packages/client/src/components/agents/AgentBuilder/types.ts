@@ -9,10 +9,11 @@ export interface AgentFormData {
   temperature: number
   maxTokens: number
   /**
-   * Optional LLM reasoning configuration as JSON string.
-   * Stored as string for easy editing in the builder UI; parsed to object on save.
+   * Reasoning effort level.
+   * - none: do not send a reasoning config (or explicitly clear it on existing agents)
+   * - low/medium/high: send `{ enabled: true, effort }` to the backend
    */
-  reasoning: string
+  reasoning: 'none' | 'low' | 'medium' | 'high'
   systemPrompt: string
   previewPrompts?: string[]
   assignedToolSlugs: string[] // Array of tool slugs

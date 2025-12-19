@@ -19,6 +19,11 @@ const CHAT_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] group-d
 interface DeployedAgentCardProps {
   agent: AgentModel
   avatarUrl?: string
+  /**
+   * When true, avatar generation is in-flight for this agent.
+   * Used to disable avatar actions and show an inline loading indicator.
+   */
+  isGeneratingAvatar?: boolean
   onClick: () => void
   onChat?: (agent: AgentModel) => void
   onEdit?: (agent: AgentModel) => void
@@ -68,6 +73,7 @@ interface DeployedAgentCardProps {
 export function DeployedAgentCard({
   agent,
   avatarUrl,
+  isGeneratingAvatar = false,
   onClick,
   onChat,
   onEdit,
@@ -111,36 +117,39 @@ export function DeployedAgentCard({
                 <Button
                   size="sm"
                   variant="ghost"
+                  disabled={isGeneratingAvatar}
                   className="h-7 w-7 p-0 rounded-full font-medium transition-all duration-200 border border-transparent text-muted-foreground hover:text-foreground hover:border-[hsl(var(--foreground)/0.15)] hover:bg-[linear-gradient(135deg,hsl(var(--foreground)/0.06),hsl(var(--foreground)/0.03))] hover:shadow-[0_0_4px_hsl(var(--foreground)/0.06)]"
                   onClick={e => e.stopPropagation()}
                 >
-                  <Icon name="dots-vertical" className="h-8 w-8" />
+                  {isGeneratingAvatar ? <Icon name="loading" className="h-4 w-4 animate-spin" /> : <Icon name="dots-vertical" className="h-8 w-8" />}
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
                 {onGenerateAvatar && (
                   <DropdownMenuItem
+                    disabled={isGeneratingAvatar}
                     onClick={e => {
                       e.stopPropagation()
                       onGenerateAvatar(agent, { mode: 'full_chain' })
                     }}
                     className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
                   >
-                    <Icon name="image" className="w-4 h-4 text-muted-foreground" />
-                    <span>Generate Avatar</span>
+                    {isGeneratingAvatar ? <Icon name="loading" className="w-4 h-4 text-muted-foreground animate-spin" /> : <Icon name="image" className="w-4 h-4 text-muted-foreground" />}
+                    <span>{isGeneratingAvatar ? 'Generating…' : 'Generate Avatar'}</span>
                   </DropdownMenuItem>
                 )}
 
                 {onGenerateAvatar && (
                   <DropdownMenuItem
+                    disabled={isGeneratingAvatar}
                     onClick={e => {
                       e.stopPropagation()
                       onGenerateAvatar(agent, { mode: 'avatar_only' })
                     }}
                     className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
                   >
-                    <Icon name="refresh" className="w-4 h-4 text-muted-foreground" />
-                    <span>Regenerate (same prompt)</span>
+                    {isGeneratingAvatar ? <Icon name="loading" className="w-4 h-4 text-muted-foreground animate-spin" /> : <Icon name="refresh" className="w-4 h-4 text-muted-foreground" />}
+                    <span>{isGeneratingAvatar ? 'Generating…' : 'Regenerate (same prompt)'}</span>
                   </DropdownMenuItem>
                 )}
 
@@ -180,6 +189,11 @@ export function DeployedAgentCard({
               >
                 <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={56} rounded />
               </Avatar>
+              {isGeneratingAvatar ? (
+                <div className="absolute inset-0 z-20 rounded-full bg-background/60 backdrop-blur-sm flex items-center justify-center pointer-events-none">
+                  <Icon name="loading" className="h-5 w-5 animate-spin text-primary" />
+                </div>
+              ) : null}
               {/* Online/Active indicator */}
               {showStatusIndicator ? (
                 <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">

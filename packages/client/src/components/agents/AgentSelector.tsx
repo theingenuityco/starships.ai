@@ -49,6 +49,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
 
   const [filteredAgents, setFilteredAgents] = useState<AgentModel[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [generatingAvatarAgentId, setGeneratingAvatarAgentId] = useState<string | null>(null)
 
   // Form state
   const [showForm, setShowForm] = useState(false)
@@ -347,10 +348,19 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
               <DeployedAgentCard
                 agent={agent}
                 avatarUrl={avatarUrlById.get((agent as any).avatarAttachmentId)}
+                isGeneratingAvatar={generateAvatarMutation.isPending && generatingAvatarAgentId === agent.id}
                 onClick={() => onAgentSelect(agent)}
                 onChat={() => handleChatWithAgent(agent)}
                 onDelete={handleDeleteAgent}
-                onGenerateAvatar={(a, options) => generateAvatarMutation.mutate({ agentId: a.id, mode: options?.mode })}
+                onGenerateAvatar={async (a, options) => {
+                  if (generateAvatarMutation.isPending) return
+                  setGeneratingAvatarAgentId(a.id)
+                  try {
+                    await generateAvatarMutation.mutateAsync({ agentId: a.id, mode: options?.mode })
+                  } finally {
+                    setGeneratingAvatarAgentId(prev => (prev === a.id ? null : prev))
+                  }
+                }}
                 showActions={true}
                 disableEntranceMotion={true}
               />

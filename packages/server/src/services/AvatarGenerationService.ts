@@ -56,7 +56,7 @@ export class AvatarGenerationService {
       '- Age: adult (20s–40s)',
       '- Face/Skin: face shape + jawline + skin tone/undertone + one defining facial feature',
       '- Eyes: shape + iris color + catchlights; slightly exaggerated for readability (bigger eyes/clear shapes)',
-      '- Hair: style + texture + color (allow one unusual accent like a streak)',
+      '- Hair: style + texture + color (allow unusual colors)',
       '- Outfit: collar/neckline/top colors (visible in head-and-shoulders avatar)',
       '- Apparatus: 1–2 role-related items visible in a portrait (no brands/logos). REQUIRED.',
       '- Background: their workplace environment (1 short phrase). REQUIRED. No text, no logos, no UI.',

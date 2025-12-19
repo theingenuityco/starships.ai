@@ -5,6 +5,7 @@ import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
 import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/primitives/Icon'
@@ -504,6 +505,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
+        if (!value.reasoning && (agent as any).reasoning) {
+          try {
+            onFieldChange?.('reasoning', JSON.stringify((agent as any).reasoning, null, 2))
+          } catch {
+            // ignore stringify errors
+          }
+        }
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
         if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
           onFieldChange?.('previewPrompts', ((agent as any).previewPrompts as string[]).filter(Boolean))
@@ -546,6 +554,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       temperature?: number | null
       maxTokens?: number | null
       timeout?: number | null
+      reasoning?: unknown
       systemPrompt?: string | null
       blueprint?: unknown
       previewPrompts?: string[] | null
@@ -561,6 +570,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         temperature: normalizedTemperature,
         maxTokens: src.maxTokens ?? null,
         timeout: src.timeout ?? null,
+        reasoning: src.reasoning ?? null,
         systemPrompt: src.systemPrompt ?? '',
         blueprint,
         previewPrompts: normalizePrompts(src.previewPrompts),
@@ -577,6 +587,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameTemperature = agentCore.temperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
+    const sameReasoning = JSON.stringify(agentCore.reasoning) === JSON.stringify(templateCore.reasoning)
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
     const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
 
@@ -637,6 +648,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!sameTemperature) changes.push('Temperature')
     if (!sameMaxTokens) changes.push('Max tokens')
     if (!sameTimeout) changes.push('Timeout')
+    if (!sameReasoning) changes.push('Reasoning')
     if (!sameSystemPrompt) changes.push('System prompt')
     if (!samePreviewPrompts) changes.push('Preview prompts')
     if (!sameAvatar) changes.push('Avatar')
@@ -737,6 +749,25 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       // Only send fields that are actually different from the current persisted agent
       const base = fullAgent
+      const baseReasoning = (base as any)?.reasoning
+
+      let reasoningObj: any | null | undefined
+      if (typeof value.reasoning === 'string') {
+        const trimmed = value.reasoning.trim()
+        if (trimmed.length === 0) {
+          // Allow clearing reasoning config if a base exists
+          if (baseReasoning != null) reasoningObj = null
+        } else {
+          try {
+            const parsed = JSON.parse(trimmed)
+            if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+              reasoningObj = parsed
+            }
+          } catch {
+            // ignore invalid JSON; do not update
+          }
+        }
+      }
 
       if (value.name && value.name.trim().length > 0 && value.name !== base.name) {
         updates.name = value.name
@@ -777,6 +808,20 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         const clampedTimeout = Math.min(600000, Math.max(1000, value.timeout))
         if (base.timeout == null || Number(base.timeout) !== clampedTimeout) {
           updates.timeout = clampedTimeout
+        }
+      }
+
+      // Reasoning (optional structured LLM config)
+      if (reasoningObj === null) {
+        // Explicitly clear
+        if (baseReasoning != null) {
+          ;(updates as any).reasoning = null
+        }
+      } else if (reasoningObj !== undefined) {
+        const nextStr = JSON.stringify(reasoningObj)
+        const baseStr = JSON.stringify(baseReasoning ?? null)
+        if (nextStr !== baseStr) {
+          ;(updates as any).reasoning = reasoningObj
         }
       }
 
@@ -1307,6 +1352,26 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 minHeightPx={200}
                 readOnly={readOnly}
               />
+            </div>
+          </div>
+        </div>
+
+        {/* Reasoning */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex items-start gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+              <Icon name="brain" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Reasoning</span>
+            </div>
+            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+              <Textarea
+                value={value.reasoning || ''}
+                onChange={e => onFieldChange?.('reasoning', e.target.value)}
+                disabled={isTemplateAgent || readOnly}
+                placeholder={`{\n  "enabled": true,\n  "effort": "medium"\n}`}
+                className="text-xs font-mono min-h-[120px] resize-y"
+              />
+              <p className="text-[10px] text-muted-foreground mt-1">Optional structured reasoning config (OpenRouter/OpenAI compatible). Leave blank to use provider defaults.</p>
             </div>
           </div>
         </div>

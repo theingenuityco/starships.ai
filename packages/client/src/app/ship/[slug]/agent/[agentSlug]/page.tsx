@@ -334,6 +334,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       model: undefined as undefined | string,
       temperature: undefined as undefined | number,
       maxTokens: undefined as undefined | number,
+      reasoning: undefined as undefined | string,
       systemPrompt: undefined as undefined | string,
       previewPrompts: undefined as undefined | string[],
       assignedToolSlugs: undefined as undefined | string[],
@@ -368,6 +369,16 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (typeof src?.model === 'string') compose.model = src.model
         if (typeof src?.temperature === 'number') compose.temperature = src.temperature
         if (typeof src?.maxTokens === 'number') compose.maxTokens = src.maxTokens
+        if (src?.reasoning !== undefined) {
+          if (typeof src.reasoning === 'string') compose.reasoning = src.reasoning
+          else if (src.reasoning && typeof src.reasoning === 'object') {
+            try {
+              compose.reasoning = JSON.stringify(src.reasoning, null, 2)
+            } catch {
+              // ignore
+            }
+          }
+        }
         if (typeof src?.systemPrompt === 'string') compose.systemPrompt = src.systemPrompt
         if (Array.isArray(src?.previewPrompts)) compose.previewPrompts = (src.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
         if (typeof src?.icon === 'string') compose.icon = src.icon
@@ -489,6 +500,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (compose.model !== undefined) agentBuilderRef.current?.updateField('model', compose.model)
     if (compose.temperature !== undefined) agentBuilderRef.current?.updateField('temperature', compose.temperature as any)
     if (compose.maxTokens !== undefined) agentBuilderRef.current?.updateField('maxTokens', compose.maxTokens as any)
+    if (compose.reasoning !== undefined) agentBuilderRef.current?.updateField('reasoning', compose.reasoning)
     if (compose.systemPrompt !== undefined) agentBuilderRef.current?.updateField('systemPrompt', compose.systemPrompt)
     if (compose.icon !== undefined) agentBuilderRef.current?.updateField('icon', compose.icon)
     if (compose.timeout !== undefined) agentBuilderRef.current?.updateField('timeout', compose.timeout as any)
@@ -629,6 +641,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
               agentBuilderRef.current.updateField('description', agent.description || '')
               agentBuilderRef.current.updateField('model', agent.model || '')
+              if ((agent as any).reasoning) {
+                try {
+                  agentBuilderRef.current.updateField('reasoning', JSON.stringify((agent as any).reasoning, null, 2))
+                } catch {
+                  // ignore
+                }
+              }
               agentBuilderRef.current.updateField('systemPrompt', agent.systemPrompt || '')
               if (agent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', agent.temperature as any)
               if (agent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', agent.maxTokens as any)
@@ -804,6 +823,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (existingAgent.slug) agentBuilderRef.current.updateField('slug', existingAgent.slug)
     if (existingAgent.description) agentBuilderRef.current.updateField('description', existingAgent.description)
     if (existingAgent.model) agentBuilderRef.current.updateField('model', existingAgent.model)
+    if ((existingAgent as any).reasoning) {
+      try {
+        agentBuilderRef.current.updateField('reasoning', JSON.stringify((existingAgent as any).reasoning, null, 2))
+      } catch {}
+    }
     if (existingAgent.systemPrompt) agentBuilderRef.current.updateField('systemPrompt', existingAgent.systemPrompt)
     if (existingAgent.temperature !== undefined) agentBuilderRef.current.updateField('temperature', existingAgent.temperature as any)
     if (existingAgent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', existingAgent.maxTokens as any)

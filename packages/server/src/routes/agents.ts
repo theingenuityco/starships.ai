@@ -39,6 +39,17 @@ const PreviewPromptsSchema = z
     message: 'Preview prompts must be unique (case-insensitive)',
   });
 
+// Optional structured reasoning configuration forwarded to the underlying LLM node.
+// Mirrors @starships/autopilot AgentParams.reasoning.
+const ReasoningConfigSchema = z
+  .object({
+    effort: z.enum(['low', 'medium', 'high']).optional(),
+    max_tokens: z.number().int().min(1).max(100000).optional(),
+    exclude: z.boolean().optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
 const CreateAgentSchema = z.object({
   slug: z.string().min(1).max(100).optional(),
   name: z
@@ -57,6 +68,7 @@ const CreateAgentSchema = z.object({
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
+  reasoning: ReasoningConfigSchema.optional(),
   timeout: z.number().min(1000).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
   sourceTemplateId: z.string().min(1).optional(),
@@ -81,6 +93,7 @@ const UpdateAgentSchema = z.object({
   model: z.string().optional(),
   temperature: z.number().min(0).max(2).optional(),
   maxTokens: z.number().min(1).optional(),
+  reasoning: z.union([ReasoningConfigSchema, z.null()]).optional(),
   timeout: z.number().min(1000).optional(),
   sourceTemplateId: z.string().min(1).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),

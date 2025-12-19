@@ -8,6 +8,11 @@ export interface AgentFormData {
   model: string
   temperature: number
   maxTokens: number
+  /**
+   * Optional LLM reasoning configuration as JSON string.
+   * Stored as string for easy editing in the builder UI; parsed to object on save.
+   */
+  reasoning: string
   systemPrompt: string
   previewPrompts?: string[]
   assignedToolSlugs: string[] // Array of tool slugs

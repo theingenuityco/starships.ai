@@ -112,11 +112,16 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
 /**
  * Request to update an agent
  */
-export interface UpdateAgentRequest extends Partial<AgentParamsWithoutMetadata> {
+export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetadata, 'reasoning'>> {
   // Optional categorization (for organizing agents in UI/marketplace)
   category?: TemplateCategory;
   sourceTemplateId?: string;
   previewPrompts?: string[];
+  /**
+   * Optional structured reasoning config.
+   * Allow `null` to explicitly clear an existing config.
+   */
+  reasoning?: AgentParamsWithoutMetadata['reasoning'] | null;
   version?: string;
   templateSnapshotAt?: string;
   publicationStatus?: 'draft' | 'pending_approval' | 'published' | 'rejected';

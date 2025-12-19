@@ -4,11 +4,7 @@ import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
  * Create Daedalus default blueprint using the standard Agent constructor
  */
 function createDaedalusDefaultBlueprint(): Blueprint {
-  return createDefaultAgentBlueprint({
-    name: 'Daedalus',
-    model: 'anthropic/claude-sonnet-4.5',
-    reasoningEffort: 'medium',
-  });
+  return createDefaultAgentBlueprint();
 }
 
 import type { AgentTemplateModel } from '@starships/protocol';

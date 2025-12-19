@@ -4,13 +4,7 @@ import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
  * Create Gaia default blueprint using the standard Agent constructor
  */
 function createGaiaDefaultBlueprint(): Blueprint {
-  return createDefaultAgentBlueprint({
-    name: 'Gaia',
-    model: 'anthropic/claude-sonnet-4.5',
-    reasoningEffort: 'medium',
-    temperature: 0.4,
-    maxTokens: 3000,
-  });
+  return createDefaultAgentBlueprint();
 }
 
 import type { AgentTemplateModel } from '@starships/protocol';

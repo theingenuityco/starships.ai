@@ -6,12 +6,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
  * Create Research Agent blueprint using Agent class
  */
 function createResearchBlueprint(): Blueprint {
-  return createDefaultAgentBlueprint({
-    name: 'Research Assistant',
-    model: 'anthropic/claude-3.5-sonnet',
-    temperature: 0.3,
-    maxTokens: 4000,
-  });
+  return createDefaultAgentBlueprint();
 }
 
 /**

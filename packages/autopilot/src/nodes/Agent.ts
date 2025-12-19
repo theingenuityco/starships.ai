@@ -24,8 +24,17 @@ export class Agent implements NodeHandler {
    * This is exposed as a static method so callers can generate the exact same
    * default blueprint without instantiating an Agent.
    */
-  static defaultAgentBlueprint(params: Pick<AgentParams, 'model' | 'temperature' | 'maxTokens' | 'timeout' | 'reasoning'>): Blueprint {
+  static defaultAgentBlueprint(): Blueprint;
+  static defaultAgentBlueprint(): Blueprint {
     const builder = new BlueprintBuilder();
+
+    // NOTE: The engine resolves {{ ... }} templates at execution time with access to:
+    // - state: execution.state
+    // - outputs / lastOutputOf(...)
+    // - env(key): Engine runtimeEnv
+    //
+    // We intentionally pull model/temperature/maxTokens/timeout/reasoning from `state`
+    // so the blueprint remains stable and configuration can be injected at runtime.
 
     // Define refs upfront for nodes used in template strings
     const llmNodeRef = 'ai_assistant';
@@ -53,16 +62,16 @@ export class Agent implements NodeHandler {
       description: 'AI model with state-driven tool support',
       ref: llmNodeRef,
       parameters: {
-        model: params.model,
+        model: '{{ state.model }}',
         messages: '{{ state.messages }}',
         tools: '{{ state.tools }}',
         // Optional OpenRouter multimodal output controls (set by the embedding host via state)
         modalities: '{{ state.modalities }}',
         imageConfig: '{{ state.imageConfig }}',
-        ...(params.temperature !== undefined && { temperature: params.temperature }),
-        ...(params.maxTokens !== undefined && { maxTokens: params.maxTokens }),
-        ...(params.timeout !== undefined && { timeout: params.timeout }),
-        ...(params.reasoning !== undefined && { reasoning: params.reasoning }),
+        temperature: '{{ state.temperature }}',
+        maxTokens: '{{ state.maxTokens }}',
+        timeout: '{{ state.timeout }}',
+        reasoning: '{{ state.reasoning }}',
         reducers: [
           `
           (state, ctx) => {
@@ -299,7 +308,7 @@ export class Agent implements NodeHandler {
    * Since tools are driven entirely by state, all blueprints are tool-ready
    */
   private createDefaultBlueprint(): void {
-    this.params.blueprint = Agent.defaultAgentBlueprint(this.params);
+    this.params.blueprint = Agent.defaultAgentBlueprint();
   }
 
   /**
@@ -327,6 +336,15 @@ export class Agent implements NodeHandler {
       if (this.params.state && typeof this.params.state === 'object') {
         Object.assign(execution.state, this.params.state);
       }
+
+      // Seed runtime-configurable LLM settings into state so the default blueprint can resolve them via templates.
+      // Use ??= so callers can override per-execution by pre-populating execution.state.
+      const s = execution.state as Record<string, unknown>;
+      (s as Record<string, unknown>)['model'] ??= this.params.model;
+      if (this.params.temperature !== undefined) (s as Record<string, unknown>)['temperature'] ??= this.params.temperature;
+      if (this.params.maxTokens !== undefined) (s as Record<string, unknown>)['maxTokens'] ??= this.params.maxTokens;
+      if (this.params.timeout !== undefined) (s as Record<string, unknown>)['timeout'] ??= this.params.timeout;
+      if (this.params.reasoning !== undefined) (s as Record<string, unknown>)['reasoning'] ??= this.params.reasoning;
       const orderedMessages: LlmMessage[] = [];
 
       // Add system prompt from params root first

@@ -1529,34 +1529,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                         const nextEffort = val as AgentFormData['reasoning']
                         reasoningDirtyRef.current = true
                         onFieldChange?.('reasoning', nextEffort as any)
-
-                        // Keep the form blueprint JSON consistent with reasoning selection
-                        // to avoid "flip-flop" autosave loops (blueprint hardcodes reasoning).
-                        try {
-                          const parsed = JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
-                          if (!parsed || typeof parsed !== 'object' || !Array.isArray((parsed as any).nodes)) return
-
-                          const nextReasoning =
-                            nextEffort === 'none'
-                              ? null
-                              : {
-                                  enabled: true,
-                                  effort: nextEffort,
-                                }
-
-                          ;(parsed as any).nodes = ((parsed as any).nodes as any[]).map((n: any) => {
-                            if (!n || typeof n !== 'object') return n
-                            if (n.type !== 'llm') return n
-                            const params = n.parameters && typeof n.parameters === 'object' ? { ...(n.parameters as any) } : {}
-                            if (nextReasoning == null) delete (params as any).reasoning
-                            else (params as any).reasoning = nextReasoning
-                            return { ...n, parameters: params }
-                          })
-
-                          onFieldChange?.('blueprint', JSON.stringify(parsed, null, 2))
-                        } catch {
-                          // ignore invalid blueprint JSON
-                        }
                       }}
                     />
                   </div>

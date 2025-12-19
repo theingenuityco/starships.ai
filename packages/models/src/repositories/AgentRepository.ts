@@ -16,44 +16,11 @@ import {
 } from '@/constants/agentDefaults';
 import { ValidationError } from '@starships/errors';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
+import type { AgentParamsWithoutMetadata } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
   constructor() {
     super('AgentRepository');
-  }
-
-  /**
-   * Normalize agent blueprint LLM node reasoning settings.
-   *
-   * Root-cause fix:
-   * - Historically, some persisted agent blueprints (seeded/default) included `llm.parameters.reasoning`
-   *   hardcoded (often "medium").
-   * - The agent builder now controls reasoning via the agent-level `reasoning` field.
-   * - When `reasoning` is updated/cleared, we must also reconcile the persisted blueprint so the
-   *   runtime behavior matches the agent config (and "none" truly disables reasoning).
-   */
-  private normalizeBlueprintReasoning(blueprint: unknown, reasoning: unknown): unknown {
-    if (!blueprint || typeof blueprint !== 'object') return blueprint;
-    const bp = blueprint as { nodes?: unknown[]; edges?: unknown[]; [k: string]: unknown };
-    if (!Array.isArray(bp.nodes)) return blueprint;
-
-    const nextNodes = bp.nodes.map((node) => {
-      if (!node || typeof node !== 'object') return node;
-      const n = node as { type?: unknown; parameters?: unknown; [k: string]: unknown };
-      if (n.type !== 'llm') return node;
-
-      const params = n.parameters && typeof n.parameters === 'object' ? { ...(n.parameters as Record<string, unknown>) } : {};
-
-      if (reasoning == null) {
-        delete params.reasoning;
-      } else if (typeof reasoning === 'object') {
-        params.reasoning = reasoning as Record<string, unknown>;
-      }
-
-      return { ...(n as Record<string, unknown>), parameters: params };
-    });
-
-    return { ...(bp as Record<string, unknown>), nodes: nextNodes };
   }
 
   async findAll(): Promise<AgentModel[]> {
@@ -250,7 +217,7 @@ export class AgentRepository extends BaseRepository {
           category: normalizedData.category || 'general',
           temperature: normalizedData.temperature,
           maxTokens: normalizedData.maxTokens,
-          reasoning: (normalizedData as any).reasoning,
+          reasoning: (normalizedData as unknown as { reasoning?: unknown }).reasoning,
           timeout: normalizedData.timeout,
           systemPrompt: normalizedData.systemPrompt,
           state: normalizedData.state,
@@ -311,14 +278,6 @@ export class AgentRepository extends BaseRepository {
         }
         if (updates.timeout !== undefined && updates.timeout !== null) {
           typedUpdates.timeout = Number(updates.timeout);
-        }
-
-        // If reasoning is explicitly updated/cleared, also reconcile blueprint LLM nodes.
-        // This fixes "None" not working when blueprints have hardcoded reasoning.
-        if (Object.prototype.hasOwnProperty.call(typedUpdates as object, 'reasoning')) {
-          const currentBlueprint = (existing as unknown as { blueprint?: unknown }).blueprint;
-          const normalized = this.normalizeBlueprintReasoning(currentBlueprint, (typedUpdates as any).reasoning);
-          (typedUpdates as any).blueprint = normalized;
         }
 
         // Use lean validation from AgentEntity for updates
@@ -430,7 +389,10 @@ export class AgentRepository extends BaseRepository {
           model: customizations?.model || template.model,
           temperature: customizations?.temperature ?? template.temperature,
           maxTokens: customizations?.maxTokens ?? template.maxTokens,
-          reasoning: (customizations as any)?.reasoning ?? (template as any).reasoning,
+          reasoning:
+            (customizations as unknown as { reasoning?: AgentParamsWithoutMetadata['reasoning'] | null })?.reasoning ??
+            (template as unknown as { reasoning?: AgentParamsWithoutMetadata['reasoning'] | null })?.reasoning ??
+            undefined,
           timeout: customizations?.timeout ?? template.timeout,
           systemPrompt: customizations?.systemPrompt || template.systemPrompt,
           state: customizations?.state || template.state || { tools: [], messages: [] },

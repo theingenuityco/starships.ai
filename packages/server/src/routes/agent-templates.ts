@@ -50,7 +50,20 @@ router.get('/agent-templates', async (req: Request, res: Response): Promise<void
 
     const paginationMeta = createPaginationMeta(page, limit, paginatedTemplates.length);
 
-    sendSuccess(res, paginatedTemplates, 200, paginationMeta);
+    // Defensive: repository already strips sensitive fields, but ensure we never leak them from this route.
+    const sanitized = paginatedTemplates.map((t) => {
+      const rest: Record<string, unknown> = { ...((t ?? {}) as Record<string, unknown>) };
+      delete rest['systemPrompt'];
+      delete rest['blueprint'];
+      delete rest['state'];
+      delete rest['temperature'];
+      delete rest['maxTokens'];
+      delete rest['reasoning'];
+      delete rest['timeout'];
+      return rest;
+    });
+
+    sendSuccess(res, sanitized, 200, paginationMeta);
   } catch (error) {
     handleError(error, res, 'loading templates');
   }
@@ -81,7 +94,17 @@ router.get('/agent-templates/:id', async (req: Request, res: Response): Promise<
       return;
     }
 
-    sendSuccess(res, template, 200);
+    // Defensive: repository already strips sensitive fields, but ensure we never leak them from this route.
+    const rest: Record<string, unknown> = { ...((template ?? {}) as unknown as Record<string, unknown>) };
+    delete rest['systemPrompt'];
+    delete rest['blueprint'];
+    delete rest['state'];
+    delete rest['temperature'];
+    delete rest['maxTokens'];
+    delete rest['reasoning'];
+    delete rest['timeout'];
+
+    sendSuccess(res, rest, 200);
   } catch (error) {
     handleError(error, res, 'loading template');
   }

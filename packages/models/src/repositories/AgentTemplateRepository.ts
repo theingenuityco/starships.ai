@@ -75,8 +75,22 @@ export class AgentTemplateRepository extends BaseRepository {
       typeof model.avatarUpdatedAt === 'string' && model.avatarUpdatedAt.length > 0 ? model.avatarUpdatedAt : undefined;
 
     // Never expose raw S3 pointers to clients
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { avatarS3Key: _k, avatarMimeType: _m, ...rest } = model;
+    /* eslint-disable @typescript-eslint/no-unused-vars */
+    const {
+      avatarS3Key: _k,
+      avatarMimeType: _m,
+      // Never expose sensitive agent configuration on marketplace/public template responses
+      systemPrompt: _systemPrompt,
+      blueprint: _blueprint,
+      state: _state,
+      // Never expose model/execution tuning details (keep only `model` name)
+      temperature: _temperature,
+      maxTokens: _maxTokens,
+      reasoning: _reasoning,
+      timeout: _timeout,
+      ...rest
+    } = model;
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     return {
       ...(rest as AgentTemplateModel),
       ...(avatarUrl ? { avatarUrl } : {}),
@@ -91,9 +105,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
 
         // Populate assignedToolSlugs for list views (Marketplace cards need this)
-        const templateIds = templates
-          .map((t) => (t as any)?.id as string | undefined)
-          .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+        const templateIds = templates.map((t) => t.id).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
         const assignedToolSlugsByTemplateId = new Map<string, string[]>();
         if (templateIds.length > 0) {
@@ -119,7 +131,7 @@ export class AgentTemplateRepository extends BaseRepository {
         return templates.map((t) =>
           this.toPublicModel({
             ...t,
-            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String((t as any).id)) ?? [],
+            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
           } as AgentTemplateModel & Record<string, unknown>)
         );
       },

@@ -37,6 +37,10 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
     if (!templateId) return false
     return deployedAgents.some(agent => agent.sourceTemplateId === templateId)
   }, [deployedAgents, templateId])
+  const isPublishedFromThisStarship = useMemo(() => {
+    if (!templateId) return false
+    return deployedAgents.some(agent => agent.publishedTemplateId === templateId)
+  }, [deployedAgents, templateId])
 
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
   const [isDeploying, setIsDeploying] = useState(false)
@@ -74,6 +78,11 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
 
   if (!template) return null
 
+  // Match Marketplace card CTA semantics
+  const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
+  const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
+  const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden flex flex-col">
@@ -93,9 +102,9 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Close
           </Button>
-          <Button onClick={handleDeployClick} disabled={!primaryStarship || isAlreadyDeployed || isDeploying}>
-            <Icon name={isAlreadyDeployed ? 'check-circle' : 'sparkles'} className="w-4 h-4 mr-2" />
-            {isAlreadyDeployed ? 'Deployed' : isDeploying ? 'Deploying...' : 'Deploy'}
+          <Button onClick={handleDeployClick} disabled={deployDisabled}>
+            <Icon name={deployIconName} className="w-4 h-4 mr-2" />
+            {deployLabel}
           </Button>
         </div>
       </DialogContent>

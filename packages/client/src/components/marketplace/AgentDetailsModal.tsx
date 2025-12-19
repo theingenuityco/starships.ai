@@ -1,9 +1,9 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef } from 'react'
+import React, { useMemo } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
-import { Dialog, DialogContent } from '@/components/ui/dialog'
-import { AgentBuilderView, type AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { AgentBuilderView } from '@/components/agents/AgentBuilder'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 
@@ -48,36 +48,24 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
     }
   }, [template])
 
-  const builderRef = useRef<AgentBuilderViewRef>(null)
-  useEffect(() => {
-    if (!template) return
-    if (!open) return
-    if (!builderRef.current) return
-    if (!initialForm) return
-
-    // Seed the builder form from the template when opening the modal.
-    // (AgentBuilderView initializes empty state by default.)
-    try {
-      ;(Object.keys(initialForm) as Array<keyof typeof initialForm>).forEach(k => {
-        builderRef.current?.updateField?.(k as any, (initialForm as any)[k])
-      })
-    } catch {}
-  }, [open, initialForm, template])
-
   if (!template) return null
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden">
-        <div className="h-[85vh] overflow-hidden">
+      <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden flex flex-col">
+        <DialogHeader className="sr-only">
+          <DialogTitle>{template.name ? `${template.name} details` : 'Agent details'}</DialogTitle>
+        </DialogHeader>
+        <div className="flex-1 min-h-0 overflow-y-auto">
           <AgentBuilderView
-            ref={builderRef}
             starshipId={primaryStarshipId}
             initialSlug={template.slug}
             readOnly={true}
+            initialData={initialForm ?? undefined}
             onCancel={() => onOpenChange(false)}
             // Marketplace details modal is read-only; deploy is handled elsewhere.
             onSave={undefined}
+            key={template.id}
           />
         </div>
       </DialogContent>

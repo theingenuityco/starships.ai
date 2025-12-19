@@ -23,6 +23,7 @@ export interface AgentBuilderViewProps {
   initialSlug?: string
   errorMessage?: string
   readOnly?: boolean
+  initialData?: Partial<AgentFormData>
 }
 
 export interface AgentBuilderViewRef {

@@ -102,6 +102,11 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   maxTokens?: number;
 
   @Expose()
+  @IsOptional()
+  @IsObject()
+  reasoning?: AgentTemplateModel['reasoning'];
+
+  @Expose()
   @IsNumber()
   @Min(1000)
   @Max(600000)

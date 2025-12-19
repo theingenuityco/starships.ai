@@ -93,7 +93,7 @@ export function AgentPublishModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-2xl rounded-lg">
         <DialogHeader>
           <DialogTitle>Request: Publish to marketplace</DialogTitle>
           <DialogDescription>Choose how to bump the agent’s version and add a brief changelog. Once approved, this agent will be published to the community marketplace.</DialogDescription>
@@ -103,7 +103,7 @@ export function AgentPublishModal({
           {/* Agent step card (identity, version diff, bump, changelog) */}
           <div className="rounded-lg border border-border bg-muted/40 px-3 py-3 space-y-3 shadow-sm">
             <div
-              className={cn('flex items-start justify-between gap-4 cursor-pointer', activePublishStep === 'agent' ? 'bg-muted/40 rounded-md px-1 py-1 -mx-1' : '')}
+              className={cn('flex items-start justify-between gap-4 cursor-pointer', activePublishStep === 'agent' ? 'bg-muted/40 rounded-lg px-1 py-1 -mx-1' : '')}
               onClick={() => setActivePublishStep('agent')}
               role="button"
               aria-expanded={activePublishStep === 'agent'}
@@ -188,7 +188,7 @@ export function AgentPublishModal({
                           type="button"
                           onClick={() => setVersionBump(option.value)}
                           className={cn(
-                            'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
+                            'w-full rounded-lg border px-3 py-2 text-left transition-colors text-xs',
                             'hover:bg-muted/60',
                             isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
                           )}
@@ -207,7 +207,7 @@ export function AgentPublishModal({
                   <p className="text-xs font-semibold text-muted-foreground">Agent changelog</p>
                   <textarea
                     id="publication-changelog"
-                    className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                    className="w-full min-h-[80px] rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                     placeholder="Summarize what changed in this version for reviewers…"
                     value={changelog}
                     onChange={e => setChangelog(e.target.value)}
@@ -239,13 +239,13 @@ export function AgentPublishModal({
                     <div key={tool.id} className="rounded-lg border border-border bg-muted/40 px-3 py-3 space-y-3 shadow-sm">
                       {/* Tool identity + version diff (mirrors agent header) */}
                       <div
-                        className={cn('flex items-start justify-between gap-4 cursor-pointer', isActiveToolStep ? 'bg-muted/40 rounded-md px-1 py-1 -mx-1' : '')}
+                        className={cn('flex items-start justify-between gap-4 cursor-pointer', isActiveToolStep ? 'bg-muted/40 rounded-lg px-1 py-1 -mx-1' : '')}
                         onClick={() => setActivePublishStep(tool.id)}
                         role="button"
                         aria-expanded={isActiveToolStep}
                       >
                         <div className="flex items-start gap-2 min-w-0">
-                          <div className="h-8 w-8 rounded-md bg-primary/5 border border-primary/30 flex items-center justify-center text-[11px] font-semibold text-primary shrink-0">
+                          <div className="h-8 w-8 rounded-lg bg-primary/5 border border-primary/30 flex items-center justify-center text-[11px] font-semibold text-primary shrink-0">
                             {(tool.name || tool.slug || 'T').charAt(0).toUpperCase()}
                           </div>
                           <div className="space-y-0.5 min-w-0">
@@ -314,7 +314,7 @@ export function AgentPublishModal({
                                       }))
                                     }
                                     className={cn(
-                                      'w-full rounded-md border px-3 py-2 text-left transition-colors text-xs',
+                                      'w-full rounded-lg border px-3 py-2 text-left transition-colors text-xs',
                                       'hover:bg-muted/60',
                                       isSelected ? 'border-emerald-500 bg-emerald-50/60 dark:bg-emerald-500/5' : 'border-border/60 bg-background'
                                     )}
@@ -334,7 +334,7 @@ export function AgentPublishModal({
                           <div className="space-y-2">
                             <p className="text-xs font-semibold text-muted-foreground">Tool changelog</p>
                             <textarea
-                              className="w-full min-h-[80px] rounded-md border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                              className="w-full min-h-[80px] rounded-lg border border-border bg-background px-3 py-2 text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                               placeholder="Notes about changes to this tool for reviewers…"
                               value={override.changelog}
                               onChange={e =>

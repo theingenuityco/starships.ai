@@ -154,6 +154,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
         model: selectedAgent.agent.model,
         temperature: (selectedAgent.agent as any).temperature ?? 0.7,
         maxTokens: (selectedAgent.agent as any).maxTokens ?? 4000,
+        reasoning: ((selectedAgent.agent as any)?.reasoning?.effort as any) || 'none',
         systemPrompt: selectedAgent.agent.systemPrompt || '',
         previewPrompts: (selectedAgent.agent as any).previewPrompts || [],
         // Use the denormalized assignedToolSlugs populated by the admin

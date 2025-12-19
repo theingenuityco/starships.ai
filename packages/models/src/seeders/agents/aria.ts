@@ -7,13 +7,7 @@ import type { AgentTemplateModel } from '@starships/protocol';
  * Aria is a delegator that routes work to other agents via tools.
  */
 function createAriaDefaultBlueprint(): Blueprint {
-  return createDefaultAgentBlueprint({
-    name: 'Aria',
-    model: 'anthropic/claude-sonnet-4.5',
-    reasoningEffort: 'medium',
-    temperature: 0.4,
-    maxTokens: 3000,
-  });
+  return createDefaultAgentBlueprint();
 }
 
 /**

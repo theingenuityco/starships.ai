@@ -16,6 +16,7 @@ import {
 } from '@/constants/agentDefaults';
 import { ValidationError } from '@starships/errors';
 import type { AgentModel, CreateAgentRequest, UpdateAgentRequest, ToolModel, AgentTemplateModel } from '@starships/protocol';
+import type { AgentParamsWithoutMetadata } from '@starships/protocol';
 
 export class AgentRepository extends BaseRepository {
   constructor() {
@@ -216,6 +217,7 @@ export class AgentRepository extends BaseRepository {
           category: normalizedData.category || 'general',
           temperature: normalizedData.temperature,
           maxTokens: normalizedData.maxTokens,
+          reasoning: (normalizedData as unknown as { reasoning?: unknown }).reasoning,
           timeout: normalizedData.timeout,
           systemPrompt: normalizedData.systemPrompt,
           state: normalizedData.state,
@@ -259,6 +261,11 @@ export class AgentRepository extends BaseRepository {
   async update(id: string, updates: UpdateAgentRequest): Promise<AgentModel | null> {
     return this.executeWithErrorHandling(
       async () => {
+        const existing = await this.findById(id);
+        if (!existing) {
+          return null;
+        }
+
         // Ensure numeric fields are properly typed (convert strings to numbers if needed)
         // Only convert values that are not null/undefined to avoid NaN or 0 from null
         const typedUpdates: UpdateAgentRequest = { ...updates };
@@ -382,6 +389,10 @@ export class AgentRepository extends BaseRepository {
           model: customizations?.model || template.model,
           temperature: customizations?.temperature ?? template.temperature,
           maxTokens: customizations?.maxTokens ?? template.maxTokens,
+          reasoning:
+            (customizations as unknown as { reasoning?: AgentParamsWithoutMetadata['reasoning'] | null })?.reasoning ??
+            (template as unknown as { reasoning?: AgentParamsWithoutMetadata['reasoning'] | null })?.reasoning ??
+            undefined,
           timeout: customizations?.timeout ?? template.timeout,
           systemPrompt: customizations?.systemPrompt || template.systemPrompt,
           state: customizations?.state || template.state || { tools: [], messages: [] },

@@ -342,6 +342,7 @@ export class AgentTemplateRepository extends BaseRepository {
           model: data.model,
           temperature: data.temperature,
           maxTokens: data.maxTokens,
+          reasoning: data.reasoning,
           timeout: data.timeout,
           icon: data.icon,
           previewPrompts: data.previewPrompts,

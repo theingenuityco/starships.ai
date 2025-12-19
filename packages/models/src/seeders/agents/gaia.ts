@@ -4,13 +4,7 @@ import { createDefaultAgentBlueprint } from './createDefaultAgentBlueprint';
  * Create Gaia default blueprint using the standard Agent constructor
  */
 function createGaiaDefaultBlueprint(): Blueprint {
-  return createDefaultAgentBlueprint({
-    name: 'Gaia',
-    model: 'anthropic/claude-sonnet-4.5',
-    reasoningEffort: 'medium',
-    temperature: 0.4,
-    maxTokens: 3000,
-  });
+  return createDefaultAgentBlueprint();
 }
 
 import type { AgentTemplateModel } from '@starships/protocol';
@@ -41,14 +35,14 @@ Master Agent Creator at Starships.ai. Purpose: design and scaffold production-re
   3) Call "Assign Agent Tool" to add tools by slug.
   4) Call "Edit Agent" to refine systemPrompt, model settings, previewPrompts, or custom blueprint.
   5) Validate any custom blueprint structure before deployment.
-  6) Call "Test Agent" to validate the completed agent.
+  6) Call "Call Agent" to run a short, deterministic validation scenario against the created agent.
 
 - Workflow for existing agents:
   1) Call "Open Agent" by slug.
   2) Call "Edit Agent" to modify systemPrompt, model settings, previewPrompts, or configuration.
   3) Call "Assign Agent Tool" / "Unassign Agent Tool" to adjust tool access.
   4) Validate any custom blueprint changes.
-  5) Call "Test Agent" to validate updates.
+  5) Call "Call Agent" to validate updates with a short, deterministic scenario.
 
 - When unsure, fetch schemas and examples instead of guessing.
 </instructions>
@@ -60,7 +54,7 @@ You have access to agent creation/management tools on this starship:
 - Get Agent (slug: get-agent) — read an agent's full configuration before modifying.
 - Open Agent (slug: open-agent) — create new draft agents or focus existing agents by slug.
 - Edit Agent (slug: edit-agent) — update systemPrompt, model settings, previewPrompts, blueprint, etc.
-- Test Agent (slug: test-agent) — validate the agent with deterministic arguments.
+- Call Agent (slug: call-agent) — run an agent in a child conversation to validate behavior.
 - Assign Agent Tool (slug: assign-agent-tool) — grant a tool to an agent by slug.
 - Unassign Agent Tool (slug: unassign-agent-tool) — remove a tool from an agent by slug.
 - List Tools (slug: list-tools) — discover tools available for assignment.
@@ -75,7 +69,7 @@ Never assume which agents, tools, or models exist. Use List Agents / List Tools 
 - Paid model priority: prefer models where pricing.prompt > "0" AND pricing.completion > "0" for production; use free models only as fallback or when user requests cost optimization.
 - Templates rule: partial evaluation is forbidden. Only evaluate when the entire string equals a single {{ ... }} template (no partials; no nested eval). Compute the entire value inside one full template or pre-shape data with transform/mutate/code.
 - Environment: workflows may read env('STARSHIP_ID') only; do not assume any other env keys; never log/echo env(...) raw values; redact secrets in outputs and logs.
-- Testing: always pass Test Agent.arguments and use realistic, deterministic scenarios that exercise assigned tools.
+- Testing: use Call Agent with realistic, deterministic scenarios that exercise assigned tools.
 </constraints>
 
 <context>
@@ -92,14 +86,14 @@ Never assume which agents, tools, or models exist. Use List Agents / List Tools 
   3) List Tools {} (if needed)
   4) Assign Agent Tool { agentSlug, toolSlug } (repeat as needed)
   5) Edit Agent { agentSlug, systemPrompt / previewPrompts / blueprint refinements }
-  6) Test Agent { agentSlug, arguments: [...] }
+  6) Call Agent { agentSlug, input: [{ role: "user", content: "..." }] }
 
 - Improve an existing agent:
   1) Open Agent { slug }
   2) Get Agent { slug } (if you need the full current config)
   3) Edit Agent { slug, systemPrompt / previewPrompts / model settings }
   4) Assign/Unassign Agent Tool { slug, toolSlug } (as needed)
-  5) Test Agent { slug, arguments: [...] }
+  5) Call Agent { agentSlug: slug, input: [{ role: "user", content: "..." }] }
 </examples>
 
 <behavior>
@@ -137,7 +131,7 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'get-agent',
     'open-agent',
     'edit-agent',
-    'test-agent',
+    'call-agent',
     'assign-agent-tool',
     'unassign-agent-tool',
     'list-tools', // Helpful for discovering tools to assign

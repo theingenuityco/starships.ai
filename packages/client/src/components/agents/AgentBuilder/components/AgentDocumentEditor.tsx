@@ -5,7 +5,7 @@ import { motion } from 'motion/react'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
-import { RichMarkdownEditor } from '@/components/ui/RichMarkdownEditor'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
@@ -59,6 +59,12 @@ interface AgentDocumentEditorProps {
 export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false }: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
   const queryClient = useQueryClient()
+  // Track whether the user explicitly changed the Reasoning dropdown.
+  // Important: we must NOT mutate agent reasoning/blueprint just by opening the editor.
+  const reasoningDirtyRef = useRef<boolean>(false)
+  const systemPromptTextareaRef = useRef<HTMLTextAreaElement | null>(null)
+  const selectLikeFieldClass =
+    'rounded-lg border border-border/70 bg-background/80 px-2 transition-colors hover:bg-muted/30 hover:shadow-sm hover:border-border/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 focus-visible:border-ring'
 
   const availableModels = useMemo(() => {
     return openRouterModels?.map(m => m.id) || []
@@ -218,6 +224,19 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       observer.disconnect()
     }
   }, [])
+
+  // Auto-grow the System Prompt textarea to fit content
+  useEffect(() => {
+    const el = systemPromptTextareaRef.current
+    if (!el) return
+    try {
+      el.style.height = 'auto'
+      const nextHeight = Math.max(el.scrollHeight, 200)
+      el.style.height = `${nextHeight}px`
+    } catch {
+      // ignore
+    }
+  }, [value.systemPrompt])
 
   const formatUpdatedAt = (dateString: string) => {
     if (!dateString) return ''
@@ -504,6 +523,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
+        if ((value.reasoning === 'none' || !value.reasoning) && (agent as any).reasoning) {
+          const effort = (agent as any)?.reasoning?.effort as AgentFormData['reasoning'] | undefined
+          if (effort === 'low' || effort === 'medium' || effort === 'high') {
+            onFieldChange?.('reasoning', effort as any)
+          }
+        } else if (!value.reasoning) {
+          onFieldChange?.('reasoning', 'none' as any)
+        }
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
         if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
           onFieldChange?.('previewPrompts', ((agent as any).previewPrompts as string[]).filter(Boolean))
@@ -546,6 +573,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       temperature?: number | null
       maxTokens?: number | null
       timeout?: number | null
+      reasoning?: unknown
       systemPrompt?: string | null
       blueprint?: unknown
       previewPrompts?: string[] | null
@@ -561,6 +589,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         temperature: normalizedTemperature,
         maxTokens: src.maxTokens ?? null,
         timeout: src.timeout ?? null,
+        reasoning: src.reasoning ?? null,
         systemPrompt: src.systemPrompt ?? '',
         blueprint,
         previewPrompts: normalizePrompts(src.previewPrompts),
@@ -577,6 +606,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     const sameTemperature = agentCore.temperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
+    const sameReasoning = JSON.stringify(agentCore.reasoning) === JSON.stringify(templateCore.reasoning)
     const sameSystemPrompt = agentCore.systemPrompt === templateCore.systemPrompt
     const samePreviewPrompts = agentCore.previewPrompts.length === templateCore.previewPrompts.length && agentCore.previewPrompts.every((p, i) => p === templateCore.previewPrompts[i])
 
@@ -637,6 +667,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     if (!sameTemperature) changes.push('Temperature')
     if (!sameMaxTokens) changes.push('Max tokens')
     if (!sameTimeout) changes.push('Timeout')
+    if (!sameReasoning) changes.push('Reasoning')
     if (!sameSystemPrompt) changes.push('System prompt')
     if (!samePreviewPrompts) changes.push('Preview prompts')
     if (!sameAvatar) changes.push('Avatar')
@@ -654,6 +685,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         sameTemperature,
         sameMaxTokens,
         sameTimeout,
+        sameReasoning,
         sameSystemPrompt,
         samePreviewPrompts,
         sameAvatar,
@@ -682,6 +714,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       sameTemperature &&
       sameMaxTokens &&
       sameTimeout &&
+      sameReasoning &&
       sameSystemPrompt &&
       samePreviewPrompts &&
       sameAvatar &&
@@ -724,6 +757,24 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     // Build update payload from current form value
     const buildUpdates = (): UpdateAgentRequest => {
+      // JSONB objects coming from Postgres don't have stable key ordering.
+      // Using JSON.stringify for comparisons can cause infinite autosave loops.
+      const stableStringify = (input: unknown): string => {
+        const sortKeys = (v: unknown): unknown => {
+          if (Array.isArray(v)) return v.map(sortKeys)
+          if (v && typeof v === 'object') {
+            const rec = v as Record<string, unknown>
+            const out: Record<string, unknown> = {}
+            for (const k of Object.keys(rec).sort()) {
+              out[k] = sortKeys(rec[k])
+            }
+            return out
+          }
+          return v
+        }
+        return JSON.stringify(sortKeys(input))
+      }
+
       let blueprintObj: any | undefined
       if (value.blueprint && value.blueprint.trim() !== '') {
         try {
@@ -737,6 +788,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       // Only send fields that are actually different from the current persisted agent
       const base = fullAgent
+      const baseReasoning = (base as any)?.reasoning as { effort?: string } | undefined
+      const nextEffort = value.reasoning as AgentFormData['reasoning']
 
       if (value.name && value.name.trim().length > 0 && value.name !== base.name) {
         updates.name = value.name
@@ -780,6 +833,22 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         }
       }
 
+      // Reasoning (effort select)
+      // Only persist reasoning changes when the user explicitly changed the dropdown.
+      if (reasoningDirtyRef.current) {
+        if (nextEffort === 'none') {
+          // If user picked "none", explicitly clear reasoning so the backend can reconcile
+          // any historical blueprint defaults.
+          ;(updates as any).reasoning = null
+        } else {
+          const nextObj = { enabled: true, effort: nextEffort }
+          const baseEffort = baseReasoning?.effort
+          if (baseEffort !== nextEffort) {
+            ;(updates as any).reasoning = nextObj
+          }
+        }
+      }
+
       if (typeof value.systemPrompt === 'string') {
         const nextPrompt = value.systemPrompt ?? ''
         const basePrompt = base.systemPrompt ?? ''
@@ -800,8 +869,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       if (blueprintObj) {
         const baseBlueprint = base.blueprint ?? { nodes: [], edges: [] }
-        const nextStr = JSON.stringify(blueprintObj)
-        const baseStr = JSON.stringify(baseBlueprint)
+        const nextStr = stableStringify(blueprintObj)
+        const baseStr = stableStringify(baseBlueprint)
         if (nextStr !== baseStr) {
           ;(updates as any).blueprint = blueprintObj
         }
@@ -828,6 +897,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           setFullAgent(updated)
           // Keep React Query cache in sync for this agent
           queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+          // If we successfully persisted a reasoning change, clear the dirty flag
+          if (Object.prototype.hasOwnProperty.call(updates as object, 'reasoning')) {
+            reasoningDirtyRef.current = false
+          }
         }
       } catch (error: any) {
         if (!cancelled) {
@@ -1160,7 +1233,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
               <Icon name="tag" className="w-4 h-4" />
               <span className="text-xs font-semibold">Category</span>
             </div>
@@ -1193,7 +1266,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Model section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
             </div>
@@ -1225,7 +1298,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Tools section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
               <Icon name="wrench" className="w-4 h-4" />
               <span className="text-xs font-semibold">Assigned Tools</span>
             </div>
@@ -1274,18 +1347,17 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* Description */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-2">
               <Icon name="file-text" className="w-4 h-4" />
               <span className="text-xs font-semibold">Description</span>
             </div>
             <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-              <RichMarkdownEditor
+              <Textarea
                 value={value.description}
-                onChange={val => onFieldChange?.('description', val)}
-                placeholder="Write a clear description. Markdown supported."
-                className="pl-2"
-                noMinHeight
-                readOnly={readOnly}
+                onChange={e => onFieldChange?.('description', e.target.value)}
+                placeholder="Write a clear description."
+                className={cn('text-sm min-h-[80px] resize-none', selectLikeFieldClass)}
+                disabled={isTemplateAgent || readOnly}
               />
             </div>
           </div>
@@ -1294,18 +1366,27 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         {/* System Prompt */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-2">
               <Icon name="sparkles" className="w-4 h-4" />
               <span className="text-xs font-semibold">System Prompt</span>
             </div>
             <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-              <RichMarkdownEditor
+              <Textarea
+                ref={systemPromptTextareaRef}
                 value={value.systemPrompt}
-                onChange={val => onFieldChange?.('systemPrompt', val)}
+                onChange={e => {
+                  onFieldChange?.('systemPrompt', e.target.value)
+                  try {
+                    e.currentTarget.style.height = 'auto'
+                    const nextHeight = Math.max(e.currentTarget.scrollHeight, 200)
+                    e.currentTarget.style.height = `${nextHeight}px`
+                  } catch {
+                    // ignore
+                  }
+                }}
                 placeholder="Define the agent's character, mission, and behavior..."
-                className="pl-2"
-                minHeightPx={200}
-                readOnly={readOnly}
+                className={cn('text-sm min-h-[200px] resize-none overflow-hidden', selectLikeFieldClass)}
+                disabled={isTemplateAgent || readOnly}
               />
             </div>
           </div>
@@ -1315,7 +1396,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       {/* Examples (Preview Prompts) */}
       <div className="border-b border-border/10 pb-2 mt-2">
         <div className="flex items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+          <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
             <Icon name="list-bullet" className="w-4 h-4" />
             <span className="text-xs font-semibold">Examples</span>
           </div>
@@ -1325,11 +1406,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 {(value.previewPrompts || []).length === 0 ? (
                   <p className="text-xs text-muted-foreground italic">No preview prompts yet. Add a few examples to help users get started.</p>
                 ) : (
-                  <ul className="space-y-1">
+                  <ul className="space-y-2">
                     {(value.previewPrompts || []).map((prompt, idx) => (
                       <li key={idx} className="flex items-start gap-2">
                         <Input
-                          className="text-xs flex-1"
+                          className={cn('text-sm flex-1 h-7', selectLikeFieldClass)}
                           value={prompt}
                           disabled={isTemplateAgent || readOnly}
                           onChange={e => {
@@ -1363,7 +1444,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </div>
               <div className="flex items-center gap-2">
                 <Input
-                  className="text-xs flex-1"
+                  className={cn('text-sm flex-1 h-7', selectLikeFieldClass)}
                   placeholder="Add a sample user prompt…"
                   value={newPreviewPrompt}
                   disabled={isTemplateAgent || readOnly}
@@ -1383,7 +1464,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                 <Button
                   type="button"
                   size="sm"
-                  className="text-xs"
+                  className="h-7 px-2 rounded-lg text-[11px]"
                   disabled={isTemplateAgent || readOnly || !newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
                   onClick={() => {
                     if (isTemplateAgent || readOnly) return
@@ -1422,7 +1503,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             {/* Blueprint first */}
             <div>
               <div className="flex items-start gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px] pt-1">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
                   <Icon name="network" className="w-4 h-4" />
                   <span className="text-xs font-semibold">Blueprint</span>
                 </div>
@@ -1445,9 +1526,43 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
             {/* Then numeric advanced controls */}
             <div className="space-y-2 border-t border-border/10 pt-2">
+              {/* Reasoning */}
+              <div className="flex items-start gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
+                  <Icon name="brain" className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Reasoning</span>
+                </div>
+                <div className="flex-1">
+                  <div className="w-[260px]">
+                    <StandardSelect
+                      aria-label="Select reasoning effort"
+                      disabled={isTemplateAgent || readOnly}
+                      value={value.reasoning}
+                      options={[
+                        { value: 'none', label: <span className="text-xs text-muted-foreground">None</span>, keywords: 'none off disabled' },
+                        { value: 'low', label: <span className="text-xs">Low</span>, keywords: 'low' },
+                        { value: 'medium', label: <span className="text-xs">Medium</span>, keywords: 'medium' },
+                        { value: 'high', label: <span className="text-xs">High</span>, keywords: 'high' },
+                      ]}
+                      placeholder="Select reasoning"
+                      triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
+                      onChange={val => {
+                        if (typeof val !== 'string') return
+                        if (isTemplateAgent || readOnly) return
+
+                        const nextEffort = val as AgentFormData['reasoning']
+                        reasoningDirtyRef.current = true
+                        onFieldChange?.('reasoning', nextEffort as any)
+                      }}
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">Controls the model’s reasoning effort (when supported).</p>
+                </div>
+              </div>
+
               {/* Temperature */}
               <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
                   <span className="text-xs font-semibold">Temperature</span>
                 </div>
                 <div className="w-[260px]">
@@ -1460,14 +1575,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     value={value.temperature}
                     onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
                     disabled={isTemplateAgent || readOnly}
-                    className="text-xs"
+                    className={cn('text-sm h-7', selectLikeFieldClass)}
                   />
                 </div>
               </div>
 
               {/* Max Tokens */}
               <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
                   <span className="text-xs font-semibold">Max Tokens</span>
                 </div>
                 <div className="w-[260px]">
@@ -1479,14 +1594,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     value={value.maxTokens}
                     onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
                     disabled={isTemplateAgent || readOnly}
-                    className="text-xs"
+                    className={cn('text-sm h-7', selectLikeFieldClass)}
                   />
                 </div>
               </div>
 
               {/* Timeout */}
               <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[120px]">
+                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
                   <span className="text-xs font-semibold">Timeout (ms)</span>
                 </div>
                 <div className="w-[260px]">
@@ -1498,7 +1613,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                     value={value.timeout}
                     onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
                     disabled={isTemplateAgent || readOnly}
-                    className="text-xs"
+                    className={cn('text-sm h-7', selectLikeFieldClass)}
                   />
                 </div>
               </div>

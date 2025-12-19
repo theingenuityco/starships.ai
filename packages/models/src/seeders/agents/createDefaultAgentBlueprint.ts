@@ -9,13 +9,10 @@ export interface DefaultBlueprintConfig {
 }
 
 export function createDefaultAgentBlueprint(config: DefaultBlueprintConfig): Blueprint {
-  const agent = new Agent({
-    name: config.name,
+  return Agent.defaultAgentBlueprint({
     model: config.model,
     ...(config.temperature !== undefined ? { temperature: config.temperature } : {}),
     ...(config.maxTokens !== undefined ? { maxTokens: config.maxTokens } : {}),
     ...(config.reasoningEffort !== undefined ? { reasoning: { enabled: true, effort: config.reasoningEffort } } : {}),
   });
-
-  return agent.getCurrentBlueprint();
 }

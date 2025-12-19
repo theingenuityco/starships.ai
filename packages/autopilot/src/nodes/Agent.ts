@@ -19,34 +19,12 @@ export class Agent implements NodeHandler {
   private options?: NodeHandlerOptions;
   private nodeCounter: number = 1;
 
-  constructor(params: AgentParams, options?: NodeHandlerOptions) {
-    // Store agent parameters
-    this.params = structuredClone(params);
-
-    // Create options
-    this.options = options;
-
-    // Initialize state if not provided
-    if (!this.params.state) {
-      this.params.state = {
-        messages: [],
-        tools: [],
-      };
-    }
-
-    // Runner selection deferred to execute() based on execution.depth to avoid nested runners
-
-    // Create complete tool-enabled blueprint if none was provided
-    if (!this.params.blueprint) {
-      this.createDefaultBlueprint();
-    }
-  }
-
   /**
-   * Create complete blueprint from scratch - includes scaffolding and tool execution infrastructure
-   * Since tools are driven entirely by state, all blueprints are tool-ready
+   * Create the default tool-enabled blueprint used by Agent when none is provided.
+   * This is exposed as a static method so callers can generate the exact same
+   * default blueprint without instantiating an Agent.
    */
-  private createDefaultBlueprint(): void {
+  static defaultAgentBlueprint(params: Pick<AgentParams, 'model' | 'temperature' | 'maxTokens' | 'timeout' | 'reasoning'>): Blueprint {
     const builder = new BlueprintBuilder();
 
     // Define refs upfront for nodes used in template strings
@@ -75,16 +53,16 @@ export class Agent implements NodeHandler {
       description: 'AI model with state-driven tool support',
       ref: llmNodeRef,
       parameters: {
-        model: this.params.model,
+        model: params.model,
         messages: '{{ state.messages }}',
         tools: '{{ state.tools }}',
         // Optional OpenRouter multimodal output controls (set by the embedding host via state)
         modalities: '{{ state.modalities }}',
         imageConfig: '{{ state.imageConfig }}',
-        ...(this.params.temperature !== undefined && { temperature: this.params.temperature }),
-        ...(this.params.maxTokens !== undefined && { maxTokens: this.params.maxTokens }),
-        ...(this.params.timeout !== undefined && { timeout: this.params.timeout }),
-        ...(this.params.reasoning !== undefined && { reasoning: this.params.reasoning }),
+        ...(params.temperature !== undefined && { temperature: params.temperature }),
+        ...(params.maxTokens !== undefined && { maxTokens: params.maxTokens }),
+        ...(params.timeout !== undefined && { timeout: params.timeout }),
+        ...(params.reasoning !== undefined && { reasoning: params.reasoning }),
         reducers: [
           `
           (state, ctx) => {
@@ -275,7 +253,7 @@ export class Agent implements NodeHandler {
     });
 
     // Connect all nodes
-    this.params.blueprint = builder
+    return builder
       .addEdge(startRef, llmNodeRef)
       .addEdge(llmNodeRef, conditionalNodeRef)
       .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
@@ -289,8 +267,39 @@ export class Agent implements NodeHandler {
       .addEdge(toolLoopConditionalRef, notAllowedNodeRef, 'tool_not_allowed')
       .addEdge(notAllowedNodeRef, toolLoopConditionalRef)
       .addEdge(toolLoopConditionalRef, llmNodeRef, 'done_tools')
-      .setMetadata('generatedBy', 'Agent constructor')
+      .setMetadata('generatedBy', 'Agent.defaultAgentBlueprint')
       .build();
+  }
+
+  constructor(params: AgentParams, options?: NodeHandlerOptions) {
+    // Store agent parameters
+    this.params = structuredClone(params);
+
+    // Create options
+    this.options = options;
+
+    // Initialize state if not provided
+    if (!this.params.state) {
+      this.params.state = {
+        messages: [],
+        tools: [],
+      };
+    }
+
+    // Runner selection deferred to execute() based on execution.depth to avoid nested runners
+
+    // Create complete tool-enabled blueprint if none was provided
+    if (!this.params.blueprint) {
+      this.createDefaultBlueprint();
+    }
+  }
+
+  /**
+   * Create complete blueprint from scratch - includes scaffolding and tool execution infrastructure
+   * Since tools are driven entirely by state, all blueprints are tool-ready
+   */
+  private createDefaultBlueprint(): void {
+    this.params.blueprint = Agent.defaultAgentBlueprint(this.params);
   }
 
   /**

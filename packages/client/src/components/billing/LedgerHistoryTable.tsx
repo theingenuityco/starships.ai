@@ -10,10 +10,25 @@ function formatCredits(n: number): string {
   return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
-export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
+function formatSignedCredits(n: number): { text: string; isNegative: boolean } {
+  const v = Number.isFinite(n) ? n : 0
+  const isNegative = v < 0
+  const abs = Math.abs(v)
+  return { text: `${isNegative ? '-' : ''}${formatCredits(abs)} cr`, isNegative }
+}
+
+export default function LedgerHistoryTable({
+  walletId,
+  view = 'billing',
+  title = 'Transaction history',
+}: {
+  walletId: string
+  view?: 'billing' | 'full'
+  title?: string
+}) {
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
-  const { data, isLoading, error } = useLedger(walletId, { page, limit, order: 'DESC' })
+  const { data, isLoading, error } = useLedger(walletId, { page, limit, order: 'DESC', view })
 
   const rows = data?.records ?? []
   const pagination = data?.pagination
@@ -27,7 +42,7 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
   if (isLoading) {
     return (
       <div className="ip-card-shadow rounded-2xl p-4">
-        <h4 className="font-medium">Transaction history</h4>
+        <h4 className="font-medium">{title}</h4>
         <div className="py-6 text-sm text-slate-600 dark:text-slate-400">Loading...</div>
       </div>
     )
@@ -36,7 +51,7 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
   if (error) {
     return (
       <div className="ip-card-shadow rounded-2xl p-4">
-        <h4 className="font-medium">Transaction history</h4>
+        <h4 className="font-medium">{title}</h4>
         <div className="py-8 text-center">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
             <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -69,7 +84,7 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
   return (
     <div className="ip-card-shadow rounded-2xl p-4">
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-slate-900 dark:text-slate-100">Transaction history</h4>
+        <h4 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
         {pagination && (
           <div className="text-xs text-slate-500 dark:text-slate-400">
             Showing {pageInfo.start}-{pageInfo.end} of {pageInfo.total}
@@ -100,8 +115,19 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
             } else if (r.type === 'REFUND') {
               details = meta.stripeChargeId ? `Refund for charge ${String(meta.stripeChargeId).slice(-8)}` : 'Refund issued'
             } else if (r.type === 'ADJUSTMENT') {
-              details = meta.promoCode ? `Promo ${meta.promoCode}` : 'Adjustment'
+              if (meta.reason === 'WELCOME_CREDIT' || meta.reason === 'WELCOME_CREDIT_BACKFILL') {
+                details = 'Welcome credit'
+              } else {
+                details = meta.promoCode ? `Promo ${meta.promoCode}` : 'Adjustment'
+              }
+            } else if (r.type === 'USAGE') {
+              const model = meta.model ? String(meta.model) : null
+              const tokens = Number.isFinite(Number(meta.totalTokens)) ? `${Number(meta.totalTokens).toLocaleString()} tokens` : null
+              const convo = meta.conversationId ? `Convo ${String(meta.conversationId).slice(-8)}` : null
+              details = [model, tokens, convo].filter(Boolean).join(' • ') || 'Usage'
             }
+            const amountSigned = formatSignedCredits(Number(r.amount))
+            const balanceAfter = formatCredits(Number(r.balanceAfter))
             return (
               <tr key={r.id} className="border-t border-slate-200/60 dark:border-slate-800/60">
                 <td className="py-2 pr-3 whitespace-nowrap">{new Date(r.createdAt).toLocaleString()}</td>
@@ -113,6 +139,8 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
                         ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-200'
                         : r.type === 'REFUND'
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+                          : r.type === 'USAGE'
+                            ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200'
                           : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200')
                     }
                   >
@@ -120,8 +148,10 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
                   </span>
                 </td>
                 <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{details}</td>
-                <td className="py-2 pr-3">{formatCredits(Number(r.amount))} cr</td>
-                <td className="py-2 pr-3">{formatCredits(Number(r.balanceAfter))} cr</td>
+                <td className={'py-2 pr-3 whitespace-nowrap ' + (amountSigned.isNegative ? 'text-rose-700 dark:text-rose-300' : '')}>
+                  {amountSigned.text}
+                </td>
+                <td className="py-2 pr-3 whitespace-nowrap">{balanceAfter} cr</td>
               </tr>
             )
           })}

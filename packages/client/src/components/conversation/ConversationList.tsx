@@ -139,7 +139,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         key={conversation.id}
         className={cn(
           'group flex items-center gap-1.5 py-1.5 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
-          isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
+          isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
         )}
         style={isChild ? { paddingLeft: '1.5rem' } : undefined}
       >

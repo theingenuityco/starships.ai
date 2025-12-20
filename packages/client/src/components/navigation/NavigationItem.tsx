@@ -68,10 +68,10 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       onClick={handleClick}
       className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 ${
         special
-          ? 'text-primary border-transparent hover:text-primary hover:bg-muted hover:border-muted'
+          ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
           : isActive
-            ? 'text-primary bg-primary/10 border-primary/30'
-            : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
+            ? 'text-primary bg-primary/10 border-transparent'
+            : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
       }`}
       style={{
         justifyContent: 'flex-start',

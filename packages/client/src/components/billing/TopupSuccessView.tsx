@@ -26,6 +26,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
 
   const topupId = searchParams.get('topupId') ?? undefined
   const amountParam = searchParams.get('amount') ?? undefined
+  const CREDITS_PER_USD = 200
 
   const { data: starship, isLoading: starshipLoading, error: starshipError } = useStarshipBySlug(slug, true)
 
@@ -45,11 +46,18 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
     return parsed.toLocaleString(undefined, { style: 'currency', currency: 'USD' })
   }, [amountParam])
 
+  const creditsAdded = useMemo(() => {
+    if (!amountParam) return null
+    const parsed = Number(amountParam)
+    if (Number.isNaN(parsed)) return null
+    return Math.round(parsed * CREDITS_PER_USD).toLocaleString()
+  }, [amountParam])
+
   const currentBalance = useMemo(() => {
     if (!wallet) return null
     const parsed = Number(wallet.balance ?? 0)
     if (Number.isNaN(parsed)) return null
-    return parsed.toLocaleString(undefined, { style: 'currency', currency: 'USD' })
+    return parsed.toLocaleString(undefined, { maximumFractionDigits: 2 })
   }, [wallet])
 
   const loading = starshipLoading || walletLoading
@@ -77,8 +85,8 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                   <div>
                     <h1 className="text-4xl font-semibold tracking-tight text-slate-900 dark:text-white sm:text-5xl">Wallet boost confirmed</h1>
                     <p className="mt-3 max-w-xl text-base text-slate-600 dark:text-slate-300">
-                      {amountAdded
-                        ? `${amountAdded} in fresh credits has landed safely in ${starship?.name ?? 'your starship'}’s wallet.`
+                      {amountAdded && creditsAdded
+                        ? `${creditsAdded} credits from your ${amountAdded} purchase have landed safely in ${starship?.name ?? 'your starship'}’s wallet.`
                         : `Fresh credits have landed safely in ${starship?.name ?? 'your starship'}’s wallet.`}{' '}
                       You’re clear to launch the next workflow.
                     </p>
@@ -125,12 +133,12 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
                     <div className="grid gap-4 sm:grid-cols-3">
                       <div className="rounded-2xl border border-emerald-500/20 bg-emerald-50/80 p-4 text-center dark:border-emerald-500/20 dark:bg-emerald-900/40">
                         <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-200">Wallet balance</p>
-                        <p className="mt-2 text-3xl font-bold text-emerald-600 dark:text-emerald-100">{currentBalance ?? (loading ? '...' : '$0.00')}</p>
+                        <p className="mt-2 text-3xl font-bold text-emerald-600 dark:text-emerald-100">{currentBalance ?? (loading ? '...' : '0')} cr</p>
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 text-center dark:border-slate-700 dark:bg-slate-900/40">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Amount added</p>
-                        <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">{amountAdded ?? 'Pending'}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">Reflects the credits from this session.</p>
+                        <p className="mt-2 text-3xl font-bold text-slate-800 dark:text-slate-100">{creditsAdded ? `${creditsAdded} cr` : 'Pending'}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">{amountAdded ? `Paid ${amountAdded} via Stripe.` : 'Reflects the credits from this session.'}</p>
                       </div>
                       <div className="rounded-2xl border border-slate-200 bg-white/70 p-4 text-center dark:border-slate-700 dark:bg-slate-900/40">
                         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-300">Starship</p>

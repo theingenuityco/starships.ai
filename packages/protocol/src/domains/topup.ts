@@ -9,6 +9,11 @@ export interface TopupModel {
   id: string;
   walletId: string;
   amountUsd: string; // Use string to preserve DECIMAL precision
+  /**
+   * Credits granted for this topup (string to preserve DECIMAL precision).
+   * Present for completed topups after the credits migration.
+   */
+  creditsGranted?: string;
   status: TopupStatus;
   stripeSessionId?: string;
   stripePaymentIntent?: string;

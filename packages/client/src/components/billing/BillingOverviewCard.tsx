@@ -1,6 +1,5 @@
 'use client'
 
-
 import { WalletModel } from '@starships/protocol'
 import React from 'react'
 import { Button } from '@/components/ui/button'
@@ -11,6 +10,11 @@ interface BillingOverviewCardProps {
   isLoading?: boolean
   error?: unknown
   onRetry?: () => void
+}
+
+function formatCredits(n: number): string {
+  const v = Number.isFinite(n) ? n : 0
+  return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
 export default function BillingOverviewCard({ wallet, isLoading, error, onRetry }: BillingOverviewCardProps): React.JSX.Element {
@@ -60,7 +64,7 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry 
             {/* Large balance amount display - matches original design */}
             <div className="relative">
               <div className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
-                ${Number(wallet?.balance ?? 0).toFixed(2)}
+                {formatCredits(Number(wallet?.balance ?? 0))} credits
               </div>
             </div>
 

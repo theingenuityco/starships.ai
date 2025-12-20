@@ -1,5 +1,6 @@
 import { LedgerRepository, UsageRepository, WalletRepository, getConnection } from '@starships/models';
 import type { UsageModel } from '@starships/protocol';
+import { CREDITS_PER_USER_MESSAGE, toCreditsString } from '@/config/credits';
 
 interface ErrorWithCode extends Error {
   code?: string;
@@ -23,6 +24,92 @@ export class BillingService {
     this.walletRepo = new WalletRepository();
     this.ledgerRepo = new LedgerRepository();
     this.usageRepo = new UsageRepository();
+  }
+
+  /**
+   * Debit a wallet for a user message at a fixed credit cost.
+   *
+   * Idempotency is enforced by querying ledger_entries where:
+   * - wallet_id = walletId
+   * - type = 'USAGE'
+   * - meta->>'messageId' = messageId
+   *
+   * A DB-level unique index for this idempotency is added in a later migration.
+   */
+  async debitForUserMessage(params: {
+    walletId: string;
+    starshipId: string;
+    conversationId: string;
+    messageId: string;
+    creditsPerMessage?: number;
+  }): Promise<{ billed: boolean; ledgerId: string }> {
+    const credits = Math.max(0, Number(params.creditsPerMessage ?? CREDITS_PER_USER_MESSAGE) || 0);
+    const amountStr = toCreditsString(credits);
+
+    if (!params.walletId?.trim()) throw new Error('WALLET_ID_REQUIRED');
+    if (!params.starshipId?.trim()) throw new Error('STARSHIP_ID_REQUIRED');
+    if (!params.conversationId?.trim()) throw new Error('CONVERSATION_ID_REQUIRED');
+    if (!params.messageId?.trim()) throw new Error('MESSAGE_ID_REQUIRED');
+    if (amountStr === '0.000000') {
+      // Free tier message cost can be configured by setting creditsPerMessage=0
+      return { billed: true, ledgerId: '0' };
+    }
+
+    const connection = getConnection();
+    return connection.transaction(async (client) => {
+      // Lock wallet row
+      const walletRes = await client.query<{ id: string }>('SELECT id FROM wallets WHERE id = $1 FOR UPDATE', [params.walletId]);
+      const walletRow = walletRes.rows[0] ?? null;
+      if (!walletRow) {
+        const err: ErrorWithCode = new Error('WALLET_NOT_FOUND');
+        err.code = 'WALLET_NOT_FOUND';
+        throw err;
+      }
+
+      // Idempotency: check if we've already billed this message
+      const existingRes = await client.query<{ id: string }>(
+        `SELECT id
+           FROM ledger_entries
+          WHERE wallet_id = $1
+            AND type = 'USAGE'
+            AND (meta ->> 'messageId') = $2
+          LIMIT 1`,
+        [params.walletId, params.messageId]
+      );
+      const existing = existingRes.rows[0] ?? null;
+      if (existing) {
+        return { billed: true, ledgerId: existing.id };
+      }
+
+      // Guarded decrement (no overdraft)
+      let newBalance: { balance: string };
+      try {
+        newBalance = await this.walletRepo.decrementBalanceReturningWithClient(client, params.walletId, amountStr);
+      } catch (e) {
+        const err = e as ErrorWithCode;
+        if (err?.code === 'INSUFFICIENT_FUNDS' || err?.message === 'INSUFFICIENT_FUNDS') {
+          throw new InsufficientFundsError();
+        }
+        throw e;
+      }
+
+      // Insert ledger entry (negative amount)
+      const ledger = await this.ledgerRepo.createWithClient(client, {
+        walletId: params.walletId,
+        type: 'USAGE',
+        amount: this.negate(amountStr),
+        balanceAfter: newBalance.balance,
+        meta: {
+          source: 'MESSAGE',
+          messageId: params.messageId,
+          conversationId: params.conversationId,
+          starshipId: params.starshipId,
+          creditsPerMessage: Number(params.creditsPerMessage ?? CREDITS_PER_USER_MESSAGE),
+        },
+      });
+
+      return { billed: true, ledgerId: ledger.id };
+    });
   }
 
   /**

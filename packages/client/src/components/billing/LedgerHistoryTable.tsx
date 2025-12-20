@@ -5,6 +5,11 @@ import type { LedgerEntryModel } from '@starships/protocol'
 import { useLedger } from '@/hooks/useLedger'
 import { Button } from '@/components/ui/button'
 
+function formatCredits(n: number): string {
+  const v = Number.isFinite(n) ? n : 0
+  return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+}
+
 export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
@@ -86,7 +91,12 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
             const meta = (r.meta as any) || {}
             let details: string = ''
             if (r.type === 'TOPUP') {
-              details = meta.stripePaymentIntent ? `Stripe PI ${String(meta.stripePaymentIntent).slice(-8)}` : meta.topupId ? `Topup ${meta.topupId}` : 'Wallet top-up'
+              const usd = meta.amountUsd ? `$${Number(meta.amountUsd).toFixed(2)}` : null
+              details = meta.stripePaymentIntent
+                ? `Stripe PI ${String(meta.stripePaymentIntent).slice(-8)}${usd ? ` (${usd})` : ''}`
+                : meta.topupId
+                  ? `Topup ${meta.topupId}${usd ? ` (${usd})` : ''}`
+                  : `Credit purchase${usd ? ` (${usd})` : ''}`
             } else if (r.type === 'REFUND') {
               details = meta.stripeChargeId ? `Refund for charge ${String(meta.stripeChargeId).slice(-8)}` : 'Refund issued'
             } else if (r.type === 'ADJUSTMENT') {
@@ -110,8 +120,8 @@ export default function LedgerHistoryTable({ walletId }: { walletId: string }) {
                   </span>
                 </td>
                 <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{details}</td>
-                <td className="py-2 pr-3">${Number(r.amount).toFixed(2)}</td>
-                <td className="py-2 pr-3">${Number(r.balanceAfter).toFixed(2)}</td>
+                <td className="py-2 pr-3">{formatCredits(Number(r.amount))} cr</td>
+                <td className="py-2 pr-3">{formatCredits(Number(r.balanceAfter))} cr</td>
               </tr>
             )
           })}

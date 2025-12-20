@@ -9,7 +9,7 @@ export interface CreateStarshipData {
   ownerId: string;
   name: string;
   maxAgents?: number;
-  initialWalletBalance?: number;
+  initialCredits?: number;
 }
 
 export interface StarshipWithDetails extends StarshipModel {
@@ -46,11 +46,11 @@ export class StarshipService {
       status: 'active',
     });
 
-    // Auto-create wallet for this starship with optional initial balance (default: $0)
+    // Auto-create wallet for this starship with optional initial credits (default: 0)
     try {
       const walletService = new WalletService();
-      const initialBalance = data.initialWalletBalance ?? 0;
-      await walletService.createForStarship(starship.id, initialBalance);
+      const initialCredits = data.initialCredits ?? 0;
+      await walletService.createForStarship(starship.id, initialCredits);
       // Optional: silent success
     } catch (err) {
       // Log and continue - starship creation should not fail due to wallet issues
@@ -278,7 +278,7 @@ export class StarshipService {
   // ============================================================================
 
   /**
-   * Create a default starship for a new user with $10 welcome credit
+   * Create a default starship for a new user with 200 welcome credits
    */
   static async createDefaultStarship(userId: string): Promise<StarshipModel> {
     const starshipService = new StarshipService();
@@ -286,12 +286,12 @@ export class StarshipService {
     // Generate a random name for the starship
     const starshipName = getRandomStarshipName();
 
-    // Create the starship with default settings and $10 welcome credit
+    // Create the starship with default settings and 200 welcome credits
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: starshipName,
       maxAgents: 8,
-      initialWalletBalance: 10, // $10 welcome credit for new users
+      initialCredits: 200, // 200 welcome credits for new users
     });
 
     return starship;

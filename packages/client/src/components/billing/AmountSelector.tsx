@@ -1,6 +1,5 @@
 'use client'
 
-
 import React, { useState } from 'react'
 import { useTopup } from '@/hooks/useTopup'
 import { useWallet } from '@/hooks/useWallet'
@@ -14,6 +13,7 @@ export interface AmountSelectorProps {
 }
 
 const PRESET_AMOUNTS = [5, 10, 20, 30, 50, 100] as const
+const CREDITS_PER_USD = 200
 
 export default function AmountSelector({ starshipId, className = '' }: AmountSelectorProps): React.JSX.Element {
   const [selectedAmount, setSelectedAmount] = useState<number>(20)
@@ -26,6 +26,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
 
   const currentAmount = useCustom ? Number(customAmount) || 0 : selectedAmount
   const isValidAmount = currentAmount >= 5 && currentAmount <= 1000
+  const creditsToReceive = Math.round(Math.max(0, currentAmount) * CREDITS_PER_USD)
 
   const handleTopup = async () => {
     if (!wallet) {
@@ -93,6 +94,11 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
           <h3 className="text-sm font-bold text-primary uppercase tracking-wide">Add Credits</h3>
         </div>
         <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">Choose an amount to add to your wallet</p>
+        {isValidAmount && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            You’ll receive <span className="font-semibold text-slate-900 dark:text-slate-100">{creditsToReceive.toLocaleString()}</span> credits.
+          </p>
+        )}
       </div>
 
       {/* Preset amounts - Modern card grid */}
@@ -143,7 +149,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
           </div>
           <Input
             type="number"
-            placeholder={useCustom ? "20.00" : selectedAmount.toFixed(2)}
+            placeholder={useCustom ? '20.00' : selectedAmount.toFixed(2)}
             value={useCustom ? customAmount : selectedAmount.toFixed(2)}
             onChange={e => handleCustomChange(e.target.value)}
             min="5"
@@ -166,8 +172,10 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
             <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
             Processing...
           </div>
+        ) : isValidAmount ? (
+          `Buy ${creditsToReceive.toLocaleString()} credits ($${currentAmount.toFixed(2)})`
         ) : (
-          `Add ${isValidAmount ? `$${currentAmount.toFixed(2)}` : 'Credits'}`
+          'Buy credits'
         )}
       </Button>
 

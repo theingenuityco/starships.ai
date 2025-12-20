@@ -1,6 +1,5 @@
 'use client'
 
-
 import React from 'react'
 import { useTopup } from '@/hooks/useTopup'
 import { useWallet } from '@/hooks/useWallet'
@@ -14,6 +13,8 @@ export interface TopupButtonProps {
   size?: 'default' | 'sm' | 'lg'
   className?: string
 }
+
+const CREDITS_PER_USD = 200
 
 export default function TopupButton({ starshipId, amount = 20, variant = 'default', size = 'default', className = '' }: TopupButtonProps): React.JSX.Element {
   const mutation = useTopup()
@@ -54,7 +55,7 @@ export default function TopupButton({ starshipId, amount = 20, variant = 'defaul
 
   return (
     <Button onClick={handleTopup} disabled={mutation.isPending || !wallet} variant={variant} size={size} className={className}>
-      {mutation.isPending ? 'Processing...' : `Add $${amount} Credits`}
+      {mutation.isPending ? 'Processing...' : `Buy ${Math.round(amount * CREDITS_PER_USD).toLocaleString()} credits ($${amount})`}
     </Button>
   )
 }

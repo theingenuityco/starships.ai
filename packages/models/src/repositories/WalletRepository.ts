@@ -1,7 +1,7 @@
 import { WalletEntity } from '@/entities/WalletEntity';
 import { fromDatabase, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
-import type { WalletModel } from '@starships/protocol';
+import type { CurrencyCode, WalletModel } from '@starships/protocol';
 import type { PoolClient } from 'pg';
 
 export class WalletRepository extends BaseRepository {
@@ -12,7 +12,7 @@ export class WalletRepository extends BaseRepository {
   /**
    * Create wallet for a starship with default USD currency and 0.000000 balance
    */
-  async create(data: { starshipId: string; balance?: string; currency?: 'USD' }): Promise<WalletModel> {
+  async create(data: { starshipId: string; balance?: string; currency?: CurrencyCode }): Promise<WalletModel> {
     return this.executeWithErrorHandling(
       async () => {
         if (!data?.starshipId?.trim()) {
@@ -22,7 +22,7 @@ export class WalletRepository extends BaseRepository {
         const now = new Date().toISOString();
         const walletData = {
           starshipId: data.starshipId,
-          currency: data.currency ?? 'USD',
+          currency: (data.currency ?? 'USD') as CurrencyCode,
           balance: data.balance ?? '0.000000',
           createdAt: now,
           updatedAt: now,

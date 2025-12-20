@@ -112,7 +112,7 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
                   onClick={() => onSelectEmoji(emoji)}
                   className={[
                     'flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors',
-                    selected ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted/60',
+                    selected ? 'border-primary bg-primary/10 text-primary' : 'border-border',
                   ].join(' ')}
                 >
                   <span className="leading-none">{emoji}</span>

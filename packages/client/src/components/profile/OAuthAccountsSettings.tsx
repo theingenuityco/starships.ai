@@ -251,7 +251,7 @@ export function OAuthAccountsSettings() {
               key={provider}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+              className="flex items-center justify-between p-4 border rounded-lg"
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-muted/30">
@@ -274,7 +274,7 @@ export function OAuthAccountsSettings() {
 
               <div className="flex items-center gap-2">
                 {isLinked ? (
-                  <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(provider)} disabled={unlinkMutation.isPending} className="text-destructive hover:text-destructive">
+                  <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(provider)} disabled={unlinkMutation.isPending} className="text-destructive">
                     <Icon name="unlink" className="h-3 w-3 mr-1" />
                     Unlink
                   </Button>

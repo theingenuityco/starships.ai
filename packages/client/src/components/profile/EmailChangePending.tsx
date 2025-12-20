@@ -34,7 +34,7 @@ export default function EmailChangePending({ newEmail, onResend, onCancel, loadi
             size="sm"
             onClick={onResend}
             disabled={loading}
-            className="w-full justify-center border-amber-400/70 px-5 text-amber-200 hover:border-amber-300 hover:bg-amber-400/15 dark:border-amber-700/60 sm:w-auto"
+            className="w-full justify-center border-amber-400/70 px-5 text-amber-200 dark:border-amber-700/60 sm:w-auto"
           >
             <Icon name="refresh" className="h-4 w-4" />
             Resend Email
@@ -44,7 +44,7 @@ export default function EmailChangePending({ newEmail, onResend, onCancel, loadi
             size="sm"
             onClick={onCancel}
             disabled={loading}
-            className="w-full justify-center border-border/70 px-5 text-foreground hover:bg-muted/30 sm:w-auto"
+            className="w-full justify-center border-border/70 px-5 text-foreground sm:w-auto"
           >
             <Icon name="x" className="h-4 w-4" />
             Cancel

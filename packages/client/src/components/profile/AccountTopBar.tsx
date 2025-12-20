@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import React from 'react'
 import { Button } from '@/components/ui/button'
+import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
 
 type AccountTopBarProps = {
@@ -15,7 +16,7 @@ type AccountTopBarProps = {
 
 export default function AccountTopBar({ dirty, saving, onReset, formId = 'account-form' }: AccountTopBarProps) {
   return (
-    <div className="sticky top-0 z-10 rounded-2xl border border-border/60 bg-card/80 backdrop-blur supports-[backdrop-filter]:bg-card/60 p-4 ring-1 ring-inset ring-border/40">
+    <div className={`sticky top-0 z-10 p-4 ${PROFILE_SECTION_CARD_CLASS}`}>
       <div className="flex items-center gap-3">
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
           <Icon name="shield" className="h-5 w-5 text-primary" />

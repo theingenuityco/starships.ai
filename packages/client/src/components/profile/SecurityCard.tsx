@@ -102,7 +102,7 @@ export default function SecurityCard({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full px-3 py-2"
                         onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                         disabled={saving}
                       >
@@ -131,7 +131,7 @@ export default function SecurityCard({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full px-3 py-2"
                         onClick={() => setShowNewPassword(!showNewPassword)}
                         disabled={saving}
                       >
@@ -161,7 +161,7 @@ export default function SecurityCard({
                         type="button"
                         variant="ghost"
                         size="sm"
-                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        className="absolute right-0 top-0 h-full px-3 py-2"
                         onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                         disabled={saving}
                       >

@@ -49,8 +49,8 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       <div
         className="flex-shrink-0"
         style={{
-          width: '1.5rem',
-          height: '1.5rem',
+          width: '1.25rem',
+          height: '1.25rem',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -58,7 +58,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
           pointerEvents: 'none',
         }}
       >
-        <Icon name={icon} className="w-5 h-5" />
+        <Icon name={icon} className="w-4 h-4" />
       </div>
     )
   }, [icon])
@@ -66,7 +66,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
   const motionDiv = (
     <div
       onClick={handleClick}
-      className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 py-1 ${
+      className={`group relative rounded-lg flex items-center border w-full h-7 cursor-pointer text-sm px-2 ${
         special
           ? 'text-primary border-transparent hover:text-primary hover:bg-muted hover:border-muted'
           : isActive
@@ -87,8 +87,8 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
-            className="ml-3 whitespace-nowrap pointer-events-none text-[13px] font-medium"
-            style={{ marginLeft: '0.5rem' }}
+            className="whitespace-nowrap pointer-events-none text-[12px] font-medium"
+            style={{ marginLeft: '0.375rem' }}
           >
             {label}
           </motion.span>

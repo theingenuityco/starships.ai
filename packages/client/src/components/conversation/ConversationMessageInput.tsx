@@ -90,8 +90,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
-    // Image generation toggle (OpenRouter multimodal output)
-    const [imageMode, setImageMode] = useState(false)
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -503,7 +501,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           starshipId: starshipId!,
           messageType: 'user_input',
           attachmentIds: attachmentIdsToSend.length > 0 ? attachmentIdsToSend : undefined,
-          ...(imageMode ? { modalities: ['image', 'text'] } : {}),
         })
           .catch(error => {
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
@@ -515,8 +512,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Clear attachments after successful send
             setPendingFiles([])
             setUploadedAttachmentIds([])
-            // Default back to text mode after a send to avoid accidental image requests
-            setImageMode(false)
           })
 
         // Exit early to avoid hitting catch/finally paths
@@ -533,7 +528,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       sending,
       disabled,
       isStreamingEffective,
-      imageMode,
       selectedAgent,
       userId,
       conversationId,
@@ -628,7 +622,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             role: 'user',
             starshipId: starshipId!,
             messageType: 'user_input',
-            ...(imageMode ? { modalities: ['image', 'text'] } : {}),
           })
             .catch(error => {
               toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
@@ -636,7 +629,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             })
             .finally(() => {
               setSending(false)
-              setImageMode(false)
             })
 
           return
@@ -646,7 +638,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           streamingRef.current = false
         }
       },
-      [sending, disabled, isStreamingEffective, imageMode, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
+      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
     )
 
     // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
@@ -2250,7 +2242,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || fileUploading}
               className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5' : 'absolute bottom-3 right-14 z-20 p-1.5',
+                minimal ? 'absolute top-1/2 -translate-y-1/2 right-14 z-20 p-1.5' : 'absolute bottom-3 right-14 z-20 p-1.5',
                 'rounded-lg transition-colors',
                 'hover:bg-muted text-muted-foreground hover:text-foreground',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -2259,29 +2251,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               title="Attach file (images, PDFs)"
             >
               <Icon name="paperclip" className="h-5 w-5" />
-            </button>
-
-            {/* Image Generation Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                if (disabled) return
-                setImageMode(v => !v)
-                try {
-                  tiptap?.commands?.focus?.()
-                } catch {}
-              }}
-              disabled={disabled || sending || isStreamingEffective}
-              className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-20 z-20 p-1.5' : 'absolute bottom-3 right-24 z-20 p-1.5',
-                'rounded-lg transition-colors',
-                imageMode ? 'bg-muted text-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-              aria-label="Image generation"
-              title={imageMode ? 'Image generation: on' : 'Image generation: off'}
-            >
-              <Icon name="image" className="h-5 w-5" />
             </button>
 
             {/* Right-side Actions: Stop (when streaming) or Send */}

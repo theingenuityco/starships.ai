@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
+import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
 type SecurityCardProps = {
   // Authentication state
@@ -52,7 +53,7 @@ export default function SecurityCard({
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
 
   return (
-    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
+    <Card className={PROFILE_SECTION_CARD_CLASS}>
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="shield" className="h-4 w-4 text-primary" />

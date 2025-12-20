@@ -4,6 +4,7 @@ import React from 'react'
 import Icon from '@/components/primitives/Icon'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
 interface SignOutSectionProps {
   onSignOut: () => Promise<void>
@@ -21,7 +22,7 @@ export default function SignOutSection({ onSignOut, onNavigateHome }: SignOutSec
   }
 
   return (
-    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm shadow-sm">
+    <Card className={PROFILE_SECTION_CARD_CLASS}>
       <CardHeader>
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>

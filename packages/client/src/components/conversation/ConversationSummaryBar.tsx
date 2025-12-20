@@ -51,7 +51,7 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: 'easeOut' }}
-      className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 border-b border-border/50 backdrop-blur-md shadow-sm"
+      className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md shadow-sm"
     >
       <div className="px-4 py-3.5">
         <div className="max-w-4xl mx-auto">

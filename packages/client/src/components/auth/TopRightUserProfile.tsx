@@ -55,14 +55,14 @@ export function TopRightUserProfile(): React.JSX.Element | null {
 
   return (
     <div className="fixed top-4 right-4 z-[60]">
-      <div className="flex items-center gap-2">
-        <Badge variant="outline" className="text-[10px] flex items-center gap-1.5 px-2 py-0.5 transition-all duration-200 min-w-0 rounded-full">
-          <Icon name="coins" className="w-3.5 h-3.5" />
+      <div className="flex items-center gap-3">
+        <Badge variant="outline" className="flex items-center gap-2 px-3 py-1 transition-all duration-200 min-w-0 rounded-full text-muted-foreground">
+          <Icon name="coins" className="w-4 h-4" />
           <span className="min-w-0">
-            <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
+            <BalanceStatusIndicator valueClassName="text-xs" wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
           </span>
         </Badge>
-        <UserProfile mode="collapsed" onClick={handleClick} centerInContainer />
+        <UserProfile mode="collapsed" onClick={handleClick} centerInContainer collapsedSize="md" />
       </div>
     </div>
   )

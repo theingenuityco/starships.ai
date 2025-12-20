@@ -17,6 +17,10 @@ interface BalanceStatusIndicatorProps {
    * Useful when the parent container controls color (e.g. icon + text should match).
    */
   inheritTextColor?: boolean
+  /**
+   * Optional className override applied to the numeric value span (e.g. to adjust font size).
+   */
+  valueClassName?: string
 }
 
 // Client-side thresholds for credit UX (server enforces actual billing rules).
@@ -29,7 +33,8 @@ const CREDIT_THRESHOLDS = {
 
 function formatCredits(n: number): string {
   const v = Number.isFinite(n) ? n : 0
-  return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+  // Force comma-grouping for readability (e.g. 12,345.67), independent of user locale.
+  return v.toLocaleString('en-US', { useGrouping: true, maximumFractionDigits: 2 })
 }
 
 export default function BalanceStatusIndicator({
@@ -41,6 +46,7 @@ export default function BalanceStatusIndicator({
   showDot = true,
   showUnit = true,
   inheritTextColor = false,
+  valueClassName,
 }: BalanceStatusIndicatorProps): React.JSX.Element {
   const balance = Number(wallet?.balance ?? '0')
   const isCritical = balance < CREDIT_THRESHOLDS.CRITICAL
@@ -85,7 +91,7 @@ export default function BalanceStatusIndicator({
     return (
       <div className={cn('flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold', inheritTextColor ? undefined : statusConfig.textColor, className)}>
         {showDot ? <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div> : null}
-        <span>{balanceLabel}</span>
+        <span className={cn(valueClassName)}>{balanceLabel}</span>
         {showDetails && <span>• Credits</span>}
       </div>
     )
@@ -95,7 +101,7 @@ export default function BalanceStatusIndicator({
     return (
       <div className={cn('flex items-center gap-2', className)}>
         {showDot ? <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div> : null}
-        <span className={cn('text-sm font-semibold', inheritTextColor ? undefined : statusConfig.textColor)}>{balanceLabel}</span>
+        <span className={cn('text-sm font-semibold', inheritTextColor ? undefined : statusConfig.textColor, valueClassName)}>{balanceLabel}</span>
       </div>
     )
   }

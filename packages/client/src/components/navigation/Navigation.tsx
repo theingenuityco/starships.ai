@@ -2,7 +2,6 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { UserProfile } from '@/components/auth/UserProfile'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
@@ -55,8 +54,6 @@ export function Navigation(props: NavigationProps) {
   const sidebarRef = useRef<HTMLDivElement>(null)
   // Ref for conversation history container
   const conversationHistoryRef = useRef<HTMLDivElement>(null)
-  // Ref for user section
-  const userSectionRef = useRef<HTMLDivElement>(null)
 
   // Ref for collapse timeout to keep logo stable during collapse animation
   const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -115,7 +112,6 @@ export function Navigation(props: NavigationProps) {
   const routeChecks = useMemo(() => {
     if (!starshipSlug) {
       return {
-        isSettingsRoute: false,
         isConnectorsRoute: false,
         isAgentsRoute: false,
         isAgentBuilderRoute: false,
@@ -125,7 +121,6 @@ export function Navigation(props: NavigationProps) {
       }
     }
     return {
-      isSettingsRoute: pathname.startsWith(`/ship/${starshipSlug}/settings`),
       isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
       isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
@@ -135,7 +130,7 @@ export function Navigation(props: NavigationProps) {
     }
   }, [pathname, starshipSlug])
 
-  const { isSettingsRoute, isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
+  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -187,13 +182,6 @@ export function Navigation(props: NavigationProps) {
     },
     [router, starshipSlug, isMobile, onClose]
   )
-
-  // Handle user profile click - memoized
-  const handleUserProfileClick = useCallback(() => {
-    if (!starshipSlug) return
-    router.push(`/ship/${starshipSlug}/settings`)
-    if (isMobile && onClose) onClose()
-  }, [router, starshipSlug, isMobile, onClose])
 
   // Handle logo click - memoized
   const handleLogoClick = useCallback(() => {
@@ -430,53 +418,7 @@ export function Navigation(props: NavigationProps) {
             </div>
           )}
 
-          {/* User Profile Section */}
-          <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative py-1.5">
-            {/* Profile section */}
-            <div className="w-full px-2">
-              {isExpanded ? (
-                <div
-                  className="flex items-center gap-2 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full py-1.5 px-2"
-                  onClick={handleUserProfileClick}
-                  style={{ justifyContent: 'flex-start', minHeight: '2.5rem' }}
-                >
-                  <div className="flex-shrink-0 flex items-center justify-center">
-                    <UserProfile mode="collapsed" active={isSettingsRoute} />
-                  </div>
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -8 }}
-                      transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-                      className="flex-1 min-w-0"
-                    >
-                      <p className="text-sm font-semibold truncate">{userName || user?.email || 'User'}</p>
-                      {starshipData && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <StarshipsLogo width={12} height={12} className="flex-shrink-0" />
-                          <p className="text-xs text-muted-foreground truncate">{starshipData.name || 'Starship'}</p>
-                        </div>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
-                  <AnimatePresence mode="wait">
-                    {isExpanded && (
-                      <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}>
-                        <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                <div className="flex items-center w-full px-2" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-                  <div className="flex-shrink-0 flex items-center justify-center">
-                    <UserProfile mode="collapsed" active={isSettingsRoute} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Profile moved to global top-right header (see `TopRightUserProfile`) */}
         </div>
       </motion.div>
     </>

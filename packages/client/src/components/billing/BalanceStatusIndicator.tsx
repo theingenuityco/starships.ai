@@ -10,6 +10,13 @@ interface BalanceStatusIndicatorProps {
   showDetails?: boolean
   className?: string
   variant?: 'default' | 'compact' | 'minimal'
+  showDot?: boolean
+  showUnit?: boolean
+  /**
+   * When true, do not apply the status-based text color classes.
+   * Useful when the parent container controls color (e.g. icon + text should match).
+   */
+  inheritTextColor?: boolean
 }
 
 // Client-side thresholds for credit UX (server enforces actual billing rules).
@@ -25,7 +32,16 @@ function formatCredits(n: number): string {
   return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
-export default function BalanceStatusIndicator({ wallet, isLoading, showDetails = false, className, variant = 'default' }: BalanceStatusIndicatorProps): React.JSX.Element {
+export default function BalanceStatusIndicator({
+  wallet,
+  isLoading,
+  showDetails = false,
+  className,
+  variant = 'default',
+  showDot = true,
+  showUnit = true,
+  inheritTextColor = false,
+}: BalanceStatusIndicatorProps): React.JSX.Element {
   const balance = Number(wallet?.balance ?? '0')
   const isCritical = balance < CREDIT_THRESHOLDS.CRITICAL
   const isLow = balance < CREDIT_THRESHOLDS.LOW && balance >= CREDIT_THRESHOLDS.CRITICAL
@@ -54,21 +70,22 @@ export default function BalanceStatusIndicator({ wallet, isLoading, showDetails 
   }
 
   const statusConfig = getStatusConfig()
+  const balanceLabel = `${formatCredits(balance)}${showUnit ? ' cr' : ''}`
 
   if (isLoading) {
     return (
       <div className={cn('flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400 font-semibold', className)}>
-        <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div>
-        <span>Loading balance...</span>
+        {showDot ? <div className="w-2 h-2 bg-slate-400 rounded-full animate-pulse"></div> : null}
+        <span>{variant === 'minimal' || variant === 'compact' ? '—' : 'Loading balance...'}</span>
       </div>
     )
   }
 
   if (variant === 'compact') {
     return (
-      <div className={cn('flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold', statusConfig.textColor, className)}>
-        <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div>
-        <span>{formatCredits(balance)} cr</span>
+      <div className={cn('flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold', inheritTextColor ? undefined : statusConfig.textColor, className)}>
+        {showDot ? <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div> : null}
+        <span>{balanceLabel}</span>
         {showDetails && <span>• Credits</span>}
       </div>
     )
@@ -77,8 +94,8 @@ export default function BalanceStatusIndicator({ wallet, isLoading, showDetails 
   if (variant === 'minimal') {
     return (
       <div className={cn('flex items-center gap-2', className)}>
-        <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div>
-        <span className={cn('text-sm font-semibold', statusConfig.textColor)}>{formatCredits(balance)} cr</span>
+        {showDot ? <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div> : null}
+        <span className={cn('text-sm font-semibold', inheritTextColor ? undefined : statusConfig.textColor)}>{balanceLabel}</span>
       </div>
     )
   }

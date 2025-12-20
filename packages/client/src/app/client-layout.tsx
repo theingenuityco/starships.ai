@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
+import { TopRightUserProfile } from '@/components/auth/TopRightUserProfile'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
@@ -75,6 +76,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return (
       <div className="h-full w-full">
         <EmailChangeToastHandler />
+        <TopRightUserProfile />
         {children}
       </div>
     )
@@ -88,6 +90,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme>
           <EmailChangeToastHandler />
           <div className="relative min-h-[100dvh] bg-background">
+            <TopRightUserProfile />
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
         </StarTheme>
@@ -101,6 +104,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <StarTheme>
         <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+          <TopRightUserProfile />
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
             <>
@@ -153,6 +157,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme>
           <EmailChangeToastHandler />
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+            <TopRightUserProfile />
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
               <>

@@ -1,15 +1,23 @@
 'use client'
 
-import { useStarshipUIStore } from '@/store/starship-ui-store'
-import { useStarshipConversations } from '@/hooks/useConversations'
-import { useConversationUsageTotals } from '@/hooks/useUsage'
-import { cn } from '@/lib/utils'
-import Icon from '@/components/primitives/Icon'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+import { Avatar } from '@/components/ui/avatar'
+import { useStarshipConversations, useConversationAgents } from '@/hooks/useConversations'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { motion } from 'motion/react'
+import { useMemo } from 'react'
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
   starshipId: string
+}
+
+interface ConversationAgent {
+  id?: string
+  name: string
+  slug?: string
+  model?: string
+  avatarAttachmentId?: string
 }
 
 export function ConversationSummaryBar({ conversationId, starshipId }: ConversationSummaryBarProps) {
@@ -17,8 +25,18 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
   const currentConversation = starshipConversationsData?.conversations?.find(c => c.id === conversationId)
 
-  // Fetch conversation usage/cost data with refetch capability
-  const { data: usageData } = useConversationUsageTotals(conversationId)
+  // Derive agents for this conversation (same source as the left navigation list)
+  const { data: convAgents = [] } = useConversationAgents(conversationId)
+  const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
+  const maxToShow = 4
+  const visibleAgents = agents.slice(0, maxToShow)
+  const remaining = agents.length - visibleAgents.length
+
+  const avatarAttachmentIds = useMemo(() => {
+    return visibleAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+  }, [visibleAgents])
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
   if (!conversationId || !currentConversation) {
     return null
@@ -26,7 +44,6 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
 
   const title = currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`
   const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')
-  const createdAt = new Date(currentConversation?.createdAt || '')
 
   // Format dates
   const formatDate = (date: Date) => {
@@ -43,9 +60,6 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  // Calculate stats
-  const totalCost = usageData?.cost || 0
-
   return (
     <motion.div
       initial={{ opacity: 0, y: -10 }}
@@ -56,50 +70,34 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
       <div className="px-4 py-3.5">
         <div className="max-w-4xl mx-auto">
           <div className="flex items-center justify-between gap-4">
-            {/* Column 1: Icon (vertically centered) */}
-            <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10 border border-primary/20 flex-shrink-0">
-              <Icon name="message-square" className="w-5 h-5 text-primary" />
-            </div>
-
-            {/* Column 2: Title and metadata (stacked) */}
+            {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
               {/* Title */}
-              <h3 className="text-base font-semibold text-foreground truncate tracking-tight leading-tight">{title}</h3>
+              <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">{title}</h3>
 
-              {/* Metadata row */}
-              <div className="flex items-center gap-3 text-xs leading-none">
-                {/* Last updated */}
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Icon name="clock" className="w-3.5 h-3.5 flex-shrink-0" />
+              {/* Agents + updated row */}
+              <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                {agents.length > 0 ? (
+                  <>
+                    {visibleAgents.map(agent => (
+                      <div key={agent.id ?? agent.slug ?? agent.name} className="inline-flex items-center gap-1.5 max-w-[14rem]" title={agent.name}>
+                        <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                          <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={16} />
+                        </Avatar>
+                        <span className="truncate font-medium leading-none">{agent.name}</span>
+                      </div>
+                    ))}
+                    {remaining > 0 ? <span className="text-muted-foreground/70">+{remaining}</span> : null}
+
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                      <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                    </span>
+                  </>
+                ) : (
                   <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
-                </div>
-
-                {/* Divider */}
-                <div className="h-3.5 w-px bg-border/60" />
-
-                {/* Created date */}
-                <div className="flex items-center gap-1.5 text-muted-foreground">
-                  <Icon name="calendar" className="w-3.5 h-3.5 flex-shrink-0" />
-                  <span className="leading-none">Created {formatDate(createdAt)}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Stats badges */}
-            <div className="flex items-center gap-2 flex-shrink-0">
-              <motion.div
-                key={`cost-${totalCost}`}
-                initial={{ scale: 0.95, opacity: 0.8 }}
-                animate={{ scale: 1, opacity: 1 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-                className={cn(
-                  'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border font-semibold',
-                  totalCost > 0.01 ? 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400' : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400'
                 )}
-              >
-                <Icon name="coins" className="w-3.5 h-3.5" />
-                <span className="text-xs">${totalCost.toFixed(2)}</span>
-              </motion.div>
+              </div>
             </div>
           </div>
         </div>

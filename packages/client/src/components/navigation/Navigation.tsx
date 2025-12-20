@@ -428,7 +428,7 @@ export function Navigation(props: NavigationProps) {
                     Appearance
                   </span>
                 </div>
-                <ThemeToggle size="sm" />
+                <ThemeToggle size="xs" />
               </div>
             </div>
           )}

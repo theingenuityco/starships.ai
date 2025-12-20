@@ -293,13 +293,22 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           return
         }
         const starshipUrl = `/api/v1/starships/${starshipId}/agents/${value.slug}`
-        const result = await safeGet<ApiResponse<AgentModel>>(starshipUrl)
-        if (result.ok && (result.data as any)?.id) {
-          const agent: any = result.data as any
+        // NOTE: the starship-scoped agent endpoint is primarily for resolving the id by slug.
+        // Its payload may be a partial AgentModel (missing model settings), which can cause
+        // false "changes to publish" vs the published template after a hard reload.
+        // We immediately hydrate `fullAgent` from the canonical agent detail endpoint.
+        const result = await safeGet<AgentModel>(starshipUrl)
+        if (result.ok && result.data?.id) {
+          const agent = result.data
           console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
           if (!cancelled) {
-            setAgentId(agent?.id || null)
-            setFullAgent(agent as AgentModel)
+            setAgentId(agent.id || null)
+          }
+          // Fetch full agent details (canonical shape) for publish diff + autosave baseline.
+          const fullResult = await safeGet<AgentModel>(`/api/v1/agents/${agent.id}`)
+          const hydrated = (fullResult.ok && fullResult.data?.id ? fullResult.data : agent) as AgentModel
+          if (!cancelled) {
+            setFullAgent(hydrated)
           }
         } else {
           if (!cancelled) {

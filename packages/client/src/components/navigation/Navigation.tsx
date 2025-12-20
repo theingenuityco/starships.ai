@@ -270,7 +270,7 @@ export function Navigation(props: NavigationProps) {
         onClick={handleSidebarBackgroundClick}
       >
         <div
-          className="flex flex-col transition-all duration-300 ease-in-out"
+          className="flex flex-col pb-2 transition-all duration-300 ease-in-out"
           style={{
             width: isExpanded ? '16rem' : '3.5rem',
             height: '100%',
@@ -428,7 +428,7 @@ export function Navigation(props: NavigationProps) {
                     Appearance
                   </span>
                 </div>
-                <ThemeToggle size="xs" />
+                <ThemeToggle size="sm" />
               </div>
             </div>
           )}

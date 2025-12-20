@@ -13,6 +13,8 @@ import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
+import { useAuth } from '@/hooks/useAuth'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -431,6 +433,22 @@ interface ConversationMessageBubbleProps {
   starshipId?: string
 }
 
+function isImageUrl(value?: string | null): boolean {
+  if (!value || typeof value !== 'string') return false
+  const trimmed = value.trim()
+  return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
+}
+
+function initialsFromName(name?: string | null): string {
+  if (!name || typeof name !== 'string') return 'U'
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  if (parts.length === 0) return 'U'
+  return parts
+    .map(p => p[0]?.toUpperCase())
+    .filter(Boolean)
+    .join('')
+}
+
 // User message attachments component
 function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: string[]; starshipId: string }) {
   const { data: attachments, isLoading } = useMessageAttachments(attachmentIds, starshipId)
@@ -462,6 +480,7 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
 const MemoizedMessageBubble = memo(
   function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
+    const { userName, userEmail, userAvatar } = useAuth()
 
     if (isUser) {
       // User message: Neutral bubble on the right
@@ -472,7 +491,7 @@ const MemoizedMessageBubble = memo(
               {/* Attachments outside bubble */}
               {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
               {/* Message bubble (match navigation/sidebar background color) */}
-              <div className={`bg-card text-card-foreground border border-border/40 rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
+              <div className={`bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
                 {message.sending && (
                   <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
@@ -481,9 +500,12 @@ const MemoizedMessageBubble = memo(
                 )}
               </div>
             </div>
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <Icon name="user" className="w-4 h-4 text-primary" />
-            </div>
+            <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
+              {isImageUrl(userAvatar) ? (
+                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+              ) : null}
+              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{initialsFromName(userName || userEmail)}</AvatarFallback>
+            </Avatar>
           </div>
         </div>
       )

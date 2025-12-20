@@ -2,6 +2,7 @@ import { AgentEntity } from '@/entities/AgentEntity';
 import { ToolEntity } from '@/entities/ToolEntity';
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
+import { AttachmentRepository } from '@/repositories/AttachmentRepository';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
@@ -371,7 +372,9 @@ export class AgentRepository extends BaseRepository {
       async () => {
         // Use AgentTemplateRepository to get template
         const templateRepository = new AgentTemplateRepository();
-        const template = await templateRepository.findById(templateId);
+        // Important: use INTERNAL template fetch so we retain blueprint/state/systemPrompt.
+        // Public findById() intentionally strips these fields for marketplace/client consumption.
+        const template = await templateRepository.findInternalById(templateId);
 
         if (!template) {
           this.handleNotFound('AgentTemplate', templateId);
@@ -417,6 +420,47 @@ export class AgentRepository extends BaseRepository {
         const agentEntity = toEntityInstance(AgentEntity, agentProps);
         const result = await this.createEntity<Record<string, unknown>>('agents', toDatabase(agentEntity));
         const agent = fromDatabase(AgentEntity, result);
+
+        // Avatar propagation on create:
+        // If the template has a public avatar stored (avatar_s3_key), create an attachment reference
+        // owned by this starship and link it on the newly created agent.
+        //
+        // This covers initial deployments (e.g. starship creation) where updateFromTemplate() is not called.
+        try {
+          const storage = await templateRepository.getAvatarStorageById(templateId);
+          if (storage?.avatarS3Key) {
+            const mimeType = storage.avatarMimeType || 'image/png';
+            const extForMime = (mt: string): string => {
+              if (mt.includes('png')) return 'png';
+              if (mt.includes('jpeg') || mt.includes('jpg')) return 'jpg';
+              if (mt.includes('webp')) return 'webp';
+              if (mt.includes('gif')) return 'gif';
+              return 'img';
+            };
+            const filename = `template-avatar__${templateId}__${agent.id}.${extForMime(mimeType)}`;
+
+            const attachmentRepo = new AttachmentRepository();
+            const existing = await attachmentRepo.findByStarshipAndS3Key(starshipId, storage.avatarS3Key);
+            const created =
+              existing ??
+              (await attachmentRepo.create({
+                starshipId,
+                messageId: undefined,
+                filename,
+                mimeType,
+                sizeBytes: 0,
+                s3Key: storage.avatarS3Key,
+              }));
+
+            const updatedWithAvatar = await this.update(agent.id, { avatarAttachmentId: created.id });
+            if (updatedWithAvatar) {
+              // Return the hydrated/updated agent with avatarAttachmentId set
+              return updatedWithAvatar;
+            }
+          }
+        } catch {
+          // Best-effort: do not fail agent creation if avatar propagation fails.
+        }
 
         // Increment template usage count
         const connection = this.getConnection();
@@ -585,7 +629,9 @@ export class AgentRepository extends BaseRepository {
         }
 
         const templateRepo = new AgentTemplateRepository();
-        const template = await templateRepo.findById(agent.sourceTemplateId);
+        // IMPORTANT: use INTERNAL template fetch so we retain blueprint/state/systemPrompt.
+        // Public findById() intentionally strips these fields for marketplace/client consumption.
+        const template = await templateRepo.findInternalById(agent.sourceTemplateId);
 
         if (!template) {
           this.handleNotFound('AgentTemplate', agent.sourceTemplateId);
@@ -618,6 +664,86 @@ export class AgentRepository extends BaseRepository {
         }
         if (template.timeout !== null && template.timeout !== undefined) {
           updates.timeout = template.timeout;
+        }
+
+        // Avatar sync:
+        // - Templates store avatar as S3 pointer fields (avatar_s3_key/mime/updated_at).
+        // - Agents store avatar as Attachment FK (avatarAttachmentId).
+        // We propagate template avatar to the agent ONLY if:
+        // - agent has no avatar, OR
+        // - agent avatar was previously synced from a template (filename prefix), OR
+        // - previously-synced avatar points to a different S3 key than the template now uses.
+        const storage = await templateRepo.getAvatarStorageById(agent.sourceTemplateId);
+        if (storage?.avatarS3Key) {
+          const attachmentRepo = new AttachmentRepository();
+
+          const isSyncedFilename = (filename: unknown): boolean => typeof filename === 'string' && filename.startsWith('template-avatar__');
+
+          const extForMime = (mimeType: string | undefined): string => {
+            if (!mimeType) return 'img';
+            if (mimeType.includes('png')) return 'png';
+            if (mimeType.includes('jpeg') || mimeType.includes('jpg')) return 'jpg';
+            if (mimeType.includes('webp')) return 'webp';
+            if (mimeType.includes('gif')) return 'gif';
+            return 'img';
+          };
+
+          let shouldSetAvatar = false;
+          const existingId = agent.avatarAttachmentId;
+          let existingSyncedIdToDelete: string | undefined;
+
+          if (!existingId) {
+            shouldSetAvatar = true;
+          } else {
+            const existing = await attachmentRepo.findById(existingId);
+            if (!existing) {
+              shouldSetAvatar = true;
+              existingSyncedIdToDelete = existingId;
+            } else if (existing.starshipId !== agent.starshipId) {
+              // Defensive: data inconsistency; replace.
+              shouldSetAvatar = true;
+            } else if (!isSyncedFilename(existing.filename)) {
+              // Custom/user avatar: do not overwrite.
+              shouldSetAvatar = false;
+            } else if (existing.s3Key !== storage.avatarS3Key) {
+              // Previously synced, but template avatar changed: refresh.
+              shouldSetAvatar = true;
+              existingSyncedIdToDelete = existingId;
+            } else {
+              // Already synced and points to the same template S3 key: no-op.
+              shouldSetAvatar = false;
+            }
+          }
+
+          if (shouldSetAvatar) {
+            const mimeType = storage.avatarMimeType || 'image/png';
+            const filename = `template-avatar__${agent.sourceTemplateId}__${agent.id}.${extForMime(mimeType)}`;
+
+            const existing = await attachmentRepo.findByStarshipAndS3Key(agent.starshipId, storage.avatarS3Key);
+            const created =
+              existing ??
+              (await attachmentRepo.create({
+                starshipId: agent.starshipId,
+                messageId: undefined,
+                filename,
+                mimeType,
+                sizeBytes: 0,
+                s3Key: storage.avatarS3Key,
+                imageWidth: undefined,
+                imageHeight: undefined,
+              }));
+
+            updates.avatarAttachmentId = created.id;
+
+            // Best-effort cleanup: remove the old synced attachment row (never deletes S3 here).
+            if (existingSyncedIdToDelete && existingSyncedIdToDelete !== created.id) {
+              try {
+                await attachmentRepo.delete(existingSyncedIdToDelete);
+              } catch {
+                // ignore
+              }
+            }
+          }
         }
 
         const updated = await this.update(agentId, updates);

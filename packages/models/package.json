@@ -12,6 +12,7 @@
     "clean": "rm -rf dist",
     "lint": "eslint src --ext .ts",
     "seed:waitlist": "tsx src/scripts/seed-waitlist.ts",
+    "migrate:seeded-templates": "tsx src/scripts/migrate-seeded-templates.ts",
     "seed:update-instances": "tsx src/scripts/seed-update-deployed-instances.ts",
     "migrate:doc-tools": "tsx src/scripts/migrate-doc-tools.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",

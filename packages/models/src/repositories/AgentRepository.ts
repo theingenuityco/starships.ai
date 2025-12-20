@@ -371,7 +371,9 @@ export class AgentRepository extends BaseRepository {
       async () => {
         // Use AgentTemplateRepository to get template
         const templateRepository = new AgentTemplateRepository();
-        const template = await templateRepository.findById(templateId);
+        // Important: use INTERNAL template fetch so we retain blueprint/state/systemPrompt.
+        // Public findById() intentionally strips these fields for marketplace/client consumption.
+        const template = await templateRepository.findInternalById(templateId);
 
         if (!template) {
           this.handleNotFound('AgentTemplate', templateId);

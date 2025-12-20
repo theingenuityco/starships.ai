@@ -15,6 +15,25 @@ export class AttachmentRepository extends BaseRepository {
   }
 
   /**
+   * Find an attachment by (starshipId, s3Key).
+   * Useful when you want to reuse the same underlying S3 object within a starship.
+   */
+  async findByStarshipAndS3Key(starshipId: string, s3Key: string): Promise<AttachmentModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>(
+          'SELECT * FROM attachments WHERE starship_id = $1 AND s3_key = $2',
+          [starshipId, s3Key]
+        );
+        return result ? this.mapToModel(result) : null;
+      },
+      'findByStarshipAndS3Key',
+      'Attachment'
+    );
+  }
+
+  /**
    * Count attachments that reference a given S3 key.
    * Used to safely delete shared S3 objects only when the last reference is removed.
    */

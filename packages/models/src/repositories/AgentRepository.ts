@@ -440,14 +440,17 @@ export class AgentRepository extends BaseRepository {
             const filename = `template-avatar__${templateId}__${agent.id}.${extForMime(mimeType)}`;
 
             const attachmentRepo = new AttachmentRepository();
-            const created = await attachmentRepo.create({
-              starshipId,
-              messageId: undefined,
-              filename,
-              mimeType,
-              sizeBytes: 0,
-              s3Key: storage.avatarS3Key,
-            });
+            const existing = await attachmentRepo.findByStarshipAndS3Key(starshipId, storage.avatarS3Key);
+            const created =
+              existing ??
+              (await attachmentRepo.create({
+                starshipId,
+                messageId: undefined,
+                filename,
+                mimeType,
+                sizeBytes: 0,
+                s3Key: storage.avatarS3Key,
+              }));
 
             const updatedWithAvatar = await this.update(agent.id, { avatarAttachmentId: created.id });
             if (updatedWithAvatar) {
@@ -716,16 +719,19 @@ export class AgentRepository extends BaseRepository {
             const mimeType = storage.avatarMimeType || 'image/png';
             const filename = `template-avatar__${agent.sourceTemplateId}__${agent.id}.${extForMime(mimeType)}`;
 
-            const created = await attachmentRepo.create({
-              starshipId: agent.starshipId,
-              messageId: undefined,
-              filename,
-              mimeType,
-              sizeBytes: 0,
-              s3Key: storage.avatarS3Key,
-              imageWidth: undefined,
-              imageHeight: undefined,
-            });
+            const existing = await attachmentRepo.findByStarshipAndS3Key(agent.starshipId, storage.avatarS3Key);
+            const created =
+              existing ??
+              (await attachmentRepo.create({
+                starshipId: agent.starshipId,
+                messageId: undefined,
+                filename,
+                mimeType,
+                sizeBytes: 0,
+                s3Key: storage.avatarS3Key,
+                imageWidth: undefined,
+                imageHeight: undefined,
+              }));
 
             updates.avatarAttachmentId = created.id;
 

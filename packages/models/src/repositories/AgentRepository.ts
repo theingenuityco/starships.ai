@@ -591,16 +591,23 @@ export class AgentRepository extends BaseRepository {
           this.handleNotFound('AgentTemplate', agent.sourceTemplateId);
         }
 
-        // Copy current template data to agent
-        // Only include fields that are defined in the template (not null/undefined)
-        // This allows templates to omit optional fields and use system defaults
+        // Copy current template data to agent.
+        // Important: avoid copying runtime-owned state; only sync template-owned fields.
         const updates: UpdateAgentRequest = {
           systemPrompt: template.systemPrompt,
           blueprint: template.blueprint,
           model: template.model,
           version: template.version, // Copy template version to agent
           templateSnapshotAt: new Date().toISOString(),
+          // Keep agent category + preview prompts aligned with template for UI/marketplace display.
+          category: template.category,
+          previewPrompts: template.previewPrompts,
         };
+
+        // Reasoning config: allow templates to define it, but don't force-clear if missing.
+        if (template.reasoning !== undefined) {
+          updates.reasoning = template.reasoning ?? null;
+        }
 
         // Only copy optional numeric fields if they're defined in the template
         if (template.temperature !== null && template.temperature !== undefined) {

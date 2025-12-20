@@ -5,7 +5,7 @@
  * It should be run after template seeding to ensure instances stay in sync with their templates.
  *
  * Features:
- * - Only updates instances that have a templateId (template-based instances)
+ * - Only updates instances that have a sourceTemplateId (template-based instances)
  * - Compares current instance version with template version using semver
  * - Only updates when template has a newer version
  * - Can target specific starships or all starships
@@ -68,7 +68,22 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
         }
 
         // Compare versions - only update if template is newer
-        const comparison = compareVersions(agent.version, template.version);
+        let comparison: number;
+        try {
+          comparison = compareVersions(String(agent.version ?? ''), String(template.version ?? ''));
+        } catch (e) {
+          stats.agentErrors++;
+          logger.warn(
+            `Skipping agent "${agent.name}" (${agent.slug}) due to invalid version(s): agent=${String(agent.version)} template=${String(template.version)}`,
+            {
+              component: 'seed-update-deployed-instances',
+              operation: 'compareAgentVersion',
+              metadata: { agentId: agent.id, templateId: agent.sourceTemplateId, starshipId, starshipSlug },
+            },
+            e as Error
+          );
+          continue;
+        }
 
         if (comparison < 0) {
           // Agent version is older than template version - update needed
@@ -126,7 +141,22 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
         }
 
         // Compare versions - only update if template is newer
-        const comparison = compareVersions(tool.version, template.version);
+        let comparison: number;
+        try {
+          comparison = compareVersions(String(tool.version ?? ''), String(template.version ?? ''));
+        } catch (e) {
+          stats.toolErrors++;
+          logger.warn(
+            `Skipping tool "${tool.name}" (${tool.slug}) due to invalid version(s): tool=${String(tool.version)} template=${String(template.version)}`,
+            {
+              component: 'seed-update-deployed-instances',
+              operation: 'compareToolVersion',
+              metadata: { toolId: tool.id, templateId: tool.sourceTemplateId, starshipId, starshipSlug },
+            },
+            e as Error
+          );
+          continue;
+        }
 
         if (comparison < 0) {
           // Tool version is older than template version - update needed

@@ -603,17 +603,35 @@ export class ToolRepository extends BaseRepository {
           this.handleNotFound('ToolTemplate', sourceTemplateId);
         }
 
-        // Copy current template data to tool
+        // Copy current template data to tool.
+        // Important: avoid copying instance-owned fields like configuration/isEnabled/status/starshipId/slug.
         const updates: UpdateToolRequest = {
-          description: template.description,
-          parameters: template.parameters,
-          blueprint: template.blueprint,
-          transforms: template.transforms,
-          mutations: template.mutations,
-          condition: template.condition,
           version: template.version, // Copy template version to tool
           templateSnapshotAt: new Date().toISOString(),
         };
+
+        // Only overwrite fields when template has a real value (defensive for legacy/partial DB rows).
+        if (template.name !== null && template.name !== undefined) {
+          updates.name = template.name;
+        }
+        if (template.description !== null && template.description !== undefined) {
+          updates.description = template.description;
+        }
+        if (template.parameters !== null && template.parameters !== undefined) {
+          updates.parameters = template.parameters;
+        }
+        if (template.blueprint !== null && template.blueprint !== undefined) {
+          updates.blueprint = template.blueprint;
+        }
+        if (template.transforms !== null && template.transforms !== undefined) {
+          updates.transforms = template.transforms;
+        }
+        if (template.mutations !== null && template.mutations !== undefined) {
+          updates.mutations = template.mutations;
+        }
+        if (template.condition !== null && template.condition !== undefined) {
+          updates.condition = template.condition;
+        }
 
         const updated = await this.update(toolId, updates);
         if (!updated) {

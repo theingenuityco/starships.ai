@@ -47,7 +47,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
             {/* Sections using shared Tabs UI with improved alignment */}
             <Tabs value={currentTab} onValueChange={value => router.push(`/ship/${slug}/settings/${value}`)} className="space-y-6">
               <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
+                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
                   <TabsTrigger value="profile" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="user" className="h-4 w-4" />
                     <span>Profile</span>
@@ -66,10 +66,8 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               </div>
 
               <TabsContent value="profile">
-                <section aria-labelledby="profile-section" className="rounded-xl border border-border/80 bg-background p-6">
-                  <div className="space-y-6">
-                    <AccountForm />
-                  </div>
+                <section aria-labelledby="profile-section" className="bg-background">
+                  <AccountForm />
                 </section>
               </TabsContent>
 

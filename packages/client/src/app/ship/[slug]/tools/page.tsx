@@ -92,7 +92,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
               className="space-y-6"
             >
               <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
+                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
                   <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="head-circuit" className="h-4 w-4" />
                     <span>Agents</span>

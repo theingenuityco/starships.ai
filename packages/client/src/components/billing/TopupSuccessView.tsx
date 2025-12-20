@@ -26,7 +26,7 @@ export function TopupSuccessView({ slug }: TopupSuccessViewProps): React.JSX.Ele
 
   const topupId = searchParams.get('topupId') ?? undefined
   const amountParam = searchParams.get('amount') ?? undefined
-  const CREDITS_PER_USD = 200
+  const CREDITS_PER_USD = 100
 
   const { data: starship, isLoading: starshipLoading, error: starshipError } = useStarshipBySlug(slug, true)
 

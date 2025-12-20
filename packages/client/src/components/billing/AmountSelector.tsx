@@ -6,6 +6,7 @@ import { useWallet } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/useToast'
+import Icon from '@/components/primitives/Icon'
 
 export interface AmountSelectorProps {
   starshipId: string
@@ -13,8 +14,8 @@ export interface AmountSelectorProps {
   variant?: 'default' | 'compact'
 }
 
-const PRESET_AMOUNTS = [5, 10, 20, 30, 50, 100] as const
-const CREDITS_PER_USD = 200
+const PRESET_AMOUNTS = [10, 20, 50] as const
+const CREDITS_PER_USD = 100
 
 export default function AmountSelector({ starshipId, className = '', variant = 'default' }: AmountSelectorProps): React.JSX.Element {
   const [selectedAmount, setSelectedAmount] = useState<number>(20)
@@ -183,14 +184,10 @@ export default function AmountSelector({ starshipId, className = '', variant = '
       </Button>
 
       {/* Stripe redirect message - Elegant styling */}
-      <div className={`text-center ${variant === 'compact' ? 'p-2' : 'p-3'} bg-muted/30 rounded-lg border border-border/50`}>
-        <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          You will be redirected to Stripe to complete your payment
-        </p>
-      </div>
+      <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+        <Icon name="external-link" className="h-3 w-3" />
+        You will be redirected to Stripe to complete your payment
+      </p>
 
       {/* Amount validation message */}
       {useCustom && customAmount && !isValidAmount && (

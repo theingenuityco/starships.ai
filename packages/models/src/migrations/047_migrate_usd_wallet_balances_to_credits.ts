@@ -22,8 +22,8 @@ export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
   try {
     // Read the pricing constant directly to avoid cross-package imports in migrations.
-    // Keep aligned with server/config/credits.ts default (200 credits per $1).
-    const creditsPerUsd = 200;
+    // Keep aligned with server/config/credits.ts default (100 credits per $1).
+    const creditsPerUsd = 100;
 
     // 1) For legacy USD wallets, compute paid USD from completed topups and set credits balance.
     await client.query(

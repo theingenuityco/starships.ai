@@ -4,6 +4,7 @@ import { WalletModel } from '@starships/protocol'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import BalanceStatusIndicator from './BalanceStatusIndicator'
+import Icon from '@/components/primitives/Icon'
 
 interface BillingOverviewCardProps {
   wallet?: WalletModel | null
@@ -71,15 +72,20 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry,
             {/* Large balance amount display - matches original design */}
             <div className="relative">
               {isCompact ? (
-                <div className="flex items-baseline justify-between gap-3">
-                  <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
-                    {formatCredits(Number(wallet?.balance ?? 0))} <span className="text-sm font-medium text-muted-foreground">credits</span>
+                <div className="text-center space-y-2">
+                  <div className="inline-flex items-center justify-center gap-2">
+                    <Icon name="coins" className="h-5 w-5 text-primary" />
+                    <div className="text-5xl font-bold tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
+                      {formatCredits(Number(wallet?.balance ?? 0))}
+                    </div>
                   </div>
-                  <BalanceStatusIndicator wallet={wallet} showDetails={false} variant="compact" />
+                  <div className="flex items-center justify-center">
+                    <BalanceStatusIndicator wallet={wallet} showDetails={false} variant="default" />
+                  </div>
                 </div>
               ) : (
                 <div className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
-                  {formatCredits(Number(wallet?.balance ?? 0))} credits
+                  {formatCredits(Number(wallet?.balance ?? 0))}
                 </div>
               )}
             </div>

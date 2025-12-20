@@ -92,7 +92,7 @@ export default function BalanceStatusIndicator({
       <div className={cn('flex items-center gap-2 px-3 py-1 rounded-full text-sm font-semibold', inheritTextColor ? undefined : statusConfig.textColor, className)}>
         {showDot ? <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div> : null}
         <span className={cn(valueClassName)}>{balanceLabel}</span>
-        {showDetails && <span>• Credits</span>}
+        {showDetails && <span>• Active credits</span>}
       </div>
     )
   }
@@ -110,7 +110,7 @@ export default function BalanceStatusIndicator({
   return (
     <div className={cn('flex items-center justify-center gap-2 text-sm text-slate-600 dark:text-slate-400 font-semibold', className)}>
       <div className={cn('w-2 h-2 rounded-full animate-pulse', statusConfig.indicatorColor)}></div>
-      <span>Credits</span>
+      <span>Active credits</span>
     </div>
   )
 }

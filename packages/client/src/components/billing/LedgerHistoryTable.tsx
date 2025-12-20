@@ -4,6 +4,7 @@ import React, { useMemo, useState } from 'react'
 import type { LedgerEntryModel } from '@starships/protocol'
 import { useLedger } from '@/hooks/useLedger'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 function formatCredits(n: number): string {
   const v = Number.isFinite(n) ? n : 0
@@ -21,10 +22,14 @@ export default function LedgerHistoryTable({
   walletId,
   view = 'billing',
   title = 'Transaction history',
+  variant = 'card',
+  showTitle = true,
 }: {
   walletId: string
   view?: 'billing' | 'full'
   title?: string
+  variant?: 'card' | 'bare'
+  showTitle?: boolean
 }) {
   const [page, setPage] = useState(1)
   const [limit] = useState(10)
@@ -41,8 +46,8 @@ export default function LedgerHistoryTable({
 
   if (isLoading) {
     return (
-      <div className="ip-card-shadow rounded-2xl p-4">
-        <h4 className="font-medium">{title}</h4>
+      <div className={cn(variant === 'card' ? 'ip-card-shadow rounded-2xl p-4' : undefined)}>
+        {showTitle ? <h4 className="font-medium">{title}</h4> : null}
         <div className="py-6 text-sm text-slate-600 dark:text-slate-400">Loading...</div>
       </div>
     )
@@ -50,8 +55,8 @@ export default function LedgerHistoryTable({
 
   if (error) {
     return (
-      <div className="ip-card-shadow rounded-2xl p-4">
-        <h4 className="font-medium">{title}</h4>
+      <div className={cn(variant === 'card' ? 'ip-card-shadow rounded-2xl p-4' : undefined)}>
+        {showTitle ? <h4 className="font-medium">{title}</h4> : null}
         <div className="py-8 text-center">
           <div className="w-12 h-12 mx-auto mb-3 rounded-full bg-red-100 dark:bg-red-900/20 flex items-center justify-center">
             <svg className="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -82,16 +87,16 @@ export default function LedgerHistoryTable({
   }
 
   return (
-    <div className="ip-card-shadow rounded-2xl p-4">
+    <div className={cn(variant === 'card' ? 'ip-card-shadow rounded-2xl p-4' : undefined)}>
       <div className="flex items-center justify-between">
-        <h4 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
+        {showTitle ? <h4 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h4> : null}
         {pagination && (
           <div className="text-xs text-slate-500 dark:text-slate-400">
             Showing {pageInfo.start}-{pageInfo.end} of {pageInfo.total}
           </div>
         )}
       </div>
-      <table className="w-full mt-4 text-sm">
+      <table className={cn('w-full text-sm', showTitle ? 'mt-4' : 'mt-0')}>
         <thead>
           <tr className="text-left text-slate-500 dark:text-slate-400">
             <th className="py-2 pr-3">Date</th>

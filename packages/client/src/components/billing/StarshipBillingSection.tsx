@@ -15,6 +15,9 @@ export interface StarshipBillingSectionProps {
   starshipId?: string
 }
 
+const SECTION_CARD_CLASS =
+  'relative overflow-hidden rounded-lg bg-card border border-border/40 shadow-sm'
+
 export default function StarshipBillingSection({ starshipId }: StarshipBillingSectionProps): React.JSX.Element {
   const enabled = Boolean(starshipId)
   const { data: wallet, isLoading, error } = useWallet(starshipId || '', enabled)
@@ -35,7 +38,7 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Left column: Balance + Promo (stacked) */}
         <div className="space-y-4">
-          <Card>
+          <Card className={SECTION_CARD_CLASS}>
             <CardHeader className="p-4 pb-2">
               <CardTitle className="text-sm">Balance</CardTitle>
             </CardHeader>
@@ -45,7 +48,7 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
           </Card>
 
           {starshipId && (
-            <Card>
+            <Card className={SECTION_CARD_CLASS}>
               <CardHeader className="p-4 pb-2">
                 <CardTitle className="text-sm">Promo</CardTitle>
               </CardHeader>
@@ -58,7 +61,7 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
 
         {/* Right column: Add credits */}
         {starshipId && (
-          <Card>
+          <Card className={SECTION_CARD_CLASS}>
             <CardHeader className="p-4 pb-2">
               <CardTitle className="text-sm">Add credits</CardTitle>
             </CardHeader>
@@ -70,7 +73,16 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
       </div>
 
       {/* Ledger */}
-      {wallet?.id && <LedgerHistoryTable walletId={wallet.id} view="full" title="Credit ledger" />}
+      {wallet?.id && (
+        <Card className={SECTION_CARD_CLASS}>
+          <CardHeader className="p-4 pb-2">
+            <CardTitle className="text-sm">Credit ledger</CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 pt-0">
+            <LedgerHistoryTable walletId={wallet.id} view="full" title="Credit ledger" variant="bare" showTitle={false} />
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

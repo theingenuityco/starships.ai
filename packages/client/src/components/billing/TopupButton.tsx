@@ -14,7 +14,7 @@ export interface TopupButtonProps {
   className?: string
 }
 
-const CREDITS_PER_USD = 200
+const CREDITS_PER_USD = 100
 
 export default function TopupButton({ starshipId, amount = 20, variant = 'default', size = 'default', className = '' }: TopupButtonProps): React.JSX.Element {
   const mutation = useTopup()

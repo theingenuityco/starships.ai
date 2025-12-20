@@ -12,21 +12,23 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 import AccountForm from '@/components/profile/AccountForm'
 import CreditLedgerSection from '@/components/billing/CreditLedgerSection'
+import { useAuth } from '@/hooks/useAuth'
 
-const VALID_TABS = ['profile', 'usage', 'billing', 'ledger'] as const
-type TabValue = (typeof VALID_TABS)[number]
+const ALL_TABS = ['profile', 'usage', 'billing', 'ledger'] as const
+type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
-  const isValidTab = VALID_TABS.includes(tab as TabValue)
-  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'usage'
+  const { isInstanceAdmin, isLoading: authLoading } = useAuth()
+  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'billing', 'ledger'] as const)
+  const isValidTab = visibleTabs.includes(tab as TabValue)
+  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'profile'
 
   useEffect(() => {
-    if (!isValidTab) {
-      router.replace(`/ship/${slug}/settings/${currentTab}`)
-    }
-  }, [router, slug, currentTab, isValidTab])
+    if (authLoading) return
+    if (!isValidTab) router.replace(`/ship/${slug}/settings/${currentTab}`)
+  }, [router, slug, currentTab, isValidTab, authLoading])
 
   const { data: starshipData } = useStarshipBySlug(slug, true)
 
@@ -51,10 +53,12 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <Icon name="user" className="h-4 w-4" />
                     <span>Profile</span>
                   </TabsTrigger>
-                  <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="activity" className="h-4 w-4" />
-                    <span>Analytics</span>
-                  </TabsTrigger>
+                  {isInstanceAdmin && (
+                    <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
+                      <Icon name="activity" className="h-4 w-4" />
+                      <span>Analytics</span>
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
@@ -74,11 +78,13 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                 </section>
               </TabsContent>
 
-              <TabsContent value="usage">
-                <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
-                  {starshipData?.id && <ShipManagement starshipId={starshipData.id} />}
-                </section>
-              </TabsContent>
+              {isInstanceAdmin && (
+                <TabsContent value="usage">
+                  <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
+                    {starshipData?.id && <ShipManagement starshipId={starshipData.id} />}
+                  </section>
+                </TabsContent>
+              )}
 
               <TabsContent value="billing">
                 <section aria-labelledby="billing-section" className="rounded-xl border border-border/80 bg-background p-6">

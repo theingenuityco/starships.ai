@@ -46,7 +46,7 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
       {/* Full-width: Ledger */}
       {wallet?.id && (
         <div className="lg:col-span-2">
-          <LedgerHistoryTable walletId={wallet.id} view="billing" title="Billing transaction history" />
+          <LedgerHistoryTable walletId={wallet.id} view="full" title="Credit ledger" />
         </div>
       )}
     </div>

@@ -11,17 +11,16 @@ import ShipManagement from '@/components/profile/ShipManagement'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 import AccountForm from '@/components/profile/AccountForm'
-import CreditLedgerSection from '@/components/billing/CreditLedgerSection'
 import { useAuth } from '@/hooks/useAuth'
 
-const ALL_TABS = ['profile', 'usage', 'billing', 'ledger'] as const
+const ALL_TABS = ['profile', 'usage', 'billing'] as const
 type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
   const { isInstanceAdmin, isLoading: authLoading } = useAuth()
-  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'billing', 'ledger'] as const)
+  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'billing'] as const)
   const isValidTab = visibleTabs.includes(tab as TabValue)
   const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'profile'
 
@@ -63,10 +62,6 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
                   </TabsTrigger>
-                  <TabsTrigger value="ledger" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="receipt" className="h-4 w-4" />
-                    <span>Credit Ledger</span>
-                  </TabsTrigger>
                 </TabsList>
               </div>
 
@@ -89,12 +84,6 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               <TabsContent value="billing">
                 <section aria-labelledby="billing-section" className="rounded-xl border border-border/80 bg-background p-6">
                   <StarshipBillingSection starshipId={starshipData?.id} />
-                </section>
-              </TabsContent>
-
-              <TabsContent value="ledger">
-                <section aria-labelledby="ledger-section" className="rounded-xl border border-border/80 bg-background p-6">
-                  <CreditLedgerSection starshipId={starshipData?.id} />
                 </section>
               </TabsContent>
             </Tabs>

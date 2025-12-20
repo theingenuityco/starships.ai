@@ -471,12 +471,12 @@ const MemoizedMessageBubble = memo(
             <div className="flex flex-col gap-2 items-end">
               {/* Attachments outside bubble */}
               {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
-              {/* Message bubble */}
-              <div className={`bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
+              {/* Message bubble (match navigation/sidebar background color) */}
+              <div className={`bg-card text-card-foreground border border-border/40 rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
                 {message.sending && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[hsl(var(--accent))] border-2 border-background rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-[hsl(var(--accent-foreground))] rounded-full animate-pulse" />
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
                   </div>
                 )}
               </div>

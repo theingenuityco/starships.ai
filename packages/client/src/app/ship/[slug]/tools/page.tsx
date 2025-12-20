@@ -61,7 +61,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
                 <Breadcrumb>
                   <BreadcrumbList>
                     <BreadcrumbItem>
-                      <BreadcrumbLink href={`/ship/${slug}`} className="font-mono">
+                      <BreadcrumbLink href={`/ship/${slug}/conversations`} className="font-mono">
                         <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
                           {slug}
                         </Badge>
@@ -81,12 +81,11 @@ export default function StarshipToolsPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">Installed tools available to your agents</p>
             </div>
 
-            {/* Tabs header mirrors overview page, but routes per tab */}
+            {/* Route-based tabs */}
             <Tabs
               value="tools"
               onValueChange={value => {
-                if (value === 'ship') router.push(`/ship/${slug}`)
-                else if (value === 'agents') router.push(`/ship/${slug}/agents`)
+                if (value === 'agents') router.push(`/ship/${slug}/agents`)
                 else if (value === 'tools') router.push(`/ship/${slug}/tools`)
                 else if (value === 'schedules') router.push(`/ship/${slug}/schedules`)
               }}
@@ -94,10 +93,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
             >
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
-                  <TabsTrigger value="ship" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="rocket" className="h-4 w-4" />
-                    <span>Ship</span>
-                  </TabsTrigger>
                   <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="head-circuit" className="h-4 w-4" />
                     <span>Agents</span>

@@ -115,7 +115,6 @@ export function Navigation(props: NavigationProps) {
   const routeChecks = useMemo(() => {
     if (!starshipSlug) {
       return {
-        isOverviewRoute: false,
         isSettingsRoute: false,
         isConnectorsRoute: false,
         isAgentsRoute: false,
@@ -126,7 +125,6 @@ export function Navigation(props: NavigationProps) {
       }
     }
     return {
-      isOverviewRoute: pathname === `/ship/${starshipSlug}`,
       isSettingsRoute: pathname.startsWith(`/ship/${starshipSlug}/settings`),
       isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
@@ -137,7 +135,7 @@ export function Navigation(props: NavigationProps) {
     }
   }, [pathname, starshipSlug])
 
-  const { isOverviewRoute, isSettingsRoute, isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
+  const { isSettingsRoute, isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -219,7 +217,6 @@ export function Navigation(props: NavigationProps) {
   const mainNavigationItems = useMemo(
     () => [
       ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
@@ -239,7 +236,6 @@ export function Navigation(props: NavigationProps) {
     [
       isAuthenticated,
       starshipSlug,
-      isOverviewRoute,
       isAgentsRoute,
       isAgentBuilderRoute,
       isToolsRoute,

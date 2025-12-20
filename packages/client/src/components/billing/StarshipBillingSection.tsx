@@ -9,6 +9,7 @@ import PromoRedeemForm from '@/components/billing/PromoRedeemForm'
 import { useWallet, WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export interface StarshipBillingSectionProps {
   starshipId?: string
@@ -29,26 +30,47 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
   }, [searchParams, queryClient, starshipId])
 
   return (
-    <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Left: Overview + Promo (stacked) */}
-      <div className="space-y-4 flex flex-col justify-center">
-        <BillingOverviewCard wallet={wallet} isLoading={isLoading} error={error} />
-        {starshipId && <PromoRedeemForm starshipId={starshipId} />}
+    <div className="mt-4 space-y-4">
+      {/* Compact sections */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Left column: Balance + Promo (stacked) */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">Balance</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <BillingOverviewCard wallet={wallet} isLoading={isLoading} error={error} variant="compact" />
+            </CardContent>
+          </Card>
+
+          {starshipId && (
+            <Card>
+              <CardHeader className="p-4 pb-2">
+                <CardTitle className="text-sm">Promo</CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 pt-0">
+                <PromoRedeemForm starshipId={starshipId} variant="compact" className="border-0 bg-transparent p-0 shadow-none backdrop-blur-0" />
+              </CardContent>
+            </Card>
+          )}
+        </div>
+
+        {/* Right column: Add credits */}
+        {starshipId && (
+          <Card>
+            <CardHeader className="p-4 pb-2">
+              <CardTitle className="text-sm">Add credits</CardTitle>
+            </CardHeader>
+            <CardContent className="p-4 pt-0">
+              <AmountSelector starshipId={starshipId} variant="compact" />
+            </CardContent>
+          </Card>
+        )}
       </div>
 
-      {/* Right: Top-up amounts */}
-      {starshipId && (
-        <div className="space-y-4">
-          <AmountSelector starshipId={starshipId} />
-        </div>
-      )}
-
-      {/* Full-width: Ledger */}
-      {wallet?.id && (
-        <div className="lg:col-span-2">
-          <LedgerHistoryTable walletId={wallet.id} view="full" title="Credit ledger" />
-        </div>
-      )}
+      {/* Ledger */}
+      {wallet?.id && <LedgerHistoryTable walletId={wallet.id} view="full" title="Credit ledger" />}
     </div>
   )
 }

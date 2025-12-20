@@ -5,6 +5,7 @@ import { usePromoRedeem } from '@/hooks/usePromo'
 import { useQueryClient } from '@tanstack/react-query'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 
 type KnownPromoErrorCode = 'PROMO_CODE_INVALID' | 'PROMO_CODE_EXPIRED' | 'PROMO_CODE_EXHAUSTED' | 'RESOURCE_CONFLICT' | 'FORBIDDEN' | 'UNAUTHORIZED'
 
@@ -31,7 +32,15 @@ function mapPromoError(error: any): { code?: KnownPromoErrorCode | string; messa
   }
 }
 
-export default function PromoRedeemForm({ starshipId }: { starshipId: string }) {
+export default function PromoRedeemForm({
+  starshipId,
+  className,
+  variant = 'default',
+}: {
+  starshipId: string
+  className?: string
+  variant?: 'default' | 'compact'
+}) {
   const [code, setCode] = useState('')
   const [errorMsg, setErrorMsg] = useState<string | null>(null)
   const [successMsg, setSuccessMsg] = useState<string | null>(null)
@@ -59,9 +68,15 @@ export default function PromoRedeemForm({ starshipId }: { starshipId: string }) 
   }
 
   return (
-    <div className="rounded-2xl border border-slate-200/60 dark:border-slate-800/60 bg-gradient-to-br from-white/60 to-slate-50/40 dark:from-slate-900/50 dark:to-slate-900/30 backdrop-blur-sm p-5 pb-2 shadow-sm transition">
+    <div
+      className={cn(
+        'border border-slate-200/60 dark:border-slate-800/60 bg-gradient-to-br from-white/60 to-slate-50/40 dark:from-slate-900/50 dark:to-slate-900/30 backdrop-blur-sm shadow-sm transition',
+        variant === 'compact' ? 'rounded-xl p-4 pb-3' : 'rounded-2xl p-5 pb-2',
+        className
+      )}
+    >
       <div className="flex items-start gap-3 mb-4">
-        <div className="w-9 h-9 rounded-xl bg-primary/10 text-primary flex items-center justify-center">
+        <div className={cn('rounded-xl bg-primary/10 text-primary flex items-center justify-center', variant === 'compact' ? 'w-8 h-8' : 'w-9 h-9')}>
           <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <path d="M20 12H4" />
             <path d="M14 6l-6 6 6 6" />

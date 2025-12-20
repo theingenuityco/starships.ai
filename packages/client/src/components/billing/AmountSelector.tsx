@@ -10,12 +10,13 @@ import { useToast } from '@/hooks/useToast'
 export interface AmountSelectorProps {
   starshipId: string
   className?: string
+  variant?: 'default' | 'compact'
 }
 
 const PRESET_AMOUNTS = [5, 10, 20, 30, 50, 100] as const
 const CREDITS_PER_USD = 200
 
-export default function AmountSelector({ starshipId, className = '' }: AmountSelectorProps): React.JSX.Element {
+export default function AmountSelector({ starshipId, className = '', variant = 'default' }: AmountSelectorProps): React.JSX.Element {
   const [selectedAmount, setSelectedAmount] = useState<number>(20)
   const [customAmount, setCustomAmount] = useState<string>('')
   const [useCustom, setUseCustom] = useState<boolean>(false)
@@ -84,38 +85,40 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`${variant === 'compact' ? 'space-y-4' : 'space-y-6'} ${className}`}>
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-3">
-          <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          <h3 className="text-sm font-bold text-primary uppercase tracking-wide">Add Credits</h3>
+      {variant !== 'compact' && (
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-3">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <h3 className="text-sm font-bold text-primary uppercase tracking-wide">Add Credits</h3>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">Choose an amount to add to your wallet</p>
+          {isValidAmount && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              You’ll receive <span className="font-semibold text-slate-900 dark:text-slate-100">{creditsToReceive.toLocaleString()}</span> credits.
+            </p>
+          )}
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">Choose an amount to add to your wallet</p>
-        {isValidAmount && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            You’ll receive <span className="font-semibold text-slate-900 dark:text-slate-100">{creditsToReceive.toLocaleString()}</span> credits.
-          </p>
-        )}
-      </div>
+      )}
 
       {/* Preset amounts - Modern card grid */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className={variant === 'compact' ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-3 gap-3'}>
         {PRESET_AMOUNTS.map(amount => (
           <button
             key={amount}
             onClick={() => handlePresetClick(amount)}
             className={`
-              relative p-4 rounded-xl border-2 transition-all duration-200 group hover:scale-105
+              relative ${variant === 'compact' ? 'p-3' : 'p-4'} rounded-xl border-2 transition-all duration-200 group ${variant === 'compact' ? '' : 'hover:scale-105'}
               ${selectedAmount === amount && !useCustom ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' : 'border-border hover:border-primary/50 hover:bg-accent/50'}
             `}
           >
             <div className="text-center">
               <div
                 className={`
-                text-2xl font-bold transition-colors
+                ${variant === 'compact' ? 'text-xl' : 'text-2xl'} font-bold transition-colors
                 ${selectedAmount === amount && !useCustom ? 'text-primary' : 'text-foreground group-hover:text-primary'}
               `}
               >
@@ -155,7 +158,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
             min="5"
             max="1000"
             step="0.01"
-            className="pl-8 h-12 text-lg font-medium border-2 focus:border-primary transition-colors"
+            className={`pl-8 ${variant === 'compact' ? 'h-10 text-base' : 'h-12 text-lg'} font-medium border-2 focus:border-primary transition-colors`}
           />
         </div>
       </div>
@@ -164,8 +167,8 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
       <Button
         onClick={handleTopup}
         disabled={mutation.isPending || !wallet || !isValidAmount}
-        size="lg"
-        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200"
+        size={variant === 'compact' ? 'default' : 'lg'}
+        className={`w-full ${variant === 'compact' ? 'h-10 text-sm' : 'h-12 text-base'} font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200`}
       >
         {mutation.isPending ? (
           <div className="flex items-center gap-2">
@@ -180,7 +183,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
       </Button>
 
       {/* Stripe redirect message - Elegant styling */}
-      <div className="text-center p-3 bg-muted/30 rounded-lg border border-border/50">
+      <div className={`text-center ${variant === 'compact' ? 'p-2' : 'p-3'} bg-muted/30 rounded-lg border border-border/50`}>
         <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />

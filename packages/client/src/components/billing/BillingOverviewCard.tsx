@@ -10,6 +10,7 @@ interface BillingOverviewCardProps {
   isLoading?: boolean
   error?: unknown
   onRetry?: () => void
+  variant?: 'default' | 'compact'
 }
 
 function formatCredits(n: number): string {
@@ -17,11 +18,12 @@ function formatCredits(n: number): string {
   return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
 }
 
-export default function BillingOverviewCard({ wallet, isLoading, error, onRetry }: BillingOverviewCardProps): React.JSX.Element {
+export default function BillingOverviewCard({ wallet, isLoading, error, onRetry, variant = 'default' }: BillingOverviewCardProps): React.JSX.Element {
   const hasError = !!error
+  const isCompact = variant === 'compact'
 
   return (
-    <div className="flex items-center justify-center p-8">
+    <div className={isCompact ? 'p-4' : 'flex items-center justify-center p-8'}>
       <div className="space-y-4">
         {isLoading ? (
           <div className="flex flex-col items-center gap-4">
@@ -32,7 +34,12 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry 
             <span className="text-slate-600 dark:text-slate-400 font-medium">Loading balance...</span>
           </div>
         ) : hasError ? (
-          <div className="text-center p-8 bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/10 dark:to-red-900/10 border border-red-200/40 dark:border-red-800/20 rounded-3xl backdrop-blur-sm">
+          <div
+            className={
+              (isCompact ? 'text-center p-4 rounded-xl ' : 'text-center p-8 rounded-3xl ') +
+              'bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/10 dark:to-red-900/10 border border-red-200/40 dark:border-red-800/20 backdrop-blur-sm'
+            }
+          >
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100/80 dark:bg-red-900/20 flex items-center justify-center">
               <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -63,13 +70,22 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry 
           <div className="space-y-4">
             {/* Large balance amount display - matches original design */}
             <div className="relative">
-              <div className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
-                {formatCredits(Number(wallet?.balance ?? 0))} credits
-              </div>
+              {isCompact ? (
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="text-2xl font-semibold text-slate-900 dark:text-slate-100 tracking-tight">
+                    {formatCredits(Number(wallet?.balance ?? 0))} <span className="text-sm font-medium text-muted-foreground">credits</span>
+                  </div>
+                  <BalanceStatusIndicator wallet={wallet} showDetails={false} variant="compact" />
+                </div>
+              ) : (
+                <div className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
+                  {formatCredits(Number(wallet?.balance ?? 0))} credits
+                </div>
+              )}
             </div>
 
             {/* Status indicator */}
-            <BalanceStatusIndicator wallet={wallet} showDetails={true} />
+            {!isCompact && <BalanceStatusIndicator wallet={wallet} showDetails={true} />}
           </div>
         )}
       </div>

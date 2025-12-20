@@ -82,7 +82,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               )}
 
               <TabsContent value="billing">
-                <section aria-labelledby="billing-section" className="rounded-xl border border-border/80 bg-background p-6">
+                <section aria-labelledby="billing-section" className="bg-background">
                   <StarshipBillingSection starshipId={starshipData?.id} />
                 </section>
               </TabsContent>

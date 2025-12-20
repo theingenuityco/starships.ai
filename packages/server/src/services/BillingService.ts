@@ -69,7 +69,7 @@ export class BillingService {
       // Idempotency: check if we've already billed this message
       const existingRes = await client.query<{ id: string }>(
         `SELECT id
-           FROM ledger_entries
+           FROM wallet_ledger
           WHERE wallet_id = $1
             AND type = 'USAGE'
             AND (meta ->> 'messageId') = $2

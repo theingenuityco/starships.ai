@@ -15,6 +15,24 @@ export class AttachmentRepository extends BaseRepository {
   }
 
   /**
+   * Count attachments that reference a given S3 key.
+   * Used to safely delete shared S3 objects only when the last reference is removed.
+   */
+  async countByS3Key(s3Key: string): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM attachments WHERE s3_key = $1', [
+          s3Key,
+        ]);
+        return Number(row?.count ?? 0);
+      },
+      'countByS3Key',
+      'Attachment'
+    );
+  }
+
+  /**
    * Create new attachment record
    */
   async create(data: {
@@ -71,10 +89,7 @@ export class AttachmentRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>(
-          'SELECT * FROM attachments WHERE id = $1',
-          [id]
-        );
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM attachments WHERE id = $1', [id]);
         return result ? this.mapToModel(result) : null;
       },
       'findById',
@@ -129,10 +144,7 @@ export class AttachmentRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        await connection.query(
-          'UPDATE attachments SET message_id = $1 WHERE id = $2',
-          [messageId, id]
-        );
+        await connection.query('UPDATE attachments SET message_id = $1 WHERE id = $2', [messageId, id]);
         // If no error was thrown, the update succeeded
         return true;
       },

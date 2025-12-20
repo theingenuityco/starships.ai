@@ -19,6 +19,48 @@ export class AttachmentService {
   }
 
   /**
+   * Create an attachment record that references an existing S3 object.
+   *
+   * This avoids redundant S3 uploads (useful for reusing marketplace/template assets),
+   * but note that delete behavior must be reference-safe (see deleteAttachment()).
+   */
+  async createAttachmentReference(data: {
+    starshipId: string;
+    filename: string;
+    mimeType: string;
+    s3Key: string;
+    sizeBytes?: number;
+    imageWidth?: number;
+    imageHeight?: number;
+  }): Promise<Attachment> {
+    // Validate MIME type
+    if (!ALLOWED_MIME_TYPES.includes(data.mimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
+      throw new Error(`File type '${data.mimeType}' not allowed. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`);
+    }
+
+    const attachment = await this.repository.create({
+      starshipId: data.starshipId,
+      messageId: undefined,
+      filename: data.filename,
+      mimeType: data.mimeType,
+      sizeBytes: data.sizeBytes ?? 0,
+      s3Key: data.s3Key,
+      imageWidth: data.imageWidth,
+      imageHeight: data.imageHeight,
+    });
+
+    return {
+      id: attachment.id,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      imageWidth: attachment.imageWidth,
+      imageHeight: attachment.imageHeight,
+      createdAt: attachment.createdAt,
+    };
+  }
+
+  /**
    * Upload file and create attachment record
    * Returns metadata only (no S3 URL exposed to client)
    */
@@ -35,7 +77,7 @@ export class AttachmentService {
     }
 
     // Validate MIME type
-    if (!ALLOWED_MIME_TYPES.includes(data.mimeType as any)) {
+    if (!ALLOWED_MIME_TYPES.includes(data.mimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
       throw new Error(`File type '${data.mimeType}' not allowed. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`);
     }
 
@@ -230,12 +272,18 @@ export class AttachmentService {
       throw new Error('Unauthorized access to attachment');
     }
 
-    // Delete from S3 first
+    // Safe delete:
+    // Only delete S3 objects that live under the starship attachment prefix.
+    // This prevents us from deleting shared/public objects (e.g. agent template avatars stored under `public/...`)
+    // that may be referenced by an attachment record for convenience.
     try {
-      await deleteFromS3(attachment.s3Key);
+      const isStarshipOwnedObject = attachment.s3Key.startsWith(`starship-${starshipId}/`);
+      if (isStarshipOwnedObject) {
+        await deleteFromS3(attachment.s3Key);
+      }
     } catch (err) {
       console.error('Failed to delete from S3:', err);
-      // Continue with DB deletion even if S3 fails
+      // Continue with DB deletion even if S3 delete fails
     }
 
     // Delete from database

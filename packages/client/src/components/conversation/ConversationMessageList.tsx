@@ -372,16 +372,21 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     <div className="h-full flex flex-col bg-transparent">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="w-full max-w-4xl mx-auto bg-transparent">
-          {renderMessages.map(message => (
-            <MemoizedMessageBubble
-              key={message.id}
-              message={message}
-              agentName={message.agentName || agentName}
-              agentAvatarUrl={agentAvatarUrl}
-              isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-              starshipId={starshipId}
-            />
-          ))}
+          {renderMessages.map((message, idx) => {
+            const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null
+            const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+            return (
+              <MemoizedMessageBubble
+                key={message.id}
+                message={message}
+                agentName={message.agentName || agentName}
+                agentAvatarUrl={agentAvatarUrl}
+                isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                starshipId={starshipId}
+                showAssistantAvatar={showAssistantAvatar}
+              />
+            )
+          })}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
@@ -431,6 +436,7 @@ interface ConversationMessageBubbleProps {
   agentAvatarUrl?: string
   isStreamingActive?: boolean
   starshipId?: string
+  showAssistantAvatar?: boolean
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -478,7 +484,7 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId, showAssistantAvatar = true }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
 
@@ -514,9 +520,13 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-start">
           <div className="flex items-start gap-3 w-full">
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-              <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
-            </div>
+            {showAssistantAvatar ? (
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
+              </div>
+            ) : (
+              <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
+            )}
             <div className="flex-1 w-full">
               <ConversationMessageContent
                 content={message.content}
@@ -548,6 +558,7 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false

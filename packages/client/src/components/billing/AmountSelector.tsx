@@ -4,7 +4,6 @@ import React, { useState } from 'react'
 import { useTopup } from '@/hooks/useTopup'
 import { useWallet } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/useToast'
 import Icon from '@/components/primitives/Icon'
 
@@ -14,21 +13,19 @@ export interface AmountSelectorProps {
   variant?: 'default' | 'compact'
 }
 
-const PRESET_CREDITS = [500, 2000, 5000] as const
+const PRESET_CREDITS = [1000, 2000, 5000] as const
 const CREDITS_PER_USD = 100
 const MIN_USD = 5
 const MAX_CREDITS = 5000
 
 export default function AmountSelector({ starshipId, className = '', variant = 'default' }: AmountSelectorProps): React.JSX.Element {
   const [selectedCredits, setSelectedCredits] = useState<number>(2000)
-  const [customCredits, setCustomCredits] = useState<string>('')
-  const [useCustom, setUseCustom] = useState<boolean>(false)
 
   const mutation = useTopup()
   const { data: wallet } = useWallet(starshipId)
   const { toast } = useToast()
 
-  const currentCredits = useCustom ? Number(customCredits) || 0 : selectedCredits
+  const currentCredits = selectedCredits
   const minCredits = MIN_USD * CREDITS_PER_USD
   const maxCredits = MAX_CREDITS
   const isValidAmount = currentCredits >= minCredits && currentCredits <= maxCredits
@@ -77,16 +74,6 @@ export default function AmountSelector({ starshipId, className = '', variant = '
 
   const handlePresetClick = (credits: number) => {
     setSelectedCredits(credits)
-    setUseCustom(false)
-    setCustomCredits('')
-  }
-
-  const handleCustomChange = (value: string) => {
-    setCustomCredits(value)
-    setUseCustom(true)
-    if (value && Number(value) > 0) {
-      setSelectedCredits(Number(value))
-    }
   }
 
   return (
@@ -112,58 +99,41 @@ export default function AmountSelector({ starshipId, className = '', variant = '
       {/* Preset amounts - Modern card grid */}
       <div className={variant === 'compact' ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-3 gap-3'}>
         {PRESET_CREDITS.map(credits => (
+          (() => {
+            const presetUsd = credits / CREDITS_PER_USD
+            const isSelected = selectedCredits === credits
+            return (
           <button
             key={credits}
             onClick={() => handlePresetClick(credits)}
             className={`
-              relative ${variant === 'compact' ? 'p-3' : 'p-4'} rounded-xl border-2 transition-all duration-200 group ${variant === 'compact' ? '' : 'hover:scale-105'}
-              ${selectedCredits === credits && !useCustom ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' : 'border-border hover:border-primary/50 hover:bg-accent/50'}
+              relative ${variant === 'compact' ? 'p-3' : 'p-6'} rounded-2xl border-2 transition-all duration-200 group ${variant === 'compact' ? '' : 'hover:scale-[1.03]'}
+              ${isSelected ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' : 'border-border hover:border-primary/50 hover:bg-accent/50'}
             `}
           >
             <div className="text-center">
               <div
                 className={`
-                ${variant === 'compact' ? 'text-xl' : 'text-2xl'} font-bold transition-colors
-                ${selectedCredits === credits && !useCustom ? 'text-primary' : 'text-foreground group-hover:text-primary'}
+                ${variant === 'compact' ? 'text-xl' : 'text-3xl'} font-bold transition-colors leading-none
+                ${isSelected ? 'text-primary' : 'text-foreground group-hover:text-primary'}
               `}
               >
                 {credits.toLocaleString()}
               </div>
-              <div className="text-[10px] text-muted-foreground font-medium -mt-0.5">credits</div>
+              <div className="mt-1 text-[11px] text-muted-foreground font-medium">credits</div>
+              <div className="mt-2 text-[12px] font-semibold text-foreground/80">
+                ${presetUsd.toFixed(2)}
+              </div>
             </div>
-            {selectedCredits === credits && !useCustom && (
+            {isSelected && (
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
                 <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
               </div>
             )}
           </button>
+            )
+          })()
         ))}
-      </div>
-
-      {/* Divider */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-3 text-muted-foreground font-medium">Or enter custom credits</span>
-        </div>
-      </div>
-
-      {/* Custom amount input - Modern design */}
-      <div className="space-y-3">
-        <div className="relative">
-          <Input
-            type="number"
-            placeholder={useCustom ? '2000' : String(selectedCredits)}
-            value={useCustom ? customCredits : String(selectedCredits)}
-            onChange={e => handleCustomChange(e.target.value)}
-            min={String(minCredits)}
-            max={String(maxCredits)}
-            step="1"
-            className={`${variant === 'compact' ? 'h-10 text-base' : 'h-12 text-lg'} font-medium border-2 focus:border-primary transition-colors`}
-          />
-        </div>
       </div>
 
       {/* Add Credits button - Premium styling */}
@@ -191,14 +161,6 @@ export default function AmountSelector({ starshipId, className = '', variant = '
         You will be redirected to Stripe to complete your payment
       </p>
 
-      {/* Amount validation message */}
-      {useCustom && customCredits && !isValidAmount && (
-        <div className="text-center p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-xs text-destructive font-medium">
-            Please enter an amount between {minCredits.toLocaleString()} and {maxCredits.toLocaleString()} credits
-          </p>
-        </div>
-      )}
     </div>
   )
 }

@@ -74,7 +74,7 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry,
               {isCompact ? (
                 <div className="text-center space-y-2">
                   <div className="inline-flex items-center justify-center gap-2">
-                    <Icon name="coins" className="h-5 w-5 text-primary" />
+                    <Icon name="coins" className="h-7 w-7 text-primary" />
                     <div className="text-5xl font-bold tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
                       {formatCredits(Number(wallet?.balance ?? 0))}
                     </div>

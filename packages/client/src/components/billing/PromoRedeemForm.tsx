@@ -6,6 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import Icon from '@/components/primitives/Icon'
 
 type KnownPromoErrorCode = 'PROMO_CODE_INVALID' | 'PROMO_CODE_EXPIRED' | 'PROMO_CODE_EXHAUSTED' | 'RESOURCE_CONFLICT' | 'FORBIDDEN' | 'UNAUTHORIZED'
 
@@ -77,10 +78,7 @@ export default function PromoRedeemForm({
     >
       <div className="flex items-start gap-3 mb-4">
         <div className={cn('rounded-xl bg-primary/10 text-primary flex items-center justify-center', variant === 'compact' ? 'w-8 h-8' : 'w-9 h-9')}>
-          <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M20 12H4" />
-            <path d="M14 6l-6 6 6 6" />
-          </svg>
+          <Icon name="tag" className={cn(variant === 'compact' ? 'h-4 w-4' : 'h-5 w-5')} />
         </div>
         <div>
           <div className="text-sm font-semibold text-slate-900 dark:text-slate-100">Have a promo code?</div>

@@ -14,21 +14,25 @@ export interface AmountSelectorProps {
   variant?: 'default' | 'compact'
 }
 
-const PRESET_AMOUNTS = [10, 20, 50] as const
+const PRESET_CREDITS = [500, 2000, 5000] as const
 const CREDITS_PER_USD = 100
+const MIN_USD = 5
+const MAX_CREDITS = 5000
 
 export default function AmountSelector({ starshipId, className = '', variant = 'default' }: AmountSelectorProps): React.JSX.Element {
-  const [selectedAmount, setSelectedAmount] = useState<number>(20)
-  const [customAmount, setCustomAmount] = useState<string>('')
+  const [selectedCredits, setSelectedCredits] = useState<number>(2000)
+  const [customCredits, setCustomCredits] = useState<string>('')
   const [useCustom, setUseCustom] = useState<boolean>(false)
 
   const mutation = useTopup()
   const { data: wallet } = useWallet(starshipId)
   const { toast } = useToast()
 
-  const currentAmount = useCustom ? Number(customAmount) || 0 : selectedAmount
-  const isValidAmount = currentAmount >= 5 && currentAmount <= 1000
-  const creditsToReceive = Math.round(Math.max(0, currentAmount) * CREDITS_PER_USD)
+  const currentCredits = useCustom ? Number(customCredits) || 0 : selectedCredits
+  const minCredits = MIN_USD * CREDITS_PER_USD
+  const maxCredits = MAX_CREDITS
+  const isValidAmount = currentCredits >= minCredits && currentCredits <= maxCredits
+  const amountUsd = parseFloat((Math.max(0, currentCredits) / CREDITS_PER_USD).toFixed(2))
 
   const handleTopup = async () => {
     if (!wallet) {
@@ -43,7 +47,7 @@ export default function AmountSelector({ starshipId, className = '', variant = '
     if (!isValidAmount) {
       toast({
         title: 'Invalid Amount',
-        description: 'Please enter a valid amount between $5 and $1000.',
+        description: `Please enter a valid amount between ${minCredits.toLocaleString()} and ${maxCredits.toLocaleString()} credits.`,
         variant: 'destructive',
       })
       return
@@ -52,7 +56,7 @@ export default function AmountSelector({ starshipId, className = '', variant = '
     try {
       const result = await mutation.mutateAsync({
         starshipId,
-        amountUsd: currentAmount,
+        amountUsd,
         walletId: wallet.id,
       })
 
@@ -71,17 +75,17 @@ export default function AmountSelector({ starshipId, className = '', variant = '
     }
   }
 
-  const handlePresetClick = (amount: number) => {
-    setSelectedAmount(amount)
+  const handlePresetClick = (credits: number) => {
+    setSelectedCredits(credits)
     setUseCustom(false)
-    setCustomAmount('')
+    setCustomCredits('')
   }
 
   const handleCustomChange = (value: string) => {
-    setCustomAmount(value)
+    setCustomCredits(value)
     setUseCustom(true)
     if (value && Number(value) > 0) {
-      setSelectedAmount(Number(value))
+      setSelectedCredits(Number(value))
     }
   }
 
@@ -96,10 +100,10 @@ export default function AmountSelector({ starshipId, className = '', variant = '
             </svg>
             <h3 className="text-sm font-bold text-primary uppercase tracking-wide">Add Credits</h3>
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">Choose an amount to add to your wallet</p>
+          <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">Choose how many credits to buy</p>
           {isValidAmount && (
             <p className="mt-2 text-xs text-muted-foreground">
-              You’ll receive <span className="font-semibold text-slate-900 dark:text-slate-100">{creditsToReceive.toLocaleString()}</span> credits.
+              You’ll pay <span className="font-semibold text-slate-900 dark:text-slate-100">${amountUsd.toFixed(2)}</span>.
             </p>
           )}
         </div>
@@ -107,26 +111,27 @@ export default function AmountSelector({ starshipId, className = '', variant = '
 
       {/* Preset amounts - Modern card grid */}
       <div className={variant === 'compact' ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-3 gap-3'}>
-        {PRESET_AMOUNTS.map(amount => (
+        {PRESET_CREDITS.map(credits => (
           <button
-            key={amount}
-            onClick={() => handlePresetClick(amount)}
+            key={credits}
+            onClick={() => handlePresetClick(credits)}
             className={`
               relative ${variant === 'compact' ? 'p-3' : 'p-4'} rounded-xl border-2 transition-all duration-200 group ${variant === 'compact' ? '' : 'hover:scale-105'}
-              ${selectedAmount === amount && !useCustom ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' : 'border-border hover:border-primary/50 hover:bg-accent/50'}
+              ${selectedCredits === credits && !useCustom ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' : 'border-border hover:border-primary/50 hover:bg-accent/50'}
             `}
           >
             <div className="text-center">
               <div
                 className={`
                 ${variant === 'compact' ? 'text-xl' : 'text-2xl'} font-bold transition-colors
-                ${selectedAmount === amount && !useCustom ? 'text-primary' : 'text-foreground group-hover:text-primary'}
+                ${selectedCredits === credits && !useCustom ? 'text-primary' : 'text-foreground group-hover:text-primary'}
               `}
               >
-                ${amount}
+                {credits.toLocaleString()}
               </div>
+              <div className="text-[10px] text-muted-foreground font-medium -mt-0.5">credits</div>
             </div>
-            {selectedAmount === amount && !useCustom && (
+            {selectedCredits === credits && !useCustom && (
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
                 <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
               </div>
@@ -141,25 +146,22 @@ export default function AmountSelector({ starshipId, className = '', variant = '
           <span className="w-full border-t border-border" />
         </div>
         <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-3 text-muted-foreground font-medium">Or enter custom amount</span>
+          <span className="bg-background px-3 text-muted-foreground font-medium">Or enter custom credits</span>
         </div>
       </div>
 
       {/* Custom amount input - Modern design */}
       <div className="space-y-3">
         <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <span className="text-muted-foreground font-medium">$</span>
-          </div>
           <Input
             type="number"
-            placeholder={useCustom ? '20.00' : selectedAmount.toFixed(2)}
-            value={useCustom ? customAmount : selectedAmount.toFixed(2)}
+            placeholder={useCustom ? '2000' : String(selectedCredits)}
+            value={useCustom ? customCredits : String(selectedCredits)}
             onChange={e => handleCustomChange(e.target.value)}
-            min="5"
-            max="1000"
-            step="0.01"
-            className={`pl-8 ${variant === 'compact' ? 'h-10 text-base' : 'h-12 text-lg'} font-medium border-2 focus:border-primary transition-colors`}
+            min={String(minCredits)}
+            max={String(maxCredits)}
+            step="1"
+            className={`${variant === 'compact' ? 'h-10 text-base' : 'h-12 text-lg'} font-medium border-2 focus:border-primary transition-colors`}
           />
         </div>
       </div>
@@ -177,7 +179,7 @@ export default function AmountSelector({ starshipId, className = '', variant = '
             Processing...
           </div>
         ) : isValidAmount ? (
-          `Buy ${creditsToReceive.toLocaleString()} credits ($${currentAmount.toFixed(2)})`
+          `Buy ${Math.round(currentCredits).toLocaleString()} credits ($${amountUsd.toFixed(2)})`
         ) : (
           'Buy credits'
         )}
@@ -190,9 +192,11 @@ export default function AmountSelector({ starshipId, className = '', variant = '
       </p>
 
       {/* Amount validation message */}
-      {useCustom && customAmount && !isValidAmount && (
+      {useCustom && customCredits && !isValidAmount && (
         <div className="text-center p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-xs text-destructive font-medium">Please enter an amount between $5 and $1000</p>
+          <p className="text-xs text-destructive font-medium">
+            Please enter an amount between {minCredits.toLocaleString()} and {maxCredits.toLocaleString()} credits
+          </p>
         </div>
       )}
     </div>

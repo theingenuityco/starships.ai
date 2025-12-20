@@ -82,7 +82,9 @@ export class AgentTemplateService {
     await this.validateAgentLimit(starshipId);
 
     // Get the template to use as a base
-    const template = await this.templateRepository.findById(templateId);
+    // Important: use INTERNAL template fetch so we retain blueprint/state/systemPrompt.
+    // Public findById() intentionally strips these fields for marketplace/client consumption.
+    const template = await this.templateRepository.findInternalById(templateId);
     if (!template) {
       throw new NotFoundError('Template', templateId);
     }

@@ -9,7 +9,7 @@ import * as Sentry from '@sentry/node';
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection, migrationRunner } from '@starships/models';
+import { createConnection, migrationRunner, seedUpdateDeployedInstances } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -150,6 +150,10 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
+
+    // Version flow: sync deployed instances to latest DB templates.
+    // (Intentionally idempotent and should not block startup on failure.)
+    await seedUpdateDeployedInstances();
   } catch (error) {
     console.error('❌ Failed to initialize database:', error);
     process.exit(1);

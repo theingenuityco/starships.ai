@@ -421,6 +421,44 @@ export class AgentRepository extends BaseRepository {
         const result = await this.createEntity<Record<string, unknown>>('agents', toDatabase(agentEntity));
         const agent = fromDatabase(AgentEntity, result);
 
+        // Avatar propagation on create:
+        // If the template has a public avatar stored (avatar_s3_key), create an attachment reference
+        // owned by this starship and link it on the newly created agent.
+        //
+        // This covers initial deployments (e.g. starship creation) where updateFromTemplate() is not called.
+        try {
+          const storage = await templateRepository.getAvatarStorageById(templateId);
+          if (storage?.avatarS3Key) {
+            const mimeType = storage.avatarMimeType || 'image/png';
+            const extForMime = (mt: string): string => {
+              if (mt.includes('png')) return 'png';
+              if (mt.includes('jpeg') || mt.includes('jpg')) return 'jpg';
+              if (mt.includes('webp')) return 'webp';
+              if (mt.includes('gif')) return 'gif';
+              return 'img';
+            };
+            const filename = `template-avatar__${templateId}__${agent.id}.${extForMime(mimeType)}`;
+
+            const attachmentRepo = new AttachmentRepository();
+            const created = await attachmentRepo.create({
+              starshipId,
+              messageId: undefined,
+              filename,
+              mimeType,
+              sizeBytes: 0,
+              s3Key: storage.avatarS3Key,
+            });
+
+            const updatedWithAvatar = await this.update(agent.id, { avatarAttachmentId: created.id });
+            if (updatedWithAvatar) {
+              // Return the hydrated/updated agent with avatarAttachmentId set
+              return updatedWithAvatar;
+            }
+          }
+        } catch {
+          // Best-effort: do not fail agent creation if avatar propagation fails.
+        }
+
         // Increment template usage count
         const connection = this.getConnection();
         await connection.query('UPDATE agent_templates SET usage_count = usage_count + 1, updated_at = NOW() WHERE id = $1', [templateId]);

@@ -69,7 +69,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     return (
       <div className={centerInContainer ? 'flex items-center justify-center' : 'flex justify-start -ml-0.5'}>
         <div
-          className={`relative transition-all duration-300 rounded-full ${isInteractive ? 'cursor-pointer' : 'cursor-default'}`}
+          className={`relative transition-all duration-300 rounded-full ${isInteractive ? 'cursor-pointer' : 'cursor-inherit'}`}
           role={isInteractive ? 'button' : undefined}
           aria-label={isInteractive ? 'Open user menu' : undefined}
           tabIndex={isInteractive ? 0 : -1}

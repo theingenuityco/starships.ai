@@ -3,9 +3,9 @@
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { UserProfile } from '@/components/auth/UserProfile'
 import Icon from '@/components/primitives/Icon'
-import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useAuth } from '@/hooks/useAuth'
 import { useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
@@ -75,44 +75,30 @@ export function TopRightUserProfile(): React.JSX.Element | null {
     'group relative rounded-lg flex items-center w-full h-8 px-2 text-[13px] font-medium border border-transparent cursor-pointer text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted'
   const navMenuItemIconClassName = 'w-4 h-4'
 
+  const topRightControlClassName =
+    'cursor-pointer rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background'
+
   if (!isAuthenticated) return null
 
   return (
     <div className="fixed top-4 right-4 z-[60]">
       <div className="flex items-center gap-3">
-        <Badge
-          variant="outline"
-          role="link"
-          tabIndex={0}
-          aria-label="Go to billing"
-          onClick={handleBillingClick}
-          onKeyDown={e => {
-            if (e.key === 'Enter' || e.key === ' ') {
-              e.preventDefault()
-              handleBillingClick()
-            }
-          }}
-          className="flex items-center gap-2 px-3 py-1 transition-all duration-200 min-w-0 rounded-full text-muted-foreground cursor-pointer hover:bg-muted/40"
-        >
+        <Button type="button" variant="ghost" size="sm" aria-label="Go to billing" onClick={handleBillingClick} className={`${topRightControlClassName} h-9 px-3`}>
           <Icon name="coins" className="w-4 h-4" />
           <span className="min-w-0">
             <BalanceStatusIndicator valueClassName="text-xs" wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
           </span>
-        </Badge>
+        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              aria-label="Open user menu"
-              className="rounded-full transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-            >
+            <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${topRightControlClassName} h-9 w-9`}>
               <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
-            </button>
+            </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-xl bg-background/95 backdrop-blur-sm border border-border/50 shadow-lg">
             <DropdownMenuLabel className="px-2 py-2 font-normal">
-              <div className="flex items-center gap-2.5">
-                <Avatar className="h-8 w-8 rounded-full ring-1 ring-border/40">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40">
                   {isImageUrl(userAvatar) ? (
                     <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
                   ) : null}
@@ -123,7 +109,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
                 <div className="min-w-0">
                   <div className="text-sm font-medium leading-tight truncate text-foreground">{userName || userEmail || 'Account'}</div>
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground leading-tight min-w-0">
-                    <StarshipsLogo width={12} height={12} className="text-muted-foreground flex-shrink-0" />
+                    <StarshipsLogo width={14} height={14} className="flex-shrink-0" idleLoop={false} />
                     <span className="truncate">{activeStarshipName || 'No starship selected'}</span>
                   </div>
                 </div>

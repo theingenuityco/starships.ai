@@ -50,11 +50,11 @@ function CompactConversationAgents({ conversationId, starshipId }: { conversatio
   if (!agents.length) return null
 
   return (
-    <div className="mt-1 flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-foreground">
+    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-foreground">
       {visibleAgents.map(agent => (
-        <div key={agent.id ?? agent.slug ?? agent.name} className="flex items-center gap-1 max-w-[6.5rem]">
-          <Avatar className="h-4 w-4 ring-1 ring-border/40">
-            <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={16} />
+        <div key={agent.id ?? agent.slug ?? agent.name} className="flex items-center gap-1 max-w-[6rem]">
+          <Avatar className="h-3.5 w-3.5 ring-1 ring-border/40">
+            <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={14} />
           </Avatar>
           <span className="truncate">{agent.name}</span>
         </div>
@@ -138,13 +138,13 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       <div
         key={conversation.id}
         className={cn(
-          'group flex items-center gap-2 py-2 pl-2.5 pr-2 rounded-lg transition-colors text-xs relative border cursor-pointer',
+          'group flex items-center gap-1.5 py-1.5 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
           isActive ? 'text-primary bg-primary/10 border-primary/30' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted hover:border-muted'
         )}
-        style={isChild ? { paddingLeft: '1.75rem' } : undefined}
+        style={isChild ? { paddingLeft: '1.5rem' } : undefined}
       >
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-          <p className={cn('text-xs font-medium truncate', isActive && 'text-primary')}>{title}</p>
+          <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{title}</p>
           <CompactConversationAgents conversationId={conversation.id} starshipId={starshipId} />
         </div>
         {/* Delete button - appears on hover */}
@@ -155,7 +155,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                 <Button
                   variant="ghost"
                   size="sm"
-                  className="h-6 w-6 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={e => {
                     e.preventDefault()
                     e.stopPropagation()
@@ -198,9 +198,9 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   if (compact) {
     if (isLoading) {
       return (
-        <div className="space-y-2">
+        <div className="space-y-1">
           {[1, 2, 3].map(i => (
-            <Skeleton key={i} className="h-10 w-full rounded-lg" />
+            <Skeleton key={i} className="h-8 w-full rounded-lg" />
           ))}
         </div>
       )
@@ -215,9 +215,9 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     }
 
     return (
-      <div className="space-y-0.5">
+      <div className="space-y-0">
         {filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 px-2">
+          <div className="flex flex-col items-center justify-center py-6 px-2">
             <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
             <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
           </div>

@@ -293,17 +293,17 @@ export function Navigation(props: NavigationProps) {
           {/* Header – logo, brand, and collapse toggle */}
           <div className="px-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
             <div
-              className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0"
+              className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
               title={isMobile ? undefined : isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : isExpanded ? 'w-resize' : 'e-resize' }}
             >
               {/* Match the nav icon column width so the logo aligns with item icons */}
-              <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.25rem', height: '1.25rem' }}>
+              <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
                 {isExpanded || isCollapsing || !isHovered ? (
                   <StarshipsLogo
-                    width={16}
-                    height={16}
+                    width={20}
+                    height={20}
                     className=""
                     gradientId="nav-gradient"
                     animationDelay={1}
@@ -313,7 +313,7 @@ export function Navigation(props: NavigationProps) {
                     playOnMountOnce={false}
                   />
                 ) : (
-                  <Icon name="sidebar" className="w-4 h-4" />
+                  <Icon name="sidebar" className="w-5 h-5" />
                 )}
               </div>
               {isExpanded && (
@@ -378,7 +378,7 @@ export function Navigation(props: NavigationProps) {
               paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.5rem',
             }}
           >
-            <div className="flex flex-col space-y-0.5 w-full px-2">
+            <div className="flex flex-col space-y-0 w-full px-2">
               <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
             </div>
           </div>
@@ -406,11 +406,11 @@ export function Navigation(props: NavigationProps) {
                   >
                     <Icon name="history" className="w-4 h-4" />
                   </div>
-                  <span className="text-[12px] font-medium">Recents</span>
+                  <span className="text-[13px] font-medium">Recents</span>
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="pb-2 space-y-0.5">
+                <div className="pb-2 space-y-0">
                   <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
                 </div>
               </div>
@@ -423,7 +423,7 @@ export function Navigation(props: NavigationProps) {
           {/* Theme toggle above profile section - styled like a nav item (expanded only) */}
           {isExpanded && (
             <div className="flex-shrink-0 px-2 pb-1">
-              <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-7 px-2 text-xs transition-colors">
+              <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 px-2 text-xs transition-colors">
                 <span className="font-medium">Appearance</span>
                 <ThemeToggle />
               </div>

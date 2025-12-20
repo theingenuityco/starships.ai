@@ -374,9 +374,6 @@ export function Navigation(props: NavigationProps) {
           {/* Conversation History List - Recents - only when expanded and data is available */}
           {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
             <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col px-2">
-              {/* Divider above Recents - make more visible */}
-              <div className="w-full border-t border-border my-2" />
-
               {/* Recents header - styled to match nav items (icon + label spacing) */}
               <div className="w-full">
                 <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-1.5" style={{ justifyContent: 'flex-start' }}>

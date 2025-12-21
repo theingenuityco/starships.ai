@@ -578,16 +578,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     }, [selectedAgent])
 
     const getPlaceholder = () => {
-      // Placeholders are only shown before a conversation exists (starter state).
-      // Once a real conversationId is present (first message sent), we hide the
-      // placeholder for all subsequent forms/states.
-      if (conversationId) return ''
-
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      if (!promptAgent) return 'Select an agent, then give instructions'
-      return `Ask ${promptAgent.name}... (Shift+Enter for new line)`
+      if (!promptAgent) return 'Select an agent, then type a message'
+      // Show placeholder even after the conversation has started.
+      return conversationId ? `Message ${promptAgent.name}... (Shift+Enter for new line)` : `Ask ${promptAgent.name}... (Shift+Enter for new line)`
     }
 
     // Track if there's actual content beyond just the mention and space
@@ -1294,6 +1290,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     return (
       <div className="relative opacity-100">
+        <PlaceholderStyles />
         {/* Context Limit Progress Indicator - Show when context limit is active and usage > 50% */}
         {hardLimitActive && contextUsagePercent > 50 && !minimal && (
           <div className="mb-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/40">

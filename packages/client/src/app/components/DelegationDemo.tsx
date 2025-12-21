@@ -566,13 +566,11 @@ export default function DelegationDemo() {
     }
   }, [demoByConvo, respondingByConvo, awaitingToolsByConvo])
 
+  const isGaiaActive = activeDemoConvoId === 'gaia'
+  const isDaedalusActive = activeDemoConvoId === 'daedalus'
+
   return (
     <div ref={containerRef} className="relative isolate w-full overflow-visible text-left">
-      {/* Subtle glow layer around the frame (intentionally mild) */}
-      <div className="absolute inset-0 -z-10 rounded-2xl video-glow opacity-25 pointer-events-none" aria-hidden />
-      {/* Soft blur border (kept faint so it doesn't read as a neon outline) */}
-      <div className="absolute inset-0 -z-10 rounded-2xl video-blur-border opacity-25 pointer-events-none" aria-hidden />
-
       {/* Connector paths (desktop only; mobile stacks windows) */}
       <svg
         className="hidden md:block absolute inset-0 pointer-events-none"
@@ -582,124 +580,178 @@ export default function DelegationDemo() {
         preserveAspectRatio="none"
         aria-hidden
       >
-        {paths.toGaia ? <path d={paths.toGaia} className="delegation-edge" /> : null}
-        {paths.toDaedalus ? <path d={paths.toDaedalus} className="delegation-edge" /> : null}
+        {paths.toGaia ? <path d={paths.toGaia} className={['delegation-edge', isGaiaActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
+        {paths.toDaedalus ? <path d={paths.toDaedalus} className={['delegation-edge', isDaedalusActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
       </svg>
 
       <div className="relative z-10">
-        <div className="flex flex-col md:flex-row gap-6">
+        <div className="flex flex-col md:flex-row gap-6 md:gap-20 lg:gap-24 xl:gap-28">
           {/* Left: Aria main chat */}
-          <div ref={leftRef} className="md:w-[54%]">
-            <div
-              className={[
-                'relative rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
-                activeDemoConvoId === 'main' ? 'border-primary/35' : 'border-border/40',
-              ].join(' ')}
-            >
-              <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.main.label}</div>
-                    <div className="mt-1 text-xs text-muted-foreground truncate">Delegator conversation</div>
-                  </div>
-                  {activeDemoConvoId === 'main' ? (
-                    <div className="text-[11px] px-2 py-0.5 rounded-full border border-primary/30 text-primary/90 bg-primary/10">active</div>
-                  ) : null}
-                </div>
-              </div>
-              <div className="h-[480px] sm:h-[540px] md:h-[600px] flex flex-col">
-                <div className="flex-1 overflow-hidden">
-                  <ConversationMessageList
-                    conversationId={null}
-                    messagesOverride={(demoByConvo.main || []) as any}
-                    agentNameOverride={DEMO_CONVERSATIONS.main.leftAgentName}
-                    isRespondingOverride={(respondingByConvo.main || false) || (awaitingToolsByConvo.main || false)}
-                    isAssistantStreamingOverride={respondingByConvo.main || false}
-                    isAwaitingToolResultsOverride={awaitingToolsByConvo.main || false}
-                    bottomPaddingPx={140}
-                    userNameOverride="You"
-                    userAvatarSeedOverride="You"
-                  />
-                </div>
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
-              </div>
-            </div>
-          </div>
-
-          {/* Right: two delegated chats */}
-          <div className="md:w-[46%] flex flex-col gap-6">
-            {/* Top: Gaia */}
-            <div ref={rightTopRef}>
+          <div ref={leftRef} className="md:w-[48%]">
+            <div className="relative isolate overflow-visible">
+              {/* Glow per-window (only when active) */}
               <div
                 className={[
-                  'relative rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
-                  activeDemoConvoId === 'gaia' ? 'border-primary/35' : 'border-border/40',
+                  'absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500',
+                  activeDemoConvoId === 'main' ? 'opacity-70' : 'opacity-0',
+                ].join(' ')}
+                aria-hidden
+              />
+              <div
+                className={[
+                  'absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500',
+                  activeDemoConvoId === 'main' ? 'opacity-55' : 'opacity-0',
+                ].join(' ')}
+                aria-hidden
+              />
+
+              <div
+                className={[
+                  'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
+                  activeDemoConvoId === 'main' ? 'border-amber-400/35' : 'border-border/40',
                 ].join(' ')}
               >
                 <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.gaia.label}</div>
-                      <div className="mt-1 text-xs text-muted-foreground truncate">Agent creation</div>
+                      <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.main.label}</div>
+                      <div className="mt-1 text-xs text-muted-foreground truncate">Delegator conversation</div>
                     </div>
-                    {activeDemoConvoId === 'gaia' ? (
-                      <div className="text-[11px] px-2 py-0.5 rounded-full border border-primary/30 text-primary/90 bg-primary/10">active</div>
+                    {activeDemoConvoId === 'main' ? (
+                      <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>
                     ) : null}
                   </div>
                 </div>
-                <div className="h-[360px] md:h-[305px] flex flex-col">
+                <div className="h-[480px] sm:h-[540px] md:h-[600px] flex flex-col">
                   <div className="flex-1 overflow-hidden">
                     <ConversationMessageList
                       conversationId={null}
-                      messagesOverride={(demoByConvo.gaia || []) as any}
-                      agentNameOverride={DEMO_CONVERSATIONS.gaia.leftAgentName}
-                      isRespondingOverride={(respondingByConvo.gaia || false) || (awaitingToolsByConvo.gaia || false)}
-                      isAssistantStreamingOverride={respondingByConvo.gaia || false}
-                      isAwaitingToolResultsOverride={awaitingToolsByConvo.gaia || false}
-                      bottomPaddingPx={90}
-                      userNameOverride={DEMO_CONVERSATIONS.gaia.rightUserLabel}
-                      userAvatarSeedOverride={DEMO_CONVERSATIONS.gaia.rightUserSeed}
+                      messagesOverride={(demoByConvo.main || []) as any}
+                      agentNameOverride={DEMO_CONVERSATIONS.main.leftAgentName}
+                      isRespondingOverride={(respondingByConvo.main || false) || (awaitingToolsByConvo.main || false)}
+                      isAssistantStreamingOverride={respondingByConvo.main || false}
+                      isAwaitingToolResultsOverride={awaitingToolsByConvo.main || false}
+                      bottomPaddingPx={140}
+                      userNameOverride="You"
+                      userAvatarSeedOverride="You"
                     />
                   </div>
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Right: two delegated chats */}
+          <div className="md:w-[52%] flex flex-col gap-8 md:gap-10">
+            {/* Top: Gaia */}
+            <div ref={rightTopRef}>
+              <div className="relative isolate overflow-visible">
+                {/* Glow per-window (only when active) */}
+                <div
+                  className={[
+                    'absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500',
+                    activeDemoConvoId === 'gaia' ? 'opacity-70' : 'opacity-0',
+                  ].join(' ')}
+                  aria-hidden
+                />
+                <div
+                  className={[
+                    'absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500',
+                    activeDemoConvoId === 'gaia' ? 'opacity-55' : 'opacity-0',
+                  ].join(' ')}
+                  aria-hidden
+                />
+
+                <div
+                  className={[
+                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
+                    activeDemoConvoId === 'gaia' ? 'border-amber-400/35' : 'border-border/40',
+                  ].join(' ')}
+                >
+                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.gaia.label}</div>
+                        <div className="mt-1 text-xs text-muted-foreground truncate">Agent creation</div>
+                      </div>
+                      {activeDemoConvoId === 'gaia' ? (
+                        <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>
+                      ) : null}
+                    </div>
+                  </div>
+                  <div className="h-[360px] md:h-[305px] flex flex-col">
+                    <div className="flex-1 overflow-hidden">
+                      <ConversationMessageList
+                        conversationId={null}
+                        messagesOverride={(demoByConvo.gaia || []) as any}
+                        agentNameOverride={DEMO_CONVERSATIONS.gaia.leftAgentName}
+                        isRespondingOverride={(respondingByConvo.gaia || false) || (awaitingToolsByConvo.gaia || false)}
+                        isAssistantStreamingOverride={respondingByConvo.gaia || false}
+                        isAwaitingToolResultsOverride={awaitingToolsByConvo.gaia || false}
+                        bottomPaddingPx={90}
+                        userNameOverride={DEMO_CONVERSATIONS.gaia.rightUserLabel}
+                        userAvatarSeedOverride={DEMO_CONVERSATIONS.gaia.rightUserSeed}
+                      />
+                    </div>
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
+                  </div>
                 </div>
               </div>
             </div>
 
             {/* Bottom: Daedalus */}
             <div ref={rightBottomRef}>
-              <div
-                className={[
-                  'relative rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
-                  activeDemoConvoId === 'daedalus' ? 'border-primary/35' : 'border-border/40',
-                ].join(' ')}
-              >
-                <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.daedalus.label}</div>
-                      <div className="mt-1 text-xs text-muted-foreground truncate">Tool creation</div>
+              <div className="relative isolate overflow-visible">
+                {/* Glow per-window (only when active) */}
+                <div
+                  className={[
+                    'absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500',
+                    activeDemoConvoId === 'daedalus' ? 'opacity-70' : 'opacity-0',
+                  ].join(' ')}
+                  aria-hidden
+                />
+                <div
+                  className={[
+                    'absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500',
+                    activeDemoConvoId === 'daedalus' ? 'opacity-55' : 'opacity-0',
+                  ].join(' ')}
+                  aria-hidden
+                />
+
+                <div
+                  className={[
+                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
+                    activeDemoConvoId === 'daedalus' ? 'border-amber-400/35' : 'border-border/40',
+                  ].join(' ')}
+                >
+                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.daedalus.label}</div>
+                        <div className="mt-1 text-xs text-muted-foreground truncate">Tool creation</div>
+                      </div>
+                      {activeDemoConvoId === 'daedalus' ? (
+                        <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>
+                      ) : null}
                     </div>
-                    {activeDemoConvoId === 'daedalus' ? (
-                      <div className="text-[11px] px-2 py-0.5 rounded-full border border-primary/30 text-primary/90 bg-primary/10">active</div>
-                    ) : null}
                   </div>
-                </div>
-                <div className="h-[360px] md:h-[305px] flex flex-col">
-                  <div className="flex-1 overflow-hidden">
-                    <ConversationMessageList
-                      conversationId={null}
-                      messagesOverride={(demoByConvo.daedalus || []) as any}
-                      agentNameOverride={DEMO_CONVERSATIONS.daedalus.leftAgentName}
-                      isRespondingOverride={(respondingByConvo.daedalus || false) || (awaitingToolsByConvo.daedalus || false)}
-                      isAssistantStreamingOverride={respondingByConvo.daedalus || false}
-                      isAwaitingToolResultsOverride={awaitingToolsByConvo.daedalus || false}
-                      bottomPaddingPx={90}
-                      userNameOverride={DEMO_CONVERSATIONS.daedalus.rightUserLabel}
-                      userAvatarSeedOverride={DEMO_CONVERSATIONS.daedalus.rightUserSeed}
-                    />
+                  <div className="h-[360px] md:h-[305px] flex flex-col">
+                    <div className="flex-1 overflow-hidden">
+                      <ConversationMessageList
+                        conversationId={null}
+                        messagesOverride={(demoByConvo.daedalus || []) as any}
+                        agentNameOverride={DEMO_CONVERSATIONS.daedalus.leftAgentName}
+                        isRespondingOverride={(respondingByConvo.daedalus || false) || (awaitingToolsByConvo.daedalus || false)}
+                        isAssistantStreamingOverride={respondingByConvo.daedalus || false}
+                        isAwaitingToolResultsOverride={awaitingToolsByConvo.daedalus || false}
+                        bottomPaddingPx={90}
+                        userNameOverride={DEMO_CONVERSATIONS.daedalus.rightUserLabel}
+                        userAvatarSeedOverride={DEMO_CONVERSATIONS.daedalus.rightUserSeed}
+                      />
+                    </div>
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
                   </div>
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
                 </div>
               </div>
             </div>
@@ -708,11 +760,44 @@ export default function DelegationDemo() {
       </div>
 
       <style jsx>{`
+        .delegation-active-glow::before {
+          content: '';
+          position: absolute;
+          inset: -14px;
+          border-radius: inherit;
+          /* Match the landing "video-glow" multicolor pattern, but tighter so it doesn't bleed into neighbors. */
+          background: conic-gradient(
+            from 0deg at 50% 50%,
+            rgba(99, 102, 241, 0.85),
+            rgba(217, 70, 239, 0.85),
+            rgba(245, 158, 11, 0.75),
+            rgba(99, 102, 241, 0.85)
+          );
+          filter: blur(32px);
+          opacity: 1;
+          pointer-events: none;
+        }
+
+        .delegation-active-border::before {
+          content: '';
+          position: absolute;
+          inset: 0;
+          border-radius: inherit;
+          border: 3px solid rgba(255, 255, 255, 0.30);
+          filter: blur(8px);
+          opacity: 1;
+          pointer-events: none;
+        }
+
         .delegation-edge {
           fill: none;
-          stroke: rgba(168, 85, 247, 0.55);
+          stroke: rgba(245, 158, 11, 0.28);
           stroke-width: 2.2px;
           stroke-linecap: round;
+        }
+        .delegation-edge--active {
+          stroke: rgba(245, 158, 11, 0.85);
+          stroke-width: 2.4px;
           stroke-dasharray: 6 10;
           animation: delegationEdgeDash 1.8s linear infinite;
         }
@@ -723,7 +808,8 @@ export default function DelegationDemo() {
         }
 
         @media (prefers-reduced-motion: reduce) {
-          .delegation-edge {
+          .delegation-edge,
+          .delegation-edge--active {
             animation: none !important;
           }
         }

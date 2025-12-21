@@ -611,11 +611,15 @@ export default function DelegationDemo() {
                   activeDemoConvoId === 'main' ? 'border-amber-300/55' : 'border-white/20',
                 ].join(' ')}
               >
-                <div className="px-4 sm:px-6 py-4 border-b border-white/15 bg-background">
+                <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.main.label}</div>
-                      <div className="mt-1 text-xs text-muted-foreground truncate">Delegator conversation</div>
+                      <div className="mt-1 flex items-center gap-2 min-w-0">
+                        <div className="text-xs text-muted-foreground truncate">
+                          {DEMO_CONVERSATIONS.main.leftAgentName}, {DEMO_CONVERSATIONS.main.rightUserLabel} · Delegator conversation
+                        </div>
+                      </div>
                     </div>
                     {activeDemoConvoId === 'main' ? (
                       <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>
@@ -669,11 +673,15 @@ export default function DelegationDemo() {
                     activeDemoConvoId === 'gaia' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
-                  <div className="px-4 sm:px-6 py-4 border-b border-white/15 bg-background">
+                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.gaia.label}</div>
-                        <div className="mt-1 text-xs text-muted-foreground truncate">Agent creation</div>
+                        <div className="mt-1 flex items-center gap-2 min-w-0">
+                          <div className="text-xs text-muted-foreground truncate">
+                            {DEMO_CONVERSATIONS.gaia.leftAgentName}, {DEMO_CONVERSATIONS.gaia.rightUserLabel} · Agent creation
+                          </div>
+                        </div>
                       </div>
                       {activeDemoConvoId === 'gaia' ? (
                         <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>
@@ -725,11 +733,15 @@ export default function DelegationDemo() {
                     activeDemoConvoId === 'daedalus' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
-                  <div className="px-4 sm:px-6 py-4 border-b border-white/15 bg-background">
+                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.daedalus.label}</div>
-                        <div className="mt-1 text-xs text-muted-foreground truncate">Tool creation</div>
+                        <div className="mt-1 flex items-center gap-2 min-w-0">
+                          <div className="text-xs text-muted-foreground truncate">
+                            {DEMO_CONVERSATIONS.daedalus.leftAgentName}, {DEMO_CONVERSATIONS.daedalus.rightUserLabel} · Tool creation
+                          </div>
+                        </div>
                       </div>
                       {activeDemoConvoId === 'daedalus' ? (
                         <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>

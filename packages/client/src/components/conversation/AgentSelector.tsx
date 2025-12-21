@@ -53,9 +53,29 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className={cn('justify-between', compact ? 'h-8 px-3 text-xs min-w-[120px]' : 'min-w-[180px]')} disabled={loading}>
-          <div className="flex items-center gap-2">
-            <Icon name="bot" className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
+        <Button
+          variant="outline"
+          className={cn(
+            // Match ConversationMessageInput container styling
+            'justify-between bg-card border border-border/60 rounded-2xl shadow-sm transition-all hover:bg-card focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/70',
+            // Match ConversationMessageInput inner padding: minimal => px-2 py-2, default => px-3 py-3
+            compact ? 'h-auto px-2 py-1.5 text-xs min-w-[140px]' : 'h-auto px-3 py-2 text-sm min-w-[220px]'
+          )}
+          disabled={loading}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {selectedAgent ? (
+              <Avatar className={cn(compact ? 'h-5 w-5' : 'h-6 w-6', 'ring-1 ring-border/40 rounded-full')}>
+                <AgentAvatar
+                  seed={selectedAgent.name}
+                  imageUrl={avatarUrlById.get((selectedAgent as any).avatarAttachmentId)}
+                  size={compact ? 20 : 24}
+                  rounded
+                />
+              </Avatar>
+            ) : (
+              <Icon name="bot" className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
+            )}
             <span className="truncate">{selectedAgent ? selectedAgent.name : compact ? 'Select Agent' : 'Select an agent'}</span>
           </div>
           {loading ? <LoadingSpinner className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} /> : <Icon name="chevron-down" className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}

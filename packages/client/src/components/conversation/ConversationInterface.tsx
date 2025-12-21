@@ -1031,20 +1031,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             {!showMessagesArea && (
               <div className="mb-4 flex items-center justify-start gap-3">
                 <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={false} />
-                {starshipSlug && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      try {
-                        router.push(`/ship/${starshipSlug}/agents`)
-                      } catch {}
-                    }}
-                    className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                  >
-                    See all agents
-                    <Icon name="chevron-right" className="h-3 w-3" />
-                  </button>
-                )}
               </div>
             )}
 

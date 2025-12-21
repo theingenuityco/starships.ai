@@ -10,6 +10,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import { CONNECTOR_LOGOS } from '@/lib/connectorLogos'
+import { motion } from 'motion/react'
+
+const CONNECTOR_CTA_BUTTON_CLASS =
+  'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
+const CONNECTOR_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] group-disabled:text-muted-foreground'
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
@@ -113,46 +118,61 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     const logoSrc = CONNECTOR_LOGOS[provider]
 
     return (
-      <Card key={`${provider}-${connectedFirst ? 'connected' : 'disconnected'}`} className="frosted-glass-card shadow-frosted-lg border border-border/40">
-        <CardHeader className="space-y-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-3">
-              {logoSrc && (
-                <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm">
-                  <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
+      <motion.div
+        key={`${provider}-${connectedFirst ? 'connected' : 'disconnected'}`}
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ y: -4 }}
+        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
+        className="h-full"
+      >
+        <Card className="group relative overflow-hidden h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md">
+          <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-3">
+                {logoSrc && (
+                  <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm border border-border/40">
+                    <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
+                  </div>
+                )}
+                <div className="flex h-10 flex-col justify-center">
+                  <span className="text-lg leading-tight">{label}</span>
+                  <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
+                    <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
+                    <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
+                  </div>
                 </div>
-              )}
-              <div className="flex h-10 flex-col justify-center">
-                <span className="text-lg leading-tight">{label}</span>
-                <div className="mt-1 flex items-center gap-1.5 text-[11px] font-medium">
-                  <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-400 animate-pulse' : 'bg-slate-400'}`} />
-                  <span className={isConnected ? 'text-slate-600 dark:text-slate-400' : 'text-muted-foreground'}>{isConnected ? 'Connected' : 'Not connected'}</span>
-                </div>
-              </div>
-            </CardTitle>
-          </div>
-          <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex gap-2">
-            <Button size="sm" variant={isConnected ? 'primaryOutline' : 'default'} className="min-w-[140px]" onClick={() => handleConnect(provider)} disabled={oauthMutation.isPending}>
-              <Icon name={isConnected ? 'repeat' : 'plug'} className="h-4 w-4" />
-              {isConnected ? 'Reconnect' : `Connect ${label}`}
-            </Button>
-            {isConnected && (
+              </CardTitle>
+            </div>
+            <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
+          </CardHeader>
+          <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
+            <div className="flex gap-2 justify-end">
               <Button
                 size="sm"
-                variant="outline"
-                className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
-                onClick={() => openDisconnectConfirm(provider)}
-                disabled={disconnectMutation.isPending}
+                variant="ghost"
+                className={`${CONNECTOR_CTA_BUTTON_CLASS} group min-w-[140px] justify-center`}
+                onClick={() => handleConnect(provider)}
+                disabled={oauthMutation.isPending}
               >
-                Disconnect
+                <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
+                {isConnected ? 'Reconnect' : `Connect ${label}`}
               </Button>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+              {isConnected && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="min-w-[140px] hover:border-destructive/60 hover:text-destructive hover:bg-destructive/10"
+                  onClick={() => openDisconnectConfirm(provider)}
+                  disabled={disconnectMutation.isPending}
+                >
+                  Disconnect
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
     )
   }
 

@@ -1,5 +1,6 @@
 import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
+import { CREDITS_PER_USD } from '@/config/credits';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
   apiVersion: '2025-09-30.clover',
@@ -47,6 +48,7 @@ export class StripeService {
 
       // Convert to cents for Stripe
       const unitAmount = Math.round(Number(amountUsd) * 100);
+      const creditsGranted = Math.round(Number(amountUsd) * Number(CREDITS_PER_USD || 0));
 
       const session = await stripe.checkout.sessions.create(
         {
@@ -62,8 +64,8 @@ export class StripeService {
               price_data: {
                 currency: 'usd',
                 product_data: {
-                  name: 'Starship Wallet Top-up',
-                  description: `Add $${amountUsd} USD to your starship wallet`,
+                  name: 'Starships Credits',
+                  description: `Buy ${creditsGranted} credits`,
                 },
                 unit_amount: unitAmount,
               },
@@ -78,6 +80,8 @@ export class StripeService {
             starship_id: starshipId,
             starship_slug: starshipSlug ?? null,
             amount_usd: amountUsd.toString(),
+            credits_per_usd: String(CREDITS_PER_USD),
+            credits_granted: String(creditsGranted),
             topup_id: topupId,
             idempotency_key: idempotencyKey,
           },
@@ -89,6 +93,8 @@ export class StripeService {
               starship_id: starshipId,
               starship_slug: starshipSlug ?? null,
               idempotency_key: idempotencyKey,
+              credits_per_usd: String(CREDITS_PER_USD),
+              credits_granted: String(creditsGranted),
             },
           },
           success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/success?topupId=${encodeURIComponent(

@@ -1207,6 +1207,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
 
       if (status === 402 || code === 'INSUFFICIENT_FUNDS') {
+        const details = error?.response?.data?.error?.details || error?.response?.data?.details
+        const currentCredits = typeof details?.currentCredits === 'string' ? details.currentCredits : undefined
+        const requiredCredits = typeof details?.requiredCredits === 'string' ? details.requiredCredits : undefined
+
         // Inject an inline system message into the streamed cache so the user sees it in chat
         const convId = (variables as any)?.conversationId as string | undefined
         const sid = (variables as any)?.starshipId as string | undefined
@@ -1215,7 +1219,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const sysMessage: any = {
             id: `sys_${Date.now()}_${Math.random().toString(36).slice(2)}`,
             role: 'system',
-            content: 'Insufficient balance. Add credits from Billing to continue.',
+            content:
+              `Insufficient credits. Add credits from Billing to continue.` +
+              (requiredCredits ? ` (Required: ${Number(requiredCredits).toFixed(0)} credits)` : '') +
+              (currentCredits ? ` (Current: ${Number(currentCredits).toFixed(0)} credits)` : ''),
             messageType: 'error',
             createdAt: now,
             updatedAt: now,

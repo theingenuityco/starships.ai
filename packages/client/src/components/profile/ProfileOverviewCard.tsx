@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
 type ProfileOverviewCardProps = {
   initials: string
@@ -39,7 +40,7 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
   }, [emojiOptions])
 
   return (
-    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
+    <Card className={PROFILE_SECTION_CARD_CLASS}>
       <CardHeader className="pb-4">
         <CardTitle className="text-base">Profile overview</CardTitle>
       </CardHeader>
@@ -111,7 +112,7 @@ export default function ProfileOverviewCard({ initials, displayName, email, sele
                   onClick={() => onSelectEmoji(emoji)}
                   className={[
                     'flex h-8 w-8 items-center justify-center rounded-full border text-base transition-colors',
-                    selected ? 'border-primary bg-primary/10 text-primary' : 'border-border hover:bg-muted/60',
+                    selected ? 'border-primary bg-primary/10 text-primary' : 'border-border',
                   ].join(' ')}
                 >
                   <span className="leading-none">{emoji}</span>

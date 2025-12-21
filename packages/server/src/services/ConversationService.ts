@@ -753,7 +753,8 @@ export class ConversationService {
       modalities?: Array<'image' | 'text'>;
       imageConfig?: Record<string, unknown>;
     },
-    ctx?: { authContext?: { userId: string; agentId?: string; starshipId?: string } }
+    ctx?: { authContext?: { userId: string; agentId?: string; starshipId?: string } },
+    opts?: { preCreatedUserMessage?: MessageModel }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
@@ -787,15 +788,17 @@ export class ConversationService {
       );
     }
 
-    // Save user message to database
-    const userMessage = await this.messageService.createMessage({
-      conversationId: data.conversationId,
-      role: data.role,
-      content: data.content,
-      messageType: data.messageType,
-      ...(data.agentId && { agentId: data.agentId }),
-      ...(data.attachmentIds && { attachmentIds: data.attachmentIds }),
-    });
+    // Persist user message unless pre-created by the route (needed to charge credits before returning 202)
+    const userMessage =
+      opts?.preCreatedUserMessage ??
+      (await this.messageService.createMessage({
+        conversationId: data.conversationId,
+        role: data.role,
+        content: data.content,
+        messageType: data.messageType,
+        ...(data.agentId && { agentId: data.agentId }),
+        ...(data.attachmentIds && { attachmentIds: data.attachmentIds }),
+      }));
 
     // Broadcast user message immediately via streaming if available
     if (this.streamingService) {
@@ -1077,16 +1080,7 @@ export class ConversationService {
             cost: Number(latest.cost || 0),
             ...(latest.model ? { model: latest.model } : {}),
           });
-          try {
-            await this.billingService.debitUsage(usageRow);
-          } catch (e) {
-            // Non-fatal: log only; stopping should still finalize UX
-            console.warn('[STOP] Billing debit failed for mid-turn usage', {
-              conversationId,
-              usageId: usageRow.id,
-              error: e instanceof Error ? e.message : String(e),
-            });
-          }
+          // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
         }
       }
     } catch (e) {
@@ -1257,12 +1251,8 @@ export class ConversationService {
               cost: Number((usage as any).cost ?? 0),
               model: String(model),
             })
-            .then(async (row) => {
-              try {
-                await this.billingService.debitUsage(row);
-              } catch (err) {
-                console.warn('[TITLE] Billing debit failed:', err);
-              }
+            .then(async (_row) => {
+              // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
             });
         }
       } catch (err) {
@@ -2120,74 +2110,7 @@ export class ConversationService {
                 model: usagePayload.model,
               });
 
-              try {
-                await this.billingService.debitUsage(usageRow);
-              } catch (e) {
-                // Prepaid policy: decline and log; do not break streaming UX
-                if (
-                  e instanceof InsufficientFundsError ||
-                  (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: unknown }).code === 'INSUFFICIENT_FUNDS')
-                ) {
-                  console.warn('[BILLING] Insufficient funds for usage debit', {
-                    starshipId: starship.id,
-                    conversationId,
-                    usageId: usageRow.id,
-                    cost: usageRow.cost,
-                  });
-                  // Emit an inline system message so the user sees a clear CTA inside the chat
-                  try {
-                    const sys = await this.messageService.createMessage({
-                      conversationId,
-                      role: 'system',
-                      content: 'Insufficient balance. Add credits from Billing to continue.',
-                      messageType: 'error',
-                    });
-                    if (this.streamingService && this.streamingService.isActive(conversationId)) {
-                      await this.streamingService.broadcastDelta(conversationId, {
-                        op: 'add',
-                        path: '/messages/-',
-                        value: sys,
-                      });
-                    }
-                  } catch (emitErr) {
-                    console.error('[BILLING] Failed to emit insufficient funds system message:', emitErr);
-                  }
-                  // Force stop the turn on insufficient funds (guarded)
-                  try {
-                    if (!this.lowBalanceStopTriggered.has(conversationId)) {
-                      this.lowBalanceStopTriggered.add(conversationId);
-                      await this.stopConversation(conversationId);
-                    }
-                  } catch (stopErr) {
-                    console.warn('[BILLING] Auto-stop on insufficient funds failed', stopErr);
-                  }
-                } else {
-                  console.error('[BILLING] Debit failed', {
-                    error: e instanceof Error ? e.message : String(e),
-                    starshipId: starship.id,
-                    conversationId,
-                    usageId: usageRow.id,
-                  });
-                  // Emit a generic billing failure system message to inform the user
-                  try {
-                    const sys = await this.messageService.createMessage({
-                      conversationId,
-                      role: 'system',
-                      content: 'Billing error detected while processing usage. Please try again or check Billing.',
-                      messageType: 'error',
-                    });
-                    if (this.streamingService && this.streamingService.isActive(conversationId)) {
-                      await this.streamingService.broadcastDelta(conversationId, {
-                        op: 'add',
-                        path: '/messages/-',
-                        value: sys,
-                      });
-                    }
-                  } catch (emitErr) {
-                    console.error('[BILLING] Failed to emit billing error system message:', emitErr);
-                  }
-                }
-              }
+              // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
               this.latestStreamingUsage.delete(conversationId);
             }
           } catch (e) {

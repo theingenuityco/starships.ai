@@ -32,7 +32,7 @@ export class LedgerRepository extends BaseRepository {
 
     const result = await client.query(
       `
-      INSERT INTO ledger_entries (id, wallet_id, type, amount, balance_after, meta)
+      INSERT INTO wallet_ledger (id, wallet_id, type, amount, balance_after, meta)
       VALUES ($1, $2, $3, $4::decimal, $5::decimal, COALESCE($6::jsonb, '{}'::jsonb))
       RETURNING *
       `,
@@ -60,7 +60,7 @@ export class LedgerRepository extends BaseRepository {
     const rows = await conn.query(
       `
       SELECT *
-      FROM ledger_entries
+      FROM wallet_ledger
       WHERE ${where}
       ORDER BY created_at DESC, id DESC
       LIMIT $${params.length}
@@ -79,12 +79,12 @@ export class LedgerRepository extends BaseRepository {
 
     if (types && types.length > 0) {
       const inClause = types.map((_, i) => `$${i + 2}`).join(',');
-      const sql = `SELECT COUNT(*) as count FROM ledger_entries WHERE wallet_id = $1 AND type IN (${inClause})`;
+      const sql = `SELECT COUNT(*) as count FROM wallet_ledger WHERE wallet_id = $1 AND type IN (${inClause})`;
       const result = await conn.queryOne<{ count: string }>(sql, [walletId, ...types]);
       return result ? parseInt(result.count, 10) : 0;
     }
 
-    const result = await conn.queryOne<{ count: string }>(`SELECT COUNT(*) as count FROM ledger_entries WHERE wallet_id = $1`, [walletId]);
+    const result = await conn.queryOne<{ count: string }>(`SELECT COUNT(*) as count FROM wallet_ledger WHERE wallet_id = $1`, [walletId]);
     return result ? parseInt(result.count, 10) : 0;
   }
 
@@ -116,7 +116,7 @@ export class LedgerRepository extends BaseRepository {
     const rows = await conn.query(
       `
       SELECT *
-      FROM ledger_entries
+      FROM wallet_ledger
       WHERE ${where}
       ORDER BY created_at ${orderSql}, id ${orderSql}
       LIMIT $${params.length - 1} OFFSET $${params.length}

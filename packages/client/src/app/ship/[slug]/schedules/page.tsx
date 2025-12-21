@@ -302,7 +302,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                 <Breadcrumb>
                   <BreadcrumbList>
                     <BreadcrumbItem>
-                      <BreadcrumbLink href={`/ship/${slug}`} className="font-mono">
+                      <BreadcrumbLink href={`/ship/${slug}/conversations`} className="font-mono">
                         <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
                           {slug}
                         </Badge>

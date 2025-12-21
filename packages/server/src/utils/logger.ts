@@ -54,8 +54,8 @@ export class Logger {
     this.log(LogLevel.INFO, message, context);
   }
 
-  public warn(message: string, context?: LogContext): void {
-    this.log(LogLevel.WARN, message, context);
+  public warn(message: string, context?: LogContext, error?: Error): void {
+    this.log(LogLevel.WARN, message, context, error);
   }
 
   public error(message: string, context?: LogContext, error?: Error): void {

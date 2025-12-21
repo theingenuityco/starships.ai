@@ -22,8 +22,9 @@ export class WalletEntity implements WalletModel {
 
   @Expose()
   @IsString()
-  @IsIn(['USD'])
-  currency!: 'USD';
+  // Transitional: support existing USD wallets until migration; new wallets will be 'CREDITS'
+  @IsIn(['USD', 'CREDITS'])
+  currency!: 'USD' | 'CREDITS';
 
   // Stored as DECIMAL(18,6) in DB; represent as string in API to preserve precision
   @Expose()
@@ -55,7 +56,7 @@ export class WalletEntity implements WalletModel {
       Object.assign(entity, {
         id: dataRecord.id || 'temp-id',
         starshipId: dataRecord.starshipId || '',
-        currency: (dataRecord.currency as 'USD') || 'USD',
+        currency: (dataRecord.currency as 'USD' | 'CREDITS') || 'USD',
         balance: (dataRecord.balance as string) ?? '0.000000',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),

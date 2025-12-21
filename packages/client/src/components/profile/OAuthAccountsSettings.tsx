@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import type { OAuthAccountModel } from '@starships/protocol'
 
 import { motion } from 'motion/react'
+import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
 // OAuth query keys following established pattern
 const OAUTH_QUERY_KEYS = {
@@ -189,7 +190,7 @@ export function OAuthAccountsSettings() {
 
   if (isLoading) {
     return (
-      <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm">
+      <Card className={PROFILE_SECTION_CARD_CLASS}>
         <CardHeader>
           <CardTitle className="text-base">Connected Accounts</CardTitle>
           <CardDescription>Loading your connected accounts...</CardDescription>
@@ -216,7 +217,7 @@ export function OAuthAccountsSettings() {
 
   if (error) {
     return (
-      <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm">
+      <Card className={PROFILE_SECTION_CARD_CLASS}>
         <CardHeader>
           <CardTitle className="text-base">Connected Accounts</CardTitle>
           <CardDescription>Failed to load connected accounts</CardDescription>
@@ -231,7 +232,7 @@ export function OAuthAccountsSettings() {
   }
 
   return (
-    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
+    <Card className={PROFILE_SECTION_CARD_CLASS}>
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="globe" className="h-4 w-4 text-primary" />
@@ -250,7 +251,7 @@ export function OAuthAccountsSettings() {
               key={provider}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-between p-4 border rounded-lg hover:bg-accent/50 transition-colors"
+              className="flex items-center justify-between p-4 border rounded-lg"
             >
               <div className="flex items-center gap-3">
                 <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-muted/30">
@@ -273,7 +274,7 @@ export function OAuthAccountsSettings() {
 
               <div className="flex items-center gap-2">
                 {isLinked ? (
-                  <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(provider)} disabled={unlinkMutation.isPending} className="text-destructive hover:text-destructive">
+                  <Button variant="outline" size="sm" onClick={() => handleUnlinkAccount(provider)} disabled={unlinkMutation.isPending} className="text-destructive">
                     <Icon name="unlink" className="h-3 w-3 mr-1" />
                     Unlink
                   </Button>

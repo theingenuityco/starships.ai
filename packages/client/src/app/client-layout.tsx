@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
+import { TopRightUserProfile } from '@/components/auth/TopRightUserProfile'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
@@ -54,6 +55,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [logoTrigger, setLogoTrigger] = useState(0)
+  const [hasMounted, setHasMounted] = useState(false)
+  const [isPageReady, setIsPageReady] = useState(false)
+
+  // Only show the top-right profile on fully-loaded ship pages.
+  // - Gate on mount to avoid pre-hydration flashes.
+  // - Gate on next animation frame when the route changes to avoid showing during layout churn.
+  const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
+  const showTopRightUserProfile = hasMounted && isPageReady && (isShipPage || (isMarketplace && isAuthenticated))
 
   useEffect(() => {
     const checkMobile = () => {
@@ -66,6 +75,17 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [])
 
   useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  useEffect(() => {
+    if (!hasMounted) return
+    setIsPageReady(false)
+    const rafId = window.requestAnimationFrame(() => setIsPageReady(true))
+    return () => window.cancelAnimationFrame(rafId)
+  }, [hasMounted, pathname])
+
+  useEffect(() => {
     const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
     return () => clearTimeout(t)
   }, [])
@@ -75,6 +95,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return (
       <div className="h-full w-full">
         <EmailChangeToastHandler />
+        {showTopRightUserProfile ? <TopRightUserProfile /> : null}
         {children}
       </div>
     )
@@ -88,6 +109,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme>
           <EmailChangeToastHandler />
           <div className="relative min-h-[100dvh] bg-background">
+            {showTopRightUserProfile ? <TopRightUserProfile /> : null}
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
         </StarTheme>
@@ -101,6 +123,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <StarTheme>
         <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+          {showTopRightUserProfile ? <TopRightUserProfile /> : null}
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
             <>
@@ -153,6 +176,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme>
           <EmailChangeToastHandler />
           <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+            {showTopRightUserProfile ? <TopRightUserProfile /> : null}
             {/* Sidebar Navigation - conditionally rendered */}
             {!shouldHideNavigation && (
               <>

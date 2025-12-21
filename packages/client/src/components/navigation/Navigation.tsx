@@ -2,7 +2,6 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { UserProfile } from '@/components/auth/UserProfile'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
@@ -55,8 +54,6 @@ export function Navigation(props: NavigationProps) {
   const sidebarRef = useRef<HTMLDivElement>(null)
   // Ref for conversation history container
   const conversationHistoryRef = useRef<HTMLDivElement>(null)
-  // Ref for user section
-  const userSectionRef = useRef<HTMLDivElement>(null)
 
   // Ref for collapse timeout to keep logo stable during collapse animation
   const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -115,8 +112,6 @@ export function Navigation(props: NavigationProps) {
   const routeChecks = useMemo(() => {
     if (!starshipSlug) {
       return {
-        isOverviewRoute: false,
-        isSettingsRoute: false,
         isConnectorsRoute: false,
         isAgentsRoute: false,
         isAgentBuilderRoute: false,
@@ -126,8 +121,6 @@ export function Navigation(props: NavigationProps) {
       }
     }
     return {
-      isOverviewRoute: pathname === `/ship/${starshipSlug}`,
-      isSettingsRoute: pathname.startsWith(`/ship/${starshipSlug}/settings`),
       isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
       isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
@@ -137,7 +130,7 @@ export function Navigation(props: NavigationProps) {
     }
   }, [pathname, starshipSlug])
 
-  const { isOverviewRoute, isSettingsRoute, isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
+  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -190,13 +183,6 @@ export function Navigation(props: NavigationProps) {
     [router, starshipSlug, isMobile, onClose]
   )
 
-  // Handle user profile click - memoized
-  const handleUserProfileClick = useCallback(() => {
-    if (!starshipSlug) return
-    router.push(`/ship/${starshipSlug}/settings`)
-    if (isMobile && onClose) onClose()
-  }, [router, starshipSlug, isMobile, onClose])
-
   // Handle logo click - memoized
   const handleLogoClick = useCallback(() => {
     // Trigger animation
@@ -219,7 +205,6 @@ export function Navigation(props: NavigationProps) {
   const mainNavigationItems = useMemo(
     () => [
       ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}`, label: 'Overview', icon: 'rocket', isActive: isOverviewRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
@@ -239,7 +224,6 @@ export function Navigation(props: NavigationProps) {
     [
       isAuthenticated,
       starshipSlug,
-      isOverviewRoute,
       isAgentsRoute,
       isAgentBuilderRoute,
       isToolsRoute,
@@ -286,7 +270,7 @@ export function Navigation(props: NavigationProps) {
         onClick={handleSidebarBackgroundClick}
       >
         <div
-          className="flex flex-col transition-all duration-300 ease-in-out"
+          className="flex flex-col pb-2 transition-all duration-300 ease-in-out"
           style={{
             width: isExpanded ? '16rem' : '3.5rem',
             height: '100%',
@@ -295,18 +279,19 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="px-4 pt-5 pb-3 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="px-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
             <div
-              className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0"
+              className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
               title={isMobile ? undefined : isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
               style={{ cursor: isMobile ? 'default' : isExpanded ? 'w-resize' : 'e-resize' }}
             >
-              <div className="flex-shrink-0 w-6 h-6 flex items-center justify-center">
+              {/* Match the nav icon column width so the logo aligns with item icons */}
+              <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
                 {isExpanded || isCollapsing || !isHovered ? (
                   <StarshipsLogo
-                    width={24}
-                    height={24}
+                    width={20}
+                    height={20}
                     className=""
                     gradientId="nav-gradient"
                     animationDelay={1}
@@ -326,7 +311,7 @@ export function Navigation(props: NavigationProps) {
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
                   className={`${orbitron.className} text-sm font-medium tracking-tight leading-none whitespace-nowrap`}
-                  style={{ marginLeft: '0.5rem' }}
+                  style={{ marginLeft: '0.375rem' }}
                 >
                   starships.ai
                 </motion.span>
@@ -376,12 +361,12 @@ export function Navigation(props: NavigationProps) {
             className="flex-shrink-0"
             style={{
               marginTop: '0rem',
-              marginBottom: '0.75rem',
-              paddingTop: '0.25rem',
-              paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.75rem',
+              marginBottom: '0.5rem',
+              paddingTop: '0rem',
+              paddingBottom: isAuthenticated && starshipSlug && starshipData?.id && isExpanded ? '0' : '0.5rem',
             }}
           >
-            <div className="flex flex-col space-y-1 w-full px-2">
+            <div className="flex flex-col space-y-0 w-full px-2">
               <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
             </div>
           </div>
@@ -389,31 +374,28 @@ export function Navigation(props: NavigationProps) {
           {/* Conversation History List - Recents - only when expanded and data is available */}
           {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
             <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col px-2">
-              {/* Divider above Recents - make more visible */}
-              <div className="w-full border-t border-border my-3" />
-
               {/* Recents header - styled to match nav items (icon + label spacing) */}
               <div className="w-full">
-                <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-2" style={{ justifyContent: 'flex-start' }}>
+                <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-1.5" style={{ justifyContent: 'flex-start' }}>
                   <div
                     className="flex-shrink-0"
                     style={{
-                      width: '1.5rem',
-                      height: '1.5rem',
+                      width: '1.25rem',
+                      height: '1.25rem',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       margin: 0,
-                      marginRight: '0.5rem',
+                      marginRight: '0.375rem',
                     }}
                   >
-                    <Icon name="history" className="w-5 h-5" />
+                    <Icon name="history" className="w-4 h-4" />
                   </div>
                   <span className="text-[13px] font-medium">Recents</span>
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="pb-3 space-y-1">
+                <div className="pb-2 space-y-0">
                   <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
                 </div>
               </div>
@@ -426,60 +408,32 @@ export function Navigation(props: NavigationProps) {
           {/* Theme toggle above profile section - styled like a nav item (expanded only) */}
           {isExpanded && (
             <div className="flex-shrink-0 px-2 pb-1">
-              <div className="w-full rounded-lg border border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/40 flex items-center justify-between h-8 px-2 text-xs transition-colors">
-                <span className="font-medium">Appearance</span>
-                <ThemeToggle />
+              <div className="group relative rounded-lg flex items-center justify-between border w-full h-8 px-2 text-sm text-muted-foreground border-transparent hover:text-foreground hover:bg-muted transition-colors">
+                <div className="flex items-center min-w-0">
+                  <div
+                    className="flex-shrink-0"
+                    style={{
+                      width: '1.25rem',
+                      height: '1.25rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      margin: 0,
+                      pointerEvents: 'none',
+                    }}
+                  >
+                    <Icon name="palette" className="w-4 h-4" />
+                  </div>
+                  <span className="whitespace-nowrap pointer-events-none text-[13px] font-medium" style={{ marginLeft: '0.375rem' }}>
+                    Appearance
+                  </span>
+                </div>
+                <ThemeToggle size="sm" />
               </div>
             </div>
           )}
 
-          {/* User Profile Section */}
-          <div ref={userSectionRef} className="flex-shrink-0 flex flex-col items-center justify-center relative py-2">
-            {/* Profile section */}
-            <div className="w-full px-2">
-              {isExpanded ? (
-                <div
-                  className="flex items-center gap-3 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group w-full py-2 px-2"
-                  onClick={handleUserProfileClick}
-                  style={{ justifyContent: 'flex-start', minHeight: '2.5rem' }}
-                >
-                  <div className="flex-shrink-0 flex items-center justify-center">
-                    <UserProfile mode="collapsed" active={isSettingsRoute} />
-                  </div>
-                  <AnimatePresence mode="wait">
-                    <motion.div
-                      initial={{ opacity: 0, x: -8 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -8 }}
-                      transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}
-                      className="flex-1 min-w-0"
-                    >
-                      <p className="text-sm font-semibold truncate">{userName || user?.email || 'User'}</p>
-                      {starshipData && (
-                        <div className="flex items-center gap-1 mt-0.5">
-                          <StarshipsLogo width={12} height={12} className="flex-shrink-0" />
-                          <p className="text-xs text-muted-foreground truncate">{starshipData.name || 'Starship'}</p>
-                        </div>
-                      )}
-                    </motion.div>
-                  </AnimatePresence>
-                  <AnimatePresence mode="wait">
-                    {isExpanded && (
-                      <motion.div initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -8 }} transition={{ duration: 0.15, ease: [0.4, 0, 0.2, 1] }}>
-                        <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors flex-shrink-0" />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
-              ) : (
-                <div className="flex items-center w-full px-2" style={{ justifyContent: 'flex-start', minHeight: '2.5rem', paddingTop: '0.5rem', paddingBottom: '0.5rem' }}>
-                  <div className="flex-shrink-0 flex items-center justify-center">
-                    <UserProfile mode="collapsed" active={isSettingsRoute} />
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Profile moved to global top-right header (see `TopRightUserProfile`) */}
         </div>
       </motion.div>
     </>

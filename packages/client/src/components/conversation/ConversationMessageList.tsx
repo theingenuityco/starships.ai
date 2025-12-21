@@ -13,6 +13,8 @@ import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
+import { useAuth } from '@/hooks/useAuth'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -370,21 +372,26 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     <div className="h-full flex flex-col bg-transparent">
       <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="w-full max-w-4xl mx-auto bg-transparent">
-          {renderMessages.map(message => (
-            <MemoizedMessageBubble
-              key={message.id}
-              message={message}
-              agentName={message.agentName || agentName}
-              agentAvatarUrl={agentAvatarUrl}
-              isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-              starshipId={starshipId}
-            />
-          ))}
+          {renderMessages.map((message, idx) => {
+            const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null
+            const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+            return (
+              <MemoizedMessageBubble
+                key={message.id}
+                message={message}
+                agentName={message.agentName || agentName}
+                agentAvatarUrl={agentAvatarUrl}
+                isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                starshipId={starshipId}
+                showAssistantAvatar={showAssistantAvatar}
+              />
+            )
+          })}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 w-full">
-                <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                   <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
                 </div>
                 <div className="min-w-0 flex-1">
@@ -429,6 +436,23 @@ interface ConversationMessageBubbleProps {
   agentAvatarUrl?: string
   isStreamingActive?: boolean
   starshipId?: string
+  showAssistantAvatar?: boolean
+}
+
+function isImageUrl(value?: string | null): boolean {
+  if (!value || typeof value !== 'string') return false
+  const trimmed = value.trim()
+  return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
+}
+
+function initialsFromName(name?: string | null): string {
+  if (!name || typeof name !== 'string') return 'U'
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  if (parts.length === 0) return 'U'
+  return parts
+    .map(p => p[0]?.toUpperCase())
+    .filter(Boolean)
+    .join('')
 }
 
 // User message attachments component
@@ -460,8 +484,9 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId, showAssistantAvatar = true }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
+    const { userName, userEmail, userAvatar } = useAuth()
 
     if (isUser) {
       // User message: Neutral bubble on the right
@@ -471,19 +496,22 @@ const MemoizedMessageBubble = memo(
             <div className="flex flex-col gap-2 items-end">
               {/* Attachments outside bubble */}
               {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
-              {/* Message bubble */}
-              <div className={`bg-[hsl(var(--accent))] text-[hsl(var(--accent-foreground))] rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
+              {/* Message bubble (match navigation/sidebar background color) */}
+              <div className={`bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
                 {message.sending && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[hsl(var(--accent))] border-2 border-background rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-[hsl(var(--accent-foreground))] rounded-full animate-pulse" />
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
+                    <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
                   </div>
                 )}
               </div>
             </div>
-            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center mb-1">
-              <Icon name="user" className="w-4 h-4 text-primary" />
-            </div>
+            <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
+              {isImageUrl(userAvatar) ? (
+                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+              ) : null}
+              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{initialsFromName(userName || userEmail)}</AvatarFallback>
+            </Avatar>
           </div>
         </div>
       )
@@ -492,9 +520,13 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-start">
           <div className="flex items-start gap-3 w-full">
-            <div className="flex-shrink-0 w-8 h-8 rounded-lg bg-muted flex items-center justify-center mt-1 overflow-hidden">
-              <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
-            </div>
+            {showAssistantAvatar ? (
+              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
+              </div>
+            ) : (
+              <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
+            )}
             <div className="flex-1 w-full">
               <ConversationMessageContent
                 content={message.content}
@@ -526,6 +558,7 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false

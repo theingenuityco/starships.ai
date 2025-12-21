@@ -1148,9 +1148,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
+            // Match the rest of the app's input typography (shadcn inputs/textarea use `text-sm`)
+            'text-sm',
             minimal ? 'min-h-[28px] max-h-[120px]' : 'min-h-[80px] max-h-[260px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
-            minimal && 'text-sm'
+            // Minimal mode has a small min-height; center the baseline within that space.
+            // This does not change font size or the overall component height.
+            minimal && 'tiptap--minimal'
           ),
           role: 'textbox',
           'aria-multiline': 'true',
@@ -1421,7 +1425,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className={cn('flex relative items-center', minimal ? 'px-2 py-2' : 'px-3 py-3')}>
+          <div className={cn('flex relative items-center', minimal ? 'pl-3 pr-2 py-2' : 'px-3 py-3')}>
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -1549,6 +1553,23 @@ export function PlaceholderStyles() {
       }
       .tiptap { line-height: 1.5; }
       .tiptap p { margin: 0; }
+      /* Minimal mode: vertically center the single-line baseline within the min-height editor box. */
+      .tiptap.tiptap--minimal {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+      }
+      /* Minimal mode placeholder: center it too (only applies when empty). */
+      .tiptap.tiptap--minimal p.is-editor-empty:first-child {
+        position: relative;
+      }
+      .tiptap.tiptap--minimal p.is-editor-empty:first-child::before {
+        float: none;
+        height: auto;
+        position: absolute;
+        top: 50%;
+        transform: translateY(-50%);
+      }
     `}</style>
   )
 }

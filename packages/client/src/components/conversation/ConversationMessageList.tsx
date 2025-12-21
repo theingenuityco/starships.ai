@@ -9,31 +9,63 @@ import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
-import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
+import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { cn } from '@/lib/utils'
 
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
   bottomPaddingPx?: number
+  className?: string
+  scrollClassName?: string
+  /**
+   * Optional override for static/demo rendering (e.g. landing page).
+   * When provided, the list will render these messages even if `conversationId` is null.
+   */
+  messagesOverride?: MessageModel[]
+  /**
+   * Optional overrides for demo/static rendering when no stream context exists.
+   */
+  agentNameOverride?: string
+  agentAvatarUrlOverride?: string
+  isRespondingOverride?: boolean
+  isAssistantStreamingOverride?: boolean
+  isAwaitingToolResultsOverride?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, bottomPaddingPx }: ConversationMessageListProps) {
-  // Render directly from the stream context (TanStack streamedQuery).
-  const { messages, isResponding, isAssistantStreaming, isAwaitingToolResults } = useConversationStreamContext()
+export function ConversationMessageList({
+  conversationId,
+  starshipId,
+  bottomPaddingPx,
+  className,
+  scrollClassName,
+  messagesOverride,
+  agentNameOverride,
+  agentAvatarUrlOverride,
+  isRespondingOverride,
+  isAssistantStreamingOverride,
+  isAwaitingToolResultsOverride,
+}: ConversationMessageListProps) {
+  // Render from stream context when available, otherwise allow static/demo rendering via overrides.
+  const stream = useConversationStreamContextOptional()
+  const messages = messagesOverride ?? stream?.messages ?? []
+  const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
+  const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
+  const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
-  const agentName = agentObj?.name
+  const agentName = agentNameOverride ?? agentObj?.name
   const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
-  const agentAvatarUrl = agentAvatarAttachments?.[0]?.previewUrl
+  const agentAvatarUrl = agentAvatarUrlOverride ?? agentAvatarAttachments?.[0]?.previewUrl
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -364,13 +396,13 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     }
   }, [shouldShowGapLoader])
 
-  if (!conversationId) {
+  if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
 
   return (
-    <div className="h-full flex flex-col bg-transparent">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
+    <div className={cn('h-full flex flex-col', className)}>
+      <div ref={scrollContainerRef} className={cn('flex-1 overflow-y-auto px-4 pt-6 scroll-smooth', scrollClassName)} style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null

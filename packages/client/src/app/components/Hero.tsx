@@ -9,6 +9,46 @@ import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+
+const DEMO_MESSAGES = [
+  {
+    id: 'demo-u1',
+    role: 'user',
+    content: 'Aria, can you plan a simple landing page revamp for Starships?',
+    createdAt: '2025-01-01T00:00:00.000Z',
+    updatedAt: '2025-01-01T00:00:00.000Z',
+    messageType: 'user_input',
+  },
+  {
+    id: 'demo-a1',
+    role: 'assistant',
+    agentName: 'Aria',
+    content:
+      "Absolutely. Here's a crisp plan focused on conversion:\n\n- Hero: one clear promise + one primary CTA\n- Social proof: outcomes, not features\n- How it works: 3 steps\n- Pricing: simplify the first decision\n\nTell me your target user and I’ll tailor the copy.",
+    createdAt: '2025-01-01T00:00:05.000Z',
+    updatedAt: '2025-01-01T00:00:05.000Z',
+    messageType: 'agent_response',
+  },
+  {
+    id: 'demo-u2',
+    role: 'user',
+    content: 'Target: founders. Keep it tight. What should the headline be?',
+    createdAt: '2025-01-01T00:00:10.000Z',
+    updatedAt: '2025-01-01T00:00:10.000Z',
+    messageType: 'user_input',
+  },
+  {
+    id: 'demo-a2',
+    role: 'assistant',
+    agentName: 'Aria',
+    content: 'Option A: “Hire your AI team—then brief them in plain English.”\nOption B: “A team of AI specialists that ships work with you.”',
+    createdAt: '2025-01-01T00:00:15.000Z',
+    updatedAt: '2025-01-01T00:00:15.000Z',
+    messageType: 'agent_response',
+  },
+] as any[]
 
 export default function Hero() {
   const router = useRouter()
@@ -126,6 +166,44 @@ export default function Hero() {
               <Icon name="store" className="w-6 h-6 mr-1" />
               Explore agents in Marketplace
             </Button>
+          </div>
+        </div>
+
+        {/* Conversation demo (uses the same message renderer as /ship/.../conversations) */}
+        <div className="relative isolate w-full overflow-visible mt-6 sm:mt-8 md:mt-10 text-left">
+          {/* Glow layer around the frame */}
+          <div className="absolute inset-0 -z-10 rounded-2xl video-glow pointer-events-none" aria-hidden />
+          {/* Blurry, almost transparent border */}
+          <div className="absolute inset-0 -z-10 rounded-2xl video-blur-border pointer-events-none" aria-hidden />
+
+          <div className="relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-card">
+            <div
+              className="relative w-full"
+              style={{
+                background:
+                  'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.12) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.08) 0%, transparent 56%)',
+              }}
+            >
+              <div className="h-[420px] sm:h-[460px] flex flex-col">
+                <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden">
+                      <AgentAvatar seed="Aria" size={32} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium leading-none">Aria</div>
+                      <div className="text-xs text-muted-foreground">Mock conversation</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-hidden">
+                  <ConversationMessageList conversationId={null} messagesOverride={DEMO_MESSAGES} agentNameOverride="Aria" bottomPaddingPx={24} className="bg-card" scrollClassName="bg-card" />
+                </div>
+
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -1059,129 +1059,107 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
-        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
-          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
-            {!showMessagesArea && (
-              <div className="mb-8 text-center opacity-100">
-                <h1 className="text-3xl font-normal mb-2 text-foreground">{`Welcome to your starship, ${starshipName}`}</h1>
-                <p className="text-base text-muted-foreground">{starterSlogan}</p>
-              </div>
-            )}
+        <div
+          ref={inputContainerRef}
+          className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-4 sm:pt-6 lg:pt-10 pb-10')}
+        >
+          <div
+            className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-16 sm:mt-24 lg:mt-40')}
+            data-message-input
+          >
+            {/* Keep the input mounted across the welcome -> conversation transition to avoid losing focus. */}
+            <div className={cn('mb-8 text-center opacity-100', showMessagesArea && 'hidden')} key="welcome-header">
+              <h1 className="text-3xl font-normal mb-2 text-foreground">{`Welcome to your starship, ${starshipName}`}</h1>
+              <p className="text-base text-muted-foreground">{starterSlogan}</p>
+            </div>
 
-            {!showMessagesArea && shouldShowWelcomeCard ? (
-              <div className="mb-6">
-                <WelcomeSignupCard userName={authUser?.name} onDismiss={dismissWelcomeCard} />
-              </div>
-            ) : null}
+            <div className={cn('mb-6', (!shouldShowWelcomeCard || showMessagesArea) && 'hidden')} key="welcome-card">
+              <WelcomeSignupCard userName={authUser?.name} onDismiss={dismissWelcomeCard} />
+            </div>
 
-            {/* Starter layout: Agent select, Message input, Suggested prompts — one shared parent + consistent spacing */}
-            {!showMessagesArea ? (
-              <div className="flex flex-col gap-6">
-                <div>
-                  <div className="mb-1">
-                    <p className="text-xs font-medium text-muted-foreground">Select an agent</p>
-                  </div>
-                  <div className="flex items-center justify-start gap-3">
-                    <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={true} />
-                  </div>
+            {/* Starter layout: Agent select, Message input, Suggested prompts — stable mount (use CSS to show/hide). */}
+            <div className={cn('flex flex-col gap-6')} key="composer-stack">
+              <div className={cn(showMessagesArea && 'hidden')} key="agent-selector">
+                <div className="mb-1">
+                  <p className="text-xs font-medium text-muted-foreground">Select an agent</p>
                 </div>
-
-                <div>
-                  <div className="mb-1">
-                    <p className="text-xs font-medium text-muted-foreground">and give instructions</p>
-                  </div>
-                  <ConversationMessageInput
-                    key={inputKey}
-                    ref={messageInputRef}
-                    selectedAgent={selectedAgent}
-                    starshipId={starshipId}
-                    conversationId={currentConversationId}
-                    onConversationStart={handleConversationStart}
-                    onToggleToolForm={handleToggleToolBuilder}
-                    isToolFormOpen={false}
-                    disabled={false}
-                    minimal={isInputDocked}
-                    onFocus={() => {}}
-                    onBlur={() => {}}
-                    onToggleOverlay={handleToggleOverlay}
-                    showExpandableOverlay={false}
-                    isOverlayExpanded={false}
-                    budgetTokens={budgetTokens}
-                    onAgentChange={handleAgentChange}
-                    starshipSlug={starshipSlug}
-                  ></ConversationMessageInput>
+                <div className="flex items-center justify-start gap-3">
+                  <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={true} />
                 </div>
+              </div>
 
-                {agentSuggestionCards.length >= 3 && (
-                  <div>
-                    <div className="mb-1 flex items-center justify-between">
-                      <div className="text-left">
-                        <p className="text-xs font-medium text-muted-foreground">or select an example</p>
-                      </div>
-                      {agentSuggestionCards.length > 3 && (
-                        <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
-                          {showAllSuggestions ? (
-                            <>
-                              Show fewer
-                              <Icon name="chevron-up" className="h-3 w-3 translate-y-px" />
-                            </>
-                          ) : (
-                            <>
-                              Explore all
-                              <Icon name="chevron-down" className="h-3 w-3" />
-                            </>
-                          )}
-                        </button>
+              <div key="message-input">
+                <div className={cn('mb-1', showMessagesArea && 'hidden')}>
+                  <p className="text-xs font-medium text-muted-foreground">and give instructions</p>
+                </div>
+                <ConversationMessageInput
+                  key={inputKey}
+                  ref={messageInputRef}
+                  selectedAgent={selectedAgent}
+                  starshipId={starshipId}
+                  conversationId={currentConversationId}
+                  onConversationStart={handleConversationStart}
+                  onToggleToolForm={handleToggleToolBuilder}
+                  isToolFormOpen={false}
+                  disabled={false}
+                  minimal={isInputDocked}
+                  onFocus={() => {}}
+                  onBlur={() => {}}
+                  onToggleOverlay={handleToggleOverlay}
+                  showExpandableOverlay={false}
+                  isOverlayExpanded={false}
+                  budgetTokens={budgetTokens}
+                  onAgentChange={handleAgentChange}
+                  starshipSlug={starshipSlug}
+                ></ConversationMessageInput>
+              </div>
+
+              <div className={cn((showMessagesArea || agentSuggestionCards.length < 3) && 'hidden')} key="suggestions">
+                <div className="mb-1 flex items-center justify-between">
+                  <div className="text-left">
+                    <p className="text-xs font-medium text-muted-foreground">or select an example</p>
+                  </div>
+                  {agentSuggestionCards.length > 3 && (
+                    <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
+                      {showAllSuggestions ? (
+                        <>
+                          Show fewer
+                          <Icon name="chevron-up" className="h-3 w-3 translate-y-px" />
+                        </>
+                      ) : (
+                        <>
+                          Explore all
+                          <Icon name="chevron-down" className="h-3 w-3" />
+                        </>
                       )}
-                    </div>
-                    <ul className="space-y-3">
-                      {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
-                        <li key={item.id}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              try {
-                                // Prefill the message input without inserting sticky mentions
-                                messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
-                                messageInputRef.current?.focusInput?.()
-                              } catch {}
-                            }}
-                            className="group flex w-full rounded-2xl bg-card border border-border/40 shadow-sm px-3 py-2 text-left transition-all duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md hover:-translate-y-1"
-                          >
-                            <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
-                              <span className="mr-1 text-base align-top text-primary/70">“</span>
-                              {item.text}
-                              <span className="ml-1 text-base align-baseline text-primary/70">”</span>
-                            </p>
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
+                    </button>
+                  )}
+                </div>
+                <ul className="space-y-3">
+                  {(showAllSuggestions ? agentSuggestionCards : collapsedSuggestionCards).map(item => (
+                    <li key={item.id}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          try {
+                            // Prefill the message input without inserting sticky mentions
+                            messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
+                            messageInputRef.current?.focusInput?.()
+                          } catch {}
+                        }}
+                        className="group flex w-full rounded-2xl bg-card border border-border/40 shadow-sm px-3 py-2 text-left transition-all duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md hover:-translate-y-1"
+                      >
+                        <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
+                          <span className="mr-1 text-base align-top text-primary/70">“</span>
+                          {item.text}
+                          <span className="ml-1 text-base align-baseline text-primary/70">”</span>
+                        </p>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </div>
-            ) : (
-              <ConversationMessageInput
-                key={inputKey}
-                ref={messageInputRef}
-                selectedAgent={selectedAgent}
-                starshipId={starshipId}
-                conversationId={currentConversationId}
-                onConversationStart={handleConversationStart}
-                onToggleToolForm={handleToggleToolBuilder}
-                isToolFormOpen={false}
-                disabled={false}
-                minimal={isInputDocked}
-                onFocus={() => {}}
-                onBlur={() => {}}
-                onToggleOverlay={handleToggleOverlay}
-                showExpandableOverlay={false}
-                isOverlayExpanded={false}
-                budgetTokens={budgetTokens}
-                onAgentChange={handleAgentChange}
-                starshipSlug={starshipSlug}
-              ></ConversationMessageInput>
-            )}
+            </div>
           </div>
         </div>
 

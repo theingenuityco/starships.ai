@@ -88,7 +88,7 @@ export default function LedgerHistoryTable({
 
   return (
     <div className={cn(variant === 'card' ? 'ip-card-shadow rounded-2xl p-4' : undefined)}>
-      <div className="flex items-center justify-between">
+      <div className={cn('flex items-center', showTitle ? 'justify-between' : 'justify-end')}>
         {showTitle ? <h4 className="font-semibold text-slate-900 dark:text-slate-100">{title}</h4> : null}
         {pagination && (
           <div className="text-xs text-slate-500 dark:text-slate-400">
@@ -170,7 +170,12 @@ export default function LedgerHistoryTable({
         </tbody>
       </table>
       {pagination && (
-        <div className="mt-4 flex items-center justify-between">
+        <div
+          className={cn(
+            'mt-4 gap-4',
+            showTitle ? 'flex items-center justify-between' : 'flex flex-col items-end justify-end gap-2',
+          )}
+        >
           <div className="text-xs text-slate-500 dark:text-slate-400">
             Page {page} of {Math.max(1, Math.ceil((pagination.total ?? 0) / limit))}
           </div>

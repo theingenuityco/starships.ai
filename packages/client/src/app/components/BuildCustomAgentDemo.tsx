@@ -173,6 +173,9 @@ export default function BuildCustomAgentDemo() {
         setIsAwaitingTools(false)
         setIsFormStreaming(false)
         setAgentTitle('New agent')
+        try {
+          agentBuilderRef.current?.resetForm()
+        } catch {}
 
         await sleep(450)
 

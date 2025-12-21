@@ -8,11 +8,11 @@ export function WelcomeSignupCard({ userName, onDismiss }: { userName?: string; 
   const firstName = userName?.trim()?.split(/\s+/)?.[0]
 
   return (
-    <Card className="border-border/50 bg-gradient-to-br from-card to-muted/10 shadow-sm">
-      <CardHeader className="pb-3">
+    <Card className="rounded-2xl bg-card border border-border/40 shadow-sm">
+      <CardHeader className="p-4 pb-2">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-primary/10 border border-primary/15 flex items-center justify-center">
+            <div className="h-9 w-9 rounded-lg bg-primary/10 border border-primary/15 flex items-center justify-center">
               <Icon name="sparkles" className="h-5 w-5 text-primary" />
             </div>
             <div>
@@ -28,7 +28,7 @@ export function WelcomeSignupCard({ userName, onDismiss }: { userName?: string; 
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0">
+      <CardContent className="p-4 pt-2">
         <div className="grid gap-2 text-sm text-muted-foreground">
           <div className="flex items-start gap-2">
             <Icon name="check" className="h-4 w-4 translate-y-[2px] text-primary/80" />

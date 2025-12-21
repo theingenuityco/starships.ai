@@ -73,7 +73,7 @@ export default function Hero() {
               View Docs
             </Button>
           </div>
-          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • $10 credit on signup</div>
+          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • 200 credits on signup</div>
           <div className="mt-3 mb-8 md:mb-12">
             <Button
               size="sm"

@@ -96,12 +96,12 @@ export default function Hero() {
           <div className="flex flex-col items-center gap-3 justify-center">
             <Button
               size="lg"
-              className="h-14 sm:h-16 px-12 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              className="h-14 sm:h-16 px-12 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden rounded-full [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating}
               aria-busy={isPrimaryAnimating}
             >
-              <span className="inline-flex w-10 h-10 items-center justify-center mr-1.5">
+              <span className="inline-flex w-10 h-10 items-center justify-center mr-1">
                 <StarshipsLogo
                   width={40}
                   height={40}
@@ -123,8 +123,8 @@ export default function Hero() {
                 window.location.href = '/marketplace?from=public'
               }}
             >
-              <Icon name="store" className="w-5 h-5 mr-2.5" />
-              Explore Marketplace
+              <Icon name="store" className="w-6 h-6 mr-1" />
+              Explore agents in Marketplace
             </Button>
           </div>
         </div>

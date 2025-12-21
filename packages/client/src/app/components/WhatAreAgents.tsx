@@ -68,47 +68,47 @@ export default function WhatAreAgents() {
       {
         id: 'agent',
         type: 'anatomy',
-        position: { x: 60, y: 295 },
+        position: { x: 360, y: 0 },
         data: { label: 'Agent', sub: 'anatomy', icon: 'head-circuit', kind: 'center' },
       },
       {
         id: 'identity',
         type: 'anatomy',
-        position: { x: 380, y: 10 },
-        data: { label: 'Identity', sub: 'Who it is', icon: 'fingerprint', kind: 'leaf', inPosition: Position.Left },
+        position: { x: 40, y: 210 },
+        data: { label: 'Identity', sub: 'Who it is', icon: 'fingerprint', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'role',
         type: 'anatomy',
-        position: { x: 380, y: 190 },
-        data: { label: 'Role', sub: 'What it does', icon: 'user-cog', kind: 'leaf', inPosition: Position.Left },
+        position: { x: 200, y: 210 },
+        data: { label: 'Role', sub: 'What it does', icon: 'user-cog', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'instructions',
         type: 'anatomy',
-        position: { x: 380, y: 370 },
-        data: { label: 'Instructions', sub: 'How it behaves', icon: 'file-text', kind: 'leaf', inPosition: Position.Left },
+        position: { x: 360, y: 210 },
+        data: { label: 'Instructions', sub: 'How it behaves', icon: 'file-text', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'tools',
         type: 'anatomy',
-        position: { x: 380, y: 550 },
-        data: { label: 'Tools', sub: 'What it can use', icon: 'wrench', kind: 'leaf', inPosition: Position.Left },
+        position: { x: 520, y: 210 },
+        data: { label: 'Tools', sub: 'What it can use', icon: 'wrench', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'autonomy',
         type: 'anatomy',
-        position: { x: 380, y: 730 },
-        data: { label: 'Autonomy', sub: 'How far it can go', icon: 'shield-check', kind: 'leaf', inPosition: Position.Left },
+        position: { x: 680, y: 210 },
+        data: { label: 'Autonomy', sub: 'How far it can go', icon: 'shield-check', kind: 'leaf', inPosition: Position.Top },
       },
     ]
 
     const edges: Edge[] = [
-      { id: 'e-agent-identity', source: 'agent', sourceHandle: 'right', target: 'identity', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-role', source: 'agent', sourceHandle: 'right', target: 'role', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-instructions', source: 'agent', sourceHandle: 'right', target: 'instructions', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-tools', source: 'agent', sourceHandle: 'right', target: 'tools', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-autonomy', source: 'agent', sourceHandle: 'right', target: 'autonomy', targetHandle: 'in', type: 'bezier', animated: true },
+      { id: 'e-agent-identity', source: 'agent', sourceHandle: 'bottom', target: 'identity', targetHandle: 'in', type: 'bezier', animated: true },
+      { id: 'e-agent-role', source: 'agent', sourceHandle: 'bottom', target: 'role', targetHandle: 'in', type: 'bezier', animated: true },
+      { id: 'e-agent-instructions', source: 'agent', sourceHandle: 'bottom', target: 'instructions', targetHandle: 'in', type: 'bezier', animated: true },
+      { id: 'e-agent-tools', source: 'agent', sourceHandle: 'bottom', target: 'tools', targetHandle: 'in', type: 'bezier', animated: true },
+      { id: 'e-agent-autonomy', source: 'agent', sourceHandle: 'bottom', target: 'autonomy', targetHandle: 'in', type: 'bezier', animated: true },
     ].map(e => ({
       ...e,
       style: { stroke: 'rgba(168,85,247,0.55)', strokeWidth: 2.2 },
@@ -123,19 +123,19 @@ export default function WhatAreAgents() {
         <div className="text-center mb-8 md:mb-10">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2">What are agents?</h2>
           <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto">
-            Agents are AI teammates you configure to do repeatable work—reliably, with visibility and control.
+            Agents are AI teammates you set up to handle tasks for you.
           </p>
         </div>
 
         <div className="mx-auto max-w-4xl">
-          <div className="rounded-2xl border border-white/15 bg-white/[0.03] backdrop-blur-md p-4 sm:p-6 shadow-[0_0_18px_rgba(168,85,247,0.16),0_0_36px_rgba(59,130,246,0.10)]">
-            <div className="h-[540px] sm:h-[660px] md:h-[780px]">
+          <div className="rounded-2xl border border-white/15 bg-white/[0.03] backdrop-blur-md px-4 pb-4 pt-1 sm:px-6 sm:pb-6 sm:pt-2 shadow-[0_0_18px_rgba(168,85,247,0.16),0_0_36px_rgba(59,130,246,0.10)]">
+            <div className="h-[260px] sm:h-[320px] md:h-[380px]">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={{ anatomy: AnatomyNode }}
                 fitView
-                fitViewOptions={{ padding: 0.12 }}
+                fitViewOptions={{ padding: 0.1 }}
                 proOptions={{ hideAttribution: true }}
                 nodesDraggable={false}
                 nodesConnectable={false}
@@ -152,9 +152,7 @@ export default function WhatAreAgents() {
             </div>
           </div>
 
-          <p className="mt-4 text-center text-xs sm:text-sm text-muted-foreground">
-            Identity + Role + Instructions + Tools + Autonomy = an agent you can trust in production.
-          </p>
+          <p className="mt-4 text-center text-xs sm:text-sm text-muted-foreground">Anatomy of an agent</p>
 
           {/* A11y fallback */}
           <ul className="sr-only">

@@ -14,7 +14,7 @@ export default function UseCases() {
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Build your custom agent</h3>
               <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Tell it what it owns, how it should communicate, and what “done” looks like. You can start simple and refine as you go.
+                Define what it owns, how it communicates, and what “done” means.
               </p>
             </div>
 
@@ -32,20 +32,7 @@ export default function UseCases() {
               </p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-sm font-medium text-foreground">Connect your apps</div>
-                <p className="mt-2 text-sm text-muted-foreground">Slack, Drive, GitHub, email, calendars, and more, with scoped access.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-sm font-medium text-foreground">Add capabilities</div>
-                <p className="mt-2 text-sm text-muted-foreground">Search, summarize, create tickets, post updates, and automate repeatable steps.</p>
-              </div>
-              <div className="rounded-2xl border border-white/10 bg-white/5 p-5">
-                <div className="text-sm font-medium text-foreground">Stay in control</div>
-                <p className="mt-2 text-sm text-muted-foreground">Keep approvals on for sensitive actions, and review drafts before anything is sent.</p>
-              </div>
-            </div>
+            <BuildCustomAgentDemo />
           </div>
         </div>
 

@@ -509,7 +509,7 @@ export default function DelegationDemo() {
       {/* Blurry, almost transparent border */}
       <div className="absolute inset-0 -z-10 rounded-2xl video-blur-border opacity-90 pointer-events-none" aria-hidden />
 
-      <div className="relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-card">
+      <div className="relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
         <div
           className="relative w-full"
           style={{
@@ -564,8 +564,6 @@ export default function DelegationDemo() {
                 isAssistantStreamingOverride={respondingByConvo[activeDemoConvoId] || false}
                 isAwaitingToolResultsOverride={awaitingToolsByConvo[activeDemoConvoId] || false}
                 bottomPaddingPx={140}
-                className="bg-card"
-                scrollClassName="bg-card"
                 userNameOverride={DEMO_CONVERSATIONS[activeDemoConvoId].userIsAgent ? DEMO_CONVERSATIONS[activeDemoConvoId].rightUserLabel : undefined}
                 userAvatarSeedOverride={DEMO_CONVERSATIONS[activeDemoConvoId].userIsAgent ? DEMO_CONVERSATIONS[activeDemoConvoId].rightUserSeed : undefined}
               />

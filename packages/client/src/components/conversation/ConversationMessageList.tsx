@@ -24,6 +24,18 @@ interface ConversationMessageListProps {
   className?: string
   scrollClassName?: string
   /**
+   * Optional override for the "user" identity (useful for demo / internal chats on landing).
+   * If omitted, the component uses the signed-in user's info via `useAuth()`.
+   */
+  userNameOverride?: string
+  userEmailOverride?: string
+  userAvatarUrlOverride?: string
+  /**
+   * If set, render the user's avatar using the AgentAvatar component (seeded).
+   * Useful to represent "Aria" when she's the delegator on the right side.
+   */
+  userAvatarSeedOverride?: string
+  /**
    * Optional override for static/demo rendering (e.g. landing page).
    * When provided, the list will render these messages even if `conversationId` is null.
    */
@@ -44,6 +56,10 @@ export function ConversationMessageList({
   bottomPaddingPx,
   className,
   scrollClassName,
+  userNameOverride,
+  userEmailOverride,
+  userAvatarUrlOverride,
+  userAvatarSeedOverride,
   messagesOverride,
   agentNameOverride,
   agentAvatarUrlOverride,
@@ -416,6 +432,10 @@ export function ConversationMessageList({
                 isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                 starshipId={starshipId}
                 showAssistantAvatar={showAssistantAvatar}
+                userNameOverride={userNameOverride}
+                userEmailOverride={userEmailOverride}
+                userAvatarUrlOverride={userAvatarUrlOverride}
+                userAvatarSeedOverride={userAvatarSeedOverride}
               />
             )
           })}
@@ -469,6 +489,10 @@ interface ConversationMessageBubbleProps {
   isStreamingActive?: boolean
   starshipId?: string
   showAssistantAvatar?: boolean
+  userNameOverride?: string
+  userEmailOverride?: string
+  userAvatarUrlOverride?: string
+  userAvatarSeedOverride?: string
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -516,9 +540,23 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId, showAssistantAvatar = true }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({
+    message,
+    agentName,
+    agentAvatarUrl,
+    isStreamingActive,
+    starshipId,
+    showAssistantAvatar = true,
+    userNameOverride,
+    userEmailOverride,
+    userAvatarUrlOverride,
+    userAvatarSeedOverride,
+  }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
+    const effectiveUserName = userNameOverride ?? userName
+    const effectiveUserEmail = userEmailOverride ?? userEmail
+    const effectiveUserAvatar = userAvatarUrlOverride ?? userAvatar
 
     if (isUser) {
       // User message: Neutral bubble on the right
@@ -539,10 +577,18 @@ const MemoizedMessageBubble = memo(
               </div>
             </div>
             <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
-              {isImageUrl(userAvatar) ? (
-                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+              {userAvatarSeedOverride ? (
+                <AgentAvatar seed={userAvatarSeedOverride} size={32} />
+              ) : isImageUrl(effectiveUserAvatar) ? (
+                <AvatarImage
+                  src={effectiveUserAvatar!}
+                  alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  className="rounded-full object-cover"
+                />
               ) : null}
-              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{initialsFromName(userName || userEmail)}</AvatarFallback>
+              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{initialsFromName(effectiveUserName || effectiveUserEmail)}</AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -620,6 +666,12 @@ const MemoizedMessageBubble = memo(
     const prevCalls = (prevProps.message as any).toolCalls?.length ?? 0
     const nextCalls = (nextProps.message as any).toolCalls?.length ?? 0
     if (prevCalls !== nextCalls) return false
+
+    // Re-render when user overrides change (demo/internal chats)
+    if ((prevProps.userNameOverride || '') !== (nextProps.userNameOverride || '')) return false
+    if ((prevProps.userEmailOverride || '') !== (nextProps.userEmailOverride || '')) return false
+    if ((prevProps.userAvatarUrlOverride || '') !== (nextProps.userAvatarUrlOverride || '')) return false
+    if ((prevProps.userAvatarSeedOverride || '') !== (nextProps.userAvatarSeedOverride || '')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as any).toolResults?.length ?? 0

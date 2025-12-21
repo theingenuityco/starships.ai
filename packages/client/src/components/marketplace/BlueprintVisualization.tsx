@@ -36,6 +36,16 @@ interface BlueprintVisualizationProps {
   transparent?: boolean
   nodesDraggable?: boolean
   borderless?: boolean
+  /**
+   * Max zoom used when auto-fitting the view (prevents tiny graphs from zooming in too much).
+   * Defaults to 1.2 (existing behavior).
+   */
+  fitViewMaxZoom?: number
+  /**
+   * Min zoom used when auto-fitting the view.
+   * Defaults to 0.35 (existing behavior).
+   */
+  fitViewMinZoom?: number
   // Applies to the inner container that holds the canvas (for transferring viewport styles)
   containerClassName?: string
   containerStyle?: React.CSSProperties
@@ -1011,6 +1021,8 @@ function BlueprintFlow({
   transparent,
   nodesDraggable = false,
   borderless = false,
+  fitViewMaxZoom = 1.2,
+  fitViewMinZoom = 0.35,
   containerClassName = '',
   containerStyle,
 }: {
@@ -1018,6 +1030,8 @@ function BlueprintFlow({
   transparent?: boolean
   nodesDraggable?: boolean
   borderless?: boolean
+  fitViewMaxZoom?: number
+  fitViewMinZoom?: number
   containerClassName?: string
   containerStyle?: React.CSSProperties
 }) {
@@ -1086,11 +1100,11 @@ function BlueprintFlow({
       reactFlowInstanceRef.current?.fitView({
         padding: 0.25,
         includeHiddenNodes: true,
-        minZoom: 0.35,
-        maxZoom: 1.2,
+        minZoom: fitViewMinZoom,
+        maxZoom: fitViewMaxZoom,
       })
     })
-  }, [nodesWithSelection.length])
+  }, [nodesWithSelection.length, fitViewMaxZoom, fitViewMinZoom])
 
   // Default amber-suited gradient if no explicit background is provided and not transparent
   const computedContainerStyle: React.CSSProperties | undefined = useMemo(() => {
@@ -1117,8 +1131,8 @@ function BlueprintFlow({
         onEdgesChange={onEdgesChange}
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
-        minZoom={0.35}
-        maxZoom={1.2}
+        minZoom={fitViewMinZoom}
+        maxZoom={fitViewMaxZoom}
         onInit={instance => {
           reactFlowInstanceRef.current = instance
         }}
@@ -1155,6 +1169,8 @@ export function BlueprintVisualization({
   transparent = false,
   nodesDraggable = false,
   borderless = false,
+  fitViewMaxZoom = 1.2,
+  fitViewMinZoom = 0.35,
   containerClassName = '',
   containerStyle,
 }: BlueprintVisualizationProps) {
@@ -1174,6 +1190,8 @@ export function BlueprintVisualization({
           transparent={transparent}
           nodesDraggable={nodesDraggable}
           borderless={borderless}
+          fitViewMaxZoom={fitViewMaxZoom}
+          fitViewMinZoom={fitViewMinZoom}
           containerClassName={containerClassName}
           containerStyle={containerStyle}
         />

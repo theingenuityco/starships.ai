@@ -1,5 +1,6 @@
 import { Skeleton } from '@/components/ui/skeleton'
 import Icon from '@/components/primitives/Icon'
+import DelegationDemo from '@/app/components/DelegationDemo'
 
 export default function UseCases() {
   const items: Array<{
@@ -75,6 +76,19 @@ export default function UseCases() {
               </div>
             )
           })}
+        </div>
+
+        {/* Delegation subsection */}
+        <div className="mt-14 md:mt-16">
+          <div className="text-center mb-6 md:mb-8">
+            <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold">Delegation</h3>
+            <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto mt-2">
+              Give one instruction, and your lead agent can spin up specialist chats to build agents, tools, and automations—then return with a deployable result.
+            </p>
+          </div>
+          <div className="w-full max-w-6xl mx-auto">
+            <DelegationDemo />
+          </div>
         </div>
       </div>
     </section>

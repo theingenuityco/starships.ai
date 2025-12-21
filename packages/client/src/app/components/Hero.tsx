@@ -128,25 +128,6 @@ export default function Hero() {
             </Button>
           </div>
         </div>
-
-        {/* Demo video replacing blueprint visualization */}
-        <div className="relative w-full overflow-visible pt-[56.25%] mt-6 sm:mt-8 md:mt-10">
-          {/* Glow layer around the video frame */}
-          <div className="absolute inset-0 rounded-2xl video-glow pointer-events-none" aria-hidden />
-          {/* Blurry, almost transparent border */}
-          <div className="absolute inset-0 rounded-2xl video-blur-border pointer-events-none" aria-hidden />
-          <div className="absolute inset-0 rounded-2xl shadow-2xl overflow-hidden">
-            <div
-              className="h-full w-full rounded-lg bg-black/30 overflow-hidden"
-              style={{
-                background:
-                  'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
-              }}
-            >
-              <video className="h-full w-full object-contain" src="/landing/demo.webm" autoPlay loop muted playsInline preload="none" />
-            </div>
-          </div>
-        </div>
       </div>
       <style jsx>{`
         .warp-word {

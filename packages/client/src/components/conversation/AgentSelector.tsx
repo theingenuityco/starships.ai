@@ -55,21 +55,22 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
       <PopoverTrigger asChild>
         <Button
           variant="outline"
+          aria-label={selectedAgent ? `Selected agent: ${selectedAgent.name}. Change agent.` : 'Select an agent'}
           className={cn(
             // Match ConversationMessageInput container styling
             'justify-between bg-card border border-border/60 rounded-2xl shadow-sm transition-all hover:bg-card focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/70',
             // Match ConversationMessageInput inner padding: minimal => px-2 py-2, default => px-3 py-3
-            compact ? 'h-auto px-2 py-1.5 text-xs min-w-[140px]' : 'h-auto px-3 py-2 text-sm min-w-[220px]'
+            compact ? 'h-auto px-2 py-1 text-xs min-w-[120px]' : 'h-auto px-3 py-2 text-sm min-w-[220px]'
           )}
           disabled={loading}
         >
           <div className="flex items-center gap-2 min-w-0">
             {selectedAgent ? (
-              <Avatar className={cn(compact ? 'h-5 w-5' : 'h-6 w-6', 'ring-1 ring-border/40 rounded-full')}>
+              <Avatar className={cn(compact ? 'h-4.5 w-4.5' : 'h-6 w-6', 'ring-1 ring-border/40 rounded-full')}>
                 <AgentAvatar
                   seed={selectedAgent.name}
                   imageUrl={avatarUrlById.get((selectedAgent as any).avatarAttachmentId)}
-                  size={compact ? 20 : 24}
+                  size={compact ? 18 : 24}
                   rounded
                 />
               </Avatar>
@@ -86,6 +87,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
         align="start"
         side="bottom"
         sideOffset={8}
+        aria-label="Agent options"
         className={cn('p-0 rounded-lg shadow-frosted-lg text-sm leading-6', compact ? 'w-80' : 'min-w-[320px] w-[min(420px,calc(100vw-40px))]')}
       >
         <div className="p-2 max-h-64 overflow-y-auto custom-scrollbar">
@@ -106,11 +108,12 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                     setIsOpen(false)
                   }}
                   className={cn(
-                    'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring',
-                    selectedAgent?.id === agent.id ? 'bg-primary/5 text-foreground' : 'text-foreground hover:bg-primary/5'
+                    // Match NavigationItem hover/active styling
+                    'w-full text-left px-3 py-2 rounded-lg transition-colors focus-visible-ring',
+                    selectedAgent?.id === agent.id ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                   )}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <Avatar className={cn('h-7 w-7 ring-1 ring-border/40 rounded-full')}>
                       <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={28} rounded />
                     </Avatar>

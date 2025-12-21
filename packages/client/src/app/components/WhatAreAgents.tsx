@@ -1,155 +1,188 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { Handle, Position, ReactFlow } from '@xyflow/react'
-import type { Edge, Node, NodeProps } from '@xyflow/react'
-import { useMemo } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 
-type AnatomyNodeData = {
+type Trait = {
+  id: string
   label: string
   sub: string
   icon: string
-  kind: 'center' | 'leaf'
-  inPosition?: Position
+  x: number
+  y: number
 }
 
-function AnatomyNode({ data }: NodeProps<Node<AnatomyNodeData>['data']>) {
-  const isCenter = data.kind === 'center'
-
-  const orbSizeClass = isCenter ? 'w-[92px] h-[92px]' : 'w-[68px] h-[68px]'
-
+function TraitCard({ trait, setRef }: { trait: Pick<Trait, 'id' | 'label' | 'sub' | 'icon'>; setRef?: (el: HTMLDivElement | null) => void }) {
   return (
-    // Important: the node bounding box should be ONLY the orb,
-    // otherwise ReactFlow will anchor edges to the combined (orb + labels) box.
-    <div className={`relative ${orbSizeClass} overflow-visible`}>
-      {/* Handles (hidden) — positioned relative to the orb box */}
-      {isCenter ? (
-        <>
-          <Handle id="top" type="source" position={Position.Top} style={{ opacity: 0 }} />
-          <Handle id="right" type="source" position={Position.Right} style={{ opacity: 0 }} />
-          <Handle id="bottom" type="source" position={Position.Bottom} style={{ opacity: 0 }} />
-          <Handle id="left" type="source" position={Position.Left} style={{ opacity: 0 }} />
-        </>
-      ) : (
-        <Handle id="in" type="target" position={data.inPosition ?? Position.Top} style={{ opacity: 0 }} />
-      )}
-
-      {/* Icon orb = the node */}
-      <div
-        title={`${data.label}${data.sub ? ` — ${data.sub}` : ''}`}
-        className={[
-          'agent-anatomy-orb relative grid place-items-center rounded-full border w-full h-full',
-          isCenter
-            ? 'border-white/25 bg-black/35 shadow-[0_0_22px_rgba(168,85,247,0.24),0_0_44px_rgba(59,130,246,0.14)]'
-            : 'border-white/18 bg-white/[0.04] shadow-[0_0_14px_rgba(168,85,247,0.18),0_0_32px_rgba(59,130,246,0.10)]',
-        ].join(' ')}
-      >
-        {/* Center pulsing aura */}
-        {isCenter && <div className="agent-anatomy-center-ring pointer-events-none absolute inset-[-12px] rounded-full" />}
-
-        <Icon
-          name={data.icon}
-          className={`${isCenter ? 'w-[44px] h-[44px]' : 'w-[30px] h-[30px]'} text-primary drop-shadow-[0_0_18px_rgba(168,85,247,0.28)]`}
-        />
-      </div>
-
-      {/* Labels outside the orb */}
-      <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-nowrap">
-        <div className={`${isCenter ? 'text-sm sm:text-base' : 'text-sm'} font-medium text-foreground`}>{data.label}</div>
-        {data.sub && <div className="text-xs sm:text-sm text-muted-foreground">{data.sub}</div>}
+    <div ref={setRef} className="relative w-[300px] rounded-xl border border-white/12 bg-white/[0.05] px-5 py-4 shadow-[0_0_18px_rgba(168,85,247,0.12),0_0_34px_rgba(59,130,246,0.08)] select-text">
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/15 bg-black/30">
+          <Icon name={trait.icon} className="h-5 w-5 text-primary" />
+        </div>
+        <div className="min-w-0 select-text">
+          <div className="text-base font-medium text-foreground leading-tight">{trait.label}</div>
+          <div className="mt-1 text-sm text-muted-foreground leading-snug">{trait.sub}</div>
+        </div>
       </div>
     </div>
   )
 }
 
 export default function WhatAreAgents() {
-  const { nodes, edges } = useMemo(() => {
-    const nodes: Node<AnatomyNodeData>[] = [
-      {
-        id: 'agent',
-        type: 'anatomy',
-        position: { x: 440, y: 0 },
-        data: { label: 'Agent', sub: 'Anatomy of an agent', icon: 'head-circuit', kind: 'center' },
-      },
-      {
-        id: 'identity',
-        type: 'anatomy',
-        position: { x: 0, y: 210 },
-        data: { label: 'Identity', sub: 'Who it is', icon: 'fingerprint', kind: 'leaf', inPosition: Position.Top },
-      },
-      {
-        id: 'role',
-        type: 'anatomy',
-        position: { x: 220, y: 210 },
-        data: { label: 'Role', sub: 'What it does', icon: 'user-cog', kind: 'leaf', inPosition: Position.Top },
-      },
-      {
-        id: 'instructions',
-        type: 'anatomy',
-        position: { x: 440, y: 210 },
-        data: { label: 'Instructions', sub: 'How it behaves', icon: 'file-text', kind: 'leaf', inPosition: Position.Top },
-      },
-      {
-        id: 'tools',
-        type: 'anatomy',
-        position: { x: 660, y: 210 },
-        data: { label: 'Tools', sub: 'What it can use', icon: 'wrench', kind: 'leaf', inPosition: Position.Top },
-      },
-      {
-        id: 'autonomy',
-        type: 'anatomy',
-        position: { x: 880, y: 210 },
-        data: { label: 'Autonomy', sub: 'How far it can go', icon: 'shield-check', kind: 'leaf', inPosition: Position.Top },
-      },
-    ]
-
-    const edges: Edge[] = [
-      { id: 'e-agent-identity', source: 'agent', sourceHandle: 'bottom', target: 'identity', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-role', source: 'agent', sourceHandle: 'bottom', target: 'role', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-instructions', source: 'agent', sourceHandle: 'bottom', target: 'instructions', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-tools', source: 'agent', sourceHandle: 'bottom', target: 'tools', targetHandle: 'in', type: 'bezier', animated: true },
-      { id: 'e-agent-autonomy', source: 'agent', sourceHandle: 'bottom', target: 'autonomy', targetHandle: 'in', type: 'bezier', animated: true },
-    ].map(e => ({
-      ...e,
-      style: { stroke: 'rgba(168,85,247,0.55)', strokeWidth: 2.2 },
-    }))
-
-    return { nodes, edges }
+  const agent = useMemo(() => {
+    return {
+      label: 'Agent',
+      sub: 'Anatomy of an agent',
+      icon: 'head-circuit',
+      x: 520,
+      y: 10,
+    }
   }, [])
+
+  const traits = useMemo<Trait[]>(() => {
+    return [
+      { id: 'identity', label: 'Identity', sub: 'Name, slug, and avatar shown in the UI', icon: 'fingerprint', x: 0, y: 270 },
+      { id: 'role', label: 'Role', sub: 'Its mission, defined in the system prompt header', icon: 'user-cog', x: 400, y: 270 },
+      { id: 'instructions', label: 'Instructions', sub: 'System prompt + (optional) blueprint that drives the loop', icon: 'file-text', x: 800, y: 270 },
+      { id: 'tools', label: 'Tools', sub: 'Assigned tools by slug (each runs its own blueprint)', icon: 'wrench', x: 200, y: 480 },
+      { id: 'autonomy', label: 'Autonomy', sub: 'Model + limits; tool calls are blocked if not assigned', icon: 'shield-check', x: 600, y: 480 },
+    ]
+  }, [])
+
+  const canvasRef = useRef<HTMLDivElement | null>(null)
+  const orbRef = useRef<HTMLDivElement | null>(null)
+  const traitRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  const [paths, setPaths] = useState<Array<{ id: string; d: string }>>([])
+
+  const computePaths = () => {
+    const canvas = canvasRef.current
+    const orb = orbRef.current
+    if (!canvas || !orb) return
+
+    const canvasRect = canvas.getBoundingClientRect()
+    const orbRect = orb.getBoundingClientRect()
+
+    const startX = orbRect.left - canvasRect.left + orbRect.width / 2
+    const startY = orbRect.top - canvasRect.top + orbRect.height
+
+    const next: Array<{ id: string; d: string }> = []
+
+    for (const t of traits) {
+      const el = traitRefs.current[t.id]
+      if (!el) continue
+      const r = el.getBoundingClientRect()
+
+      const endX = r.left - canvasRect.left + r.width / 2
+      const endY = r.top - canvasRect.top
+
+      // Smooth cubic curve from agent orb to card top-center
+      const dy = endY - startY
+      const c1x = startX
+      const c1y = startY + Math.max(60, dy * 0.45)
+      const c2x = endX
+      const c2y = endY - Math.max(60, dy * 0.25)
+      const d = `M ${startX} ${startY} C ${c1x} ${c1y}, ${c2x} ${c2y}, ${endX} ${endY}`
+
+      next.push({ id: `edge-${t.id}`, d })
+    }
+
+    setPaths(next)
+  }
+
+  useLayoutEffect(() => {
+    computePaths()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traits])
+
+  useEffect(() => {
+    computePaths()
+
+    const onResize = () => computePaths()
+    window.addEventListener('resize', onResize)
+
+    let ro: ResizeObserver | undefined
+    if (typeof ResizeObserver !== 'undefined' && canvasRef.current) {
+      ro = new ResizeObserver(() => computePaths())
+      ro.observe(canvasRef.current)
+    }
+
+    return () => {
+      window.removeEventListener('resize', onResize)
+      ro?.disconnect()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [traits])
 
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
         <div className="mb-10 md:mb-14">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">What are agents?</h2>
-          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto">
-            Agents are AI teammates you set up to handle tasks for you.
-          </p>
+          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto">Agents are AI teammates you set up to handle tasks for you.</p>
         </div>
 
         <div className="mx-auto max-w-6xl">
-          <div className="rounded-2xl bg-transparent border border-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0 shadow-none">
-            <div className="h-[260px] sm:h-[320px] md:h-[400px]">
-              <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                nodeTypes={{ anatomy: AnatomyNode }}
-                fitView
-                fitViewOptions={{ padding: 0 }}
-                minZoom={1}
-                maxZoom={1}
-                proOptions={{ hideAttribution: true }}
-                nodesDraggable={false}
-                nodesConnectable={false}
-                elementsSelectable={false}
-                panOnDrag={false}
-                zoomOnScroll={false}
-                zoomOnPinch={false}
-                zoomOnDoubleClick={false}
-                preventScrolling={false}
-                className="!bg-transparent"
-              >
-              </ReactFlow>
+          {/* Mobile/tablet: simple stacked cards */}
+          <div className="lg:hidden grid gap-3">
+            <div className="flex items-center gap-3 rounded-xl border border-white/12 bg-white/[0.05] px-4 py-3 select-text">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/15 bg-black/30">
+                <Icon name="head-circuit" className="h-6 w-6 text-primary" />
+              </div>
+              <div className="select-text">
+                <div className="text-base font-medium text-foreground leading-tight">Agent</div>
+                <div className="mt-1 text-sm text-muted-foreground leading-snug">Anatomy of an agent</div>
+              </div>
+            </div>
+
+            <div className="grid gap-3">
+              {traits.map(t => (
+                <TraitCard key={t.id} trait={t} />
+              ))}
+            </div>
+          </div>
+
+          {/* Desktop: diagram (divs + SVG paths) */}
+          <div className="hidden lg:block rounded-2xl bg-transparent border border-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0 shadow-none">
+            <div ref={canvasRef} className="relative mx-auto h-[720px] w-[1180px] max-w-full">
+              <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true">
+                {paths.map(p => (
+                  <path key={p.id} d={p.d} className="agent-anatomy-edge" />
+                ))}
+              </svg>
+
+              {/* Center agent */}
+              <div className="absolute" style={{ left: agent.x, top: agent.y }}>
+                <div ref={orbRef} className="relative w-[92px] h-[92px] overflow-visible">
+                  <div
+                    title={`${agent.label}${agent.sub ? ` — ${agent.sub}` : ''}`}
+                    className={[
+                      'agent-anatomy-orb relative grid place-items-center rounded-full border w-full h-full',
+                      'border-white/25 bg-black/35 shadow-[0_0_22px_rgba(168,85,247,0.24),0_0_44px_rgba(59,130,246,0.14)]',
+                    ].join(' ')}
+                  >
+                    <div className="agent-anatomy-center-ring pointer-events-none absolute inset-[-12px] rounded-full" />
+                    <Icon name={agent.icon} className="w-[44px] h-[44px] text-primary drop-shadow-[0_0_18px_rgba(168,85,247,0.28)]" />
+                  </div>
+
+                  {/* Label anchored to orb center (so text width never shifts alignment) */}
+                  <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-nowrap select-text">
+                    <div className="text-base sm:text-lg font-semibold text-foreground">{agent.label}</div>
+                    <div className="text-sm sm:text-base text-muted-foreground">{agent.sub}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Trait cards */}
+              {traits.map(t => (
+                <div key={t.id} className="absolute" style={{ left: t.x, top: t.y }}>
+                  <TraitCard
+                    trait={t}
+                    setRef={el => {
+                      traitRefs.current[t.id] = el
+                    }}
+                  />
+                </div>
+              ))}
             </div>
           </div>
 
@@ -165,11 +198,11 @@ export default function WhatAreAgents() {
       </div>
 
       <style jsx>{`
-        /* Edge animation tinting */
-        :global(.react-flow__edge-path) {
+        .agent-anatomy-edge {
+          fill: none;
           stroke: rgba(168, 85, 247, 0.55);
-        }
-        :global(.react-flow__edge.animated .react-flow__edge-path) {
+          stroke-width: 2.2px;
+          stroke-linecap: round;
           stroke-dasharray: 6 10;
           animation: agentEdgeDash 1.8s linear infinite;
         }
@@ -199,7 +232,7 @@ export default function WhatAreAgents() {
 
         /* Respect reduced motion */
         @media (prefers-reduced-motion: reduce) {
-          :global(.react-flow__edge.animated .react-flow__edge-path) {
+          .agent-anatomy-edge {
             animation: none !important;
           }
           .agent-anatomy-center-ring {

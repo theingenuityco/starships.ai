@@ -2,27 +2,68 @@
 
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant } from '@/lib/flags'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
 
 export default function Hero() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuth()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
   const primaryStarship = starships[0]
+  const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
+  const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
+  const pendingPrimaryActionRef = useRef<null | (() => void)>(null)
+  const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handlePrimaryClick = useCallback(() => {
-    track({ type: 'hero_cta_clicked' })
+  useEffect(() => {
+    return () => {
+      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current)
+    }
+  }, [])
+
+  const runPendingPrimaryAction = useCallback(() => {
+    const fn = pendingPrimaryActionRef.current
+    if (!fn) return
+    pendingPrimaryActionRef.current = null
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current)
+      fallbackTimeoutRef.current = null
+    }
+    fn()
+  }, [])
+
+  const navigatePrimary = useCallback(() => {
     if (isAuthenticated && primaryStarship?.slug) {
       router.push(`/ship/${primaryStarship.slug}/conversations`)
       return
     }
     router.push('/login')
   }, [isAuthenticated, primaryStarship?.slug, router])
+
+  const handlePrimaryClick = useCallback(() => {
+    if (isPrimaryAnimating) return
+    track({ type: 'hero_cta_clicked' })
+
+    setIsPrimaryAnimating(true)
+    pendingPrimaryActionRef.current = () => {
+      navigatePrimary()
+      setIsPrimaryAnimating(false)
+    }
+
+    // Kick off the logo entry animation, then navigate once it completes.
+    setHeroLogoTrigger(v => v + 1)
+
+    // Fallback: if the animation completion callback doesn't fire (e.g. reduced motion),
+    // proceed after a short delay.
+    fallbackTimeoutRef.current = setTimeout(() => {
+      runPendingPrimaryAction()
+    }, 1100)
+  }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
     <section className="pt-44 md:pt-52 pb-20 px-4">
@@ -52,32 +93,40 @@ export default function Hero() {
             })()}
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed max-w-[60ch] mx-auto">Build, manage and deploy agents to handle the busy work.</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button size="lg" className="h-12 px-10 text-base leading-none overflow-hidden [&_svg]:!w-7 [&_svg]:!h-7" onClick={handlePrimaryClick}>
-              {isAuthenticated ? (
-                <span className="inline-flex w-7 h-7 items-center justify-center mr-2">
-                  <Icon name="rocket" size={28} />
-                </span>
-              ) : (
-                <span className="inline-flex w-7 h-7 items-center justify-center mr-2">
-                  <Icon name="rocket-launch" size={28} />
-                </span>
-              )}
-              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Launch your starship'}
-            </Button>
+          <div className="flex flex-col items-center gap-3 justify-center">
             <Button
               size="lg"
-              variant="outline"
-              className="h-12 px-10 text-base"
+              className="h-14 sm:h-16 px-12 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              onClick={handlePrimaryClick}
+              disabled={isPrimaryAnimating}
+              aria-busy={isPrimaryAnimating}
+            >
+              <span className="inline-flex w-10 h-10 items-center justify-center mr-1.5">
+                <StarshipsLogo
+                  width={40}
+                  height={40}
+                  className="text-primary-foreground"
+                  gradientId="hero-starships-logo-gradient"
+                  idleLoop={false}
+                  activeStroke="currentColor"
+                  triggerAnimation={heroLogoTrigger}
+                  onEntryAnimationComplete={runPendingPrimaryAction}
+                />
+              </span>
+              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get started for free'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-base text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => {
                 window.location.href = '/marketplace?from=public'
               }}
             >
               <Icon name="store" className="w-5 h-5 mr-2.5" />
-              Explore agents
+              Explore Marketplace
             </Button>
           </div>
-          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • 200 credits on signup</div>
         </div>
 
         {/* Demo video replacing blueprint visualization */}

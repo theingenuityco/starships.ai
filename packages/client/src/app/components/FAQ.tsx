@@ -2,28 +2,32 @@ import { Card } from '@/components/ui/card'
 
 const QA = [
   {
-    q: 'Can I self-host or run Starships locally?',
-    a: 'No. Starships.ai is a fully managed, hosted service. Self-hosting and local deployments are not supported at this time.',
+    q: 'What is Starships.ai?',
+    a: 'Starships is a workspace where you assemble an AI team—specialists you can brief, equip with tools, and collaborate with to get real work done.',
   },
   {
-    q: 'How do I get access and start?',
-    a: 'Create an account, add your model provider keys in Environment settings, create a starship workspace, then launch your first agent from a template and start a conversation.',
+    q: 'How do I get started?',
+    a: 'Create an account, launch a template from the marketplace, then start a conversation. You can customize teammates and add skills as you go.',
+  },
+  {
+    q: 'Do I need to be technical?',
+    a: 'Not to start. Most people begin with templates and simple prompts. If you want deeper control later, you can configure advanced settings and custom tools.',
   },
   {
     q: 'Which models and providers are supported?',
-    a: 'OpenRouter (recommended), OpenAI, and Anthropic. Set a default provider/model for your workspace and override per agent or workflow (e.g., “anthropic/claude-3.5-sonnet”, “gpt-4o”).',
+    a: 'OpenRouter (recommended), OpenAI, and Anthropic. You can set defaults for your workspace and override per teammate when needed.',
   },
   {
-    q: 'How do tools work and how do I add custom ones?',
-    a: 'Tools are JSON-schema functions backed by a blueprint workflow. Define name, description, parameters, and blueprint; agents will call them automatically when appropriate. You can test tools and iterate before enabling them.',
-  },
-  {
-    q: 'What are agents and workflows?',
-    a: 'Workflows are DAGs composed of nodes (LLM, HTTP, transform, conditional, tool, workflow, code, user_prompt). Agents wrap workflows to manage conversation state, tool calls, and streaming results.',
+    q: 'Can my AI teammates use my tools and data?',
+    a: 'Yes. You can connect skills (tools) so teammates can take actions and fetch information, and you stay in control of what’s enabled in each workspace.',
   },
   {
     q: 'How does Starships handle security and privacy?',
-    a: 'JWT-protected APIs, encrypted environment variables for secrets, and data stored in our managed PostgreSQL. Provider keys remain in your workspace and are used only at runtime. We do not use your data to train models.',
+    a: 'Secrets are encrypted and scoped to your workspace. Runs are isolated and observable. We do not use your data to train models.',
+  },
+  {
+    q: 'Can I self-host or run Starships locally?',
+    a: 'Not currently. Starships.ai is a fully managed, hosted service.',
   },
 ]
 

@@ -8,23 +8,23 @@ export default function UseCases() {
     icon: string
   }> = [
     {
-      title: 'Create agents in minutes',
-      desc: 'Use the builder to define name, prompt, model, and settings. Save and iterate quickly.',
+      title: 'Create AI teammates',
+      desc: 'Define roles, tone, and goals. Start from a template or create your own in minutes.',
       icon: 'bot',
     },
     {
-      title: 'Create tools that fit your needs',
-      desc: 'Spin up tools with parameters and blueprints, or deploy a template and customize.',
+      title: 'Give them skills (tools)',
+      desc: 'Pick proven skills from the marketplace, or add custom tools when you need something specific.',
       icon: 'wrench',
     },
     {
-      title: 'Assign tools to agents',
-      desc: 'Wire tools to agents with one click and keep configs organized inside your starship.',
+      title: 'Assign work as a team',
+      desc: 'Organize teammates inside a starship workspace and keep everything aligned in one place.',
       icon: 'plug',
     },
     {
-      title: 'Stream tests and iterate live',
-      desc: 'Chat with agents, watch executions stream in real‑time, and refine prompts and blueprints.',
+      title: 'Collaborate in real time',
+      desc: 'Chat, watch progress stream live, and iterate until the output is exactly what you want.',
       icon: 'activity',
     },
   ]
@@ -34,8 +34,10 @@ export default function UseCases() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Build agents and tools fast</h2>
-        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Design, connect, and iterate on agents and tools in minutes.</p>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Assemble your AI team</h2>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">
+          Create teammates, equip them with the right skills, and work together in one shared workspace.
+        </p>
         <div className="space-y-10 md:space-y-12">
           {items.map((item, idx) => {
             const isRightAligned = idx % 2 === 1

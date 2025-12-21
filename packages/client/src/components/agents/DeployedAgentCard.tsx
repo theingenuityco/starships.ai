@@ -94,7 +94,8 @@ export function DeployedAgentCard({
   disableEntranceMotion = false,
   disableHoverMotion = false,
 }: DeployedAgentCardProps) {
-  // Check if this is a template-based agent (has sourceTemplateId) - these are protected
+  // Check if this is a template-based agent (has sourceTemplateId).
+  // Note: template-based agents may be read-only in some editors, but they can still be deleted.
   const isTemplateAgent = !!agent.sourceTemplateId
 
   // Get update info from agent object (populated by API)
@@ -160,7 +161,7 @@ export function DeployedAgentCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
-                {onDelete && !isTemplateAgent && (
+                {onDelete && (
                   <DropdownMenuItem
                     onClick={e => {
                       e.stopPropagation()

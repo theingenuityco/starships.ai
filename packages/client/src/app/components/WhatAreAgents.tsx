@@ -41,11 +41,11 @@ export default function WhatAreAgents() {
 
   const traits = useMemo<Trait[]>(() => {
     return [
-      { id: 'identity', label: 'Identity', sub: 'Name, slug, and avatar shown in the UI', icon: 'fingerprint', x: 0, y: 270 },
-      { id: 'role', label: 'Role', sub: 'Its mission, defined in the system prompt header', icon: 'user-cog', x: 400, y: 270 },
-      { id: 'instructions', label: 'Instructions', sub: 'System prompt + (optional) blueprint that drives the loop', icon: 'file-text', x: 800, y: 270 },
-      { id: 'tools', label: 'Tools', sub: 'Assigned tools by slug (each runs its own blueprint)', icon: 'wrench', x: 200, y: 480 },
-      { id: 'autonomy', label: 'Autonomy', sub: 'Model + limits; tool calls are blocked if not assigned', icon: 'shield-check', x: 600, y: 480 },
+      { id: 'identity', label: 'Identity', sub: 'Its name, avatar, and personality, plus how it shows up in your workspace', icon: 'fingerprint', x: 0, y: 270 },
+      { id: 'role', label: 'Role', sub: 'Its job description, what it owns, what “done” looks like, and what to prioritize', icon: 'user-cog', x: 400, y: 270 },
+      { id: 'instructions', label: 'Instructions', sub: 'The rules it follows, including tone, steps to take, and output format', icon: 'file-text', x: 800, y: 270 },
+      { id: 'tools', label: 'Tools', sub: 'The actions it can take, which apps it can access, and what it’s allowed to do', icon: 'wrench', x: 200, y: 480 },
+      { id: 'autonomy', label: 'Autonomy', sub: 'The guardrails, what it can do automatically, and when it should ask you first', icon: 'shield-check', x: 600, y: 480 },
     ]
   }, [])
 

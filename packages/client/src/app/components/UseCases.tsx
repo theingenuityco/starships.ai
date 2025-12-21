@@ -13,7 +13,7 @@ export default function UseCases() {
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Delegation</h3>
               <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Give one instruction, and your lead agent can spin up specialist chats to build agents, tools, and automations—then return with a deployable result.
+                Give one instruction, and Aria can spin up specialist chats to set up agents and tools for you, then return with a ready-to-use result.
               </p>
             </div>
             <div className="w-full">

@@ -121,6 +121,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
         avatarUrl={(template as any).avatarUrl}
         onClick={handleCardClick}
         showStatusIndicator={false}
+        showPublicationBadge={false}
         hideChatControl={true}
         showActions={false}
         disableEntranceMotion={true}

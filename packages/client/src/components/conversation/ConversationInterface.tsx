@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
+import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -25,8 +26,9 @@ import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -84,10 +86,25 @@ function getMostRecentAgentIdFromMessages(messages: any[], conversationId?: stri
   return null
 }
 
+function pickDefaultAgent(agents: any[]): any | null {
+  if (!Array.isArray(agents) || agents.length === 0) return null
+  const aria = agents.find(a => typeof a?.slug === 'string' && a.slug.toLowerCase().startsWith('aria'))
+  return aria ?? agents[0] ?? null
+}
+
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { data: authUser } = useAuthUser()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const shouldShowWelcomeCard = searchParams.get('welcome') === '1'
+  const dismissWelcomeCard = useCallback(() => {
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete('welcome')
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname)
+  }, [pathname, router, searchParams])
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
@@ -201,22 +218,27 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const first = full.split(/\s+/)[0]
     return first || 'there'
   }, [authUser?.name])
-  const starterGreetings = useMemo(
+  const starterSlogans = useMemo(
     () => [
-      `Hi ${displayName}`,
-      `Ship mode on`,
-      `It's automation time`,
-      `Agents awaiting orders`,
-      `Ideas to agents, ${displayName}`,
-      `Less meetings, more shipping`,
-      `New mission unlocked`,
-      `Let the agents handle it`,
-      `One prompt away from prod`,
-      `Prototype now, refactor later`,
+      `What are we doing next?`,
+      `What should we ship today?`,
+      `Tell me the goal.`,
+      `Give me a task.`,
+      `Pick one thing to finish.`,
+      `What’s the next step?`,
+      `Let’s make progress.`,
+      `Let’s ship a quick win.`,
+      `What needs to get done?`,
+      `Start with the outcome.`,
     ],
     [displayName]
   )
-  const starterGreeting = useMemo(() => starterGreetings[Math.floor(Math.random() * starterGreetings.length)] ?? 'What are we building today?', [starterGreetings])
+  const starterSlogan = useMemo(() => starterSlogans[Math.floor(Math.random() * starterSlogans.length)] ?? 'What are we building today?', [starterSlogans])
+
+  const starshipName = useMemo(() => {
+    const n = (starshipData as any)?.name
+    return typeof n === 'string' && n.trim().length > 0 ? n.trim() : 'your starship'
+  }, [starshipData])
 
   // For collapsed view, show only the first few prompts for the selected agent
   const collapsedSuggestionCards = useMemo(() => {
@@ -319,6 +341,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Track if user explicitly selected an agent to avoid auto-restore overriding it
   const userSelectedAgentRef = useRef(false)
 
+  const updateStarterAgentQueryParam = useCallback(
+    (agentSlug: string | null) => {
+      // Only update query param on the starter view (no conversation id yet)
+      if (currentConversationIdRef.current || externalConversationId) return
+      try {
+        const sp = new URLSearchParams(searchParams?.toString() || '')
+        if (agentSlug && agentSlug.trim().length > 0) sp.set('agent', agentSlug)
+        else sp.delete('agent')
+        const qs = sp.toString()
+        router.replace(qs ? `${pathname}?${qs}` : pathname)
+      } catch {
+        // ignore URL update failures
+      }
+    },
+    [externalConversationId, pathname, router, searchParams]
+  )
+
   // Core agent change handler used by both input and cards
   const handleAgentChange = useCallback(
     (agent: Agent | null) => {
@@ -334,8 +373,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       if (agent && currentConversationId) {
         setConversationAgentStore(currentConversationId, agent.id as any, agent.name as any)
       }
+
+      // Keep the starter URL in sync so the selected agent is shareable/bookmarkable
+      updateStarterAgentQueryParam(agent?.slug ?? null)
     },
-    [currentConversationId, setConversationAgentStore, setSelectedAgentWithLogging]
+    [currentConversationId, setConversationAgentStore, setSelectedAgentWithLogging, updateStarterAgentQueryParam]
   )
 
   // Handle conversation start - receive actual database conversation ID
@@ -455,7 +497,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [initialAgentId, starshipAgentsData, selectedAgent, currentConversationId, setConversationAgentStore])
 
-  // Set Gaia as default ONLY on initial mount - use stable deps to avoid re-runs
+  // Set default agent (prefer aria*) ONLY on initial mount - use stable deps to avoid re-runs
   useEffect(() => {
     // Don't run if already set
     if (hasSetInitialDefaultAgentRef.current) {
@@ -498,8 +540,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
-    // Agents are already sorted on the server (newest first), so use the first as the default
-    const fallback = starshipAgentsData[0]
+    const fallback = pickDefaultAgent(starshipAgentsData as any)
 
     if (fallback && typeof fallback.id === 'string') {
       // Set flags BEFORE state update to prevent re-runs
@@ -1018,96 +1059,65 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
-        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
-          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
-            {!showMessagesArea && (
-              <div className="mb-8 text-center opacity-100">
-                <h1 className="text-3xl font-normal mb-4 text-foreground">{starterGreeting}</h1>
-              </div>
-            )}
-            <ConversationMessageInput
-              key={inputKey}
-              ref={messageInputRef}
-              selectedAgent={selectedAgent}
-              starshipId={starshipId}
-              conversationId={currentConversationId}
-              onConversationStart={handleConversationStart}
-              onToggleToolForm={handleToggleToolBuilder}
-              isToolFormOpen={false}
-              disabled={false}
-              minimal={isInputDocked}
-              onFocus={() => {}}
-              onBlur={() => {}}
-              onToggleOverlay={handleToggleOverlay}
-              showExpandableOverlay={false}
-              isOverlayExpanded={false}
-              budgetTokens={budgetTokens}
-              onAgentChange={handleAgentChange}
-              starshipSlug={starshipSlug}
-            ></ConversationMessageInput>
-            {/* Starship agents selector - shown between the input and suggested prompts on the welcome view */}
-            {!showMessagesArea && Array.isArray(starshipAgentsData) && starshipAgentsData.length > 0 && (
-              <div className="mt-12">
-                <div className="mb-4 flex items-center justify-between">
-                  <div className="text-left">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Select an agent</p>
-                  </div>
-                  {starshipSlug && (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        try {
-                          router.push(`/ship/${starshipSlug}/agents`)
-                        } catch {}
-                      }}
-                      className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
-                    >
-                      See all agents
-                      <Icon name="chevron-right" className="h-3 w-3" />
-                    </button>
-                  )}
+        <div
+          ref={inputContainerRef}
+          className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-4 sm:pt-6 lg:pt-10 pb-10')}
+        >
+          <div
+            className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-16 sm:mt-24 lg:mt-40')}
+            data-message-input
+          >
+            {/* Keep the input mounted across the welcome -> conversation transition to avoid losing focus. */}
+            <div className={cn('mb-8 text-center opacity-100', showMessagesArea && 'hidden')} key="welcome-header">
+              <h1 className="text-3xl font-normal mb-2 text-foreground">{`Welcome to your starship, ${starshipName}`}</h1>
+              <p className="text-base text-muted-foreground">{starterSlogan}</p>
+            </div>
+
+            <div className={cn('mb-6', (!shouldShowWelcomeCard || showMessagesArea) && 'hidden')} key="welcome-card">
+              <WelcomeSignupCard userName={authUser?.name} onDismiss={dismissWelcomeCard} />
+            </div>
+
+            {/* Starter layout: Agent select, Message input, Suggested prompts — stable mount (use CSS to show/hide). */}
+            <div className={cn('flex flex-col gap-6')} key="composer-stack">
+              <div className={cn(showMessagesArea && 'hidden')} key="agent-selector">
+                <div className="mb-1">
+                  <p className="text-xs font-medium text-muted-foreground">Select an agent</p>
                 </div>
-                <div className="flex gap-3 overflow-x-auto custom-scrollbar">
-                  {starshipAgentsData.map((agent: any) => (
-                    <button
-                      key={agent.id}
-                      type="button"
-                      onClick={() => {
-                        // Delegate agent selection + leading mention insertion to the input's
-                        // TipTap-aware helper, which also calls onAgentChange under the hood.
-                        try {
-                          messageInputRef.current?.setLeadingMentionAgent?.(agent as any)
-                        } catch {}
-                      }}
-                      className={cn(
-                        'group flex-shrink-0 w-[260px] rounded-2xl border bg-card/80 px-4 py-4 text-left transition-colors shadow-sm hover:bg-primary/5 hover:border-primary/40',
-                        selectedAgent?.id === agent.id ? 'border-primary/70 bg-primary/5 shadow-[0_0_0_1px_rgba(245,158,11,0.35)]' : 'border-border/60'
-                      )}
-                    >
-                      <div className="flex flex-col gap-2">
-                        <div className="flex items-end gap-3">
-                          <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full">
-                            <AgentAvatar seed={agent.name} imageUrl={starshipAgentAvatarUrlById.get((agent as any).avatarAttachmentId)} size={32} rounded />
-                          </Avatar>
-                          <div className="min-w-0 flex-1">
-                            <div className="mb-1 flex flex-col gap-[2px]">
-                              <p className="text-base font-semibold text-foreground truncate group-hover:text-primary">{agent.name}</p>
-                            </div>
-                          </div>
-                        </div>
-                        {agent.description && <p className="text-xs text-muted-foreground leading-relaxed line-clamp-3">{agent.description}</p>}
-                      </div>
-                    </button>
-                  ))}
+                <div className="flex items-center justify-start gap-3">
+                  <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={true} />
                 </div>
               </div>
-            )}
-            {/* Suggested prompts for the selected agent, positioned below the input without shifting it */}
-            {!showMessagesArea && agentSuggestionCards.length >= 3 && (
-              <div className="mt-12 absolute inset-x-0 top-full">
-                <div className="mb-4 flex items-center justify-between">
+
+              <div key="message-input">
+                <div className={cn('mb-1', showMessagesArea && 'hidden')}>
+                  <p className="text-xs font-medium text-muted-foreground">and give instructions</p>
+                </div>
+                <ConversationMessageInput
+                  key={inputKey}
+                  ref={messageInputRef}
+                  selectedAgent={selectedAgent}
+                  starshipId={starshipId}
+                  conversationId={currentConversationId}
+                  onConversationStart={handleConversationStart}
+                  onToggleToolForm={handleToggleToolBuilder}
+                  isToolFormOpen={false}
+                  disabled={false}
+                  minimal={isInputDocked}
+                  onFocus={() => {}}
+                  onBlur={() => {}}
+                  onToggleOverlay={handleToggleOverlay}
+                  showExpandableOverlay={false}
+                  isOverlayExpanded={false}
+                  budgetTokens={budgetTokens}
+                  onAgentChange={handleAgentChange}
+                  starshipSlug={starshipSlug}
+                ></ConversationMessageInput>
+              </div>
+
+              <div className={cn((showMessagesArea || agentSuggestionCards.length < 3) && 'hidden')} key="suggestions">
+                <div className="mb-1 flex items-center justify-between">
                   <div className="text-left">
-                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Suggested prompts{selectedAgent ? ` for ${selectedAgent.name}` : ''}</p>
+                    <p className="text-xs font-medium text-muted-foreground">or select an example</p>
                   </div>
                   {agentSuggestionCards.length > 3 && (
                     <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
@@ -1132,13 +1142,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                         type="button"
                         onClick={() => {
                           try {
+                            // Prefill the message input without inserting sticky mentions
                             messageInputRef.current?.setLeadingMentionAgent?.(item.agent as any, item.text)
                             messageInputRef.current?.focusInput?.()
                           } catch {}
                         }}
-                        className="group flex w-full rounded-2xl border border-border/60 bg-card px-3 py-2 text-left transition-colors hover:bg-primary/5 hover:border-primary/40"
+                        className="group flex w-full rounded-2xl bg-card border border-border/40 shadow-sm px-3 py-2 text-left transition-all duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md hover:-translate-y-1"
                       >
-                        <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-primary break-words">
+                        <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
                           <span className="mr-1 text-base align-top text-primary/70">“</span>
                           {item.text}
                           <span className="ml-1 text-base align-baseline text-primary/70">”</span>
@@ -1148,7 +1159,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                   ))}
                 </ul>
               </div>
-            )}
+            </div>
           </div>
         </div>
 

@@ -28,6 +28,12 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
   // Memoize agents array to prevent unnecessary rerenders
   const agents = useMemo(() => agentsData, [agentsData])
 
+  const defaultAgent = useMemo(() => {
+    if (!Array.isArray(agents) || agents.length === 0) return null
+    const aria = agents.find(a => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria'))
+    return aria ?? agents[0] ?? null
+  }, [agents])
+
   const avatarAttachmentIds = useMemo(() => {
     const ids = agents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
     return Array.from(new Set(ids))
@@ -43,19 +49,40 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
     return map
   }, [avatarAttachments])
 
-  // Auto-select first agent when agents are loaded
+  // Auto-select default agent (prefer aria*) when agents are loaded
   useEffect(() => {
-    if (!loading && agents.length > 0 && !selectedAgent) {
-      onAgentChange(agents[0])
+    if (!loading && !selectedAgent && defaultAgent) {
+      onAgentChange(defaultAgent)
     }
-  }, [agents, loading, selectedAgent, onAgentChange])
+  }, [defaultAgent, loading, selectedAgent, onAgentChange])
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
-        <Button variant="outline" className={cn('justify-between', compact ? 'h-8 px-3 text-xs min-w-[120px]' : 'min-w-[180px]')} disabled={loading}>
-          <div className="flex items-center gap-2">
-            <Icon name="bot" className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
+        <Button
+          variant="outline"
+          aria-label={selectedAgent ? `Selected agent: ${selectedAgent.name}. Change agent.` : 'Select an agent'}
+          className={cn(
+            // Match ConversationMessageInput container styling
+            'justify-between bg-card border border-border/60 rounded-2xl shadow-sm transition-all hover:bg-card focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/70',
+            // Match ConversationMessageInput inner padding: minimal => pl-3 pr-2 py-2, default => px-3 py-3
+            compact ? 'h-auto px-2 py-1 text-xs min-w-[120px]' : 'h-auto px-3 py-2 text-sm min-w-[220px]'
+          )}
+          disabled={loading}
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {selectedAgent ? (
+              <Avatar className={cn(compact ? 'h-4.5 w-4.5' : 'h-6 w-6', 'ring-1 ring-border/40 rounded-full')}>
+                <AgentAvatar
+                  seed={selectedAgent.name}
+                  imageUrl={avatarUrlById.get((selectedAgent as any).avatarAttachmentId)}
+                  size={compact ? 18 : 24}
+                  rounded
+                />
+              </Avatar>
+            ) : (
+              <Icon name="bot" className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
+            )}
             <span className="truncate">{selectedAgent ? selectedAgent.name : compact ? 'Select Agent' : 'Select an agent'}</span>
           </div>
           {loading ? <LoadingSpinner className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} /> : <Icon name="chevron-down" className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}
@@ -66,6 +93,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
         align="start"
         side="bottom"
         sideOffset={8}
+        aria-label="Agent options"
         className={cn('p-0 rounded-lg shadow-frosted-lg text-sm leading-6', compact ? 'w-80' : 'min-w-[320px] w-[min(420px,calc(100vw-40px))]')}
       >
         <div className="p-2 max-h-64 overflow-y-auto custom-scrollbar">
@@ -86,11 +114,12 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                     setIsOpen(false)
                   }}
                   className={cn(
-                    'w-full text-left px-3 py-2 rounded-sm transition-colors focus-visible-ring',
-                    selectedAgent?.id === agent.id ? 'bg-primary/5 text-foreground' : 'text-foreground hover:bg-primary/5'
+                    // Match NavigationItem hover/active styling
+                    'w-full text-left px-3 py-2 rounded-lg transition-colors focus-visible-ring',
+                    selectedAgent?.id === agent.id ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                   )}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-start gap-3">
                     <Avatar className={cn('h-7 w-7 ring-1 ring-border/40 rounded-full')}>
                       <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={28} rounded />
                     </Avatar>

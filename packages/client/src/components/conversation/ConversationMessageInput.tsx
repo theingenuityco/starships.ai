@@ -1393,13 +1393,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           </div>
         )}
 
-        {/* Cost hint (non-minimal) */}
-        {!minimal && (
-          <div className="mb-2 px-1 text-xs text-muted-foreground">
-            Each user message costs <span className="font-semibold text-foreground">{CREDITS_PER_MESSAGE} credits</span>.
-          </div>
-        )}
-
         {/* File Attachments Preview - Outside input container in minimal mode */}
         {minimal && pendingFiles.length > 0 && (
           <div className="mb-2 px-1">
@@ -1520,6 +1513,18 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
           </div>
         </div>
+
+        {/* Cost hint (non-minimal) - moved below the composer */}
+        {!minimal && (
+          <div className="mt-2 px-1 text-xs text-muted-foreground">
+            Each user message costs
+            <span className="ml-2 font-semibold text-muted-foreground">
+              <Icon name="coins" className="inline-block h-3 w-3 align-text-bottom text-muted-foreground mr-1" />
+              {CREDITS_PER_MESSAGE} credits
+            </span>
+            .
+          </div>
+        )}
       </div>
     )
   }

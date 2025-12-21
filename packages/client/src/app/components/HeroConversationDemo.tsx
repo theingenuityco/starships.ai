@@ -754,7 +754,7 @@ export default function HeroConversationDemo() {
             chunks = [...chunks, { content: part, position, timestamp: nextTs() }]
             position += 1
             updateMessage(convoId, id, { chunks, streaming: true })
-            await sleep(35)
+            await sleep(70)
           }
         } else {
           updateMessage(convoId, id, { content: step.content, streaming: true })

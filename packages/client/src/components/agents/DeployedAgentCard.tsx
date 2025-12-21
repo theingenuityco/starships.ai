@@ -92,6 +92,36 @@ export function DeployedAgentCard({
   // Get update info from agent object (populated by API)
   const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
 
+  const statusBadge = (() => {
+    if (isTemplateAgent) {
+      return {
+        label: 'From Marketplace',
+        iconName: 'store',
+        style: {
+          borderColor: 'rgba(245,158,11,0.35)',
+          backgroundColor: 'rgba(245,158,11,0.10)',
+          color: 'rgba(245,158,11,0.95)',
+        } as React.CSSProperties,
+      }
+    }
+    if (agent.publicationStatus === 'published') {
+      return {
+        label: 'Published',
+        iconName: 'globe',
+        style: {
+          borderColor: 'rgba(59,130,246,0.35)',
+          backgroundColor: 'rgba(59,130,246,0.10)',
+          color: 'rgba(59,130,246,0.95)',
+        } as React.CSSProperties,
+      }
+    }
+    return {
+      label: 'Private',
+      iconName: 'lock',
+      style: undefined,
+    }
+  })()
+
   const entranceOff = disableMotion || disableEntranceMotion
   const hoverOff = disableMotion || disableHoverMotion
 
@@ -132,13 +162,6 @@ export function DeployedAgentCard({
                   >
                     <Icon name="trash" className="w-4 h-4" />
                     <span>Delete Agent</span>
-                  </DropdownMenuItem>
-                )}
-
-                {onDelete != null && isTemplateAgent && (
-                  <DropdownMenuItem disabled className="flex items-center gap-2 opacity-50">
-                    <Icon name="shield" className="w-4 h-4" />
-                    <span>Protected Agent</span>
                   </DropdownMenuItem>
                 )}
               </DropdownMenuContent>
@@ -200,20 +223,6 @@ export function DeployedAgentCard({
                   <span className="font-mono text-[10px] truncate">{agent.model}</span>
                 </Badge>
               )}
-              {isTemplateAgent && (
-                <Badge
-                  variant="outline"
-                  className="text-[10px] px-1.5 py-0.5 flex items-center"
-                  style={{
-                    borderColor: 'rgba(245,158,11,0.4)',
-                    backgroundColor: 'rgba(245,158,11,0.15)',
-                    color: 'rgba(245,158,11,1)',
-                  }}
-                >
-                  <Icon name="shield" className="w-2.5 h-2.5 mr-1" />
-                  System
-                </Badge>
-              )}
               {/* Premium update available indicator with subtle animation */}
               {needsUpdate && (
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
@@ -256,7 +265,12 @@ export function DeployedAgentCard({
         </CardHeader>
 
         <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between gap-3">
+            <Badge variant="outline" className="text-[10px] px-2 py-1 flex items-center gap-1.5" style={statusBadge.style}>
+              <Icon name={statusBadge.iconName} className="w-3 h-3" />
+              <span className="font-mono">{statusBadge.label}</span>
+            </Badge>
+
             {/* Primary action (optional override) */}
             {primaryAction ? (
               <Button

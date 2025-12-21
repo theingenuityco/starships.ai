@@ -581,9 +581,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      if (!promptAgent) return 'Select an agent, then type a message'
+      if (!promptAgent) return 'Select an agent to assign a task or ask anything'
       // Show placeholder even after the conversation has started.
-      return conversationId ? `Message ${promptAgent.name}... (Shift+Enter for new line)` : `Ask ${promptAgent.name}... (Shift+Enter for new line)`
+      return `Assign a task to ${promptAgent.name} or ask anything`
     }
 
     // Track if there's actual content beyond just the mention and space
@@ -1516,9 +1516,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
         {/* Cost hint (non-minimal) - moved below the composer */}
         {!minimal && (
-          <div className="mt-2 px-1 text-xs text-muted-foreground">
+          <div className="mt-2 px-1 text-xs text-muted-foreground text-right">
             Each user message costs
-            <span className="ml-2 font-semibold text-muted-foreground">
+            {'\u00A0'}
+            <span className="ml-1 font-semibold text-muted-foreground">
               <Icon name="coins" className="inline-block h-3 w-3 align-text-bottom text-muted-foreground mr-1" />
               {CREDITS_PER_MESSAGE} credits
             </span>

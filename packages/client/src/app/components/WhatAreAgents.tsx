@@ -1,7 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { Background, BackgroundVariant, Handle, Position, ReactFlow } from '@xyflow/react'
+import { Handle, Position, ReactFlow } from '@xyflow/react'
 import type { Edge, Node, NodeProps } from '@xyflow/react'
 import { useMemo } from 'react'
 
@@ -36,7 +36,7 @@ function AnatomyNode({ data }: NodeProps<Node<AnatomyNodeData>['data']>) {
 
       {/* Icon orb = the node */}
       <div
-        title={isCenter ? data.label : `${data.label}${data.sub ? ` — ${data.sub}` : ''}`}
+        title={`${data.label}${data.sub ? ` — ${data.sub}` : ''}`}
         className={[
           'agent-anatomy-orb relative grid place-items-center rounded-full border w-full h-full',
           isCenter
@@ -56,7 +56,7 @@ function AnatomyNode({ data }: NodeProps<Node<AnatomyNodeData>['data']>) {
       {/* Labels outside the orb */}
       <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-nowrap">
         <div className={`${isCenter ? 'text-sm sm:text-base' : 'text-sm'} font-medium text-foreground`}>{data.label}</div>
-        {!isCenter && <div className="text-xs sm:text-sm text-muted-foreground">{data.sub}</div>}
+        {data.sub && <div className="text-xs sm:text-sm text-muted-foreground">{data.sub}</div>}
       </div>
     </div>
   )
@@ -68,37 +68,37 @@ export default function WhatAreAgents() {
       {
         id: 'agent',
         type: 'anatomy',
-        position: { x: 360, y: 0 },
-        data: { label: 'Agent', sub: 'anatomy', icon: 'head-circuit', kind: 'center' },
+        position: { x: 440, y: 0 },
+        data: { label: 'Agent', sub: 'Anatomy of an agent', icon: 'head-circuit', kind: 'center' },
       },
       {
         id: 'identity',
         type: 'anatomy',
-        position: { x: 40, y: 210 },
+        position: { x: 0, y: 210 },
         data: { label: 'Identity', sub: 'Who it is', icon: 'fingerprint', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'role',
         type: 'anatomy',
-        position: { x: 200, y: 210 },
+        position: { x: 220, y: 210 },
         data: { label: 'Role', sub: 'What it does', icon: 'user-cog', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'instructions',
         type: 'anatomy',
-        position: { x: 360, y: 210 },
+        position: { x: 440, y: 210 },
         data: { label: 'Instructions', sub: 'How it behaves', icon: 'file-text', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'tools',
         type: 'anatomy',
-        position: { x: 520, y: 210 },
+        position: { x: 660, y: 210 },
         data: { label: 'Tools', sub: 'What it can use', icon: 'wrench', kind: 'leaf', inPosition: Position.Top },
       },
       {
         id: 'autonomy',
         type: 'anatomy',
-        position: { x: 680, y: 210 },
+        position: { x: 880, y: 210 },
         data: { label: 'Autonomy', sub: 'How far it can go', icon: 'shield-check', kind: 'leaf', inPosition: Position.Top },
       },
     ]
@@ -120,22 +120,24 @@ export default function WhatAreAgents() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
-        <div className="text-center mb-8 md:mb-10">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2">What are agents?</h2>
-          <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto">
+        <div className="mb-10 md:mb-14">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">What are agents?</h2>
+          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto">
             Agents are AI teammates you set up to handle tasks for you.
           </p>
         </div>
 
-        <div className="mx-auto max-w-4xl">
-          <div className="rounded-2xl border border-white/15 bg-white/[0.03] backdrop-blur-md px-4 pb-4 pt-1 sm:px-6 sm:pb-6 sm:pt-2 shadow-[0_0_18px_rgba(168,85,247,0.16),0_0_36px_rgba(59,130,246,0.10)]">
-            <div className="h-[260px] sm:h-[320px] md:h-[380px]">
+        <div className="mx-auto max-w-6xl">
+          <div className="rounded-2xl bg-transparent border border-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0 shadow-none">
+            <div className="h-[260px] sm:h-[320px] md:h-[400px]">
               <ReactFlow
                 nodes={nodes}
                 edges={edges}
                 nodeTypes={{ anatomy: AnatomyNode }}
                 fitView
-                fitViewOptions={{ padding: 0.1 }}
+                fitViewOptions={{ padding: 0 }}
+                minZoom={1}
+                maxZoom={1}
                 proOptions={{ hideAttribution: true }}
                 nodesDraggable={false}
                 nodesConnectable={false}
@@ -147,12 +149,9 @@ export default function WhatAreAgents() {
                 preventScrolling={false}
                 className="!bg-transparent"
               >
-                <Background variant={BackgroundVariant.Dots} gap={18} size={1.2} color="rgba(255,255,255,0.12)" />
               </ReactFlow>
             </div>
           </div>
-
-          <p className="mt-4 text-center text-xs sm:text-sm text-muted-foreground">Anatomy of an agent</p>
 
           {/* A11y fallback */}
           <ul className="sr-only">

@@ -347,7 +347,8 @@ export function ConversationMessageList({
     // - Do NOT show while awaiting tool results (tool UI shows its own spinner)
     const betweenMessages = isResponding && !isAssistantStreaming && !awaitingResumeAfterTools
     const responding = !isAwaitingToolResults && isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools || betweenMessages)
-    const toolGapFetching = awaitingResumeAfterTools && isResponding
+    // IMPORTANT: never show the gap loader while tools are still pending; the tools UI has its own spinner.
+    const toolGapFetching = !isAwaitingToolResults && awaitingResumeAfterTools && isResponding
     return responding || toolGapFetching
   }, [isAwaitingToolResults, isResponding, isAssistantStreaming, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
 

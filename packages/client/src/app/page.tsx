@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 import Hero from '@/app/components/Hero'
-import WhatIsAgent from '@/app/components/WhatIsAgent'
+import WhatAreAgents from '@/app/components/WhatAreAgents'
 import UseCases from '@/app/components/UseCases'
 import Security from '@/app/components/Security'
 import PricingTeaser from '@/app/components/PricingTeaser'
@@ -42,7 +42,7 @@ export default function HomePage() {
 
         {/* New Landing Sections */}
         <Hero />
-        <WhatIsAgent />
+        <WhatAreAgents />
         <UseCases />
         <MarketplaceTeaser />
         <Security />

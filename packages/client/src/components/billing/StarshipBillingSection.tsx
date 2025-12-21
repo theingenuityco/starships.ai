@@ -76,10 +76,10 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
       {wallet?.id && (
         <Card className={SECTION_CARD_CLASS}>
           <CardHeader className="p-4 pb-2">
-            <CardTitle className="text-sm">Credit ledger</CardTitle>
+            <CardTitle className="text-sm">Transactions</CardTitle>
           </CardHeader>
           <CardContent className="p-4 pt-0">
-            <LedgerHistoryTable walletId={wallet.id} view="full" title="Credit ledger" variant="bare" showTitle={false} />
+            <LedgerHistoryTable walletId={wallet.id} view="full" title="Transactions" variant="bare" showTitle={false} />
           </CardContent>
         </Card>
       )}

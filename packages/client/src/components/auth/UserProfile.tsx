@@ -16,13 +16,23 @@ interface UserProfileProps {
   onClick?: () => void
   active?: boolean
   starshipName?: string
+  /**
+   * Collapsed mode was originally built for the sidebar and includes small alignment nudges.
+   * Set this to true when rendering inside tight containers (e.g. top-right badge) so the avatar centers cleanly.
+   */
+  centerInContainer?: boolean
+  /**
+   * Size for the collapsed avatar.
+   * Use 'sm' for sidebar, 'md' for top-right header.
+   */
+  collapsedSize?: 'sm' | 'md'
 }
 
 /**
  * User profile component for navigation bottom
  * Shows user name and starship name with logout functionality via tooltip
  */
-export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', onClick, active = false, starshipName }: UserProfileProps) {
+export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', onClick, active = false, starshipName, centerInContainer = false, collapsedSize = 'sm' }: UserProfileProps) {
   const { user, userName, userEmail, isAuthenticated, logout, userAvatar } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -53,11 +63,13 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
 
   if (mode === 'collapsed') {
     const isInteractive = !!onClick
+    const avatarSizeClass = collapsedSize === 'md' ? 'w-8 h-8' : 'w-7 h-7'
+    const iconSize = collapsedSize === 'md' ? 20 : 18
 
     return (
-      <div className="flex justify-start -ml-0.5">
+      <div className={centerInContainer ? 'flex items-center justify-center' : 'flex justify-start -ml-0.5'}>
         <div
-          className={`relative transition-all duration-300 rounded-full ${isInteractive ? 'cursor-pointer' : 'cursor-default'}`}
+          className={`relative transition-all duration-300 rounded-full ${isInteractive ? 'cursor-pointer' : 'cursor-inherit'}`}
           role={isInteractive ? 'button' : undefined}
           aria-label={isInteractive ? 'Open user menu' : undefined}
           tabIndex={isInteractive ? 0 : -1}
@@ -68,12 +80,12 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
           }}
         >
           {isImageUrl(userAvatar) ? (
-            <Avatar className="w-7 h-7 ring-1 ring-border/40">
-              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" />
+            <Avatar className={`${avatarSizeClass} rounded-full ring-1 ring-border/40`}>
+              <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
             </Avatar>
           ) : (
-            <div className="w-7 h-7 rounded-full flex items-center justify-center bg-muted/40">
-              <LordIcon src={getLordiconUrl('user')} width={18} height={18} className="w-4 h-4" trigger="click" />
+            <div className={`${avatarSizeClass} rounded-full flex items-center justify-center bg-muted/40`}>
+              <LordIcon src={getLordiconUrl('user')} width={iconSize} height={iconSize} className="w-4 h-4" trigger="click" />
             </div>
           )}
         </div>

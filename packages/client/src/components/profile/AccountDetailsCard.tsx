@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import EmailChangePending from './EmailChangePending'
+import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
 type AccountDetailsCardProps = {
   form: Pick<FormState, 'displayName' | 'email'>
@@ -30,7 +31,7 @@ export default function AccountDetailsCard({
   onCancelEmailChange,
 }: AccountDetailsCardProps) {
   return (
-    <Card className="flex h-full flex-col border-border/60 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
+    <Card className={PROFILE_SECTION_CARD_CLASS}>
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="id-card" className="h-4 w-4 text-primary" />

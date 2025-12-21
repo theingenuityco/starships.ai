@@ -14,7 +14,7 @@ type DangerZoneCardProps = {
 
 export default function DangerZoneCard({ deleting, onDelete }: DangerZoneCardProps) {
   return (
-    <Card className="border-destructive/40 bg-background/70 backdrop-blur-sm transition-shadow hover:shadow-sm">
+    <Card className="border-destructive/40 bg-background/70 backdrop-blur-sm">
       <CardHeader>
         <CardTitle className="text-destructive text-base">Danger Zone</CardTitle>
         <CardDescription>Delete your account and all associated data.</CardDescription>

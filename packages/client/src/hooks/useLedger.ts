@@ -3,7 +3,8 @@ import { useQuery } from '@tanstack/react-query'
 import type { ApiResponse, LedgerEntryModel, PaginationMeta } from '@starships/protocol'
 
 export const LEDGER_QUERY_KEYS = {
-  list: (walletId: string, page: number, limit: number, order: 'ASC' | 'DESC') => ['ledger', walletId, { page, limit, order }] as const,
+  list: (walletId: string, page: number, limit: number, order: 'ASC' | 'DESC', view: 'billing' | 'full') =>
+    ['ledger', walletId, { page, limit, order, view }] as const,
 } as const
 
 export interface LedgerListResult {
@@ -15,16 +16,20 @@ export interface LedgerListResult {
  * Offset-based paginated ledger list for a wallet
  * Follows same pagination style as other APIs (page, limit, order) with PaginationMeta in response.meta
  */
-export function useLedger(walletId: string | null, opts?: { page?: number; limit?: number; order?: 'ASC' | 'DESC' }) {
+export function useLedger(
+  walletId: string | null,
+  opts?: { page?: number; limit?: number; order?: 'ASC' | 'DESC'; view?: 'billing' | 'full' }
+) {
   const page = opts?.page ?? 1
   const limit = opts?.limit ?? 20
   const order: 'ASC' | 'DESC' = opts?.order ?? 'DESC'
+  const view: 'billing' | 'full' = opts?.view ?? 'billing'
 
   return useQuery<LedgerListResult>({
-    queryKey: walletId ? LEDGER_QUERY_KEYS.list(walletId, page, limit, order) : ['__noop__'],
+    queryKey: walletId ? LEDGER_QUERY_KEYS.list(walletId, page, limit, order, view) : ['__noop__'],
     queryFn: async (): Promise<LedgerListResult> => {
       const res = await api.get<ApiResponse<LedgerEntryModel[]>>(`/api/v1/ledger/${walletId}`, {
-        params: { page, limit, order },
+        params: { page, limit, order, view },
       })
       const data = res.data.data
       const meta = (res.data.meta?.pagination as PaginationMeta | undefined) || {

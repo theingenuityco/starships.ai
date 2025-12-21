@@ -11,21 +11,23 @@ import ShipManagement from '@/components/profile/ShipManagement'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 import AccountForm from '@/components/profile/AccountForm'
+import { useAuth } from '@/hooks/useAuth'
 
-const VALID_TABS = ['profile', 'usage', 'billing'] as const
-type TabValue = (typeof VALID_TABS)[number]
+const ALL_TABS = ['profile', 'usage', 'billing'] as const
+type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
-  const isValidTab = VALID_TABS.includes(tab as TabValue)
-  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'usage'
+  const { isInstanceAdmin, isLoading: authLoading } = useAuth()
+  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'billing'] as const)
+  const isValidTab = visibleTabs.includes(tab as TabValue)
+  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'profile'
 
   useEffect(() => {
-    if (!isValidTab) {
-      router.replace(`/ship/${slug}/settings/${currentTab}`)
-    }
-  }, [router, slug, currentTab, isValidTab])
+    if (authLoading) return
+    if (!isValidTab) router.replace(`/ship/${slug}/settings/${currentTab}`)
+  }, [router, slug, currentTab, isValidTab, authLoading])
 
   const { data: starshipData } = useStarshipBySlug(slug, true)
 
@@ -45,15 +47,17 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
             {/* Sections using shared Tabs UI with improved alignment */}
             <Tabs value={currentTab} onValueChange={value => router.push(`/ship/${slug}/settings/${value}`)} className="space-y-6">
               <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-background/70 p-1 shadow-sm">
+                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
                   <TabsTrigger value="profile" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="user" className="h-4 w-4" />
                     <span>Profile</span>
                   </TabsTrigger>
-                  <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="activity" className="h-4 w-4" />
-                    <span>Analytics</span>
-                  </TabsTrigger>
+                  {isInstanceAdmin && (
+                    <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
+                      <Icon name="activity" className="h-4 w-4" />
+                      <span>Analytics</span>
+                    </TabsTrigger>
+                  )}
                   <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
@@ -62,21 +66,21 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               </div>
 
               <TabsContent value="profile">
-                <section aria-labelledby="profile-section" className="rounded-xl border border-border/80 bg-background p-6">
-                  <div className="space-y-6">
-                    <AccountForm />
-                  </div>
+                <section aria-labelledby="profile-section" className="bg-background">
+                  <AccountForm />
                 </section>
               </TabsContent>
 
-              <TabsContent value="usage">
-                <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
-                  {starshipData?.id && <ShipManagement starshipId={starshipData.id} />}
-                </section>
-              </TabsContent>
+              {isInstanceAdmin && (
+                <TabsContent value="usage">
+                  <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
+                    {starshipData?.id && <ShipManagement starshipId={starshipData.id} />}
+                  </section>
+                </TabsContent>
+              )}
 
               <TabsContent value="billing">
-                <section aria-labelledby="billing-section" className="rounded-xl border border-border/80 bg-background p-6">
+                <section aria-labelledby="billing-section" className="bg-background">
                   <StarshipBillingSection starshipId={starshipData?.id} />
                 </section>
               </TabsContent>

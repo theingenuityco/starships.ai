@@ -90,8 +90,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
-    // Image generation toggle (OpenRouter multimodal output)
-    const [imageMode, setImageMode] = useState(false)
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -137,10 +135,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const createConversation = useCreateConversation()
     const { data: wallet, isLoading } = useWallet(starshipId, !!starshipId)
-    const MINIMUM_THRESHOLD = 0.05
-    const LOW_WARNING_THRESHOLD = 5.0
+    // Credits policy (server is authoritative; this is for UX only)
+    const CREDITS_PER_MESSAGE = 10
+    const LOW_WARNING_THRESHOLD = 50 // ~5 messages left
     const balanceNum = Number(wallet?.balance ?? '0')
-    const hasFunds = balanceNum >= MINIMUM_THRESHOLD
+    const hasFunds = balanceNum >= CREDITS_PER_MESSAGE
     const showLowBalanceWarning = Boolean(conversationId && !isLoading && hasFunds && balanceNum <= LOW_WARNING_THRESHOLD)
 
     // Determine current ship slug for billing URL
@@ -502,7 +501,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           starshipId: starshipId!,
           messageType: 'user_input',
           attachmentIds: attachmentIdsToSend.length > 0 ? attachmentIdsToSend : undefined,
-          ...(imageMode ? { modalities: ['image', 'text'] } : {}),
         })
           .catch(error => {
             toast.error('Failed to send message', { description: (error as any)?.message || 'Please try again.' })
@@ -514,8 +512,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             // Clear attachments after successful send
             setPendingFiles([])
             setUploadedAttachmentIds([])
-            // Default back to text mode after a send to avoid accidental image requests
-            setImageMode(false)
           })
 
         // Exit early to avoid hitting catch/finally paths
@@ -532,7 +528,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       sending,
       disabled,
       isStreamingEffective,
-      imageMode,
       selectedAgent,
       userId,
       conversationId,
@@ -627,7 +622,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             role: 'user',
             starshipId: starshipId!,
             messageType: 'user_input',
-            ...(imageMode ? { modalities: ['image', 'text'] } : {}),
           })
             .catch(error => {
               toast.error('Failed to send suggestion', { description: (error as any)?.message || 'Please try again.' })
@@ -635,7 +629,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             })
             .finally(() => {
               setSending(false)
-              setImageMode(false)
             })
 
           return
@@ -645,7 +638,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           streamingRef.current = false
         }
       },
-      [sending, disabled, isStreamingEffective, imageMode, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
+      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
     )
 
     // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
@@ -2115,7 +2108,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             )}
           </div>
         )}
-        {/* Low balance warning banner - Show when balance <= $5 and above critical */}
+        {/* Low credits warning banner */}
         {showLowBalanceWarning && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-yellow-50/80 to-orange-50/60 dark:from-yellow-950/20 dark:to-orange-950/10 border border-yellow-200/50 dark:border-yellow-800/30 backdrop-blur-sm shadow-sm">
             <div className="flex items-center gap-3">
@@ -2125,13 +2118,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-1">Low Balance</p>
-                <p className="text-xs text-yellow-700 dark:text-yellow-300 leading-relaxed">Your balance is running low. Consider adding credits to avoid interruptions.</p>
+                <p className="text-sm font-semibold text-yellow-900 dark:text-yellow-100 mb-1">Low credits</p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-300 leading-relaxed">
+                  You’re running low on credits. Each message costs {CREDITS_PER_MESSAGE} credits—add more to avoid interruptions.
+                </p>
               </div>
               <div className="flex-shrink-0">
                 <Link href={billingHref}>
                   <Button variant="default" size="sm" className="bg-amber-500 hover:bg-amber-600 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
-                    Manage Billing
+                    Get credits
                   </Button>
                 </Link>
               </div>
@@ -2139,7 +2134,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           </div>
         )}
 
-        {/* Professional insufficient balance indicator - Show when there is conversation ID */}
+        {/* Professional insufficient credits indicator */}
         {!hasFunds && !isLoading && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
             <div className="flex items-center gap-3">
@@ -2154,17 +2149,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 </svg>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">Insufficient Balance</p>
-                <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">Your account balance is too low to continue. Please add credits to keep chatting.</p>
+                <p className="text-sm font-semibold text-red-900 dark:text-red-100 mb-1">Insufficient credits</p>
+                <p className="text-xs text-red-700 dark:text-red-300 leading-relaxed">You need at least {CREDITS_PER_MESSAGE} credits to send a message. Please add credits to keep chatting.</p>
               </div>
               <div className="flex-shrink-0">
                 <Link href={billingHref}>
                   <Button variant="default" size="sm" className="bg-red-600 hover:bg-red-700 text-white border-0 shadow-md hover:shadow-lg transition-all duration-200 font-medium">
-                    Manage Billing
+                    Get credits
                   </Button>
                 </Link>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Cost hint (non-minimal) */}
+        {!minimal && (
+          <div className="mb-2 px-1 text-xs text-muted-foreground">
+            Each user message costs <span className="font-semibold text-foreground">{CREDITS_PER_MESSAGE} credits</span>.
           </div>
         )}
 
@@ -2240,7 +2242,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || fileUploading}
               className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-12 z-20 p-1.5' : 'absolute bottom-3 right-14 z-20 p-1.5',
+                minimal ? 'absolute top-1/2 -translate-y-1/2 right-14 z-20 p-1.5' : 'absolute bottom-3 right-14 z-20 p-1.5',
                 'rounded-lg transition-colors',
                 'hover:bg-muted text-muted-foreground hover:text-foreground',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -2249,29 +2251,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               title="Attach file (images, PDFs)"
             >
               <Icon name="paperclip" className="h-5 w-5" />
-            </button>
-
-            {/* Image Generation Toggle */}
-            <button
-              type="button"
-              onClick={() => {
-                if (disabled) return
-                setImageMode(v => !v)
-                try {
-                  tiptap?.commands?.focus?.()
-                } catch {}
-              }}
-              disabled={disabled || sending || isStreamingEffective}
-              className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-20 z-20 p-1.5' : 'absolute bottom-3 right-24 z-20 p-1.5',
-                'rounded-lg transition-colors',
-                imageMode ? 'bg-muted text-foreground' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-              aria-label="Image generation"
-              title={imageMode ? 'Image generation: on' : 'Image generation: off'}
-            >
-              <Icon name="image" className="h-5 w-5" />
             </button>
 
             {/* Right-side Actions: Stop (when streaming) or Send */}

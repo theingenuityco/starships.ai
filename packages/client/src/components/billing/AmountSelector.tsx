@@ -1,31 +1,35 @@
 'use client'
 
-
 import React, { useState } from 'react'
 import { useTopup } from '@/hooks/useTopup'
 import { useWallet } from '@/hooks/useWallet'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/useToast'
+import Icon from '@/components/primitives/Icon'
 
 export interface AmountSelectorProps {
   starshipId: string
   className?: string
+  variant?: 'default' | 'compact'
 }
 
-const PRESET_AMOUNTS = [5, 10, 20, 30, 50, 100] as const
+const PRESET_CREDITS = [1000, 2000, 5000] as const
+const CREDITS_PER_USD = 100
+const MIN_USD = 5
+const MAX_CREDITS = 5000
 
-export default function AmountSelector({ starshipId, className = '' }: AmountSelectorProps): React.JSX.Element {
-  const [selectedAmount, setSelectedAmount] = useState<number>(20)
-  const [customAmount, setCustomAmount] = useState<string>('')
-  const [useCustom, setUseCustom] = useState<boolean>(false)
+export default function AmountSelector({ starshipId, className = '', variant = 'default' }: AmountSelectorProps): React.JSX.Element {
+  const [selectedCredits, setSelectedCredits] = useState<number>(2000)
 
   const mutation = useTopup()
   const { data: wallet } = useWallet(starshipId)
   const { toast } = useToast()
 
-  const currentAmount = useCustom ? Number(customAmount) || 0 : selectedAmount
-  const isValidAmount = currentAmount >= 5 && currentAmount <= 1000
+  const currentCredits = selectedCredits
+  const minCredits = MIN_USD * CREDITS_PER_USD
+  const maxCredits = MAX_CREDITS
+  const isValidAmount = currentCredits >= minCredits && currentCredits <= maxCredits
+  const amountUsd = parseFloat((Math.max(0, currentCredits) / CREDITS_PER_USD).toFixed(2))
 
   const handleTopup = async () => {
     if (!wallet) {
@@ -40,7 +44,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
     if (!isValidAmount) {
       toast({
         title: 'Invalid Amount',
-        description: 'Please enter a valid amount between $5 and $1000.',
+        description: `Please enter a valid amount between ${minCredits.toLocaleString()} and ${maxCredits.toLocaleString()} credits.`,
         variant: 'destructive',
       })
       return
@@ -49,7 +53,7 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
     try {
       const result = await mutation.mutateAsync({
         starshipId,
-        amountUsd: currentAmount,
+        amountUsd,
         walletId: wallet.id,
       })
 
@@ -68,125 +72,95 @@ export default function AmountSelector({ starshipId, className = '' }: AmountSel
     }
   }
 
-  const handlePresetClick = (amount: number) => {
-    setSelectedAmount(amount)
-    setUseCustom(false)
-    setCustomAmount('')
-  }
-
-  const handleCustomChange = (value: string) => {
-    setCustomAmount(value)
-    setUseCustom(true)
-    if (value && Number(value) > 0) {
-      setSelectedAmount(Number(value))
-    }
+  const handlePresetClick = (credits: number) => {
+    setSelectedCredits(credits)
   }
 
   return (
-    <div className={`space-y-6 ${className}`}>
+    <div className={`${variant === 'compact' ? 'space-y-4' : 'space-y-6'} ${className}`}>
       {/* Header */}
-      <div className="text-center mb-8">
-        <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-3">
-          <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          <h3 className="text-sm font-bold text-primary uppercase tracking-wide">Add Credits</h3>
+      {variant !== 'compact' && (
+        <div className="text-center mb-8">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-3">
+            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            <h3 className="text-sm font-bold text-primary uppercase tracking-wide">Add Credits</h3>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">Choose how many credits to buy</p>
+          {isValidAmount && (
+            <p className="mt-2 text-xs text-muted-foreground">
+              You’ll pay <span className="font-semibold text-slate-900 dark:text-slate-100">${amountUsd.toFixed(2)}</span>.
+            </p>
+          )}
         </div>
-        <p className="text-sm text-slate-600 dark:text-slate-400 font-medium">Choose an amount to add to your wallet</p>
-      </div>
+      )}
 
       {/* Preset amounts - Modern card grid */}
-      <div className="grid grid-cols-3 gap-3">
-        {PRESET_AMOUNTS.map(amount => (
+      <div className={variant === 'compact' ? 'grid grid-cols-3 gap-2' : 'grid grid-cols-3 gap-3'}>
+        {PRESET_CREDITS.map(credits => (
+          (() => {
+            const presetUsd = credits / CREDITS_PER_USD
+            const isSelected = selectedCredits === credits
+            return (
           <button
-            key={amount}
-            onClick={() => handlePresetClick(amount)}
+            key={credits}
+            onClick={() => handlePresetClick(credits)}
             className={`
-              relative p-4 rounded-xl border-2 transition-all duration-200 group hover:scale-105
-              ${selectedAmount === amount && !useCustom ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' : 'border-border hover:border-primary/50 hover:bg-accent/50'}
+              relative ${variant === 'compact' ? 'p-3' : 'p-6'} rounded-2xl border-2 transition-all duration-200 group ${variant === 'compact' ? '' : 'hover:scale-[1.03]'}
+              ${isSelected ? 'border-primary bg-primary/5 shadow-lg shadow-primary/20' : 'border-border hover:border-primary/50 hover:bg-accent/50'}
             `}
           >
             <div className="text-center">
               <div
                 className={`
-                text-2xl font-bold transition-colors
-                ${selectedAmount === amount && !useCustom ? 'text-primary' : 'text-foreground group-hover:text-primary'}
+                ${variant === 'compact' ? 'text-xl' : 'text-3xl'} font-bold transition-colors leading-none
+                ${isSelected ? 'text-primary' : 'text-foreground group-hover:text-primary'}
               `}
               >
-                ${amount}
+                {credits.toLocaleString()}
+              </div>
+              <div className="mt-1 text-[11px] text-muted-foreground font-medium">credits</div>
+              <div className="mt-2 text-[12px] font-semibold text-foreground/80">
+                ${presetUsd.toFixed(2)}
               </div>
             </div>
-            {selectedAmount === amount && !useCustom && (
+            {isSelected && (
               <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
                 <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
               </div>
             )}
           </button>
+            )
+          })()
         ))}
-      </div>
-
-      {/* Divider */}
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t border-border" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-3 text-muted-foreground font-medium">Or enter custom amount</span>
-        </div>
-      </div>
-
-      {/* Custom amount input - Modern design */}
-      <div className="space-y-3">
-        <div className="relative">
-          <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-            <span className="text-muted-foreground font-medium">$</span>
-          </div>
-          <Input
-            type="number"
-            placeholder={useCustom ? "20.00" : selectedAmount.toFixed(2)}
-            value={useCustom ? customAmount : selectedAmount.toFixed(2)}
-            onChange={e => handleCustomChange(e.target.value)}
-            min="5"
-            max="1000"
-            step="0.01"
-            className="pl-8 h-12 text-lg font-medium border-2 focus:border-primary transition-colors"
-          />
-        </div>
       </div>
 
       {/* Add Credits button - Premium styling */}
       <Button
         onClick={handleTopup}
         disabled={mutation.isPending || !wallet || !isValidAmount}
-        size="lg"
-        className="w-full h-12 text-base font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200"
+        size={variant === 'compact' ? 'default' : 'lg'}
+        className={`w-full ${variant === 'compact' ? 'h-10 text-sm' : 'h-12 text-base'} font-semibold bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 shadow-lg hover:shadow-xl transition-all duration-200`}
       >
         {mutation.isPending ? (
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin"></div>
             Processing...
           </div>
+        ) : isValidAmount ? (
+          `Buy ${Math.round(currentCredits).toLocaleString()} credits ($${amountUsd.toFixed(2)})`
         ) : (
-          `Add ${isValidAmount ? `$${currentAmount.toFixed(2)}` : 'Credits'}`
+          'Buy credits'
         )}
       </Button>
 
       {/* Stripe redirect message - Elegant styling */}
-      <div className="text-center p-3 bg-muted/30 rounded-lg border border-border/50">
-        <p className="text-xs text-muted-foreground flex items-center justify-center gap-2">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-          </svg>
-          You will be redirected to Stripe to complete your payment
-        </p>
-      </div>
+      <p className="text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+        <Icon name="external-link" className="h-3 w-3" />
+        You will be redirected to Stripe to complete your payment
+      </p>
 
-      {/* Amount validation message */}
-      {useCustom && customAmount && !isValidAmount && (
-        <div className="text-center p-3 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <p className="text-xs text-destructive font-medium">Please enter an amount between $5 and $1000</p>
-        </div>
-      )}
     </div>
   )
 }

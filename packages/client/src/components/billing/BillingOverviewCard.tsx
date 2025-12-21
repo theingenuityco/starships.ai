@@ -1,23 +1,30 @@
 'use client'
 
-
 import { WalletModel } from '@starships/protocol'
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import BalanceStatusIndicator from './BalanceStatusIndicator'
+import Icon from '@/components/primitives/Icon'
 
 interface BillingOverviewCardProps {
   wallet?: WalletModel | null
   isLoading?: boolean
   error?: unknown
   onRetry?: () => void
+  variant?: 'default' | 'compact'
 }
 
-export default function BillingOverviewCard({ wallet, isLoading, error, onRetry }: BillingOverviewCardProps): React.JSX.Element {
+function formatCredits(n: number): string {
+  const v = Number.isFinite(n) ? n : 0
+  return v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+}
+
+export default function BillingOverviewCard({ wallet, isLoading, error, onRetry, variant = 'default' }: BillingOverviewCardProps): React.JSX.Element {
   const hasError = !!error
+  const isCompact = variant === 'compact'
 
   return (
-    <div className="flex items-center justify-center p-8">
+    <div className={isCompact ? 'p-4' : 'flex items-center justify-center p-8'}>
       <div className="space-y-4">
         {isLoading ? (
           <div className="flex flex-col items-center gap-4">
@@ -28,7 +35,12 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry 
             <span className="text-slate-600 dark:text-slate-400 font-medium">Loading balance...</span>
           </div>
         ) : hasError ? (
-          <div className="text-center p-8 bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/10 dark:to-red-900/10 border border-red-200/40 dark:border-red-800/20 rounded-3xl backdrop-blur-sm">
+          <div
+            className={
+              (isCompact ? 'text-center p-4 rounded-xl ' : 'text-center p-8 rounded-3xl ') +
+              'bg-gradient-to-br from-red-50/50 to-red-100/30 dark:from-red-950/10 dark:to-red-900/10 border border-red-200/40 dark:border-red-800/20 backdrop-blur-sm'
+            }
+          >
             <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-red-100/80 dark:bg-red-900/20 flex items-center justify-center">
               <svg className="w-8 h-8 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path
@@ -59,13 +71,27 @@ export default function BillingOverviewCard({ wallet, isLoading, error, onRetry 
           <div className="space-y-4">
             {/* Large balance amount display - matches original design */}
             <div className="relative">
-              <div className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
-                ${Number(wallet?.balance ?? 0).toFixed(2)}
-              </div>
+              {isCompact ? (
+                <div className="text-center space-y-2">
+                  <div className="inline-flex items-center justify-center gap-2">
+                    <Icon name="coins" className="h-7 w-7 text-primary" />
+                    <div className="text-5xl font-bold tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
+                      {formatCredits(Number(wallet?.balance ?? 0))}
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-center">
+                    <BalanceStatusIndicator wallet={wallet} showDetails={false} variant="default" />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-5xl font-bold text-slate-900 dark:text-white tracking-tight bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 dark:from-white dark:via-slate-100 dark:to-white bg-clip-text text-transparent">
+                  {formatCredits(Number(wallet?.balance ?? 0))}
+                </div>
+              )}
             </div>
 
             {/* Status indicator */}
-            <BalanceStatusIndicator wallet={wallet} showDetails={true} />
+            {!isCompact && <BalanceStatusIndicator wallet={wallet} showDetails={true} />}
           </div>
         )}
       </div>

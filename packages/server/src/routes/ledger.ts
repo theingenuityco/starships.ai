@@ -15,6 +15,7 @@ const QuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   limit: z.coerce.number().int().min(1).max(100).default(20),
   order: z.enum(['ASC', 'DESC']).optional(),
+  view: z.enum(['billing', 'full']).default('billing'),
 });
 
 // helper for zod validation responses consistent with other routes
@@ -43,7 +44,7 @@ function validateData<T>(schema: z.ZodSchema<T>, data: unknown, res: Response, c
 
 /**
  * GET /ledger/:walletId
- * Returns immutable ledger entries for a wallet using keyset pagination (created_at DESC, id DESC)
+ * Returns immutable credit ledger entries for a wallet (wallet_ledger)
  */
 router.get('/ledger/:walletId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -54,7 +55,7 @@ router.get('/ledger/:walletId', jwtAuthMiddleware, async (req: Request, res: Res
     if (!query) return;
 
     const { walletId } = params;
-    const { page, limit, order } = query;
+    const { page, limit, order, view } = query;
     const userId = req.user?.id || '';
 
     // Load wallet and verify access via starship
@@ -72,14 +73,16 @@ router.get('/ledger/:walletId', jwtAuthMiddleware, async (req: Request, res: Res
       return;
     }
 
-  const ledgerRepo = new LedgerRepository();
-  // Filter to display only TOPUP, REFUND, ADJUSTMENT types in management billing history
-  const visibleTypes: Array<'TOPUP' | 'USAGE' | 'REFUND' | 'ADJUSTMENT'> = ['TOPUP', 'REFUND', 'ADJUSTMENT'];
-  const total = await ledgerRepo.countByWallet(wallet.id, visibleTypes);
-  const offset = (page - 1) * limit;
-  let rows = await ledgerRepo.listByWalletPage(wallet.id, limit, offset, (order ?? 'DESC') as 'ASC' | 'DESC', visibleTypes);
-  // Extra safety: enforce filter on the API layer as well
-  rows = rows.filter((r) => (visibleTypes as unknown as string[]).includes(r.type));
+    const ledgerRepo = new LedgerRepository();
+    // Default (billing): show only balance-affecting credit actions that users expect in Billing.
+    // Full: include usage debits as well.
+    const visibleTypes: Array<'TOPUP' | 'USAGE' | 'REFUND' | 'ADJUSTMENT'> =
+      view === 'full' ? ['TOPUP', 'USAGE', 'REFUND', 'ADJUSTMENT'] : ['TOPUP', 'REFUND', 'ADJUSTMENT'];
+    const total = await ledgerRepo.countByWallet(wallet.id, visibleTypes);
+    const offset = (page - 1) * limit;
+    let rows = await ledgerRepo.listByWalletPage(wallet.id, limit, offset, (order ?? 'DESC') as 'ASC' | 'DESC', visibleTypes);
+    // Extra safety: enforce filter on the API layer as well
+    rows = rows.filter((r) => (visibleTypes as unknown as string[]).includes(r.type));
 
     const meta = createPaginationMeta(page, limit, total);
     sendSuccess(res, rows, 200, meta);

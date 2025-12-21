@@ -2,7 +2,6 @@ import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
 import { ConversationService } from '@/services/ConversationService';
 import { StreamingService } from '@/services/StreamingService';
-import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
@@ -13,6 +12,9 @@ import { WalletService } from '@/services/WalletService';
 import { ResumeTokenService } from '@/services/ResumeTokenService';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { AgentService } from '@/services/AgentService';
+import { MessageService } from '@/services/MessageService';
+import { BillingService, InsufficientFundsError } from '@/services/BillingService';
+import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 
 const router: Router = Router();
 
@@ -321,7 +323,7 @@ router.post(
 
       const isInternal = isInternalScheduleRequest(req);
 
-      // Preflight billing gate: block when wallet balance is <= 0
+      // Preflight billing gate: block when wallet credits are insufficient for a user message
       const conversationService = new ConversationService();
 
       // Verify conversation exists
@@ -366,16 +368,57 @@ router.post(
         return;
       }
 
-      // Use centralized balance validation service with $0.05 threshold
-      const balanceValidation = BalanceValidationService.validateBalance({
-        id: wallet.id,
-        balance: wallet.balance,
+      const currentCredits = Number(wallet.balance) || 0;
+      const requiredCredits = Number(CREDITS_PER_USER_MESSAGE) || 0;
+      if (currentCredits < requiredCredits) {
+        sendError(
+          res,
+          'INSUFFICIENT_FUNDS',
+          `Insufficient credits. ${requiredCredits} credits required per message. Please add credits from Billing to continue.`,
+          402,
+          {
+            currentCredits: wallet.balance,
+            requiredCredits: requiredCredits.toFixed(6),
+          }
+        );
+        return;
+      }
+
+      // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.
+      // If debit fails, delete the message and return 402 (do not start the turn).
+      const messageService = new MessageService();
+      const userMessage = await messageService.createMessage({
+        conversationId,
+        role: 'user',
+        content,
+        messageType: 'user_input',
+        ...(agentId && { agentId }),
+        ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
       });
 
-      if (!balanceValidation.isValid) {
-        const errorDetails = BalanceValidationService.getInsufficientBalanceError(wallet.balance);
-        sendError(res, 'INSUFFICIENT_FUNDS', errorDetails.message, 402, errorDetails.details);
-        return;
+      const billingService = new BillingService();
+      try {
+        await billingService.debitForUserMessage({
+          walletId: wallet.id,
+          starshipId: starship.id,
+          conversationId,
+          messageId: userMessage.id,
+        });
+      } catch (e) {
+        // Best-effort cleanup: remove message if we couldn't charge it.
+        try {
+          await messageService.deleteMessage(userMessage.id);
+        } catch {
+          /* ignore cleanup failure */
+        }
+        if (e instanceof InsufficientFundsError) {
+          sendError(res, 'INSUFFICIENT_FUNDS', 'Insufficient credits. Please add credits from Billing to continue.', 402, {
+            currentCredits: wallet.balance,
+            requiredCredits: requiredCredits.toFixed(6),
+          });
+          return;
+        }
+        throw e;
       }
 
       // Authorization: if agentId is provided, verify user owns it and it belongs to the conversation's starship
@@ -414,7 +457,8 @@ router.post(
               ...(modalities && modalities.length > 0 && { modalities }),
               ...(imageConfig && { imageConfig }),
             },
-            { authContext: req.authContext }
+            { authContext: req.authContext },
+            { preCreatedUserMessage: userMessage }
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
@@ -449,7 +493,8 @@ router.post(
             ...(modalities && modalities.length > 0 && { modalities }),
             ...(imageConfig && { imageConfig }),
           },
-          { authContext: req.authContext }
+          { authContext: req.authContext },
+          { preCreatedUserMessage: userMessage }
         )
         .catch((error) => {
           // Background conversation processing failure; main request already acknowledged

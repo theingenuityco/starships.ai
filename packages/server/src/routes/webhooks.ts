@@ -2,6 +2,7 @@ import express, { Request, Response, Router } from 'express';
 import Stripe from 'stripe';
 import { TopupRepository, WalletRepository, LedgerRepository, getConnection } from '@starships/models';
 import { logger } from '@/utils/logger';
+import { CREDITS_PER_USD, toCreditsString } from '@/config/credits';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
@@ -86,19 +87,23 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
           const ledgerRepo = new LedgerRepository();
 
           const amountUsd: string = row.amount_usd; // DECIMAL(18,4) stored as string
-          const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, row.wallet_id, amountUsd);
+          const creditsGranted = toCreditsString((Number(amountUsd) || 0) * Number(CREDITS_PER_USD || 0));
+          const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, row.wallet_id, creditsGranted);
           await topupRepo.markCompletedWithClient(row.id, paymentIntentId ?? null, null, client);
 
           await ledgerRepo.createWithClient(client, {
             walletId: row.wallet_id,
             type: 'TOPUP',
-            amount: amountUsd,
+            amount: creditsGranted,
             balanceAfter: balance,
             meta: {
               topupId: row.id,
               stripeSession: session.id,
               stripePaymentIntent: paymentIntentId ?? null,
               stripeEvent: event.id,
+              amountUsd,
+              creditsGranted,
+              creditsPerUsd: Number(CREDITS_PER_USD),
             },
           });
         });
@@ -154,19 +159,23 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
           const ledgerRepo = new LedgerRepository();
 
           const amountUsd: string = row.amount_usd; // DECIMAL stored as string
-          const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, row.wallet_id, amountUsd);
+          const creditsGranted = toCreditsString((Number(amountUsd) || 0) * Number(CREDITS_PER_USD || 0));
+          const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, row.wallet_id, creditsGranted);
           await topupRepo.markCompletedWithClient(row.id, paymentIntentId ?? null, null, client);
 
           await ledgerRepo.createWithClient(client, {
             walletId: row.wallet_id,
             type: 'TOPUP',
-            amount: amountUsd,
+            amount: creditsGranted,
             balanceAfter: balance,
             meta: {
               topupId: row.id,
               stripeSession: session.id,
               stripePaymentIntent: paymentIntentId ?? null,
               stripeEvent: event.id,
+              amountUsd,
+              creditsGranted,
+              creditsPerUsd: Number(CREDITS_PER_USD),
             },
           });
         });
@@ -211,22 +220,26 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
           const walletRepo = new WalletRepository();
           const ledgerRepo = new LedgerRepository();
           const amountUsd: string = locked.amount_usd;
+          const creditsGranted = toCreditsString((Number(amountUsd) || 0) * Number(CREDITS_PER_USD || 0));
 
           if (locked.status !== 'completed') {
             // Not yet credited (e.g., if checkout.session.completed didn't run), credit now
-            const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, locked.wallet_id, amountUsd);
+            const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, locked.wallet_id, creditsGranted);
             await topupRepo.markCompletedWithClient(locked.id, paymentIntentId ?? null, stripeChargeId, client);
 
             await ledgerRepo.createWithClient(client, {
               walletId: locked.wallet_id,
               type: 'TOPUP',
-              amount: amountUsd,
+              amount: creditsGranted,
               balanceAfter: balance,
               meta: {
                 topupId: locked.id,
                 stripePaymentIntent: paymentIntentId ?? null,
                 stripeChargeId: stripeChargeId,
                 stripeEvent: event.id,
+                amountUsd,
+                creditsGranted,
+                creditsPerUsd: Number(CREDITS_PER_USD),
               },
             });
           } else if (!locked.stripe_charge_id) {

@@ -808,7 +808,7 @@ export default function HeroConversationDemo() {
       <div className="absolute inset-0 -z-10 rounded-2xl video-glow opacity-80 pointer-events-none" aria-hidden />
       <div className="absolute inset-0 -z-10 rounded-2xl video-blur-border opacity-90 pointer-events-none" aria-hidden />
 
-      <div className="relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-card">
+      <div className="relative z-10 rounded-2xl shadow-2xl overflow-hidden border border-border/40 bg-background">
         <div
           className="relative w-full"
           style={{
@@ -862,8 +862,6 @@ export default function HeroConversationDemo() {
                 isAssistantStreamingOverride={respondingByConvo[activeConvoId] || false}
                 isAwaitingToolResultsOverride={awaitingToolsByConvo[activeConvoId] || false}
                 bottomPaddingPx={140}
-                className="bg-card"
-                scrollClassName="bg-card"
                 userNameOverride="You"
                 userAvatarSeedOverride="You"
               />

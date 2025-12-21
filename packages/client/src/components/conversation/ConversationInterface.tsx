@@ -212,15 +212,16 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }, [authUser?.name])
   const starterSlogans = useMemo(
     () => [
-      `Ship mode on`,
-      `It's automation time`,
-      `Agents awaiting orders`,
-      `Ideas to agents, ${displayName}`,
-      `Less meetings, more shipping`,
-      `New mission unlocked`,
-      `Let the agents handle it`,
-      `One prompt away from prod`,
-      `Prototype now, refactor later`,
+      `What are we doing next?`,
+      `What should we ship today?`,
+      `Tell me the goal.`,
+      `Give me a task.`,
+      `Pick one thing to finish.`,
+      `What’s the next step?`,
+      `Let’s make progress.`,
+      `Let’s ship a quick win.`,
+      `What needs to get done?`,
+      `Start with the outcome.`,
     ],
     [displayName]
   )

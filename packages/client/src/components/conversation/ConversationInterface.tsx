@@ -28,6 +28,7 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -97,6 +98,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
+  const shouldShowWelcomeCard = searchParams.get('welcome') === '1'
+  const dismissWelcomeCard = useCallback(() => {
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete('welcome')
+    const qs = next.toString()
+    router.replace(qs ? `${pathname}?${qs}` : pathname)
+  }, [pathname, router, searchParams])
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
@@ -1052,6 +1060,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
         <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
+          {!showMessagesArea && shouldShowWelcomeCard ? (
+            <div className="w-full max-w-2xl mx-auto pointer-events-auto opacity-100 mb-4">
+              <WelcomeSignupCard userName={authUser?.name} onDismiss={dismissWelcomeCard} />
+            </div>
+          ) : null}
+
           <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
             {!showMessagesArea && (
               <div className="mb-8 text-center opacity-100">

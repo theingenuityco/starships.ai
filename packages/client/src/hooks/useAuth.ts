@@ -97,17 +97,15 @@ const validateToken = async (token: string): Promise<AuthUser | null> => {
   }
 }
 
-// Get current user info using query
-// Welcome modal state key (separate from user data)
-const SHOW_WELCOME_MODAL_KEY = ['auth', 'showWelcomeModal'] as const
-
-// Hook to get welcome modal state
-export function useWelcomeModalState() {
-  const queryClient = useQueryClient()
-
-  return {
-    shouldShow: queryClient.getQueryData<boolean>(SHOW_WELCOME_MODAL_KEY) ?? false,
-    clearFlag: () => queryClient.setQueryData(SHOW_WELCOME_MODAL_KEY, false),
+function addWelcomeParamToPath(path: string): string {
+  // `path` is expected to be a relative path beginning with `/`
+  try {
+    const url = new URL(path, window.location.origin)
+    url.searchParams.set('welcome', '1')
+    return `${url.pathname}${url.search}${url.hash}`
+  } catch {
+    // Very defensive fallback; should not happen due to isValidRedirectUrl checks
+    return path.includes('?') ? `${path}&welcome=1` : `${path}?welcome=1`
   }
 }
 
@@ -174,19 +172,15 @@ export function useLogin() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // If first login (backend-tracked), set welcome modal flag in query cache
-      if (isFirstLogin) {
-        queryClient.setQueryData(SHOW_WELCOME_MODAL_KEY, true)
-      }
-
       // Handle redirect with returnUrl pattern
       const searchParams = new URLSearchParams(window.location.search)
       const returnUrl = searchParams.get('returnUrl')
 
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
-        router.push(returnUrl)
+        router.push(isFirstLogin ? addWelcomeParamToPath(returnUrl) : returnUrl)
       } else if (starship) {
-        router.push(`/ship/${starship.slug}/conversations`)
+        const path = `/ship/${starship.slug}/conversations`
+        router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)
       } else {
         // If no starship available, redirect to profile which handles starship routing
         router.push('/profile')
@@ -248,7 +242,7 @@ export function useRegister() {
 
       // Redirect to starship's conversation if available
       if (starship) {
-        router.push(`/ship/${starship.slug}/conversations`)
+        router.push(addWelcomeParamToPath(`/ship/${starship.slug}/conversations`))
       }
 
       // Invalidate all queries to refetch with new auth context
@@ -299,19 +293,15 @@ export function useOAuthLogin() {
       // Update auth user cache (same as regular login)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // If first login (backend-tracked), set welcome modal flag in query cache
-      if (isFirstLogin) {
-        queryClient.setQueryData(SHOW_WELCOME_MODAL_KEY, true)
-      }
-
       // Handle redirect with returnUrl pattern (same as regular login)
       const searchParams = new URLSearchParams(window.location.search)
       const returnUrl = searchParams.get('returnUrl')
 
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
-        router.push(returnUrl)
+        router.push(isFirstLogin ? addWelcomeParamToPath(returnUrl) : returnUrl)
       } else if (starship) {
-        router.push(`/ship/${starship.slug}/conversations`)
+        const path = `/ship/${starship.slug}/conversations`
+        router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)
       } else {
         router.push('/profile')
       }

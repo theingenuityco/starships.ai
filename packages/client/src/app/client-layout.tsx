@@ -7,7 +7,6 @@ import { TopRightUserProfile } from '@/components/auth/TopRightUserProfile'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
-import { WelcomeModalProvider } from '@/components/auth/WelcomeModalProvider'
 import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHandler'
 
 import { motion } from 'motion/react'
@@ -172,50 +171,46 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   // Regular pages with conditional navigation sidebar
   return (
     <JwtAuthGate>
-      <WelcomeModalProvider>
-        <StarTheme>
-          <EmailChangeToastHandler />
-          <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-            {showTopRightUserProfile ? <TopRightUserProfile /> : null}
-            {/* Sidebar Navigation - conditionally rendered */}
-            {!shouldHideNavigation && (
-              <>
-                {/* Desktop: always visible */}
-                {!isMobile && (
-                  <div className="flex-shrink-0 relative z-50">
-                    <aside className="relative h-full">
-                      <Navigation isMobile={false} isOpen={true} />
-                    </aside>
-                  </div>
-                )}
+      <StarTheme>
+        <EmailChangeToastHandler />
+        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+          {showTopRightUserProfile ? <TopRightUserProfile /> : null}
+          {/* Sidebar Navigation - conditionally rendered */}
+          {!shouldHideNavigation && (
+            <>
+              {/* Desktop: always visible */}
+              {!isMobile && (
+                <div className="flex-shrink-0 relative z-50">
+                  <aside className="relative h-full">
+                    <Navigation isMobile={false} isOpen={true} />
+                  </aside>
+                </div>
+              )}
 
-                {/* Mobile: overlay navigation */}
-                {isMobile && (
-                  <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />
-                )}
-              </>
-            )}
+              {/* Mobile: overlay navigation */}
+              {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
+            </>
+          )}
 
-            {/* Mobile Toggle Button - only show when menu is closed */}
-            {isMobile && !shouldHideNavigation && !showMobileMenu && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={() => setShowMobileMenu(true)}
-                className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
-                aria-label="Open navigation menu"
-                style={{ zIndex: 999 }}
-              >
-                <Icon name="sidebar" className="w-5 h-5" />
-              </motion.button>
-            )}
+          {/* Mobile Toggle Button - only show when menu is closed */}
+          {isMobile && !shouldHideNavigation && !showMobileMenu && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              onClick={() => setShowMobileMenu(true)}
+              className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+              aria-label="Open navigation menu"
+              style={{ zIndex: 999 }}
+            >
+              <Icon name="sidebar" className="w-5 h-5" />
+            </motion.button>
+          )}
 
-            {/* Main Content Area - takes remaining space */}
-            <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
-          </div>
-        </StarTheme>
-      </WelcomeModalProvider>
+          {/* Main Content Area - takes remaining space */}
+          <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
+        </div>
+      </StarTheme>
     </JwtAuthGate>
   )
 }

@@ -7,26 +7,28 @@ export default function Security() {
       icon: 'shield-check',
       title: 'Isolation',
       text: 'Each run happens in its own safe space, so one job can’t affect another.',
-      tech: 'Process isolation with per‑run resource limits and safe termination.',
+      tech: 'Runs are sandboxed with time and resource limits.',
     },
     {
       icon: 'lock',
       title: 'Secret Encryption',
       text: 'Your secrets are encrypted and kept separate for each starship.',
-      tech: 'Encryption at rest with scoped access and managed keys.',
+      tech: 'Encrypted at rest with tightly scoped access.',
     },
     {
       icon: 'activity',
       title: 'Observability',
       text: 'Watch work happen live and review a clear timeline of every step.',
-      tech: 'SSE streaming with heartbeats, replay buffer, and reliable reconnects.',
+      tech: 'Live streaming and a complete audit trail of what happened.',
     },
   ]
   return (
     <section className="py-16 px-4">
       <div className="max-w-6xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Security & reliability</h2>
-        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-16">Designed for safe execution and clear visibility across every run.</p>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Security & trust</h2>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-16">
+          Built so you can safely give AI real work—without losing control of your data or process.
+        </p>
         <div>
           <ul className="grid gap-4 sm:gap-6 md:gap-8 md:grid-cols-3">
             {items.map((i, idx) => (
@@ -46,7 +48,7 @@ export default function Security() {
           </ul>
           <div className="mt-10 text-center">
             <a href="/docs" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline">
-              Read the security docs
+              Learn more about security
               <Icon name="external-link" className="w-3.5 h-3.5" />
             </a>
           </div>

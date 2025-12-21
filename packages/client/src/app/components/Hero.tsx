@@ -31,23 +31,22 @@ export default function Hero() {
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
             {(() => {
               const v = getHeadlineVariant()
-              if (v === 'B') return 'From prompt to working agent—without brittle glue'
-              if (v === 'C') return 'Design, run, and monitor AI automations'
+              if (v === 'B') return 'Hire your AI team—then brief them in plain English'
+              if (v === 'C') return 'A team of AI specialists that ships work with you'
               return (
                 <>
-                  Build automations at{' '}
-                  <span className="warp-word" data-text="warp">
-                    <span className="warp-letter">w</span>
+                  Your very own AI{' '}
+                  <span className="warp-word" data-text="team">
+                    <span className="warp-letter">t</span>
+                    <span className="warp-letter">e</span>
                     <span className="warp-letter">a</span>
-                    <span className="warp-letter">r</span>
-                    <span className="warp-letter">p</span>
+                    <span className="warp-letter">m</span>
                   </span>
-                  &nbsp;speed
                 </>
               )
             })()}
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-6 md:mb-10 leading-relaxed max-w-[60ch] mx-auto">Ship intelligent automations in minutes - safe, observable and fast.</p>
+          <p className="text-base sm:text-lg text-muted-foreground mb-6 md:mb-10 leading-relaxed max-w-[60ch] mx-auto">Build, manage and deploy agents at unbelievable speed.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button size="lg" className="h-12 px-10 text-base leading-none overflow-hidden [&_svg]:!w-7 [&_svg]:!h-7" onClick={handlePrimaryClick}>
               {isAuthenticated ? (
@@ -66,11 +65,11 @@ export default function Hero() {
               variant="outline"
               className="h-12 px-10 text-base"
               onClick={() => {
-                window.open('/docs', '_blank')
+                window.location.href = '/marketplace?from=public'
               }}
             >
-              <Icon name="book" className="w-5 h-5 mr-2.5" />
-              View Docs
+              <Icon name="store" className="w-5 h-5 mr-2.5" />
+              Explore marketplace
             </Button>
           </div>
           <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • 200 credits on signup</div>

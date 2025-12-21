@@ -35,7 +35,12 @@ export default function Hero() {
               if (v === 'C') return 'A team of AI specialists that ships work with you'
               return (
                 <>
-                  Your very own AI{' '}
+                  Your very own{' '}
+                  <span className="warp-word" data-text="ai">
+                    <span className="warp-letter">A</span>
+                    <span className="warp-letter">I</span>
+                  </span>
+                  &nbsp;
                   <span className="warp-word" data-text="team">
                     <span className="warp-letter">t</span>
                     <span className="warp-letter">e</span>
@@ -46,7 +51,7 @@ export default function Hero() {
               )
             })()}
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-6 md:mb-10 leading-relaxed max-w-[60ch] mx-auto">Build, manage and deploy agents at unbelievable speed.</p>
+          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed max-w-[60ch] mx-auto">Build, manage and deploy agents to handle the busy work.</p>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button size="lg" className="h-12 px-10 text-base leading-none overflow-hidden [&_svg]:!w-7 [&_svg]:!h-7" onClick={handlePrimaryClick}>
               {isAuthenticated ? (
@@ -69,28 +74,14 @@ export default function Hero() {
               }}
             >
               <Icon name="store" className="w-5 h-5 mr-2.5" />
-              Explore marketplace
+              Explore agents
             </Button>
           </div>
           <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • 200 credits on signup</div>
-          <div className="mt-3 mb-8 md:mb-12">
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-sm h-9 px-4 hover:bg-primary/10 hover:text-primary transition-colors"
-              onClick={() => {
-                track({ type: 'discord_hero_clicked' })
-                window.open('https://discord.gg/wzF7xfjrKv', '_blank')
-              }}
-            >
-              <Icon name="discord" className="w-4 h-4 mr-2" />
-              Join our Discord community
-            </Button>
-          </div>
         </div>
 
         {/* Demo video replacing blueprint visualization */}
-        <div className="relative w-full overflow-visible pt-[56.25%]">
+        <div className="relative w-full overflow-visible pt-[56.25%] mt-6 sm:mt-8 md:mt-10">
           {/* Glow layer around the video frame */}
           <div className="absolute inset-0 rounded-2xl video-glow pointer-events-none" aria-hidden />
           {/* Blurry, almost transparent border */}

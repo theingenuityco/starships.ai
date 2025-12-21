@@ -26,7 +26,7 @@ import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 interface ConversationInterfaceProps {
@@ -85,10 +85,18 @@ function getMostRecentAgentIdFromMessages(messages: any[], conversationId?: stri
   return null
 }
 
+function pickDefaultAgent(agents: any[]): any | null {
+  if (!Array.isArray(agents) || agents.length === 0) return null
+  const aria = agents.find(a => typeof a?.slug === 'string' && a.slug.toLowerCase().startsWith('aria'))
+  return aria ?? agents[0] ?? null
+}
+
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { data: authUser } = useAuthUser()
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
@@ -202,9 +210,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const first = full.split(/\s+/)[0]
     return first || 'there'
   }, [authUser?.name])
-  const starterGreetings = useMemo(
+  const starterSlogans = useMemo(
     () => [
-      `Hi ${displayName}`,
       `Ship mode on`,
       `It's automation time`,
       `Agents awaiting orders`,
@@ -217,7 +224,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     ],
     [displayName]
   )
-  const starterGreeting = useMemo(() => starterGreetings[Math.floor(Math.random() * starterGreetings.length)] ?? 'What are we building today?', [starterGreetings])
+  const starterSlogan = useMemo(() => starterSlogans[Math.floor(Math.random() * starterSlogans.length)] ?? 'What are we building today?', [starterSlogans])
+
+  const starshipName = useMemo(() => {
+    const n = (starshipData as any)?.name
+    return typeof n === 'string' && n.trim().length > 0 ? n.trim() : 'your starship'
+  }, [starshipData])
 
   // For collapsed view, show only the first few prompts for the selected agent
   const collapsedSuggestionCards = useMemo(() => {
@@ -320,6 +332,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Track if user explicitly selected an agent to avoid auto-restore overriding it
   const userSelectedAgentRef = useRef(false)
 
+  const updateStarterAgentQueryParam = useCallback(
+    (agentSlug: string | null) => {
+      // Only update query param on the starter view (no conversation id yet)
+      if (currentConversationIdRef.current || externalConversationId) return
+      try {
+        const sp = new URLSearchParams(searchParams?.toString() || '')
+        if (agentSlug && agentSlug.trim().length > 0) sp.set('agent', agentSlug)
+        else sp.delete('agent')
+        const qs = sp.toString()
+        router.replace(qs ? `${pathname}?${qs}` : pathname)
+      } catch {
+        // ignore URL update failures
+      }
+    },
+    [externalConversationId, pathname, router, searchParams]
+  )
+
   // Core agent change handler used by both input and cards
   const handleAgentChange = useCallback(
     (agent: Agent | null) => {
@@ -335,8 +364,11 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       if (agent && currentConversationId) {
         setConversationAgentStore(currentConversationId, agent.id as any, agent.name as any)
       }
+
+      // Keep the starter URL in sync so the selected agent is shareable/bookmarkable
+      updateStarterAgentQueryParam(agent?.slug ?? null)
     },
-    [currentConversationId, setConversationAgentStore, setSelectedAgentWithLogging]
+    [currentConversationId, setConversationAgentStore, setSelectedAgentWithLogging, updateStarterAgentQueryParam]
   )
 
   // Handle conversation start - receive actual database conversation ID
@@ -456,7 +488,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [initialAgentId, starshipAgentsData, selectedAgent, currentConversationId, setConversationAgentStore])
 
-  // Set Gaia as default ONLY on initial mount - use stable deps to avoid re-runs
+  // Set default agent (prefer aria*) ONLY on initial mount - use stable deps to avoid re-runs
   useEffect(() => {
     // Don't run if already set
     if (hasSetInitialDefaultAgentRef.current) {
@@ -499,8 +531,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       return
     }
 
-    // Agents are already sorted on the server (newest first), so use the first as the default
-    const fallback = starshipAgentsData[0]
+    const fallback = pickDefaultAgent(starshipAgentsData as any)
 
     if (fallback && typeof fallback.id === 'string') {
       // Set flags BEFORE state update to prevent re-runs
@@ -1023,7 +1054,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
             {!showMessagesArea && (
               <div className="mb-8 text-center opacity-100">
-                <h1 className="text-3xl font-normal mb-4 text-foreground">{starterGreeting}</h1>
+                <h1 className="text-3xl font-normal mb-2 text-foreground">{`Welcome to your starship, ${starshipName}`}</h1>
+                <p className="text-base text-muted-foreground">{starterSlogan}</p>
               </div>
             )}
 

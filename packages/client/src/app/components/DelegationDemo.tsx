@@ -607,11 +607,11 @@ export default function DelegationDemo() {
 
               <div
                 className={[
-                  'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
-                  activeDemoConvoId === 'main' ? 'border-amber-400/35' : 'border-border/40',
+                  'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
+                  activeDemoConvoId === 'main' ? 'border-amber-300/55' : 'border-white/20',
                 ].join(' ')}
               >
-                <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
+                <div className="px-4 sm:px-6 py-4 border-b border-white/15 bg-background">
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.main.label}</div>
@@ -665,11 +665,11 @@ export default function DelegationDemo() {
 
                 <div
                   className={[
-                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
-                    activeDemoConvoId === 'gaia' ? 'border-amber-400/35' : 'border-border/40',
+                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
+                    activeDemoConvoId === 'gaia' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
-                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
+                  <div className="px-4 sm:px-6 py-4 border-b border-white/15 bg-background">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.gaia.label}</div>
@@ -721,11 +721,11 @@ export default function DelegationDemo() {
 
                 <div
                   className={[
-                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-lg shadow-black/20',
-                    activeDemoConvoId === 'daedalus' ? 'border-amber-400/35' : 'border-border/40',
+                    'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
+                    activeDemoConvoId === 'daedalus' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
-                  <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background">
+                  <div className="px-4 sm:px-6 py-4 border-b border-white/15 bg-background">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.daedalus.label}</div>
@@ -783,7 +783,7 @@ export default function DelegationDemo() {
           position: absolute;
           inset: 0;
           border-radius: inherit;
-          border: 3px solid rgba(255, 255, 255, 0.30);
+          border: 2px solid rgba(255, 255, 255, 0.34);
           filter: blur(8px);
           opacity: 1;
           pointer-events: none;

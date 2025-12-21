@@ -95,7 +95,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
               <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-xl bg-background/95 backdrop-blur-sm border border-border/50 shadow-lg">
+          <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-lg bg-card border border-border shadow-sm">
             <DropdownMenuLabel className="px-2 py-2 font-normal">
               <div className="flex items-center gap-3">
                 <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40">

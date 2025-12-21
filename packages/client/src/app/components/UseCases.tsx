@@ -1,5 +1,4 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
-import { Card } from '@/components/ui/card'
 
 export default function UseCases() {
   return (
@@ -12,7 +11,7 @@ export default function UseCases() {
 
         {/* Delegation subsection */}
         <div className="mt-14 md:mt-16">
-          <Card className="w-full max-w-6xl mx-auto p-4 sm:p-6 md:p-8 bg-white/5 border border-white/15">
+          <div className="w-full max-w-6xl mx-auto">
             <div className="text-center mb-6 md:mb-8">
               <h3 className="text-xl sm:text-2xl md:text-3xl font-semibold">Delegation</h3>
               <p className="text-sm md:text-base text-muted-foreground max-w-2xl mx-auto mt-2">
@@ -23,7 +22,7 @@ export default function UseCases() {
             <div className="w-full">
               <DelegationDemo />
             </div>
-          </Card>
+          </div>
         </div>
       </div>
     </section>

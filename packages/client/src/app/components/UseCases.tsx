@@ -1,4 +1,5 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
+import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
 
 export default function UseCases() {
   return (
@@ -17,19 +18,7 @@ export default function UseCases() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-              <div className="text-xs font-medium text-muted-foreground mb-3">Example</div>
-              <div className="grid gap-3">
-                <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-relaxed">
-                  <span className="font-semibold text-foreground">You:</span>{' '}
-                  <span className="text-foreground/90">“Aria, create an agent that summarizes customer emails and drafts friendly replies for my approval.”</span>
-                </div>
-                <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-relaxed">
-                  <span className="font-semibold text-foreground">Aria:</span>{' '}
-                  <span className="text-foreground/80">“Done. I created a ‘Customer Inbox Assistant’ with rules for tone, what to escalate, and an approval step before sending.”</span>
-                </div>
-              </div>
-            </div>
+            <BuildCustomAgentDemo />
           </div>
         </div>
 

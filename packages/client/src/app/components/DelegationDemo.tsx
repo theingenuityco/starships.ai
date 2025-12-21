@@ -476,7 +476,7 @@ export default function DelegationDemo() {
               chunks = [...chunks, { content: part, position, timestamp: Date.now() }]
               position += 1
               updateMessage(step.convoId, id, { chunks, streaming: true })
-              await sleep(45)
+              await sleep(70)
             }
           } else {
             // Immediate (non-streaming) assistant text

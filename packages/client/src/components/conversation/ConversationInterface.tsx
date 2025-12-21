@@ -1060,12 +1060,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
         <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-6 pb-10')}>
-          {!showMessagesArea && shouldShowWelcomeCard ? (
-            <div className="w-full max-w-2xl mx-auto pointer-events-auto opacity-100 mb-4">
-              <WelcomeSignupCard userName={authUser?.name} onDismiss={dismissWelcomeCard} />
-            </div>
-          ) : null}
-
           <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-40')} data-message-input>
             {!showMessagesArea && (
               <div className="mb-8 text-center opacity-100">
@@ -1073,6 +1067,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 <p className="text-base text-muted-foreground">{starterSlogan}</p>
               </div>
             )}
+
+            {!showMessagesArea && shouldShowWelcomeCard ? (
+              <div className="mb-6">
+                <WelcomeSignupCard userName={authUser?.name} onDismiss={dismissWelcomeCard} />
+              </div>
+            ) : null}
 
             {/* Starter layout: Agent select, Message input, Suggested prompts — one shared parent + consistent spacing */}
             {!showMessagesArea ? (

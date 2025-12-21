@@ -17,7 +17,7 @@ export function WelcomeSignupCard({ userName, onDismiss }: { userName?: string; 
             </div>
             <div>
               <CardTitle className="text-base font-semibold">{firstName ? `Welcome, ${firstName}!` : 'Welcome aboard!'}</CardTitle>
-              <p className="text-sm text-muted-foreground">You’re ready to start your first conversation.</p>
+              <p className="text-sm text-muted-foreground">We added 200 credits to your account. Start your first conversation.</p>
             </div>
           </div>
 

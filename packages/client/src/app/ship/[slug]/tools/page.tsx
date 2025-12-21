@@ -5,7 +5,6 @@ import Icon from '@/components/primitives/Icon'
 import React, { useMemo, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { PageLayout } from '@/components/layout/PageLayout'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
@@ -81,84 +80,59 @@ export default function StarshipToolsPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">Installed tools available to your agents</p>
             </div>
 
-            {/* Route-based tabs */}
-            <Tabs
-              value="tools"
-              onValueChange={value => {
-                if (value === 'agents') router.push(`/ship/${slug}/agents`)
-                else if (value === 'tools') router.push(`/ship/${slug}/tools`)
-                else if (value === 'schedules') router.push(`/ship/${slug}/schedules`)
-              }}
-              className="space-y-6"
-            >
-              <div className="flex justify-center">
-                <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
-                  <TabsTrigger value="agents" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="head-circuit" className="h-4 w-4" />
-                    <span>Agents</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="tools" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="wrench" className="h-4 w-4" />
-                    <span>Tools</span>
-                  </TabsTrigger>
-                  <TabsTrigger value="schedules" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="clock" className="h-4 w-4" />
-                    <span>Schedules</span>
-                  </TabsTrigger>
-                </TabsList>
-              </div>
+            <section aria-labelledby="tools-list">
+              {starshipToolsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map(i => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
+                </div>
+              ) : starshipTools.length === 0 ? (
+                <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
+                  <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Icon name="wrench" className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-base text-muted-foreground mb-3">No tools installed</p>
+                  <p className="text-sm text-muted-foreground">Install tools from the Marketplace to get started.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-8 sticky top-6 z-30">
+                    <div className="relative max-w-md mb-6 mx-auto">
+                      <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                      <Input
+                        type="text"
+                        placeholder="Search tools..."
+                        value={search}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
+                        className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
+                      />
+                    </div>
+                  </div>
 
-              <TabsContent value="tools">
-                <section aria-labelledby="tools-list">
-                  {starshipToolsLoading ? (
-                    <div className="space-y-2">
-                      {[1, 2, 3].map(i => (
-                        <Skeleton key={i} className="h-16 w-full" />
+                  {filteredTools.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {filteredTools.map(tool => (
+                        <DeployedToolCard
+                          key={tool.id}
+                          tool={tool}
+                          onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
+                          onOpen={t => router.push(`/ship/${slug}/tool/${t.slug}`)}
+                        />
                       ))}
                     </div>
-                  ) : starshipTools.length === 0 ? (
+                  ) : (
                     <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
                       <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <Icon name="wrench" className="w-8 h-8 text-muted-foreground" />
+                        <Icon name="search" className="w-8 h-8 text-muted-foreground" />
                       </div>
-                      <p className="text-base text-muted-foreground mb-3">No tools installed</p>
-                      <p className="text-sm text-muted-foreground">Install tools from the Marketplace to get started.</p>
+                      <p className="text-base text-muted-foreground mb-3">No tools match your search</p>
+                      <p className="text-sm text-muted-foreground">Try a different keyword.</p>
                     </div>
-                  ) : (
-                    <>
-                      <div className="mb-8 sticky top-6 z-30">
-                        <div className="relative max-w-md mb-6 mx-auto">
-                          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                          <Input
-                            type="text"
-                            placeholder="Search tools..."
-                            value={search}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSearch(e.target.value)}
-                            className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
-                          />
-                        </div>
-                      </div>
-
-                      {filteredTools.length > 0 ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                          {filteredTools.map(tool => (
-                            <DeployedToolCard key={tool.id} tool={tool} onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)} onOpen={t => router.push(`/ship/${slug}/tool/${t.slug}`)} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
-                          <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <Icon name="search" className="w-8 h-8 text-muted-foreground" />
-                          </div>
-                          <p className="text-base text-muted-foreground mb-3">No tools match your search</p>
-                          <p className="text-sm text-muted-foreground">Try a different keyword.</p>
-                        </div>
-                      )}
-                    </>
                   )}
-                </section>
-              </TabsContent>
-            </Tabs>
+                </>
+              )}
+            </section>
           </div>
         </div>
       </div>

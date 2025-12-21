@@ -563,7 +563,7 @@ export default function DelegationDemo() {
                 isRespondingOverride={(respondingByConvo[activeDemoConvoId] || false) || (awaitingToolsByConvo[activeDemoConvoId] || false)}
                 isAssistantStreamingOverride={respondingByConvo[activeDemoConvoId] || false}
                 isAwaitingToolResultsOverride={awaitingToolsByConvo[activeDemoConvoId] || false}
-                bottomPaddingPx={24}
+                bottomPaddingPx={140}
                 className="bg-card"
                 scrollClassName="bg-card"
                 userNameOverride={DEMO_CONVERSATIONS[activeDemoConvoId].userIsAgent ? DEMO_CONVERSATIONS[activeDemoConvoId].rightUserLabel : undefined}

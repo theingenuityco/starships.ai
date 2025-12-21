@@ -86,6 +86,10 @@ export function ConversationMessageList({
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
+  // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
+  // issue during streaming where message length stays constant but chunks keep appending.
+  const isNearBottomRef = useRef(true)
+  const SCROLL_THRESHOLD_PX = 120
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
@@ -375,30 +379,60 @@ export function ConversationMessageList({
     return lastId
   }, [renderMessages])
 
-  // Optimized auto-scroll with debouncing
+  // "Progress key" for streaming: changes when chunks/tool results advance even if message count doesn't.
+  const lastRenderedMessage: any = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as any) : null
+  const lastRenderedChunkTs = useMemo(() => {
+    const chunks = lastRenderedMessage?.chunks
+    if (Array.isArray(chunks) && chunks.length > 0) {
+      return Number(chunks[chunks.length - 1]?.timestamp) || 0
+    }
+    return 0
+  }, [lastRenderedMessage?.chunks])
+  const lastRenderedProgressKey = useMemo(() => {
+    const id = lastRenderedMessage?.id ?? 'none'
+    const updatedAt = String(lastRenderedMessage?.updatedAt ?? lastRenderedMessage?.createdAt ?? '')
+    const toolResultsLen = Array.isArray(lastRenderedMessage?.toolResults) ? lastRenderedMessage.toolResults.length : 0
+    return [id, updatedAt, String(lastRenderedChunkTs), String(toolResultsLen), String(activeRenderedStreamingAssistantId ?? ''), shouldShowGapLoader ? 'gap' : ''].join('|')
+  }, [
+    activeRenderedStreamingAssistantId,
+    lastRenderedChunkTs,
+    lastRenderedMessage?.createdAt,
+    lastRenderedMessage?.id,
+    lastRenderedMessage?.updatedAt,
+    lastRenderedMessage?.toolResults,
+    shouldShowGapLoader,
+  ])
+
+  // Initialize near-bottom status on mount / when container ref becomes available.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
+  }, [])
+
+  // Optimized auto-scroll with debouncing (now supports streaming progress).
   useEffect(() => {
     if (!scrollContainerRef.current) return
 
     const container = scrollContainerRef.current
-    const shouldScroll = () => {
-      const threshold = 100
-      return container.scrollTop + container.clientHeight >= container.scrollHeight - threshold
-    }
+    const isActivelyStreaming = isAssistantStreaming || !!activeRenderedStreamingAssistantId || shouldShowGapLoader
 
-    // Only scroll if user is near bottom or new messages arrived
-    if (shouldScroll() || displayMessages.length > lastMessageCountRef.current) {
+    // Only scroll if user is near bottom (as last reported by onScroll) or new messages arrived.
+    // NOTE: during streaming, content grows without a scroll event; keeping a ref avoids losing the lock.
+    if (isNearBottomRef.current || displayMessages.length > lastMessageCountRef.current || shouldShowGapLoader) {
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
         scrollContainerRef.current.scrollTo({
           top: scrollContainerRef.current.scrollHeight,
-          behavior: displayMessages.length === lastMessageCountRef.current ? 'smooth' : 'auto',
+          // Prefer immediate scroll during streaming to avoid "lagging behind" effect.
+          behavior: displayMessages.length === lastMessageCountRef.current ? (isActivelyStreaming ? 'auto' : 'smooth') : 'auto',
         })
       })
     }
 
     lastMessageCountRef.current = displayMessages.length
-  }, [displayMessages.length])
+  }, [activeRenderedStreamingAssistantId, displayMessages.length, isAssistantStreaming, lastRenderedProgressKey, shouldShowGapLoader])
 
   // Ensure the GAP loader remains visible by auto-scrolling when we are waiting for assistant text
   // either initially or while waiting after tool results.
@@ -418,7 +452,16 @@ export function ConversationMessageList({
 
   return (
     <div className={cn('h-full flex flex-col', className)}>
-      <div ref={scrollContainerRef} className={cn('flex-1 overflow-y-auto px-4 pt-6 scroll-smooth', scrollClassName)} style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
+      <div
+        ref={scrollContainerRef}
+        className={cn('flex-1 overflow-y-auto px-4 pt-6 scroll-smooth', scrollClassName)}
+        style={{ paddingBottom: bottomPaddingPx ?? 160 }}
+        onScroll={() => {
+          const container = scrollContainerRef.current
+          if (!container) return
+          isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
+        }}
+      >
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null

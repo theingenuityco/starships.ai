@@ -1,5 +1,6 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
 import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
+import ToolsBlueprintDemo from '@/app/components/ToolsBlueprintDemo'
 
 export default function UseCases() {
   return (
@@ -14,7 +15,7 @@ export default function UseCases() {
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Build your custom agent</h3>
               <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Define what it owns, how it communicates, and what “done” means.
+                Gaia helps you define what it owns, how it communicates, and what “done” means.
               </p>
             </div>
 
@@ -28,11 +29,11 @@ export default function UseCases() {
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Upgrade your agents by adding tools</h3>
               <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Tools let agents do real work, like fetching info and taking actions in your apps, not just writing text.
+                Daedalus turns steps into workflows your agents can run.
               </p>
             </div>
 
-            <BuildCustomAgentDemo />
+            <ToolsBlueprintDemo />
           </div>
         </div>
 
@@ -42,7 +43,7 @@ export default function UseCases() {
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Delegate like never before</h3>
               <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Give one instruction, and Aria can spin up specialist chats to set up agents and tools for you, then return with a ready-to-use result.
+                Aria spins up specialist chats and brings back the result.
               </p>
             </div>
             <div className="w-full">

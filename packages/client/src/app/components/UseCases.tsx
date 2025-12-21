@@ -34,9 +34,9 @@ export default function UseCases() {
   return (
     <section className="py-14 px-4">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Assemble your AI team</h2>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">How it works?</h2>
         <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">
-          Create teammates, equip them with the right skills, and work together in one shared workspace.
+          Create agents, add tools, and collaborate in one workspace.
         </p>
         <div className="space-y-10 md:space-y-12">
           {items.map((item, idx) => {

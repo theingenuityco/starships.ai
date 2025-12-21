@@ -284,7 +284,7 @@ export function Navigation(props: NavigationProps) {
               className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
               title={isMobile ? undefined : isExpanded ? 'Go to Landing Screen' : 'Expand sidebar'}
-              style={{ cursor: isMobile ? 'default' : isExpanded ? 'w-resize' : 'e-resize' }}
+              style={{ cursor: isMobile ? 'default' : 'pointer' }}
             >
               {/* Match the nav icon column width so the logo aligns with item icons */}
               <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>

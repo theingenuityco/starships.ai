@@ -65,7 +65,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
           className={cn(
             // Match ConversationMessageInput container styling
             'justify-between bg-card border border-border/60 rounded-2xl shadow-sm transition-all hover:bg-card focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/70',
-            // Match ConversationMessageInput inner padding: minimal => px-2 py-2, default => px-3 py-3
+            // Match ConversationMessageInput inner padding: minimal => pl-3 pr-2 py-2, default => px-3 py-3
             compact ? 'h-auto px-2 py-1 text-xs min-w-[120px]' : 'h-auto px-3 py-2 text-sm min-w-[220px]'
           )}
           disabled={loading}

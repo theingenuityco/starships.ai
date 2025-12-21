@@ -25,7 +25,8 @@ type ConvoId = 'aria' | 'doc_organizer' | 'lead_generator'
 type ConvoConfig = {
   id: ConvoId
   label: string
-  agentName: string
+  tabName: string
+  actorName: string
   agentSeed: string
   subtitle: string
 }
@@ -34,21 +35,24 @@ const CONVOS: Record<ConvoId, ConvoConfig> = {
   aria: {
     id: 'aria',
     label: 'Aria ↔ You',
-    agentName: 'Demo',
+    tabName: 'Demo',
+    actorName: 'Aria',
     agentSeed: 'Aria',
     subtitle: 'Q&A: what is Starships.ai?',
   },
   doc_organizer: {
     id: 'doc_organizer',
     label: 'Doc Organizer ↔ You',
-    agentName: 'Doc Organizer',
+    tabName: 'Doc Organizer',
+    actorName: 'Doc Organizer',
     agentSeed: 'Doc Organizer',
     subtitle: 'Drive cleanup with visible tool progress',
   },
   lead_generator: {
     id: 'lead_generator',
     label: 'Lead Generator ↔ You',
-    agentName: 'Lead Generator',
+    tabName: 'Lead Generator',
+    actorName: 'Lead Generator',
     agentSeed: 'Lead Generator',
     subtitle: 'Lead-gen campaign setup in Ads Manager',
   },
@@ -84,7 +88,7 @@ function chunkTextForStreaming(text: string) {
 const ARIA_TIMELINE: Step[] = [
   {
     role: 'user',
-    content: 'Aria — what is Starships.ai?',
+    content: 'What is Starships.ai?',
   },
   {
     role: 'assistant',
@@ -731,7 +735,7 @@ export default function HeroConversationDemo() {
         appendMessage(convoId, {
           id,
           role: 'assistant',
-          agentName: step.agentName ?? CONVOS[convoId].agentName,
+          agentName: step.agentName ?? CONVOS[convoId].actorName,
           content: '',
           createdAt,
           updatedAt: createdAt,
@@ -767,7 +771,7 @@ export default function HeroConversationDemo() {
           appendMessage(convoId, {
             id: toolRunnerId,
             role: 'assistant',
-            agentName: step.agentName ?? CONVOS[convoId].agentName,
+            agentName: step.agentName ?? CONVOS[convoId].actorName,
             content: 'Running tools…',
             createdAt: toolCreatedAt,
             updatedAt: toolCreatedAt,
@@ -802,6 +806,16 @@ export default function HeroConversationDemo() {
   const hasAnyMessages = (messagesByConvo[activeConvoId] || []).length > 0
   const isAutoplayTab = activeConvoId === 'aria'
   const showDemoChooser = activeConvoId === 'aria' && hasRunByConvo.aria && !isRunningByConvo.aria && demoChoiceState.stage === 'choose' && (messagesByConvo.aria?.length || 0) > 0
+  const isDemoCalling = activeConvoId === 'aria' && demoChoiceState.stage === 'calling'
+
+  const handleRestart = () => {
+    // Restart should fully reset the Demo chooser state so the two choice buttons appear again
+    // after the Demo (Aria) autoplay finishes.
+    if (activeConvoId === 'aria') {
+      setDemoChoiceState({ stage: 'choose', selected: null })
+    }
+    startConversation(activeConvoId)
+  }
 
   return (
     <div className="relative isolate w-full overflow-visible text-left">
@@ -815,21 +829,15 @@ export default function HeroConversationDemo() {
             background: 'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.10) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.07) 0%, transparent 56%)',
           }}
         >
-          <div className="h-[520px] sm:h-[580px] md:h-[640px] flex flex-col">
+          <div className="h-[560px] sm:h-[620px] md:h-[680px] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex items-center -space-x-2">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden ring-1 ring-border/40">
-                      <AgentAvatar seed={cfg.agentSeed} size={32} />
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden ring-1 ring-border/40">
-                      <AgentAvatar seed="You" size={32} />
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium leading-none truncate">{cfg.label}</div>
-                    <div className="text-xs text-muted-foreground truncate">{cfg.subtitle}</div>
+                <div className="min-w-0">
+                  {/* Title */}
+                  <div className="text-sm font-medium leading-none truncate">{cfg.subtitle}</div>
+                  {/* Actors */}
+                  <div className="mt-1 flex items-center gap-2 min-w-0">
+                    <div className="text-xs text-muted-foreground truncate">{cfg.actorName}, You</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
@@ -845,7 +853,7 @@ export default function HeroConversationDemo() {
                           active ? 'bg-primary text-primary-foreground border-primary/40' : 'bg-background/40 text-foreground/80 border-border/50 hover:bg-background/60',
                         ].join(' ')}
                       >
-                        {CONVOS[id].agentName}
+                        {CONVOS[id].tabName}
                       </button>
                     )
                   })}
@@ -857,7 +865,7 @@ export default function HeroConversationDemo() {
               <ConversationMessageList
                 conversationId={null}
                 messagesOverride={(messagesByConvo[activeConvoId] || []) as any}
-                agentNameOverride={cfg.agentName}
+                agentNameOverride={cfg.actorName}
                 isRespondingOverride={isResponding}
                 isAssistantStreamingOverride={respondingByConvo[activeConvoId] || false}
                 isAwaitingToolResultsOverride={awaitingToolsByConvo[activeConvoId] || false}
@@ -867,15 +875,16 @@ export default function HeroConversationDemo() {
               />
 
               {/* Restart control (shown after a run has completed) */}
-              {hasAnyMessages && !isRunning && !showDemoChooser && (
-                <div className="absolute top-3 right-3">
+              {hasAnyMessages && !isRunning && !isResponding && !showDemoChooser && !isDemoCalling && (
+                <div className="absolute inset-x-0 bottom-6 flex items-center justify-center px-4">
                   <button
                     type="button"
-                    onClick={() => startConversation(activeConvoId)}
-                    className="w-9 h-9 rounded-full bg-white/8 text-white border border-white/20 hover:bg-white/12 hover:border-white/30 backdrop-blur inline-flex items-center justify-center"
-                    aria-label={`Restart ${cfg.agentName} demo`}
+                    onClick={handleRestart}
+                    className="h-11 px-5 rounded-full bg-primary text-primary-foreground border border-primary/40 hover:opacity-95 shadow-lg inline-flex items-center gap-2 justify-center"
+                    aria-label={`Restart ${cfg.tabName} demo`}
                   >
                     <Icon name="rotate-ccw" iconOverride={{ type: 'phosphor', component: 'ArrowCounterClockwise' }} weight="bold" className="w-4 h-4" />
+                    <span className="text-sm font-semibold">Restart</span>
                   </button>
                 </div>
               )}
@@ -925,7 +934,7 @@ export default function HeroConversationDemo() {
                     type="button"
                     onClick={() => startConversation(activeConvoId)}
                     className="w-16 h-16 rounded-full bg-white/10 text-white hover:bg-white/14 border border-white/25 hover:border-white/35 shadow-lg inline-flex items-center justify-center backdrop-blur"
-                    aria-label={`Start ${cfg.agentName} demo`}
+                    aria-label={`Start ${cfg.tabName} demo`}
                   >
                     <Icon name="play" iconOverride={{ type: 'phosphor', component: 'Play' }} weight="fill" className="w-7 h-7 translate-x-[1px]" />
                   </button>

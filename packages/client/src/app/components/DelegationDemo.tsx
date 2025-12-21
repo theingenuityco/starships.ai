@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import AgentAvatar from '@/components/animated/AgentAvatar'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
 type DemoMessage = {
@@ -520,18 +519,14 @@ export default function DelegationDemo() {
           <div className="h-[520px] sm:h-[580px] md:h-[640px] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="flex items-center -space-x-2">
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden ring-1 ring-border/40">
-                      <AgentAvatar seed={DEMO_CONVERSATIONS[activeDemoConvoId].leftAgentSeed} size={32} />
+                <div className="min-w-0">
+                  {/* Title */}
+                  <div className="text-sm font-medium leading-none truncate">Live demo: switching chats while Aria delegates</div>
+                  {/* Actors */}
+                  <div className="mt-1 flex items-center gap-2 min-w-0">
+                    <div className="text-xs text-muted-foreground truncate">
+                      {DEMO_CONVERSATIONS[activeDemoConvoId].leftAgentName}, {DEMO_CONVERSATIONS[activeDemoConvoId].rightUserLabel}
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center overflow-hidden ring-1 ring-border/40">
-                      <AgentAvatar seed={DEMO_CONVERSATIONS[activeDemoConvoId].rightUserSeed || 'You'} size={32} />
-                    </div>
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS[activeDemoConvoId].label}</div>
-                    <div className="text-xs text-muted-foreground truncate">Live demo: switching chats while Aria delegates</div>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">

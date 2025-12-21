@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
@@ -90,7 +90,7 @@ const ARIA_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Aria',
     content:
-      'Starships.ai is a workspace for building and running an AI team.\n\n- Create agents with clear roles and rules\n- Give them tools (connectors + automations)\n- Delegate work, watch progress stream live, and ship results\n\nWant a quick example? Ask me to set up an agent + tool for a weekly update.',
+      'Starships.ai is where you build, manage, and deploy an AI team.\n\n- Create agents with clear roles and rules\n- Give them tools (connectors + automations)\n- Delegate work, watch progress stream live, and ship results\n\nDo you want to see a demo?',
   },
 ]
 
@@ -529,6 +529,137 @@ export default function HeroConversationDemo() {
   const [isRunningByConvo, setIsRunningByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, doc_organizer: false, lead_generator: false })
   const [hasRunByConvo, setHasRunByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, doc_organizer: false, lead_generator: false })
   const runSeqRef = useState(() => ({ aria: 0, doc_organizer: 0, lead_generator: 0 }))[0]
+  const demoChooserClockRef = useRef<number>(Date.now())
+  const [demoChoiceState, setDemoChoiceState] = useState<{ stage: 'choose' | 'calling' | 'done'; selected: ConvoId | null }>({
+    stage: 'choose',
+    selected: null,
+  })
+
+  // Autoplay only the "Demo" conversation.
+  useEffect(() => {
+    // Fire-and-forget; startConversation handles re-entrancy.
+    startConversation('aria')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const nextDemoChooserIso = () => {
+    demoChooserClockRef.current = Math.max(Date.now(), demoChooserClockRef.current + 1)
+    return new Date(demoChooserClockRef.current).toISOString()
+  }
+
+  const appendDemoChooserMessage = (cid: ConvoId, msg: DemoMessage) => {
+    setMessagesByConvo(prev => ({ ...prev, [cid]: [...(prev[cid] || []), msg] }))
+  }
+
+  const handleDemoChoice = async (target: Exclude<ConvoId, 'aria'>) => {
+    if (demoChoiceState.stage === 'calling') return
+    setDemoChoiceState({ stage: 'calling', selected: target })
+
+    // Append interaction into the Demo (Aria) conversation, then switch tabs after the call-agent succeeds.
+    const convoId: ConvoId = 'aria'
+    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+
+    // User "click"
+    const userCreatedAt = nextDemoChooserIso()
+    appendDemoChooserMessage(convoId, {
+      id: `demo-${convoId}-u-choice-${userCreatedAt}`,
+      role: 'user',
+      content: target === 'doc_organizer' ? 'Sure, help me organize my drive' : 'Sure, help me run an ad campaign',
+      createdAt: userCreatedAt,
+      updatedAt: userCreatedAt,
+      messageType: 'user_input',
+    })
+
+    await sleep(350)
+
+    // Aria acknowledgement
+    const a1CreatedAt = nextDemoChooserIso()
+    appendDemoChooserMessage(convoId, {
+      id: `demo-${convoId}-a-ack-${a1CreatedAt}`,
+      role: 'assistant',
+      agentName: 'Aria',
+      content: target === 'doc_organizer' ? 'Perfect — I’ll spin up **Doc Organizer** and hand it the task.' : 'Perfect — I’ll spin up **Lead Generator** and hand it the campaign setup.',
+      createdAt: a1CreatedAt,
+      updatedAt: a1CreatedAt,
+      messageType: 'agent_response',
+      streaming: false,
+    })
+
+    await sleep(350)
+
+    // Tool runner: call-agent
+    const toolCallId = target === 'doc_organizer' ? 'tc_demo_call_doc_organizer' : 'tc_demo_call_lead_generator'
+    const toolRunnerAt = nextDemoChooserIso()
+    appendDemoChooserMessage(convoId, {
+      id: `demo-${convoId}-a-tools-${toolRunnerAt}`,
+      role: 'assistant',
+      agentName: 'Aria',
+      content: 'Running tools…',
+      createdAt: toolRunnerAt,
+      updatedAt: toolRunnerAt,
+      messageType: 'agent_response',
+      streaming: false,
+      toolCalls: [
+        {
+          id: toolCallId,
+          type: 'function',
+          function: {
+            name: 'call-agent',
+            arguments:
+              target === 'doc_organizer'
+                ? '{ "agent": "Doc Organizer", "task": "Clean up my Google Drive", "conversationTitle": "Doc Organizer — Demo" }'
+                : '{ "agent": "Lead Generator", "task": "Set up a lead-gen campaign in Ads Manager", "conversationTitle": "Lead Generator — Demo" }',
+          },
+        },
+      ],
+    })
+    setAwaitingToolsByConvo(prev => ({ ...prev, aria: true }))
+
+    await sleep(520)
+
+    const toolResultAt = nextDemoChooserIso()
+    appendDemoChooserMessage(convoId, {
+      id: `demo-${convoId}-tr-${toolResultAt}`,
+      role: 'tool',
+      content: JSON.stringify(
+        {
+          status: 'ok',
+          delegatedTo: target === 'doc_organizer' ? 'Doc Organizer' : 'Lead Generator',
+          conversation: {
+            id: target === 'doc_organizer' ? 'c_demo_doc_organizer' : 'c_demo_lead_generator',
+          },
+        },
+        null,
+        2
+      ),
+      createdAt: toolResultAt,
+      updatedAt: toolResultAt,
+      messageType: 'tool_result',
+      toolCallId,
+    })
+    setAwaitingToolsByConvo(prev => ({ ...prev, aria: false }))
+
+    await sleep(350)
+
+    const a2CreatedAt = nextDemoChooserIso()
+    appendDemoChooserMessage(convoId, {
+      id: `demo-${convoId}-a-switch-${a2CreatedAt}`,
+      role: 'assistant',
+      agentName: 'Aria',
+      content: target === 'doc_organizer' ? 'Done — switching you to **Doc Organizer**.' : 'Done — switching you to **Lead Generator**.',
+      createdAt: a2CreatedAt,
+      updatedAt: a2CreatedAt,
+      messageType: 'agent_response',
+      streaming: false,
+    })
+
+    await sleep(300)
+
+    setDemoChoiceState({ stage: 'done', selected: target })
+    setActiveConvoId(target)
+    // Start the selected agent demo stream.
+    startConversation(target)
+  }
 
   const startConversation = async (convoId: ConvoId) => {
     if (isRunningByConvo[convoId]) return
@@ -669,6 +800,8 @@ export default function HeroConversationDemo() {
   const isRunning = isRunningByConvo[activeConvoId] || false
   const hasRun = hasRunByConvo[activeConvoId] || false
   const hasAnyMessages = (messagesByConvo[activeConvoId] || []).length > 0
+  const isAutoplayTab = activeConvoId === 'aria'
+  const showDemoChooser = activeConvoId === 'aria' && hasRunByConvo.aria && !isRunningByConvo.aria && demoChoiceState.stage === 'choose' && (messagesByConvo.aria?.length || 0) > 0
 
   return (
     <div className="relative isolate w-full overflow-visible text-left">
@@ -736,7 +869,7 @@ export default function HeroConversationDemo() {
               />
 
               {/* Restart control (shown after a run has completed) */}
-              {hasAnyMessages && !isRunning && (
+              {hasAnyMessages && !isRunning && !showDemoChooser && (
                 <div className="absolute top-3 right-3">
                   <button
                     type="button"
@@ -749,7 +882,46 @@ export default function HeroConversationDemo() {
                 </div>
               )}
 
-              {!hasAnyMessages && !isRunning && (
+              {/* Demo chooser buttons (pose as user messages right after the assistant message) */}
+              {showDemoChooser && (
+                <div className="absolute inset-x-0 bottom-6 px-4">
+                  <div className="w-full max-w-4xl mx-auto">
+                    <div className="flex justify-end">
+                      <div className="mb-4 mt-6 flex items-end gap-3 max-w-[70%]">
+                        <div className="flex flex-col gap-2 items-end w-full">
+                          <button
+                            type="button"
+                            onClick={() => handleDemoChoice('doc_organizer')}
+                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            aria-label="Sure, help me organize my drive"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-sm leading-relaxed">Sure, help me organize my drive</div>
+                              <Icon name="caret-right" iconOverride={{ type: 'phosphor', component: 'CaretRight' }} weight="bold" className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDemoChoice('lead_generator')}
+                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            aria-label="Sure, help me run an ad campaign"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="text-sm leading-relaxed">Sure, help me run an ad campaign</div>
+                              <Icon name="caret-right" iconOverride={{ type: 'phosphor', component: 'CaretRight' }} weight="bold" className="w-4 h-4 text-muted-foreground" />
+                            </div>
+                          </button>
+                        </div>
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden flex items-center justify-center">
+                          <AgentAvatar seed="You" size={32} />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {!isAutoplayTab && !hasAnyMessages && !isRunning && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <button
                     type="button"

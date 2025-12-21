@@ -1152,6 +1152,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
             minimal && 'text-sm'
           ),
+          role: 'textbox',
+          'aria-multiline': 'true',
+          'aria-label': selectedAgent ? `Message ${selectedAgent.name}` : 'Message input',
         },
         handleKeyDown: (_view, event) => {
           if (isSuggestionActiveRef.current) {

@@ -1029,11 +1029,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
             {/* Starter-only agent selector (just above the input) */}
             {!showMessagesArea && (
-              <div className="mb-4 flex items-center justify-start gap-3">
-                <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={false} />
+              <div className="mb-3">
+                <div className="mb-1">
+                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agent</p>
+                </div>
+                <div className="flex items-center justify-start gap-3">
+                  <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={true} />
+                </div>
               </div>
             )}
 
+            {!showMessagesArea && (
+              <div className="mb-1">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Message</p>
+              </div>
+            )}
             <ConversationMessageInput
               key={inputKey}
               ref={messageInputRef}

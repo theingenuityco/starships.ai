@@ -34,7 +34,7 @@ const CONVOS: Record<ConvoId, ConvoConfig> = {
   aria: {
     id: 'aria',
     label: 'Aria ↔ You',
-    agentName: 'Aria',
+    agentName: 'Demo',
     agentSeed: 'Aria',
     subtitle: 'Q&A: what is Starships.ai?',
   },
@@ -700,23 +700,6 @@ export default function HeroConversationDemo() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
-                  <button
-                    type="button"
-                    onClick={() => startConversation(activeConvoId)}
-                    disabled={isRunning}
-                    className={[
-                      'w-9 h-9 rounded-full border transition-colors inline-flex items-center justify-center backdrop-blur',
-                      // Neutral "video control" styling (no primary fill)
-                      isRunning ? 'bg-white/5 text-white/60 border-white/15 cursor-not-allowed' : 'bg-white/8 text-white border-white/20 hover:bg-white/12 hover:border-white/30',
-                    ].join(' ')}
-                    aria-label={isRunning ? 'Running demo' : hasRun ? 'Restart demo' : 'Start demo'}
-                  >
-                    {isRunning ? (
-                      <Icon name="loading" iconOverride={{ type: 'phosphor', component: 'CircleNotch' }} weight="bold" className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Icon name="play" iconOverride={{ type: 'phosphor', component: 'Play' }} weight="fill" className="w-4 h-4 translate-x-[0.5px]" />
-                    )}
-                  </button>
                   {(Object.keys(CONVOS) as ConvoId[]).map(id => {
                     const active = id === activeConvoId
                     return (
@@ -751,6 +734,20 @@ export default function HeroConversationDemo() {
                 userNameOverride="You"
                 userAvatarSeedOverride="You"
               />
+
+              {/* Restart control (shown after a run has completed) */}
+              {hasAnyMessages && !isRunning && (
+                <div className="absolute top-3 right-3">
+                  <button
+                    type="button"
+                    onClick={() => startConversation(activeConvoId)}
+                    className="w-9 h-9 rounded-full bg-white/8 text-white border border-white/20 hover:bg-white/12 hover:border-white/30 backdrop-blur inline-flex items-center justify-center"
+                    aria-label={`Restart ${cfg.agentName} demo`}
+                  >
+                    <Icon name="rotate-ccw" iconOverride={{ type: 'phosphor', component: 'ArrowCounterClockwise' }} weight="bold" className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
 
               {!hasAnyMessages && !isRunning && (
                 <div className="absolute inset-0 flex items-center justify-center">

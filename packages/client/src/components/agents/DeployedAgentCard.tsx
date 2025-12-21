@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import type { AgentModel } from '@starships/protocol'
 import { motion } from 'motion/react'
 
@@ -34,6 +34,13 @@ interface DeployedAgentCardProps {
    * Marketplace template cards should typically turn this off.
    */
   showStatusIndicator?: boolean
+  /**
+   * When true (default), shows the bottom-left badge that indicates whether the
+   * agent is Private / Published / From Marketplace.
+   *
+   * Marketplace template cards should typically hide this badge.
+   */
+  showPublicationBadge?: boolean
   showActions?: boolean
   hideChatControl?: boolean
   /**
@@ -78,6 +85,7 @@ export function DeployedAgentCard({
   onChat,
   onDelete,
   showStatusIndicator = true,
+  showPublicationBadge = true,
   showActions = false,
   hideChatControl = false,
   belowDescription,
@@ -92,7 +100,7 @@ export function DeployedAgentCard({
   // Get update info from agent object (populated by API)
   const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
 
-  const statusBadge = (() => {
+  const statusBadge = useMemo(() => {
     if (isTemplateAgent) {
       return {
         label: 'From Marketplace',
@@ -120,7 +128,7 @@ export function DeployedAgentCard({
       iconName: 'lock',
       style: undefined,
     }
-  })()
+  }, [agent.publicationStatus, isTemplateAgent])
 
   const entranceOff = disableMotion || disableEntranceMotion
   const hoverOff = disableMotion || disableHoverMotion
@@ -266,10 +274,14 @@ export function DeployedAgentCard({
 
         <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
           <div className="flex items-center justify-between gap-3">
-            <Badge variant="outline" className="text-[10px] px-2 py-1 flex items-center gap-1.5" style={statusBadge.style}>
-              <Icon name={statusBadge.iconName} className="w-3 h-3" />
-              <span className="font-mono">{statusBadge.label}</span>
-            </Badge>
+            {showPublicationBadge ? (
+              <Badge variant="outline" className="text-[10px] px-2 py-1 flex items-center gap-1.5" style={statusBadge.style}>
+                <Icon name={statusBadge.iconName} className="w-3 h-3" />
+                <span className="font-mono">{statusBadge.label}</span>
+              </Badge>
+            ) : (
+              <span aria-hidden />
+            )}
 
             {/* Primary action (optional override) */}
             {primaryAction ? (

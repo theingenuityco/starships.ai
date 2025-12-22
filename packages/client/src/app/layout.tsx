@@ -17,21 +17,27 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://starships.ai'),
-  title: 'Starships.ai - Ship production AI agents fast',
-  description: 'Design agent behavior, connect tools safely, and run with observability and guardrails on a production-ready runtime.',
+  title: 'Starships.ai — Hire your AI team, brief them in plain English',
+  description:
+    'Starships.ai is a workspace to assemble AI teammates, connect tools, set guardrails, and collaborate to get real work done. Start from Marketplace templates and deploy in minutes.',
   applicationName: 'Starships.ai',
   authors: [{ name: 'Starships.ai' }],
   creator: 'Starships.ai',
   publisher: 'Starships.ai',
   keywords: [
     'AI agents',
+    'AI teammates',
+    'AI team',
+    'agentic workspace',
     'production AI',
-    'agent runtime',
-    'AI observability',
-    'AI guardrails',
-    'agent development',
+    'agent marketplace',
+    'agent templates',
+    'workflow automation',
+    'tool calling',
     'AI tools',
-    'agent framework',
+    'guardrails',
+    'observability',
+    'task automation',
   ],
   robots: {
     index: true,
@@ -51,8 +57,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Starships.ai',
-    title: 'Starships.ai - Ship production AI agents fast',
-    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails on a production-ready runtime.',
+    title: 'Starships.ai — Hire your AI team, brief them in plain English',
+    description:
+      'Assemble AI teammates, connect tools, set guardrails, and collaborate in one workspace. Start from Marketplace templates and deploy in minutes.',
     url: 'https://starships.ai',
     locale: 'en_US',
     images: [
@@ -60,14 +67,15 @@ export const metadata: Metadata = {
         url: '/static-assets/og.png',
         width: 1200,
         height: 630,
-        alt: 'Starships.ai – Ship production AI agents fast',
+        alt: 'Starships.ai — Hire your AI team, brief them in plain English',
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Starships.ai - Ship production AI agents fast',
-    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails on a production-ready runtime.',
+    title: 'Starships.ai — Hire your AI team, brief them in plain English',
+    description:
+      'Assemble AI teammates, connect tools, set guardrails, and collaborate in one workspace. Start from Marketplace templates and deploy in minutes.',
     images: ['/static-assets/og.png'],
   },
   icons: {

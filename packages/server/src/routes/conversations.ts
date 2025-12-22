@@ -18,7 +18,9 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AgentRepository, MessageRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
+import type { Operation } from 'fast-json-patch';
 
 const router: Router = Router();
 
@@ -115,11 +117,17 @@ function buildConnectorHostRuntime(connectors: Record<string, { baseUrl: string;
           parsedBody = await resp.text().catch(() => '');
         }
 
+        const headerObj: Record<string, string> = {};
+        // Avoid Headers.entries() typing issues in non-DOM TS libs by using forEach.
+        resp.headers.forEach((value, key) => {
+          headerObj[key] = value;
+        });
+
         return {
           status: resp.status,
           statusText: resp.statusText,
           url,
-          headers: Object.fromEntries(resp.headers.entries()),
+          headers: headerObj,
           body: parsedBody,
         };
       } finally {
@@ -130,7 +138,7 @@ function buildConnectorHostRuntime(connectors: Record<string, { baseUrl: string;
 }
 
 async function executeToolBlueprint(args: {
-  blueprint: any;
+  blueprint: Blueprint;
   toolConfig: Record<string, unknown>;
   toolArgs: Record<string, unknown>;
   runnerConfig: Record<string, unknown>;
@@ -139,7 +147,7 @@ async function executeToolBlueprint(args: {
   const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
   execution.results.push({ nodeRef: '__initial__', items: initial });
   const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
-  const items = await runner.run(args.blueprint, execution, { failOnNodeError: true, ...(args.runnerConfig as any) });
+  const items = await runner.run(args.blueprint, execution, { failOnNodeError: true, ...(args.runnerConfig as unknown as EngineConfig) });
   return ExecutionItemUtils.unwrapSingle(items);
 }
 
@@ -407,7 +415,7 @@ router.post(
           agentId: IdSchema,
           toolSlug: z.string().min(1),
           toolCallId: z.string().min(1),
-          args: z.record(z.unknown()).optional(),
+          args: z.record(z.string(), z.unknown()).optional(),
         }),
         req.body,
         res,
@@ -477,10 +485,7 @@ router.post(
           args: args || {},
         });
 
-        sendSuccess(
-          res,
-          { ok: false, error: 'TOOL_APPROVAL_REQUIRED', approvalId: approval.id, toolCallId } satisfies ToolExecutorResult
-        );
+        sendSuccess(res, { ok: false, error: 'TOOL_APPROVAL_REQUIRED', approvalId: approval.id, toolCallId } satisfies ToolExecutorResult);
         return;
       }
 
@@ -494,7 +499,7 @@ router.post(
 
       const connectorRuntime = new ConnectorRuntimeService();
       const connectors = await connectorRuntime.buildConnectorHttpConfig(conversation.starshipId, authUserId);
-      const hostRuntime = buildConnectorHostRuntime(connectors as any);
+      const hostRuntime = buildConnectorHostRuntime(connectors);
       const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId };
 
       const env = getEnvConfig();
@@ -521,8 +526,9 @@ router.post(
       });
 
       sendSuccess(res, { ok: true, result, toolCallId } satisfies ToolExecutorResult);
-    } catch (error) {
-      const toolCallId = typeof (req.body as any)?.toolCallId === 'string' ? String((req.body as any).toolCallId) : '';
+    } catch {
+      const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
+      const toolCallId = typeof body.toolCallId === 'string' ? String(body.toolCallId) : '';
       sendSuccess(res, { ok: false, error: 'INTERNAL_SERVER_ERROR', toolCallId } satisfies ToolExecutorResult);
     }
   }
@@ -536,7 +542,12 @@ router.post(
   jwtAuthMiddleware,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const paramsValidation = validateData(z.object({ conversationId: IdSchema, approvalId: IdSchema }), req.params, res, 'approval parameters');
+      const paramsValidation = validateData(
+        z.object({ conversationId: IdSchema, approvalId: IdSchema }),
+        req.params,
+        res,
+        'approval parameters'
+      );
       if (!paramsValidation) return;
       const { conversationId, approvalId } = paramsValidation as { conversationId: string; approvalId: string };
 
@@ -578,7 +589,7 @@ router.post(
 
       const connectorRuntime = new ConnectorRuntimeService();
       const connectors = await connectorRuntime.buildConnectorHttpConfig(conversation.starshipId, authUserId);
-      const hostRuntime = buildConnectorHostRuntime(connectors as any);
+      const hostRuntime = buildConnectorHostRuntime(connectors);
       const env = getEnvConfig();
       const llm = env.OPENROUTER_API_KEY
         ? {
@@ -608,20 +619,20 @@ router.post(
 
       const updated =
         existingToolMsg && existingToolMsg.id
-          ? await messageService.updateMessage(existingToolMsg.id, { content, messageType: 'tool_result' } as any)
+          ? await messageService.updateMessage(existingToolMsg.id, { content, messageType: 'tool_result' })
           : await messageService.createMessage({
               conversationId,
               role: 'tool',
               content,
               messageType: 'tool_result',
               toolCallId: approval.toolCallId,
-            } as any);
+            });
 
       // Best-effort broadcast: update last message (after client supports replace for non-assistant)
       try {
         const streaming = new StreamingService();
         if (updated) {
-          await streaming.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: updated } as any);
+          await streaming.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: updated } as unknown as Operation);
         }
         await streaming.broadcastUIAction(conversationId, {
           __ui_action: 'tool_approval_resolved',
@@ -653,7 +664,12 @@ router.post(
   jwtAuthMiddleware,
   async (req: Request, res: Response): Promise<void> => {
     try {
-      const paramsValidation = validateData(z.object({ conversationId: IdSchema, approvalId: IdSchema }), req.params, res, 'approval parameters');
+      const paramsValidation = validateData(
+        z.object({ conversationId: IdSchema, approvalId: IdSchema }),
+        req.params,
+        res,
+        'approval parameters'
+      );
       if (!paramsValidation) return;
       const { conversationId, approvalId } = paramsValidation as { conversationId: string; approvalId: string };
 
@@ -697,19 +713,19 @@ router.post(
 
       const updated =
         existingToolMsg && existingToolMsg.id
-          ? await messageService.updateMessage(existingToolMsg.id, { content, messageType: 'tool_result' } as any)
+          ? await messageService.updateMessage(existingToolMsg.id, { content, messageType: 'tool_result' })
           : await messageService.createMessage({
               conversationId,
               role: 'tool',
               content,
               messageType: 'tool_result',
               toolCallId: approval.toolCallId,
-            } as any);
+            });
 
       try {
         const streaming = new StreamingService();
         if (updated) {
-          await streaming.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: updated } as any);
+          await streaming.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: updated } as unknown as Operation);
         }
         await streaming.broadcastUIAction(conversationId, {
           __ui_action: 'tool_approval_resolved',
@@ -717,7 +733,9 @@ router.post(
           conversationId,
           status: 'denied',
         });
-      } catch {}
+      } catch {
+        /* ignore broadcast failures */
+      }
 
       void conversationService
         .continueAfterToolApproval(conversationId, approval.agentId, { authContext: { userId: authUserId } })

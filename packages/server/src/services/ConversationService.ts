@@ -31,6 +31,7 @@ import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+import { AgentService } from '@/services/AgentService';
 
 /**
  * Autopilot child process configuration

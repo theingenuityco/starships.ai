@@ -83,7 +83,14 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         if (section === 'tools') return 'Tools | Starships.ai'
         if (section === 'tool') return 'Tool | Starships.ai'
         if (section === 'connectors') return 'Connectors | Starships.ai'
-        if (section === 'settings') return parts.length >= 3 ? 'Settings: Section | Starships.ai' : 'Settings | Starships.ai'
+        if (section === 'settings') {
+          const tab = parts[2]
+          if (!tab) return 'Settings | Starships.ai'
+          if (tab === 'profile') return 'Settings: Profile | Starships.ai'
+          if (tab === 'usage') return 'Settings: Analytics | Starships.ai'
+          if (tab === 'billing') return 'Settings: Billing | Starships.ai'
+          return 'Settings | Starships.ai'
+        }
         if (section === 'management') return 'Management | Starships.ai'
         if (section === 'schedules') return 'Schedules | Starships.ai'
 

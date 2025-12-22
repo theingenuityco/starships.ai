@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Starships.ai - Terms of Service',
+  title: 'Terms of Service | Starships.ai',
   description: 'Read the terms and conditions for using Starships.ai. Understand your rights, responsibilities, and our service agreements.',
   alternates: {
     canonical: 'https://starships.ai/terms',
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Starships.ai',
-    title: 'Starships.ai - Terms of Service',
+    title: 'Terms of Service | Starships.ai',
     description: 'Read the terms and conditions for using Starships.ai. Understand your rights, responsibilities, and our service agreements.',
     url: 'https://starships.ai/terms',
     locale: 'en_US',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Starships.ai - Terms of Service',
+    title: 'Terms of Service | Starships.ai',
     description: 'Read the terms and conditions for using Starships.ai. Understand your rights, responsibilities, and our service agreements.',
     images: ['/static-assets/og.png'],
   },

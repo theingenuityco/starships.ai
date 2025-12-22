@@ -163,7 +163,7 @@ export function ConversationMessageList({
             // skip current blank shell; next will be processed/pushed in subsequent iterations
             continue
           } else {
-            // trailing blank shell - drop it
+            // trailing blank shell — drop it
             continue
           }
         }

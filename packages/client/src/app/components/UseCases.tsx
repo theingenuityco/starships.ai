@@ -4,6 +4,7 @@ import ToolsBlueprintDemo from '@/app/components/ToolsBlueprintDemo'
 import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import { useMemo } from 'react'
 
@@ -89,7 +90,9 @@ export default function UseCases() {
             </div>
 
             <div className="py-8 sm:py-10">
-              <BuildCustomAgentDemo />
+              <ErrorBoundary name="BuildCustomAgentDemo">
+                <BuildCustomAgentDemo />
+              </ErrorBoundary>
             </div>
           </div>
         </div>
@@ -103,7 +106,9 @@ export default function UseCases() {
             </div>
 
             <div className="py-8 sm:py-10">
-              <ToolsBlueprintDemo />
+              <ErrorBoundary name="ToolsBlueprintDemo">
+                <ToolsBlueprintDemo />
+              </ErrorBoundary>
             </div>
           </div>
         </div>
@@ -117,7 +122,9 @@ export default function UseCases() {
             </div>
             <div className="w-full">
               <div className="py-8 sm:py-10">
-                <DelegationDemo />
+                <ErrorBoundary name="DelegationDemo">
+                  <DelegationDemo />
+                </ErrorBoundary>
               </div>
             </div>
           </div>
@@ -134,7 +141,9 @@ export default function UseCases() {
             </div>
 
             <div className="py-8 sm:py-10">
-              <ScheduleRepetitiveTasksDemo />
+              <ErrorBoundary name="ScheduleRepetitiveTasksDemo">
+                <ScheduleRepetitiveTasksDemo />
+              </ErrorBoundary>
             </div>
           </div>
         </div>

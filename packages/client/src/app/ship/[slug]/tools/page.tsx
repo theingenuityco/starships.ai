@@ -17,6 +17,9 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { cn } from '@/lib/utils'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+import { useMessageAttachments } from '@/hooks/useFileUpload'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -51,6 +54,24 @@ export default function StarshipToolsPage(): React.JSX.Element {
     enabled: !!starshipId,
     staleTime: 10 * 1000,
   })
+
+  const agentAvatarAttachmentIds = useMemo(() => {
+    const ids =
+      (Array.isArray(starshipAgents) ? starshipAgents : [])
+        .map(a => (a as any)?.avatarAttachmentId as string | undefined)
+        .filter((x): x is string => typeof x === 'string' && x.trim().length > 0) ?? []
+    return Array.from(new Set(ids))
+  }, [starshipAgents])
+
+  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
+
+  const agentAvatarUrlById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const a of agentAvatarAttachments) {
+      if (a.previewUrl) map.set(a.id, a.previewUrl)
+    }
+    return map
+  }, [agentAvatarAttachments])
 
   const setPermissionMutation = useMutation({
     mutationFn: async (input: { agentId: string; toolSlug: string; permission: StarshipAgentToolPermissionModel['permission'] }) => {
@@ -105,6 +126,17 @@ export default function StarshipToolsPage(): React.JSX.Element {
       const inner = map.get(row.agentId) ?? new Map<string, StarshipAgentToolPermissionModel['permission']>()
       inner.set(row.toolSlug, row.permission)
       map.set(row.agentId, inner)
+    }
+    return map
+  }, [permissionRows])
+
+  const assignedToolSlugsByAgentId = useMemo(() => {
+    const map = new Map<string, Set<string>>()
+    for (const row of permissionRows) {
+      if (!row?.agentId || !row?.toolSlug) continue
+      const set = map.get(row.agentId) ?? new Set<string>()
+      set.add(row.toolSlug)
+      map.set(row.agentId, set)
     }
     return map
   }, [permissionRows])
@@ -221,16 +253,29 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                   className={cn(
                                     'sticky top-0 z-20 bg-background/90 backdrop-blur',
                                     'text-left text-xs font-semibold text-muted-foreground',
-                                    'px-4 py-3 border-b border-border/40 w-[170px] min-w-[170px]'
+                                    'px-4 py-3 border-b border-border/40 w-[220px] min-w-[220px]'
                                   )}
                                 >
                                   <button
                                     type="button"
-                                    className="hover:text-foreground transition-colors"
+                                    className="w-full text-left hover:text-foreground transition-colors"
                                     onClick={() => router.push(`/ship/${slug}/agent/${agent.slug}`)}
                                     title={`Open agent: ${agent.name}`}
                                   >
-                                    {agent.name}
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full shrink-0">
+                                        <AgentAvatar
+                                          seed={agent.name || agent.slug || 'Agent'}
+                                          imageUrl={agentAvatarUrlById.get((agent as any)?.avatarAttachmentId)}
+                                          size={32}
+                                          rounded
+                                        />
+                                      </Avatar>
+                                      <div className="min-w-0">
+                                        <div className="truncate text-sm font-semibold text-foreground">{agent.name}</div>
+                                        <div className="truncate text-xs font-mono text-muted-foreground">{agent.slug}</div>
+                                      </div>
+                                    </div>
                                   </button>
                                 </th>
                               ))}
@@ -259,26 +304,38 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                     </div>
                                   </td>
                                   {starshipAgents.map(agent => {
+                                    const isAssigned = assignedToolSlugsByAgentId.get(agent.id)?.has(tool.slug) ?? false
                                     const p =
                                       permissionByAgentId.get(agent.id)?.get(tool.slug) ??
-                                      ('deny' as StarshipAgentToolPermissionModel['permission'])
+                                      ('allow' as StarshipAgentToolPermissionModel['permission'])
                                     const isUpdating = setPermissionMutation.isPending
                                     return (
                                       <td key={`${tool.id}:${agent.id}`} className="px-4 py-3 border-b border-border/30 align-middle">
                                         <button
                                           type="button"
-                                          disabled={isUpdating}
+                                          disabled={isUpdating || !isAssigned}
                                           onClick={() => {
+                                            if (!isAssigned) return
                                             const next = nextPermission(p)
                                             setPermissionMutation.mutate({ agentId: agent.id, toolSlug: tool.slug, permission: next })
                                           }}
-                                          className={cn('w-full flex items-center justify-start', isUpdating && 'opacity-60 cursor-not-allowed')}
-                                          aria-label={`Set permission for agent ${agent.name} on tool ${tool.name}. Current: ${permissionLabel(p)}`}
-                                          title="Click to cycle: Allow → Ask first → Deny"
+                                          className={cn('w-full flex items-center justify-start', (isUpdating || !isAssigned) && 'opacity-60 cursor-not-allowed')}
+                                          aria-label={
+                                            isAssigned
+                                              ? `Set permission for agent ${agent.name} on tool ${tool.name}. Current: ${permissionLabel(p)}`
+                                              : `Tool ${tool.name} is not assigned to agent ${agent.name}`
+                                          }
+                                          title={isAssigned ? 'Click to cycle: Allow → Ask first → Deny' : 'Not assigned to this agent'}
                                         >
-                                          <Badge variant={permissionVariant(p)} className="whitespace-nowrap">
-                                            {permissionLabel(p)}
-                                          </Badge>
+                                          {isAssigned ? (
+                                            <Badge variant={permissionVariant(p)} className="whitespace-nowrap">
+                                              {permissionLabel(p)}
+                                            </Badge>
+                                          ) : (
+                                            <Badge variant="outline" className="whitespace-nowrap text-muted-foreground border-border/40">
+                                              Not assigned
+                                            </Badge>
+                                          )}
                                         </button>
                                       </td>
                                     )

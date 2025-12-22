@@ -1,6 +1,7 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
 import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
 import ToolsBlueprintDemo from '@/app/components/ToolsBlueprintDemo'
+import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'
 
 export default function UseCases() {
   return (
@@ -62,12 +63,7 @@ export default function UseCases() {
               </p>
             </div>
 
-            <div className="rounded-2xl border border-white/10 bg-white/5 p-4 sm:p-5">
-              <div className="text-xs font-medium text-muted-foreground mb-3">Example schedule</div>
-              <div className="rounded-lg border border-white/10 bg-black/20 p-4 text-sm leading-relaxed text-foreground/85">
-                Every Friday at 9:00 AM, compile this week’s GitHub changes and draft a short update for Slack. Ask me to approve before posting.
-              </div>
-            </div>
+            <ScheduleRepetitiveTasksDemo />
           </div>
         </div>
       </div>

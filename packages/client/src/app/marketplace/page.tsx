@@ -4,7 +4,7 @@ import MarketplacePageClient from './MarketplacePageClient'
 import PublicHeader from '@/components/navigation/PublicHeader'
 
 export const metadata: Metadata = {
-  title: 'Starships.ai - Marketplace',
+  title: 'Marketplace | Starships.ai',
   description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
   alternates: {
     canonical: 'https://starships.ai/marketplace',
@@ -21,7 +21,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Starships.ai',
-    title: 'Starships.ai - Marketplace',
+    title: 'Marketplace | Starships.ai',
     description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
     url: 'https://starships.ai/marketplace',
     locale: 'en_US',
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Starships.ai - Marketplace',
+    title: 'Marketplace | Starships.ai',
     description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
     images: ['/static-assets/og.png'],
   },

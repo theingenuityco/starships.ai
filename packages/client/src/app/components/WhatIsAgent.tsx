@@ -1,6 +1,7 @@
 import { Card } from '@/components/ui/card'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
+import Link from 'next/link'
 
 export default function WhatIsAgent() {
   const items = [
@@ -69,8 +70,8 @@ export default function WhatIsAgent() {
               <p className="text-sm text-muted-foreground">Browse ready‑made agents and deploy one in a click.</p>
             </div>
             <div className="mt-4">
-              <Button size="lg" variant="outline" className="w-full border-primary/60 text-primary hover:bg-primary/10" onClick={() => (window.location.href = '/marketplace?from=public')}>
-                Explore marketplace
+              <Button size="lg" variant="outline" className="w-full border-primary/60 text-primary hover:bg-primary/10" asChild>
+                <Link href="/marketplace?from=public">Explore marketplace</Link>
               </Button>
             </div>
           </Card>

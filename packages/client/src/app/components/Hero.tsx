@@ -121,7 +121,7 @@ export default function Hero() {
               variant="ghost"
               className="text-base text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => {
-                window.location.href = '/marketplace?from=public'
+                router.push('/marketplace?from=public')
               }}
             >
               <Icon name="store" className="w-6 h-6 mr-1" />

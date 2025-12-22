@@ -66,13 +66,13 @@ export default function MarketplaceTeaser() {
         <div className="mt-10 md:mt-12 flex flex-col items-center text-center gap-3 sm:gap-4">
           <div className="inline-flex items-baseline gap-2">
             <span className="font-mono text-2xl sm:text-3xl md:text-4xl font-bold text-primary">{agentCount}</span>
-            <span className="text-base sm:text-lg md:text-xl">teammates,</span>
+            <span className="text-base sm:text-lg md:text-xl">agents,</span>
             <span className="font-mono text-2xl sm:text-3xl md:text-4xl font-bold text-primary">{toolCount}</span>
-            <span className="text-base sm:text-lg md:text-xl">skills and counting</span>
+            <span className="text-base sm:text-lg md:text-xl">tools and counting</span>
           </div>
           <div className="mt-2 sm:mt-3 md:mt-4">
-            <Button size="lg" variant="outline" className="border-primary/60 text-primary hover:bg-primary/10" onClick={goToMarketplace}>
-              <Icon name="store" className="w-7 h-7 mr-2" /> Browse marketplace
+            <Button size="lg" variant="outline" className="h-12 sm:h-14 px-8 sm:px-10 text-base sm:text-lg border-primary/60 text-primary hover:bg-primary/10" onClick={goToMarketplace}>
+              <Icon name="store" className="w-8 h-8 sm:w-9 sm:h-9 mr-2" /> Browse marketplace
             </Button>
           </div>
         </div>

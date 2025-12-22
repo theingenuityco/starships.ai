@@ -7,19 +7,16 @@ export default function Security() {
       icon: 'shield-check',
       title: 'Isolation',
       text: 'Each run happens in its own safe space, so one job can’t affect another.',
-      tech: 'Runs are sandboxed with time and resource limits.',
     },
     {
       icon: 'lock',
       title: 'Secret Encryption',
       text: 'Your secrets are encrypted and kept separate for each starship.',
-      tech: 'Encrypted at rest with tightly scoped access.',
     },
     {
       icon: 'activity',
       title: 'Observability',
       text: 'Watch work happen live and review a clear timeline of every step.',
-      tech: 'Live streaming and a complete audit trail of what happened.',
     },
   ]
   return (
@@ -40,7 +37,6 @@ export default function Security() {
                     </div>
                     <div className="mt-4 font-semibold text-white/90 text-sm md:text-base">{i.title}</div>
                     <div className="mt-2 md:mt-3 text-white/75 text-sm md:text-base">{i.text}</div>
-                    {i.tech && <div className="mt-2 md:mt-3 text-[11px] md:text-xs text-white/60">{i.tech}</div>}
                   </div>
                 </Card>
               </li>

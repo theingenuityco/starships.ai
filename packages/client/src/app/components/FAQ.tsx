@@ -18,6 +18,10 @@ const QA = [
     a: 'OpenRouter (recommended), OpenAI, and Anthropic. You can set defaults for your workspace and override per teammate when needed.',
   },
   {
+    q: 'Do I need to bring my own model keys?',
+    a: 'No. Starships is a managed service—you don’t bring your own model keys.',
+  },
+  {
     q: 'Can my AI teammates use my tools and data?',
     a: 'Yes. You can connect skills (tools) so teammates can take actions and fetch information, and you stay in control of what’s enabled in each workspace.',
   },

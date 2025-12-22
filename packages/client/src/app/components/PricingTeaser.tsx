@@ -24,7 +24,7 @@ export default function PricingTeaser() {
           <Card className="relative overflow-hidden px-6 py-10 border-0 shadow-lg flex flex-col md:flex-row items-center justify-between gap-4 text-center md:text-left bg-gradient-to-r from-indigo-500/15 via-fuchsia-500/15 to-amber-500/15">
             <div>
               <h2 className="text-2xl md:text-3xl font-semibold mb-2">Meet your team in minutes</h2>
-              <p className="text-sm text-muted-foreground">Start free, then bring your own model keys when you’re ready.</p>
+              <p className="text-sm text-muted-foreground">Start free, then scale up when you’re ready.</p>
             </div>
             <div className="flex gap-3">
               <Button size="lg" variant="outline" className="h-12 px-10 text-base" onClick={handleClick}>

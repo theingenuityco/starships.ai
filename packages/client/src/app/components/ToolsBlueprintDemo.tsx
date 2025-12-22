@@ -97,6 +97,7 @@ export default function ToolsBlueprintDemo() {
           transparent
           nodesDraggable={false}
           borderless={true}
+          nodeSize="sm"
           fitViewMaxZoom={0.9}
           containerStyle={{ background: 'hsl(var(--background))' }}
         />

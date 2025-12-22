@@ -6,7 +6,7 @@
 
 import type { ToolCallApprovalModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsEnum, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsEnum, IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 export class ToolCallApprovalEntity implements ToolCallApprovalModel {
   @Expose()
@@ -40,6 +40,7 @@ export class ToolCallApprovalEntity implements ToolCallApprovalModel {
   toolCallId!: string;
 
   @Expose()
+  @IsObject()
   argsJson!: Record<string, unknown>;
 
   @Expose()
@@ -71,9 +72,9 @@ export class ToolCallApprovalEntity implements ToolCallApprovalModel {
         toolSlug: rec.toolSlug,
         toolCallId: rec.toolCallId,
         argsJson: (rec.argsJson && typeof rec.argsJson === 'object' ? rec.argsJson : {}) as Record<string, unknown>,
-        status: (rec.status as any) || 'pending',
+        status: rec.status || 'pending',
         createdAt: rec.createdAt || new Date().toISOString(),
-        decidedAt: (rec.decidedAt as any) ?? null,
+        decidedAt: rec.decidedAt ?? null,
       });
     } else {
       Object.assign(entity, rec);
@@ -91,5 +92,3 @@ export class ToolCallApprovalEntity implements ToolCallApprovalModel {
     }
   }
 }
-
-

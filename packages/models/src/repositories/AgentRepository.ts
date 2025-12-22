@@ -348,7 +348,7 @@ export class AgentRepository extends BaseRepository {
         const result = await connection.query<Record<string, unknown>>(
           `SELECT t.* FROM tools t
            INNER JOIN agent_tools at ON t.id = at.tool_id
-           WHERE at.agent_id = $1 AND t.starship_id = $2 AND at.permission <> 'deny'
+           WHERE at.agent_id = $1 AND t.starship_id = $2
            ORDER BY t.created_at DESC`,
           [agentId, starshipId]
         );
@@ -690,7 +690,7 @@ export class AgentRepository extends BaseRepository {
         const result = await connection.query<Record<string, unknown>>(
           `SELECT t.* FROM tools t
            INNER JOIN agent_tools at ON t.id = at.tool_id
-           WHERE at.agent_id = $1 AND at.permission <> 'deny'
+           WHERE at.agent_id = $1
            ORDER BY t.name`,
           [agentId]
         );

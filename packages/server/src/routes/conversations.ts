@@ -21,6 +21,7 @@ import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import type { Operation } from 'fast-json-patch';
+import { AppError } from '@starships/errors';
 
 const router: Router = Router();
 
@@ -50,7 +51,14 @@ const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction
 
 type ToolExecutorResult =
   | { ok: true; result: unknown; toolCallId: string }
-  | { ok: false; error: string; toolCallId: string; approvalId?: string };
+  | { ok: false; error: string; toolCallId: string; approvalId?: string; message?: string };
+
+function getSafeErrorMessageWithCause(error: unknown): string {
+  if (error instanceof AppError) {
+    return error.cause?.message ? `${error.message}: ${error.cause.message}` : error.message;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
 
 function buildConnectorHostRuntime(connectors: Record<string, { baseUrl: string; headers: Record<string, string> }>) {
   return {
@@ -462,20 +470,28 @@ router.post(
 
       if (permission === 'ask') {
         const approvals = new ToolCallApprovalRepository();
-        const approval = await approvals.createPending({
-          starshipId: conversation.starshipId,
-          conversationId,
-          agentId,
-          toolSlug,
-          toolCallId,
-          argsJson: args || {},
-        });
+        let approvalId: string;
+        try {
+          const approval = await approvals.createPending({
+            starshipId: conversation.starshipId,
+            conversationId,
+            agentId,
+            toolSlug,
+            toolCallId,
+            argsJson: args || {},
+          });
+          approvalId = approval.id;
+        } catch (e) {
+          const msg = getSafeErrorMessageWithCause(e);
+          sendSuccess(res, { ok: false, error: 'TOOL_APPROVAL_CREATE_FAILED', message: msg, toolCallId } satisfies ToolExecutorResult);
+          return;
+        }
 
         // Emit out-of-band UI action so the client can show an Approve/Deny prompt.
         const streaming = new StreamingService();
         await streaming.broadcastUIAction(conversationId, {
           __ui_action: 'tool_approval_required',
-          approvalId: approval.id,
+          approvalId,
           conversationId,
           starshipId: conversation.starshipId,
           agentId,
@@ -485,7 +501,7 @@ router.post(
           args: args || {},
         });
 
-        sendSuccess(res, { ok: false, error: 'TOOL_APPROVAL_REQUIRED', approvalId: approval.id, toolCallId } satisfies ToolExecutorResult);
+        sendSuccess(res, { ok: false, error: 'TOOL_APPROVAL_REQUIRED', approvalId, toolCallId } satisfies ToolExecutorResult);
         return;
       }
 
@@ -526,10 +542,11 @@ router.post(
       });
 
       sendSuccess(res, { ok: true, result, toolCallId } satisfies ToolExecutorResult);
-    } catch {
+    } catch (e) {
       const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
       const toolCallId = typeof body.toolCallId === 'string' ? String(body.toolCallId) : '';
-      sendSuccess(res, { ok: false, error: 'INTERNAL_SERVER_ERROR', toolCallId } satisfies ToolExecutorResult);
+      const msg = getSafeErrorMessageWithCause(e);
+      sendSuccess(res, { ok: false, error: 'INTERNAL_SERVER_ERROR', message: msg, toolCallId } satisfies ToolExecutorResult);
     }
   }
 );

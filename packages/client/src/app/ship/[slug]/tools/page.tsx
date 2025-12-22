@@ -29,7 +29,8 @@ export default function StarshipToolsPage(): React.JSX.Element {
   const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
 
-  const { data: starshipAgents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, !!starshipId)
+  // Fetch agents oldest-first from the API so column ordering is server-defined.
+  const { data: starshipAgents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, !!starshipId, { order: 'ASC' })
 
   const { data: starshipTools = [], isLoading: starshipToolsLoading } = useQuery({
     queryKey: ['starship-tools', starshipId] as const,
@@ -46,9 +47,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
     queryKey: ['starship-agent-tool-permissions', starshipId] as const,
     queryFn: async (): Promise<StarshipAgentToolPermissionModel[]> => {
       if (!starshipId) return []
-      const response: FetchResponse<ApiResponse<StarshipAgentToolPermissionModel[]>> = await api.get(
-        `/api/v1/starships/${starshipId}/agent-tool-permissions`
-      )
+      const response: FetchResponse<ApiResponse<StarshipAgentToolPermissionModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agent-tool-permissions`)
       return response.data.data || []
     },
     enabled: !!starshipId,
@@ -57,9 +56,8 @@ export default function StarshipToolsPage(): React.JSX.Element {
 
   const agentAvatarAttachmentIds = useMemo(() => {
     const ids =
-      (Array.isArray(starshipAgents) ? starshipAgents : [])
-        .map(a => (a as any)?.avatarAttachmentId as string | undefined)
-        .filter((x): x is string => typeof x === 'string' && x.trim().length > 0) ?? []
+      (Array.isArray(starshipAgents) ? starshipAgents : []).map(a => (a as any)?.avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0) ??
+      []
     return Array.from(new Set(ids))
   }, [starshipAgents])
 
@@ -246,7 +244,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                 className={cn(
                                   'sticky top-0 left-0 z-30 bg-background/90 backdrop-blur',
                                   'text-left text-xs font-semibold text-muted-foreground',
-                                  'px-4 py-3 border-b border-border/40 w-[260px] min-w-[260px]'
+                                  'px-4 py-3 border-b border-r border-border/30 w-[260px] min-w-[260px]'
                                 )}
                               >
                                 Tools
@@ -258,7 +256,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                   className={cn(
                                     'sticky top-0 z-20 bg-background/90 backdrop-blur',
                                     'text-left text-xs font-semibold text-muted-foreground',
-                                    'px-4 py-3 border-b border-border/40 w-[220px] min-w-[220px]'
+                                    'px-4 py-3 border-b border-l border-border/30 w-[220px] min-w-[220px] max-w-[220px]'
                                   )}
                                 >
                                   <button
@@ -269,12 +267,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                   >
                                     <div className="flex items-center gap-2 min-w-0">
                                       <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full shrink-0">
-                                        <AgentAvatar
-                                          seed={agent.name || agent.slug || 'Agent'}
-                                          imageUrl={agentAvatarUrlById.get((agent as any)?.avatarAttachmentId)}
-                                          size={32}
-                                          rounded
-                                        />
+                                        <AgentAvatar seed={agent.name || agent.slug || 'Agent'} imageUrl={agentAvatarUrlById.get((agent as any)?.avatarAttachmentId)} size={32} rounded />
                                       </Avatar>
                                       <div className="min-w-0">
                                         <div className="truncate text-sm font-semibold text-foreground">{agent.name}</div>
@@ -290,12 +283,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
                             {filteredTools.map(tool => {
                               return (
                                 <tr key={tool.id} className="group">
-                                  <td
-                                    className={cn(
-                                      'sticky left-0 z-10 bg-background/70 backdrop-blur',
-                                      'px-4 py-3 border-b border-border/30 align-middle w-[260px] min-w-[260px]'
-                                    )}
-                                  >
+                                  <td className={cn('sticky left-0 z-10 bg-background/70 backdrop-blur', 'px-4 py-3 border-b border-r border-border/30 align-middle w-[260px] min-w-[260px]')}>
                                     <div className="flex flex-col gap-1">
                                       <button
                                         type="button"
@@ -310,12 +298,10 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                   </td>
                                   {starshipAgents.map(agent => {
                                     const isAssigned = assignedToolSlugsByAgentId.get(agent.id)?.has(tool.slug) ?? false
-                                    const p =
-                                      permissionByAgentId.get(agent.id)?.get(tool.slug) ??
-                                      ('allow' as StarshipAgentToolPermissionModel['permission'])
+                                    const p = permissionByAgentId.get(agent.id)?.get(tool.slug) ?? ('allow' as StarshipAgentToolPermissionModel['permission'])
                                     const isUpdating = setPermissionMutation.isPending
                                     return (
-                                      <td key={`${tool.id}:${agent.id}`} className="px-4 py-3 border-b border-border/30 align-middle">
+                                      <td key={`${tool.id}:${agent.id}`} className="px-4 py-3 border-b border-l border-border/30 align-middle w-[220px] min-w-[220px] max-w-[220px]">
                                         <button
                                           type="button"
                                           disabled={isUpdating || !isAssigned}

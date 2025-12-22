@@ -20,6 +20,7 @@ import { cn } from '@/lib/utils'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -144,6 +145,11 @@ export default function StarshipToolsPage(): React.JSX.Element {
     if (p === 'allow') return 'Allow'
     if (p === 'ask') return 'Ask first'
     return 'Deny'
+  }
+  const permissionDescription = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'Agent can trigger this tool without confirmation.'
+    if (p === 'ask') return 'Agent can trigger this tool, but you will be asked to confirm.'
+    return 'Agent cannot trigger this tool.'
   }
   const permissionIconName = (p: StarshipAgentToolPermissionModel['permission']): string => {
     if (p === 'allow') return 'check-circle'
@@ -300,37 +306,60 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                     const isAssigned = assignedToolSlugsByAgentId.get(agent.id)?.has(tool.slug) ?? false
                                     const p = permissionByAgentId.get(agent.id)?.get(tool.slug) ?? ('allow' as StarshipAgentToolPermissionModel['permission'])
                                     const isUpdating = setPermissionMutation.isPending
+                                    const next = nextPermission(p)
                                     return (
                                       <td key={`${tool.id}:${agent.id}`} className="px-4 py-3 border-b border-l border-border/30 align-middle w-[220px] min-w-[220px] max-w-[220px]">
-                                        <button
-                                          type="button"
-                                          disabled={isUpdating || !isAssigned}
-                                          onClick={() => {
-                                            if (!isAssigned) return
-                                            const next = nextPermission(p)
-                                            setPermissionMutation.mutate({ agentId: agent.id, toolSlug: tool.slug, permission: next })
-                                          }}
-                                          className={cn('w-full flex items-center justify-start', (isUpdating || !isAssigned) && 'opacity-60 cursor-not-allowed')}
-                                          aria-label={
-                                            isAssigned
-                                              ? `Set permission for agent ${agent.name} on tool ${tool.name}. Current: ${permissionLabel(p)}`
-                                              : `Tool ${tool.name} is not assigned to agent ${agent.name}`
-                                          }
-                                          title={isAssigned ? 'Click to cycle: Allow → Ask first → Deny' : 'Not assigned to this agent'}
-                                        >
-                                          {isAssigned ? (
-                                            <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(p))}>
-                                              <span className="inline-flex items-center gap-1.5">
-                                                <Icon name={permissionIconName(p)} className="h-3.5 w-3.5" />
-                                                <span>{permissionLabel(p)}</span>
-                                              </span>
-                                            </Badge>
-                                          ) : (
-                                            <Badge variant="outline" className="whitespace-nowrap text-muted-foreground border-border/40">
-                                              Not assigned
-                                            </Badge>
-                                          )}
-                                        </button>
+                                        <Tooltip delayDuration={250}>
+                                          <TooltipTrigger asChild>
+                                            {/* Use a span wrapper so tooltip still works when the inner button is disabled */}
+                                            <span className={cn('inline-flex', (isUpdating || !isAssigned) && 'cursor-not-allowed')}>
+                                              <button
+                                                type="button"
+                                                disabled={isUpdating || !isAssigned}
+                                                onClick={() => {
+                                                  if (!isAssigned) return
+                                                  setPermissionMutation.mutate({ agentId: agent.id, toolSlug: tool.slug, permission: next })
+                                                }}
+                                                className={cn('inline-flex items-center justify-start', (isUpdating || !isAssigned) && 'opacity-60')}
+                                                aria-label={
+                                                  isAssigned
+                                                    ? `Permission for agent ${agent.name} on tool ${tool.name}. Current: ${permissionLabel(p)}. Click to change to ${permissionLabel(next)}.`
+                                                    : `Tool ${tool.name} is not assigned to agent ${agent.name}`
+                                                }
+                                              >
+                                                {isAssigned ? (
+                                                  <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(p))}>
+                                                    <span className="inline-flex items-center gap-1.5">
+                                                      <Icon name={permissionIconName(p)} className="h-3.5 w-3.5" />
+                                                      <span>{permissionLabel(p)}</span>
+                                                    </span>
+                                                  </Badge>
+                                                ) : (
+                                                  <Badge variant="outline" className="whitespace-nowrap text-muted-foreground border-border/40">
+                                                    Not assigned
+                                                  </Badge>
+                                                )}
+                                              </button>
+                                            </span>
+                                          </TooltipTrigger>
+                                          <TooltipContent
+                                            side="right"
+                                            align="start"
+                                            className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60"
+                                          >
+                                            {isAssigned ? (
+                                              <div className="space-y-1">
+                                                <div className="font-medium">{permissionDescription(p)}</div>
+                                                <div className="italic text-muted-foreground">Click to change to {permissionLabel(next)}.</div>
+                                              </div>
+                                            ) : (
+                                              <div className="space-y-1">
+                                                <div className="font-medium">This tool is not assigned to the agent.</div>
+                                                <div className="italic text-muted-foreground">Assign the tool to enable permissions.</div>
+                                              </div>
+                                            )}
+                                          </TooltipContent>
+                                        </Tooltip>
                                       </td>
                                     )
                                   })}

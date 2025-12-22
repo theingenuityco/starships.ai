@@ -20,7 +20,9 @@ type DemoMessage = {
 }
 
 function chunkTextForStreaming(text: string) {
-  const tokens = String(text).split(/(\s+)/).filter(t => t.length > 0)
+  const tokens = String(text)
+    .split(/(\s+)/)
+    .filter(t => t.length > 0)
   const parts: string[] = []
   let buf = ''
   for (const t of tokens) {
@@ -112,24 +114,23 @@ export default function BuildCustomAgentDemo() {
       const name = 'Customer Inbox Assistant'
       const slug = 'customer-inbox-assistant'
       const description = 'Summarize inbound customer emails and draft friendly replies for approval.'
-      const systemPrompt =
-        [
-          'You are the Customer Inbox Assistant.',
-          '',
-          'Goal:',
-          '- Turn raw inbound customer emails into a short, accurate summary and a suggested reply.',
-          '',
-          'Rules:',
-          '- Be warm, concise, and professional.',
-          '- Ask 1-2 clarifying questions only when absolutely needed.',
-          '- If an email is angry or urgent, de-escalate and escalate to a human.',
-          '- Never send emails directly; always output a draft for approval.',
-          '',
-          'Output format:',
-          '1) Summary (3 bullets max)',
-          '2) Draft reply (ready to copy/paste)',
-          '3) Escalation flags (if any)',
-        ].join('\n')
+      const systemPrompt = [
+        'You are the Customer Inbox Assistant.',
+        '',
+        'Goal:',
+        '- Turn raw inbound customer emails into a short, accurate summary and a suggested reply.',
+        '',
+        'Rules:',
+        '- Be warm, concise, and professional.',
+        '- Ask 1-2 clarifying questions only when absolutely needed.',
+        '- If an email is angry or urgent, de-escalate and escalate to a human.',
+        '- Never send emails directly; always output a draft for approval.',
+        '',
+        'Output format:',
+        '1) Summary (3 bullets max)',
+        '2) Draft reply (ready to copy/paste)',
+        '3) Escalation flags (if any)',
+      ].join('\n')
 
       await streamTextField('name', name, 55)
       await setField('slug', slug, 420)
@@ -208,11 +209,9 @@ export default function BuildCustomAgentDemo() {
         setIsResponding(true)
         await streamAssistant(
           a1Id,
-          [
-            "Got it. I’ll create an agent with a warm, customer-friendly voice and an approval step before anything is sent.",
-            '',
-            'I’m opening the agent builder now and filling in the spec…',
-          ].join('\n')
+          ['Got it. I’ll create an agent with a warm, customer-friendly voice and an approval step before anything is sent.', '', 'I’m opening the agent builder now and filling in the spec…'].join(
+            '\n'
+          )
         )
         setIsResponding(false)
         await sleep(300)
@@ -354,110 +353,81 @@ export default function BuildCustomAgentDemo() {
   return (
     <div ref={containerRef} className="relative isolate w-full overflow-visible text-left">
       {/* Connector path (desktop only; mobile stacks windows) */}
-      <svg
-        className="hidden md:block absolute inset-0 pointer-events-none"
-        width={svgSize.w}
-        height={svgSize.h}
-        viewBox={`0 0 ${svgSize.w} ${svgSize.h}`}
-        preserveAspectRatio="none"
-        aria-hidden
-      >
+      <svg className="hidden md:block absolute inset-0 pointer-events-none" width={svgSize.w} height={svgSize.h} viewBox={`0 0 ${svgSize.w} ${svgSize.h}`} preserveAspectRatio="none" aria-hidden>
         {path ? <path d={path} className={['delegation-edge', isEdgeActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
       </svg>
 
       <div className="relative z-10 grid gap-6 md:grid-cols-2 md:gap-20 lg:gap-24 xl:gap-28">
-      {/* Left: mock conversation */}
-      <div ref={leftRef} className="relative isolate overflow-visible">
-        {/* Glow per-window (only when active) */}
-        <div
-          className={[
-            'absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500',
-            isLeftActive ? 'opacity-70' : 'opacity-0',
-          ].join(' ')}
-          aria-hidden
-        />
-        <div
-          className={[
-            'absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500',
-            isLeftActive ? 'opacity-55' : 'opacity-0',
-          ].join(' ')}
-          aria-hidden
-        />
+        {/* Left: mock conversation */}
+        <div ref={leftRef} className="relative isolate overflow-visible">
+          {/* Glow per-window (only when active) */}
+          <div
+            className={['absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500', isLeftActive ? 'opacity-70' : 'opacity-0'].join(' ')}
+            aria-hidden
+          />
+          <div
+            className={['absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500', isLeftActive ? 'opacity-55' : 'opacity-0'].join(' ')}
+            aria-hidden
+          />
 
-        <div
-          className={[
-            'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
-            isLeftActive ? 'border-amber-300/55' : 'border-white/20',
-          ].join(' ')}
-        >
-          <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
-            <div className="text-sm font-medium leading-none truncate">Building Customer Inbox Agent with Gaia</div>
-            <div className="mt-1 text-xs text-muted-foreground truncate">You, Gaia</div>
-          </div>
-          <div className="h-[440px] sm:h-[520px] flex flex-col">
-            <div className="flex-1 overflow-hidden">
-              <ConversationMessageList
-                conversationId={null}
-                messagesOverride={(messages || []) as any}
-                agentNameOverride="Gaia"
-                isRespondingOverride={isResponding || isAwaitingTools}
-                isAssistantStreamingOverride={isResponding}
-                isAwaitingToolResultsOverride={isAwaitingTools}
-                bottomPaddingPx={120}
-                userNameOverride="You"
-                userAvatarSeedOverride="You"
-              />
+          <div className={['relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30', isLeftActive ? 'border-amber-300/55' : 'border-white/20'].join(' ')}>
+            <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+              <div className="text-sm font-medium leading-none truncate">Building Customer Inbox Agent with Gaia</div>
+              <div className="mt-1 text-xs text-muted-foreground truncate">You, Gaia</div>
             </div>
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
-          </div>
-        </div>
-      </div>
-
-      {/* Right: embedded agent builder form */}
-      <div ref={rightRef} className="relative isolate overflow-visible">
-        {/* Glow per-window (only when active) */}
-        <div
-          className={[
-            'absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500',
-            isRightActive ? 'opacity-70' : 'opacity-0',
-          ].join(' ')}
-          aria-hidden
-        />
-        <div
-          className={[
-            'absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500',
-            isRightActive ? 'opacity-55' : 'opacity-0',
-          ].join(' ')}
-          aria-hidden
-        />
-
-        <div
-          className={[
-            'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
-            isRightActive ? 'border-amber-300/55' : 'border-white/20',
-          ].join(' ')}
-        >
-          <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
-            <div className="flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-sm font-medium leading-none truncate">{agentTitle || 'New agent'}</div>
-                <div className="mt-1 text-xs text-muted-foreground truncate">Agent Builder</div>
+            <div className="h-[440px] sm:h-[520px] flex flex-col">
+              <div className="flex-1 overflow-hidden">
+                <ConversationMessageList
+                  conversationId={null}
+                  messagesOverride={(messages || []) as any}
+                  agentNameOverride="Gaia"
+                  isRespondingOverride={isResponding || isAwaitingTools}
+                  isAssistantStreamingOverride={isResponding}
+                  isAwaitingToolResultsOverride={isAwaitingTools}
+                  bottomPaddingPx={120}
+                  userNameOverride="You"
+                  userAvatarSeedOverride="You"
+                />
               </div>
-              {isFormStreaming ? (
-                <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">filling…</div>
-              ) : isAwaitingTools ? (
-                <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">opening…</div>
-              ) : (
-                <div className="text-[11px] px-2 py-0.5 rounded-full border border-emerald-400/25 text-emerald-300 bg-emerald-500/10">ready</div>
-              )}
+              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
             </div>
           </div>
+        </div>
 
-          <div className="h-[440px] sm:h-[520px] overflow-auto">
-            <AgentBuilderView ref={agentBuilderRef} readOnly={true} embedded={true} />
+        {/* Right: embedded agent builder form */}
+        <div ref={rightRef} className="relative isolate overflow-visible">
+          {/* Glow per-window (only when active) */}
+          <div
+            className={['absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500', isRightActive ? 'opacity-70' : 'opacity-0'].join(' ')}
+            aria-hidden
+          />
+          <div
+            className={['absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500', isRightActive ? 'opacity-55' : 'opacity-0'].join(' ')}
+            aria-hidden
+          />
+
+          <div className={['relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30', isRightActive ? 'border-amber-300/55' : 'border-white/20'].join(' ')}>
+            <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
+              <div className="flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-medium leading-none truncate">{agentTitle || 'New agent'}</div>
+                  <div className="mt-1 text-xs text-muted-foreground truncate">Agent Builder</div>
+                </div>
+                {isFormStreaming ? (
+                  <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">filling…</div>
+                ) : isAwaitingTools ? (
+                  <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">opening…</div>
+                ) : (
+                  <div className="text-[11px] px-2 py-0.5 rounded-full border border-emerald-400/25 text-emerald-300 bg-emerald-500/10">ready</div>
+                )}
+              </div>
+            </div>
+
+            <div className="h-[440px] sm:h-[520px] overflow-auto">
+              <AgentBuilderView ref={agentBuilderRef} readOnly={true} embedded={true} />
+            </div>
           </div>
         </div>
-      </div>
       </div>
 
       {/* Match DelegationDemo connector styling */}
@@ -467,13 +437,7 @@ export default function BuildCustomAgentDemo() {
           position: absolute;
           inset: -14px;
           border-radius: inherit;
-          background: conic-gradient(
-            from 0deg at 50% 50%,
-            rgba(99, 102, 241, 0.85),
-            rgba(217, 70, 239, 0.85),
-            rgba(245, 158, 11, 0.75),
-            rgba(99, 102, 241, 0.85)
-          );
+          background: conic-gradient(from 0deg at 50% 50%, rgba(99, 102, 241, 0.85), rgba(217, 70, 239, 0.85), rgba(245, 158, 11, 0.75), rgba(99, 102, 241, 0.85));
           filter: blur(32px);
           opacity: 1;
           pointer-events: none;
@@ -517,5 +481,3 @@ export default function BuildCustomAgentDemo() {
     </div>
   )
 }
-
-

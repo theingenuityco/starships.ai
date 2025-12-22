@@ -15,7 +15,7 @@ const QA = [
   },
   {
     q: 'Which models and providers are supported?',
-    a: 'OpenRouter (recommended), OpenAI, and Anthropic. You can set defaults for your workspace and override per teammate when needed.',
+    a: 'All popular model providers are supported, including Google, OpenAI, Anthropic, xAI, and DeepSeek.',
   },
   {
     q: 'Do I need to bring my own model keys?',

@@ -191,7 +191,15 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
     if (!paramValidation) return;
 
     // Validate query parameters
-    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    const queryValidation = validateData(
+      PaginationSchema.extend({
+        // Match other endpoints' convention (e.g. ledger): ASC | DESC
+        order: z.enum(['ASC', 'DESC']).optional(),
+      }),
+      req.query,
+      res,
+      'pagination query'
+    );
     if (!queryValidation) return;
 
     // Delegate to service layer
@@ -200,7 +208,8 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
       paramValidation.starshipId,
       req.user!.id,
       queryValidation.page,
-      queryValidation.limit
+      queryValidation.limit,
+      queryValidation.order
     );
 
     sendSuccess(res, result.agents, 200, { pagination: result.pagination });

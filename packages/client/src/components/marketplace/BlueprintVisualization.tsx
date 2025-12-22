@@ -97,7 +97,7 @@ const NodeIcon: React.FC<{ nodeType: string; className?: string }> = React.memo(
     case 'code':
       return <Icon name="code" className={iconClassName} />
     case 'tool':
-      return <Icon name="settings" className={iconClassName} />
+      return <Icon name="wrench" className={iconClassName} />
     case 'workflow':
       return <Icon name="git-branch" className={iconClassName} />
     case 'transform':
@@ -215,7 +215,8 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
   const incomingSpacing = isCompact ? 12 : 16
   // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
   const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[320px]' : 'gap-4 px-5 py-4 w-[420px]'
-  const iconClass = isCompact ? 'w-10 h-10' : 'w-12 h-12'
+  // Slightly larger icon container to add more breathing room around the glyph
+  const iconClass = isCompact ? 'w-12 h-12' : 'w-14 h-14'
   const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'
   const titleClass = isCompact ? 'text-2xl' : 'text-base'
   const subtitleClass = isCompact ? 'text-lg' : 'text-sm'
@@ -375,7 +376,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
   const incomingSpacing = isCompact ? 12 : 16
   // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
   const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[320px]' : 'gap-4 px-5 py-4 w-[420px]'
-  const iconClass = isCompact ? 'w-10 h-10' : 'w-12 h-12'
+  // Slightly larger icon container to add more breathing room around the glyph
+  const iconClass = isCompact ? 'w-12 h-12' : 'w-14 h-14'
   const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'
   const titleClass = isCompact ? 'text-2xl' : 'text-base'
   const subtitleClass = isCompact ? 'text-lg' : 'text-sm'

@@ -414,15 +414,20 @@ export class AgentRepository extends BaseRepository {
           throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
         }
 
-        await connection.query(
+        // Important semantic: permissions do NOT implicitly assign tools.
+        // Only update an existing relationship row. (Assignment is handled by the /agents/:id/tools endpoints.)
+        const res = await connection.queryWithResult(
           `
-          INSERT INTO agent_tools (agent_id, tool_id, created_at, permission)
-          VALUES ($1, $2, NOW(), $3)
-          ON CONFLICT (agent_id, tool_id)
-          DO UPDATE SET permission = EXCLUDED.permission
+          UPDATE agent_tools
+          SET permission = $3
+          WHERE agent_id = $1 AND tool_id = $2
           `,
           [agentId, toolResult.id, permission]
         );
+
+        if (!res.rowCount) {
+          throw new ValidationError('Tool is not assigned to agent', 'toolSlug', { agentId, toolSlug });
+        }
       },
       'setAgentToolPermissionBySlug',
       'Agent',

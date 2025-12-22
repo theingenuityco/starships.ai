@@ -3,18 +3,20 @@ import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
+import { useRouter } from 'next/navigation'
 
 export default function PricingTeaser() {
+  const router = useRouter()
   const { isAuthenticated, user } = useAuth()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
   const primaryStarship = starships[0]
 
   const handleClick = () => {
     if (isAuthenticated && primaryStarship?.slug) {
-      window.location.href = `/ship/${primaryStarship.slug}/conversations`
+      router.push(`/ship/${primaryStarship.slug}/conversations`)
       return
     }
-    window.location.href = '/login'
+    router.push('/login')
   }
   return (
     <section className="py-14 px-4">

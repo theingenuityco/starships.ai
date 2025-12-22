@@ -154,7 +154,7 @@ export default function WhatAreAgents() {
               <div className="absolute" style={{ left: agent.x, top: agent.y }}>
                 <div ref={orbRef} className="relative w-[92px] h-[92px] overflow-visible">
                   <div
-                    title={`${agent.label}${agent.sub ? ` — ${agent.sub}` : ''}`}
+                    title={`${agent.label}${agent.sub ? ` - ${agent.sub}` : ''}`}
                     className={[
                       'agent-anatomy-orb relative grid place-items-center rounded-full border w-full h-full',
                       'border-white/25 bg-black/35 shadow-[0_0_22px_rgba(168,85,247,0.24),0_0_44px_rgba(59,130,246,0.14)]',

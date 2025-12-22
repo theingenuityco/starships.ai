@@ -11,7 +11,7 @@
   --icon-stroke: 1.75;
 }
 
-/* Landing demo video glow — global, uses pseudo-elements for identical visual */
+/* Landing demo video glow - global, uses pseudo-elements for identical visual */
 .video-glow::before {
   content: '';
   position: absolute;

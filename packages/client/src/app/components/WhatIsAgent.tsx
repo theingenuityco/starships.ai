@@ -7,12 +7,12 @@ export default function WhatIsAgent() {
     {
       icon: 'user',
       title: 'A role with a mission',
-      desc: 'An agent is a dedicated teammate—like “Support”, “Research”, or “Ops”—with clear goals and instructions.',
+      desc: 'An agent is a dedicated teammate, like “Support”, “Research”, or “Ops”, with clear goals and instructions.',
     },
     {
       icon: 'wrench',
       title: 'Skills it can use',
-      desc: 'Give agents the right tools so they can do more than chat—pull data, take actions, and produce results.',
+      desc: 'Give agents the right tools so they can do more than chat: pull data, take actions, and produce results.',
     },
     {
       icon: 'rocket',
@@ -57,7 +57,7 @@ export default function WhatIsAgent() {
                 <span className="font-semibold">Agent:</span> “Done. Here are the urgent items, draft responses, and a summary you can approve.”
               </div>
             </div>
-            <div className="mt-3 text-xs text-muted-foreground">You stay in control—agents only use the tools you enable.</div>
+            <div className="mt-3 text-xs text-muted-foreground">You stay in control. Agents only use the tools you enable.</div>
           </Card>
 
           <Card className="p-6 bg-white/5 border-white/10 flex flex-col justify-between">

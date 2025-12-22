@@ -371,6 +371,7 @@ export class StarshipService {
     const created: Record<string, any> = {};
     try {
       const templateService = new AgentTemplateService();
+      const agentRepo = new AgentRepository();
 
       // Ensure default tools are deployed once so agents relying on them have what they need
       await StarshipService.createDefaultTools(starshipId);
@@ -388,6 +389,9 @@ export class StarshipService {
       if (daedalusTemplate) {
         try {
           const daedalus = await templateService.createAgentFromTemplate(daedalusTemplate.id, starshipId);
+          if (daedalus?.id) {
+            await agentRepo.setAllAssignedToolPermissionsForAgent(daedalus.id, 'allow');
+          }
           created['Daedalus'] = daedalus;
         } catch (err) {
           console.error('[STARSHIP-SERVICE] Failed to create Daedalus agent:', err);
@@ -400,6 +404,9 @@ export class StarshipService {
       if (gaiaTemplate) {
         try {
           const gaia = await templateService.createAgentFromTemplate(gaiaTemplate.id, starshipId);
+          if (gaia?.id) {
+            await agentRepo.setAllAssignedToolPermissionsForAgent(gaia.id, 'allow');
+          }
           created['Gaia'] = gaia;
         } catch (err) {
           console.error('[STARSHIP-SERVICE] Failed to create Gaia agent:', err);
@@ -412,6 +419,9 @@ export class StarshipService {
       if (ariaTemplate) {
         try {
           const aria = await templateService.createAgentFromTemplate(ariaTemplate.id, starshipId);
+          if (aria?.id) {
+            await agentRepo.setAllAssignedToolPermissionsForAgent(aria.id, 'allow');
+          }
           created['Aria'] = aria;
         } catch (err) {
           console.error('[STARSHIP-SERVICE] Failed to create Aria agent:', err);

@@ -627,6 +627,26 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
+   * Set permissions for all tools currently assigned to an agent (existing join rows only).
+   * Useful for bootstrapping default agents created during starship creation.
+   */
+  async setAllAssignedToolPermissionsForAgent(agentId: string, permission: 'allow' | 'ask' | 'deny'): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentId?.trim()) {
+          throw new Error('agentId is required');
+        }
+        const connection = this.getConnection();
+        const res = await connection.queryWithResult(`UPDATE agent_tools SET permission = $2 WHERE agent_id = $1`, [agentId, permission]);
+        return res.rowCount ?? 0;
+      },
+      'setAllAssignedToolPermissionsForAgent',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
    * Get all Tools that an Agent uses via junction table relationships
    */
   async getAgentToolsByRelationships(agentId: string): Promise<ToolModel[]> {

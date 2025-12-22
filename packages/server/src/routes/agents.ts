@@ -108,6 +108,15 @@ const ToolAssignmentSchema = z.object({
   toolSlugs: z.array(z.string().min(1)).min(1, 'At least one tool slug is required'),
 });
 
+const ToolPermissionSchema = z.object({
+  toolSlug: z.string().min(1, 'Tool slug is required'),
+  permission: z.enum(['allow', 'ask', 'deny']),
+});
+
+const ToolPermissionsUpdateSchema = z.object({
+  permissions: z.array(ToolPermissionSchema).min(1, 'At least one tool permission update is required'),
+});
+
 const ToolPublishOverrideSchema = z.object({
   toolId: IdSchema,
   versionBump: z.enum(['patch', 'minor', 'major']),
@@ -198,6 +207,24 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
   } catch (error) {
     console.error('[AGENTS] Error fetching starship agents:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship agents');
+  }
+});
+
+// GET /starships/:starshipId/agent-tool-permissions - Get agent↔tool permission rows for a starship
+router.get('/starships/:starshipId/agent-tool-permissions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    const ok = await verifyStarshipAccess(paramValidation.starshipId, req.user!.id, res);
+    if (!ok) return;
+
+    const agentService = new AgentService();
+    const rows = await agentService.getStarshipAgentToolPermissions(paramValidation.starshipId, req.user!.id);
+    sendSuccess(res, rows);
+  } catch (error) {
+    console.error('[AGENTS] Error fetching starship agent tool permissions:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch tool permissions');
   }
 });
 
@@ -769,6 +796,37 @@ router.get('/agents/:id/tools', jwtAuthMiddleware, async (req: Request, res: Res
   } catch (error) {
     console.error('[AGENTS] Error getting agent tools:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent tools');
+  }
+});
+
+// PUT /agents/:id/tool-permissions - Upsert tool permissions for an agent (by tool slug)
+router.put('/agents/:id/tool-permissions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const bodyValidation = validateData(ToolPermissionsUpdateSchema, req.body, res, 'tool permissions update');
+    if (!bodyValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const userId = req.user!.id;
+
+    // Access check: caller must have access to the agent's starship
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, userId, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    await agentService.setAgentToolPermissionsDerived(agentId, userId, bodyValidation.permissions);
+    sendSuccess(res, { ok: true });
+  } catch (error) {
+    console.error('[AGENTS] Error updating agent tool permissions:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update tool permissions');
   }
 });
 

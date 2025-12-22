@@ -8,14 +8,15 @@ import { PageLayout } from '@/components/layout/PageLayout'
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
-import type { ApiResponse } from '@starships/protocol'
+import type { AgentModel, ApiResponse, StarshipAgentToolPermissionModel, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import type { ToolModel } from '@starships/protocol'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useStarshipAgents } from '@/hooks/useAgents'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
-import { DeployedToolCard } from '@/components/tools/DeployedToolCard'
+import { cn } from '@/lib/utils'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -23,6 +24,9 @@ export default function StarshipToolsPage(): React.JSX.Element {
   const { data: starship } = useStarshipBySlug(slug, true)
   const starshipId = starship?.id || ''
   const [search, setSearch] = useState('')
+  const queryClient = useQueryClient()
+
+  const { data: starshipAgents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, !!starshipId)
 
   const { data: starshipTools = [], isLoading: starshipToolsLoading } = useQuery({
     queryKey: ['starship-tools', starshipId] as const,
@@ -35,6 +39,54 @@ export default function StarshipToolsPage(): React.JSX.Element {
     staleTime: 30 * 1000,
   })
 
+  const { data: permissionRows = [], isLoading: permissionsLoading } = useQuery({
+    queryKey: ['starship-agent-tool-permissions', starshipId] as const,
+    queryFn: async (): Promise<StarshipAgentToolPermissionModel[]> => {
+      if (!starshipId) return []
+      const response: FetchResponse<ApiResponse<StarshipAgentToolPermissionModel[]>> = await api.get(
+        `/api/v1/starships/${starshipId}/agent-tool-permissions`
+      )
+      return response.data.data || []
+    },
+    enabled: !!starshipId,
+    staleTime: 10 * 1000,
+  })
+
+  const setPermissionMutation = useMutation({
+    mutationFn: async (input: { agentId: string; toolSlug: string; permission: StarshipAgentToolPermissionModel['permission'] }) => {
+      const body: UpdateAgentToolPermissionsRequest = { permissions: [{ toolSlug: input.toolSlug, permission: input.permission }] }
+      await api.put(`/api/v1/agents/${input.agentId}/tool-permissions`, body)
+      return input
+    },
+    onMutate: async input => {
+      await queryClient.cancelQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
+
+      const prev = queryClient.getQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const)
+      queryClient.setQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const, old => {
+        const next = Array.isArray(old) ? [...old] : []
+        const idx = next.findIndex(r => r.agentId === input.agentId && r.toolSlug === input.toolSlug)
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], permission: input.permission }
+        } else {
+          // toolId isn't required for the UI map; keep it empty for optimistic row
+          next.push({ agentId: input.agentId, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
+        }
+        return next
+      })
+
+      return { prev }
+    },
+    onError: (_err, _input, ctx) => {
+      if (ctx?.prev) {
+        queryClient.setQueryData(['starship-agent-tool-permissions', starshipId] as const, ctx.prev)
+      }
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
+      await queryClient.invalidateQueries({ queryKey: ['starship-tools', starshipId] as const })
+    },
+  })
+
   const filteredTools = useMemo(() => {
     const q = (search || '').trim().toLowerCase()
     if (!q) return starshipTools
@@ -45,6 +97,34 @@ export default function StarshipToolsPage(): React.JSX.Element {
       return name.includes(q) || slugv.includes(q) || desc.includes(q)
     })
   }, [starshipTools, search])
+
+  const permissionByAgentId = useMemo(() => {
+    const map = new Map<string, Map<string, StarshipAgentToolPermissionModel['permission']>>()
+    for (const row of permissionRows) {
+      if (!row?.agentId || !row?.toolSlug) continue
+      const inner = map.get(row.agentId) ?? new Map<string, StarshipAgentToolPermissionModel['permission']>()
+      inner.set(row.toolSlug, row.permission)
+      map.set(row.agentId, inner)
+    }
+    return map
+  }, [permissionRows])
+
+  const PERMISSION_ORDER = ['allow', 'ask', 'deny'] as const
+  const permissionLabel = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'Allow'
+    if (p === 'ask') return 'Ask first'
+    return 'Deny'
+  }
+  const permissionVariant = (p: StarshipAgentToolPermissionModel['permission']): React.ComponentProps<typeof Badge>['variant'] => {
+    if (p === 'allow') return 'connected'
+    if (p === 'ask') return 'secondary'
+    return 'destructive'
+  }
+  const nextPermission = (p: StarshipAgentToolPermissionModel['permission']): StarshipAgentToolPermissionModel['permission'] => {
+    const idx = PERMISSION_ORDER.indexOf(p as any)
+    const nextIdx = idx >= 0 ? (idx + 1) % PERMISSION_ORDER.length : 0
+    return PERMISSION_ORDER[nextIdx]
+  }
 
   return (
     <PageLayout>
@@ -81,7 +161,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
             </div>
 
             <section aria-labelledby="tools-list">
-              {starshipToolsLoading ? (
+              {starshipToolsLoading || agentsLoading || permissionsLoading ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map(i => (
                     <Skeleton key={i} className="h-16 w-full" />
@@ -94,6 +174,14 @@ export default function StarshipToolsPage(): React.JSX.Element {
                   </div>
                   <p className="text-base text-muted-foreground mb-3">No tools installed</p>
                   <p className="text-sm text-muted-foreground">Install tools from the Marketplace to get started.</p>
+                </div>
+              ) : starshipAgents.length === 0 ? (
+                <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
+                  <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Icon name="bot" className="w-8 h-8 text-muted-foreground" />
+                  </div>
+                  <p className="text-base text-muted-foreground mb-3">No agents deployed</p>
+                  <p className="text-sm text-muted-foreground">Create an agent to configure tool permissions.</p>
                 </div>
               ) : (
                 <>
@@ -111,15 +199,96 @@ export default function StarshipToolsPage(): React.JSX.Element {
                   </div>
 
                   {filteredTools.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {filteredTools.map(tool => (
-                        <DeployedToolCard
-                          key={tool.id}
-                          tool={tool}
-                          onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
-                          onOpen={t => router.push(`/ship/${slug}/tool/${t.slug}`)}
-                        />
-                      ))}
+                    <div className="rounded-2xl border border-border/40 frosted-glass-card shadow-frosted-lg overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="min-w-max w-full border-separate border-spacing-0">
+                          <thead>
+                            <tr>
+                              <th
+                                scope="col"
+                                className={cn(
+                                  'sticky top-0 left-0 z-30 bg-background/90 backdrop-blur',
+                                  'text-left text-xs font-semibold text-muted-foreground',
+                                  'px-4 py-3 border-b border-border/40 w-[260px] min-w-[260px]'
+                                )}
+                              >
+                                Tools
+                              </th>
+                              {starshipAgents.map((agent: AgentModel) => (
+                                <th
+                                  key={agent.id}
+                                  scope="col"
+                                  className={cn(
+                                    'sticky top-0 z-20 bg-background/90 backdrop-blur',
+                                    'text-left text-xs font-semibold text-muted-foreground',
+                                    'px-4 py-3 border-b border-border/40 w-[170px] min-w-[170px]'
+                                  )}
+                                >
+                                  <button
+                                    type="button"
+                                    className="hover:text-foreground transition-colors"
+                                    onClick={() => router.push(`/ship/${slug}/agent/${agent.slug}`)}
+                                    title={`Open agent: ${agent.name}`}
+                                  >
+                                    {agent.name}
+                                  </button>
+                                </th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {filteredTools.map(tool => {
+                              return (
+                                <tr key={tool.id} className="group">
+                                  <td
+                                    className={cn(
+                                      'sticky left-0 z-10 bg-background/70 backdrop-blur',
+                                      'px-4 py-3 border-b border-border/30 align-middle w-[260px] min-w-[260px]'
+                                    )}
+                                  >
+                                    <div className="flex flex-col gap-1">
+                                      <button
+                                        type="button"
+                                        className="text-sm font-semibold text-foreground text-left hover:underline"
+                                        onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
+                                        title={`Open tool: ${tool.name}`}
+                                      >
+                                        {tool.name}
+                                      </button>
+                                      <div className="text-xs text-muted-foreground font-mono">{tool.slug}</div>
+                                    </div>
+                                  </td>
+                                  {starshipAgents.map(agent => {
+                                    const p =
+                                      permissionByAgentId.get(agent.id)?.get(tool.slug) ??
+                                      ('deny' as StarshipAgentToolPermissionModel['permission'])
+                                    const isUpdating = setPermissionMutation.isPending
+                                    return (
+                                      <td key={`${tool.id}:${agent.id}`} className="px-4 py-3 border-b border-border/30 align-middle">
+                                        <button
+                                          type="button"
+                                          disabled={isUpdating}
+                                          onClick={() => {
+                                            const next = nextPermission(p)
+                                            setPermissionMutation.mutate({ agentId: agent.id, toolSlug: tool.slug, permission: next })
+                                          }}
+                                          className={cn('w-full flex items-center justify-start', isUpdating && 'opacity-60 cursor-not-allowed')}
+                                          aria-label={`Set permission for agent ${agent.name} on tool ${tool.name}. Current: ${permissionLabel(p)}`}
+                                          title="Click to cycle: Allow → Ask first → Deny"
+                                        >
+                                          <Badge variant={permissionVariant(p)} className="whitespace-nowrap">
+                                            {permissionLabel(p)}
+                                          </Badge>
+                                        </button>
+                                      </td>
+                                    )
+                                  })}
+                                </tr>
+                              )
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   ) : (
                     <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">

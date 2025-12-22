@@ -348,7 +348,7 @@ export class AgentRepository extends BaseRepository {
         const result = await connection.query<Record<string, unknown>>(
           `SELECT t.* FROM tools t
            INNER JOIN agent_tools at ON t.id = at.tool_id
-           WHERE at.agent_id = $1 AND t.starship_id = $2
+           WHERE at.agent_id = $1 AND t.starship_id = $2 AND at.permission <> 'deny'
            ORDER BY t.created_at DESC`,
           [agentId, starshipId]
         );
@@ -357,6 +357,76 @@ export class AgentRepository extends BaseRepository {
       'getAgentTools',
       'Agent',
       agentId
+    );
+  }
+
+  /**
+   * Get agent→tool permissions (join metadata) for a specific starship.
+   * Returns only rows present in agent_tools; callers can treat missing pairs as 'deny'.
+   */
+  async getStarshipAgentToolPermissions(starshipId: string): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const rows = await connection.query<{ agent_id: string; tool_id: string; tool_slug: string; permission: 'allow' | 'ask' | 'deny' }>(
+          `
+          SELECT
+            at.agent_id as agent_id,
+            t.id as tool_id,
+            t.slug as tool_slug,
+            at.permission as permission
+          FROM agent_tools at
+          INNER JOIN agents a ON a.id = at.agent_id
+          INNER JOIN tools t ON t.id = at.tool_id
+          WHERE a.starship_id = $1 AND t.starship_id = $1
+          ORDER BY a.created_at DESC, t.created_at DESC
+          `,
+          [starshipId]
+        );
+
+        return (rows || []).map((r) => ({
+          agentId: r.agent_id,
+          toolId: r.tool_id,
+          toolSlug: r.tool_slug,
+          permission: r.permission,
+        }));
+      },
+      'getStarshipAgentToolPermissions',
+      'Agent'
+    );
+  }
+
+  /**
+   * Upsert a permission for an agent/tool pair by tool slug within a starship.
+   * This is intentionally starship-scoped to prevent cross-starship tool slugs.
+   */
+  async setAgentToolPermissionBySlug(args: { agentId: string; starshipId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { agentId, starshipId, toolSlug, permission } = args;
+        if (!agentId?.trim() || !starshipId?.trim() || !toolSlug?.trim()) {
+          throw new Error('agentId, starshipId, and toolSlug are required');
+        }
+
+        const connection = this.getConnection();
+        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [toolSlug, starshipId]);
+        if (!toolResult?.id) {
+          throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
+        }
+
+        await connection.query(
+          `
+          INSERT INTO agent_tools (agent_id, tool_id, created_at, permission)
+          VALUES ($1, $2, NOW(), $3)
+          ON CONFLICT (agent_id, tool_id)
+          DO UPDATE SET permission = EXCLUDED.permission
+          `,
+          [agentId, toolResult.id, permission]
+        );
+      },
+      'setAgentToolPermissionBySlug',
+      'Agent',
+      args.agentId
     );
   }
 
@@ -565,7 +635,7 @@ export class AgentRepository extends BaseRepository {
         const result = await connection.query<Record<string, unknown>>(
           `SELECT t.* FROM tools t
            INNER JOIN agent_tools at ON t.id = at.tool_id
-           WHERE at.agent_id = $1
+           WHERE at.agent_id = $1 AND at.permission <> 'deny'
            ORDER BY t.name`,
           [agentId]
         );

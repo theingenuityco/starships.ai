@@ -10,6 +10,7 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import HeroConversationDemo from '@/app/components/HeroConversationDemo'
+import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 
 export default function Hero() {
   const router = useRouter()
@@ -132,7 +133,9 @@ export default function Hero() {
 
         {/* Conversation demo (uses the same message renderer as /ship/.../conversations) */}
         <div className="w-full mt-6 sm:mt-8 md:mt-10 text-left">
-          <HeroConversationDemo />
+          <ErrorBoundary name="HeroConversationDemo">
+            <HeroConversationDemo />
+          </ErrorBoundary>
         </div>
       </div>
       <style jsx>{`

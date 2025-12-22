@@ -18,6 +18,35 @@ type DemoMessage = {
   toolCallId?: string
 }
 
+function createAbortableSleep(signal: AbortSignal) {
+  const timeouts = new Set<ReturnType<typeof setTimeout>>()
+
+  const sleep = (ms: number) =>
+    new Promise<void>(resolve => {
+      if (signal.aborted) return resolve()
+      let id: ReturnType<typeof setTimeout>
+      const onAbort = () => {
+        clearTimeout(id)
+        timeouts.delete(id)
+        resolve()
+      }
+      id = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort)
+        timeouts.delete(id)
+        resolve()
+      }, ms)
+      timeouts.add(id)
+      signal.addEventListener('abort', onAbort, { once: true })
+    })
+
+  const clearAll = () => {
+    for (const id of timeouts) clearTimeout(id)
+    timeouts.clear()
+  }
+
+  return { sleep, clearAll }
+}
+
 function chunkTextForStreaming(text: string) {
   // Split into whitespace-aware tokens so we preserve spacing/newlines, then group into small chunks.
   const tokens = String(text).split(/(\s+)/).filter(t => t.length > 0)
@@ -358,7 +387,8 @@ export default function DelegationDemo() {
   // Mock streaming effect for the landing conversation demo (multi-chat with switching).
   useEffect(() => {
     let cancelled = false
-    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+    const abortController = new AbortController()
+    const { sleep, clearAll } = createAbortableSleep(abortController.signal)
     const setResponding = (convoId: DemoConvoId, value: boolean) => {
       setRespondingByConvo(prev => (prev[convoId] === value ? prev : { ...prev, [convoId]: value }))
     }
@@ -374,7 +404,7 @@ export default function DelegationDemo() {
 
     const run = async () => {
       // Loop forever (until unmount) so the demo stays "alive".
-      while (!cancelled) {
+      while (!cancelled && !abortController.signal.aborted) {
         setRespondingByConvo({ main: false, gaia: false, daedalus: false })
         setAwaitingToolsByConvo({ main: false, gaia: false, daedalus: false })
         setDemoByConvo({ main: [], gaia: [], daedalus: [] })
@@ -390,7 +420,7 @@ export default function DelegationDemo() {
         const pendingToolIds: Record<DemoConvoId, Set<string>> = { main: new Set(), gaia: new Set(), daedalus: new Set() }
 
         for (const step of DEMO_TIMELINE) {
-          if (cancelled) return
+          if (cancelled || abortController.signal.aborted) return
 
           // Switch visible conversation when the step targets a different one.
           if (step.convoId !== activeConvo) {
@@ -480,7 +510,7 @@ export default function DelegationDemo() {
             let chunks: DemoStreamChunk[] = []
 
             for (const part of parts) {
-              if (cancelled) return
+              if (cancelled || abortController.signal.aborted) return
               chunks = [...chunks, { content: part, position, timestamp: Date.now() }]
               position += 1
               updateMessage(step.convoId, id, { chunks, streaming: true })
@@ -503,9 +533,11 @@ export default function DelegationDemo() {
       }
     }
 
-    run()
+    run().catch(err => console.error('[DelegationDemo] run() failed', err))
     return () => {
       cancelled = true
+      abortController.abort()
+      clearAll()
     }
   }, [])
 
@@ -521,7 +553,11 @@ export default function DelegationDemo() {
       return `M ${from.x} ${from.y} C ${from.x + dx} ${from.y}, ${to.x - dx} ${to.y}, ${to.x} ${to.y}`
     }
 
+    let disposed = false
+    let rafId: number | null = null
+
     const compute = () => {
+      if (disposed) return
       const c = container.getBoundingClientRect()
       const l = left.getBoundingClientRect()
       const t = top.getBoundingClientRect()
@@ -550,7 +586,14 @@ export default function DelegationDemo() {
       })
     }
 
-    const rafCompute = () => requestAnimationFrame(compute)
+    const rafCompute = () => {
+      if (disposed) return
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        compute()
+      })
+    }
     rafCompute()
 
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(rafCompute) : null
@@ -561,6 +604,8 @@ export default function DelegationDemo() {
 
     window.addEventListener('resize', rafCompute, { passive: true } as any)
     return () => {
+      disposed = true
+      if (rafId !== null) cancelAnimationFrame(rafId)
       ro?.disconnect()
       window.removeEventListener('resize', rafCompute as any)
     }

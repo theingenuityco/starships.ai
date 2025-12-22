@@ -85,6 +85,35 @@ function chunkTextForStreaming(text: string) {
   return parts.length > 0 ? parts : [text]
 }
 
+function createAbortableSleep(signal: AbortSignal) {
+  const timeouts = new Set<ReturnType<typeof setTimeout>>()
+
+  const sleep = (ms: number) =>
+    new Promise<void>(resolve => {
+      if (signal.aborted) return resolve()
+      let id: ReturnType<typeof setTimeout>
+      const onAbort = () => {
+        clearTimeout(id)
+        timeouts.delete(id)
+        resolve()
+      }
+      id = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort)
+        timeouts.delete(id)
+        resolve()
+      }, ms)
+      timeouts.add(id)
+      signal.addEventListener('abort', onAbort, { once: true })
+    })
+
+  const clearAll = () => {
+    for (const id of timeouts) clearTimeout(id)
+    timeouts.clear()
+  }
+
+  return { sleep, clearAll }
+}
+
 const ARIA_TIMELINE: Step[] = [
   {
     role: 'user',
@@ -539,6 +568,20 @@ export default function HeroConversationDemo() {
     selected: null,
   })
 
+  const abortControllerRef = useRef<AbortController | null>(null)
+  if (!abortControllerRef.current) abortControllerRef.current = new AbortController()
+  const sleepCtlRef = useRef<ReturnType<typeof createAbortableSleep> | null>(null)
+  if (!sleepCtlRef.current) sleepCtlRef.current = createAbortableSleep(abortControllerRef.current.signal)
+  const sleep = sleepCtlRef.current.sleep
+  const signal = abortControllerRef.current.signal
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+      sleepCtlRef.current?.clearAll()
+    }
+  }, [])
+
   // Autoplay only the "Demo" conversation.
   useEffect(() => {
     // Fire-and-forget; startConversation handles re-entrancy.
@@ -561,7 +604,7 @@ export default function HeroConversationDemo() {
 
     // Append interaction into the Demo (Aria) conversation, then switch tabs after the call-agent succeeds.
     const convoId: ConvoId = 'aria'
-    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+    if (signal.aborted) return
 
     // User "click"
     const userCreatedAt = nextDemoChooserIso()
@@ -575,6 +618,7 @@ export default function HeroConversationDemo() {
     })
 
     await sleep(350)
+    if (signal.aborted) return
 
     // Aria acknowledgement
     const a1CreatedAt = nextDemoChooserIso()
@@ -590,6 +634,7 @@ export default function HeroConversationDemo() {
     })
 
     await sleep(350)
+    if (signal.aborted) return
 
     // Tool runner: call-agent
     const toolCallId = target === 'doc_organizer' ? 'tc_demo_call_doc_organizer' : 'tc_demo_call_lead_generator'
@@ -620,6 +665,7 @@ export default function HeroConversationDemo() {
     setAwaitingToolsByConvo(prev => ({ ...prev, aria: true }))
 
     await sleep(520)
+    if (signal.aborted) return
 
     const toolResultAt = nextDemoChooserIso()
     appendDemoChooserMessage(convoId, {
@@ -644,6 +690,7 @@ export default function HeroConversationDemo() {
     setAwaitingToolsByConvo(prev => ({ ...prev, aria: false }))
 
     await sleep(350)
+    if (signal.aborted) return
 
     const a2CreatedAt = nextDemoChooserIso()
     appendDemoChooserMessage(convoId, {
@@ -658,6 +705,7 @@ export default function HeroConversationDemo() {
     })
 
     await sleep(300)
+    if (signal.aborted) return
 
     setDemoChoiceState({ stage: 'done', selected: target })
     setActiveConvoId(target)
@@ -669,8 +717,7 @@ export default function HeroConversationDemo() {
     if (isRunningByConvo[convoId]) return
     runSeqRef[convoId] += 1
     const runSeq = runSeqRef[convoId]
-
-    const sleep = (ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))
+    if (signal.aborted) return
     const appendMessage = (cid: ConvoId, msg: DemoMessage) => {
       setMessagesByConvo(prev => ({ ...prev, [cid]: [...(prev[cid] || []), msg] }))
     }
@@ -703,10 +750,12 @@ export default function HeroConversationDemo() {
       const nextIso = () => new Date(nextTs()).toISOString()
 
       await sleep(250)
+      if (signal.aborted) return
 
       for (const step of timeline) {
         // Cancel if another run for this conversation started.
         if (runSeqRef[convoId] !== runSeq) return
+        if (signal.aborted) return
 
         seq += 1
         const createdAt = nextIso()
@@ -715,6 +764,7 @@ export default function HeroConversationDemo() {
           const id = `demo-${convoId}-u${seq}-${logicalTs}`
           appendMessage(convoId, { id, role: 'user', content: step.content, createdAt, updatedAt: createdAt, messageType: 'user_input' })
           await sleep(700)
+          if (signal.aborted) return
           continue
         }
 
@@ -725,6 +775,7 @@ export default function HeroConversationDemo() {
           if (step.toolCallId) pendingToolIds.delete(step.toolCallId)
           setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: pendingToolIds.size > 0 }))
           await sleep(420)
+          if (signal.aborted) return
           continue
         }
 
@@ -751,14 +802,17 @@ export default function HeroConversationDemo() {
           let chunks: DemoStreamChunk[] = []
           for (const part of parts) {
             if (runSeqRef[convoId] !== runSeq) return
+            if (signal.aborted) return
             chunks = [...chunks, { content: part, position, timestamp: nextTs() }]
             position += 1
             updateMessage(convoId, id, { chunks, streaming: true })
             await sleep(70)
+            if (signal.aborted) return
           }
         } else {
           updateMessage(convoId, id, { content: step.content, streaming: true })
           await sleep(160)
+          if (signal.aborted) return
         }
 
         updateMessage(convoId, id, { content: step.content, streaming: false, updatedAt: nextIso() })
@@ -788,8 +842,10 @@ export default function HeroConversationDemo() {
           pendingToolIds = new Set(ids)
           setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: ids.length > 0 }))
           await sleep(250)
+          if (signal.aborted) return
         } else {
           await sleep(900)
+          if (signal.aborted) return
         }
       }
     } finally {

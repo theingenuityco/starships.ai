@@ -36,8 +36,33 @@ function chunkTextForStreaming(text: string) {
   return parts.length > 0 ? parts : [text]
 }
 
-async function sleep(ms: number) {
-  return new Promise<void>(resolve => setTimeout(resolve, ms))
+function createAbortableSleep(signal: AbortSignal) {
+  const timeouts = new Set<ReturnType<typeof setTimeout>>()
+
+  const sleep = (ms: number) =>
+    new Promise<void>(resolve => {
+      if (signal.aborted) return resolve()
+      let id: ReturnType<typeof setTimeout>
+      const onAbort = () => {
+        clearTimeout(id)
+        timeouts.delete(id)
+        resolve()
+      }
+      id = setTimeout(() => {
+        signal.removeEventListener('abort', onAbort)
+        timeouts.delete(id)
+        resolve()
+      }, ms)
+      timeouts.add(id)
+      signal.addEventListener('abort', onAbort, { once: true })
+    })
+
+  const clearAll = () => {
+    for (const id of timeouts) clearTimeout(id)
+    timeouts.clear()
+  }
+
+  return { sleep, clearAll }
 }
 
 export default function BuildCustomAgentDemo() {
@@ -47,6 +72,7 @@ export default function BuildCustomAgentDemo() {
   const [isAwaitingTools, setIsAwaitingTools] = useState(false)
   const [isFormStreaming, setIsFormStreaming] = useState(false)
   const [agentTitle, setAgentTitle] = useState<string>('New agent')
+  const [demoError, setDemoError] = useState<string | null>(null)
 
   const agentBuilderRef = useRef<AgentBuilderViewRef>(null)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -57,6 +83,19 @@ export default function BuildCustomAgentDemo() {
 
   useEffect(() => {
     let cancelled = false
+    const abortController = new AbortController()
+    const { sleep, clearAll } = createAbortableSleep(abortController.signal)
+
+    const reportError = (where: string, err: unknown) => {
+      // Log the full error for debugging.
+      console.error(`[BuildCustomAgentDemo] ${where}`, err)
+      // Show a single user-visible message (avoid spamming the UI).
+      setDemoError(prev => {
+        if (prev) return prev
+        const msg = err instanceof Error ? err.message : String(err)
+        return `Demo error: ${where}${msg ? ` — ${msg}` : ''}`
+      })
+    }
 
     const appendMessage = (msg: DemoMessage) => setMessages(prev => [...prev, msg])
     const updateMessage = (id: string, patch: Partial<DemoMessage>) => {
@@ -83,14 +122,18 @@ export default function BuildCustomAgentDemo() {
 
       try {
         agentBuilderRef.current.resetForm()
-      } catch {}
+      } catch (err) {
+        reportError('agentBuilderRef.resetForm()', err)
+      }
       setAgentTitle('New agent')
 
       const setField = async (field: any, value: any, delay = 320) => {
         if (cancelled) return
         try {
           agentBuilderRef.current?.updateField(field, value)
-        } catch {}
+        } catch (err) {
+          reportError(`agentBuilderRef.updateField(${String(field)})`, err)
+        }
         await sleep(delay)
       }
 
@@ -102,7 +145,9 @@ export default function BuildCustomAgentDemo() {
           cur += part
           try {
             agentBuilderRef.current?.updateField(field, cur)
-          } catch {}
+          } catch (err) {
+            reportError(`agentBuilderRef.updateField(${String(field)})`, err)
+          }
           if (field === 'name') {
             const nextName = cur.trim()
             if (nextName) setAgentTitle(nextName)
@@ -168,15 +213,18 @@ export default function BuildCustomAgentDemo() {
     }
 
     const run = async () => {
-      while (!cancelled) {
+      while (!cancelled && !abortController.signal.aborted) {
         setMessages([])
         setIsResponding(false)
         setIsAwaitingTools(false)
         setIsFormStreaming(false)
         setAgentTitle('New agent')
+        setDemoError(null)
         try {
           agentBuilderRef.current?.resetForm()
-        } catch {}
+        } catch (err) {
+          reportError('agentBuilderRef.resetForm()', err)
+        }
 
         await sleep(450)
 
@@ -296,9 +344,11 @@ export default function BuildCustomAgentDemo() {
       }
     }
 
-    run()
+    run().catch(err => reportError('run()', err))
     return () => {
       cancelled = true
+      abortController.abort()
+      clearAll()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -309,6 +359,8 @@ export default function BuildCustomAgentDemo() {
     const left = leftRef.current
     const right = rightRef.current
     if (!container || !left || !right) return
+    let disposed = false
+    let rafId: number | null = null
 
     const makePath = (from: { x: number; y: number }, to: { x: number; y: number }) => {
       const dx = Math.max(80, Math.min(220, (to.x - from.x) * 0.55))
@@ -316,6 +368,7 @@ export default function BuildCustomAgentDemo() {
     }
 
     const compute = () => {
+      if (disposed) return
       const c = container.getBoundingClientRect()
       const l = left.getBoundingClientRect()
       const r = right.getBoundingClientRect()
@@ -331,7 +384,14 @@ export default function BuildCustomAgentDemo() {
       setPath(prev => (prev === next ? prev : next))
     }
 
-    const rafCompute = () => requestAnimationFrame(compute)
+    const rafCompute = () => {
+      if (disposed) return
+      if (rafId !== null) cancelAnimationFrame(rafId)
+      rafId = requestAnimationFrame(() => {
+        rafId = null
+        compute()
+      })
+    }
     rafCompute()
 
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(rafCompute) : null
@@ -341,6 +401,8 @@ export default function BuildCustomAgentDemo() {
 
     window.addEventListener('resize', rafCompute, { passive: true } as any)
     return () => {
+      disposed = true
+      if (rafId !== null) cancelAnimationFrame(rafId)
       ro?.disconnect()
       window.removeEventListener('resize', rafCompute as any)
     }
@@ -352,6 +414,7 @@ export default function BuildCustomAgentDemo() {
 
   return (
     <div ref={containerRef} className="relative isolate w-full overflow-visible text-left">
+      {demoError ? <div className="mb-3 rounded-lg border border-red-500/25 bg-red-500/10 px-3 py-2 text-xs text-red-200">{demoError}</div> : null}
       {/* Connector path (desktop only; mobile stacks windows) */}
       <svg className="hidden md:block absolute inset-0 pointer-events-none" width={svgSize.w} height={svgSize.h} viewBox={`0 0 ${svgSize.w} ${svgSize.h}`} preserveAspectRatio="none" aria-hidden>
         {path ? <path d={path} className={['delegation-edge', isEdgeActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}

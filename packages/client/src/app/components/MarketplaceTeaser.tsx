@@ -1,11 +1,14 @@
+'use client'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel'
-import { AgentTemplateCardCompact } from '@/components/marketplace/AgentTemplateCard'
+import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 export default function MarketplaceTeaser() {
+  const router = useRouter()
   const { data: agentTemplates = [], isLoading: agentLoading } = useAgentTemplates()
   const { data: toolTemplates = [] } = useToolTemplates()
 
@@ -15,6 +18,8 @@ export default function MarketplaceTeaser() {
   const featuredAgents = agentTemplates.slice(0, 9)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
+
+  const goToMarketplace = () => router.push('/marketplace?from=public')
 
   useEffect(() => {
     if (!carouselApi) return
@@ -33,9 +38,7 @@ export default function MarketplaceTeaser() {
       <div className="max-w-6xl mx-auto">
         <div className="flex flex-col items-center text-center">
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Hire from the Marketplace</h2>
-          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">
-            Start with ready‑made AI teammates and skills. Deploy in one click.
-          </p>
+          <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-6 md:mb-8">Start with ready‑made AI teammates and skills. Deploy in one click.</p>
         </div>
 
         {/* Featured agents carousel */}
@@ -45,12 +48,12 @@ export default function MarketplaceTeaser() {
               {agentLoading
                 ? [...Array(6)].map((_, idx) => (
                     <CarouselItem key={idx} className="basis-full sm:basis-1/2 lg:basis-1/3">
-                      <div className="h-[146px] rounded-xl bg-muted/40 border border-muted-foreground/20 animate-pulse" />
+                      <div className="h-[270px] rounded-xl bg-muted/40 border border-muted-foreground/20 animate-pulse" />
                     </CarouselItem>
                   ))
                 : featuredAgents.map(template => (
                     <CarouselItem key={template.id} className="basis-full sm:basis-1/2 lg:basis-1/3">
-                      <AgentTemplateCardCompact template={template} onClick={() => (window.location.href = '/marketplace?from=public')} />
+                      <AgentTemplateCard template={template} onClick={goToMarketplace} />
                     </CarouselItem>
                   ))}
             </CarouselContent>
@@ -68,7 +71,7 @@ export default function MarketplaceTeaser() {
             <span className="text-base sm:text-lg md:text-xl">skills and counting</span>
           </div>
           <div className="mt-2 sm:mt-3 md:mt-4">
-            <Button size="lg" variant="outline" className="border-primary/60 text-primary hover:bg-primary/10" onClick={() => (window.location.href = '/marketplace?from=public')}>
+            <Button size="lg" variant="outline" className="border-primary/60 text-primary hover:bg-primary/10" onClick={goToMarketplace}>
               <Icon name="store" className="w-7 h-7 mr-2" /> Browse marketplace
             </Button>
           </div>

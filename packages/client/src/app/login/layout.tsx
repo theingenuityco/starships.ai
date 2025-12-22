@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Starships.ai - Login',
+  title: 'Login | Starships.ai',
   description: 'Sign in to your Starships.ai account to access your AI agents, tools, and automations. Ship production AI agents fast.',
   alternates: {
     canonical: 'https://starships.ai/login',
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Starships.ai',
-    title: 'Starships.ai - Login',
+    title: 'Login | Starships.ai',
     description: 'Sign in to your Starships.ai account to access your AI agents, tools, and automations. Ship production AI agents fast.',
     url: 'https://starships.ai/login',
     locale: 'en_US',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Starships.ai - Login',
+    title: 'Login | Starships.ai',
     description: 'Sign in to your Starships.ai account to access your AI agents, tools, and automations. Ship production AI agents fast.',
     images: ['/static-assets/og.png'],
   },

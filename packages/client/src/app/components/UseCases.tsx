@@ -1,78 +1,151 @@
-import { Skeleton } from '@/components/ui/skeleton'
-import Icon from '@/components/primitives/Icon'
+import DelegationDemo from '@/app/components/DelegationDemo'
+import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
+import ToolsBlueprintDemo from '@/app/components/ToolsBlueprintDemo'
+import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'
+import { Avatar } from '@/components/ui/avatar'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+import { ErrorBoundary } from '@/components/error/ErrorBoundary'
+import { useAgentTemplates } from '@/hooks/useTemplates'
+import { useMemo } from 'react'
 
 export default function UseCases() {
-  const items: Array<{
-    title: string
-    desc: string
-    icon: string
-  }> = [
-    {
-      title: 'Create agents in minutes',
-      desc: 'Use the builder to define name, prompt, model, and settings. Save and iterate quickly.',
-      icon: 'bot',
-    },
-    {
-      title: 'Create tools that fit your needs',
-      desc: 'Spin up tools with parameters and blueprints, or deploy a template and customize.',
-      icon: 'wrench',
-    },
-    {
-      title: 'Assign tools to agents',
-      desc: 'Wire tools to agents with one click and keep configs organized inside your starship.',
-      icon: 'plug',
-    },
-    {
-      title: 'Stream tests and iterate live',
-      desc: 'Chat with agents, watch executions stream in real‑time, and refine prompts and blueprints.',
-      icon: 'activity',
-    },
-  ]
+  const { data: agentTemplates = [] } = useAgentTemplates()
 
-  const mediaSrc = ['/landing/usecases/agents.png', '/landing/usecases/tools.png', '/landing/usecases/assign.png', '/landing/usecases/streaming.png']
+  const starterTeam = useMemo(() => {
+    const findTemplateAvatarUrl = (agentName: string): string | null => {
+      const needle = agentName.trim().toLowerCase()
+      if (!needle) return null
+
+      const match =
+        agentTemplates.find(t => (t.name || '').trim().toLowerCase() === needle) ??
+        agentTemplates.find(t => ((t as any).slug || '').trim().toLowerCase() === needle) ??
+        agentTemplates.find(t => (t.name || '').trim().toLowerCase().startsWith(needle))
+
+      return ((match as any)?.avatarUrl as string | undefined) ?? null
+    }
+
+    return [
+      {
+        name: 'Gaia',
+        desc: 'Ask Gaia to help design and create a new agent.',
+        imageUrl: findTemplateAvatarUrl('Gaia'),
+      },
+      {
+        name: 'Daedalus',
+        desc: 'Ask Daedalus to help craft tools for an agent.',
+        imageUrl: findTemplateAvatarUrl('Daedalus'),
+      },
+      {
+        name: 'Aria',
+        desc: 'Ask Aria to help delegate tasks and summarize results.',
+        imageUrl: findTemplateAvatarUrl('Aria'),
+      },
+    ] as const
+  }, [agentTemplates])
 
   return (
     <section className="py-14 px-4">
       <div className="max-w-7xl mx-auto">
-        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Build agents and tools fast</h2>
-        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Design, connect, and iterate on agents and tools in minutes.</p>
-        <div className="space-y-10 md:space-y-12">
-          {items.map((item, idx) => {
-            const isRightAligned = idx % 2 === 1
-            const isWide = idx % 2 === 1
-            const swapLayout = idx === 1 || idx === 3 // Cards 2 and 4
-            return (
-              <div
-                key={item.title}
-                className={`flex flex-col ${swapLayout ? 'md:flex-row-reverse' : 'md:flex-row'} md:items-center gap-5 md:gap-6 py-4 md:py-6 rounded-xl border border-white/20 p-3 md:p-5 shadow-[0_0_15px_rgba(168,85,247,0.15),0_0_30px_rgba(236,72,153,0.10),0_0_45px_rgba(251,146,60,0.06)] backdrop-blur-md bg-gradient-to-br from-white/[0.08] via-purple-500/[0.03] to-white/[0.05] ${
-                  isRightAligned ? 'ml-auto' : 'mr-auto'
-                } ${isWide ? 'w-full md:w-[80%]' : 'w-full md:w-[65%]'}`}
-              >
-                {/* Media slot */}
-                <div className="w-full md:w-[58%] flex-shrink-0">
-                  <img
-                    src={mediaSrc[idx]}
-                    alt={`${item.title} demo`}
-                    loading="lazy"
-                    decoding="async"
-                    sizes="(min-width: 768px) 58vw, 100vw"
-                    className="w-full h-[180px] sm:h-[220px] md:h-[280px] object-cover rounded-lg border border-white/10"
-                  />
-                </div>
+        <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">How it works?</h2>
+        <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Create agents, add tools, and collaborate in one workspace.</p>
 
-                {/* Text */}
-                <div className="flex-1 flex flex-col justify-center space-y-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary/30 to-purple-500/20 border border-primary/30 flex items-center justify-center flex-shrink-0 shadow-sm">
-                      <Icon name={item.icon} className="w-5 h-5 text-primary" />
+        {/* Meet your starter team */}
+        <div className="mt-2 md:mt-4">
+          <div className="w-full max-w-6xl mx-auto">
+            <div className="text-left mb-6 md:mb-8">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Meet your starter team</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
+                Three built‑in agents to help you design, build, and delegate from day one.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+              {starterTeam.map(agent => (
+                <div key={agent.name} className="w-full rounded-xl border border-white/12 bg-white/[0.05] px-4 py-4 shadow-[0_0_18px_rgba(168,85,247,0.10),0_0_34px_rgba(59,130,246,0.06)]">
+                  <div className="flex flex-col">
+                    <div className="flex justify-center">
+                      <Avatar className="h-16 w-16 sm:h-20 sm:w-20 rounded-full ring-2 ring-border/40 bg-black/30 overflow-hidden">
+                        <AgentAvatar seed={agent.name} imageUrl={agent.imageUrl} size={80} rounded />
+                      </Avatar>
                     </div>
-                    <h3 className="text-base sm:text-lg md:text-xl font-semibold leading-tight text-white">{item.title}</h3>
+                    <div className="mt-4 min-w-0 text-center">
+                      <div className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground leading-tight">{agent.name}</div>
+                      <div className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed text-pretty">{agent.desc}</div>
+                    </div>
                   </div>
-                  <p className="text-xs md:text-sm text-gray-300 leading-relaxed">{item.desc}</p>
                 </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Build your custom agent */}
+        <div className="mt-14 md:mt-16">
+          <div className="w-full max-w-6xl mx-auto">
+            <div className="text-left mb-6 md:mb-8">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Build your custom agent</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
+                Gaia helps you define an agent’s responsibilities, inputs/outputs, and success criteria.
+              </p>
+            </div>
+
+            <div className="py-8 sm:py-10">
+              <ErrorBoundary name="BuildCustomAgentDemo">
+                <BuildCustomAgentDemo />
+              </ErrorBoundary>
+            </div>
+          </div>
+        </div>
+
+        {/* Upgrade your agents by adding tools */}
+        <div className="mt-14 md:mt-16">
+          <div className="w-full max-w-6xl mx-auto">
+            <div className="text-left mb-6 md:mb-8">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Upgrade your agents by adding tools</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Daedalus turns steps into workflows your agents can run.</p>
+            </div>
+
+            <div className="py-8 sm:py-10">
+              <ErrorBoundary name="ToolsBlueprintDemo">
+                <ToolsBlueprintDemo />
+              </ErrorBoundary>
+            </div>
+          </div>
+        </div>
+
+        {/* Delegate like never before */}
+        <div className="mt-14 md:mt-16">
+          <div className="w-full max-w-6xl mx-auto">
+            <div className="text-left mb-6 md:mb-8">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Delegate like never before</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Aria spins up specialist chats and brings back the result.</p>
+            </div>
+            <div className="w-full">
+              <div className="py-8 sm:py-10">
+                <ErrorBoundary name="DelegationDemo">
+                  <DelegationDemo />
+                </ErrorBoundary>
               </div>
-            )
-          })}
+            </div>
+          </div>
+        </div>
+
+        {/* Schedule repetitive tasks */}
+        <div className="mt-14 md:mt-16">
+          <div className="w-full max-w-6xl mx-auto">
+            <div className="text-left mb-6 md:mb-8">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Schedule repetitive tasks</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
+                Turn one-off work into a repeatable routine. Run on a schedule, get a draft, and approve before anything goes out.
+              </p>
+            </div>
+
+            <div className="py-8 sm:py-10">
+              <ErrorBoundary name="ScheduleRepetitiveTasksDemo">
+                <ScheduleRepetitiveTasksDemo />
+              </ErrorBoundary>
+            </div>
+          </div>
         </div>
       </div>
     </section>

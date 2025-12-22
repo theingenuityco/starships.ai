@@ -2,27 +2,70 @@
 
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { useCallback } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant } from '@/lib/flags'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import HeroConversationDemo from '@/app/components/HeroConversationDemo'
+import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 
 export default function Hero() {
   const router = useRouter()
   const { isAuthenticated, user } = useAuth()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
   const primaryStarship = starships[0]
+  const [heroLogoTrigger, setHeroLogoTrigger] = useState(0)
+  const [isPrimaryAnimating, setIsPrimaryAnimating] = useState(false)
+  const pendingPrimaryActionRef = useRef<null | (() => void)>(null)
+  const fallbackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  const handlePrimaryClick = useCallback(() => {
-    track({ type: 'hero_cta_clicked' })
+  useEffect(() => {
+    return () => {
+      if (fallbackTimeoutRef.current) clearTimeout(fallbackTimeoutRef.current)
+    }
+  }, [])
+
+  const runPendingPrimaryAction = useCallback(() => {
+    const fn = pendingPrimaryActionRef.current
+    if (!fn) return
+    pendingPrimaryActionRef.current = null
+    if (fallbackTimeoutRef.current) {
+      clearTimeout(fallbackTimeoutRef.current)
+      fallbackTimeoutRef.current = null
+    }
+    fn()
+  }, [])
+
+  const navigatePrimary = useCallback(() => {
     if (isAuthenticated && primaryStarship?.slug) {
       router.push(`/ship/${primaryStarship.slug}/conversations`)
       return
     }
     router.push('/login')
   }, [isAuthenticated, primaryStarship?.slug, router])
+
+  const handlePrimaryClick = useCallback(() => {
+    if (isPrimaryAnimating) return
+    track({ type: 'hero_cta_clicked' })
+
+    setIsPrimaryAnimating(true)
+    pendingPrimaryActionRef.current = () => {
+      navigatePrimary()
+      setIsPrimaryAnimating(false)
+    }
+
+    // Kick off the logo entry animation, then navigate once it completes.
+    setHeroLogoTrigger(v => v + 1)
+
+    // Fallback: if the animation completion callback doesn't fire (e.g. reduced motion),
+    // proceed after a short delay.
+    fallbackTimeoutRef.current = setTimeout(() => {
+      runPendingPrimaryAction()
+    }, 1100)
+  }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
     <section className="pt-44 md:pt-52 pb-20 px-4">
@@ -31,82 +74,68 @@ export default function Hero() {
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
             {(() => {
               const v = getHeadlineVariant()
-              if (v === 'B') return 'From prompt to working agent—without brittle glue'
-              if (v === 'C') return 'Design, run, and monitor AI automations'
+              if (v === 'B') return 'Hire your AI team, then brief them in plain language'
+              if (v === 'C') return 'A team of AI specialists that ships work with you'
               return (
                 <>
-                  Build automations at{' '}
-                  <span className="warp-word" data-text="warp">
-                    <span className="warp-letter">w</span>
-                    <span className="warp-letter">a</span>
-                    <span className="warp-letter">r</span>
-                    <span className="warp-letter">p</span>
+                  Your very own{' '}
+                  <span className="warp-word" data-text="ai">
+                    <span className="warp-letter">A</span>
+                    <span className="warp-letter">I</span>
                   </span>
-                  &nbsp;speed
+                  &nbsp;
+                  <span className="warp-word" data-text="team">
+                    <span className="warp-letter">t</span>
+                    <span className="warp-letter">e</span>
+                    <span className="warp-letter">a</span>
+                    <span className="warp-letter">m</span>
+                  </span>
                 </>
               )
             })()}
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-6 md:mb-10 leading-relaxed max-w-[60ch] mx-auto">Ship intelligent automations in minutes - safe, observable and fast.</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button size="lg" className="h-12 px-10 text-base leading-none overflow-hidden [&_svg]:!w-7 [&_svg]:!h-7" onClick={handlePrimaryClick}>
-              {isAuthenticated ? (
-                <span className="inline-flex w-7 h-7 items-center justify-center mr-2">
-                  <Icon name="rocket" size={28} />
-                </span>
-              ) : (
-                <span className="inline-flex w-7 h-7 items-center justify-center mr-2">
-                  <Icon name="rocket-launch" size={28} />
-                </span>
-              )}
-              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Launch your starship'}
-            </Button>
+          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed max-w-[60ch] mx-auto">Build, manage and deploy agents to handle the busy work.</p>
+          <div className="flex flex-col items-center gap-3 justify-center">
             <Button
               size="lg"
-              variant="outline"
-              className="h-12 px-10 text-base"
-              onClick={() => {
-                window.open('/docs', '_blank')
-              }}
+              className="h-14 sm:h-16 px-12 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden rounded-full [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              onClick={handlePrimaryClick}
+              disabled={isPrimaryAnimating}
+              aria-busy={isPrimaryAnimating}
             >
-              <Icon name="book" className="w-5 h-5 mr-2.5" />
-              View Docs
+              <span className="inline-flex w-10 h-10 items-center justify-center mr-1">
+                <StarshipsLogo
+                  width={40}
+                  height={40}
+                  className="text-primary-foreground"
+                  gradientId="hero-starships-logo-gradient"
+                  idleLoop={false}
+                  activeStroke="currentColor"
+                  triggerAnimation={heroLogoTrigger}
+                  onEntryAnimationComplete={runPendingPrimaryAction}
+                />
+              </span>
+              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get started for free'}
             </Button>
-          </div>
-          <div className="mt-3 text-sm text-muted-foreground">Get started for free • No credit card required • 200 credits on signup</div>
-          <div className="mt-3 mb-8 md:mb-12">
             <Button
               size="sm"
               variant="ghost"
-              className="text-sm h-9 px-4 hover:bg-primary/10 hover:text-primary transition-colors"
+              className="text-base text-muted-foreground transition-colors hover:text-foreground"
               onClick={() => {
-                track({ type: 'discord_hero_clicked' })
-                window.open('https://discord.gg/wzF7xfjrKv', '_blank')
+                router.push('/marketplace?from=public')
               }}
             >
-              <Icon name="discord" className="w-4 h-4 mr-2" />
-              Join our Discord community
+              <Icon name="store" className="w-6 h-6 mr-1" />
+              Explore agents in Marketplace
             </Button>
           </div>
         </div>
 
-        {/* Demo video replacing blueprint visualization */}
-        <div className="relative w-full overflow-visible pt-[56.25%]">
-          {/* Glow layer around the video frame */}
-          <div className="absolute inset-0 rounded-2xl video-glow pointer-events-none" aria-hidden />
-          {/* Blurry, almost transparent border */}
-          <div className="absolute inset-0 rounded-2xl video-blur-border pointer-events-none" aria-hidden />
-          <div className="absolute inset-0 rounded-2xl shadow-2xl overflow-hidden">
-            <div
-              className="h-full w-full rounded-lg bg-black/30 overflow-hidden"
-              style={{
-                background:
-                  'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.16) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.10) 0%, transparent 56%)',
-              }}
-            >
-              <video className="h-full w-full object-contain" src="/landing/demo.webm" autoPlay loop muted playsInline preload="none" />
-            </div>
-          </div>
+        {/* Conversation demo (uses the same message renderer as /ship/.../conversations) */}
+        <div className="w-full mt-6 sm:mt-8 md:mt-10 text-left">
+          <ErrorBoundary name="HeroConversationDemo">
+            <HeroConversationDemo />
+          </ErrorBoundary>
         </div>
       </div>
       <style jsx>{`

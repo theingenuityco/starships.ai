@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { motion } from 'motion/react'
 import Icon from '@/components/primitives/Icon'
 
@@ -8,6 +8,13 @@ export default function BackToTop() {
   const [isFlying, setIsFlying] = useState(false)
   const [rocketPosition, setRocketPosition] = useState({ x: 0, y: 0 })
   const buttonRef = useRef<HTMLButtonElement>(null)
+  const resetTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current)
+    }
+  }, [])
 
   const scrollToTop = () => {
     // Get button position for rocket start point
@@ -29,7 +36,8 @@ export default function BackToTop() {
     })
 
     // Reset flying state after animation completes
-    setTimeout(() => {
+    if (resetTimeoutRef.current) clearTimeout(resetTimeoutRef.current)
+    resetTimeoutRef.current = setTimeout(() => {
       setIsFlying(false)
     }, 1200)
   }

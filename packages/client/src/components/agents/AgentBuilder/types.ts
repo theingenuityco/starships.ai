@@ -28,6 +28,15 @@ export interface AgentBuilderViewProps {
   starshipId?: string
   initialSlug?: string
   errorMessage?: string
+  /**
+   * When true, renders the builder in read-only/inspection mode.
+   */
+  readOnly?: boolean
+  /**
+   * When true, renders the builder in an embedded mode suitable for the landing page:
+   * hides ship-page-specific chrome and keeps layout compact.
+   */
+  embedded?: boolean
 }
 
 export interface AgentBuilderViewRef {

@@ -60,10 +60,7 @@ export default function UseCases() {
 
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {starterTeam.map(agent => (
-                <div
-                  key={agent.name}
-                  className="w-full rounded-xl border border-white/12 bg-white/[0.05] px-4 py-4 shadow-[0_0_18px_rgba(168,85,247,0.10),0_0_34px_rgba(59,130,246,0.06)]"
-                >
+                <div key={agent.name} className="w-full rounded-xl border border-white/12 bg-white/[0.05] px-4 py-4 shadow-[0_0_18px_rgba(168,85,247,0.10),0_0_34px_rgba(59,130,246,0.06)]">
                   <div className="flex flex-col">
                     <div className="flex justify-center">
                       <Avatar className="h-16 w-16 sm:h-20 sm:w-20 rounded-full ring-2 ring-border/40 bg-black/30 overflow-hidden">

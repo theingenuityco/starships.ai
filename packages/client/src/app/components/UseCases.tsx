@@ -15,12 +15,14 @@ export default function UseCases() {
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Build your custom agent</h3>
-              <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Gaia helps you define what it owns, how it communicates, and what “done” means.
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
+                Gaia helps you define an agent’s responsibilities, inputs/outputs, and success criteria.
               </p>
             </div>
 
-            <BuildCustomAgentDemo />
+            <div className="py-8 sm:py-10">
+              <BuildCustomAgentDemo />
+            </div>
           </div>
         </div>
 
@@ -29,12 +31,12 @@ export default function UseCases() {
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Upgrade your agents by adding tools</h3>
-              <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Daedalus turns steps into workflows your agents can run.
-              </p>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Daedalus turns steps into workflows your agents can run.</p>
             </div>
 
-            <ToolsBlueprintDemo />
+            <div className="py-8 sm:py-10">
+              <ToolsBlueprintDemo />
+            </div>
           </div>
         </div>
 
@@ -43,12 +45,12 @@ export default function UseCases() {
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Delegate like never before</h3>
-              <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Aria spins up specialist chats and brings back the result.
-              </p>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Aria spins up specialist chats and brings back the result.</p>
             </div>
             <div className="w-full">
-              <DelegationDemo />
+              <div className="py-8 sm:py-10">
+                <DelegationDemo />
+              </div>
             </div>
           </div>
         </div>
@@ -58,12 +60,14 @@ export default function UseCases() {
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Schedule repetitive tasks</h3>
-              <p className="mt-3 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
                 Turn one-off work into a repeatable routine. Run on a schedule, get a draft, and approve before anything goes out.
               </p>
             </div>
 
-            <ScheduleRepetitiveTasksDemo />
+            <div className="py-8 sm:py-10">
+              <ScheduleRepetitiveTasksDemo />
+            </div>
           </div>
         </div>
       </div>

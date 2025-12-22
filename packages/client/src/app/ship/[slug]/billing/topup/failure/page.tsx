@@ -9,11 +9,9 @@ interface PageProps {
 }
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { slug } = await params
-
   return {
-    title: `Top-up Failed | ${slug} | Starships AI`,
-    description: `Your latest wallet top-up for starship ${slug} did not complete. Review details and next steps.`,
+    title: 'Top-up Failed | Starships.ai',
+    description: 'Your latest wallet top-up did not complete. Review details and next steps.',
   }
 }
 

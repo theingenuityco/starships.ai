@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 
 import { cn } from '@/lib/utils'
 import { useAuth } from '@/hooks/useAuth'
+import { useRouter } from 'next/navigation'
 
 interface LogoutButtonProps {
   variant?: 'default' | 'secondary' | 'outline' | 'ghost'
@@ -20,11 +21,12 @@ interface LogoutButtonProps {
  */
 export function LogoutButton({ variant = 'ghost', size = 'default', className, children }: LogoutButtonProps) {
   const { logout } = useAuth()
+  const router = useRouter()
 
   const handleLogout = async () => {
     await logout()
     // Optionally redirect to home page
-    window.location.href = '/'
+    router.replace('/')
   }
 
   return (

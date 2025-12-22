@@ -214,4 +214,31 @@ export class MessageRepository extends BaseRepository {
       'Message'
     );
   }
+
+  /**
+   * Find the latest tool message for a conversation by toolCallId.
+   * Used to update placeholder tool results (e.g., approval-required → actual result).
+   */
+  async findLatestToolMessageByToolCallId(conversationId: string, toolCallId: string): Promise<MessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `
+          SELECT *
+          FROM messages
+          WHERE conversation_id = $1
+            AND role = 'tool'
+            AND tool_call_id = $2
+          ORDER BY created_at DESC
+          LIMIT 1
+          `,
+          [conversationId, toolCallId]
+        );
+        return row ? fromDatabase(MessageEntity, row) : null;
+      },
+      'findLatestToolMessageByToolCallId',
+      'Message'
+    );
+  }
 }

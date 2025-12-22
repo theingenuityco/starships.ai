@@ -27,6 +27,7 @@ export { LedgerEntryEntity } from './entities/LedgerEntryEntity';
 export { PromoRedemptionEntity } from './entities/PromoRedemptionEntity';
 export { WidgetEntity } from './entities/WidgetEntity';
 export { ScheduleEntity } from './entities/ScheduleEntity';
+export { ToolCallApprovalEntity } from './entities/ToolCallApprovalEntity';
 
 /* Repository exports */
 export { AgentRepository } from './repositories/AgentRepository';
@@ -54,6 +55,7 @@ export { LedgerRepository } from './repositories/LedgerRepository';
 export { PromoRedemptionRepository } from './repositories/PromoRedemptionRepository';
 export { WidgetRepository } from './repositories/WidgetRepository';
 export { ScheduleRepository } from './repositories/ScheduleRepository';
+export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

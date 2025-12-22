@@ -513,6 +513,45 @@ export class AgentService {
   }
 
   /**
+   * Get agent→tool permissions for all agents/tools on a starship.
+   * Returns only rows present in agent_tools.
+   */
+  async getStarshipAgentToolPermissions(starshipId: string, userId: string): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+    return await this.agentRepository.getStarshipAgentToolPermissions(starshipId);
+  }
+
+  /**
+   * Upsert tool permissions for a single agent by tool slug (derived starship + access).
+   */
+  async setAgentToolPermissionsDerived(
+    agentId: string,
+    userId: string,
+    permissions: Array<{ toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>
+  ): Promise<{ ok: true }> {
+    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+
+    for (const p of permissions) {
+      if (!p?.toolSlug) continue;
+      await this.agentRepository.setAgentToolPermissionBySlug({
+        agentId,
+        starshipId,
+        toolSlug: p.toolSlug,
+        permission: p.permission,
+      });
+    }
+
+    return { ok: true };
+  }
+
+  /**
    * Get tools assigned to an agent, deriving starship from agent and validating access
    */
   async getAgentToolsForAgent(agentId: string, userId: string): Promise<import('@starships/protocol').ToolModel[]> {

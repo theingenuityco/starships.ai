@@ -1,6 +1,8 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
+import AgentAvatar from '@/components/animated/AgentAvatar'
+import { Avatar } from '@/components/ui/avatar'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -45,9 +47,15 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
           {/* Template Info */}
           <div className="border rounded-lg p-4 space-y-3">
             <div className="flex items-start gap-3">
-              <div className="flex-shrink-0 p-2 rounded-lg bg-primary/20">
-                <div className="text-lg">{isAgent ? (template as AgentTemplateModel).icon || '🤖' : '🔧'}</div>
-              </div>
+              {isAgent ? (
+                <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shadow-sm">
+                  <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={40} rounded />
+                </Avatar>
+              ) : (
+                <div className="flex-shrink-0 p-2 rounded-lg bg-primary/20">
+                  <div className="text-lg">🔧</div>
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <h4 className="font-semibold text-sm">{template.name}</h4>
                 <Badge variant="outline" className="text-xs mt-1">

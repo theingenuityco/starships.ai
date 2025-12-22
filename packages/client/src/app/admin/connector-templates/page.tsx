@@ -7,8 +7,10 @@ import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
 import { useAdminConnectorTemplates, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function AdminConnectorTemplatesPage(): React.JSX.Element {
+  const router = useRouter()
   const { isAuthenticated, isInstanceAdmin } = useAuth()
   const { data: connectors = [], isLoading, isError, error } = useAdminConnectorTemplates(isAuthenticated && isInstanceAdmin)
   const updateMutation = useUpdateAdminConnectorTemplate()
@@ -108,7 +110,7 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                         <tr
                           key={c.id}
                           className="border-b last:border-0 transition-colors hover:bg-muted/30 cursor-pointer"
-                          onClick={() => (window.location.href = `/admin/connector-templates/${c.id}`)}
+                          onClick={() => router.push(`/admin/connector-templates/${c.id}`)}
                         >
                           <td className="px-4 py-3 text-sm font-mono">{c.provider}</td>
                           <td className="px-4 py-3 text-sm">{c.displayName}</td>

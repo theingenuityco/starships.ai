@@ -50,6 +50,66 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isMarketplace = pathname === '/marketplace'
   const isPublicSimplePage = pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password' || pathname === '/terms' || pathname === '/privacy'
 
+  useEffect(() => {
+    if (!pathname) return
+
+    const titleForPath = (path: string): string | null => {
+      // Public pages
+      if (path === '/') return 'Starships.ai | Hire your AI team, brief them in plain language'
+      if (path === '/marketplace') return 'Marketplace | Starships.ai'
+      if (path === '/login') return 'Login | Starships.ai'
+      if (path === '/forgot-password') return 'Forgot Password | Starships.ai'
+      if (path === '/reset-password') return 'Reset Password | Starships.ai'
+      if (path === '/terms') return 'Terms of Service | Starships.ai'
+      if (path === '/privacy') return 'Privacy Policy | Starships.ai'
+      if (path === '/profile') return 'Profile | Starships.ai'
+
+      // Admin
+      if (path === '/admin/connector-templates') return 'Admin: Connector Templates | Starships.ai'
+      if (path.startsWith('/admin/connector-templates/')) return 'Admin: Connector Template | Starships.ai'
+      if (path === '/admin/agents/pending') return 'Admin: Agent Approvals | Starships.ai'
+      if (path === '/admin/platform-secrets') return 'Admin: Platform Secrets | Starships.ai'
+
+      // Ship routes (do NOT use route params like slug/ids in title)
+      if (path.startsWith('/ship/')) {
+        const rest = path.slice('/ship/'.length)
+        const parts = rest.split('/').filter(Boolean)
+        const section = parts[1] // after slug
+
+        if (!section) return 'Starship | Starships.ai'
+        if (section === 'conversations') return parts.length >= 3 ? 'Conversation | Starships.ai' : 'Conversations | Starships.ai'
+        if (section === 'agents') return 'Agents | Starships.ai'
+        if (section === 'agent') return 'Agent | Starships.ai'
+        if (section === 'tools') return 'Tools | Starships.ai'
+        if (section === 'tool') return 'Tool | Starships.ai'
+        if (section === 'connectors') return 'Connectors | Starships.ai'
+        if (section === 'settings') {
+          const tab = parts[2]
+          if (!tab) return 'Settings | Starships.ai'
+          if (tab === 'profile') return 'Settings: Profile | Starships.ai'
+          if (tab === 'usage') return 'Settings: Analytics | Starships.ai'
+          if (tab === 'billing') return 'Settings: Billing | Starships.ai'
+          return 'Settings | Starships.ai'
+        }
+        if (section === 'management') return 'Management | Starships.ai'
+        if (section === 'schedules') return 'Schedules | Starships.ai'
+
+        if (section === 'billing') {
+          if (parts[2] === 'topup' && parts[3] === 'success') return 'Top-up Successful | Starships.ai'
+          if (parts[2] === 'topup' && parts[3] === 'failure') return 'Top-up Failed | Starships.ai'
+          return 'Billing | Starships.ai'
+        }
+
+        return 'Starship | Starships.ai'
+      }
+
+      return null
+    }
+
+    const nextTitle = titleForPath(pathname)
+    if (nextTitle && document.title !== nextTitle) document.title = nextTitle
+  }, [pathname])
+
   // Mobile detection
   const [isMobile, setIsMobile] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
@@ -136,9 +196,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
               )}
 
               {/* Mobile: overlay navigation */}
-              {isMobile && (
-                <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />
-              )}
+              {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
             </>
           )}
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { motion } from 'motion/react'
+import { useRef } from 'react'
 
 interface StarshipsLogoProps {
   width?: number
@@ -10,6 +11,10 @@ interface StarshipsLogoProps {
   animationDelay?: number
   repeatDelay?: number
   triggerAnimation?: number
+  // When active, should the stroke use the animated gradient, or stay as `currentColor`?
+  activeStroke?: 'gradient' | 'currentColor'
+  // Called once when the entry animation (path/line draw-in) completes for a given triggerAnimation value.
+  onEntryAnimationComplete?: () => void
   // When true (default), the logo has a gentle idle loop. When false, it stays static until triggered.
   idleLoop?: boolean
   // When true, run a single entry animation on mount (no loop)
@@ -24,11 +29,15 @@ export function StarshipsLogo({
   animationDelay = 1,
   repeatDelay = 8,
   triggerAnimation = 0,
+  activeStroke = 'gradient',
+  onEntryAnimationComplete,
   idleLoop = true,
   playOnMountOnce = false,
 }: StarshipsLogoProps) {
   const isActive = idleLoop || triggerAnimation > 0 || playOnMountOnce
+  const shouldUseGradient = isActive && activeStroke === 'gradient'
   const gradientRepeat = idleLoop ? Infinity : 0
+  const lastCompletedTriggerRef = useRef<number | null>(null)
   return (
     <motion.svg
       xmlns="http://www.w3.org/2000/svg"
@@ -36,14 +45,14 @@ export function StarshipsLogo({
       height={height}
       viewBox="0 0 24 24"
       fill="none"
-      stroke={isActive ? `url(#${gradientId})` : 'currentColor'}
+      stroke={shouldUseGradient ? `url(#${gradientId})` : 'currentColor'}
       strokeWidth="1"
       strokeLinecap="round"
       strokeLinejoin="round"
       className={className}
     >
-      <defs>
-        {isActive ? (
+      {shouldUseGradient ? (
+        <defs>
           <motion.linearGradient
             id={gradientId}
             x1="0%"
@@ -95,30 +104,8 @@ export function StarshipsLogo({
             <stop offset="88%" stopColor="hsl(var(--foreground) / 0.95)" />
             <stop offset="100%" stopColor="hsl(var(--foreground) / 0.9)" />
           </motion.linearGradient>
-        ) : (
-          <linearGradient id={gradientId} x1="0%" y1="75%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="hsl(var(--foreground) / 0.9)" />
-            <stop offset="12%" stopColor="hsl(var(--foreground) / 0.95)" />
-            <stop offset="15%" stopColor="hsl(var(--foreground))" />
-            <stop offset="18%" stopColor="hsl(var(--foreground) / 0.8)" />
-            <stop offset="20%" stopColor="hsl(var(--foreground) / 0.5)" />
-            <stop offset="22%" stopColor="hsl(var(--foreground) / 0.2)" />
-            <stop offset="25%" stopColor="hsl(var(--background) / 0.01)" />
-            <stop offset="30%" stopColor="hsl(var(--background) / 0.05)" />
-            <stop offset="35%" stopColor="hsl(var(--background) / 0.08)" />
-            <stop offset="50%" stopColor="hsl(var(--background) / 0.1)" />
-            <stop offset="65%" stopColor="hsl(var(--background) / 0.08)" />
-            <stop offset="70%" stopColor="hsl(var(--background) / 0.05)" />
-            <stop offset="75%" stopColor="hsl(var(--background) / 0.01)" />
-            <stop offset="78%" stopColor="hsl(var(--foreground) / 0.2)" />
-            <stop offset="80%" stopColor="hsl(var(--foreground) / 0.5)" />
-            <stop offset="82%" stopColor="hsl(var(--foreground) / 0.8)" />
-            <stop offset="85%" stopColor="hsl(var(--foreground))" />
-            <stop offset="88%" stopColor="hsl(var(--foreground) / 0.95)" />
-            <stop offset="100%" stopColor="hsl(var(--foreground) / 0.9)" />
-          </linearGradient>
-        )}
-      </defs>
+        </defs>
+      ) : null}
       <motion.path
         d="m11 16-3-3a22 22 0 0 1 2-3.95A12.88 12.88 0 0 1 21 3c0 2.72-.78 7.5-6 11a22.35 22.35 0 0 1-4 2z"
         key={`path1-${triggerAnimation}`}
@@ -183,6 +170,14 @@ export function StarshipsLogo({
         initial={isActive ? { pathLength: 0, opacity: 0 } : undefined}
         animate={isActive ? { pathLength: 1, opacity: 1 } : undefined}
         transition={isActive ? { duration: 0.2, delay: triggerAnimation > 0 ? 0.7 : animationDelay * 0.8 } : undefined}
+        onAnimationComplete={() => {
+          if (!onEntryAnimationComplete) return
+          if (idleLoop) return
+          if (triggerAnimation <= 0) return
+          if (lastCompletedTriggerRef.current === triggerAnimation) return
+          lastCompletedTriggerRef.current = triggerAnimation
+          onEntryAnimationComplete()
+        }}
       />
     </motion.svg>
   )

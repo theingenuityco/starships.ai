@@ -54,9 +54,14 @@ interface AgentDocumentEditorProps {
    * - No mutations or publish/update actions are triggered
    */
   readOnly?: boolean
+  /**
+   * When true, renders in a compact embedded mode (e.g., landing page demo).
+   * Hides ship-page-specific chrome like publish banners / sticky action bars.
+   */
+  embedded?: boolean
 }
 
-export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false }: AgentDocumentEditorProps) {
+export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false, embedded = false }: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
   const queryClient = useQueryClient()
   // Track whether the user explicitly changed the Reasoning dropdown.
@@ -67,8 +72,10 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     'rounded-lg border border-border/70 bg-background/80 px-2 transition-colors hover:bg-muted/30 hover:shadow-sm hover:border-border/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 focus-visible:border-ring'
 
   const availableModels = useMemo(() => {
-    return openRouterModels?.map(m => m.id) || []
-  }, [openRouterModels])
+    const fetched = openRouterModels?.map(m => m.id).filter(Boolean) || []
+    const current = typeof value?.model === 'string' && value.model.trim() ? [value.model.trim()] : []
+    return Array.from(new Set([...fetched, ...current]))
+  }, [openRouterModels, value?.model])
 
   const generatedSlug = useMemo(
     () =>
@@ -191,6 +198,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   // Show compact identity in the sticky banner only after the main page header scrolls out of view.
   useEffect(() => {
+    if (embedded) return
     if (typeof window === 'undefined' || typeof document === 'undefined') return
 
     const headerEl = document.getElementById('agent-page-header')
@@ -929,9 +937,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   }, [agentId, value, readOnly, isTemplateAgent, queryClient, fullAgent])
 
   return (
-    <div className="pt-4 pb-20">
+    <div className={embedded ? 'pt-2 pb-6' : 'pt-4 pb-20'}>
       {/* Template Agent Update Banner */}
-      {isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && !readOnly && (
+      {!embedded && isTemplateAgent && fullAgent?.updateInfo?.needsUpdate && !readOnly && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -1002,7 +1010,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       )}
 
       {/* Update Confirmation Dialog */}
-      <Dialog open={showUpdateDialog && !readOnly} onOpenChange={setShowUpdateDialog}>
+      <Dialog open={!embedded && showUpdateDialog && !readOnly} onOpenChange={setShowUpdateDialog}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Update Agent</DialogTitle>
@@ -1045,7 +1053,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       </Dialog>
 
       {/* Primary actions & publication status - compact banner (styled like navbar, sticky with offset) */}
-      <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
+      {!embedded ? (
+        <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
         {agentId && (
           <div className="flex items-center gap-4 text-sm">
             {/* Avatar + name/slug on the far left */}
@@ -1209,33 +1218,36 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             )}
           </div>
         )}
-      </div>
+        </div>
+      ) : null}
 
       {/* Publication Request Dialog */}
-      <AgentPublishModal
-        open={showPublishDialog}
-        readOnly={readOnly}
-        onOpenChange={setShowPublishDialog}
-        fullAgent={fullAgent}
-        value={value}
-        differsFromPublishedTemplate={differsFromPublishedTemplate}
-        publishedChangeDetails={publishedChangeDetails}
-        assignedToolsForOverrides={assignedToolsForOverrides}
-        versionBump={versionBump}
-        setVersionBump={setVersionBump}
-        changelog={changelog}
-        setChangelog={setChangelog}
-        toolOverrides={toolOverrides}
-        setToolOverrides={setToolOverrides}
-        publishSteps={publishSteps}
-        activePublishStep={activePublishStep}
-        setActivePublishStep={setActivePublishStep}
-        nextVersion={nextVersion}
-        isRequestingPublish={isRequestingPublish}
-        onSubmit={() => {
-          void handleRequestPublication()
-        }}
-      />
+      {!embedded ? (
+        <AgentPublishModal
+          open={showPublishDialog}
+          readOnly={readOnly}
+          onOpenChange={setShowPublishDialog}
+          fullAgent={fullAgent}
+          value={value}
+          differsFromPublishedTemplate={differsFromPublishedTemplate}
+          publishedChangeDetails={publishedChangeDetails}
+          assignedToolsForOverrides={assignedToolsForOverrides}
+          versionBump={versionBump}
+          setVersionBump={setVersionBump}
+          changelog={changelog}
+          setChangelog={setChangelog}
+          toolOverrides={toolOverrides}
+          setToolOverrides={setToolOverrides}
+          publishSteps={publishSteps}
+          activePublishStep={activePublishStep}
+          setActivePublishStep={setActivePublishStep}
+          nextVersion={nextVersion}
+          isRequestingPublish={isRequestingPublish}
+          onSubmit={() => {
+            void handleRequestPublication()
+          }}
+        />
+      ) : null}
 
       {/* Quick selectors + core fields */}
       <div className="space-y-2 mb-4">

@@ -183,7 +183,7 @@ export default function BuildCustomAgentDemo() {
         const userMsg: DemoMessage = {
           id: `demo-u-${now0}`,
           role: 'user',
-          content: 'Gaia — create an agent that summarizes customer emails and drafts friendly replies for my approval.',
+          content: 'Gaia, create an agent that summarizes customer emails and drafts friendly replies for my approval.',
           createdAt: new Date(now0).toISOString(),
           updatedAt: new Date(now0).toISOString(),
           messageType: 'user_input',
@@ -282,7 +282,7 @@ export default function BuildCustomAgentDemo() {
         await streamAssistant(
           a3Id,
           [
-            '✅ Done — I created **Customer Inbox Assistant**.',
+            '✅ Done. I created **Customer Inbox Assistant**.',
             '',
             '- It summarizes each email (3 bullets max)',
             '- Drafts a warm reply for your approval',

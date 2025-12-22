@@ -18,7 +18,7 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   metadataBase: new URL('https://starships.ai'),
   title: 'Starships.ai - Ship production AI agents fast',
-  description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
+  description: 'Design agent behavior, connect tools safely, and run with observability and guardrails on a production-ready runtime.',
   applicationName: 'Starships.ai',
   authors: [{ name: 'Starships.ai' }],
   creator: 'Starships.ai',
@@ -52,7 +52,7 @@ export const metadata: Metadata = {
     type: 'website',
     siteName: 'Starships.ai',
     title: 'Starships.ai - Ship production AI agents fast',
-    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
+    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails on a production-ready runtime.',
     url: 'https://starships.ai',
     locale: 'en_US',
     images: [
@@ -67,7 +67,7 @@ export const metadata: Metadata = {
   twitter: {
     card: 'summary_large_image',
     title: 'Starships.ai - Ship production AI agents fast',
-    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails—on a production-ready runtime.',
+    description: 'Design agent behavior, connect tools safely, and run with observability and guardrails on a production-ready runtime.',
     images: ['/static-assets/og.png'],
   },
   icons: {

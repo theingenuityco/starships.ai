@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card'
 const QA = [
   {
     q: 'What is Starships.ai?',
-    a: 'Starships is a workspace where you assemble an AI team—specialists you can brief, equip with tools, and collaborate with to get real work done.',
+    a: 'Starships is a workspace where you assemble an AI team: specialists you can brief, equip with tools, and collaborate with to get real work done.',
   },
   {
     q: 'How do I get started?',
@@ -19,7 +19,7 @@ const QA = [
   },
   {
     q: 'Do I need to bring my own model keys?',
-    a: 'No. Starships is a managed service—you don’t bring your own model keys.',
+    a: 'No. Starships is a managed service; you don’t bring your own model keys.',
   },
   {
     q: 'Can my AI teammates use my tools and data?',

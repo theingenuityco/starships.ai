@@ -24,7 +24,7 @@ export default function Security() {
       <div className="max-w-6xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">Security & trust</h2>
         <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-16">
-          Built so you can safely give AI real work—without losing control of your data or process.
+          Built so you can safely give AI real work, without losing control of your data or process.
         </p>
         <div>
           <ul className="grid gap-4 sm:gap-6 md:gap-8 md:grid-cols-3">

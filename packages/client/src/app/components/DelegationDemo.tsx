@@ -82,7 +82,7 @@ const DEMO_TIMELINE: DemoStep[] = [
   {
     convoId: 'main',
     role: 'user',
-    content: 'Aria — can you set up a Weekly Ship Update that posts our GitHub changelog to Discord every Friday?',
+    content: 'Aria, can you set up a Weekly Ship Update that posts our GitHub changelog to Discord every Friday?',
   },
   {
     convoId: 'main',
@@ -95,7 +95,7 @@ const DEMO_TIMELINE: DemoStep[] = [
         type: 'function',
         function: {
           name: 'call-agent',
-          arguments: '{ "agent": "Gaia", "task": "Create the Weekly Ship Update agent (voice + rules)", "conversationTitle": "Weekly Ship Update — Agent" }',
+          arguments: '{ "agent": "Gaia", "task": "Create the Weekly Ship Update agent (voice + rules)", "conversationTitle": "Weekly Ship Update - Agent" }',
         },
       },
     ],
@@ -178,12 +178,12 @@ const DEMO_TIMELINE: DemoStep[] = [
         type: 'function',
         function: {
           name: 'call-agent',
-          arguments: '{ "agent": "Daedalus", "task": "Create the Weekly Ship Update tool (GitHub → summarize → Discord + schedule)", "conversationTitle": "Weekly Ship Update — Tool" }',
+          arguments: '{ "agent": "Daedalus", "task": "Create the Weekly Ship Update tool (GitHub → summarize → Discord + schedule)", "conversationTitle": "Weekly Ship Update - Tool" }',
         },
       },
     ],
     noStream: false,
-    content: "Great — the agent is ready. Now I’m calling **Daedalus** to build the tool and wiring.",
+    content: "Great, the agent is ready. Now I’m calling **Daedalus** to build the tool and wiring.",
   },
   {
     convoId: 'main',
@@ -259,7 +259,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     toolCallId: 'tc_demo_summarize_changelog',
     noStream: true,
     content: JSON.stringify(
-      { bullets: ['Faster streaming + cleaner response states', 'Improved connector runtime + auth handling', 'Landing refresh + updated demo experience', 'Stability fixes and performance improvements', 'More shipping next week — stay tuned'] },
+      { bullets: ['Faster streaming + cleaner response states', 'Improved connector runtime + auth handling', 'Landing refresh + updated demo experience', 'Stability fixes and performance improvements', 'More shipping next week - stay tuned'] },
       null,
       2
     ),
@@ -279,7 +279,7 @@ const DEMO_TIMELINE: DemoStep[] = [
           'Improved connector runtime + auth handling',
           'Landing refresh + updated demo',
           'Bug fixes and stability improvements',
-          'More coming next week — stay tuned',
+          'More coming next week - stay tuned',
         ],
       },
       null,
@@ -300,7 +300,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     content:
       "Completed.\n\n- **Agent**: Weekly Ship Update (Gaia)\n- **Tool**: GitHub → summarize → Discord (Daedalus)\n- **Connectors**: GitHub + Discord\n\nTwo quick choices before I deploy:\n1) Highlight **features**, **fixes**, or **both**?\n2) Keep **approve-before-posting** on?",
   },
-  { convoId: 'main', role: 'user', content: 'Both. And yes—keep approval on.' },
+  { convoId: 'main', role: 'user', content: 'Both. And yes, keep approval on.' },
   {
     convoId: 'main',
     role: 'assistant',
@@ -317,7 +317,7 @@ const DEMO_TIMELINE: DemoStep[] = [
       },
     ],
     noStream: false,
-    content: 'Perfect — scheduling it now…',
+    content: 'Perfect, scheduling it now…',
   },
   {
     convoId: 'main',

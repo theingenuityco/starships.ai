@@ -37,6 +37,11 @@ interface BlueprintVisualizationProps {
   nodesDraggable?: boolean
   borderless?: boolean
   /**
+   * Controls how large the rendered node cards appear (padding, min width, icon + font sizes).
+   * Defaults to 'md' to preserve existing behavior in editors/details.
+   */
+  nodeSize?: 'sm' | 'md'
+  /**
    * Max zoom used when auto-fitting the view (prevents tiny graphs from zooming in too much).
    * Defaults to 1.2 (existing behavior).
    */
@@ -60,6 +65,7 @@ interface ReactFlowNode extends Node {
     outgoingEdges?: BlueprintEdge[]
     incomingEdges?: BlueprintEdge[]
     nodeId: string
+    nodeSize?: 'sm' | 'md'
   }
 }
 
@@ -68,37 +74,38 @@ type FlowNodeData = ReactFlowNode['data'] & { isSelected?: boolean }
 type FlowNode = Node<FlowNodeData>
 
 // Get icon component for node type
-const NodeIcon: React.FC<{ nodeType: string }> = React.memo(({ nodeType }) => {
-  const className = 'w-6 h-6'
+const NodeIcon: React.FC<{ nodeType: string; className?: string }> = React.memo(({ nodeType, className }) => {
+  const iconClassName = className ?? 'w-6 h-6'
   switch (nodeType) {
     case 'start':
-      return <Icon name="play" className={className} />
+      return <Icon name="play" className={iconClassName} />
     case 'end':
-      return <Icon name="check-circle" className={className} />
+      return <Icon name="check-circle" className={iconClassName} />
     case 'agent':
-      return <Icon name="zap" className={className} />
+      return <Icon name="zap" className={iconClassName} />
     case 'user_prompt':
-      return <Icon name="user" className={className} />
+      return <Icon name="user" className={iconClassName} />
     case 'conditional':
-      return <Icon name="split" className={className} />
+      // 'split' can resolve to a Phosphor icon that isn't present in some builds; use a known-good icon.
+      return <Icon name="git-branch" className={iconClassName} />
     case 'output':
-      return <Icon name="eye" className={className} />
+      return <Icon name="eye" className={iconClassName} />
     case 'llm':
-      return <Icon name="zap" className={className} />
+      return <Icon name="zap" className={iconClassName} />
     case 'http_request':
-      return <Icon name="globe" className={className} />
+      return <Icon name="globe" className={iconClassName} />
     case 'code':
-      return <Icon name="code" className={className} />
+      return <Icon name="code" className={iconClassName} />
     case 'tool':
-      return <Icon name="settings" className={className} />
+      return <Icon name="settings" className={iconClassName} />
     case 'workflow':
-      return <Icon name="git-branch" className={className} />
+      return <Icon name="git-branch" className={iconClassName} />
     case 'transform':
-      return <Icon name="cog" className={className} />
+      return <Icon name="cog" className={iconClassName} />
     case 'mutate':
-      return <Icon name="edit-3" className={className} />
+      return <Icon name="edit-3" className={iconClassName} />
     default:
-      return <Icon name="clock" className={className} />
+      return <Icon name="clock" className={iconClassName} />
   }
 })
 NodeIcon.displayName = 'NodeIcon'
@@ -201,6 +208,18 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
   const incoming = data.incomingEdges || []
   const edges = data.outgoingEdges || []
   const isSelected = data.isSelected
+  const nodeSize = data.nodeSize ?? 'md'
+  const isCompact = nodeSize === 'sm'
+  const handleSizeClass = isCompact ? '!w-2.5 !h-2.5' : '!w-3 !h-3'
+  const handleOffset = isCompact ? 5 : 6
+  const incomingSpacing = isCompact ? 12 : 16
+  // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
+  const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[320px]' : 'gap-4 px-5 py-4 w-[420px]'
+  const iconClass = isCompact ? 'w-10 h-10' : 'w-12 h-12'
+  const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'
+  const titleClass = isCompact ? 'text-2xl' : 'text-base'
+  const subtitleClass = isCompact ? 'text-lg' : 'text-sm'
+  const branchClass = isCompact ? 'px-3 py-2 text-xl leading-tight' : 'px-4 py-3 text-lg leading-tight'
 
   // Adjust opacity based on theme - darker in light mode for better visibility
   const primaryOpacity = theme === 'light' ? '15' : '15'
@@ -214,7 +233,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
         {/* Main node body */}
         <div
           className={`
-            relative flex items-center gap-4 px-5 py-4 min-w-[220px] max-w-[280px]
+            relative flex flex-col items-start ${containerClass}
             backdrop-blur-[20px] backdrop-saturate-[180%] border-2
             ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-border/40'}
             rounded-xl shadow-frosted-lg transition-all duration-300
@@ -230,41 +249,42 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               id={`${data.nodeId}-in-0`}
               type="target"
               position={Position.Left}
-              className="!w-3 !h-3 !rounded-full"
-              style={{ left: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+              className={`${handleSizeClass} !rounded-full`}
+              style={{ left: -handleOffset, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
             />
           )}
           {incoming.length > 1 &&
             incoming.map((edge, i) => {
-              const spacing = 16
-              const offset = (i - (incoming.length - 1) / 2) * spacing
+              const offset = (i - (incoming.length - 1) / 2) * incomingSpacing
               return (
                 <Handle
                   key={`in-${i}`}
                   id={`${data.nodeId}-in-${i}`}
                   type="target"
                   position={Position.Left}
-                  className="!w-3 !h-3 !rounded-full"
-                  style={{ left: -6, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+                  className={`${handleSizeClass} !rounded-full`}
+                  style={{ left: -handleOffset, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
                 />
               )
             })}
-          {/* Circular icon container */}
-          <div
-            className="flex items-center justify-center w-12 h-12 rounded-full flex-shrink-0 shadow-sm"
-            style={{
-              backgroundColor: colors.handle + '15',
-              color: colors.handle,
-              border: `2px solid ${colors.handle}30`,
-            }}
-          >
-            <NodeIcon nodeType={data.nodeType} />
+          {/* Icon row (separate from title) */}
+          <div className="flex w-full items-start">
+            <div
+              className={`flex items-center justify-center ${iconClass} rounded-full flex-shrink-0 shadow-sm`}
+              style={{
+                backgroundColor: colors.handle + '15',
+                color: colors.handle,
+                border: `2px solid ${colors.handle}30`,
+              }}
+            >
+              <NodeIcon nodeType={data.nodeType} className={iconInnerClass} />
+            </div>
           </div>
 
-          {/* Node content */}
-          <div className="flex-1 min-w-0">
-            <div className="font-semibold text-base text-foreground truncate leading-tight">{data.label}</div>
-            {data.type && <div className="text-sm text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
+          {/* Title row */}
+          <div className="w-full min-w-0">
+            <div className={`font-semibold ${titleClass} text-foreground truncate leading-tight`}>{data.label}</div>
+            {data.type && <div className={`${subtitleClass} text-muted-foreground capitalize font-medium mt-0.5`}>{data.type.replace('_', ' ')}</div>}
           </div>
         </div>
 
@@ -301,7 +321,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
               return (
                 <div
                   key={uniqueKey}
-                  className="relative backdrop-blur-[20px] backdrop-saturate-[180%] border-2 border-border/40 rounded-xl px-3.5 py-2.5 text-sm font-medium text-foreground shadow-frosted-lg hover:border-border/60 transition-all duration-300"
+                  className={`relative backdrop-blur-[20px] backdrop-saturate-[180%] border-2 border-border/40 rounded-xl ${branchClass} font-semibold text-foreground shadow-frosted-lg hover:border-border/60 transition-all duration-300`}
                   style={{
                     background: `linear-gradient(135deg, ${colors.handle}${branchPrimaryOpacity} 0%, ${colors.handle}${branchSecondaryOpacity} 100%)`,
                   }}
@@ -312,9 +332,9 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
                     type="source"
                     position={Position.Right}
                     id={edge?.ref}
-                    className="!w-3 !h-3 !rounded-full"
+                    className={`${handleSizeClass} !rounded-full`}
                     style={{
-                      right: -6,
+                      right: -handleOffset,
                       top: '50%',
                       transform: 'translateY(-50%)',
                       backgroundColor: colors.handle,
@@ -333,8 +353,8 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
           <Handle
             type="source"
             position={Position.Right}
-            className="!w-3 !h-3 !rounded-full"
-            style={{ right: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+            className={`${handleSizeClass} !rounded-full`}
+            style={{ right: -handleOffset, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
           />
         )}
       </div>
@@ -348,6 +368,17 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
   const colors = getNodeColors(data.type)
   const incoming = data.incomingEdges || []
   const isSelected = data.isSelected
+  const nodeSize = data.nodeSize ?? 'md'
+  const isCompact = nodeSize === 'sm'
+  const handleSizeClass = isCompact ? '!w-2.5 !h-2.5' : '!w-3 !h-3'
+  const handleOffset = isCompact ? 5 : 6
+  const incomingSpacing = isCompact ? 12 : 16
+  // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
+  const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[320px]' : 'gap-4 px-5 py-4 w-[420px]'
+  const iconClass = isCompact ? 'w-10 h-10' : 'w-12 h-12'
+  const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'
+  const titleClass = isCompact ? 'text-2xl' : 'text-base'
+  const subtitleClass = isCompact ? 'text-lg' : 'text-sm'
 
   // Adjust opacity based on theme - darker in light mode for better visibility
   const primaryOpacity = theme === 'light' ? '15' : '15'
@@ -366,30 +397,29 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
           id={`${data.nodeId}-in-0`}
           type="target"
           position={Position.Left}
-          className="!w-3 !h-3 !rounded-full"
-          style={{ left: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+          className={`${handleSizeClass} !rounded-full`}
+          style={{ left: -handleOffset, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
         />
       )}
       {data.type !== 'start' &&
         incoming.length > 1 &&
         incoming.map((edge, i) => {
-          const spacing = 16
-          const offset = (i - (incoming.length - 1) / 2) * spacing
+          const offset = (i - (incoming.length - 1) / 2) * incomingSpacing
           return (
             <Handle
               key={`in-${i}`}
               id={`${data.nodeId}-in-${i}`}
               type="target"
               position={Position.Left}
-              className="!w-3 !h-3 !rounded-full"
-              style={{ left: -6, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+              className={`${handleSizeClass} !rounded-full`}
+              style={{ left: -handleOffset, top: `calc(50% + ${offset}px)`, transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
             />
           )
         })}
 
       <div
         className={`
-          relative flex items-center gap-4 px-5 py-4 min-w-[220px] max-w-[280px]
+          relative flex flex-col items-start ${containerClass}
           backdrop-blur-[20px] backdrop-saturate-[180%] border-2
           ${isSelected ? 'border-primary dark:border-primary ring-2 ring-primary/30' : 'border-border/40'}
           rounded-xl shadow-frosted-lg transition-all duration-300
@@ -399,22 +429,24 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
           background: `linear-gradient(135deg, ${colors.handle}${primaryOpacity} 0%, ${colors.handle}${secondaryOpacity} 100%)`,
         }}
       >
-        {/* Circular icon container with better styling */}
-        <div
-          className="flex items-center justify-center w-12 h-12 rounded-full flex-shrink-0 shadow-sm"
-          style={{
-            backgroundColor: colors.handle + '15',
-            color: colors.handle,
-            border: `2px solid ${colors.handle}30`,
-          }}
-        >
-          <NodeIcon nodeType={data.nodeType} />
+        {/* Icon row (separate from title) */}
+        <div className="flex w-full items-start">
+          <div
+            className={`flex items-center justify-center ${iconClass} rounded-full flex-shrink-0 shadow-sm`}
+            style={{
+              backgroundColor: colors.handle + '15',
+              color: colors.handle,
+              border: `2px solid ${colors.handle}30`,
+            }}
+          >
+            <NodeIcon nodeType={data.nodeType} className={iconInnerClass} />
+          </div>
         </div>
 
-        {/* Node content with better typography */}
-        <div className="flex-1 min-w-0">
-          <div className="font-semibold text-base text-foreground truncate leading-tight">{data.label}</div>
-          {data.type && <div className="text-sm text-muted-foreground capitalize font-medium mt-0.5">{data.type.replace('_', ' ')}</div>}
+        {/* Title row */}
+        <div className="w-full min-w-0">
+          <div className={`font-semibold ${titleClass} text-foreground truncate leading-tight`}>{data.label}</div>
+          {data.type && <div className={`${subtitleClass} text-muted-foreground capitalize font-medium mt-0.5`}>{data.type.replace('_', ' ')}</div>}
         </div>
       </div>
 
@@ -423,8 +455,8 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
         <Handle
           type="source"
           position={Position.Right}
-          className="!w-3 !h-3 !rounded-full"
-          style={{ right: -6, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
+          className={`${handleSizeClass} !rounded-full`}
+          style={{ right: -handleOffset, top: '50%', transform: 'translateY(-50%)', backgroundColor: colors.handle, border: `2px solid ${colors.handle}`, zIndex: 10 }}
         />
       )}
     </>
@@ -526,10 +558,13 @@ const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
         })
       }
 
+      const nodeSize: 'sm' | 'md' = data?.nodeSize === 'sm' ? 'sm' : 'md'
       return {
         id: node.id,
-        width: 280,
-        height: 96,
+        // Keep ELK layout dimensions in sync with the rendered node card widths
+        width: nodeSize === 'sm' ? 320 : 420,
+        // Slightly taller to reflect the icon-row + title-row layout
+        height: nodeSize === 'sm' ? 110 : 120,
         ports: [...targetPorts, ...sourcePorts],
       }
     }),
@@ -561,7 +596,7 @@ const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
 }
 
 // Convert blueprint to React Flow format with ELK layout
-const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: boolean = false) => {
+const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: boolean = false, nodeSize: 'sm' | 'md' = 'md') => {
   if (!blueprint.nodes || blueprint.nodes.length === 0) {
     return { nodes: [], edges: [] }
   }
@@ -616,12 +651,15 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
       nodeType: node.type, // Store node type instead of icon element
       outgoingEdges: outgoingEdgesMap.get(node.ref) || [],
       incomingEdges: incomingEdgesMap.get(node.ref) || [],
+      nodeSize,
     },
     style: {
       background: 'transparent',
       border: 'none',
     },
   }))
+
+  const edgeLabelFontSize = nodeSize === 'sm' ? 18 : 16
 
   // Create edges using built-in bezier; loop-backs updated later
   const flowEdges: Edge[] = validEdges.map((edge: BlueprintEdge) => {
@@ -642,7 +680,7 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
       target: edge.to,
       sourceHandle: isConditionalEdge ? edge.ref : undefined,
       targetHandle,
-      type: 'bezier',
+      // Leave undefined to use ReactFlow's built-in default edge type
       animated: false,
       style: {
         stroke: '#94a3b8',
@@ -654,7 +692,21 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
         width: 10,
         height: 10,
       },
-      label: edge.label,
+      label: edge.label || undefined,
+      labelStyle: {
+        fontSize: edgeLabelFontSize,
+        fontWeight: 600,
+        fill: 'hsl(var(--foreground))',
+      },
+      labelBgPadding: [12, 8],
+      labelBgBorderRadius: 12,
+      labelBgStyle: {
+        fill: 'hsl(var(--background))',
+        fillOpacity: 0.85,
+        stroke: 'hsl(var(--border))',
+        strokeOpacity: 0.65,
+        strokeWidth: 0.75,
+      },
       // Higher z-index for back edges will be set after layout
       data: {},
     }
@@ -744,8 +796,8 @@ const convertBlueprintToFlow = async (blueprint: Blueprint, nodesDraggable: bool
 
     return {
       ...edge,
-      // Use built-in smoothstep for back edges; others as bezier
-      type: isBackEdge ? 'smoothstep' : 'bezier',
+      // Use built-in smoothstep for back edges; others use default
+      type: isBackEdge ? 'smoothstep' : undefined,
       zIndex: -1, // All edges render behind nodes
       style: {
         ...edge.style,
@@ -1021,6 +1073,7 @@ function BlueprintFlow({
   transparent,
   nodesDraggable = false,
   borderless = false,
+  nodeSize = 'md',
   fitViewMaxZoom = 1.2,
   fitViewMinZoom = 0.35,
   containerClassName = '',
@@ -1030,6 +1083,7 @@ function BlueprintFlow({
   transparent?: boolean
   nodesDraggable?: boolean
   borderless?: boolean
+  nodeSize?: 'sm' | 'md'
   fitViewMaxZoom?: number
   fitViewMinZoom?: number
   containerClassName?: string
@@ -1048,14 +1102,14 @@ function BlueprintFlow({
     // Increment version to track this layout request
     const currentVersion = ++layoutVersion.current
 
-    convertBlueprintToFlow(blueprint, nodesDraggable).then(flowData => {
+    convertBlueprintToFlow(blueprint, nodesDraggable, nodeSize).then(flowData => {
       // Only apply if this is still the latest layout request
       if (currentVersion === layoutVersion.current) {
         setNodes(flowData.nodes)
         setEdges(flowData.edges)
       }
     })
-  }, [JSON.stringify(blueprint.nodes), JSON.stringify(blueprint.edges), nodesDraggable])
+  }, [JSON.stringify(blueprint.nodes), JSON.stringify(blueprint.edges), nodesDraggable, nodeSize])
 
   // Add selection state to node data
   const nodesWithSelection: FlowNode[] = useMemo(() => {
@@ -1169,6 +1223,7 @@ export function BlueprintVisualization({
   transparent = false,
   nodesDraggable = false,
   borderless = false,
+  nodeSize = 'md',
   fitViewMaxZoom = 1.2,
   fitViewMinZoom = 0.35,
   containerClassName = '',
@@ -1190,6 +1245,7 @@ export function BlueprintVisualization({
           transparent={transparent}
           nodesDraggable={nodesDraggable}
           borderless={borderless}
+          nodeSize={nodeSize}
           fitViewMaxZoom={fitViewMaxZoom}
           fitViewMinZoom={fitViewMinZoom}
           containerClassName={containerClassName}

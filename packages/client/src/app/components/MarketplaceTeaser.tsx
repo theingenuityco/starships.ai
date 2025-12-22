@@ -53,7 +53,7 @@ export default function MarketplaceTeaser() {
                   ))
                 : featuredAgents.map(template => (
                     <CarouselItem key={template.id} className="basis-full sm:basis-1/2 lg:basis-1/3">
-                      <AgentTemplateCard template={template} onClick={goToMarketplace} />
+                      <AgentTemplateCard template={template} onClick={goToMarketplace} showDeployCta={false} />
                     </CarouselItem>
                   ))}
             </CarouselContent>

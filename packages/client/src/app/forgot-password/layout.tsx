@@ -1,7 +1,7 @@
 import type { Metadata } from 'next'
 
 export const metadata: Metadata = {
-  title: 'Starships.ai - Forgot Password',
+  title: 'Forgot Password | Starships.ai',
   description: 'Reset your Starships.ai password. Enter your email to receive a password reset link.',
   alternates: {
     canonical: 'https://starships.ai/forgot-password',
@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     siteName: 'Starships.ai',
-    title: 'Starships.ai - Forgot Password',
+    title: 'Forgot Password | Starships.ai',
     description: 'Reset your Starships.ai password. Enter your email to receive a password reset link.',
     url: 'https://starships.ai/forgot-password',
     locale: 'en_US',
@@ -24,7 +24,7 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Starships.ai - Forgot Password',
+    title: 'Forgot Password | Starships.ai',
     description: 'Reset your Starships.ai password. Enter your email to receive a password reset link.',
     images: ['/static-assets/og.png'],
   },

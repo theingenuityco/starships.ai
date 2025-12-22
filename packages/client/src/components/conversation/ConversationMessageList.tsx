@@ -9,35 +9,94 @@ import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
-import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
+import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { cn } from '@/lib/utils'
 
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
   bottomPaddingPx?: number
+  className?: string
+  scrollClassName?: string
+  /**
+   * Optional override for the "user" identity (useful for demo / internal chats on landing).
+   * If omitted, the component uses the signed-in user's info via `useAuth()`.
+   */
+  userNameOverride?: string
+  userEmailOverride?: string
+  userAvatarUrlOverride?: string
+  /**
+   * If set, render the user's avatar using the AgentAvatar component (seeded).
+   * Useful to represent "Aria" when she's the delegator on the right side.
+   */
+  userAvatarSeedOverride?: string
+  /**
+   * Controls what the user avatar falls back to when no image/seed is provided.
+   * - 'initials' (default): renders initials (e.g. "You" -> "Y")
+   * - 'user-icon': renders a generic user icon (recommended for landing page mock conversations)
+   */
+  userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
+  /**
+   * Optional override for static/demo rendering (e.g. landing page).
+   * When provided, the list will render these messages even if `conversationId` is null.
+   */
+  messagesOverride?: MessageModel[]
+  /**
+   * Optional overrides for demo/static rendering when no stream context exists.
+   */
+  agentNameOverride?: string
+  agentAvatarUrlOverride?: string
+  isRespondingOverride?: boolean
+  isAssistantStreamingOverride?: boolean
+  isAwaitingToolResultsOverride?: boolean
 }
 
-export function ConversationMessageList({ conversationId, starshipId, bottomPaddingPx }: ConversationMessageListProps) {
-  // Render directly from the stream context (TanStack streamedQuery).
-  const { messages, isResponding, isAssistantStreaming, isAwaitingToolResults } = useConversationStreamContext()
+export function ConversationMessageList({
+  conversationId,
+  starshipId,
+  bottomPaddingPx,
+  className,
+  scrollClassName,
+  userNameOverride,
+  userEmailOverride,
+  userAvatarUrlOverride,
+  userAvatarSeedOverride,
+  userAvatarFallbackVariantOverride,
+  messagesOverride,
+  agentNameOverride,
+  agentAvatarUrlOverride,
+  isRespondingOverride,
+  isAssistantStreamingOverride,
+  isAwaitingToolResultsOverride,
+}: ConversationMessageListProps) {
+  // Render from stream context when available, otherwise allow static/demo rendering via overrides.
+  const stream = useConversationStreamContextOptional()
+  const messages = messagesOverride ?? stream?.messages ?? []
+  const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
+  const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
+  const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
-  const agentName = agentObj?.name
+  const agentName = agentNameOverride ?? agentObj?.name
   const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
-  const agentAvatarUrl = agentAvatarAttachments?.[0]?.previewUrl
+  const agentAvatarUrl = agentAvatarUrlOverride ?? agentAvatarAttachments?.[0]?.previewUrl
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
+  // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
+  // issue during streaming where message length stays constant but chunks keep appending.
+  const isNearBottomRef = useRef(true)
+  const SCROLL_THRESHOLD_PX = 120
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
@@ -295,7 +354,8 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     // - Do NOT show while awaiting tool results (tool UI shows its own spinner)
     const betweenMessages = isResponding && !isAssistantStreaming && !awaitingResumeAfterTools
     const responding = !isAwaitingToolResults && isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools || betweenMessages)
-    const toolGapFetching = awaitingResumeAfterTools && isResponding
+    // IMPORTANT: never show the gap loader while tools are still pending; the tools UI has its own spinner.
+    const toolGapFetching = !isAwaitingToolResults && awaitingResumeAfterTools && isResponding
     return responding || toolGapFetching
   }, [isAwaitingToolResults, isResponding, isAssistantStreaming, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
 
@@ -327,30 +387,60 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     return lastId
   }, [renderMessages])
 
-  // Optimized auto-scroll with debouncing
+  // "Progress key" for streaming: changes when chunks/tool results advance even if message count doesn't.
+  const lastRenderedMessage: any = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as any) : null
+  const lastRenderedChunkTs = useMemo(() => {
+    const chunks = lastRenderedMessage?.chunks
+    if (Array.isArray(chunks) && chunks.length > 0) {
+      return Number(chunks[chunks.length - 1]?.timestamp) || 0
+    }
+    return 0
+  }, [lastRenderedMessage?.chunks])
+  const lastRenderedProgressKey = useMemo(() => {
+    const id = lastRenderedMessage?.id ?? 'none'
+    const updatedAt = String(lastRenderedMessage?.updatedAt ?? lastRenderedMessage?.createdAt ?? '')
+    const toolResultsLen = Array.isArray(lastRenderedMessage?.toolResults) ? lastRenderedMessage.toolResults.length : 0
+    return [id, updatedAt, String(lastRenderedChunkTs), String(toolResultsLen), String(activeRenderedStreamingAssistantId ?? ''), shouldShowGapLoader ? 'gap' : ''].join('|')
+  }, [
+    activeRenderedStreamingAssistantId,
+    lastRenderedChunkTs,
+    lastRenderedMessage?.createdAt,
+    lastRenderedMessage?.id,
+    lastRenderedMessage?.updatedAt,
+    lastRenderedMessage?.toolResults,
+    shouldShowGapLoader,
+  ])
+
+  // Initialize near-bottom status on mount / when container ref becomes available.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
+  }, [])
+
+  // Optimized auto-scroll with debouncing (now supports streaming progress).
   useEffect(() => {
     if (!scrollContainerRef.current) return
 
     const container = scrollContainerRef.current
-    const shouldScroll = () => {
-      const threshold = 100
-      return container.scrollTop + container.clientHeight >= container.scrollHeight - threshold
-    }
+    const isActivelyStreaming = isAssistantStreaming || !!activeRenderedStreamingAssistantId || shouldShowGapLoader
 
-    // Only scroll if user is near bottom or new messages arrived
-    if (shouldScroll() || displayMessages.length > lastMessageCountRef.current) {
+    // Only scroll if user is near bottom (as last reported by onScroll) or new messages arrived.
+    // NOTE: during streaming, content grows without a scroll event; keeping a ref avoids losing the lock.
+    if (isNearBottomRef.current || displayMessages.length > lastMessageCountRef.current || shouldShowGapLoader) {
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
         scrollContainerRef.current.scrollTo({
           top: scrollContainerRef.current.scrollHeight,
-          behavior: displayMessages.length === lastMessageCountRef.current ? 'smooth' : 'auto',
+          // Prefer immediate scroll during streaming to avoid "lagging behind" effect.
+          behavior: displayMessages.length === lastMessageCountRef.current ? (isActivelyStreaming ? 'auto' : 'smooth') : 'auto',
         })
       })
     }
 
     lastMessageCountRef.current = displayMessages.length
-  }, [displayMessages.length])
+  }, [activeRenderedStreamingAssistantId, displayMessages.length, isAssistantStreaming, lastRenderedProgressKey, shouldShowGapLoader])
 
   // Ensure the GAP loader remains visible by auto-scrolling when we are waiting for assistant text
   // either initially or while waiting after tool results.
@@ -364,13 +454,22 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
     }
   }, [shouldShowGapLoader])
 
-  if (!conversationId) {
+  if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
 
   return (
-    <div className="h-full flex flex-col bg-transparent">
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 pt-6 scroll-smooth bg-transparent" style={{ paddingBottom: bottomPaddingPx ?? 160 }}>
+    <div className={cn('h-full flex flex-col', className)}>
+      <div
+        ref={scrollContainerRef}
+        className={cn('flex-1 overflow-y-auto px-4 pt-6 scroll-smooth', scrollClassName)}
+        style={{ paddingBottom: bottomPaddingPx ?? 160 }}
+        onScroll={() => {
+          const container = scrollContainerRef.current
+          if (!container) return
+          isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
+        }}
+      >
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null
@@ -384,6 +483,11 @@ export function ConversationMessageList({ conversationId, starshipId, bottomPadd
                 isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                 starshipId={starshipId}
                 showAssistantAvatar={showAssistantAvatar}
+                userNameOverride={userNameOverride}
+                userEmailOverride={userEmailOverride}
+                userAvatarUrlOverride={userAvatarUrlOverride}
+                userAvatarSeedOverride={userAvatarSeedOverride}
+                userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
               />
             )
           })}
@@ -437,6 +541,11 @@ interface ConversationMessageBubbleProps {
   isStreamingActive?: boolean
   starshipId?: string
   showAssistantAvatar?: boolean
+  userNameOverride?: string
+  userEmailOverride?: string
+  userAvatarUrlOverride?: string
+  userAvatarSeedOverride?: string
+  userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -484,9 +593,25 @@ function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: 
 
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
-  function ConversationMessageBubble({ message, agentName, agentAvatarUrl, isStreamingActive, starshipId, showAssistantAvatar = true }: ConversationMessageBubbleProps) {
+  function ConversationMessageBubble({
+    message,
+    agentName,
+    agentAvatarUrl,
+    isStreamingActive,
+    starshipId,
+    showAssistantAvatar = true,
+    userNameOverride,
+    userEmailOverride,
+    userAvatarUrlOverride,
+    userAvatarSeedOverride,
+    userAvatarFallbackVariantOverride,
+  }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
+    const effectiveUserName = userNameOverride ?? userName
+    const effectiveUserEmail = userEmailOverride ?? userEmail
+    const effectiveUserAvatar = userAvatarUrlOverride ?? userAvatar
+    const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     if (isUser) {
       // User message: Neutral bubble on the right
@@ -507,10 +632,24 @@ const MemoizedMessageBubble = memo(
               </div>
             </div>
             <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
-              {isImageUrl(userAvatar) ? (
-                <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
+              {userAvatarSeedOverride ? (
+                <AgentAvatar seed={userAvatarSeedOverride} size={32} />
+              ) : isImageUrl(effectiveUserAvatar) ? (
+                <AvatarImage
+                  src={effectiveUserAvatar!}
+                  alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  className="rounded-full object-cover"
+                />
               ) : null}
-              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{initialsFromName(userName || userEmail)}</AvatarFallback>
+              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                {fallbackVariant === 'user-icon' ? (
+                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
+                ) : (
+                  initialsFromName(effectiveUserName || effectiveUserEmail)
+                )}
+              </AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -588,6 +727,13 @@ const MemoizedMessageBubble = memo(
     const prevCalls = (prevProps.message as any).toolCalls?.length ?? 0
     const nextCalls = (nextProps.message as any).toolCalls?.length ?? 0
     if (prevCalls !== nextCalls) return false
+
+    // Re-render when user overrides change (demo/internal chats)
+    if ((prevProps.userNameOverride || '') !== (nextProps.userNameOverride || '')) return false
+    if ((prevProps.userEmailOverride || '') !== (nextProps.userEmailOverride || '')) return false
+    if ((prevProps.userAvatarUrlOverride || '') !== (nextProps.userAvatarUrlOverride || '')) return false
+    if ((prevProps.userAvatarSeedOverride || '') !== (nextProps.userAvatarSeedOverride || '')) return false
+    if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as any).toolResults?.length ?? 0

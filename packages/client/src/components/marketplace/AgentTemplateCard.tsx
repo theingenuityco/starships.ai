@@ -21,9 +21,14 @@ interface AgentTemplateCardProps {
   template: AgentTemplateModel
   onDeploy?: (template: AgentTemplateModel) => void
   onClick?: (template: AgentTemplateModel) => void
+  /**
+   * When false, hides the bottom-right Deploy CTA (useful for landing page carousel previews).
+   * Defaults to true.
+   */
+  showDeployCta?: boolean
 }
 
-export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplateCardProps) {
+export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta = true }: AgentTemplateCardProps) {
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
@@ -145,14 +150,18 @@ export function AgentTemplateCard({ template, onDeploy, onClick }: AgentTemplate
             </div>
           ) : null
         }
-        primaryAction={{
-          label: isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
-          iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
-          disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
-          // Match the Chat CTA style from DeployedAgentCard
-          variant: 'ghost',
-          onAction: () => requestDeploy(),
-        }}
+        primaryAction={
+          showDeployCta
+            ? {
+                label: isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
+                iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
+                disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
+                // Match the Chat CTA style from DeployedAgentCard
+                variant: 'ghost',
+                onAction: () => requestDeploy(),
+              }
+            : undefined
+        }
       />
 
       {/* Confirmation Modal */}

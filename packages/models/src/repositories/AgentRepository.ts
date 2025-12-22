@@ -361,6 +361,36 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
+   * Get the stored permission for a given agent↔tool (by tool slug within a starship).
+   * Returns null when the tool is not assigned to the agent.
+   */
+  async getAgentToolPermissionBySlug(
+    agentId: string,
+    starshipId: string,
+    toolSlug: string
+  ): Promise<'allow' | 'ask' | 'deny' | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ permission: 'allow' | 'ask' | 'deny' }>(
+          `
+          SELECT at.permission as permission
+          FROM agent_tools at
+          INNER JOIN tools t ON t.id = at.tool_id
+          WHERE at.agent_id = $1 AND t.starship_id = $2 AND t.slug = $3
+          LIMIT 1
+          `,
+          [agentId, starshipId, toolSlug]
+        );
+        return row?.permission ?? null;
+      },
+      'getAgentToolPermissionBySlug',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
    * Get agent→tool permissions (join metadata) for a specific starship.
    * Returns only rows present in agent_tools; callers can treat missing pairs as 'deny'.
    */

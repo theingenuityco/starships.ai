@@ -159,7 +159,7 @@ function stableStringify(value: unknown): string {
 
 function buildDefaultBlueprint(): Blueprint {
   // IMPORTANT: Default blueprint is a stable definition that reads runtime configuration from execution.state.
-  return Agent.defaultAgentBlueprint();
+  return Agent.defaultAgentBlueprintServerTools();
 }
 
 async function updateInBatches(

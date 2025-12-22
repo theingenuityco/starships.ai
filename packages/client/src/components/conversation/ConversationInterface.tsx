@@ -17,11 +17,12 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useStarship } from '@/hooks/useStarships'
 import type { Agent } from '@/lib/api'
-import { agentAPI, templateAPI, toolAPI } from '@/lib/api'
+import api, { agentAPI, templateAPI, toolAPI } from '@/lib/api'
 import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
+import { toast } from 'sonner'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
@@ -177,6 +178,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
+  const [pendingToolApproval, setPendingToolApproval] = useState<{
+    approvalId: string
+    conversationId: string
+    starshipId?: string
+    agentId: string
+    agentName?: string
+    toolSlug: string
+    toolCallId: string
+    args?: Record<string, any>
+  } | null>(null)
+  const [toolApprovalBusy, setToolApprovalBusy] = useState<'approve' | 'deny' | null>(null)
   const [hasWelcomeExited, setHasWelcomeExited] = useState<boolean>(false)
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -634,6 +646,43 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           } catch {}
           break
         }
+        case 'tool_approval_required': {
+          try {
+            const approvalId = String((payload as any)?.approvalId || '')
+            const cid = String((payload as any)?.conversationId || '')
+            const agentId = String((payload as any)?.agentId || '')
+            const toolSlug = String((payload as any)?.toolSlug || '')
+            const toolCallId = String((payload as any)?.toolCallId || '')
+            const args = (payload as any)?.args
+
+            if (!approvalId || !cid || !agentId || !toolSlug || !toolCallId) break
+
+            const currentCid = currentConversationIdRef.current || externalConversationId || null
+            if (currentCid && cid !== currentCid) break
+
+            setPendingToolApproval({
+              approvalId,
+              conversationId: cid,
+              starshipId: (payload as any)?.starshipId,
+              agentId,
+              agentName: (payload as any)?.agentName,
+              toolSlug,
+              toolCallId,
+              args: args && typeof args === 'object' ? args : undefined,
+            })
+          } catch {}
+          break
+        }
+        case 'tool_approval_resolved': {
+          try {
+            const approvalId = String((payload as any)?.approvalId || '')
+            if (approvalId && pendingToolApproval?.approvalId === approvalId) {
+              setPendingToolApproval(null)
+              setToolApprovalBusy(null)
+            }
+          } catch {}
+          break
+        }
         case 'tool_call_detected': {
           const toolName = (payload as any).toolName
           const toolNameLc = typeof toolName === 'string' ? toolName.toLowerCase() : ''
@@ -697,7 +746,36 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     } catch {
       // ignore
     }
-  }, [])
+  }, [queryClient, router, starshipId, starshipSlug, externalConversationId, pendingToolApproval?.approvalId])
+
+  const handleApproveTool = useCallback(async () => {
+    if (!pendingToolApproval?.approvalId || !pendingToolApproval?.conversationId) return
+    if (toolApprovalBusy) return
+    setToolApprovalBusy('approve')
+    try {
+      await api.post(`/api/v1/conversations/${pendingToolApproval.conversationId}/tool-approvals/${pendingToolApproval.approvalId}/approve`)
+      // Continuation will stream; clear prompt optimistically
+      setPendingToolApproval(null)
+    } catch (e: any) {
+      toast.error('Failed to approve tool', { description: e?.response?.data?.message || e?.message || 'Unknown error' })
+    } finally {
+      setToolApprovalBusy(null)
+    }
+  }, [pendingToolApproval, toolApprovalBusy])
+
+  const handleDenyTool = useCallback(async () => {
+    if (!pendingToolApproval?.approvalId || !pendingToolApproval?.conversationId) return
+    if (toolApprovalBusy) return
+    setToolApprovalBusy('deny')
+    try {
+      await api.post(`/api/v1/conversations/${pendingToolApproval.conversationId}/tool-approvals/${pendingToolApproval.approvalId}/deny`)
+      setPendingToolApproval(null)
+    } catch (e: any) {
+      toast.error('Failed to deny tool', { description: e?.response?.data?.message || e?.message || 'Unknown error' })
+    } finally {
+      setToolApprovalBusy(null)
+    }
+  }, [pendingToolApproval, toolApprovalBusy])
 
   // Handle tool completion for entity-modifying tools
   const handleToolComplete = useCallback(
@@ -1092,6 +1170,53 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 <div className={cn('mb-1', showMessagesArea && 'hidden')}>
                   <p className="text-xs font-medium text-muted-foreground">and give instructions</p>
                 </div>
+                {showMessagesArea && pendingToolApproval ? (
+                  <div className="mb-3 rounded-2xl border border-border/60 bg-card/80 shadow-sm px-4 py-3">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground">
+                          Approve tool call: <span className="font-mono text-xs">{pendingToolApproval.toolSlug}</span>
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Agent: {pendingToolApproval.agentName || pendingToolApproval.agentId}
+                        </p>
+                        {pendingToolApproval.args ? (
+                          <pre className="mt-2 max-h-40 overflow-auto rounded-xl bg-muted/30 border border-border/40 p-2 text-[11px] leading-relaxed text-foreground/80">
+                            {JSON.stringify(pendingToolApproval.args, null, 2)}
+                          </pre>
+                        ) : null}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleDenyTool}
+                          disabled={toolApprovalBusy !== null}
+                          className={cn(
+                            'inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors',
+                            'border-border/60 bg-background hover:bg-muted/40',
+                            toolApprovalBusy !== null && 'opacity-60 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon name="x" className="h-3.5 w-3.5" />
+                          Deny
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleApproveTool}
+                          disabled={toolApprovalBusy !== null}
+                          className={cn(
+                            'inline-flex items-center gap-2 rounded-xl border px-3 py-1.5 text-xs font-medium transition-colors',
+                            'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 hover:bg-emerald-500/15 dark:text-emerald-300',
+                            toolApprovalBusy !== null && 'opacity-60 cursor-not-allowed'
+                          )}
+                        >
+                          <Icon name="check" className="h-3.5 w-3.5" />
+                          Approve
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
                 <ConversationMessageInput
                   key={inputKey}
                   ref={messageInputRef}

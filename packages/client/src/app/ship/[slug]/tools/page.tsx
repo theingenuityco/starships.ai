@@ -147,10 +147,15 @@ export default function StarshipToolsPage(): React.JSX.Element {
     if (p === 'ask') return 'Ask first'
     return 'Deny'
   }
-  const permissionVariant = (p: StarshipAgentToolPermissionModel['permission']): React.ComponentProps<typeof Badge>['variant'] => {
-    if (p === 'allow') return 'connected'
-    if (p === 'ask') return 'secondary'
-    return 'destructive'
+  const permissionIconName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'check-circle'
+    if (p === 'ask') return 'help-circle'
+    return 'x-circle'
+  }
+  const permissionBadgeClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    if (p === 'ask') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
   }
   const nextPermission = (p: StarshipAgentToolPermissionModel['permission']): StarshipAgentToolPermissionModel['permission'] => {
     const idx = PERMISSION_ORDER.indexOf(p as any)
@@ -328,8 +333,11 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                           title={isAssigned ? 'Click to cycle: Allow → Ask first → Deny' : 'Not assigned to this agent'}
                                         >
                                           {isAssigned ? (
-                                            <Badge variant={permissionVariant(p)} className="whitespace-nowrap">
-                                              {permissionLabel(p)}
+                                            <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(p))}>
+                                              <span className="inline-flex items-center gap-1.5">
+                                                <Icon name={permissionIconName(p)} className="h-3.5 w-3.5" />
+                                                <span>{permissionLabel(p)}</span>
+                                              </span>
                                             </Badge>
                                           ) : (
                                             <Badge variant="outline" className="whitespace-nowrap text-muted-foreground border-border/40">

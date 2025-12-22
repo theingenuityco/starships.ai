@@ -9,13 +9,13 @@ import type { Client } from 'pg';
  * - deny: tool cannot be invoked
  *
  * Notes:
- * - Default is 'allow' for existing relationships to preserve current behavior.
+ * - Default is 'ask' for existing relationships.
  * - We keep this as a plain VARCHAR + CHECK to avoid enum migration pain.
  */
 export async function up(client: Client): Promise<void> {
   const sql = `
     ALTER TABLE agent_tools
-      ADD COLUMN IF NOT EXISTS permission VARCHAR(10) NOT NULL DEFAULT 'allow'
+      ADD COLUMN IF NOT EXISTS permission VARCHAR(10) NOT NULL DEFAULT 'ask'
       CHECK (permission IN ('allow', 'ask', 'deny'));
   `;
   await client.query(sql);

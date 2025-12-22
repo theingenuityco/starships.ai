@@ -66,19 +66,13 @@ export function PublicHeader(): React.JSX.Element {
           >
             Marketplace
           </Link>
-          <a
-            href="/docs"
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`${pathname.startsWith('/docs') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
-            aria-current={pathname.startsWith('/docs') ? 'page' : undefined}
+          <Link
+            href="/login"
+            className={`${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
+            aria-current={pathname.startsWith('/login') ? 'page' : undefined}
           >
-            <span className="inline-flex items-center gap-1">
-              <span className="hidden md:inline">Documentation</span>
-              <span className="inline md:hidden">Docs</span>
-              <Icon name="external-link" className="w-3 h-3 opacity-80" />
-            </span>
-          </a>
+            Login
+          </Link>
         </nav>
 
         {/* Mobile menu toggle */}
@@ -108,15 +102,13 @@ export function PublicHeader(): React.JSX.Element {
               >
                 Marketplace
               </Link>
-              <a
-                href="/docs"
-                target="_blank"
-                rel="noopener noreferrer"
+              <Link
+                href="/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="block px-3 py-2 rounded-md text-sm text-muted-foreground hover:text-foreground hover:bg-accent"
+                className={`block px-3 py-2 rounded-md text-sm ${pathname.startsWith('/login') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground hover:bg-accent'}`}
               >
-                Docs
-              </a>
+                Login
+              </Link>
             </div>
           )}
         </div>

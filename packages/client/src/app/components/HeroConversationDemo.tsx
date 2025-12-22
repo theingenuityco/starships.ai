@@ -101,7 +101,7 @@ const ARIA_TIMELINE: Step[] = [
 const DOC_ORGANIZER_TIMELINE: Step[] = [
   {
     role: 'user',
-    content: 'Doc Organizer — clean up my Google Drive.\n\nGoals:\n- Find duplicate files\n- Move “Receipts” into a single folder\n- Archive old project docs (2022+)\n- Show progress step-by-step',
+    content: 'Doc Organizer - clean up my Google Drive.\n\nGoals:\n- Find duplicate files\n- Move “Receipts” into a single folder\n- Archive old project docs (2022+)\n- Show progress step-by-step',
   },
   {
     role: 'assistant',
@@ -286,7 +286,7 @@ const LEAD_GENERATOR_TIMELINE: Step[] = [
   {
     role: 'user',
     content:
-      'Lead Generator — set up a lead-gen campaign in Ads Manager for our product.\n\nTarget:\n- B2B teams (Ops + Engineering)\n- Goal: capture qualified leads (demo requests)\n- Placements: feed + stories\n- Show progress step-by-step',
+      'Lead Generator - set up a lead-gen campaign in Ads Manager for our product.\n\nTarget:\n- B2B teams (Ops + Engineering)\n- Goal: capture qualified leads (demo requests)\n- Placements: feed + stories\n- Show progress step-by-step',
   },
   {
     role: 'assistant',
@@ -339,7 +339,7 @@ const LEAD_GENERATOR_TIMELINE: Step[] = [
       {
         id: 'tc_lg_campaign',
         type: 'function',
-        function: { name: 'create_campaign', arguments: '{ "accountId": "act_demo_01", "name": "Starships — Lead Gen", "objective": "LEAD_GENERATION", "status": "PAUSED" }' },
+        function: { name: 'create_campaign', arguments: '{ "accountId": "act_demo_01", "name": "Starships - Lead Gen", "objective": "LEAD_GENERATION", "status": "PAUSED" }' },
       },
       {
         id: 'tc_lg_adset',

@@ -10,7 +10,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   return {
-    title: 'Top-up Successful — Starships.ai',
+    title: 'Top-up Successful - Starships.ai',
     description: 'Your recent wallet top-up has been completed successfully.',
   }
 }

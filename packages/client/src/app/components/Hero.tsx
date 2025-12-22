@@ -73,7 +73,7 @@ export default function Hero() {
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
             {(() => {
               const v = getHeadlineVariant()
-              if (v === 'B') return 'Hire your AI team, then brief them in plain English'
+              if (v === 'B') return 'Hire your AI team, then brief them in plain language'
               if (v === 'C') return 'A team of AI specialists that ships work with you'
               return (
                 <>

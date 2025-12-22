@@ -10,7 +10,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   return {
-    title: 'Connectors — Starships.ai',
+    title: 'Connectors - Starships.ai',
     description: 'Manage connectors for your starship.',
   }
 }

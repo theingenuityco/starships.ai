@@ -100,7 +100,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     }
 
     const nextTitle = titleForPath(pathname)
-    if (nextTitle) document.title = nextTitle
+    if (nextTitle && document.title !== nextTitle) document.title = nextTitle
   }, [pathname])
 
   // Mobile detection

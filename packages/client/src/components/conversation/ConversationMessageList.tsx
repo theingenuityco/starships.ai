@@ -36,6 +36,12 @@ interface ConversationMessageListProps {
    */
   userAvatarSeedOverride?: string
   /**
+   * Controls what the user avatar falls back to when no image/seed is provided.
+   * - 'initials' (default): renders initials (e.g. "You" -> "Y")
+   * - 'user-icon': renders a generic user icon (recommended for landing page mock conversations)
+   */
+  userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
+  /**
    * Optional override for static/demo rendering (e.g. landing page).
    * When provided, the list will render these messages even if `conversationId` is null.
    */
@@ -60,6 +66,7 @@ export function ConversationMessageList({
   userEmailOverride,
   userAvatarUrlOverride,
   userAvatarSeedOverride,
+  userAvatarFallbackVariantOverride,
   messagesOverride,
   agentNameOverride,
   agentAvatarUrlOverride,
@@ -480,6 +487,7 @@ export function ConversationMessageList({
                 userEmailOverride={userEmailOverride}
                 userAvatarUrlOverride={userAvatarUrlOverride}
                 userAvatarSeedOverride={userAvatarSeedOverride}
+                userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
               />
             )
           })}
@@ -537,6 +545,7 @@ interface ConversationMessageBubbleProps {
   userEmailOverride?: string
   userAvatarUrlOverride?: string
   userAvatarSeedOverride?: string
+  userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -595,12 +604,14 @@ const MemoizedMessageBubble = memo(
     userEmailOverride,
     userAvatarUrlOverride,
     userAvatarSeedOverride,
+    userAvatarFallbackVariantOverride,
   }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
     const effectiveUserName = userNameOverride ?? userName
     const effectiveUserEmail = userEmailOverride ?? userEmail
     const effectiveUserAvatar = userAvatarUrlOverride ?? userAvatar
+    const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     if (isUser) {
       // User message: Neutral bubble on the right
@@ -632,7 +643,13 @@ const MemoizedMessageBubble = memo(
                   className="rounded-full object-cover"
                 />
               ) : null}
-              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">{initialsFromName(effectiveUserName || effectiveUserEmail)}</AvatarFallback>
+              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                {fallbackVariant === 'user-icon' ? (
+                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
+                ) : (
+                  initialsFromName(effectiveUserName || effectiveUserEmail)
+                )}
+              </AvatarFallback>
             </Avatar>
           </div>
         </div>
@@ -716,6 +733,7 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.userEmailOverride || '') !== (nextProps.userEmailOverride || '')) return false
     if ((prevProps.userAvatarUrlOverride || '') !== (nextProps.userAvatarUrlOverride || '')) return false
     if ((prevProps.userAvatarSeedOverride || '') !== (nextProps.userAvatarSeedOverride || '')) return false
+    if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as any).toolResults?.length ?? 0

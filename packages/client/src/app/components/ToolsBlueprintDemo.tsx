@@ -85,7 +85,7 @@ const DEMO_TOOL_BLUEPRINT: Blueprint = {
 
 export default function ToolsBlueprintDemo() {
   return (
-    <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-background/60 shadow-md shadow-black/30">
+    <div className="relative rounded-2xl overflow-hidden border border-white/20 bg-background/60 shadow-md shadow-black/30">
       <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
         <div className="text-sm font-medium leading-none truncate">Draft Reply</div>
         <div className="mt-1 text-xs text-muted-foreground truncate">Tools Builder</div>

@@ -1,6 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import api from '@/lib/api'
 import type { OpenRouterModel, OpenRouterModelsResponse } from '@starships/protocol'
+import { useAuth } from '@/hooks/useAuth'
 
 /** Cache TTLs */
 const OPENROUTER_MODELS_STALE_MS = 6 * 60 * 60 * 1000 // 6h
@@ -11,29 +12,39 @@ const OPENROUTER_MODELS_GC_MS = 24 * 60 * 60 * 1000 // 24h
  * Returns an empty array on unexpected shapes (and logs a warning) instead of throwing.
  */
 async function fetchOpenRouterModels(): Promise<OpenRouterModel[]> {
-  const res = await api.get<OpenRouterModelsResponse>('/api/v1/openrouter/models')
+  try {
+    const res = await api.get<OpenRouterModelsResponse>('/api/v1/openrouter/models')
 
-  // Explicit guards against undefined/null shapes
-  const payload = res?.data
-  const models = payload && Array.isArray(payload.data) ? payload.data : undefined
+    // Explicit guards against undefined/null shapes
+    const payload = res?.data
+    const models = payload && Array.isArray(payload.data) ? payload.data : undefined
 
-  if (!models) {
-    console.warn('[openrouter] Unexpected /models response shape:', payload)
-    return []
+    if (!models) {
+      console.warn('[openrouter] Unexpected /models response shape:', payload)
+      return []
+    }
+
+    return models
+  } catch (err: any) {
+    // If the user is not authenticated (or OpenRouter access isn't configured for this account),
+    // the proxy will respond 401. Treat that as "no models available" for UI, not a hard error.
+    const status = err?.response?.status
+    if (status === 401) return []
+    throw err
   }
-
-  return models
 }
 
 /**
  * Cache-aware hook for the OpenRouter model catalog (filtered by account Provider Preferences).
  */
 export function useOpenRouterModels() {
+  const { isAuthenticated } = useAuth()
   return useQuery({
     queryKey: ['openrouter', 'models'],
     queryFn: () => fetchOpenRouterModels(),
     staleTime: OPENROUTER_MODELS_STALE_MS,
     gcTime: OPENROUTER_MODELS_GC_MS,
+    enabled: isAuthenticated,
   })
 }
 

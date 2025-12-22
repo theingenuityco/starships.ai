@@ -871,7 +871,7 @@ export default function HeroConversationDemo() {
                 isAwaitingToolResultsOverride={awaitingToolsByConvo[activeConvoId] || false}
                 bottomPaddingPx={140}
                 userNameOverride="You"
-                userAvatarSeedOverride="You"
+                userAvatarFallbackVariantOverride="user-icon"
               />
 
               {/* Restart control (shown after a run has completed) */}
@@ -920,7 +920,7 @@ export default function HeroConversationDemo() {
                           </button>
                         </div>
                         <div className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden flex items-center justify-center">
-                          <AgentAvatar seed="You" size={32} />
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
                         </div>
                       </div>
                     </div>

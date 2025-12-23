@@ -1170,7 +1170,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                   <p className="text-xs font-medium text-muted-foreground">Select an agent</p>
                 </div>
                 <div className="flex items-center justify-start gap-3">
-                  <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={true} />
+                  <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={false} />
                 </div>
               </div>
 

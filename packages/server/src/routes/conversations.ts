@@ -15,10 +15,81 @@ import { AgentService } from '@/services/AgentService';
 import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
+import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
+import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import type { Blueprint, EngineConfig } from '@starships/autopilot';
+import { getEnvConfig } from '@starships/env';
+import { AppError } from '@starships/errors';
+import { StarshipService } from '@/services/StarshipService';
+import { UserService } from '@/services/UserService';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
+import type { ToolModel } from '@starships/protocol';
 
 const router: Router = Router();
 
 const INTERNAL_SCHEDULE_HEADER = 'x-internal-schedule-token';
+
+// -----------------------------------------------------------------------------
+// Lightweight in-memory caches (best-effort) to reduce repeated DB reads during
+// tool-call loops. These are intentionally small + TTL-based.
+// -----------------------------------------------------------------------------
+const PERMISSION_CACHE_TTL_MS = 15_000;
+const TOOL_CACHE_TTL_MS = 15_000;
+
+const permissionCache = new Map<string, { value: 'allow' | 'ask' | 'deny' | null; expiresAt: number }>();
+const toolCache = new Map<string, { value: ToolModel | null; expiresAt: number }>();
+
+function getCachedPermission(key: string): ('allow' | 'ask' | 'deny' | null) | undefined {
+  const hit = permissionCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() > hit.expiresAt) {
+    permissionCache.delete(key);
+    return undefined;
+  }
+  return hit.value;
+}
+
+function setCachedPermission(key: string, value: 'allow' | 'ask' | 'deny' | null): void {
+  permissionCache.set(key, { value, expiresAt: Date.now() + PERMISSION_CACHE_TTL_MS });
+  // Guardrail to prevent unbounded growth in long-lived processes
+  if (permissionCache.size > 5000) {
+    // Simple prune: delete expired entries first; if still too big, delete oldest-ish by iteration.
+    const now = Date.now();
+    for (const [k, v] of permissionCache) {
+      if (v.expiresAt <= now) permissionCache.delete(k);
+      if (permissionCache.size <= 4000) break;
+    }
+    if (permissionCache.size > 4500) {
+      let i = 0;
+      for (const k of permissionCache.keys()) {
+        permissionCache.delete(k);
+        if (++i >= 500) break;
+      }
+    }
+  }
+}
+
+function getCachedTool(key: string): ToolModel | null | undefined {
+  const hit = toolCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() > hit.expiresAt) {
+    toolCache.delete(key);
+    return undefined;
+  }
+  return hit.value;
+}
+
+function setCachedTool(key: string, value: ToolModel | null): void {
+  toolCache.set(key, { value, expiresAt: Date.now() + TOOL_CACHE_TTL_MS });
+  if (toolCache.size > 2000) {
+    const now = Date.now();
+    for (const [k, v] of toolCache) {
+      if (v.expiresAt <= now) toolCache.delete(k);
+      if (toolCache.size <= 1500) break;
+    }
+  }
+}
 
 function isInternalScheduleRequest(req: Request): boolean {
   const expected = process.env.SCHEDULE_WORKER_TOKEN;
@@ -31,6 +102,48 @@ function isInternalScheduleRequest(req: Request): boolean {
   return header === expected;
 }
 
+async function verifyResourceAccess200(args: {
+  resourceStarshipId: string;
+  userId: string;
+  resourceType: string;
+  resourceId: string;
+  res: Response;
+}): Promise<boolean> {
+  const starshipService = new StarshipService();
+  const userService = new UserService();
+
+  const [starship, user] = await Promise.all([starshipService.getStarship(args.resourceStarshipId), userService.getUserById(args.userId)]);
+
+  if (!starship) {
+    // Preserve "always 200" contract for HttpRequest node (it throws on non-2xx).
+    sendError(args.res, 'RESOURCE_NOT_FOUND', `${args.resourceType} belongs to non-existent starship`, 200, {
+      resource: args.resourceType,
+      id: args.resourceId,
+    });
+    return false;
+  }
+
+  if (!user) {
+    sendError(args.res, 'ACCESS_DENIED', `Access denied to this ${args.resourceType}`, 200, {
+      resource: args.resourceType,
+      id: args.resourceId,
+      reason: 'user_not_found',
+    });
+    return false;
+  }
+
+  if (starship.ownerId !== args.userId && !isInstanceAdmin(user)) {
+    sendError(args.res, 'ACCESS_DENIED', `Access denied to this ${args.resourceType}`, 200, {
+      resource: args.resourceType,
+      id: args.resourceId,
+      reason: 'not_owner',
+    });
+    return false;
+  }
+
+  return true;
+}
+
 const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   if (isInternalScheduleRequest(req)) {
     // Internal scheduler calls are authenticated via shared secret header and do not
@@ -41,6 +154,112 @@ const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction
 };
 
 // Using standard pagination schema for consistency
+
+function getSafeErrorMessageWithCause(error: unknown): string {
+  if (error instanceof AppError) {
+    return error.cause?.message ? `${error.message}: ${error.cause.message}` : error.message;
+  }
+  return error instanceof Error ? error.message : String(error);
+}
+
+function buildConnectorHostRuntime(connectors: Record<string, { baseUrl: string; headers: Record<string, string> }>) {
+  return {
+    http: async (req: {
+      method: string;
+      url: string;
+      headers?: Record<string, unknown>;
+      body?: unknown;
+      timeoutMs?: number;
+      connector?: string;
+    }) => {
+      const method = String(req.method || 'GET').toUpperCase();
+      const connector = typeof req.connector === 'string' ? req.connector : undefined;
+      const connectorCfg = connector ? connectors?.[connector] : undefined;
+
+      const rawUrl = String(req.url || '');
+      const url =
+        connectorCfg && !/^https?:\/\//i.test(rawUrl) ? `${connectorCfg.baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}` : rawUrl;
+
+      // Normalize headers to string record
+      const headers: Record<string, string> = {};
+      const h = req.headers && typeof req.headers === 'object' ? (req.headers as Record<string, unknown>) : {};
+      for (const [k, v] of Object.entries(h)) {
+        if (typeof v === 'string') headers[k] = v;
+        else if (typeof v === 'number' || typeof v === 'boolean') headers[k] = String(v);
+      }
+      if (connectorCfg?.headers) {
+        // Connector headers take precedence unless explicitly overridden
+        for (const [k, v] of Object.entries(connectorCfg.headers)) {
+          if (!(k in headers)) headers[k] = v;
+        }
+      }
+
+      const controller = new AbortController();
+      const timeoutMs = typeof req.timeoutMs === 'number' && req.timeoutMs > 0 ? req.timeoutMs : 30000;
+      const t = setTimeout(() => controller.abort(), timeoutMs);
+
+      try {
+        const hasBody = !(method === 'GET' || method === 'HEAD') && req.body !== undefined;
+        let body: string | undefined = undefined;
+        if (hasBody) {
+          if (typeof req.body === 'string') {
+            body = req.body;
+          } else {
+            body = JSON.stringify(req.body);
+            if (!Object.keys(headers).some((k) => k.toLowerCase() === 'content-type')) {
+              headers['Content-Type'] = 'application/json';
+            }
+          }
+        }
+
+        const resp = await fetch(url, {
+          method,
+          headers,
+          body,
+          signal: controller.signal,
+        });
+
+        const contentType = resp.headers.get('content-type') || '';
+        let parsedBody: unknown;
+        if (contentType.toLowerCase().includes('application/json')) {
+          parsedBody = await resp.json().catch(() => null);
+        } else {
+          parsedBody = await resp.text().catch(() => '');
+        }
+
+        const headerObj: Record<string, string> = {};
+        // Avoid Headers.entries() typing issues in non-DOM TS libs by using forEach.
+        resp.headers.forEach((value, key) => {
+          headerObj[key] = value;
+        });
+
+        return {
+          status: resp.status,
+          statusText: resp.statusText,
+          url,
+          headers: headerObj,
+          body: parsedBody,
+        };
+      } finally {
+        clearTimeout(t);
+      }
+    },
+  };
+}
+
+async function executeToolBlueprint(args: {
+  blueprint: Blueprint;
+  toolConfig: Record<string, unknown>;
+  toolArgs: Record<string, unknown>;
+  runnerConfig: Record<string, unknown>;
+}): Promise<unknown> {
+  const execution = ExecutionItemUtils.createExecution();
+  const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
+  execution.results.push({ nodeRef: '__initial__', items: initial });
+  const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
+  const items = await runner.run(args.blueprint, execution, { failOnNodeError: true, ...(args.runnerConfig as unknown as EngineConfig) });
+  return ExecutionItemUtils.unwrapSingle(items);
+}
 
 /**
  * GET /conversations/:conversationId/messages - Get conversation messages (supports streaming for live updates)
@@ -279,6 +498,408 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
     handleError(error, res, 'stopping conversation');
   }
 });
+
+/**
+ * POST /conversations/:conversationId/tool-calls/authorize-and-maybe-execute
+ *
+ * Called from the agent's default blueprint (server-tools mode) via HttpRequest + starships connector.
+ * Always returns 200 using the standard API contract so the HttpRequest node does not throw on non-2xx:
+ * - Success: { success: true, data: { ... } }
+ * - Error: { success: false, error: { code, message, details } }
+ */
+router.post(
+  '/conversations/:conversationId/tool-calls/authorize-and-maybe-execute',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!paramValidation) return;
+      const { conversationId } = paramValidation;
+
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 200, { toolCallId: '' });
+        return;
+      }
+
+      const bodyValidation = validateData(
+        z.object({
+          agentId: IdSchema,
+          toolSlug: z.string().min(1),
+          toolCallId: z.string().min(1),
+          args: z.record(z.string(), z.unknown()).optional(),
+        }),
+        req.body,
+        res,
+        'tool authorization payload'
+      );
+      if (!bodyValidation) return;
+
+      const { agentId, toolSlug, toolCallId, args } = bodyValidation as {
+        agentId: string;
+        toolSlug: string;
+        toolCallId: string;
+        args?: Record<string, unknown>;
+      };
+
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 200, { conversationId, toolCallId });
+        return;
+      }
+
+      // Authorization: ensure the authenticated user can only authorize tools for their own starships.
+      // This endpoint must ALWAYS return 200 for the HttpRequest node, so we use a 200-wrapped guard.
+      const ok = await verifyResourceAccess200({
+        resourceStarshipId: conversation.starshipId,
+        userId: authUserId,
+        resourceType: 'conversation',
+        resourceId: conversationId,
+        res,
+      });
+      if (!ok) {
+        return;
+      }
+
+      // Starship connector JWT embeds starshipId in authContext; enforce scoping without using 4xx
+      // responses (HttpRequest node throws on non-2xx).
+      const authStarshipId = (req as unknown as { authContext?: { starshipId?: string } })?.authContext?.starshipId;
+      if (authStarshipId && authStarshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Conversation does not belong to authenticated starship', 200, {
+          conversationId,
+          toolCallId,
+          starshipId: conversation.starshipId,
+          authStarshipId,
+        });
+        return;
+      }
+
+      const agentService = new AgentService();
+      const agent = await agentService.getAgent(agentId);
+      if (!agent || agent.starshipId !== conversation.starshipId) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 200, { agentId, toolCallId });
+        return;
+      }
+
+      const agentRepo = new AgentRepository();
+      const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}`;
+      const cachedPerm = getCachedPermission(permCacheKey);
+      const permission =
+        cachedPerm !== undefined ? cachedPerm : await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+      if (cachedPerm === undefined) {
+        setCachedPermission(permCacheKey, permission);
+      }
+      if (!permission) {
+        sendError(res, 'FORBIDDEN', 'Tool is not assigned to agent', 200, { agentId, toolSlug, toolCallId });
+        return;
+      }
+      if (permission === 'deny') {
+        sendError(res, 'FORBIDDEN', 'Tool permission denied', 200, { agentId, toolSlug, toolCallId });
+        return;
+      }
+
+      if (permission === 'ask') {
+        const approvals = new ToolCallApprovalRepository();
+        let approvalId: string;
+        try {
+          const approval = await approvals.createPending({
+            starshipId: conversation.starshipId,
+            conversationId,
+            agentId,
+            toolSlug,
+            toolCallId,
+            argsJson: args || {},
+          });
+          approvalId = approval.id;
+        } catch (e) {
+          const msg = getSafeErrorMessageWithCause(e);
+          sendError(res, 'INTERNAL_SERVER_ERROR', msg, 200, { agentId, toolSlug, toolCallId });
+          return;
+        }
+
+        // Emit out-of-band UI action so the client can show an Approve/Deny prompt.
+        const streaming = new StreamingService();
+        await streaming.broadcastUIAction(conversationId, {
+          __ui_action: 'tool_approval_required',
+          approvalId,
+          conversationId,
+          starshipId: conversation.starshipId,
+          agentId,
+          agentName: agent.name,
+          toolSlug,
+          toolCallId,
+          args: args || {},
+        });
+
+        sendError(res, 'TOOL_APPROVAL_REQUIRED', 'Tool requires approval', 200, { approvalId, agentId, toolSlug, toolCallId });
+        return;
+      }
+
+      // permission === 'allow' → execute tool immediately in the runner (remote when RUNNER_URL is configured)
+      const toolRepo = new ToolRepository();
+      const toolCacheKey = `${conversation.starshipId}:${toolSlug}`;
+      const cachedTool = getCachedTool(toolCacheKey);
+      const tool = cachedTool !== undefined ? cachedTool : await toolRepo.findBySlugAndStarship(toolSlug, conversation.starshipId);
+      if (cachedTool === undefined) {
+        setCachedTool(toolCacheKey, tool);
+      }
+      if (!tool || tool.status === 'draft' || !tool.blueprint) {
+        sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId });
+        return;
+      }
+
+      const connectorRuntime = new ConnectorRuntimeService();
+      const connectors = await connectorRuntime.buildConnectorHttpConfig(conversation.starshipId, authUserId);
+      const hostRuntime = buildConnectorHostRuntime(connectors);
+      const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId };
+
+      const env = getEnvConfig();
+      const llm = env.OPENROUTER_API_KEY
+        ? {
+            apiKey: env.OPENROUTER_API_KEY,
+            baseUrl: 'https://openrouter.ai/api/v1',
+          }
+        : undefined;
+
+      // Align with remote-runner expectations: pass connector + llm config as runnerConfig keys.
+      const runnerConfig: Record<string, unknown> = {
+        connectors,
+        llm,
+        runtimeEnv,
+        hostRuntime,
+      };
+
+      const result = await executeToolBlueprint({
+        blueprint: tool.blueprint,
+        toolConfig: (tool.configuration || {}) as Record<string, unknown>,
+        toolArgs: args || {},
+        runnerConfig,
+      });
+
+      sendSuccess(res, { toolCallId, result }, 200);
+    } catch (e) {
+      const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
+      const toolCallId = typeof body.toolCallId === 'string' ? String(body.toolCallId) : '';
+      const msg = getSafeErrorMessageWithCause(e);
+      sendError(res, 'INTERNAL_SERVER_ERROR', msg, 200, { toolCallId });
+    }
+  }
+);
+
+/**
+ * POST /conversations/:conversationId/tool-approvals/:approvalId/approve
+ */
+router.post(
+  '/conversations/:conversationId/tool-approvals/:approvalId/approve',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramsValidation = validateData(
+        z.object({ conversationId: IdSchema, approvalId: IdSchema }),
+        req.params,
+        res,
+        'approval parameters'
+      );
+      if (!paramsValidation) return;
+      const { conversationId, approvalId } = paramsValidation as { conversationId: string; approvalId: string };
+
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+        return;
+      }
+      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+
+      const approvals = new ToolCallApprovalRepository();
+      const approval = await approvals.findById(approvalId);
+      if (!approval || approval.conversationId !== conversationId) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Tool approval not found', 404, { approvalId });
+        return;
+      }
+      if (approval.starshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Tool approval does not belong to this conversation', 403, { approvalId, conversationId });
+        return;
+      }
+      if (approval.status !== 'pending') {
+        sendSuccess(res, { status: approval.status, approvalId });
+        return;
+      }
+
+      // Mark approved (idempotent for pending-only)
+      await approvals.markApproved(approvalId);
+
+      // Execute tool (server-side) and update the placeholder tool message
+      const toolRepo = new ToolRepository();
+      const tool = await toolRepo.findBySlugAndStarship(approval.toolSlug, conversation.starshipId);
+      if (!tool || tool.status === 'draft' || !tool.blueprint) {
+        sendError(res, 'VALIDATION_ERROR', 'Tool is not available for execution', 400, { toolSlug: approval.toolSlug });
+        return;
+      }
+
+      const connectorRuntime = new ConnectorRuntimeService();
+      const connectors = await connectorRuntime.buildConnectorHttpConfig(conversation.starshipId, authUserId);
+      const hostRuntime = buildConnectorHostRuntime(connectors);
+      const env = getEnvConfig();
+      const llm = env.OPENROUTER_API_KEY
+        ? {
+            apiKey: env.OPENROUTER_API_KEY,
+            baseUrl: 'https://openrouter.ai/api/v1',
+          }
+        : undefined;
+
+      const runnerConfig: Record<string, unknown> = {
+        connectors,
+        llm,
+        runtimeEnv: { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId },
+        hostRuntime,
+      };
+
+      const result = await executeToolBlueprint({
+        blueprint: tool.blueprint,
+        toolConfig: (tool.configuration || {}) as Record<string, unknown>,
+        toolArgs: approval.argsJson || {},
+        runnerConfig,
+      });
+
+      const messageService = new MessageService();
+      const content = JSON.stringify({
+        success: true,
+        data: { result, approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId },
+      });
+
+      // Do NOT persist any interim tool result before approval; this message is the first persisted tool result for this call.
+      const created = await messageService.createMessage({
+        conversationId,
+        role: 'tool',
+        content,
+        messageType: 'tool_result',
+        toolCallId: approval.toolCallId,
+      });
+
+      // Best-effort broadcast: update last message (after client supports replace for non-assistant)
+      try {
+        const streaming = new StreamingService();
+        // Broadcast as a normal message append (safe; client de-dupes by id)
+        await streaming.broadcastMessage(conversationId, created);
+        await streaming.broadcastUIAction(conversationId, {
+          __ui_action: 'tool_approval_resolved',
+          approvalId,
+          conversationId,
+          status: 'approved',
+        });
+      } catch {
+        // ignore broadcast failures
+      }
+
+      // Continue agent execution without billing a new user message (async; UI watches SSE)
+      void conversationService
+        .continueAfterToolApproval(conversationId, approval.agentId, { authContext: { userId: authUserId } })
+        .catch((e) => console.warn('[tool-approval] continueAfterToolApproval failed', e));
+
+      sendSuccess(res, { approvalId, status: 'approved' }, 202);
+    } catch (error) {
+      handleError(error, res, 'approving tool');
+    }
+  }
+);
+
+/**
+ * POST /conversations/:conversationId/tool-approvals/:approvalId/deny
+ */
+router.post(
+  '/conversations/:conversationId/tool-approvals/:approvalId/deny',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramsValidation = validateData(
+        z.object({ conversationId: IdSchema, approvalId: IdSchema }),
+        req.params,
+        res,
+        'approval parameters'
+      );
+      if (!paramsValidation) return;
+      const { conversationId, approvalId } = paramsValidation as { conversationId: string; approvalId: string };
+
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+        return;
+      }
+      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+
+      const approvals = new ToolCallApprovalRepository();
+      const approval = await approvals.findById(approvalId);
+      if (!approval || approval.conversationId !== conversationId) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Tool approval not found', 404, { approvalId });
+        return;
+      }
+      if (approval.starshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Tool approval does not belong to this conversation', 403, { approvalId, conversationId });
+        return;
+      }
+      if (approval.status !== 'pending') {
+        sendSuccess(res, { status: approval.status, approvalId });
+        return;
+      }
+
+      await approvals.markDenied(approvalId);
+
+      const messageService = new MessageService();
+      const content = JSON.stringify({
+        success: false,
+        error: {
+          code: 'TOOL_APPROVAL_DENIED',
+          message: 'Tool approval denied',
+          details: { approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId },
+        },
+      });
+
+      const created = await messageService.createMessage({
+        conversationId,
+        role: 'tool',
+        content,
+        messageType: 'tool_result',
+        toolCallId: approval.toolCallId,
+      });
+
+      try {
+        const streaming = new StreamingService();
+        await streaming.broadcastMessage(conversationId, created);
+        await streaming.broadcastUIAction(conversationId, {
+          __ui_action: 'tool_approval_resolved',
+          approvalId,
+          conversationId,
+          status: 'denied',
+        });
+      } catch {
+        /* ignore broadcast failures */
+      }
+
+      void conversationService
+        .continueAfterToolApproval(conversationId, approval.agentId, { authContext: { userId: authUserId } })
+        .catch((e) => console.warn('[tool-approval] continueAfterToolApproval failed', e));
+
+      sendSuccess(res, { approvalId, status: 'denied' }, 202);
+    } catch (error) {
+      handleError(error, res, 'denying tool');
+    }
+  }
+);
 
 /**
  * POST /conversations/:conversationId/messages - Send message to agent (supports unified streaming)

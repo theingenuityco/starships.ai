@@ -30,7 +30,7 @@ export async function GET() {
   const now = new Date()
 
   // Important: In K8s ingress, `/docs/*` routes to the docs service.
-  const sitemapUrls = [`${publicUrl}/sitemaps/client.xml`, `${publicUrl}/docs/sitemap.xml`]
+  const sitemapUrls = [`${publicUrl}/sitemaps/app.xml`, `${publicUrl}/docs/sitemap.xml`]
 
   const body =
     `<?xml version="1.0" encoding="UTF-8"?>\n` +

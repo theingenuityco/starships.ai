@@ -99,7 +99,7 @@ function LoginContent() {
 
   return (
     <StarTheme theme="dark">
-      <div className="min-h-screen bg-black relative overflow-hidden flex">
+      <div className="h-[100dvh] bg-black relative overflow-hidden flex">
         {/* Full-screen background */}
         <AuthMarketingPanel className="absolute inset-0" />
 
@@ -159,7 +159,7 @@ function LoginContent() {
         </div>
 
         {/* Right Side - Login Form overlay */}
-        <div className="w-full lg:w-1/2 flex items-start sm:items-center justify-center px-6 pt-24 pb-16 sm:py-6 min-h-screen max-h-screen overflow-y-auto relative z-10">
+        <div className="w-full lg:w-1/2 flex items-start sm:items-center justify-center px-6 pt-24 pb-16 sm:py-6 h-full overflow-y-auto box-border relative z-10">
           <div className="w-full max-w-md">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-4 text-center">
               <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-3">

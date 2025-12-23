@@ -165,7 +165,7 @@ export default function WhatAreAgents() {
                   {/* Full-width label on smaller screens */}
                   <div className="mt-2 w-full text-center leading-tight whitespace-normal select-text">
                     <div className="text-base sm:text-lg font-semibold text-foreground">{agent.label}</div>
-                    <div className="text-sm sm:text-base text-muted-foreground">{agent.sub}</div>
+                    <div className="text-sm sm:text-base text-muted-foreground whitespace-nowrap">{agent.sub}</div>
                   </div>
                 </div>
 
@@ -208,9 +208,9 @@ export default function WhatAreAgents() {
                     </div>
 
                     {/* Label anchored to orb center (so text width never shifts alignment) */}
-                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-normal select-text max-w-[14rem]">
+                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight select-text">
                       <div className="text-base sm:text-lg font-semibold text-foreground">{agent.label}</div>
-                      <div className="text-sm sm:text-base text-muted-foreground">{agent.sub}</div>
+                      <div className="text-sm sm:text-base text-muted-foreground whitespace-nowrap">{agent.sub}</div>
                     </div>
                   </div>
                 </div>

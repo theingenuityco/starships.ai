@@ -38,7 +38,13 @@ function getOAuthErrorMessage(errorCode: string): string {
 /**
  * JWT-based login and registration form
  */
-export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void }) {
+export function LoginForm({
+  onTabChange,
+  defaultTab = 'login',
+}: {
+  onTabChange?: (tab: string) => void
+  defaultTab?: 'login' | 'register'
+}) {
   const { login, register, oauthLogin, resendVerification, isLoading } = useAuth()
   const searchParams = useSearchParams()
 
@@ -61,7 +67,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [activeTab, setActiveTab] = useState('login')
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>(defaultTab)
   const [formError, setFormError] = useState<string | null>(null)
   const [emailVerificationStatus, setEmailVerificationStatus] = useState<{
     needsVerification: boolean
@@ -69,6 +75,10 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     message: string
   } | null>(null)
   const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
+
+  useEffect(() => {
+    setActiveTab(defaultTab)
+  }, [defaultTab])
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)

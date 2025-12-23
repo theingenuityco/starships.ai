@@ -885,7 +885,7 @@ export default function HeroConversationDemo() {
             background: 'radial-gradient(1000px 700px at 20% 20%, rgba(245, 158, 11, 0.10) 0%, transparent 58%), radial-gradient(1000px 700px at 80% 80%, rgba(217, 119, 6, 0.07) 0%, transparent 56%)',
           }}
         >
-          <div className="h-[560px] sm:h-[620px] md:h-[680px] flex flex-col">
+          <div className="h-[640px] sm:h-[620px] md:h-[680px] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
@@ -950,8 +950,8 @@ export default function HeroConversationDemo() {
                 <div className="absolute inset-x-0 bottom-6 px-4">
                   <div className="w-full max-w-4xl mx-auto">
                     <div className="flex justify-end">
-                      <div className="mb-4 mt-6 flex items-end gap-3 max-w-[70%]">
-                        <div className="flex flex-col gap-2 items-end w-full">
+                      <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
+                        <div className="flex flex-1 flex-col gap-2 items-end w-full">
                           <button
                             type="button"
                             onClick={() => handleDemoChoice('doc_organizer')}

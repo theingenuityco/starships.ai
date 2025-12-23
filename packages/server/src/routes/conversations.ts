@@ -21,10 +21,75 @@ import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
 import { AppError } from '@starships/errors';
+import { StarshipService } from '@/services/StarshipService';
+import { UserService } from '@/services/UserService';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
+import type { ToolModel } from '@starships/protocol';
 
 const router: Router = Router();
 
 const INTERNAL_SCHEDULE_HEADER = 'x-internal-schedule-token';
+
+// -----------------------------------------------------------------------------
+// Lightweight in-memory caches (best-effort) to reduce repeated DB reads during
+// tool-call loops. These are intentionally small + TTL-based.
+// -----------------------------------------------------------------------------
+const PERMISSION_CACHE_TTL_MS = 15_000;
+const TOOL_CACHE_TTL_MS = 15_000;
+
+const permissionCache = new Map<string, { value: 'allow' | 'ask' | 'deny' | null; expiresAt: number }>();
+const toolCache = new Map<string, { value: ToolModel | null; expiresAt: number }>();
+
+function getCachedPermission(key: string): ('allow' | 'ask' | 'deny' | null) | undefined {
+  const hit = permissionCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() > hit.expiresAt) {
+    permissionCache.delete(key);
+    return undefined;
+  }
+  return hit.value;
+}
+
+function setCachedPermission(key: string, value: 'allow' | 'ask' | 'deny' | null): void {
+  permissionCache.set(key, { value, expiresAt: Date.now() + PERMISSION_CACHE_TTL_MS });
+  // Guardrail to prevent unbounded growth in long-lived processes
+  if (permissionCache.size > 5000) {
+    // Simple prune: delete expired entries first; if still too big, delete oldest-ish by iteration.
+    const now = Date.now();
+    for (const [k, v] of permissionCache) {
+      if (v.expiresAt <= now) permissionCache.delete(k);
+      if (permissionCache.size <= 4000) break;
+    }
+    if (permissionCache.size > 4500) {
+      let i = 0;
+      for (const k of permissionCache.keys()) {
+        permissionCache.delete(k);
+        if (++i >= 500) break;
+      }
+    }
+  }
+}
+
+function getCachedTool(key: string): ToolModel | null | undefined {
+  const hit = toolCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() > hit.expiresAt) {
+    toolCache.delete(key);
+    return undefined;
+  }
+  return hit.value;
+}
+
+function setCachedTool(key: string, value: ToolModel | null): void {
+  toolCache.set(key, { value, expiresAt: Date.now() + TOOL_CACHE_TTL_MS });
+  if (toolCache.size > 2000) {
+    const now = Date.now();
+    for (const [k, v] of toolCache) {
+      if (v.expiresAt <= now) toolCache.delete(k);
+      if (toolCache.size <= 1500) break;
+    }
+  }
+}
 
 function isInternalScheduleRequest(req: Request): boolean {
   const expected = process.env.SCHEDULE_WORKER_TOKEN;
@@ -35,6 +100,48 @@ function isInternalScheduleRequest(req: Request): boolean {
     return header.includes(expected);
   }
   return header === expected;
+}
+
+async function verifyResourceAccess200(args: {
+  resourceStarshipId: string;
+  userId: string;
+  resourceType: string;
+  resourceId: string;
+  res: Response;
+}): Promise<boolean> {
+  const starshipService = new StarshipService();
+  const userService = new UserService();
+
+  const [starship, user] = await Promise.all([starshipService.getStarship(args.resourceStarshipId), userService.getUserById(args.userId)]);
+
+  if (!starship) {
+    // Preserve "always 200" contract for HttpRequest node (it throws on non-2xx).
+    sendError(args.res, 'RESOURCE_NOT_FOUND', `${args.resourceType} belongs to non-existent starship`, 200, {
+      resource: args.resourceType,
+      id: args.resourceId,
+    });
+    return false;
+  }
+
+  if (!user) {
+    sendError(args.res, 'ACCESS_DENIED', `Access denied to this ${args.resourceType}`, 200, {
+      resource: args.resourceType,
+      id: args.resourceId,
+      reason: 'user_not_found',
+    });
+    return false;
+  }
+
+  if (starship.ownerId !== args.userId && !isInstanceAdmin(user)) {
+    sendError(args.res, 'ACCESS_DENIED', `Access denied to this ${args.resourceType}`, 200, {
+      resource: args.resourceType,
+      id: args.resourceId,
+      reason: 'not_owner',
+    });
+    return false;
+  }
+
+  return true;
 }
 
 const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
@@ -442,6 +549,19 @@ router.post(
         return;
       }
 
+      // Authorization: ensure the authenticated user can only authorize tools for their own starships.
+      // This endpoint must ALWAYS return 200 for the HttpRequest node, so we use a 200-wrapped guard.
+      const ok = await verifyResourceAccess200({
+        resourceStarshipId: conversation.starshipId,
+        userId: authUserId,
+        resourceType: 'conversation',
+        resourceId: conversationId,
+        res,
+      });
+      if (!ok) {
+        return;
+      }
+
       // Starship connector JWT embeds starshipId in authContext; enforce scoping without using 4xx
       // responses (HttpRequest node throws on non-2xx).
       const authStarshipId = (req as unknown as { authContext?: { starshipId?: string } })?.authContext?.starshipId;
@@ -463,7 +583,13 @@ router.post(
       }
 
       const agentRepo = new AgentRepository();
-      const permission = await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+      const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}`;
+      const cachedPerm = getCachedPermission(permCacheKey);
+      const permission =
+        cachedPerm !== undefined ? cachedPerm : await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+      if (cachedPerm === undefined) {
+        setCachedPermission(permCacheKey, permission);
+      }
       if (!permission) {
         sendError(res, 'FORBIDDEN', 'Tool is not assigned to agent', 200, { agentId, toolSlug, toolCallId });
         return;
@@ -512,7 +638,12 @@ router.post(
 
       // permission === 'allow' → execute tool immediately in the runner (remote when RUNNER_URL is configured)
       const toolRepo = new ToolRepository();
-      const tool = await toolRepo.findBySlugAndStarship(toolSlug, conversation.starshipId);
+      const toolCacheKey = `${conversation.starshipId}:${toolSlug}`;
+      const cachedTool = getCachedTool(toolCacheKey);
+      const tool = cachedTool !== undefined ? cachedTool : await toolRepo.findBySlugAndStarship(toolSlug, conversation.starshipId);
+      if (cachedTool === undefined) {
+        setCachedTool(toolCacheKey, tool);
+      }
       if (!tool || tool.status === 'draft' || !tool.blueprint) {
         sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId });
         return;
@@ -591,6 +722,10 @@ router.post(
       const approval = await approvals.findById(approvalId);
       if (!approval || approval.conversationId !== conversationId) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Tool approval not found', 404, { approvalId });
+        return;
+      }
+      if (approval.starshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Tool approval does not belong to this conversation', 403, { approvalId, conversationId });
         return;
       }
       if (approval.status !== 'pending') {
@@ -711,6 +846,10 @@ router.post(
       const approval = await approvals.findById(approvalId);
       if (!approval || approval.conversationId !== conversationId) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Tool approval not found', 404, { approvalId });
+        return;
+      }
+      if (approval.starshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Tool approval does not belong to this conversation', 403, { approvalId, conversationId });
         return;
       }
       if (approval.status !== 'pending') {

@@ -325,6 +325,15 @@ export class AgentService {
     const offset = (page - 1) * limit;
     const paginatedAgents = pendingAgents.slice(offset, offset + limit);
 
+    // Bulk-load assigned tool slugs for this page of agents (avoid N+1).
+    const toolRows = await this.agentRepository.getAssignedToolSlugsForAgents(paginatedAgents.map((a) => a.id));
+    const toolSlugsByAgentId = new Map<string, string[]>();
+    for (const row of toolRows) {
+      const list = toolSlugsByAgentId.get(row.agentId) ?? [];
+      list.push(row.toolSlug);
+      toolSlugsByAgentId.set(row.agentId, list);
+    }
+
     // Enrich with user display name and starship label for admin UX,
     // while keeping publicationRequestedBy as the underlying user id.
     const userRepo = new UserRepository();
@@ -395,14 +404,7 @@ export class AgentService {
       // Resolve assigned tools for this agent so admin review can see
       // the actual tool slugs attached to the agent, even though the
       // underlying relationship is stored via the junction table.
-      try {
-        const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-        assignedToolSlugs = (tools || [])
-          .map((t) => t.slug)
-          .filter((slug): slug is string => typeof slug === 'string' && slug.trim().length > 0);
-      } catch {
-        assignedToolSlugs = [];
-      }
+      assignedToolSlugs = (toolSlugsByAgentId.get(agent.id) || []).filter((slug) => typeof slug === 'string' && slug.trim().length > 0);
 
       enrichedAgents.push({
         agent: {

@@ -361,6 +361,40 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
+   * Bulk-load assigned tool slugs for many agents in one query.
+   * Used by admin listings to avoid N+1 lookups.
+   */
+  async getAssignedToolSlugsForAgents(agentIds: string[]): Promise<Array<{ agentId: string; toolSlug: string }>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const ids = (agentIds || []).filter((id) => typeof id === 'string' && id.trim().length > 0);
+        if (ids.length === 0) return [];
+
+        const connection = this.getConnection();
+        const placeholders = ids.map((_, idx) => `$${idx + 1}`).join(', ');
+        const rows = await connection.query<{ agent_id: string; tool_slug: string }>(
+          `
+          SELECT
+            at.agent_id as agent_id,
+            t.slug as tool_slug
+          FROM agent_tools at
+          INNER JOIN agents a ON a.id = at.agent_id
+          INNER JOIN tools t ON t.id = at.tool_id
+          WHERE at.agent_id IN (${placeholders})
+            AND t.starship_id = a.starship_id
+          ORDER BY at.agent_id, t.created_at DESC
+          `,
+          ids
+        );
+
+        return (rows || []).map((r) => ({ agentId: r.agent_id, toolSlug: r.tool_slug }));
+      },
+      'getAssignedToolSlugsForAgents',
+      'Agent'
+    );
+  }
+
+  /**
    * Get the stored permission for a given agent↔tool (by tool slug within a starship).
    * Returns null when the tool is not assigned to the agent.
    */

@@ -29,7 +29,7 @@ function joinUrl(base: string, path: string): string {
 export const revalidate = 60 * 60 // 1 hour
 
 /**
- * Client app sitemap (public-facing pages only).
+ * App sitemap (public-facing pages only).
  *
  * Note: authenticated app routes like `/ship/*` are intentionally excluded.
  */
@@ -71,3 +71,5 @@ export async function GET() {
     },
   })
 }
+
+

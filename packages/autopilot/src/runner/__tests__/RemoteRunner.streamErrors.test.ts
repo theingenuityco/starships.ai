@@ -69,3 +69,4 @@ describe('RemoteRunner (SSE)', () => {
     await expect(runner.run(blueprint, execution, { eventCallback: jest.fn() })).rejects.toThrow(/ended without a completed result/i);
   });
 });
+

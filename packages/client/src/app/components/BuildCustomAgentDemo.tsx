@@ -420,9 +420,9 @@ export default function BuildCustomAgentDemo() {
         {path ? <path d={path} className={['delegation-edge', isEdgeActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
       </svg>
 
-      <div className="relative z-10 grid gap-6 md:grid-cols-2 md:gap-20 lg:gap-24 xl:gap-28">
+      <div className="relative z-10 grid w-full gap-6 md:grid-cols-2 md:gap-20 lg:gap-24 xl:gap-28">
         {/* Left: mock conversation */}
-        <div ref={leftRef} className="relative isolate overflow-visible">
+        <div ref={leftRef} className="relative isolate overflow-visible w-full min-w-0">
           {/* Glow per-window (only when active) */}
           <div
             className={['absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500', isLeftActive ? 'opacity-70' : 'opacity-0'].join(' ')}
@@ -433,7 +433,7 @@ export default function BuildCustomAgentDemo() {
             aria-hidden
           />
 
-          <div className={['relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30', isLeftActive ? 'border-amber-300/55' : 'border-white/20'].join(' ')}>
+          <div className={['relative z-10 w-full min-w-0 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30', isLeftActive ? 'border-amber-300/55' : 'border-white/20'].join(' ')}>
             <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
               <div className="text-sm font-medium leading-none truncate">Building Customer Inbox Agent with Gaia</div>
               <div className="mt-1 text-xs text-muted-foreground truncate">You, Gaia</div>
@@ -458,7 +458,7 @@ export default function BuildCustomAgentDemo() {
         </div>
 
         {/* Right: embedded agent builder form */}
-        <div ref={rightRef} className="relative isolate overflow-visible">
+        <div ref={rightRef} className="relative isolate overflow-visible w-full min-w-0">
           {/* Glow per-window (only when active) */}
           <div
             className={['absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500', isRightActive ? 'opacity-70' : 'opacity-0'].join(' ')}
@@ -469,7 +469,7 @@ export default function BuildCustomAgentDemo() {
             aria-hidden
           />
 
-          <div className={['relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30', isRightActive ? 'border-amber-300/55' : 'border-white/20'].join(' ')}>
+          <div className={['relative z-10 w-full min-w-0 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30', isRightActive ? 'border-amber-300/55' : 'border-white/20'].join(' ')}>
             <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">

@@ -31,7 +31,7 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
   return (
     <div className="h-full flex flex-col bg-background">
       <div className="flex-1">
-        <div className="w-full max-w-6xl mx-auto px-6 py-3 space-y-6">
+        <div className={embedded ? 'w-full max-w-none mx-0 px-3 py-3 space-y-6' : 'w-full max-w-6xl mx-auto px-6 py-3 space-y-6'}>
           {errorMessage ? (
             <Alert variant="destructive" className="flex-col">
               <AlertTitle>Agent creation failed</AlertTitle>

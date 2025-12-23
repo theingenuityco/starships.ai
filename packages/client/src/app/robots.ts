@@ -1,9 +1,20 @@
 import type { MetadataRoute } from 'next'
+import { isIndexingEnabled } from '@/lib/indexing'
+import { publicEnvConfig } from '@starships/env/public'
 
-export const revalidate = 60 * 60 // 1 hour
+export const revalidate = 3600 // 1 hour
 
 export default function robots(): MetadataRoute.Robots {
-  const publicUrl = (process.env.PUBLIC_URL || 'https://starships.ai').replace(/\/+$/, '')
+  const publicUrl = publicEnvConfig.PUBLIC_URL.replace(/\/+$/, '')
+  const indexingEnabled = isIndexingEnabled()
+
+  if (!indexingEnabled) {
+    return {
+      rules: [{ userAgent: '*', disallow: '/' }],
+      // Intentionally omit `sitemap` when indexing is disabled.
+      host: publicUrl,
+    }
+  }
 
   return {
     rules: [

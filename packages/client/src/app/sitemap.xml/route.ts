@@ -1,3 +1,6 @@
+import { isIndexingEnabled } from '@/lib/indexing'
+import { publicEnvConfig } from '@starships/env/public'
+
 function xmlEscape(value: string): string {
   return (
     value
@@ -23,10 +26,14 @@ function toIsoDate(value: Date): string {
  *
  * This endpoint returns a sitemap index pointing to each app's sitemap.
  */
-export const revalidate = 60 * 60 // 1 hour
+export const revalidate = 3600 // 1 hour
 
 export async function GET() {
-  const publicUrl = (process.env.PUBLIC_URL || 'https://starships.ai').replace(/\/+$/, '')
+  if (!isIndexingEnabled()) {
+    return new Response('Not Found', { status: 404 })
+  }
+
+  const publicUrl = publicEnvConfig.PUBLIC_URL.replace(/\/+$/, '')
   const now = new Date()
 
   // Important: In K8s ingress, `/docs/*` routes to the docs service.

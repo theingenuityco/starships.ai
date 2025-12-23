@@ -14,7 +14,10 @@ type Trait = {
 
 function TraitCard({ trait, setRef }: { trait: Pick<Trait, 'id' | 'label' | 'sub' | 'icon'>; setRef?: (el: HTMLDivElement | null) => void }) {
   return (
-    <div ref={setRef} className="relative w-[300px] rounded-xl border border-white/12 bg-white/[0.05] px-5 py-4 shadow-[0_0_18px_rgba(168,85,247,0.12),0_0_34px_rgba(59,130,246,0.08)] select-text">
+    <div
+      ref={setRef}
+      className="relative w-full xl:w-[300px] rounded-xl border border-white/12 bg-white/[0.05] px-5 py-4 shadow-[0_0_18px_rgba(168,85,247,0.12),0_0_34px_rgba(59,130,246,0.08)] select-text"
+    >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/15 bg-black/30">
           <Icon name={trait.icon} className="h-5 w-5 text-primary" />
@@ -29,6 +32,24 @@ function TraitCard({ trait, setRef }: { trait: Pick<Trait, 'id' | 'label' | 'sub
 }
 
 export default function WhatAreAgents() {
+  const [isXl, setIsXl] = useState(false)
+
+  // Render only one diagram DOM variant at a time so our refs (canvas/orb/cards) always point
+  // at the visible layout (avoids measuring hidden elements).
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia === 'undefined') return
+    const mql = window.matchMedia('(min-width: 1280px)') // Tailwind `xl`
+    const apply = () => setIsXl(Boolean(mql.matches))
+    apply()
+    // Safari < 14 uses addListener/removeListener
+    if (typeof (mql as any).addEventListener === 'function') {
+      mql.addEventListener('change', apply)
+      return () => mql.removeEventListener('change', apply)
+    }
+    mql.addListener(apply)
+    return () => mql.removeListener(apply)
+  }, [])
+
   const agent = useMemo(() => {
     return {
       label: 'Agent',
@@ -92,7 +113,7 @@ export default function WhatAreAgents() {
   useLayoutEffect(() => {
     computePaths()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traits])
+  }, [traits, isXl])
 
   useEffect(() => {
     computePaths()
@@ -111,7 +132,7 @@ export default function WhatAreAgents() {
       ro?.disconnect()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [traits])
+  }, [traits, isXl])
 
   return (
     <section className="py-14 px-4">
@@ -122,69 +143,92 @@ export default function WhatAreAgents() {
         </div>
 
         <div className="mx-auto max-w-6xl">
-          {/* Mobile/tablet: simple stacked cards */}
-          <div className="lg:hidden grid gap-3">
-            <div className="flex items-center gap-3 rounded-xl border border-white/12 bg-white/[0.05] px-4 py-3 select-text">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-white/15 bg-black/30">
-                <Icon name="head-circuit" className="h-6 w-6 text-primary" />
-              </div>
-              <div className="select-text">
-                <div className="text-base font-medium text-foreground leading-tight">Agent</div>
-                <div className="mt-1 text-sm text-muted-foreground leading-snug">Anatomy of an agent</div>
-              </div>
-            </div>
-
-            <div className="grid gap-3">
-              {traits.map(t => (
-                <TraitCard key={t.id} trait={t} />
-              ))}
-            </div>
-          </div>
-
-          {/* Desktop: diagram (divs + SVG paths) */}
-          <div className="hidden lg:block rounded-2xl bg-transparent border border-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0 shadow-none">
-            <div ref={canvasRef} className="relative mx-auto h-[720px] w-[1180px] max-w-full">
-              <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true">
-                {paths.map(p => (
-                  <path key={p.id} d={p.d} className="agent-anatomy-edge" />
-                ))}
-              </svg>
-
-              {/* Center agent */}
-              <div className="absolute" style={{ left: agent.x, top: agent.y }}>
-                <div ref={orbRef} className="relative w-[92px] h-[92px] overflow-visible">
-                  <div
-                    title={`${agent.label}${agent.sub ? ` - ${agent.sub}` : ''}`}
-                    className={[
-                      'agent-anatomy-orb relative grid place-items-center rounded-full border w-full h-full',
-                      'border-white/25 bg-black/35 shadow-[0_0_22px_rgba(168,85,247,0.24),0_0_44px_rgba(59,130,246,0.14)]',
-                    ].join(' ')}
-                  >
-                    <div className="agent-anatomy-center-ring pointer-events-none absolute inset-[-12px] rounded-full" />
-                    <Icon name={agent.icon} className="w-[44px] h-[44px] text-primary drop-shadow-[0_0_18px_rgba(168,85,247,0.28)]" />
+          {!isXl ? (
+            // Mobile/tablet: diagram layout (orb + connector lines + cards in flow)
+            <div className="rounded-2xl bg-transparent border border-transparent px-0 sm:px-2 shadow-none">
+              <div ref={canvasRef} className="relative mx-auto w-full">
+                {/* Orb centered on top */}
+                <div className="relative z-10 pt-2 flex flex-col items-center">
+                  <div ref={orbRef} className="relative w-[92px] h-[92px] overflow-visible">
+                    <div
+                      title={`${agent.label}${agent.sub ? ` - ${agent.sub}` : ''}`}
+                      className={[
+                        'agent-anatomy-orb relative grid place-items-center rounded-full border w-full h-full',
+                        'border-white/25 bg-black/35 shadow-[0_0_22px_rgba(168,85,247,0.24),0_0_44px_rgba(59,130,246,0.14)]',
+                      ].join(' ')}
+                    >
+                      <div className="agent-anatomy-center-ring pointer-events-none absolute inset-[-12px] rounded-full" />
+                      <Icon name={agent.icon} className="w-[44px] h-[44px] text-primary drop-shadow-[0_0_18px_rgba(168,85,247,0.28)]" />
+                    </div>
                   </div>
 
-                  {/* Label anchored to orb center (so text width never shifts alignment) */}
-                  <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-nowrap select-text">
+                  {/* Full-width label on smaller screens */}
+                  <div className="mt-2 w-full text-center leading-tight whitespace-normal select-text">
                     <div className="text-base sm:text-lg font-semibold text-foreground">{agent.label}</div>
                     <div className="text-sm sm:text-base text-muted-foreground">{agent.sub}</div>
                   </div>
                 </div>
-              </div>
 
-              {/* Trait cards */}
-              {traits.map(t => (
-                <div key={t.id} className="absolute" style={{ left: t.x, top: t.y }}>
-                  <TraitCard
-                    trait={t}
-                    setRef={el => {
-                      traitRefs.current[t.id] = el
-                    }}
-                  />
+                {/* Trait cards below (still connected via SVG) */}
+                <div className="relative z-10 mt-16 grid gap-3 sm:grid-cols-2">
+                  {traits.map(t => (
+                    <TraitCard
+                      key={t.id}
+                      trait={t}
+                      setRef={el => {
+                        traitRefs.current[t.id] = el
+                      }}
+                    />
+                  ))}
                 </div>
-              ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            // Desktop: diagram (absolute positions)
+            <div className="rounded-2xl bg-transparent border border-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0 shadow-none">
+              <div ref={canvasRef} className="relative mx-auto h-[720px] w-full max-w-[1152px]">
+                <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true">
+                  {paths.map(p => (
+                    <path key={p.id} d={p.d} className="agent-anatomy-edge" />
+                  ))}
+                </svg>
+
+                {/* Center agent */}
+                <div className="absolute" style={{ left: agent.x, top: agent.y }}>
+                  <div ref={orbRef} className="relative w-[92px] h-[92px] overflow-visible">
+                    <div
+                      title={`${agent.label}${agent.sub ? ` - ${agent.sub}` : ''}`}
+                      className={[
+                        'agent-anatomy-orb relative grid place-items-center rounded-full border w-full h-full',
+                        'border-white/25 bg-black/35 shadow-[0_0_22px_rgba(168,85,247,0.24),0_0_44px_rgba(59,130,246,0.14)]',
+                      ].join(' ')}
+                    >
+                      <div className="agent-anatomy-center-ring pointer-events-none absolute inset-[-12px] rounded-full" />
+                      <Icon name={agent.icon} className="w-[44px] h-[44px] text-primary drop-shadow-[0_0_18px_rgba(168,85,247,0.28)]" />
+                    </div>
+
+                    {/* Label anchored to orb center (so text width never shifts alignment) */}
+                    <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-normal select-text max-w-[14rem]">
+                      <div className="text-base sm:text-lg font-semibold text-foreground">{agent.label}</div>
+                      <div className="text-sm sm:text-base text-muted-foreground">{agent.sub}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Trait cards */}
+                {traits.map(t => (
+                  <div key={t.id} className="absolute" style={{ left: t.x, top: t.y }}>
+                    <TraitCard
+                      trait={t}
+                      setRef={el => {
+                        traitRefs.current[t.id] = el
+                      }}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* A11y fallback */}
           <ul className="sr-only">

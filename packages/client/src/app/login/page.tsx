@@ -20,11 +20,13 @@ const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 function LoginContent() {
   const { isAuthenticated, isLoading, user, logout } = useAuth()
-  const [activeTab, setActiveTab] = useState('login')
   const [mounted, setMounted] = useState(false)
   const [logoTrigger, setLogoTrigger] = useState(0)
   const router = useRouter()
   const searchParams = useSearchParams()
+  const tabParam = searchParams?.get('tab')
+  const initialTab = tabParam === 'register' ? 'register' : 'login'
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab)
 
   // Fetch user's starships when authenticated
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
@@ -33,6 +35,13 @@ function LoginContent() {
   React.useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Support deep links like /login?tab=register
+  React.useEffect(() => {
+    if (tabParam === 'login' || tabParam === 'register') {
+      setActiveTab(tabParam)
+    }
+  }, [tabParam])
 
   const logoutParam = searchParams?.get('logout')
   const expectedEmail = searchParams?.get('expectedEmail')
@@ -90,9 +99,9 @@ function LoginContent() {
 
   return (
     <StarTheme theme="dark">
-      <div className="min-h-screen bg-black relative overflow-hidden flex">
+      <div className="min-h-[100dvh] bg-black relative overflow-hidden flex">
         {/* Full-screen background */}
-        <AuthMarketingPanel className="absolute inset-0" />
+        <AuthMarketingPanel className="fixed inset-0" />
 
         {/* Header with logo */}
         <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
@@ -150,16 +159,16 @@ function LoginContent() {
         </div>
 
         {/* Right Side - Login Form overlay */}
-        <div className="w-full lg:w-1/2 flex items-center justify-center px-6 py-6 min-h-screen max-h-screen overflow-y-auto relative z-10">
+        <div className="w-full lg:w-1/2 flex items-start justify-center px-6 pt-24 pb-16 md:pt-28 md:pb-20 xl:items-center xl:py-10 relative z-10">
           <div className="w-full max-w-md">
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-4 text-center">
               <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-3">
-                <h1 className="text-3xl font-bold text-primary">{activeTab === 'login' ? 'Welcome Back' : 'Join Starships'}</h1>
+                <h1 className="text-3xl font-bold text-primary">{activeTab === 'login' ? 'Sign in' : 'Sign up'}</h1>
                 <p className="text-muted-foreground mt-1">{activeTab === 'login' ? 'Continue your starship journey' : 'Start your starship journey'}</p>
               </motion.div>
             </motion.div>
 
-            <LoginForm onTabChange={setActiveTab} />
+            <LoginForm defaultTab={activeTab} onTabChange={tab => setActiveTab(tab === 'register' ? 'register' : 'login')} />
           </div>
         </div>
       </div>

@@ -46,8 +46,28 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
 
     let llmCallCount = 0;
     const hostRuntime: HostRuntime = {
-      http: async () => {
-        throw new Error('http not used in this test');
+      http: async (req) => {
+        const body = (req?.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
+        const toolSlug = String(body.toolSlug ?? '');
+        const toolCallId = String(body.toolCallId ?? '');
+        const args = (body.args && typeof body.args === 'object' ? (body.args as Record<string, unknown>) : {}) as Record<string, unknown>;
+
+        const label = toolSlug === 'tool_a' ? 'A' : toolSlug === 'tool_b' ? 'B' : 'UNKNOWN';
+
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          url: String(req?.url ?? ''),
+          // Mirror server contract: { success: true, data: { toolCallId, result } }
+          body: {
+            success: true,
+            data: {
+              toolCallId,
+              result: { label, input: args },
+            },
+          },
+        };
       },
       llm: async () => {
         llmCallCount++;
@@ -138,11 +158,17 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
 
     expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
     expect(typeof msgs[2]?.content).toBe('string');
-    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({ label: 'A', input: { value: 'one' } });
+    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({
+      success: true,
+      data: { toolCallId: 'call_1', result: { label: 'A', input: { value: 'one' } } },
+    });
 
     expect(msgs[3]).toMatchObject({ role: 'tool', toolCallId: 'call_2' });
     expect(typeof msgs[3]?.content).toBe('string');
-    expect(JSON.parse(String(msgs[3]?.content))).toMatchObject({ label: 'B', input: { value: 'two' } });
+    expect(JSON.parse(String(msgs[3]?.content))).toMatchObject({
+      success: true,
+      data: { toolCallId: 'call_2', result: { label: 'B', input: { value: 'two' } } },
+    });
 
     expect(msgs[4]).toMatchObject({ role: 'assistant', content: 'done' });
   });

@@ -1253,12 +1253,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       <div className="space-y-2 mb-4">
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
-          <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
               <Icon name="tag" className="w-4 h-4" />
               <span className="text-xs font-semibold">Category</span>
             </div>
-            <div className="w-[260px]">
+            <div className="w-full sm:w-[260px]">
               <StandardSelect
                 mode="single"
                 aria-label="Change category"
@@ -1286,12 +1286,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
         {/* Model section */}
         <div className="border-b border-border/10 pb-2">
-          <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
               <Icon name="cpu" className="w-4 h-4" />
               <span className="text-xs font-semibold">Model</span>
             </div>
-            <div className="w-[260px]">
+            <div className="w-full sm:w-[260px]">
               <StandardSelect
                 mode="single"
                 aria-label="Select model"
@@ -1318,12 +1318,12 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
         {/* Tools section */}
         <div className="border-b border-border/10 pb-2">
-          <div className="flex items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
               <Icon name="wrench" className="w-4 h-4" />
               <span className="text-xs font-semibold">Assigned Tools</span>
             </div>
-            <div className="w-[260px]">
+            <div className="w-full sm:w-[260px]">
               <StandardSelect
                 mode="multiple"
                 aria-label="Select tools"
@@ -1367,8 +1367,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
         {/* Description */}
         <div className="border-b border-border/10 pb-2">
-          <div className="flex items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-2">
               <Icon name="file-text" className="w-4 h-4" />
               <span className="text-xs font-semibold">Description</span>
             </div>
@@ -1386,8 +1386,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
         {/* System Prompt */}
         <div className="border-b border-border/10 pb-2">
-          <div className="flex items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-2">
+          <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-2">
               <Icon name="sparkles" className="w-4 h-4" />
               <span className="text-xs font-semibold">System Prompt</span>
             </div>
@@ -1416,8 +1416,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       {/* Examples (Preview Prompts) */}
       <div className="border-b border-border/10 pb-2 mt-2">
-        <div className="flex items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
+          <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
             <Icon name="list-bullet" className="w-4 h-4" />
             <span className="text-xs font-semibold">Examples</span>
           </div>
@@ -1523,8 +1523,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           <div className="space-y-4 mt-1">
             {/* Blueprint first */}
             <div>
-              <div className="flex items-start gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
                   <Icon name="network" className="w-4 h-4" />
                   <span className="text-xs font-semibold">Blueprint</span>
                 </div>
@@ -1548,13 +1548,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             {/* Then numeric advanced controls */}
             <div className="space-y-2 border-t border-border/10 pt-2">
               {/* Reasoning */}
-              <div className="flex items-start gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px] pt-1">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
                   <Icon name="brain" className="w-4 h-4" />
                   <span className="text-xs font-semibold">Reasoning</span>
                 </div>
                 <div className="flex-1">
-                  <div className="w-[260px]">
+                  <div className="w-full sm:w-[260px]">
                     <StandardSelect
                       aria-label="Select reasoning effort"
                       disabled={isTemplateAgent || readOnly}
@@ -1582,11 +1582,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </div>
 
               {/* Temperature */}
-              <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
                   <span className="text-xs font-semibold">Temperature</span>
                 </div>
-                <div className="w-[260px]">
+                <div className="w-full sm:w-[260px]">
                   <Input
                     id="agent-temperature"
                     type="number"
@@ -1602,11 +1602,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </div>
 
               {/* Max Tokens */}
-              <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
                   <span className="text-xs font-semibold">Max Tokens</span>
                 </div>
-                <div className="w-[260px]">
+                <div className="w-full sm:w-[260px]">
                   <Input
                     id="agent-max-tokens"
                     type="number"
@@ -1621,11 +1621,11 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
               </div>
 
               {/* Timeout */}
-              <div className="flex items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground min-w-[160px]">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
                   <span className="text-xs font-semibold">Timeout (ms)</span>
                 </div>
-                <div className="w-[260px]">
+                <div className="w-full sm:w-[260px]">
                   <Input
                     id="agent-timeout"
                     type="number"

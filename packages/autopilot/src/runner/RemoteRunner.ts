@@ -47,6 +47,7 @@ export class RemoteRunner implements Runner {
       const decoder = new TextDecoder();
       let buffer = '';
       let finalResult: ExecutionItem[] | undefined = undefined;
+      let fatalStreamError: Error | undefined = undefined;
 
       type CompletedPayload = { duration_ms?: number; result_json?: string };
       type ErrorPayload = { error?: { message?: string } };
@@ -101,14 +102,40 @@ export class RemoteRunner implements Runner {
             } else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
           }
           if (dataStr) {
+            let data: unknown;
             try {
-              const data = JSON.parse(dataStr);
+              data = JSON.parse(dataStr);
+            } catch (e) {
+              // Non-fatal: malformed JSON in stream; log and keep parsing.
+              console.error('[RemoteRunner] SSE parse error', e);
+              continue;
+            }
+
+            try {
               await emit(eventName, data);
             } catch (e) {
-              console.error('[RemoteRunner] SSE parse error', e);
+              // Important: 'error' events are fatal to the caller; do not swallow them.
+              if (eventName === 'error') {
+                fatalStreamError = e instanceof Error ? e : new Error(String(e));
+                try {
+                  await reader.cancel();
+                } catch {
+                  // ignore
+                }
+                break;
+              }
+              console.error('[RemoteRunner] SSE event handler error', e);
             }
           }
+
+          if (fatalStreamError) break;
         }
+
+        if (fatalStreamError) break;
+      }
+
+      if (fatalStreamError) {
+        throw fatalStreamError;
       }
 
       // If the stream ended without a completed payload, treat as an error.

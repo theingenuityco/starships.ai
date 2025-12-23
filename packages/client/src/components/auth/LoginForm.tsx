@@ -38,7 +38,19 @@ function getOAuthErrorMessage(errorCode: string): string {
 /**
  * JWT-based login and registration form
  */
-export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void }) {
+type AuthTab = 'login' | 'register'
+
+function isAuthTab(value: string): value is AuthTab {
+  return value === 'login' || value === 'register'
+}
+
+export function LoginForm({
+  onTabChange,
+  defaultTab = 'login',
+}: {
+  onTabChange?: (tab: AuthTab) => void
+  defaultTab?: AuthTab
+}) {
   const { login, register, oauthLogin, resendVerification, isLoading } = useAuth()
   const searchParams = useSearchParams()
 
@@ -61,7 +73,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [activeTab, setActiveTab] = useState('login')
+  const [activeTab, setActiveTab] = useState<AuthTab>(defaultTab)
   const [formError, setFormError] = useState<string | null>(null)
   const [emailVerificationStatus, setEmailVerificationStatus] = useState<{
     needsVerification: boolean
@@ -69,6 +81,10 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
     message: string
   } | null>(null)
   const [autoSwitchedToRegister, setAutoSwitchedToRegister] = useState(false)
+
+  useEffect(() => {
+    setActiveTab(defaultTab)
+  }, [defaultTab])
 
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
@@ -262,6 +278,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
           <Tabs
             value={activeTab}
             onValueChange={value => {
+              if (!isAuthTab(value)) return
               setActiveTab(value)
               onTabChange?.(value) // Notify parent of tab change
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
@@ -350,9 +367,9 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
               </form>
             </TabsContent>
 
-            <TabsContent value="register" className="space-y-2">
-              <form onSubmit={handleRegister} className="space-y-2">
-                <div className="space-y-1">
+            <TabsContent value="register" className="space-y-4">
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>
                   <Input
                     id="register-name"
@@ -366,7 +383,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="register-email">Email</Label>
                   <Input
                     id="register-email"
@@ -380,7 +397,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <PasswordLabelWithTooltip htmlFor="register-password" password={registerData.password} />
                   <div className="relative">
                     <Input
@@ -407,7 +424,7 @@ export function LoginForm({ onTabChange }: { onTabChange?: (tab: string) => void
                   {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="register-confirm-password">Confirm Password</Label>
                   <div className="relative">
                     <Input

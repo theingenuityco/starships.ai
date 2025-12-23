@@ -360,9 +360,9 @@ export function LoginForm({
               </form>
             </TabsContent>
 
-            <TabsContent value="register" className="space-y-2">
-              <form onSubmit={handleRegister} className="space-y-2">
-                <div className="space-y-1">
+            <TabsContent value="register" className="space-y-4">
+              <form onSubmit={handleRegister} className="space-y-4">
+                <div className="space-y-2">
                   <Label htmlFor="register-name">Full Name</Label>
                   <Input
                     id="register-name"
@@ -376,7 +376,7 @@ export function LoginForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="register-email">Email</Label>
                   <Input
                     id="register-email"
@@ -390,7 +390,7 @@ export function LoginForm({
                   />
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <PasswordLabelWithTooltip htmlFor="register-password" password={registerData.password} />
                   <div className="relative">
                     <Input
@@ -417,7 +417,7 @@ export function LoginForm({
                   {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
                 </div>
 
-                <div className="space-y-1">
+                <div className="space-y-2">
                   <Label htmlFor="register-confirm-password">Confirm Password</Label>
                   <div className="relative">
                     <Input

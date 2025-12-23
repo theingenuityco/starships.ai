@@ -85,6 +85,12 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: DOCS_URL
+            # SEO / indexing (default should be false for dev/staging instances)
+            - name: ENABLE_INDEXING
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ENABLE_INDEXING
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

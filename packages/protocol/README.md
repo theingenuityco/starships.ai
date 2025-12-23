@@ -87,7 +87,6 @@ import { ApiResponse } from '@starships/protocol';
 const response: ApiResponse<Starship> = {
   success: true,
   data: starship,
-  message: 'Starship retrieved successfully',
 };
 ```
 

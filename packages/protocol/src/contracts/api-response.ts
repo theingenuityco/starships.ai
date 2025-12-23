@@ -9,6 +9,7 @@ import type { StandardErrorCode } from '@/contracts/errors';
 
 // Standard success response structure
 export interface ApiResponse<T = unknown> {
+  success: true;
   data: T;
   meta?: ApiResponseMeta;
 }
@@ -31,6 +32,7 @@ export interface PaginationMeta {
 
 // Standard error response structure
 export interface ApiErrorResponse {
+  success: false;
   error: {
     code: StandardErrorCode;
     message: string;

@@ -549,10 +549,10 @@ export class Agent implements NodeHandler {
         condition: `{{(() => {
           const resp = lastOutputOf("${httpNodeRef}") || {};
           const body = resp?.body || {};
-          const ok = body?.ok === true;
-          if (ok) return "append_and_continue";
-          const err = typeof body?.error === "string" ? body.error : "";
-          return err === "TOOL_APPROVAL_REQUIRED" ? "approval_required" : "append_and_continue";
+          const success = body?.success === true;
+          if (success) return "append_and_continue";
+          const code = body?.error?.code;
+          return code === "TOOL_APPROVAL_REQUIRED" ? "approval_required" : "append_and_continue";
         })()}}`,
       },
     });
@@ -582,31 +582,6 @@ export class Agent implements NodeHandler {
             } else {
               next.pendingToolCallIndex = nextIdx;
             }
-            return next;
-          }
-          `,
-        ],
-      },
-    });
-
-    const appendApprovalPendingNodeRef = builder.addNode({
-      type: 'mutate',
-      name: 'Append Approval Pending',
-      description: 'Append TOOL_APPROVAL_REQUIRED tool result and stop the workflow',
-      parameters: {
-        reducers: [
-          `
-          (state, ctx) => {
-            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
-            const rawIdx = state?.pendingToolCallIndex;
-            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
-            const tc = pending?.[idx];
-            const toolCallId = tc?.id ?? '';
-            const resp = ctx.lastOutputOf("${httpNodeRef}") || {};
-            const body = resp?.body || {};
-            const content = JSON.stringify(body);
-            const next = { ...(state || {}) };
-            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
             return next;
           }
           `,
@@ -645,25 +620,29 @@ export class Agent implements NodeHandler {
       },
     });
 
-    return builder
-      .addEdge(startRef, llmNodeRef)
-      .addEdge(llmNodeRef, conditionalNodeRef)
-      .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
-      .addEdge(conditionalNodeRef, initToolCallsNodeRef, 'init_tool_calls')
-      .addEdge(conditionalNodeRef, endRef, 'complete')
-      .addEdge(initToolCallsNodeRef, toolLoopConditionalRef)
-      .addEdge(toolLoopConditionalRef, argsNodeRef, 'call_tool')
-      .addEdge(argsNodeRef, httpNodeRef)
-      .addEdge(httpNodeRef, toolHttpOutcomeRef)
-      .addEdge(toolHttpOutcomeRef, appendToolResultNodeRef, 'append_and_continue')
-      .addEdge(appendToolResultNodeRef, toolLoopConditionalRef)
-      .addEdge(toolHttpOutcomeRef, appendApprovalPendingNodeRef, 'approval_required')
-      .addEdge(appendApprovalPendingNodeRef, endRef)
-      .addEdge(toolLoopConditionalRef, notAllowedNodeRef, 'tool_not_allowed')
-      .addEdge(notAllowedNodeRef, toolLoopConditionalRef)
-      .addEdge(toolLoopConditionalRef, llmNodeRef, 'done_tools')
-      .setMetadata('generatedBy', 'Agent.defaultAgentBlueprintServerTools')
-      .build();
+    return (
+      builder
+        .addEdge(startRef, llmNodeRef)
+        .addEdge(llmNodeRef, conditionalNodeRef)
+        .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
+        .addEdge(conditionalNodeRef, initToolCallsNodeRef, 'init_tool_calls')
+        .addEdge(conditionalNodeRef, endRef, 'complete')
+        .addEdge(initToolCallsNodeRef, toolLoopConditionalRef)
+        .addEdge(toolLoopConditionalRef, argsNodeRef, 'call_tool')
+        .addEdge(argsNodeRef, httpNodeRef)
+        .addEdge(httpNodeRef, toolHttpOutcomeRef)
+        .addEdge(toolHttpOutcomeRef, appendToolResultNodeRef, 'append_and_continue')
+        .addEdge(appendToolResultNodeRef, toolLoopConditionalRef)
+        // CRITICAL: On TOOL_APPROVAL_REQUIRED, stop execution immediately and do NOT
+        // persist any interim tool result message. The real tool result is recorded
+        // only after the user approves/denies.
+        .addEdge(toolHttpOutcomeRef, endRef, 'approval_required')
+        .addEdge(toolLoopConditionalRef, notAllowedNodeRef, 'tool_not_allowed')
+        .addEdge(notAllowedNodeRef, toolLoopConditionalRef)
+        .addEdge(toolLoopConditionalRef, llmNodeRef, 'done_tools')
+        .setMetadata('generatedBy', 'Agent.defaultAgentBlueprintServerTools')
+        .build()
+    );
   }
 
   constructor(params: AgentParams, options?: NodeHandlerOptions) {

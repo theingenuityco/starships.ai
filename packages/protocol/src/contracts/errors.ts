@@ -99,6 +99,8 @@ export type StandardErrorCode =
   | 'OAUTH_TOKEN_INVALID'
   | 'OAUTH_EMAIL_MISMATCH'
   | 'OAUTH_ACCOUNT_LINKING_FAILED'
+  // Tool approval (agent tool permissions)
+  | 'TOOL_APPROVAL_REQUIRED'
   // Promo specific
   | 'PROMO_CODE_INVALID'
   | 'PROMO_CODE_EXPIRED'

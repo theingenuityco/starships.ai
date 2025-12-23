@@ -1,3 +1,6 @@
+import { isIndexingEnabled } from '@/lib/indexing'
+import { publicEnvConfig } from '@starships/env/public'
+
 function xmlEscape(value: string): string {
   return (
     value
@@ -26,7 +29,7 @@ function joinUrl(base: string, path: string): string {
   return `${base}${p === '/' ? '' : p}`
 }
 
-export const revalidate = 60 * 60 // 1 hour
+export const revalidate = 3600 // 1 hour
 
 /**
  * App sitemap (public-facing pages only).
@@ -34,7 +37,11 @@ export const revalidate = 60 * 60 // 1 hour
  * Note: authenticated app routes like `/ship/*` are intentionally excluded.
  */
 export async function GET() {
-  const base = normalizeSiteUrl(process.env.PUBLIC_URL || 'https://starships.ai')
+  if (!isIndexingEnabled()) {
+    return new Response('Not Found', { status: 404 })
+  }
+
+  const base = normalizeSiteUrl(publicEnvConfig.PUBLIC_URL)
   const now = new Date()
 
   const urls: UrlEntry[] = [
@@ -71,5 +78,3 @@ export async function GET() {
     },
   })
 }
-
-

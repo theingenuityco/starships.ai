@@ -29,5 +29,3 @@ export default function robots(): MetadataRoute.Robots {
     host: publicUrl,
   }
 }
-
-

@@ -1,10 +1,13 @@
 function xmlEscape(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;')
+  return (
+    value
+      // Use regex replaces (instead of String.prototype.replaceAll) to keep TS lib targets older than ES2021 happy.
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+  )
 }
 
 type UrlEntry = {
@@ -46,7 +49,7 @@ export async function GET() {
     `<?xml version="1.0" encoding="UTF-8"?>\n` +
     `<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n` +
     urls
-      .map((u) => {
+      .map(u => {
         const loc = joinUrl(base, u.path)
         const parts = [
           `  <url>`,
@@ -68,5 +71,3 @@ export async function GET() {
     },
   })
 }
-
-

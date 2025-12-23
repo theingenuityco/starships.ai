@@ -15,12 +15,11 @@ import { AgentService } from '@/services/AgentService';
 import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
-import { AgentRepository, MessageRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
+import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import type { Operation } from 'fast-json-patch';
 import { AppError } from '@starships/errors';
 
 const router: Router = Router();
@@ -48,10 +47,6 @@ const scheduleOrJwtAuth = async (req: Request, res: Response, next: NextFunction
 };
 
 // Using standard pagination schema for consistency
-
-type ToolExecutorResult =
-  | { ok: true; result: unknown; toolCallId: string }
-  | { ok: false; error: string; toolCallId: string; approvalId?: string; message?: string };
 
 function getSafeErrorMessageWithCause(error: unknown): string {
   if (error instanceof AppError) {
@@ -401,7 +396,9 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
  * POST /conversations/:conversationId/tool-calls/authorize-and-maybe-execute
  *
  * Called from the agent's default blueprint (server-tools mode) via HttpRequest + starships connector.
- * Always returns 200 with an ok/error payload so the HttpRequest node does not throw on non-2xx.
+ * Always returns 200 using the standard API contract so the HttpRequest node does not throw on non-2xx:
+ * - Success: { success: true, data: { ... } }
+ * - Error: { success: false, error: { code, message, details } }
  */
 router.post(
   '/conversations/:conversationId/tool-calls/authorize-and-maybe-execute',
@@ -414,7 +411,7 @@ router.post(
 
       const authUserId = req.user?.id as string | undefined;
       if (!authUserId) {
-        sendSuccess(res, { ok: false, error: 'AUTHENTICATION_REQUIRED', toolCallId: '' } satisfies ToolExecutorResult);
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 200, { toolCallId: '' });
         return;
       }
 
@@ -441,30 +438,38 @@ router.post(
       const conversationService = new ConversationService();
       const conversation = await conversationService.getConversationById(conversationId);
       if (!conversation) {
-        sendSuccess(res, { ok: false, error: 'CONVERSATION_NOT_FOUND', toolCallId } satisfies ToolExecutorResult);
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 200, { conversationId, toolCallId });
         return;
       }
 
-      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
-        // verifyResourceAccess already sent the error
+      // Starship connector JWT embeds starshipId in authContext; enforce scoping without using 4xx
+      // responses (HttpRequest node throws on non-2xx).
+      const authStarshipId = (req as unknown as { authContext?: { starshipId?: string } })?.authContext?.starshipId;
+      if (authStarshipId && authStarshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Conversation does not belong to authenticated starship', 200, {
+          conversationId,
+          toolCallId,
+          starshipId: conversation.starshipId,
+          authStarshipId,
+        });
         return;
       }
 
       const agentService = new AgentService();
       const agent = await agentService.getAgent(agentId);
       if (!agent || agent.starshipId !== conversation.starshipId) {
-        sendSuccess(res, { ok: false, error: 'AGENT_NOT_FOUND', toolCallId } satisfies ToolExecutorResult);
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 200, { agentId, toolCallId });
         return;
       }
 
       const agentRepo = new AgentRepository();
       const permission = await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
       if (!permission) {
-        sendSuccess(res, { ok: false, error: 'TOOL_NOT_ASSIGNED', toolCallId } satisfies ToolExecutorResult);
+        sendError(res, 'FORBIDDEN', 'Tool is not assigned to agent', 200, { agentId, toolSlug, toolCallId });
         return;
       }
       if (permission === 'deny') {
-        sendSuccess(res, { ok: false, error: 'TOOL_PERMISSION_DENIED', toolCallId } satisfies ToolExecutorResult);
+        sendError(res, 'FORBIDDEN', 'Tool permission denied', 200, { agentId, toolSlug, toolCallId });
         return;
       }
 
@@ -483,7 +488,7 @@ router.post(
           approvalId = approval.id;
         } catch (e) {
           const msg = getSafeErrorMessageWithCause(e);
-          sendSuccess(res, { ok: false, error: 'TOOL_APPROVAL_CREATE_FAILED', message: msg, toolCallId } satisfies ToolExecutorResult);
+          sendError(res, 'INTERNAL_SERVER_ERROR', msg, 200, { agentId, toolSlug, toolCallId });
           return;
         }
 
@@ -501,7 +506,7 @@ router.post(
           args: args || {},
         });
 
-        sendSuccess(res, { ok: false, error: 'TOOL_APPROVAL_REQUIRED', approvalId, toolCallId } satisfies ToolExecutorResult);
+        sendError(res, 'TOOL_APPROVAL_REQUIRED', 'Tool requires approval', 200, { approvalId, agentId, toolSlug, toolCallId });
         return;
       }
 
@@ -509,7 +514,7 @@ router.post(
       const toolRepo = new ToolRepository();
       const tool = await toolRepo.findBySlugAndStarship(toolSlug, conversation.starshipId);
       if (!tool || tool.status === 'draft' || !tool.blueprint) {
-        sendSuccess(res, { ok: false, error: 'TOOL_NOT_READY', toolCallId } satisfies ToolExecutorResult);
+        sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId });
         return;
       }
 
@@ -541,12 +546,12 @@ router.post(
         runnerConfig,
       });
 
-      sendSuccess(res, { ok: true, result, toolCallId } satisfies ToolExecutorResult);
+      sendSuccess(res, { toolCallId, result }, 200);
     } catch (e) {
       const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
       const toolCallId = typeof body.toolCallId === 'string' ? String(body.toolCallId) : '';
       const msg = getSafeErrorMessageWithCause(e);
-      sendSuccess(res, { ok: false, error: 'INTERNAL_SERVER_ERROR', message: msg, toolCallId } satisfies ToolExecutorResult);
+      sendError(res, 'INTERNAL_SERVER_ERROR', msg, 200, { toolCallId });
     }
   }
 );
@@ -589,7 +594,7 @@ router.post(
         return;
       }
       if (approval.status !== 'pending') {
-        sendSuccess(res, { ok: true, status: approval.status, approvalId });
+        sendSuccess(res, { status: approval.status, approvalId });
         return;
       }
 
@@ -629,28 +634,26 @@ router.post(
         runnerConfig,
       });
 
-      const messageRepo = new MessageRepository();
-      const existingToolMsg = await messageRepo.findLatestToolMessageByToolCallId(conversationId, approval.toolCallId);
       const messageService = new MessageService();
-      const content = JSON.stringify({ ok: true, result, approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId });
+      const content = JSON.stringify({
+        success: true,
+        data: { result, approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId },
+      });
 
-      const updated =
-        existingToolMsg && existingToolMsg.id
-          ? await messageService.updateMessage(existingToolMsg.id, { content, messageType: 'tool_result' })
-          : await messageService.createMessage({
-              conversationId,
-              role: 'tool',
-              content,
-              messageType: 'tool_result',
-              toolCallId: approval.toolCallId,
-            });
+      // Do NOT persist any interim tool result before approval; this message is the first persisted tool result for this call.
+      const created = await messageService.createMessage({
+        conversationId,
+        role: 'tool',
+        content,
+        messageType: 'tool_result',
+        toolCallId: approval.toolCallId,
+      });
 
       // Best-effort broadcast: update last message (after client supports replace for non-assistant)
       try {
         const streaming = new StreamingService();
-        if (updated) {
-          await streaming.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: updated } as unknown as Operation);
-        }
+        // Broadcast as a normal message append (safe; client de-dupes by id)
+        await streaming.broadcastMessage(conversationId, created);
         await streaming.broadcastUIAction(conversationId, {
           __ui_action: 'tool_approval_resolved',
           approvalId,
@@ -666,7 +669,7 @@ router.post(
         .continueAfterToolApproval(conversationId, approval.agentId, { authContext: { userId: authUserId } })
         .catch((e) => console.warn('[tool-approval] continueAfterToolApproval failed', e));
 
-      sendSuccess(res, { ok: true, approvalId }, 202);
+      sendSuccess(res, { approvalId, status: 'approved' }, 202);
     } catch (error) {
       handleError(error, res, 'approving tool');
     }
@@ -711,39 +714,33 @@ router.post(
         return;
       }
       if (approval.status !== 'pending') {
-        sendSuccess(res, { ok: true, status: approval.status, approvalId });
+        sendSuccess(res, { status: approval.status, approvalId });
         return;
       }
 
       await approvals.markDenied(approvalId);
 
-      const messageRepo = new MessageRepository();
-      const existingToolMsg = await messageRepo.findLatestToolMessageByToolCallId(conversationId, approval.toolCallId);
       const messageService = new MessageService();
       const content = JSON.stringify({
-        ok: false,
-        error: 'TOOL_APPROVAL_DENIED',
-        approvalId,
-        toolSlug: approval.toolSlug,
+        success: false,
+        error: {
+          code: 'TOOL_APPROVAL_DENIED',
+          message: 'Tool approval denied',
+          details: { approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId },
+        },
+      });
+
+      const created = await messageService.createMessage({
+        conversationId,
+        role: 'tool',
+        content,
+        messageType: 'tool_result',
         toolCallId: approval.toolCallId,
       });
 
-      const updated =
-        existingToolMsg && existingToolMsg.id
-          ? await messageService.updateMessage(existingToolMsg.id, { content, messageType: 'tool_result' })
-          : await messageService.createMessage({
-              conversationId,
-              role: 'tool',
-              content,
-              messageType: 'tool_result',
-              toolCallId: approval.toolCallId,
-            });
-
       try {
         const streaming = new StreamingService();
-        if (updated) {
-          await streaming.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: updated } as unknown as Operation);
-        }
+        await streaming.broadcastMessage(conversationId, created);
         await streaming.broadcastUIAction(conversationId, {
           __ui_action: 'tool_approval_resolved',
           approvalId,
@@ -758,7 +755,7 @@ router.post(
         .continueAfterToolApproval(conversationId, approval.agentId, { authContext: { userId: authUserId } })
         .catch((e) => console.warn('[tool-approval] continueAfterToolApproval failed', e));
 
-      sendSuccess(res, { ok: true, approvalId }, 202);
+      sendSuccess(res, { approvalId, status: 'denied' }, 202);
     } catch (error) {
       handleError(error, res, 'denying tool');
     }

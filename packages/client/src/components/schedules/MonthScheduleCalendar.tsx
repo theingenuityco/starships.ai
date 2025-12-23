@@ -26,10 +26,7 @@ export type MonthScheduleCalendarProps = {
   className?: string
 }
 
-function getRunsForDay(
-  runsByDay: Map<string, MonthCalendarRun[]> | Record<string, MonthCalendarRun[]>,
-  key: string
-): MonthCalendarRun[] {
+function getRunsForDay(runsByDay: Map<string, MonthCalendarRun[]> | Record<string, MonthCalendarRun[]>, key: string): MonthCalendarRun[] {
   if (runsByDay instanceof Map) return runsByDay.get(key) ?? []
   return runsByDay[key] ?? []
 }
@@ -152,5 +149,3 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
     </div>
   )
 }
-
-

@@ -171,14 +171,14 @@ describe('Agent Node Handler', () => {
 
       // Verify default blueprint was created
       const blueprint = agent.getCurrentBlueprint();
-      expect(blueprint.nodes).toHaveLength(10); // start, end, llm, conditional (2x), code, tool, mutate (3x incl init+results)
+      expect(blueprint.nodes).toHaveLength(11); // start, end, llm, conditional (3x), code, http_request, mutate (3x incl init+results)
       expect(blueprint.nodes.some((node) => node.type === 'start')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'llm')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'end')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'conditional')).toBe(true);
-      expect(blueprint.nodes.some((node) => node.type === 'tool')).toBe(true);
+      expect(blueprint.nodes.some((node) => node.type === 'http_request')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'mutate')).toBe(true);
-      expect(blueprint.edges).toHaveLength(13); // Updated count to match actual blueprint generation
+      expect(blueprint.edges).toHaveLength(15); // Updated count to match actual blueprint generation
     });
 
     it('should validate blueprint structure', () => {

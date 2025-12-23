@@ -887,7 +887,7 @@ export default function HeroConversationDemo() {
         >
           <div className="h-[560px] sm:h-[620px] md:h-[680px] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
-              <div className="flex items-center justify-between gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
                   {/* Title */}
                   <div className="text-sm font-medium leading-none truncate">{cfg.subtitle}</div>
@@ -896,7 +896,7 @@ export default function HeroConversationDemo() {
                     <div className="text-xs text-muted-foreground truncate">{cfg.actorName}, You</div>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">
                   {(Object.keys(CONVOS) as ConvoId[]).map(id => {
                     const active = id === activeConvoId
                     return (

@@ -71,7 +71,7 @@ export default function Hero() {
     <section className="pt-44 md:pt-52 pb-20 px-4">
       <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
         <div>
-          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
+          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
             {(() => {
               const v = getHeadlineVariant()
               if (v === 'B') return 'Hire your AI team, then brief them in plain language'

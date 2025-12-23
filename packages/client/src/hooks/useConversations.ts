@@ -393,7 +393,7 @@ type StreamedChunk =
   | { type: 'replace_reasoning'; value: string }
   | { type: 'update_last_assistant'; fields: Partial<ClientMessage> }
   | { type: 'mark_last_assistant_streaming'; streaming: boolean }
-  | { type: 'replace_whole_assistant'; message: ClientMessage }
+  | { type: 'replace_whole_message'; message: ClientMessage }
   | { type: 'ui_action'; payload: any }
   | { type: 'turn_state'; payload: any }
   | { type: 'turn_started'; payload?: any }
@@ -549,10 +549,10 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
               break
             }
 
-            // Replace whole assistant message (server persisted final)
+            // Replace whole last message (server persisted final)
             if (op === 'replace' && replaceWholeRe.test(path)) {
               const value = raw.value as ClientMessage
-              push({ type: 'replace_whole_assistant', message: value })
+              push({ type: 'replace_whole_message', message: value })
               break
             }
 
@@ -685,22 +685,34 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       }
       return [...messages, { ...msg }]
     }
-    case 'replace_whole_assistant': {
+    case 'replace_whole_message': {
       const messages = clone(acc)
-      for (let i = messages.length - 1; i >= 0; i--) {
-        if (messages[i].role === 'assistant') {
-          const next: any = { ...(chunk.message as any) }
-          // Ensure streaming is false and transient chunks are cleared when final arrives
-          next.streaming = false
-          if (typeof next.content === 'string' && next.content.trim().length > 0) {
-            next.chunks = undefined
-          }
-          messages[i] = next as ClientMessage
+      const incoming: any = { ...(chunk.message as any) }
+
+      const normalizeAssistantFinal = (msg: any) => {
+        const next = { ...msg }
+        next.streaming = false
+        if (typeof next.content === 'string' && next.content.trim().length > 0) {
+          next.chunks = undefined
+        }
+        return next
+      }
+
+      // Prefer replacing by id when present (stable even if the last message changes).
+      if (typeof incoming?.id === 'string') {
+        const idx = messages.findIndex((m: any) => m?.id === incoming.id)
+        if (idx !== -1) {
+          messages[idx] = (incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage
           return messages
         }
       }
-      // If no assistant exists yet, append
-      return [...messages, { ...(chunk.message as any), streaming: false } as ClientMessage]
+
+      // Fallback: replace the last message in the list.
+      if (messages.length === 0) {
+        return [(incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage]
+      }
+      messages[messages.length - 1] = (incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage
+      return messages
     }
     case 'append_chunk': {
       const messages = clone(acc)

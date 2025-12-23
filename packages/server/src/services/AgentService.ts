@@ -325,6 +325,15 @@ export class AgentService {
     const offset = (page - 1) * limit;
     const paginatedAgents = pendingAgents.slice(offset, offset + limit);
 
+    // Bulk-load assigned tool slugs for this page of agents (avoid N+1).
+    const toolRows = await this.agentRepository.getAssignedToolSlugsForAgents(paginatedAgents.map((a) => a.id));
+    const toolSlugsByAgentId = new Map<string, string[]>();
+    for (const row of toolRows) {
+      const list = toolSlugsByAgentId.get(row.agentId) ?? [];
+      list.push(row.toolSlug);
+      toolSlugsByAgentId.set(row.agentId, list);
+    }
+
     // Enrich with user display name and starship label for admin UX,
     // while keeping publicationRequestedBy as the underlying user id.
     const userRepo = new UserRepository();
@@ -395,14 +404,7 @@ export class AgentService {
       // Resolve assigned tools for this agent so admin review can see
       // the actual tool slugs attached to the agent, even though the
       // underlying relationship is stored via the junction table.
-      try {
-        const tools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-        assignedToolSlugs = (tools || [])
-          .map((t) => t.slug)
-          .filter((slug): slug is string => typeof slug === 'string' && slug.trim().length > 0);
-      } catch {
-        assignedToolSlugs = [];
-      }
+      assignedToolSlugs = (toolSlugsByAgentId.get(agent.id) || []).filter((slug) => typeof slug === 'string' && slug.trim().length > 0);
 
       enrichedAgents.push({
         agent: {
@@ -452,7 +454,8 @@ export class AgentService {
     starshipId: string,
     userId: string,
     page: number = 1,
-    limit: number = 50
+    limit: number = 50,
+    order: 'ASC' | 'DESC' = 'DESC'
   ): Promise<{
     agents: AgentModel[];
     total: number;
@@ -470,11 +473,13 @@ export class AgentService {
     // Get all agents for the starship
     const allAgents = await this.getAgentsByStarship(starshipId);
 
-    // Sort agents by newest first (createdAt desc), then by name for stability
+    // Sort agents by createdAt, then by name for stability
     const sortedAgents = [...allAgents].sort((a, b) => {
       const aTs = a?.createdAt ? new Date(a.createdAt as string).getTime() : 0;
       const bTs = b?.createdAt ? new Date(b.createdAt as string).getTime() : 0;
-      if (aTs !== bTs) return bTs - aTs;
+      if (aTs !== bTs) {
+        return order === 'ASC' ? aTs - bTs : bTs - aTs;
+      }
       const aName = (a?.name || '') as string;
       const bName = (b?.name || '') as string;
       return aName.localeCompare(bName);
@@ -510,6 +515,45 @@ export class AgentService {
    */
   async getAgentTools(agentId: string, starshipId: string): Promise<import('@starships/protocol').ToolModel[]> {
     return await this.agentRepository.getAgentTools(agentId, starshipId);
+  }
+
+  /**
+   * Get agent→tool permissions for all agents/tools on a starship.
+   * Returns only rows present in agent_tools.
+   */
+  async getStarshipAgentToolPermissions(starshipId: string, userId: string): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+    return await this.agentRepository.getStarshipAgentToolPermissions(starshipId);
+  }
+
+  /**
+   * Upsert tool permissions for a single agent by tool slug (derived starship + access).
+   */
+  async setAgentToolPermissionsDerived(
+    agentId: string,
+    userId: string,
+    permissions: Array<{ toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>
+  ): Promise<{ ok: true }> {
+    const starshipId = await this.getAgentStarshipIdOrThrow(agentId);
+    const hasAccess = await this.validateStarshipAccess(starshipId, userId);
+    if (!hasAccess) {
+      throw new Error('Access denied to this starship');
+    }
+
+    for (const p of permissions) {
+      if (!p?.toolSlug) continue;
+      await this.agentRepository.setAgentToolPermissionBySlug({
+        agentId,
+        starshipId,
+        toolSlug: p.toolSlug,
+        permission: p.permission,
+      });
+    }
+
+    return { ok: true };
   }
 
   /**

@@ -360,6 +360,145 @@ export class AgentRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Bulk-load assigned tool slugs for many agents in one query.
+   * Used by admin listings to avoid N+1 lookups.
+   */
+  async getAssignedToolSlugsForAgents(agentIds: string[]): Promise<Array<{ agentId: string; toolSlug: string }>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const ids = (agentIds || []).filter((id) => typeof id === 'string' && id.trim().length > 0);
+        if (ids.length === 0) return [];
+
+        const connection = this.getConnection();
+        const placeholders = ids.map((_, idx) => `$${idx + 1}`).join(', ');
+        const rows = await connection.query<{ agent_id: string; tool_slug: string }>(
+          `
+          SELECT
+            at.agent_id as agent_id,
+            t.slug as tool_slug
+          FROM agent_tools at
+          INNER JOIN agents a ON a.id = at.agent_id
+          INNER JOIN tools t ON t.id = at.tool_id
+          WHERE at.agent_id IN (${placeholders})
+            AND t.starship_id = a.starship_id
+          ORDER BY at.agent_id, t.created_at DESC
+          `,
+          ids
+        );
+
+        return (rows || []).map((r) => ({ agentId: r.agent_id, toolSlug: r.tool_slug }));
+      },
+      'getAssignedToolSlugsForAgents',
+      'Agent'
+    );
+  }
+
+  /**
+   * Get the stored permission for a given agent↔tool (by tool slug within a starship).
+   * Returns null when the tool is not assigned to the agent.
+   */
+  async getAgentToolPermissionBySlug(
+    agentId: string,
+    starshipId: string,
+    toolSlug: string
+  ): Promise<'allow' | 'ask' | 'deny' | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ permission: 'allow' | 'ask' | 'deny' }>(
+          `
+          SELECT at.permission as permission
+          FROM agent_tools at
+          INNER JOIN tools t ON t.id = at.tool_id
+          WHERE at.agent_id = $1 AND t.starship_id = $2 AND t.slug = $3
+          LIMIT 1
+          `,
+          [agentId, starshipId, toolSlug]
+        );
+        return row?.permission ?? null;
+      },
+      'getAgentToolPermissionBySlug',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Get agent→tool permissions (join metadata) for a specific starship.
+   * Returns only rows present in agent_tools; callers can treat missing pairs as 'deny'.
+   */
+  async getStarshipAgentToolPermissions(starshipId: string): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const rows = await connection.query<{ agent_id: string; tool_id: string; tool_slug: string; permission: 'allow' | 'ask' | 'deny' }>(
+          `
+          SELECT
+            at.agent_id as agent_id,
+            t.id as tool_id,
+            t.slug as tool_slug,
+            at.permission as permission
+          FROM agent_tools at
+          INNER JOIN agents a ON a.id = at.agent_id
+          INNER JOIN tools t ON t.id = at.tool_id
+          WHERE a.starship_id = $1 AND t.starship_id = $1
+          ORDER BY a.created_at DESC, t.created_at DESC
+          `,
+          [starshipId]
+        );
+
+        return (rows || []).map((r) => ({
+          agentId: r.agent_id,
+          toolId: r.tool_id,
+          toolSlug: r.tool_slug,
+          permission: r.permission,
+        }));
+      },
+      'getStarshipAgentToolPermissions',
+      'Agent'
+    );
+  }
+
+  /**
+   * Upsert a permission for an agent/tool pair by tool slug within a starship.
+   * This is intentionally starship-scoped to prevent cross-starship tool slugs.
+   */
+  async setAgentToolPermissionBySlug(args: { agentId: string; starshipId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { agentId, starshipId, toolSlug, permission } = args;
+        if (!agentId?.trim() || !starshipId?.trim() || !toolSlug?.trim()) {
+          throw new Error('agentId, starshipId, and toolSlug are required');
+        }
+
+        const connection = this.getConnection();
+        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [toolSlug, starshipId]);
+        if (!toolResult?.id) {
+          throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
+        }
+
+        // Important semantic: permissions do NOT implicitly assign tools.
+        // Only update an existing relationship row. (Assignment is handled by the /agents/:id/tools endpoints.)
+        const res = await connection.queryWithResult(
+          `
+          UPDATE agent_tools
+          SET permission = $3
+          WHERE agent_id = $1 AND tool_id = $2
+          `,
+          [agentId, toolResult.id, permission]
+        );
+
+        if (!res.rowCount) {
+          throw new ValidationError('Tool is not assigned to agent', 'toolSlug', { agentId, toolSlug });
+        }
+      },
+      'setAgentToolPermissionBySlug',
+      'Agent',
+      args.agentId
+    );
+  }
+
   // ============================================================================
   // AGENT TEMPLATE RELATIONSHIPS
   // ============================================================================
@@ -546,6 +685,26 @@ export class AgentRepository extends BaseRepository {
         await connection.query('DELETE FROM agent_tools WHERE agent_id = $1 AND tool_id = $2', [agentId, toolId]);
       },
       'removeToolRelationship',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Set permissions for all tools currently assigned to an agent (existing join rows only).
+   * Useful for bootstrapping default agents created during starship creation.
+   */
+  async setAllAssignedToolPermissionsForAgent(agentId: string, permission: 'allow' | 'ask' | 'deny'): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!agentId?.trim()) {
+          throw new Error('agentId is required');
+        }
+        const connection = this.getConnection();
+        const res = await connection.queryWithResult(`UPDATE agent_tools SET permission = $2 WHERE agent_id = $1`, [agentId, permission]);
+        return res.rowCount ?? 0;
+      },
+      'setAllAssignedToolPermissionsForAgent',
       'Agent',
       agentId
     );

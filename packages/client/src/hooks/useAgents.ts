@@ -72,11 +72,16 @@ export function useAgentBySlugOrId(slugOrId: string, enabled: boolean = true) {
 /**
  * Get agents by starship
  */
-export function useStarshipAgents(starshipId: string, enabled: boolean = true) {
+export function useStarshipAgents(starshipId: string, enabled: boolean = true, options?: { order?: 'ASC' | 'DESC' }) {
+  const order = options?.order
   return useQuery({
-    queryKey: AGENT_QUERY_KEYS.byStarship(starshipId),
+    queryKey: [...AGENT_QUERY_KEYS.byStarship(starshipId), { order }] as const,
     queryFn: async (): Promise<AgentModel[]> => {
-      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`)
+      const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agents`, {
+        params: {
+          ...(order ? { order } : {}),
+        },
+      })
       return response.data.data
     },
     enabled: !!starshipId && enabled,

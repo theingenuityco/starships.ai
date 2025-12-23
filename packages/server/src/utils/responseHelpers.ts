@@ -10,7 +10,7 @@ import type { Response } from 'express';
  * Send standardized success response
  */
 export function sendSuccess<T>(res: Response, data: T, statusCode: number = 200, meta?: ApiResponseMeta): void {
-  const response: ApiResponse<T> = { data };
+  const response: ApiResponse<T> = { success: true, data };
   if (meta) {
     response.meta = meta;
   }
@@ -43,6 +43,7 @@ export function sendError(
   details?: Record<string, unknown>
 ): void {
   const response: ApiErrorResponse = {
+    success: false,
     error: {
       code,
       message,

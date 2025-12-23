@@ -89,6 +89,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
+    const isStarter = !conversationId
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -1035,7 +1036,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             <span className="flex-shrink-0 h-4 w-4 rounded-sm overflow-hidden">
               <AgentAvatar seed={display} imageUrl={agent ? mentionAvatarUrlById.get((agent as any).avatarAttachmentId) : undefined} size={16} />
             </span>
-            <span className="font-medium text-sm">@{display}</span>
+            <span className="font-medium text-base">@{display}</span>
           </span>
         </NodeViewWrapper>
       )
@@ -1148,9 +1149,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         attributes: {
           class: cn(
             'tiptap w-full bg-transparent outline-none',
-            // Match the rest of the app's input typography (shadcn inputs/textarea use `text-sm`)
-            'text-sm',
-            minimal ? 'min-h-[28px] max-h-[120px]' : 'min-h-[80px] max-h-[260px]',
+            // Use a “normal” input font size for both starter + docked/minimal modes.
+            'text-base',
+            // Minimal mode should still feel comfortable (not cramped).
+            minimal ? 'min-h-[36px] max-h-[140px]' : isStarter ? 'min-h-[96px] max-h-[300px]' : 'min-h-[64px] max-h-[220px]',
             'scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent',
             // Minimal mode has a small min-height; center the baseline within that space.
             // This does not change font size or the overall component height.
@@ -1425,7 +1427,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           )}
 
           {/* Main Input Section - Text input with right-aligned actions */}
-          <div className={cn('flex relative items-center', minimal ? 'pl-3 pr-2 py-2' : 'px-3 py-3')}>
+          <div className={cn('flex relative items-center', minimal ? 'pl-3 pr-2 py-2.5' : 'px-3 py-2.5')}>
             {/* Hidden file input */}
             <input
               ref={fileInputRef}
@@ -1468,7 +1470,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               onClick={() => fileInputRef.current?.click()}
               disabled={disabled || fileUploading}
               className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-14 z-20 p-1.5' : 'absolute bottom-3 right-14 z-20 p-1.5',
+                minimal ? 'absolute top-1/2 -translate-y-1/2 right-14 z-20 p-1.5' : 'absolute bottom-2.5 right-14 z-20 p-1.5',
                 'rounded-lg transition-colors',
                 'hover:bg-muted text-muted-foreground hover:text-foreground',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
@@ -1480,7 +1482,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </button>
 
             {/* Right-side Actions: Stop (when streaming) or Send */}
-            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-3' : 'bottom-3 right-3')}>
+            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-3' : 'bottom-2.5 right-3')}>
               {shouldShowStop ? (
                 <div className="relative h-8 w-8">
                   <Button
@@ -1527,7 +1529,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <Icon name="coins" className="inline-block h-3 w-3 align-text-bottom text-muted-foreground mr-1" />
               {CREDITS_PER_MESSAGE} credits
             </span>
-            .
           </div>
         )}
       </div>

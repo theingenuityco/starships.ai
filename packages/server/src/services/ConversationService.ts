@@ -31,6 +31,7 @@ import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+import { AgentService } from '@/services/AgentService';
 
 /**
  * Autopilot child process configuration
@@ -641,6 +642,15 @@ export class ConversationService {
    */
   private async getAgentTools(agentId: string, starshipId: string): Promise<ToolParams[]> {
     try {
+      const redactedBlueprint = {
+        nodes: [
+          { ref: 'start', type: 'start', name: 'Start', description: 'Redacted tool blueprint start', parameters: {} },
+          { ref: 'end', type: 'end', name: 'End', description: 'Redacted tool blueprint end', parameters: {} },
+        ],
+        edges: [{ ref: 'edge-1', from: 'start', to: 'end' }],
+        metadata: { generatedBy: 'Tool.blueprintRedacted' },
+      };
+
       // Use relationship-based approach: Agent-[:USES_TOOL]->Tool-[:DEPLOYED_ON]->Starship
       const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
 
@@ -651,16 +661,15 @@ export class ConversationService {
       // Convert ToolModel instances to ToolParams with their actual blueprints
       // Filter out draft tools (status='draft') as they don't have complete parameters/blueprint
       const toolParams: ToolParams[] = deployedTools
-        .filter((tool) => tool.status !== 'draft' && tool.parameters && tool.blueprint)
+        .filter((tool) => tool.status !== 'draft' && tool.parameters)
         .map((tool) => ({
           name: tool.name,
           slug: tool.slug,
           description: tool.description,
           parameters: tool.parameters!,
-          blueprint: tool.blueprint!,
-          ...(tool.transforms && { transforms: tool.transforms }),
-          ...(tool.mutations && { mutations: tool.mutations }),
-          ...(tool.condition && { condition: tool.condition }),
+          // IMPORTANT: Tools are executed server-side; do not embed tool blueprints/transforms/mutations/condition in agent state.
+          // Provide a minimal placeholder blueprint for ToolParams compatibility.
+          blueprint: redactedBlueprint as any,
         }));
 
       return toolParams;
@@ -899,14 +908,19 @@ export class ConversationService {
         processedAgents.add(agentModel.id);
         hops += 1;
 
-        // Get deployed tools for this agent
-        const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+        // Expose current agent id to the blueprint via env("AGENT_ID")
+        (runtimeEnv as any).AGENT_ID = agentModel.id;
 
         // Guard against NULL/undefined persisted JSONB state
         const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
 
+        // Get deployed tools for this agent (always redacted; server executes tools)
+        const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+
         const agentWithTools: AgentParams = {
           ...agentModel,
+          // Always use the server-tools blueprint (no legacy tool-node execution).
+          blueprint: Agent.defaultAgentBlueprintServerTools(),
           state: {
             ...baseState,
             ...conversationState,
@@ -1034,6 +1048,137 @@ export class ConversationService {
           conversationId: data.conversationId,
         });
       }
+    }
+  }
+
+  /**
+   * Continue a conversation turn after an out-of-band tool approval/denial.
+   *
+   * This does NOT create a new user message and must NOT debit fixed user-message credits.
+   * It simply runs the specified agent again using the latest persisted conversation messages.
+   */
+  async continueAfterToolApproval(conversationId: string, agentId: string, ctx?: { authContext?: { userId?: string } }): Promise<void> {
+    // SERVER-SIDE GUARD: prevent concurrent turns
+    const hasActiveCancellation = ConversationService.activeCancellations.has(conversationId);
+    if (hasActiveCancellation) {
+      throw new ConflictError('A turn is already in progress for this conversation. Please wait for it to complete.');
+    }
+
+    ConversationService.activeCancellations.set(conversationId, () => {
+      // placeholder; replaced by actual cancel on workflow start
+    });
+
+    try {
+      const conversation = await this.getConversationById(conversationId);
+      const turnActive =
+        conversation?.state && typeof conversation.state === 'object' && (conversation.state as { turnActive?: boolean }).turnActive === true;
+      if (turnActive) {
+        ConversationService.activeCancellations.delete(conversationId);
+        throw new ConflictError('A turn is already in progress for this conversation. Please wait for it to complete.');
+      }
+
+      if (!conversation) {
+        ConversationService.activeCancellations.delete(conversationId);
+        throw new NotFoundError('Conversation', conversationId);
+      }
+
+      const starship = await this.getConversationStarship(conversationId);
+      if (!starship) {
+        ConversationService.activeCancellations.delete(conversationId);
+        throw new NotFoundError('Starship', String(conversation.starshipId || ''));
+      }
+
+      const agentService = new AgentService();
+      const agentModel = await agentService.getAgent(agentId);
+      if (!agentModel || agentModel.starshipId !== starship.id) {
+        ConversationService.activeCancellations.delete(conversationId);
+        throw new NotFoundError('Agent', agentId);
+      }
+
+      // Load latest persisted conversation messages and convert to LlmMessage array
+      const messages = await this.getConversationMessages(conversationId);
+      const llmMessages: LlmMessage[] = await Promise.all(
+        messages.map(async (msg): Promise<LlmMessage> => {
+          const content = await this.buildMessageContent(msg, starship.id);
+          const baseMessage: LlmMessage = {
+            role: msg.role as 'user' | 'assistant' | 'system' | 'tool',
+            content,
+            ...(msg.reasoning ? { reasoning: msg.reasoning } : {}),
+          };
+          if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+            (baseMessage as LlmMessage).toolCalls = msg.toolCalls as unknown as LlmToolCall[];
+          }
+          if (msg.role === 'tool' && typeof msg.toolCallId === 'string') {
+            (baseMessage as LlmMessage).toolCallId = msg.toolCallId;
+          }
+          return baseMessage;
+        })
+      );
+
+      const runtimeEnv = {
+        STARSHIP_ID: starship.id,
+        CONVERSATION_ID: conversationId,
+        AGENT_ID: agentModel.id,
+      };
+
+      // Load conversation-level state context (if any)
+      const conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as Record<string, unknown>;
+
+      // Resolve tools for this agent (always redacted; server executes tools)
+      const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
+
+      // Guard against NULL/undefined persisted JSONB state
+      const baseState =
+        agentModel.state && typeof agentModel.state === 'object' ? (agentModel.state as Record<string, unknown>) : ({ messages: [], tools: [] } as any);
+
+      const agentWithTools: AgentParams = {
+        ...(agentModel as any),
+        // Always use the server-tools blueprint (no legacy tool-node execution).
+        blueprint: Agent.defaultAgentBlueprintServerTools(),
+        state: {
+          ...baseState,
+          ...conversationState,
+          tools: resolvedTools,
+          starshipId: starship.id,
+        },
+      } as unknown as AgentParams;
+
+      // Build connector and llm runtime config, same as addConversationMessage
+      const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
+      const connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starship.id, authUserId);
+      const env = getEnvConfig();
+      const llm = env.OPENROUTER_API_KEY
+        ? {
+            apiKey: env.OPENROUTER_API_KEY,
+            baseUrl: 'https://openrouter.ai/api/v1',
+          }
+        : undefined;
+
+      const engineConfig = {
+        eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
+        runtimeEnv,
+        connectors,
+        llm,
+      } as EngineConfig & {
+        connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+        llm?: { apiKey: string; baseUrl?: string };
+      };
+
+      this.currentAgentForConversation.set(conversationId, { id: agentModel.id, name: agentModel.name });
+
+      const agent = new Agent(agentWithTools, {
+        eventCallback: (event) => this.eventCallback(conversationId, event),
+        runtimeEnv,
+        runner: this.defaultRunner,
+        runnerConfig: engineConfig as unknown as Record<string, unknown>,
+        onCancel: (cancel) => {
+          ConversationService.activeCancellations.set(conversationId, cancel);
+        },
+      });
+
+      await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
+    } finally {
+      ConversationService.activeCancellations.delete(conversationId);
     }
   }
 

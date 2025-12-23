@@ -90,6 +90,36 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
 }
 
 // ============================================================================
+// AGENT ↔ TOOL PERMISSIONS (join metadata)
+// ============================================================================
+
+/**
+ * Permission an agent has to trigger a tool.
+ * - allow: agent can invoke tool
+ * - ask: agent can invoke tool but requires confirmation (UI-level / future engine gate)
+ * - deny: agent cannot invoke tool
+ */
+export type AgentToolPermission = 'allow' | 'ask' | 'deny';
+
+/**
+ * Starship-scoped matrix row: (agent, tool) → permission.
+ * Returned by starship listing endpoints for rendering permission grids.
+ */
+export interface StarshipAgentToolPermissionModel {
+  agentId: string;
+  toolId: string;
+  toolSlug: string;
+  permission: AgentToolPermission;
+}
+
+export interface UpdateAgentToolPermissionsRequest {
+  permissions: Array<{
+    toolSlug: string;
+    permission: AgentToolPermission;
+  }>;
+}
+
+// ============================================================================
 // AGENT REQUEST/RESPONSE TYPES
 // ============================================================================
 

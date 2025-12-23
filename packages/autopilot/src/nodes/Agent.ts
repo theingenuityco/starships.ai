@@ -370,6 +370,281 @@ export class Agent implements NodeHandler {
       .build();
   }
 
+  /**
+   * Default blueprint variant that delegates tool execution to the Starships server via HttpRequest
+   * (connector: "starships"), allowing server-side enforcement of assignment + allow/ask/deny.
+   *
+   * Key behavior difference vs defaultAgentBlueprint():
+   * - Instead of a `tool` node executing a blueprint carried in state, we call:
+   *   POST /conversations/:conversationId/tool-calls/authorize-and-maybe-execute
+   * - If server responds TOOL_APPROVAL_REQUIRED, we append a tool message and end the workflow.
+   */
+  static defaultAgentBlueprintServerTools(): Blueprint {
+    const builder = new BlueprintBuilder();
+
+    const llmNodeRef = 'ai_assistant';
+    const argsNodeRef = 'prepare_tool_args';
+    const httpNodeRef = 'authorize_tool_call';
+
+    const startRef = builder.addNode({
+      type: 'start',
+      name: 'Start',
+      description: 'Start node',
+      parameters: {},
+    });
+
+    const endRef = builder.addNode({
+      type: 'end',
+      name: 'End',
+      description: 'End node',
+      parameters: {},
+    });
+
+    builder.addNode({
+      type: 'llm',
+      name: 'AI Assistant',
+      description: 'AI model with state-driven tool support',
+      ref: llmNodeRef,
+      parameters: {
+        model: '{{ state.model }}',
+        messages: '{{ state.messages }}',
+        tools: '{{ state.tools }}',
+        modalities: '{{ state.modalities }}',
+        imageConfig: '{{ state.imageConfig }}',
+        temperature: '{{ state.temperature }}',
+        maxTokens: '{{ state.maxTokens }}',
+        timeout: '{{ state.timeout }}',
+        reasoning: '{{ state.reasoning }}',
+        reducers: [
+          `
+          (state, ctx) => {
+            const msg = ctx.lastOutputOf("${llmNodeRef}")?.choices?.[0]?.message ?? {};
+            const content = typeof msg.content === 'string' ? msg.content : '';
+            const calls = Array.isArray(msg.toolCalls) ? msg.toolCalls : [];
+            const reasoning = typeof msg.reasoning === 'string' ? msg.reasoning : undefined;
+            let out;
+            if (calls.length > 0) {
+              const toolCalls = calls.map(tc => ({
+                id: tc?.id ?? '',
+                type: 'function',
+                function: {
+                  name: tc?.function?.name ?? '',
+                  arguments: (function() {
+                    const a = tc?.function?.arguments;
+                    if (typeof a === 'string') { try { return JSON.parse(a); } catch { return {}; } }
+                    return a ?? {};
+                  })()
+                }
+              }));
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}), toolCalls };
+            } else {
+              out = { role: 'assistant', content, ...(reasoning ? { reasoning } : {}) };
+            }
+            const next = { ...(state || {}) };
+            next.messages = [...(state?.messages ?? []), out];
+            return next;
+          }
+          `,
+        ],
+      },
+    });
+
+    const conditionalNodeRef = builder.addNode({
+      type: 'conditional',
+      name: 'Check Tool Calls',
+      description: 'Route after LLM: continue on length, initialize tool-call batch, or complete',
+      parameters: {
+        condition:
+          '{{(() => { const last = lastOutputOf("ai_assistant"); const fr = last?.choices?.[0]?.finishReason; if (fr==="length") return "continue"; const calls = last?.choices?.[0]?.message?.toolCalls; return Array.isArray(calls) && calls.length > 0 ? "init_tool_calls" : "complete"; })()}}',
+      },
+    });
+
+    const initToolCallsNodeRef = builder.addNode({
+      type: 'mutate',
+      name: 'Init Tool Calls Batch',
+      description: 'Store toolCalls[] and reset index for sequential execution',
+      parameters: {
+        reducers: [
+          `
+          (state, ctx) => {
+            const last = ctx.lastOutputOf("${llmNodeRef}") || {};
+            const calls = last?.choices?.[0]?.message?.toolCalls;
+            const pending = Array.isArray(calls) ? calls : [];
+            const next = { ...(state || {}) };
+            next.pendingToolCalls = pending;
+            next.pendingToolCallIndex = 0;
+            return next;
+          }
+          `,
+        ],
+      },
+    });
+
+    const toolLoopConditionalRef = builder.addNode({
+      type: 'conditional',
+      name: 'Process Tool Calls',
+      description: 'Execute pending tool calls via server until done, then resume LLM',
+      parameters: {
+        condition: `{{(() => {
+          const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+          const rawIdx = state?.pendingToolCallIndex;
+          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+          if (!pending.length || idx >= pending.length) return "done_tools";
+          const slug = pending?.[idx]?.function?.name;
+          const tools = Array.isArray(state?.tools) ? state.tools : [];
+          const known = slug ? tools.some(t => t && typeof t.slug === "string" && t.slug === String(slug)) : false;
+          return known ? "call_tool" : "tool_not_allowed";
+        })()}}`,
+      },
+    });
+
+    builder.addNode({
+      type: 'code',
+      name: 'Prepare Tool Args',
+      ref: argsNodeRef,
+      description: 'Materialize current pending tool call arguments into a plain object',
+      parameters: {
+        code: `
+        async function main(ctx) {
+          const pending = Array.isArray(ctx.state?.pendingToolCalls) ? ctx.state.pendingToolCalls : [];
+          const rawIdx = ctx.state?.pendingToolCallIndex;
+          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+          const tc = pending?.[idx];
+          let j = tc?.function?.arguments;
+          if (typeof j === 'string') { try { j = JSON.parse(j); } catch {}
+          }
+          if (j && typeof j === 'object') { return j; }
+          throw new Error('Missing toolCall function.arguments');
+        }
+      `,
+        timeout: 3000,
+      },
+    });
+
+    // Server tool authorization/execution
+    builder.addNode({
+      type: 'http_request',
+      name: 'Authorize & Execute Tool (Server)',
+      description: 'Call Starships API to enforce permissions and execute tool remotely',
+      ref: httpNodeRef,
+      parameters: {
+        connector: 'starships',
+        method: 'POST',
+        url: `{{ "/conversations/" + String(env("CONVERSATION_ID") ?? "") + "/tool-calls/authorize-and-maybe-execute" }}`,
+        body: {
+          agentId: `{{ String(env("AGENT_ID") ?? "") }}`,
+          toolSlug: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.function?.name ?? ""); })() }}`,
+          toolCallId: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.id ?? ""); })() }}`,
+          args: `{{ lastOutputOf("${argsNodeRef}") }}`,
+        },
+        timeout: 120000,
+      },
+    });
+
+    const toolHttpOutcomeRef = builder.addNode({
+      type: 'conditional',
+      name: 'Tool HTTP Outcome',
+      description: 'Branch on TOOL_APPROVAL_REQUIRED vs normal tool result',
+      parameters: {
+        condition: `{{(() => {
+          const resp = lastOutputOf("${httpNodeRef}") || {};
+          const body = resp?.body || {};
+          const success = body?.success === true;
+          if (success) return "append_and_continue";
+          const code = body?.error?.code;
+          return code === "TOOL_APPROVAL_REQUIRED" ? "approval_required" : "append_and_continue";
+        })()}}`,
+      },
+    });
+
+    const appendToolResultNodeRef = builder.addNode({
+      type: 'mutate',
+      name: 'Append Tool Result',
+      description: 'Append tool result and advance to next tool call',
+      parameters: {
+        reducers: [
+          `
+          (state, ctx) => {
+            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+            const rawIdx = state?.pendingToolCallIndex;
+            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+            const tc = pending?.[idx];
+            const toolCallId = tc?.id ?? '';
+            const resp = ctx.lastOutputOf("${httpNodeRef}") || {};
+            const body = resp?.body || {};
+            const content = JSON.stringify(body);
+            const next = { ...(state || {}) };
+            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
+            const nextIdx = idx + 1;
+            if (pending.length > 0 && nextIdx >= pending.length) {
+              next.pendingToolCalls = [];
+              next.pendingToolCallIndex = 0;
+            } else {
+              next.pendingToolCallIndex = nextIdx;
+            }
+            return next;
+          }
+          `,
+        ],
+      },
+    });
+
+    const notAllowedNodeRef = builder.addNode({
+      type: 'mutate',
+      name: 'Handle Unknown Tool',
+      description: 'Append tool result error for unknown tool calls and advance',
+      parameters: {
+        reducers: [
+          `
+          (state, ctx) => {
+            const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+            const rawIdx = state?.pendingToolCallIndex;
+            const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+            const tc = pending?.[idx];
+            const slug = tc?.function?.name ?? 'unknown';
+            const toolCallId = tc?.id ?? '';
+            const next = { ...(state || {}) };
+            const payload = { ok: false, error: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." };
+            next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content: JSON.stringify(payload) }];
+            const nextIdx = idx + 1;
+            if (pending.length > 0 && nextIdx >= pending.length) {
+              next.pendingToolCalls = [];
+              next.pendingToolCallIndex = 0;
+            } else {
+              next.pendingToolCallIndex = nextIdx;
+            }
+            return next;
+          }
+          `,
+        ],
+      },
+    });
+
+    return (
+      builder
+        .addEdge(startRef, llmNodeRef)
+        .addEdge(llmNodeRef, conditionalNodeRef)
+        .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
+        .addEdge(conditionalNodeRef, initToolCallsNodeRef, 'init_tool_calls')
+        .addEdge(conditionalNodeRef, endRef, 'complete')
+        .addEdge(initToolCallsNodeRef, toolLoopConditionalRef)
+        .addEdge(toolLoopConditionalRef, argsNodeRef, 'call_tool')
+        .addEdge(argsNodeRef, httpNodeRef)
+        .addEdge(httpNodeRef, toolHttpOutcomeRef)
+        .addEdge(toolHttpOutcomeRef, appendToolResultNodeRef, 'append_and_continue')
+        .addEdge(appendToolResultNodeRef, toolLoopConditionalRef)
+        // CRITICAL: On TOOL_APPROVAL_REQUIRED, stop execution immediately and do NOT
+        // persist any interim tool result message. The real tool result is recorded
+        // only after the user approves/denies.
+        .addEdge(toolHttpOutcomeRef, endRef, 'approval_required')
+        .addEdge(toolLoopConditionalRef, notAllowedNodeRef, 'tool_not_allowed')
+        .addEdge(notAllowedNodeRef, toolLoopConditionalRef)
+        .addEdge(toolLoopConditionalRef, llmNodeRef, 'done_tools')
+        .setMetadata('generatedBy', 'Agent.defaultAgentBlueprintServerTools')
+        .build()
+    );
+  }
+
   constructor(params: AgentParams, options?: NodeHandlerOptions) {
     // Store agent parameters
     this.params = structuredClone(params);
@@ -398,7 +673,9 @@ export class Agent implements NodeHandler {
    * Since tools are driven entirely by state, all blueprints are tool-ready
    */
   private createDefaultBlueprint(): void {
-    this.params.blueprint = Agent.defaultAgentBlueprint();
+    // Server-controlled tool execution is now the only supported agent execution path.
+    // Tools are executed via HttpRequest -> Starships API, and permissions are enforced server-side.
+    this.params.blueprint = Agent.defaultAgentBlueprintServerTools();
   }
 
   /**

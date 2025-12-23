@@ -189,6 +189,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     args?: Record<string, any>
   } | null>(null)
   const [toolApprovalBusy, setToolApprovalBusy] = useState<'approve' | 'deny' | null>(null)
+  const [toolApprovalArgsCollapsed, setToolApprovalArgsCollapsed] = useState(true)
+
+  // Reset args collapse state whenever a new approval prompt arrives
+  useEffect(() => {
+    if (pendingToolApproval?.approvalId) {
+      setToolApprovalArgsCollapsed(true)
+    }
+  }, [pendingToolApproval?.approvalId])
   const [hasWelcomeExited, setHasWelcomeExited] = useState<boolean>(false)
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1181,9 +1189,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                           Agent: {pendingToolApproval.agentName || pendingToolApproval.agentId}
                         </p>
                         {pendingToolApproval.args ? (
-                          <pre className="mt-2 max-h-40 overflow-auto rounded-xl bg-muted/30 border border-border/40 p-2 text-[11px] leading-relaxed text-foreground/80">
-                            {JSON.stringify(pendingToolApproval.args, null, 2)}
-                          </pre>
+                          <div className="mt-2">
+                            <button
+                              type="button"
+                              onClick={() => setToolApprovalArgsCollapsed(v => !v)}
+                              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                            >
+                              <Icon name={toolApprovalArgsCollapsed ? 'chevron-right' : 'chevron-down'} className="h-3.5 w-3.5" />
+                              {toolApprovalArgsCollapsed ? 'Show arguments' : 'Hide arguments'}
+                            </button>
+                            {!toolApprovalArgsCollapsed ? (
+                              <pre className="mt-2 max-h-40 overflow-auto rounded-xl bg-muted/30 border border-border/40 p-2 text-[11px] leading-relaxed text-foreground/80">
+                                {JSON.stringify(pendingToolApproval.args, null, 2)}
+                              </pre>
+                            ) : null}
+                          </div>
                         ) : null}
                       </div>
                       <div className="flex shrink-0 items-center gap-2">

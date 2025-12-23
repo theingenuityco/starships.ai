@@ -52,20 +52,26 @@ export class RemoteRunner implements Runner {
       type ErrorPayload = { error?: { message?: string } };
 
       const emit = async (name: 'message' | 'completed' | 'error', data: unknown) => {
-        try {
-          if (name === 'message') {
+        if (name === 'message') {
+          try {
             await config.eventCallback!(data as AutopilotEvent);
-          } else if (name === 'completed') {
-            const env = data as CompletedPayload;
-            const parsed = typeof env?.result_json === 'string' ? JSON.parse(env.result_json) : undefined;
-            if (Array.isArray(parsed)) finalResult = parsed as ExecutionItem[];
-          } else if (name === 'error') {
-            const env = data as ErrorPayload;
-            throw new Error(String(env?.error?.message || 'stream error'));
+          } catch (e) {
+            // Non-fatal: don't let a bad consumer callback break execution
+            console.error('[RemoteRunner] SSE event dispatch failed', e);
           }
-        } catch (e) {
-          console.error('[RemoteRunner] SSE event dispatch failed', e);
+          return;
         }
+
+        if (name === 'completed') {
+          const env = data as CompletedPayload;
+          const parsed = typeof env?.result_json === 'string' ? JSON.parse(env.result_json) : undefined;
+          if (Array.isArray(parsed)) finalResult = parsed as ExecutionItem[];
+          return;
+        }
+
+        // name === 'error' must be fatal to the caller; do NOT swallow.
+        const env = data as ErrorPayload;
+        throw new Error(String(env?.error?.message || 'stream error'));
       };
 
       // Minimal SSE parser
@@ -105,7 +111,12 @@ export class RemoteRunner implements Runner {
         }
       }
 
-      return Array.isArray(finalResult) ? finalResult : [];
+      // If the stream ended without a completed payload, treat as an error.
+      // This prevents silent "success" with [] when the runner dies mid-stream.
+      if (!Array.isArray(finalResult)) {
+        throw new Error('Remote runner stream ended without a completed result');
+      }
+      return finalResult;
     }
 
     // Non-streaming fallback

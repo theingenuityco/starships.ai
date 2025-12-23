@@ -38,12 +38,18 @@ function getOAuthErrorMessage(errorCode: string): string {
 /**
  * JWT-based login and registration form
  */
+type AuthTab = 'login' | 'register'
+
+function isAuthTab(value: string): value is AuthTab {
+  return value === 'login' || value === 'register'
+}
+
 export function LoginForm({
   onTabChange,
   defaultTab = 'login',
 }: {
-  onTabChange?: (tab: string) => void
-  defaultTab?: 'login' | 'register'
+  onTabChange?: (tab: AuthTab) => void
+  defaultTab?: AuthTab
 }) {
   const { login, register, oauthLogin, resendVerification, isLoading } = useAuth()
   const searchParams = useSearchParams()
@@ -67,7 +73,7 @@ export function LoginForm({
 
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [activeTab, setActiveTab] = useState<'login' | 'register'>(defaultTab)
+  const [activeTab, setActiveTab] = useState<AuthTab>(defaultTab)
   const [formError, setFormError] = useState<string | null>(null)
   const [emailVerificationStatus, setEmailVerificationStatus] = useState<{
     needsVerification: boolean
@@ -272,6 +278,7 @@ export function LoginForm({
           <Tabs
             value={activeTab}
             onValueChange={value => {
+              if (!isAuthTab(value)) return
               setActiveTab(value)
               onTabChange?.(value) // Notify parent of tab change
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs

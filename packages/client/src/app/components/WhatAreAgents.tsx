@@ -42,14 +42,11 @@ export default function WhatAreAgents() {
     const apply = () => setIsXl(Boolean(mql.matches))
     apply()
     // Safari < 14 uses addListener/removeListener
-    // eslint-disable-next-line deprecation/deprecation
     if (typeof (mql as any).addEventListener === 'function') {
       mql.addEventListener('change', apply)
       return () => mql.removeEventListener('change', apply)
     }
-    // eslint-disable-next-line deprecation/deprecation
     mql.addListener(apply)
-    // eslint-disable-next-line deprecation/deprecation
     return () => mql.removeListener(apply)
   }, [])
 

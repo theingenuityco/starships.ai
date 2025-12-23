@@ -43,7 +43,7 @@ export class ToolCallApprovalRepository extends BaseRepository {
         try {
           const result = await this.createEntity<Record<string, unknown>>('tool_call_approvals', serialized);
           return fromDatabase(ToolCallApprovalEntity, result);
-        } catch (e: any) {
+        } catch (e: unknown) {
           // Unique(conversation_id, tool_call_id) enforcement
           const msg = e instanceof Error ? e.message : String(e);
           if (msg.toLowerCase().includes('duplicate') || msg.toLowerCase().includes('unique')) {
@@ -140,5 +140,3 @@ export class ToolCallApprovalRepository extends BaseRepository {
     );
   }
 }
-
-

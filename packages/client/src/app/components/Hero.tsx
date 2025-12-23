@@ -98,7 +98,7 @@ export default function Hero() {
           <div className="flex flex-col items-center gap-3 justify-center">
             <Button
               size="lg"
-              className="h-14 sm:h-16 px-12 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden rounded-full [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              className="h-14 sm:h-16 w-full sm:w-auto max-w-[min(28rem,100%)] px-8 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal text-center [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating}
               aria-busy={isPrimaryAnimating}

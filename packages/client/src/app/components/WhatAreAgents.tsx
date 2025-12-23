@@ -14,7 +14,10 @@ type Trait = {
 
 function TraitCard({ trait, setRef }: { trait: Pick<Trait, 'id' | 'label' | 'sub' | 'icon'>; setRef?: (el: HTMLDivElement | null) => void }) {
   return (
-    <div ref={setRef} className="relative w-[300px] rounded-xl border border-white/12 bg-white/[0.05] px-5 py-4 shadow-[0_0_18px_rgba(168,85,247,0.12),0_0_34px_rgba(59,130,246,0.08)] select-text">
+    <div
+      ref={setRef}
+      className="relative w-full xl:w-[300px] rounded-xl border border-white/12 bg-white/[0.05] px-5 py-4 shadow-[0_0_18px_rgba(168,85,247,0.12),0_0_34px_rgba(59,130,246,0.08)] select-text"
+    >
       <div className="flex items-start gap-3">
         <div className="mt-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-white/15 bg-black/30">
           <Icon name={trait.icon} className="h-5 w-5 text-primary" />
@@ -142,8 +145,8 @@ export default function WhatAreAgents() {
           </div>
 
           {/* Desktop: diagram (divs + SVG paths) */}
-          <div className="hidden lg:block rounded-2xl bg-transparent border border-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0 shadow-none">
-            <div ref={canvasRef} className="relative mx-auto h-[720px] w-[1180px] max-w-full">
+          <div className="hidden xl:block rounded-2xl bg-transparent border border-transparent px-4 pb-4 pt-0 sm:px-6 sm:pb-6 sm:pt-0 shadow-none">
+            <div ref={canvasRef} className="relative mx-auto h-[720px] w-full max-w-[1152px]">
               <svg className="absolute inset-0 pointer-events-none" width="100%" height="100%" aria-hidden="true">
                 {paths.map(p => (
                   <path key={p.id} d={p.d} className="agent-anatomy-edge" />
@@ -165,7 +168,7 @@ export default function WhatAreAgents() {
                   </div>
 
                   {/* Label anchored to orb center (so text width never shifts alignment) */}
-                  <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-nowrap select-text">
+                  <div className="absolute left-1/2 top-full mt-2 -translate-x-1/2 text-center leading-tight whitespace-normal select-text max-w-[14rem]">
                     <div className="text-base sm:text-lg font-semibold text-foreground">{agent.label}</div>
                     <div className="text-sm sm:text-base text-muted-foreground">{agent.sub}</div>
                   </div>

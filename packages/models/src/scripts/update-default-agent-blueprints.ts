@@ -22,6 +22,7 @@
  * Options:
  *   --dry-run           Print counts only (default)
  *   --apply             Perform updates
+ *   --force             Update every row even if the blueprint JSON is identical (no skipping)
  *   --only=agents       Only update agents table
  *   --only=templates    Only update agent_templates table
  *   --starship=<id>     Only update agents for a specific starship_id (templates are global and unaffected)
@@ -62,6 +63,7 @@ function parseArgs(argv: string[]) {
   const out: {
     apply: boolean;
     dryRun: boolean;
+    force: boolean;
     only: OnlyMode;
     starshipId?: string;
     limit?: number;
@@ -69,6 +71,7 @@ function parseArgs(argv: string[]) {
   } = {
     apply: false,
     dryRun: true,
+    force: false,
     only: 'all',
     batchSize: 100,
   };
@@ -82,6 +85,10 @@ function parseArgs(argv: string[]) {
     if (arg === '--dry-run') {
       out.dryRun = true;
       out.apply = false;
+      continue;
+    }
+    if (arg === '--force' || arg === '--no-skip') {
+      out.force = true;
       continue;
     }
     if (arg.startsWith('--only=')) {
@@ -191,6 +198,7 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
     component: 'update-default-agent-blueprints',
     metadata: {
       only: opts.only,
+      force: opts.force,
       starshipId: opts.starshipId,
       limit: opts.limit,
       batchSize: opts.batchSize,
@@ -231,8 +239,8 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
         const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
         const next = setBlueprintCreatedAt(generated, existingCreatedAt);
 
-        // Only update if the blueprint meaningfully changes.
-        if (stableStringify(r.blueprint) === stableStringify(next)) {
+        // Only update if the blueprint meaningfully changes (unless forced).
+        if (!opts.force && stableStringify(r.blueprint) === stableStringify(next)) {
           skipped++;
           continue;
         }
@@ -269,7 +277,7 @@ export async function updateDefaultAgentBlueprints(): Promise<void> {
         const existingCreatedAt = getBlueprintCreatedAt(r.blueprint);
         const next = setBlueprintCreatedAt(generated, existingCreatedAt);
 
-        if (stableStringify(r.blueprint) === stableStringify(next)) {
+        if (!opts.force && stableStringify(r.blueprint) === stableStringify(next)) {
           skipped++;
           continue;
         }

@@ -39,7 +39,6 @@ export class ImportExportService {
     const payload: AgentExportPayloadV1 = {
       agent: {
         name: agent.name,
-        slug: agent.slug,
         description: agent.description,
         model: agent.model,
         temperature: agent.temperature,
@@ -83,7 +82,6 @@ export class ImportExportService {
     const payload: ToolExportPayloadV1 = {
       tool: {
         name: tool.name,
-        slug: tool.slug,
         description: tool.description,
         parameters: tool.parameters,
         blueprint: tool.blueprint,
@@ -129,7 +127,7 @@ export class ImportExportService {
       // Back-compat: older exports may include payload.tool.slug.
       // New exports store it in container.metadata.fromSlug.
       const fromSlug = (container as any)?.metadata?.fromSlug;
-      const requestedSlug = t?.slug ?? fromSlug;
+      const requestedSlug = fromSlug;
 
       const created = await this.toolRepo.createImported(
         {

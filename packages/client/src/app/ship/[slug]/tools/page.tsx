@@ -350,14 +350,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                         {isInstanceAdmin && (
                                           <DropdownMenu>
                                             <DropdownMenuTrigger asChild>
-                                              <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-7 w-7 p-0 rounded-full"
-                                                onClick={e => e.stopPropagation()}
-                                                title="Tool actions"
-                                              >
+                                              <Button type="button" size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full" onClick={e => e.stopPropagation()} title="Tool actions">
                                                 <Icon name="dots-vertical" className="h-4 w-4" />
                                               </Button>
                                             </DropdownMenuTrigger>

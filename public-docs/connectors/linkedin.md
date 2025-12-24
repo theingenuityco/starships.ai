@@ -2,7 +2,7 @@
 
 This document specifies how to call LinkedIn APIs from tools using the `http_request` node with `connector: "linkedin"`.
 
-Auth is provided by a **LinkedIn OAuth 2.0 access token**, stored per‑starship in the encrypted environments table as `LINKEDIN_ACCESS_TOKEN` and injected at runtime. Tools never see the raw token.
+Auth is provided by a **LinkedIn OAuth 2.0 access token**, stored per‑starship in the encrypted connector secrets store as `LINKEDIN_ACCESS_TOKEN` and injected at runtime. Tools never see the raw token.
 
 ---
 
@@ -24,24 +24,17 @@ LinkedIn has two main endpoint families used by this connector, with slightly di
   - Optional / connector-managed:
     - `Authorization: Bearer <token>` (injected by the LinkedIn connector)
 
-The connector injects these for you so tools normally **do not** set them manually:
+Important: only **auth** is injected by the connector by default. For LinkedIn’s Rest.li APIs you should explicitly set required Rest.li headers (shown above) in your `http_request.parameters.headers`.
 
-- Always injects `Authorization: Bearer <LINKEDIN_ACCESS_TOKEN>` unless you override `Authorization`.
-- Always injects `X-RestLi-Protocol-Version: 2.0.0` unless you override it.
-- Injects `LinkedIn-Version: 202511` if you did not set any `LinkedIn-Version` header yourself. This header is required by many `/rest/*` endpoints and is harmless for `/v2/*`.
+If LinkedIn starts returning `426 Upgrade Required` for `/rest/*`, update the `LinkedIn-Version` header you send in tools.
 
-If LinkedIn deprecates that version in the future and starts returning `426 Upgrade Required`, you can override `LinkedIn-Version` per‑request in your node `parameters.headers`.
-
-> ⚠️ **Auto-injected headers – do not set these manually in normal usage**
+> ⚠️ **Headers**
 >
-> The LinkedIn connector manages the following headers for you:
+> The LinkedIn connector manages only authentication for you:
 >
 > - `Authorization: Bearer <LINKEDIN_ACCESS_TOKEN>`
-> - `X-RestLi-Protocol-Version: 2.0.0`
-> - `LinkedIn-Version: 202511` (or any value you explicitly override it with)
-> - `Content-Type: application/json` for object bodies
 >
-> Only set these headers yourself if you intentionally need to override the connector’s defaults for a specific call (for example, testing a new LinkedIn API version).
+> You should set LinkedIn-specific headers (`X-RestLi-Protocol-Version`, `LinkedIn-Version`, etc.) directly in tool nodes as required by the endpoint family.
 
 ---
 
@@ -70,13 +63,10 @@ The connector does **not** enforce which endpoint you use; it only manages auth 
     - `url: "/v2/..."` → `https://api.linkedin.com/v2/...`
   - If `url` is an absolute `https://...` URL, it is used as‑is (no prefixing).
 
-- **Auth + required headers injection**
+- **Auth injection**
   - For `connector: "linkedin"`, the HostRuntime:
-    - Looks up the current starship’s decrypted environment and reads `LINKEDIN_ACCESS_TOKEN`.
+    - Looks up the current starship’s decrypted connector secrets and reads `LINKEDIN_ACCESS_TOKEN`.
     - Injects an `Authorization: Bearer <access_token>` header into the outgoing request **if** you did not explicitly supply any `Authorization` header.
-    - Ensures the following headers are present if you did not already set them (any casing):
-      - `X-RestLi-Protocol-Version: 2.0.0`
-      - `LinkedIn-Version: 202511` (pinned Marketing API version; required by many `/rest/*` endpoints, tolerated on `/v2/*`; you can override it per‑request).
   - If you explicitly set an `Authorization` header (any casing) in `parameters.headers`, that value **takes precedence** and the connector does not overwrite it.
 
 - **Relevant `http_request` parameters**

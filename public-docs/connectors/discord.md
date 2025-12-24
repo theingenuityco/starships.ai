@@ -11,8 +11,14 @@ Secrets (bot token, etc.) are managed by the platform and injected by the HostRu
     - `headers` / `body`: only non-secret fields (JSON payload, content strings, channel IDs, etc.).
   - The HostRuntime:
     - Normalizes the URL against `https://discord.com` (for example, `"/api/channels/.../messages"` → `https://discord.com/api/channels/.../messages`).
-    - Injects an `Authorization: Bot <token>` header using the configured bot token.
+    - Injects an `Authorization: Bot <token>` header using the configured bot token (a platform secret such as `DISCORD_BOT_TOKEN`).
   - If you explicitly set an `Authorization` header, it **wins** and the connector will not override it.
+
+> Note: Discord is “connector-scoped” even though the runtime token is a platform secret.
+>
+> The bot token is instance-wide, but HostRuntime will only expose the `discord` connector to workflows when the
+> connector is marked **connected** for the current starship. This lets an admin control which starships are allowed
+> to send Discord API calls using the shared bot.
 
 ---
 

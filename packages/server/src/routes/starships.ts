@@ -11,7 +11,7 @@ import { IdSchema } from '@/schemas/common';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import type { StarshipModel } from '@starships/protocol';
 import type { AuthUser, ImportExportContainerV1 } from '@starships/protocol';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
@@ -19,7 +19,7 @@ import { ImportExportService } from '@/services/ImportExportService';
 
 const router: Router = Router();
 
-function requireInstanceAdminMiddleware(req: Request, res: Response, next: any): void {
+function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
     sendError(res, 'FORBIDDEN', 'Only instance admins can import/export agents and tools', 403);
     return;
@@ -432,34 +432,46 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
  *
  * Instance-admin only.
  */
-router.post('/starships/:id/import', jwtAuthMiddleware, requireInstanceAdminMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
-    if (!paramValidation) return;
+router.post(
+  '/starships/:id/import',
+  jwtAuthMiddleware,
+  requireInstanceAdminMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+      if (!paramValidation) return;
 
-    // Basic container validation (deep validation is handled in service-level create calls)
-    const ContainerSchema = z.object({
-      schemaVersion: z.literal('1'),
-      kind: z.enum(['agent', 'tool']),
-      exportedAt: z.string().min(1),
-      source: z
-        .object({
-          app: z.string().optional(),
-          version: z.string().optional(),
-        })
-        .optional(),
-      payload: z.unknown(),
-    });
+      // Basic container validation (deep validation is handled in service-level create calls)
+      const ContainerSchema = z.object({
+        schemaVersion: z.literal('1'),
+        kind: z.enum(['agent', 'tool']),
+        exportedAt: z.string().min(1),
+        metadata: z
+          .object({
+            fromSlug: z.string().optional(),
+            fromStarshipSlug: z.string().optional(),
+          })
+          .passthrough()
+          .optional(),
+        source: z
+          .object({
+            app: z.string().optional(),
+            version: z.string().optional(),
+          })
+          .optional(),
+        payload: z.unknown(),
+      });
 
-    const bodyValidation = validateData(ContainerSchema, req.body, res, 'import container');
-    if (!bodyValidation) return;
+      const bodyValidation = validateData(ContainerSchema, req.body, res, 'import container');
+      if (!bodyValidation) return;
 
-    const svc = new ImportExportService();
-    const result = await svc.importToStarship(paramValidation.id, bodyValidation as unknown as ImportExportContainerV1);
-    sendSuccess(res, result, 201);
-  } catch (error) {
-    handleError(error, res, 'importing into starship');
+      const svc = new ImportExportService();
+      const result = await svc.importToStarship(paramValidation.id, bodyValidation as unknown as ImportExportContainerV1);
+      sendSuccess(res, result, 201);
+    } catch (error) {
+      handleError(error, res, 'importing into starship');
+    }
   }
-});
+);
 
 export default router;

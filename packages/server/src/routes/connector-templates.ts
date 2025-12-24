@@ -5,15 +5,17 @@ import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import type { Blueprint } from '@starships/autopilot';
 import type {
   AdminConnectorTemplateListResponse,
   AdminConnectorTemplateResponse,
   AuthUser,
   ConnectorTemplateAdminModel,
   ConnectorTemplateModel,
+  CreateConnectorTemplateRequest,
   UpdateConnectorTemplateRequest,
 } from '@starships/protocol';
-import { ConnectorTemplateRepository } from '@starships/models';
+import { ConnectorTemplateEntity, ConnectorTemplateRepository } from '@starships/models';
 
 const router: Router = Router();
 
@@ -45,9 +47,10 @@ const UpdateConnectorTemplateSchema = z
     version: z.string().trim().min(1).max(20).optional(),
     category: z.string().trim().min(1).max(100).optional(),
     runtimeConfig: z.record(z.string(), z.unknown()).optional(),
-    connectBlueprint: z.record(z.string(), z.unknown()).nullable().optional(),
-    refreshBlueprint: z.record(z.string(), z.unknown()).nullable().optional(),
-    testBlueprint: z.record(z.string(), z.unknown()).nullable().optional(),
+    // Blueprint is a structured DSL object; we keep runtime validation permissive here.
+    connectBlueprint: z.unknown().nullable().optional(),
+    refreshBlueprint: z.unknown().nullable().optional(),
+    testBlueprint: z.unknown().nullable().optional(),
   })
   .refine(
     (body) =>
@@ -64,7 +67,24 @@ const UpdateConnectorTemplateSchema = z
     { message: 'At least one field must be provided' }
   );
 
-function toTemplateSummary(entity: any): ConnectorTemplateModel {
+const CreateConnectorTemplateSchema = z.object({
+  id: TemplateIdOrProviderSchema.optional(),
+  slug: z.string().trim().min(1).max(255).optional(),
+  provider: z.string().trim().min(1).max(255),
+  displayName: TemplateTextSchema.max(255),
+  description: TemplateTextSchema.max(1024),
+  authType: z.enum(['oauth2', 'api_key', 'custom', 'none']),
+  isEnabled: z.boolean().optional(),
+  version: z.string().trim().min(1).max(20).optional(),
+  category: z.string().trim().min(1).max(100).optional(),
+  runtimeConfig: z.record(z.string(), z.unknown()).optional(),
+  // Blueprint is a structured DSL object; we keep runtime validation permissive here.
+  connectBlueprint: z.unknown().nullable().optional(),
+  refreshBlueprint: z.unknown().nullable().optional(),
+  testBlueprint: z.unknown().nullable().optional(),
+});
+
+function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateModel {
   return {
     id: entity.id,
     slug: entity.slug,
@@ -81,13 +101,13 @@ function toTemplateSummary(entity: any): ConnectorTemplateModel {
   };
 }
 
-function toAdminModel(entity: any): ConnectorTemplateAdminModel {
+function toAdminModel(entity: ConnectorTemplateEntity): ConnectorTemplateAdminModel {
   return {
     ...toTemplateSummary(entity),
-    runtimeConfig: (entity.runtimeConfig || {}) as Record<string, unknown>,
-    connectBlueprint: (entity.connectBlueprint ?? null) as Record<string, unknown> | null,
-    refreshBlueprint: (entity.refreshBlueprint ?? null) as Record<string, unknown> | null,
-    testBlueprint: (entity.testBlueprint ?? null) as Record<string, unknown> | null,
+    runtimeConfig: entity.runtimeConfig || {},
+    connectBlueprint: entity.connectBlueprint ?? null,
+    refreshBlueprint: entity.refreshBlueprint ?? null,
+    testBlueprint: entity.testBlueprint ?? null,
   };
 }
 
@@ -108,6 +128,39 @@ router.get('/admin/connector-templates', async (req: Request, res: Response): Pr
     sendSuccess(res, payload);
   } catch (error) {
     handleError(error, res, 'listing connector templates');
+  }
+});
+
+// POST /admin/connector-templates - Create a connector template (admin only)
+router.post('/admin/connector-templates', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const body = validateData(CreateConnectorTemplateSchema, req.body as CreateConnectorTemplateRequest, res, 'connector template create');
+    if (!body) return;
+
+    const repo = new ConnectorTemplateRepository();
+    const created = await repo.create({
+      id: body.id,
+      slug: body.slug,
+      provider: body.provider,
+      displayName: body.displayName,
+      description: body.description,
+      authType: body.authType,
+      isEnabled: body.isEnabled,
+      version: body.version,
+      category: body.category,
+      runtimeConfig: body.runtimeConfig,
+      connectBlueprint: (body.connectBlueprint as Blueprint | null | undefined) ?? undefined,
+      refreshBlueprint: (body.refreshBlueprint as Blueprint | null | undefined) ?? undefined,
+      testBlueprint: (body.testBlueprint as Blueprint | null | undefined) ?? undefined,
+    } satisfies CreateConnectorTemplateRequest);
+
+    const payload: AdminConnectorTemplateResponse = {
+      connector: toAdminModel(created),
+    };
+
+    sendSuccess(res, payload, 201);
+  } catch (error) {
+    handleError(error, res, 'creating connector template');
   }
 });
 
@@ -153,14 +206,14 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
     const updated = await repo.update(existing.id, {
       displayName: body.displayName,
       description: body.description,
-      authType: body.authType as any,
+      authType: body.authType,
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
       runtimeConfig: body.runtimeConfig,
-      connectBlueprint: body.connectBlueprint as any,
-      refreshBlueprint: body.refreshBlueprint as any,
-      testBlueprint: body.testBlueprint as any,
+      connectBlueprint: body.connectBlueprint as Blueprint | null | undefined,
+      refreshBlueprint: body.refreshBlueprint as Blueprint | null | undefined,
+      testBlueprint: body.testBlueprint as Blueprint | null | undefined,
     });
 
     if (!updated) {
@@ -175,6 +228,31 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
     sendSuccess(res, payload);
   } catch (error) {
     handleError(error, res, 'updating connector template');
+  }
+});
+
+// DELETE /admin/connector-templates/:id - Delete a connector template (admin only)
+router.delete('/admin/connector-templates/:id', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
+    if (!params) return;
+
+    const repo = new ConnectorTemplateRepository();
+    const existing = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
+    if (!existing) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const deleted = await repo.delete(existing.id);
+    if (!deleted) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    res.status(204).send();
+  } catch (error) {
+    handleError(error, res, 'deleting connector template');
   }
 });
 

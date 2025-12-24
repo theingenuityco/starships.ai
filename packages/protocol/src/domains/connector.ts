@@ -4,6 +4,8 @@
  * Types for managing third-party connectors at the starship level.
  */
 
+import type { Blueprint } from '@starships/autopilot';
+
 // ============================================================================
 // CONNECTOR TYPES
 // ============================================================================
@@ -165,9 +167,9 @@ export interface ConnectorTemplateModel {
  */
 export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
   runtimeConfig: ConnectorRuntimeConfig;
-  connectBlueprint?: Record<string, unknown> | null;
-  refreshBlueprint?: Record<string, unknown> | null;
-  testBlueprint?: Record<string, unknown> | null;
+  connectBlueprint?: Blueprint | null;
+  refreshBlueprint?: Blueprint | null;
+  testBlueprint?: Blueprint | null;
 }
 
 // ============================================================================
@@ -190,9 +192,31 @@ export interface UpdateConnectorTemplateRequest {
   version?: string;
   category?: string;
   runtimeConfig?: ConnectorRuntimeConfig;
-  connectBlueprint?: Record<string, unknown> | null;
-  refreshBlueprint?: Record<string, unknown> | null;
-  testBlueprint?: Record<string, unknown> | null;
+  connectBlueprint?: Blueprint | null;
+  refreshBlueprint?: Blueprint | null;
+  testBlueprint?: Blueprint | null;
+}
+
+export interface CreateConnectorTemplateRequest {
+  /**
+   * Optional explicit id. If omitted, server defaults to provider (stable ids for templates).
+   */
+  id?: string;
+  /**
+   * Optional explicit slug. If omitted, server generates a unique slug.
+   */
+  slug?: string;
+  provider: ConnectorProvider;
+  displayName: string;
+  description: string;
+  authType: ConnectorAuthType;
+  isEnabled?: boolean;
+  version?: string;
+  category?: string;
+  runtimeConfig?: ConnectorRuntimeConfig;
+  connectBlueprint?: Blueprint | null;
+  refreshBlueprint?: Blueprint | null;
+  testBlueprint?: Blueprint | null;
 }
 
 export interface ConnectWithApiKeyRequest {

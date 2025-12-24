@@ -21,6 +21,8 @@ import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuth } from '@/hooks/useAuth'
+import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -29,6 +31,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
   const starshipId = starship?.id || ''
   const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
+  const { isInstanceAdmin } = useAuth()
 
   // Fetch agents oldest-first from the API so column ordering is server-defined.
   const { data: starshipAgents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, !!starshipId, { order: 'ASC' })
@@ -200,6 +203,20 @@ export default function StarshipToolsPage(): React.JSX.Element {
               </div>
               <p className="text-muted-foreground mt-2">Installed tools available to your agents</p>
             </div>
+
+            {isInstanceAdmin && starshipId && (
+              <div className="flex items-center justify-center">
+                <JsonImportExportButtons
+                  kind="tool"
+                  starshipId={starshipId}
+                  onImported={result => {
+                    if (result.kind === 'tool' && result.tool?.slug) {
+                      router.push(`/ship/${slug}/tool/${encodeURIComponent(result.tool.slug)}`)
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             <section aria-labelledby="tools-list">
               {starshipToolsLoading || agentsLoading || permissionsLoading ? (

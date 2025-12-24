@@ -150,6 +150,9 @@ jobs:
       SERVER_URL: ${{ vars.SERVER_URL }}
       DOCS_URL: ${{ vars.DOCS_URL }}
 
+      # SEO / indexing should always be disabled in CI.
+      ENABLE_INDEXING: ${{ vars.ENABLE_INDEXING || 'false' }}
+
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
 

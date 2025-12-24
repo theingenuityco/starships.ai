@@ -22,10 +22,6 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: '*',
         allow: '/',
         disallow: [
-          // Auth/account flows
-          '/login',
-          '/forgot-password',
-          '/reset-password',
           // Authenticated app area
           '/ship',
           '/profile',

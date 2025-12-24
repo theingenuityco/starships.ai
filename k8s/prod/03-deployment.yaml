@@ -94,6 +94,13 @@ spec:
                   name: starships-secrets
                   key: DOCS_URL
 
+            # SEO / indexing (set true ONLY on canonical prod)
+            - name: ENABLE_INDEXING
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ENABLE_INDEXING
+
             # Auth
             - name: JWT_SECRET
               valueFrom:

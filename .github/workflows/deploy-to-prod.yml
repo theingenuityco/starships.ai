@@ -113,6 +113,8 @@ jobs:
           CLIENT_URL: ${{ vars.CLIENT_URL }}
           PUBLIC_URL: ${{ vars.PUBLIC_URL }}
           DOCS_URL: ${{ vars.DOCS_URL }}
+          # Default false for safety. Set true in the `prod` GitHub Environment vars for the canonical domain.
+          ENABLE_INDEXING: ${{ vars.ENABLE_INDEXING || 'false' }}
           GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
           USERBACK_TOKEN: ${{ secrets.USERBACK_TOKEN }}
           SENTRY_DSN_CLIENT: ${{ secrets.SENTRY_DSN_CLIENT }}
@@ -167,6 +169,7 @@ jobs:
             --from-literal=CLIENT_URL="$CLIENT_URL" \
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
             --from-literal=DOCS_URL="$DOCS_URL" \
+            --from-literal=ENABLE_INDEXING="$ENABLE_INDEXING" \
             --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
             --from-literal=USERBACK_TOKEN="$USERBACK_TOKEN" \
             --from-literal=SENTRY_DSN_CLIENT="$SENTRY_DSN_CLIENT" \

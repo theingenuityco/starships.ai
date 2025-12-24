@@ -20,8 +20,10 @@ This folder documents the Engine/Eval and each Autopilot node type with precise,
 
 - Connectors
   - [Overview](./connectors/README.md)
+  - [Runtime config](./connectors/runtime-config.md)
   - [LinkedIn](./connectors/linkedin.md)
   - [Discord](./connectors/discord.md)
+  - [Google Drive](./connectors/google-drive.md)
   - [GitHub](./connectors/github.md)
 
 Audience and access modes

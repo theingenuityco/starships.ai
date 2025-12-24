@@ -1,4 +1,4 @@
-import { Engine, ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { ToolParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { AgentRepository, ToolRepository } from '@starships/models';
@@ -16,7 +16,7 @@ interface LLMToolDefinition {
 }
 
 /**
- * Simple tool interface that replaces LangChain's DynamicTool
+ * Simple tool interface for tools executable by an agent
  */
 interface AgentTool {
   name: string;
@@ -82,7 +82,7 @@ export class ToolService {
           continue;
         }
 
-        const agentTool = await this.createAgentToolFromDatabase(dbTool, {});
+        const agentTool = await this.createAgentToolFromDatabase(dbTool);
         if (agentTool) {
           tools.push(agentTool);
         }
@@ -144,7 +144,7 @@ export class ToolService {
   /**
    * Create an executable AgentTool from a database ToolModel
    */
-  private async createAgentToolFromDatabase(dbTool: ToolModel, apiKeys: Record<string, string>): Promise<AgentTool | null> {
+  private async createAgentToolFromDatabase(dbTool: ToolModel): Promise<AgentTool | null> {
     try {
       // Use tool configuration as-is (API keys functionality removed)
       const toolConfig = {
@@ -206,56 +206,6 @@ export class ToolService {
   }
 
   /**
-   * Create Brave Search Tool
-   */
-  private async createBraveSearchTool(apiKey: string): Promise<AgentTool> {
-    return {
-      name: 'brave_web_search',
-      description: 'Search the web using Brave Search API. Useful for finding current information, news, facts, and general web content.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'The search query to execute',
-          },
-        },
-        required: ['query'],
-      },
-      execute: async (input: string) => {
-        try {
-          const args = JSON.parse(input);
-          const axios = (await import('axios')).default;
-
-          const response = await axios.get('https://api.search.brave.com/res/v1/web/search', {
-            headers: {
-              Accept: 'application/json',
-              'Accept-Encoding': 'gzip',
-              'X-Subscription-Token': apiKey,
-            },
-            params: {
-              q: args.query,
-              count: 5,
-            },
-          });
-
-          if (response.data.web?.results) {
-            const results = response.data.web.results
-              .slice(0, 5)
-              .map((result: any) => `**${result.title}**\n${result.description}\n${result.url}`)
-              .join('\n\n');
-            return `Search results for "${args.query}":\n\n${results}`;
-          } else {
-            return `No search results found for "${args.query}"`;
-          }
-        } catch (error) {
-          return `Error searching: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        }
-      },
-    };
-  }
-
-  /**
    * Create Firecrawl Tool
    */
   private async createFirecrawlTool(apiKey: string): Promise<AgentTool> {
@@ -297,108 +247,6 @@ export class ToolService {
           }
         } catch (error) {
           return `Error scraping: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        }
-      },
-    };
-  }
-
-  /**
-   * Create Notion Tool
-   */
-  private async createNotionTool(apiKey: string): Promise<AgentTool> {
-    return {
-      name: 'notion_search',
-      description: 'Search and retrieve content from Notion workspace.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'The search query for Notion content',
-          },
-        },
-        required: ['query'],
-      },
-      execute: async (input: string) => {
-        try {
-          const args = JSON.parse(input);
-          const { Client } = await import('@notionhq/client');
-          const notion = new Client({ auth: apiKey });
-
-          const response = await notion.search({
-            query: args.query,
-            filter: {
-              property: 'object',
-              value: 'page',
-            },
-          });
-
-          if (response.results.length === 0) {
-            return 'No results found in Notion workspace';
-          }
-
-          const results = response.results
-            .slice(0, 5)
-            .map((page: any) => {
-              const title = page.properties?.title?.title?.[0]?.plain_text || 'Untitled';
-              return `- ${title} (${page.url})`;
-            })
-            .join('\n');
-
-          return `Found ${response.results.length} results:\n${results}`;
-        } catch (error) {
-          return `Error searching Notion: ${error instanceof Error ? error.message : 'Unknown error'}`;
-        }
-      },
-    };
-  }
-
-  /**
-   * Create Tavily Search Tool
-   */
-  private async createTavilySearchTool(apiKey: string): Promise<AgentTool> {
-    return {
-      name: 'tavily_search',
-      description: 'Advanced AI-powered search using Tavily API. Better for research and finding comprehensive information.',
-      parameters: {
-        type: 'object',
-        properties: {
-          query: {
-            type: 'string',
-            description: 'The search query to execute',
-          },
-        },
-        required: ['query'],
-      },
-      execute: async (input: string) => {
-        try {
-          const args = JSON.parse(input);
-          const axios = (await import('axios')).default;
-
-          const response = await axios.post(
-            'https://api.tavily.com/search',
-            {
-              api_key: apiKey,
-              query: args.query,
-              max_results: 5,
-            },
-            {
-              headers: {
-                'Content-Type': 'application/json',
-              },
-            }
-          );
-
-          if (response.data.results && response.data.results.length > 0) {
-            const results = response.data.results
-              .map((result: any) => `**${result.title}**\n${result.content || result.raw_content}\n${result.url}`)
-              .join('\n\n');
-            return `Search results for "${args.query}":\n\n${results}`;
-          } else {
-            return `No search results found for "${args.query}"`;
-          }
-        } catch (error) {
-          return `Error searching: ${error instanceof Error ? error.message : 'Unknown error'}`;
         }
       },
     };

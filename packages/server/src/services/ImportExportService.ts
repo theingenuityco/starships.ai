@@ -123,12 +123,14 @@ export class ImportExportService {
       const toolPayload = (container as ImportExportContainerV1<'tool'>).payload;
       const t = toolPayload.tool as any;
 
-      // Back-compat: older exports may include payload.tool.slug.
-      // New exports store it in container.metadata.fromSlug.
+      // IMPORTANT: On import, do not reuse the exported slug (even debug metadata).
+      // Always let the system generate a new unique slug for the destination starship.
       const fromSlug = (container as any)?.metadata?.fromSlug;
-      const requestedSlug = fromSlug;
+      if (typeof fromSlug === 'string' && fromSlug.trim().length > 0) {
+        warnings.push(`Tool slug will be regenerated on import (source slug: ${fromSlug}).`);
+      }
 
-      const created = await this.toolRepo.createImported(
+      const created = await this.toolRepo.create(
         {
           name: t.name,
           // Keep description defaulting consistent with other flows
@@ -141,8 +143,6 @@ export class ImportExportService {
           isEnabled: t.isEnabled,
           status: t.status,
           // Intentionally ignore versioning fields (version/templateSnapshotAt) on import.
-          // allow explicit slug for import
-          slug: requestedSlug,
         } as any,
         starshipId
       );

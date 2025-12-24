@@ -10,6 +10,31 @@ export class AgentTemplateRepository extends BaseRepository {
     super('AgentTemplateRepository');
   }
 
+  private async generateUniqueTemplateSlug(baseSlug: string): Promise<string> {
+    const connection = this.getConnection();
+    const base = (baseSlug || '').trim();
+    const fallbackBase = base.length > 0 ? base : 'agent-template';
+
+    // Fast-path: base slug is free
+    const existing = await connection.queryOne<{ id: string }>('SELECT id FROM agent_templates WHERE slug = $1', [fallbackBase]);
+    if (!existing?.id) return fallbackBase;
+
+    // Otherwise suffix with -2, -3, ... until free
+    let counter = 2;
+    // Avoid an infinite loop in pathological cases
+    const maxAttempts = 10_000;
+    while (counter < maxAttempts) {
+      const candidate = `${fallbackBase}-${counter}`;
+      const row = await connection.queryOne<{ id: string }>('SELECT id FROM agent_templates WHERE slug = $1', [candidate]);
+      if (!row?.id) return candidate;
+      counter++;
+    }
+
+    // Fallback: timestamp if something is seriously wrong
+    const ts = Date.now().toString(36);
+    return `${fallbackBase}-${ts}`;
+  }
+
   /**
    * Resolve the "creator" (user id) for one or more templates.
    *
@@ -329,8 +354,10 @@ export class AgentTemplateRepository extends BaseRepository {
       async () => {
         const now = new Date().toISOString();
 
-        // Use provided slug or generate from name
-        const slug = data.slug || generateSlug(data.name);
+        // Generate a stable template slug from the name (or provided slug), ensuring uniqueness.
+        // IMPORTANT: Template slugs should not reuse instance slugs (which contain random suffixes).
+        const baseSlug = generateSlug((data.slug || data.name || '').toString()) || 'agent-template';
+        const slug = await this.generateUniqueTemplateSlug(baseSlug);
 
         // Build template data for database storage
         const templateProps = {

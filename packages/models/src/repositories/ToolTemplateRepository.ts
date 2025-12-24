@@ -16,6 +16,27 @@ export class ToolTemplateRepository extends BaseRepository {
     super('ToolTemplateRepository');
   }
 
+  private async generateUniqueTemplateSlug(baseSlug: string): Promise<string> {
+    const connection = this.getConnection();
+    const base = (baseSlug || '').trim();
+    const fallbackBase = base.length > 0 ? base : 'tool-template';
+
+    const existing = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [fallbackBase]);
+    if (!existing?.id) return fallbackBase;
+
+    let counter = 2;
+    const maxAttempts = 10_000;
+    while (counter < maxAttempts) {
+      const candidate = `${fallbackBase}-${counter}`;
+      const row = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [candidate]);
+      if (!row?.id) return candidate;
+      counter++;
+    }
+
+    const ts = Date.now().toString(36);
+    return `${fallbackBase}-${ts}`;
+  }
+
   async findAll(): Promise<ToolTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
@@ -105,8 +126,10 @@ export class ToolTemplateRepository extends BaseRepository {
   async create(data: CreateToolTemplateRequest): Promise<ToolTemplateModel> {
     return this.executeWithErrorHandling(
       async () => {
-        // Use provided slug or generate from name (slug is required by entity)
-        const slug = data.slug || generateSlug(data.name);
+        // Generate a stable template slug from the name (or provided slug), ensuring uniqueness.
+        // IMPORTANT: Template slugs should not reuse instance slugs (which contain random suffixes).
+        const baseSlug = generateSlug((data.slug || data.name || '').toString()) || 'tool-template';
+        const slug = await this.generateUniqueTemplateSlug(baseSlug);
 
         // Validate using entity with slug included
         const dataWithSlug = { ...data, slug };

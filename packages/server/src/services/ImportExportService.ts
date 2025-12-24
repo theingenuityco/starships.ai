@@ -90,8 +90,7 @@ export class ImportExportService {
         condition: (tool as any).condition,
         isEnabled: tool.isEnabled,
         status: tool.status,
-        version: tool.version,
-        templateSnapshotAt: tool.templateSnapshotAt,
+        // Intentionally do not export versioning fields. Import should behave like a fresh copy.
       } as any,
     };
 
@@ -141,8 +140,7 @@ export class ImportExportService {
           condition: t.condition,
           isEnabled: t.isEnabled,
           status: t.status,
-          version: t.version,
-          templateSnapshotAt: t.templateSnapshotAt,
+          // Intentionally ignore versioning fields (version/templateSnapshotAt) on import.
           // allow explicit slug for import
           slug: requestedSlug,
         } as any,
@@ -194,5 +192,3 @@ export class ImportExportService {
     throw new Error(`Unsupported import kind: ${String((container as any)?.kind)}`);
   }
 }
-
-

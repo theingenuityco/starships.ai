@@ -23,6 +23,9 @@ import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/useAuth'
 import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { toast } from 'sonner'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -32,6 +35,32 @@ export default function StarshipToolsPage(): React.JSX.Element {
   const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
   const { isInstanceAdmin } = useAuth()
+
+  const downloadJson = (filename: string, data: unknown) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportToolJson = async (tool: ToolModel) => {
+    try {
+      const resp: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/tools/${tool.id}/export`)
+      const container = resp.data.data
+      if (!container) throw new Error('Export failed: empty response')
+      const base = tool.slug ? `tool-${tool.slug}` : `tool-${tool.id}`
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      downloadJson(`${base}__${stamp}.json`, container)
+      toast.success('Exported JSON')
+    } catch (e: any) {
+      toast.error('Export failed', { description: e?.message || 'Unknown error' })
+    }
+  }
 
   // Fetch agents oldest-first from the API so column ordering is server-defined.
   const { data: starshipAgents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, !!starshipId, { order: 'ASC' })
@@ -308,14 +337,45 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                 <tr key={tool.id} className="group">
                                   <td className={cn('sticky left-0 z-10 bg-background/70 backdrop-blur', 'px-4 py-3 border-b border-r border-border/30 align-middle w-[260px] min-w-[260px]')}>
                                     <div className="flex flex-col gap-1">
-                                      <button
-                                        type="button"
-                                        className="text-sm font-semibold text-foreground text-left hover:underline"
-                                        onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
-                                        title={`Open tool: ${tool.name}`}
-                                      >
-                                        {tool.name}
-                                      </button>
+                                      <div className="flex items-start justify-between gap-2">
+                                        <button
+                                          type="button"
+                                          className="text-sm font-semibold text-foreground text-left hover:underline min-w-0 flex-1 truncate"
+                                          onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
+                                          title={`Open tool: ${tool.name}`}
+                                        >
+                                          {tool.name}
+                                        </button>
+
+                                        {isInstanceAdmin && (
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="ghost"
+                                                className="h-7 w-7 p-0 rounded-full"
+                                                onClick={e => e.stopPropagation()}
+                                                title="Tool actions"
+                                              >
+                                                <Icon name="dots-vertical" className="h-4 w-4" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40" onClick={e => e.stopPropagation()}>
+                                              <DropdownMenuItem
+                                                onClick={e => {
+                                                  e.stopPropagation()
+                                                  void exportToolJson(tool)
+                                                }}
+                                                className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                                              >
+                                                <Icon name="download" className="w-4 h-4 text-muted-foreground" />
+                                                <span>Export JSON</span>
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        )}
+                                      </div>
                                       <div className="text-xs text-muted-foreground font-mono">{tool.slug}</div>
                                     </div>
                                   </td>

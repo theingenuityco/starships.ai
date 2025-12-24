@@ -9,6 +9,8 @@ import { AgentSelector } from '@/components/agents/AgentSelector'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Badge } from '@/components/ui/badge'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useAuth } from '@/hooks/useAuth'
+import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
 
 export default function StarshipAgentsPage(): React.JSX.Element {
   const router = useRouter()
@@ -16,6 +18,7 @@ export default function StarshipAgentsPage(): React.JSX.Element {
   const { data: starship } = useStarshipBySlug(slug, true)
   const starshipId = starship?.id || ''
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
+  const { isInstanceAdmin } = useAuth()
 
   return (
     <PageLayout>
@@ -50,6 +53,20 @@ export default function StarshipAgentsPage(): React.JSX.Element {
               </div>
               <p className="text-muted-foreground mt-2">Manage and view all agents in this starship</p>
             </div>
+
+            {isInstanceAdmin && starshipId && (
+              <div className="flex items-center justify-center">
+                <JsonImportExportButtons
+                  kind="agent"
+                  starshipId={starshipId}
+                  onImported={result => {
+                    if (result.kind === 'agent' && result.agent?.slug) {
+                      router.push(`/ship/${slug}/agent/${encodeURIComponent(result.agent.slug)}`)
+                    }
+                  }}
+                />
+              </div>
+            )}
 
             <section aria-label="Agents list">
               <AgentSelector

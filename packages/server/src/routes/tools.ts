@@ -10,6 +10,7 @@ import { WalletService } from '@/services/WalletService';
 import { sendError, sendSuccess } from '../utils/responseHelpers';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { ImportExportService } from '@/services/ImportExportService';
 
 const router: Router = Router();
 
@@ -251,6 +252,29 @@ router.post('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Resp
 // ============================================================================
 // TOOL INSTANCE ENDPOINTS
 // ============================================================================
+
+/**
+ * GET /tools/:id/export
+ * Export a tool as a JSON container (instance admin only).
+ */
+router.get('/tools/:id/export', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as any)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can export tools', 403);
+      return;
+    }
+
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'tool parameter');
+    if (!paramValidation) return;
+
+    const svc = new ImportExportService();
+    const container = await svc.exportTool(paramValidation.id);
+    sendSuccess(res, container);
+  } catch (error) {
+    console.error('[TOOLS] Error exporting tool:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to export tool');
+  }
+});
 
 // GET /starships/:starshipId/tools - Get tools for a starship (OpenAPI pattern)
 router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

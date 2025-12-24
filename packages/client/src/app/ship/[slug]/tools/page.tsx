@@ -21,6 +21,12 @@ import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { useAuth } from '@/hooks/useAuth'
+import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { toast } from 'sonner'
 
 export default function StarshipToolsPage(): React.JSX.Element {
   const router = useRouter()
@@ -29,6 +35,101 @@ export default function StarshipToolsPage(): React.JSX.Element {
   const starshipId = starship?.id || ''
   const [search, setSearch] = useState('')
   const queryClient = useQueryClient()
+  const { isInstanceAdmin } = useAuth()
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [toolToDelete, setToolToDelete] = useState<ToolModel | null>(null)
+
+  const downloadJson = (filename: string, data: unknown) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const exportToolJson = async (tool: ToolModel) => {
+    try {
+      const resp: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/tools/${tool.id}/export`)
+      const container = resp.data.data
+      if (!container) throw new Error('Export failed: empty response')
+      const base = tool.slug ? `tool-${tool.slug}` : `tool-${tool.id}`
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      downloadJson(`${base}__${stamp}.json`, container)
+      toast.success('Exported JSON')
+    } catch (e: any) {
+      toast.error('Export failed', { description: e?.message || 'Unknown error' })
+    }
+  }
+
+  const deleteToolMutation = useMutation({
+    mutationFn: async (tool: ToolModel) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.delete(`/api/v1/tools/${tool.id}`)
+      return response.data.data
+    },
+    onMutate: async tool => {
+      await queryClient.cancelQueries({ queryKey: ['starship-tools', starshipId] as const })
+      await queryClient.cancelQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
+
+      const prevTools = queryClient.getQueryData<ToolModel[]>(['starship-tools', starshipId] as const)
+      const prevPerms = queryClient.getQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const)
+
+      queryClient.setQueryData<ToolModel[]>(['starship-tools', starshipId] as const, old => {
+        const next = Array.isArray(old) ? old : []
+        return next.filter(t => t.id !== tool.id)
+      })
+      queryClient.setQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const, old => {
+        const next = Array.isArray(old) ? old : []
+        return next.filter(r => r.toolSlug !== tool.slug)
+      })
+
+      return { prevTools, prevPerms }
+    },
+    onSuccess: (_data, tool) => {
+      toast.success('Tool deleted successfully!', {
+        description: `${tool.name} has been removed from the starship.`,
+      })
+    },
+    onError: (error: any, _tool, ctx) => {
+      if (ctx?.prevTools) queryClient.setQueryData(['starship-tools', starshipId] as const, ctx.prevTools)
+      if (ctx?.prevPerms) queryClient.setQueryData(['starship-agent-tool-permissions', starshipId] as const, ctx.prevPerms)
+
+      // Extract error message - handle both object and string formats (match agent delete pattern)
+      let errorMessage = 'Failed to delete tool'
+      if (error?.response?.data?.error) {
+        const errorObj = error.response.data.error
+        errorMessage = typeof errorObj === 'string' ? errorObj : errorObj?.message || 'Failed to delete tool'
+      } else if (error?.message) {
+        errorMessage = error.message
+      }
+
+      toast.error('Failed to delete tool', { description: errorMessage })
+    },
+    onSettled: async () => {
+      setShowDeleteConfirm(false)
+      setToolToDelete(null)
+      await queryClient.invalidateQueries({ queryKey: ['starship-tools', starshipId] as const })
+      await queryClient.invalidateQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
+    },
+  })
+
+  const handleRequestDeleteTool = (tool: ToolModel) => {
+    setToolToDelete(tool)
+    setShowDeleteConfirm(true)
+  }
+
+  const handleCancelDeleteTool = () => {
+    setShowDeleteConfirm(false)
+    setToolToDelete(null)
+  }
+
+  const handleConfirmDeleteTool = async () => {
+    if (!toolToDelete) return
+    await deleteToolMutation.mutateAsync(toolToDelete)
+  }
 
   // Fetch agents oldest-first from the API so column ordering is server-defined.
   const { data: starshipAgents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, !!starshipId, { order: 'ASC' })
@@ -201,6 +302,20 @@ export default function StarshipToolsPage(): React.JSX.Element {
               <p className="text-muted-foreground mt-2">Installed tools available to your agents</p>
             </div>
 
+            {isInstanceAdmin && starshipId && (
+              <div className="flex items-center justify-center">
+                <JsonImportExportButtons
+                  kind="tool"
+                  starshipId={starshipId}
+                  onImported={result => {
+                    if (result.kind === 'tool' && result.tool?.slug) {
+                      router.push(`/ship/${slug}/tool/${encodeURIComponent(result.tool.slug)}`)
+                    }
+                  }}
+                />
+              </div>
+            )}
+
             <section aria-labelledby="tools-list">
               {starshipToolsLoading || agentsLoading || permissionsLoading ? (
                 <div className="space-y-2">
@@ -291,14 +406,49 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                 <tr key={tool.id} className="group">
                                   <td className={cn('sticky left-0 z-10 bg-background/70 backdrop-blur', 'px-4 py-3 border-b border-r border-border/30 align-middle w-[260px] min-w-[260px]')}>
                                     <div className="flex flex-col gap-1">
-                                      <button
-                                        type="button"
-                                        className="text-sm font-semibold text-foreground text-left hover:underline"
-                                        onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
-                                        title={`Open tool: ${tool.name}`}
-                                      >
-                                        {tool.name}
-                                      </button>
+                                      <div className="flex items-start justify-between gap-2">
+                                        <button
+                                          type="button"
+                                          className="text-sm font-semibold text-foreground text-left hover:underline min-w-0 flex-1 truncate"
+                                          onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
+                                          title={`Open tool: ${tool.name}`}
+                                        >
+                                          {tool.name}
+                                        </button>
+
+                                        {isInstanceAdmin && (
+                                          <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                              <Button type="button" size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full" onClick={e => e.stopPropagation()} title="Tool actions">
+                                                <Icon name="dots-vertical" className="h-4 w-4" />
+                                              </Button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" className="w-40" onClick={e => e.stopPropagation()}>
+                                              <DropdownMenuItem
+                                                onClick={e => {
+                                                  e.stopPropagation()
+                                                  void exportToolJson(tool)
+                                                }}
+                                                className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                                              >
+                                                <Icon name="download" className="w-4 h-4 text-muted-foreground" />
+                                                <span>Export JSON</span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuSeparator />
+                                              <DropdownMenuItem
+                                                onClick={e => {
+                                                  e.stopPropagation()
+                                                  handleRequestDeleteTool(tool)
+                                                }}
+                                                className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 focus:bg-destructive/10"
+                                              >
+                                                <Icon name="trash" className="w-4 h-4" />
+                                                <span>Delete tool</span>
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        )}
+                                      </div>
                                       <div className="text-xs text-muted-foreground font-mono">{tool.slug}</div>
                                     </div>
                                   </td>
@@ -385,6 +535,45 @@ export default function StarshipToolsPage(): React.JSX.Element {
           </div>
         </div>
       </div>
+
+      {/* Delete Confirmation Dialog (mirrors agents page flow) */}
+      <Dialog
+        open={showDeleteConfirm}
+        onOpenChange={open => {
+          setShowDeleteConfirm(open)
+          if (!open) setToolToDelete(null)
+        }}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Icon name="alert-triangle" className="h-5 w-5 text-destructive" />
+              Delete Tool
+            </DialogTitle>
+            <DialogDescription className="text-left">
+              Are you sure you want to delete <strong>&ldquo;{toolToDelete?.name}&rdquo;</strong>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex gap-2">
+            <Button variant="outline" onClick={handleCancelDeleteTool}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={handleConfirmDeleteTool} disabled={deleteToolMutation.isPending}>
+              {deleteToolMutation.isPending ? (
+                <>
+                  <Icon name="loading" className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                <>
+                  <Icon name="trash" className="w-4 h-4 mr-2" />
+                  Delete Tool
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   )
 }

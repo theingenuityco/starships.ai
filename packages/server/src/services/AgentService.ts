@@ -521,7 +521,10 @@ export class AgentService {
    * Get agent→tool permissions for all agents/tools on a starship.
    * Returns only rows present in agent_tools.
    */
-  async getStarshipAgentToolPermissions(starshipId: string, userId: string): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+  async getStarshipAgentToolPermissions(
+    starshipId: string,
+    userId: string
+  ): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
     const hasAccess = await this.validateStarshipAccess(starshipId, userId);
     if (!hasAccess) {
       throw new Error('Access denied to this starship');
@@ -1007,7 +1010,10 @@ export class AgentService {
       // Create a new template from this agent
       const createdTemplate = await templateRepo.create({
         name: agent.name,
-        slug: agent.slug,
+        // IMPORTANT:
+        // Do NOT reuse instance slugs for marketplace templates.
+        // Instance slugs include random suffixes for uniqueness; template slugs should be
+        // stable + human-readable and will be derived from the template name.
         description: agent.description,
         // Prefer the agent's category when present; fall back to "general"
         category: agent.category ?? 'general',
@@ -1105,8 +1111,10 @@ export class AgentService {
             // Create a new ToolTemplate from this tool instance
             const createdTemplate = await toolTemplateRepo.create({
               name: tool.name,
-              // Use the tool's slug as starting point for template slug
-              slug: tool.slug,
+              // IMPORTANT:
+              // Do NOT reuse instance slugs for marketplace templates.
+              // Instance slugs include random suffixes for uniqueness; template slugs should be
+              // stable + human-readable and will be derived from the template name.
               description: tool.description,
               category: 'utility',
               parameters: tool.parameters!,

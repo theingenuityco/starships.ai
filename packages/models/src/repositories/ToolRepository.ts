@@ -19,6 +19,85 @@ export class ToolRepository extends BaseRepository {
     super('ToolRepository');
   }
 
+  /**
+   * Create a tool instance for a starship, optionally preserving an explicit slug (used by admin import flows).
+   *
+   * IMPORTANT:
+   * - Regular tool creation routes do NOT accept a slug from clients.
+   * - This method exists specifically to support controlled imports where preserving slugs is valuable.
+   */
+  async createImported(data: CreateToolRequest & { slug?: string }, starshipId: string): Promise<ToolModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const now = new Date().toISOString();
+
+        const sourceTemplateId = data.sourceTemplateId;
+        const publishedTemplateId = data.publishedTemplateId;
+
+        const normalizeSlug = (raw: string): string =>
+          raw
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '')
+            .replace(/--+/g, '-');
+
+        // Determine a globally-unique slug:
+        // - Prefer explicit slug (sanitized) when provided
+        // - Otherwise derive from name
+        const requested = typeof data.slug === 'string' ? String(data.slug) : '';
+        const baseFromRequested = requested.trim().length > 0 ? normalizeSlug(requested) : '';
+        const baseFromName = normalizeSlug(data.name || 'tool');
+        const base = baseFromRequested || baseFromName || 'tool';
+        const slug = await generateUniqueToolSlug(base, this);
+
+        // Explicitly omit configuration from imports by default; callers can pass it if desired.
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { configuration: _configuration, ...rest } = data;
+
+        const toolProps = {
+          // Core ToolParams fields
+          name: rest.name,
+          description: rest.description,
+          parameters: rest.parameters,
+          blueprint: rest.blueprint,
+          transforms: rest.transforms,
+          mutations: rest.mutations,
+          condition: rest.condition,
+
+          // Tool instance fields
+          slug,
+          configuration: undefined,
+          isEnabled: rest.isEnabled ?? true,
+          status: rest.status || 'active',
+
+          // Relationship field
+          starshipId: starshipId,
+          ...(sourceTemplateId ? { sourceTemplateId } : {}),
+          ...(publishedTemplateId ? { publishedTemplateId } : {}),
+
+          // Versioning fields
+          version: (rest as UpdateToolRequest).version || '1.0.0',
+          ...((rest as UpdateToolRequest).templateSnapshotAt ? { templateSnapshotAt: (rest as UpdateToolRequest).templateSnapshotAt } : {}),
+
+          // Database-specific fields
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await ToolEntity.validate(toolProps, 'create');
+
+        const toolEntity = toEntityInstance(ToolEntity, toolProps);
+        const databaseFormat = toDatabase(toolEntity);
+        const result = await this.createEntity<Record<string, unknown>>('tools', databaseFormat);
+
+        return fromDatabase(ToolEntity, result);
+      },
+      'createImported',
+      'Tool'
+    );
+  }
+
   async findAll(): Promise<ToolModel[]> {
     return this.executeWithErrorHandling(
       async () => {

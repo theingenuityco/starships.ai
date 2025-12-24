@@ -21,11 +21,14 @@ import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import { ToolUpdateNotification } from '@/components/tools/ToolUpdateNotification'
+import { useAuth } from '@/hooks/useAuth'
+import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
 
 export default function ToolBuilderPage(): React.JSX.Element | null {
   const { slug, toolSlug } = useParams<{ slug: string; toolSlug: string }>()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { isInstanceAdmin } = useAuth()
 
   const { data: starship } = useStarshipBySlug(slug, true)
   const queryClient = useQueryClient()
@@ -696,6 +699,23 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
       {existingTool && (
         <div className="absolute top-6 right-6 z-50">
           <ToolUpdateNotification tool={existingTool} />
+        </div>
+      )}
+
+      {isInstanceAdmin && starship?.id && (
+        <div className="absolute top-6 left-6 z-50">
+          <JsonImportExportButtons
+            kind="tool"
+            starshipId={starship.id}
+            exportResourceId={existingTool?.id}
+            exportFileBaseName={existingTool?.slug ? `tool-${existingTool.slug}` : existingTool?.id ? `tool-${existingTool.id}` : undefined}
+            onImported={result => {
+              if (result.kind === 'tool' && result.tool?.slug) {
+                const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+                router.push(`/ship/${slug}/tool/${encodeURIComponent(result.tool.slug)}${q}`)
+              }
+            }}
+          />
         </div>
       )}
       <ToolBuilderView ref={toolBuilderRef} starshipId={starship.id} onCancel={handleCancel} toolId={existingTool?.id} templateId={existingTool?.sourceTemplateId} />

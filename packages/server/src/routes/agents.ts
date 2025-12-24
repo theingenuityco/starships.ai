@@ -13,6 +13,7 @@ import { StarshipService } from '@/services/StarshipService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { AvatarGenerationService } from '@/services/AvatarGenerationService';
 import { AttachmentService } from '@/services/AttachmentService';
+import { ImportExportService } from '@/services/ImportExportService';
 
 const router: Router = Router();
 
@@ -276,6 +277,25 @@ router.get('/starships/:starshipId/agents/:slug', jwtAuthMiddleware, async (req:
   } catch (error) {
     console.error('[AGENTS] Error getting agent by slug for starship:', error);
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to get agent');
+  }
+});
+
+/**
+ * GET /agents/:id/export
+ * Export an agent as a JSON container (instance admin only).
+ *
+ * IMPORTANT: This route must be defined before GET /agents/:slugOrId.
+ */
+router.get('/agents/:id/export', jwtAuthMiddleware, requireInstanceAdminMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const svc = new ImportExportService();
+    const container = await svc.exportAgent(paramValidation.id);
+    sendSuccess(res, container);
+  } catch (error) {
+    handleError(error, res, 'exporting agent');
   }
 });
 

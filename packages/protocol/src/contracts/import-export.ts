@@ -11,6 +11,16 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
   schemaVersion: '1';
   kind: K;
   exportedAt: string; // ISO 8601
+  /**
+   * Optional debug-only metadata about the source resource.
+   * Importers should NOT rely on this for correctness (except where explicitly designed, e.g. tool slug preservation).
+   */
+  metadata?: {
+    fromSlug?: string;
+    fromStarshipSlug?: string;
+    // Back/forward compatibility: allow additional metadata keys without breaking parsing.
+    [key: string]: unknown;
+  };
   source?: {
     app?: string;
     version?: string;
@@ -29,7 +39,6 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
 export interface AgentExportPayloadV1 {
   agent: Partial<CreateAgentRequest> & {
     name: string;
-    slug?: string;
   };
   assignedToolSlugs?: string[];
 }
@@ -44,7 +53,6 @@ export interface AgentExportPayloadV1 {
 export interface ToolExportPayloadV1 {
   tool: Partial<Omit<CreateToolRequest, 'configuration'>> & {
     name: string;
-    slug?: string;
   };
 }
 

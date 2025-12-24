@@ -30,7 +30,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { LoadingSpinner } from '@/components/primitives/LoadingSpinner'
-import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
 
 export default function AgentBuilderPage(): React.JSX.Element | null {
   const { slug, agentSlug } = useParams<{ slug: string; agentSlug: string }>()
@@ -962,23 +961,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 </BreadcrumbList>
               </Breadcrumb>
             </div>
-
-            {isInstanceAdmin && starship?.id && (
-              <div className="mt-4 flex items-center justify-center">
-                <JsonImportExportButtons
-                  kind="agent"
-                  starshipId={starship.id}
-                  exportResourceId={existingAgent?.id}
-                  exportFileBaseName={existingAgent?.slug ? `agent-${existingAgent.slug}` : existingAgent?.id ? `agent-${existingAgent.id}` : undefined}
-                  onImported={result => {
-                    if (result.kind === 'agent' && result.agent?.slug) {
-                      const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-                      router.push(`/ship/${slug}/agent/${encodeURIComponent(result.agent.slug)}${q}`)
-                    }
-                  }}
-                />
-              </div>
-            )}
           </div>
 
           {/* Avatar Preview / Regenerate Modal */}

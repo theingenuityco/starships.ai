@@ -2,8 +2,8 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import React, { useMemo } from 'react'
-import type { AgentModel } from '@starships/protocol'
+import React, { useMemo, useState } from 'react'
+import type { AgentModel, ApiResponse, ImportExportContainerV1 } from '@starships/protocol'
 import { motion } from 'motion/react'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -12,6 +12,11 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Badge } from '@/components/ui/badge'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
+import api from '@/lib/api'
+import type { FetchResponse } from '@/lib/types'
+import { toast } from 'sonner'
+import { useAuth } from '@/hooks/useAuth'
 
 const CHAT_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -94,6 +99,9 @@ export function DeployedAgentCard({
   disableEntranceMotion = false,
   disableHoverMotion = false,
 }: DeployedAgentCardProps) {
+  const { isInstanceAdmin } = useAuth()
+  const [isExporting, setIsExporting] = useState(false)
+
   // Check if this is a template-based agent (has sourceTemplateId).
   // Note: template-based agents may be read-only in some editors, but they can still be deleted.
   const isTemplateAgent = !!agent.sourceTemplateId
@@ -134,6 +142,37 @@ export function DeployedAgentCard({
   const entranceOff = disableMotion || disableEntranceMotion
   const hoverOff = disableMotion || disableHoverMotion
 
+  const downloadJson = (filename: string, data: unknown) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleExportJson = async () => {
+    if (!isInstanceAdmin || !agent?.id) return
+    setIsExporting(true)
+    try {
+      const resp: FetchResponse<ApiResponse<ImportExportContainerV1>> = await api.get(`/api/v1/agents/${agent.id}/export`)
+      const container = resp.data.data
+      if (!container) throw new Error('Export failed: empty response')
+
+      const base = agent.slug ? `agent-${agent.slug}` : `agent-${agent.id}`
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      downloadJson(`${base}__${stamp}.json`, container)
+      toast.success('Exported JSON')
+    } catch (e: any) {
+      toast.error('Export failed', { description: e?.message || 'Unknown error' })
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   return (
     <motion.div
       initial={entranceOff ? undefined : { opacity: 0, y: 10 }}
@@ -147,7 +186,7 @@ export function DeployedAgentCard({
         onClick={onClick}
       >
         {/* Actions dropdown */}
-        {showActions && onDelete && (
+        {showActions && (onDelete || isInstanceAdmin) && (
           <div className="absolute top-3 right-3 z-30">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -161,6 +200,22 @@ export function DeployedAgentCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
+                {isInstanceAdmin && (
+                  <>
+                    <DropdownMenuItem
+                      onClick={e => {
+                        e.stopPropagation()
+                        void handleExportJson()
+                      }}
+                      disabled={isExporting}
+                      className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                    >
+                      <Icon name="download" className="w-4 h-4 text-muted-foreground" />
+                      <span>{isExporting ? 'Exporting…' : 'Export JSON'}</span>
+                    </DropdownMenuItem>
+                    {onDelete && <DropdownMenuSeparator />}
+                  </>
+                )}
                 {onDelete && (
                   <DropdownMenuItem
                     onClick={e => {

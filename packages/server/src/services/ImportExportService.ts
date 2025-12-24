@@ -1,6 +1,6 @@
 import { AgentService } from '@/services/AgentService';
 import { StarshipService } from '@/services/StarshipService';
-import { AgentRepository, ToolRepository } from '@starships/models';
+import { AgentRepository, StarshipRepository, ToolRepository } from '@starships/models';
 import type {
   AgentExportPayloadV1,
   ImportExportContainerV1,
@@ -12,12 +12,14 @@ import type {
 export class ImportExportService {
   private agentRepo: AgentRepository;
   private toolRepo: ToolRepository;
+  private starshipRepo: StarshipRepository;
   private agentService: AgentService;
   private starshipService: StarshipService;
 
   constructor() {
     this.agentRepo = new AgentRepository();
     this.toolRepo = new ToolRepository();
+    this.starshipRepo = new StarshipRepository();
     this.agentService = new AgentService();
     this.starshipService = new StarshipService();
   }
@@ -27,6 +29,8 @@ export class ImportExportService {
     if (!agent) {
       throw new Error('Agent not found');
     }
+
+    const starship = await this.starshipRepo.findById(agent.starshipId);
 
     const assignedTools = await this.agentRepo.getAgentTools(agent.id, agent.starshipId);
     const assignedToolSlugs = assignedTools.map((t) => t.slug).filter((s) => typeof s === 'string' && s.trim().length > 0);
@@ -56,6 +60,10 @@ export class ImportExportService {
       schemaVersion: '1',
       kind: 'agent',
       exportedAt: new Date().toISOString(),
+      metadata: {
+        fromSlug: agent.slug,
+        fromStarshipSlug: starship?.slug,
+      },
       source: {
         app: 'starships.ai',
         version: process.env.npm_package_version,
@@ -69,6 +77,8 @@ export class ImportExportService {
     if (!tool) {
       throw new Error('Tool not found');
     }
+
+    const starship = await this.starshipRepo.findById(tool.starshipId);
 
     const payload: ToolExportPayloadV1 = {
       tool: {
@@ -91,6 +101,10 @@ export class ImportExportService {
       schemaVersion: '1',
       kind: 'tool',
       exportedAt: new Date().toISOString(),
+      metadata: {
+        fromSlug: tool.slug,
+        fromStarshipSlug: starship?.slug,
+      },
       source: {
         app: 'starships.ai',
         version: process.env.npm_package_version,
@@ -112,6 +126,11 @@ export class ImportExportService {
       const toolPayload = (container as ImportExportContainerV1<'tool'>).payload;
       const t = toolPayload.tool as any;
 
+      // Back-compat: older exports may include payload.tool.slug.
+      // New exports store it in container.metadata.fromSlug.
+      const fromSlug = (container as any)?.metadata?.fromSlug;
+      const requestedSlug = t?.slug ?? fromSlug;
+
       const created = await this.toolRepo.createImported(
         {
           name: t.name,
@@ -127,7 +146,7 @@ export class ImportExportService {
           version: t.version,
           templateSnapshotAt: t.templateSnapshotAt,
           // allow explicit slug for import
-          slug: t.slug,
+          slug: requestedSlug,
         } as any,
         starshipId
       );
@@ -153,7 +172,9 @@ export class ImportExportService {
       const created = await this.agentService.createAgent({
         starshipId,
         name: a.name,
-        slug: a.slug,
+        // IMPORTANT: On import, do not reuse the exported slug.
+        // Always let the system generate a new unique slug for the destination starship.
+        slug: undefined,
         description: a.description,
         model: a.model,
         temperature: a.temperature,

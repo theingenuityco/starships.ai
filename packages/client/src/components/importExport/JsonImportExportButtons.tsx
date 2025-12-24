@@ -90,13 +90,7 @@ export function JsonImportExportButtons(props: Props): React.JSX.Element {
 
   return (
     <div className="flex items-center justify-center gap-2">
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept="application/json,.json"
-        className="hidden"
-        onChange={e => void handleFileSelected(e.target.files?.[0] ?? null)}
-      />
+      <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={e => void handleFileSelected(e.target.files?.[0] ?? null)} />
 
       <Button type="button" variant="outline" onClick={handlePickFile} disabled={!starshipId || isImporting}>
         {isImporting ? 'Importing…' : `Import ${kind === 'agent' ? 'Agent' : 'Tool'} JSON`}
@@ -110,5 +104,3 @@ export function JsonImportExportButtons(props: Props): React.JSX.Element {
     </div>
   )
 }
-
-

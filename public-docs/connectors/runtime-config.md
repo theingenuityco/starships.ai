@@ -8,6 +8,14 @@ It is the source of truth used by the host to compute:
 
 This document describes the **supported keys used by the current host runtime**.
 
+> Note on secret refs
+>
+> `runtime_config` must never contain raw secret values. Instead, it contains **references**
+> to encrypted secrets stored in:
+>
+> - `platform_secrets` (instance-wide; instance admins only)
+> - `connector_secrets` (per-starship; created/updated by connector flows)
+
 ---
 
 ### Top-level keys
@@ -52,6 +60,14 @@ This document describes the **supported keys used by the current host runtime**.
   - Prefix placed before the token. Default: `"Bearer"`.
   - Use `""` for no prefix (token is used as-is).
   - Examples: `"Bearer"`, `"Bot"`, `""`.
+
+---
+
+### Authorization override behavior (escape hatch)
+
+If a workflow explicitly supplies an `Authorization` header in `http_request.parameters.headers` (any casing),
+HostRuntime will **not** overwrite it with connector auth. All other connector headers are still eligible
+to be injected.
 
 ---
 

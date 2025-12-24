@@ -9,14 +9,15 @@ Secrets (OAuth tokens, etc.) are managed by the platform and injected by the Hos
 ### 1. Connector Behavior
 
 - **URL resolution**
-  - When `connector: "google_drive"` is set and `url` starts with `/`, the HostRuntime resolves:
+  - When `connector: "google_drive"` is set and `url` is relative (starts with `/`), HostRuntime resolves it against the connector template’s configured `apiBaseUrl` (typically `https://www.googleapis.com`).
+  - Examples:
     - `url: "/drive/v3/..."` → `https://www.googleapis.com/drive/v3/...`
     - `url: "/upload/drive/v3/..."` → `https://www.googleapis.com/upload/drive/v3/...`
   - If `url` is an absolute `https://...` URL, it is used as-is (no prefixing).
 
 - **Auth injection**
   - For `connector: "google_drive"`, the HostRuntime:
-    - Retrieves a Google Drive access token for the current starship from encrypted server-side storage (`GOOGLE_DRIVE_ACCESS_TOKEN`).
+    - Retrieves a Google Drive access token for the current starship from encrypted per-starship connector secrets (`GOOGLE_DRIVE_ACCESS_TOKEN`).
     - Injects an `Authorization: Bearer <access_token>` header into the outgoing request.
   - If you explicitly set an `Authorization` header (any casing) in `parameters.headers`, that value **takes precedence** and the connector does not overwrite it.
 
@@ -144,6 +145,16 @@ Typical inputs:
 - **Do not handle secrets in blueprints**
   - Never attempt to read Google tokens from `ctx.env` or tool parameters.
   - Assume all connector auth is HostRuntime-managed based on starship connector configuration.
+
+---
+
+### 4. OAuth scopes (what the connector is allowed to do)
+
+The Google Drive connector is configured by the instance admin and typically requests the broad Drive scope:
+
+- `https://www.googleapis.com/auth/drive`
+
+If you see `403` responses, treat them as scope/permission issues (and surface a clear error to the user).
 
 - **Normalize outputs**
   - After each Google Drive call, use Transform/Code nodes to project only the fields your tool’s public interface needs (e.g. `{ success, fileId, name, webViewLink }`).

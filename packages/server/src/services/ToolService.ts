@@ -1,4 +1,4 @@
-import { Engine, ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { ToolParams } from '@starships/autopilot';
 import { NotFoundError } from '@starships/errors';
 import { AgentRepository, ToolRepository } from '@starships/models';
@@ -15,8 +15,15 @@ interface LLMToolDefinition {
   };
 }
 
+type BraveWebResult = { title?: string; description?: string; url?: string };
+type TavilyResult = { title?: string; content?: string; raw_content?: string; url?: string };
+type NotionSearchPageLike = {
+  properties?: { title?: { title?: Array<{ plain_text?: string }> } };
+  url?: string;
+};
+
 /**
- * Simple tool interface that replaces LangChain's DynamicTool
+ * Simple tool interface for tools executable by an agent
  */
 interface AgentTool {
   name: string;
@@ -82,7 +89,7 @@ export class ToolService {
           continue;
         }
 
-        const agentTool = await this.createAgentToolFromDatabase(dbTool, {});
+        const agentTool = await this.createAgentToolFromDatabase(dbTool);
         if (agentTool) {
           tools.push(agentTool);
         }
@@ -144,7 +151,7 @@ export class ToolService {
   /**
    * Create an executable AgentTool from a database ToolModel
    */
-  private async createAgentToolFromDatabase(dbTool: ToolModel, apiKeys: Record<string, string>): Promise<AgentTool | null> {
+  private async createAgentToolFromDatabase(dbTool: ToolModel): Promise<AgentTool | null> {
     try {
       // Use tool configuration as-is (API keys functionality removed)
       const toolConfig = {
@@ -242,7 +249,7 @@ export class ToolService {
           if (response.data.web?.results) {
             const results = response.data.web.results
               .slice(0, 5)
-              .map((result: any) => `**${result.title}**\n${result.description}\n${result.url}`)
+              .map((result: BraveWebResult) => `**${result.title}**\n${result.description}\n${result.url}`)
               .join('\n\n');
             return `Search results for "${args.query}":\n\n${results}`;
           } else {
@@ -339,9 +346,10 @@ export class ToolService {
 
           const results = response.results
             .slice(0, 5)
-            .map((page: any) => {
-              const title = page.properties?.title?.title?.[0]?.plain_text || 'Untitled';
-              return `- ${title} (${page.url})`;
+            .map((page) => {
+              const p = page as unknown as NotionSearchPageLike;
+              const title = p.properties?.title?.title?.[0]?.plain_text || 'Untitled';
+              return `- ${title} (${p.url})`;
             })
             .join('\n');
 
@@ -391,7 +399,7 @@ export class ToolService {
 
           if (response.data.results && response.data.results.length > 0) {
             const results = response.data.results
-              .map((result: any) => `**${result.title}**\n${result.content || result.raw_content}\n${result.url}`)
+              .map((result: TavilyResult) => `**${result.title}**\n${result.content || result.raw_content}\n${result.url}`)
               .join('\n\n');
             return `Search results for "${args.query}":\n\n${results}`;
           } else {

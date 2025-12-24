@@ -521,7 +521,10 @@ export class AgentService {
    * Get agent→tool permissions for all agents/tools on a starship.
    * Returns only rows present in agent_tools.
    */
-  async getStarshipAgentToolPermissions(starshipId: string, userId: string): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+  async getStarshipAgentToolPermissions(
+    starshipId: string,
+    userId: string
+  ): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
     const hasAccess = await this.validateStarshipAccess(starshipId, userId);
     if (!hasAccess) {
       throw new Error('Access denied to this starship');

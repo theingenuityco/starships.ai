@@ -27,7 +27,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/static-assets/og.png',
+        url: '/static-assets/og.jpg',
         width: 1200,
         height: 630,
         alt: 'Starships.ai Marketplace',
@@ -38,7 +38,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Marketplace | Starships.ai',
     description: 'Discover and deploy pre-built AI agents and tools from the Starships.ai community. Browse templates for customer support, automation, research, and more.',
-    images: ['/static-assets/og.png'],
+    images: ['/static-assets/og.jpg'],
   },
 }
 

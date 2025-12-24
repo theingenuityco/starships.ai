@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/static-assets/og.png',
+        url: '/static-assets/og.jpg',
         width: 1200,
         height: 630,
         alt: 'Starships.ai Login',
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Login | Starships.ai',
     description: 'Sign in to your Starships.ai account to access your AI agents, tools, and automations. Ship production AI agents fast.',
-    images: ['/static-assets/og.png'],
+    images: ['/static-assets/og.jpg'],
   },
   robots: {
     index: false, // Don't index login pages

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/static-assets/og.png',
+        url: '/static-assets/og.jpg',
         width: 1200,
         height: 630,
         alt: 'Starships.ai Terms of Service',
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Terms of Service | Starships.ai',
     description: 'Read the terms and conditions for using Starships.ai. Understand your rights, responsibilities, and our service agreements.',
-    images: ['/static-assets/og.png'],
+    images: ['/static-assets/og.jpg'],
   },
 }
 

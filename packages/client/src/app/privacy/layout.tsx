@@ -15,7 +15,7 @@ export const metadata: Metadata = {
     locale: 'en_US',
     images: [
       {
-        url: '/static-assets/og.png',
+        url: '/static-assets/og.jpg',
         width: 1200,
         height: 630,
         alt: 'Starships.ai Privacy Policy',
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Privacy Policy | Starships.ai',
     description: 'Learn how Starships.ai collects, uses, and protects your personal information. GDPR compliant privacy policy with transparent data practices.',
-    images: ['/static-assets/og.png'],
+    images: ['/static-assets/og.jpg'],
   },
 }
 

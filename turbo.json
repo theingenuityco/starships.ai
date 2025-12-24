@@ -68,6 +68,7 @@
       "outputs": ["dist/**"]
     },
     "@starships/docs#build": {
+      "dependsOn": ["^build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local"],
       "outputs": [".next/**", "build/**"]
     },

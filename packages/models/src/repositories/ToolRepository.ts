@@ -45,7 +45,7 @@ export class ToolRepository extends BaseRepository {
         // Determine a globally-unique slug:
         // - Prefer explicit slug (sanitized) when provided
         // - Otherwise derive from name
-        const requested = typeof (data as any).slug === 'string' ? String((data as any).slug) : '';
+        const requested = typeof data.slug === 'string' ? String(data.slug) : '';
         const baseFromRequested = requested.trim().length > 0 ? normalizeSlug(requested) : '';
         const baseFromName = normalizeSlug(data.name || 'tool');
         const base = baseFromRequested || baseFromName || 'tool';
@@ -53,7 +53,7 @@ export class ToolRepository extends BaseRepository {
 
         // Explicitly omit configuration from imports by default; callers can pass it if desired.
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { configuration: _configuration, ...rest } = data as any;
+        const { configuration: _configuration, ...rest } = data;
 
         const toolProps = {
           // Core ToolParams fields

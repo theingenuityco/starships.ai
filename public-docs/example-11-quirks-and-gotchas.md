@@ -5,12 +5,13 @@
   - Bad: upstream input `"{"a":1,"b":2}"` (string) → Tool throws: arguments must be a plain object
   - Use a Code node to parse strings before Tool.
 
-- LLM parallel tool calls disabled
-  - Node sets `parallel_tool_calls: false` (provider hint). The default Agent blueprint can still safely handle multiple tool calls if a provider returns them anyway (it executes them sequentially).
+- LLM tool-call concurrency
+  - The LLM node delegates provider configuration to the host runtime. If you need to disable parallel tool calls (provider hint), do it in `hostRuntime.llm`.
+  - Regardless, the Engine/Agent patterns typically **execute tool calls sequentially** (in-order) once toolCalls are observed.
 
-- `lastOutputOf(ref)` error surface
-  - Throws with a detailed message if the ref hasn’t executed in current scope; don’t suppress.
-  - Common mistake: referencing a node in a different (nested) workflow scope.
+- `lastOutputOf(ref)` behavior
+  - Returns `undefined` if the ref hasn’t produced output yet in the current execution history.
+  - Common mistake: referencing a node in a different (nested) workflow scope (you’ll still get `undefined`).
 
 - GET/HEAD requests never include a body
   - Even if you specify `body`, HttpRequest omits it for GET/HEAD.
@@ -21,9 +22,10 @@
     - `url: "/repos/{{ input.owner }}/{{ input.repo }}?state={{ input.state || 'open' }}"`
   - **Good (single full-string template)**:
     - `url: "{{ '/repos/' + input.owner + '/' + input.repo + '?state=' + (input.state || 'open') }}"`
-  - For complex URLs (including when using connectors like GitHub), prefer either:
+  - For complex URLs, prefer either:
     - One expression that returns the final URL string, or
     - A Code node that returns `{ url }`, then an HttpRequest node with `url: "{{ (lastOutputOf('build_url') || {}).url }}"`.
+  - For connector-backed calls (GitHub/Discord/LinkedIn/Google Drive), use `connector_action` (not `http_request`). See `connectors/README.md`.
 
 - Mutate vs Transform
   - Transform changes input→output; Mutate changes `execution.state`.

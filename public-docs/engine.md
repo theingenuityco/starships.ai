@@ -71,12 +71,16 @@ Edge selection algorithm (detailed)
 
 Runtime configuration and secrets
 
-- When embedding the Engine directly (SDK usage), hosts may pass non-secret configuration via `Engine({ runtimeEnv })` and expose it however they choose.
-- In the hosted Starships product, workflows only receive a single env-like value in their template context: `env('STARSHIP_ID')`. **Custom env keys are not supported** and are not exposed to templates or Code nodes.
+- When embedding the Engine directly (SDK usage), hosts must provide a `hostRuntime` if they want to use nodes that perform side effects:
+  - `http_request` requires `hostRuntime.http`
+  - `llm` and `agent` require `hostRuntime.llm`
+  - `connector_action` requires `hostRuntime.connectorAction`
+- Hosts may pass non-secret configuration via `Engine({ runtimeEnv })`. At runtime, templates can read these values via `env('KEY')` and Code nodes can read them via `ctx.env('KEY')`.
+- In the hosted Starships product, the server supplies `runtimeEnv` (for example `STARSHIP_ID`, `CONVERSATION_ID`, `SERVER_URL`) and a connector/LLM-capable `hostRuntime`. Blueprints never receive raw API keys or OAuth tokens.
 
 Cross-links
 
 - See `eval.md` for template expression capabilities and context.
 - See each node’s doc for node-specific behavior and validation.
 - See `node-http-request.md` and `node-code.md` for concrete examples of full-string template rules (`"{{ ... }}"` only) and the recommended Code + HttpRequest URL-building pattern.
-- See `connectors/README.md` and `connectors/github.md` for connector behavior (relative URLs + auth injection) when using `connector` on HttpRequest nodes.
+- See `connectors/README.md` and `connectors/github.md` for connector behavior (auth injection + baseUrl + mapping) when using the `connector_action` node.

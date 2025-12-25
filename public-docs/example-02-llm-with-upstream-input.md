@@ -5,7 +5,28 @@ Goal: Use upstream input as the user message by explicitly constructing the LLM 
 Code
 
 ```ts
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import OpenAI from 'openai';
+import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+
+const apiKey = process.env.OPENROUTER_API_KEY;
+if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+
+const hostRuntime: HostRuntime = {
+  http: async () => {
+    throw new Error('HostRuntime.http not configured for this example');
+  },
+  connectorAction: async () => {
+    throw new Error('HostRuntime.connectorAction not configured for this example');
+  },
+  llm: async (req) => {
+    return await openai.chat.completions.create({
+      model: req.model,
+      messages: req.messages as any,
+      stream: true,
+    });
+  },
+};
 
 const blueprint = {
   nodes: [
@@ -33,7 +54,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine();
+const engine = new Engine({ hostRuntime });
 // Provide an initial input string; Start will pass it through
 const exec = ExecutionItemUtils.createExecution(ExecutionItemUtils.wrapSingle('What is 2+2?'));
 const out = await engine.executeBlueprint(blueprint, exec);

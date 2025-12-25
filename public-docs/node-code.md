@@ -16,7 +16,7 @@ ctx surface (prefixed to avoid collisions)
 
 - input: unwrapped input item (`ctx.input`)
 - state: execution.state (`ctx.state`)
-- env(key): host-provided env lookup (in Starships, only `ctx.env('STARSHIP_ID')` is populated; custom env keys are not supported)
+- env(key): host-provided runtime env lookup (values come from `Engine({ runtimeEnv })`)
 - lastOutputOf(ref): latest output json for ref within current execution (`ctx.lastOutputOf(ref)`)
 - console shim: log/error/warn (scoped)
 

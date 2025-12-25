@@ -11,8 +11,8 @@ Connectors let Starships tools and agents talk to third‑party platforms (like 
   - **Tools make requests** using `connector_action` with a `connector` slug and an `action` (endpoint name).
   - **At execution time, HostRuntime**
     - Looks up the connector template endpoint by `connector + action`.
-    - Validates `args` against the endpoint JSON Schema.
-    - Resolves path/query/body/header mapping and injects auth **without exposing secrets to the workflow**.
+    - Applies path/query/header/body mapping and injects auth **without exposing secrets to the workflow**.
+    - Note: JSON Schema validation via `endpoint.parameters` exists in types, but is not enforced by the current runner implementation.
 
 - **Built‑in connectors**
   - **[LinkedIn](./linkedin.md)**

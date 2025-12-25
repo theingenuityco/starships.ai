@@ -34,7 +34,7 @@ Response parsing
 Return value (shape)
 
 ```ts
-{ status: number, statusText: string, headers: Record<string,string>, body: unknown, url: string }
+{ status: number, statusText: string, headers: Record<string, unknown>, body: unknown, url: string }
 ```
 
 Error behavior
@@ -53,7 +53,7 @@ Validation rules
 ### Template rules (full-string only)
 
 - The Engine resolves string parameters in **full-only** mode: a string is only evaluated when the **entire** value is a single `{{ ... }}` template.
-- This applies to `url`, `headers`, and `body` on `http_request` nodes (including when you use `connector`).
+- This applies to `url`, `headers`, and `body` on `http_request` nodes.
 - **Bad (partial templates)**:
 
   ```ts
@@ -131,6 +131,7 @@ Cross-links
 
 - See Transform for output reshaping after an HTTP call.
 - See Engine for template resolution rules applied to parameters and how HostRuntime is constructed.
+- See ConnectorAction for connector-backed calls (auth/baseUrl/mapping handled by the host runtime).
 
 ### Notes
 

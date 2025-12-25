@@ -1,6 +1,7 @@
 import { Executor, ExecuteInput } from './Executor';
 import { Engine } from '@starships/autopilot';
-import { createRunnerHostRuntime, type ConnectorHttpConfig, type LlmRuntimeConfig } from '../hostRuntime/RunnerHostRuntime';
+import { createRunnerHostRuntime, type ConnectorSession, type LlmRuntimeConfig } from '../hostRuntime/RunnerHostRuntime';
+import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
 
 export class InProcessExecutor implements Executor {
   async execute(input: ExecuteInput): Promise<unknown> {
@@ -10,11 +11,13 @@ export class InProcessExecutor implements Executor {
       failOnNodeError?: boolean;
       runtimeEnv?: Record<string, unknown>;
       /**
-       * Optional connector HTTP configuration passed from the embedding host.
-       * This is consumed ONLY by the runner HostRuntime and is never exposed
-       * to workflows as runtimeEnv or execution state.
+       * Connector templates (safe) passed from embedding host.
        */
-      connectors?: Record<string, ConnectorHttpConfig | undefined>;
+      connectorTemplates?: Record<string, ConnectorTemplateRuntimeFieldsV2 | undefined>;
+      /**
+       * Connector sessions (auth headers) passed from embedding host.
+       */
+      connectorSessions?: Record<string, ConnectorSession | undefined>;
       /**
        * Optional LLM runtime configuration used by HostRuntime.llm. When set,
        * the runner does not need to read provider keys from its own env.
@@ -25,10 +28,12 @@ export class InProcessExecutor implements Executor {
 
     // Extract host-runtime-only configuration; do NOT expose this via Engine
     // runtimeEnv or execution state so secrets remain hidden from workflows.
-    const { connectors, llm, ...engineConfig } = rawConfig;
+    const { connectorTemplates, connectorSessions, llm, runtimeEnv, ...engineConfig } = rawConfig;
 
     const hostRuntime = createRunnerHostRuntime({
-      connectors: connectors ?? {},
+      connectorTemplates: connectorTemplates ?? {},
+      connectorSessions: connectorSessions ?? {},
+      runtimeEnv: runtimeEnv ?? {},
       llm,
     });
 

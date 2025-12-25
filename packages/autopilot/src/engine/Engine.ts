@@ -20,6 +20,7 @@ const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   agent: () => import('@/nodes/Agent').then((m) => m.Agent as NodeHandlerConstructor),
   workflow: () => import('@/nodes/Workflow').then((m) => m.Workflow as NodeHandlerConstructor),
   http_request: () => import('@/nodes/HttpRequest').then((m) => m.HttpRequest as NodeHandlerConstructor),
+  connector_action: () => import('@/nodes/ConnectorAction').then((m) => m.ConnectorAction as NodeHandlerConstructor),
   llm: () => import('@/nodes/LLM').then((m) => m.LLM as NodeHandlerConstructor),
   user_prompt: () => import('@/nodes/UserPrompt').then((m) => m.UserPrompt as NodeHandlerConstructor),
   conditional: () => import('@/nodes/Conditional').then((m) => m.Conditional as NodeHandlerConstructor),

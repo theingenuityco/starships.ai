@@ -5,6 +5,7 @@ import { toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { CreateConnectorTemplateRequest, ConnectorProvider } from '@starships/protocol';
+import type { ConnectorAuthV2, ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2, JsonSchemaObject } from '@starships/protocol';
 
 export class ConnectorTemplateRepository extends BaseRepository {
   constructor() {
@@ -106,17 +107,19 @@ export class ConnectorTemplateRepository extends BaseRepository {
           id,
           slug,
           provider: data.provider,
-          displayName: data.displayName,
+          name: data.name,
           description: data.description,
           authType: data.authType,
-          runtimeConfig: data.runtimeConfig || {},
+          baseUrl: data.baseUrl,
+          authJson: data.auth as ConnectorAuthV2,
+          variablesJson: (data.variables as ConnectorTemplateRuntimeFieldsV2['variables']) ?? undefined,
+          endpointsJson: (data.endpoints as ConnectorEndpointV2[]) ?? [],
+          rateLimitJson: (data.rateLimit as ConnectorTemplateRuntimeFieldsV2['rateLimit']) ?? undefined,
+          metadataSchemaJson: (data.metadataSchema as JsonSchemaObject | undefined) ?? undefined,
           version: data.version || '1.0.0',
           category: data.category || 'connector',
           usageCount: 0,
           isEnabled: data.isEnabled ?? true,
-          connectBlueprint: data.connectBlueprint ?? undefined,
-          refreshBlueprint: data.refreshBlueprint ?? undefined,
-          testBlueprint: data.testBlueprint ?? undefined,
           createdAt: now,
           updatedAt: now,
         };
@@ -136,13 +139,22 @@ export class ConnectorTemplateRepository extends BaseRepository {
   async update(
     id: string,
     updates: Partial<
-      Pick<ConnectorTemplateEntity, 'displayName' | 'description' | 'authType' | 'isEnabled' | 'runtimeConfig' | 'version' | 'category'>
-    > & {
-      // Allow null to explicitly clear blueprint JSONB columns.
-      connectBlueprint?: ConnectorTemplateEntity['connectBlueprint'] | null;
-      refreshBlueprint?: ConnectorTemplateEntity['refreshBlueprint'] | null;
-      testBlueprint?: ConnectorTemplateEntity['testBlueprint'] | null;
-    }
+      Pick<
+        ConnectorTemplateEntity,
+        | 'name'
+        | 'description'
+        | 'authType'
+        | 'isEnabled'
+        | 'version'
+        | 'category'
+        | 'baseUrl'
+        | 'authJson'
+        | 'variablesJson'
+        | 'endpointsJson'
+        | 'rateLimitJson'
+        | 'metadataSchemaJson'
+      >
+    >
   ): Promise<ConnectorTemplateEntity | null> {
     return this.executeWithErrorHandling(
       async () => {

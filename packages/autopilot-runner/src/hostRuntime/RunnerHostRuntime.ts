@@ -1,26 +1,14 @@
 import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
+import type { ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
 import OpenAI from 'openai';
+import Ajv from 'ajv';
 
 /**
- * Connector-aware HTTP configuration passed from the embedding host (API server)
- * to the runner process.
+ * Connector sessions passed from the embedding host (API server) to the runner.
  *
- * IMPORTANT: This data is ONLY consumed inside the HostRuntime implementation.
- * It is never exposed to workflows as runtimeEnv or node state, so secrets
- * carried in headers remain invisible to blueprints/code nodes.
+ * Sessions carry injected auth headers (never exposed to workflows).
  */
-export interface ConnectorHttpConfig {
-  /**
-   * Optional base URL used when HttpRequest nodes specify a relative URL
-   * (e.g., "/starships/{id}/connectors"). When provided and the request URL
-   * is relative, the final URL will be resolved against this base.
-   */
-  baseUrl?: string;
-
-  /**
-   * Headers to inject on every HTTP request executed via this connector.
-   * Typically used for Authorization or other connector-specific metadata.
-   */
+export interface ConnectorSession {
   headers?: Record<string, string>;
 }
 
@@ -39,11 +27,21 @@ export interface LlmRuntimeConfig {
 
 export interface RunnerHostRuntimeOptions {
   /**
-   * Map of connector slug -> HTTP configuration. Keys MUST match the
-   * connector identifiers used in HttpRequestParams.connector, e.g.:
-   *   { starships: { baseUrl, headers }, linkedin: { baseUrl, headers } }
+   * Connector templates (safe, no raw secrets) keyed by connector slug/provider.
    */
-  connectors?: Record<string, ConnectorHttpConfig | undefined>;
+  connectorTemplates?: Record<string, ConnectorTemplateRuntimeFieldsV2 | undefined>;
+
+  /**
+   * Connector sessions (auth headers, no raw secrets exposed to workflows)
+   * keyed by connector slug/provider.
+   */
+  connectorSessions?: Record<string, ConnectorSession | undefined>;
+
+  /**
+   * Non-secret runtime env values (same as Engine runtimeEnv). Needed for
+   * template expression evaluation in connector_action mappings.
+   */
+  runtimeEnv?: Record<string, unknown>;
 
   /**
    * Optional LLM runtime configuration. When provided, HostRuntime.llm will
@@ -65,9 +63,11 @@ export interface RunnerHostRuntimeOptions {
  * headers or URLs used here.
  */
 export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}): HostRuntime {
-  const connectorConfigs = options.connectors ?? {};
+  const connectorTemplates = options.connectorTemplates ?? {};
+  const connectorSessions = options.connectorSessions ?? {};
+  const runtimeEnv = options.runtimeEnv ?? {};
 
-  const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs, connector }) => {
+  const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
     const controller = new AbortController();
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
     const timeoutId = setTimeout(() => controller.abort(), timeout);
@@ -76,56 +76,8 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const finalMethod = method.toUpperCase();
 
       // Start from caller-provided URL and headers
-      let finalUrl = url;
-      let finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
-
-      // If a connector slug is provided, apply connector-specific behavior:
-      // - Resolve relative URLs against connector.baseUrl
-      // - Inject connector headers (typically Authorization) unless the caller
-      //   explicitly set an Authorization header.
-      if (connector && typeof connector === 'string') {
-        const cfg = connectorConfigs[connector];
-
-        // If the workflow requested a connector but the embedding host did not
-        // provide configuration for it, surface a clear error up front instead
-        // of failing with a low-level "Failed to parse URL" from fetch when
-        // using a relative URL like "/user/repos".
-        if (!cfg) {
-          const isRelative = typeof finalUrl === 'string' && !/^https?:\/\//i.test(finalUrl);
-          if (isRelative) {
-            throw new Error(
-              `Connector "${connector}" has no HTTP configuration; cannot resolve relative URL "${finalUrl}". ` +
-                'Make sure the connector is connected and has an access token configured on the host.'
-            );
-          }
-        }
-
-        if (cfg) {
-          const { baseUrl, headers: connectorHeaders } = cfg;
-
-          // Resolve relative URLs against connector baseUrl, when provided.
-          if (typeof baseUrl === 'string' && typeof finalUrl === 'string' && !/^https?:\/\//i.test(finalUrl)) {
-            const normalizedBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-            const normalizedPath = finalUrl.startsWith('/') ? finalUrl : `/${finalUrl}`;
-            finalUrl = `${normalizedBase}${normalizedPath}`;
-          }
-
-          // Merge connector headers last so they can override generic ones,
-          // EXCEPT for Authorization: if the caller explicitly set any
-          // Authorization header, we must not overwrite it (matches connector
-          // docs and keeps "escape hatches" predictable).
-          if (connectorHeaders && typeof connectorHeaders === 'object') {
-            const hasCallerAuth = Object.keys(finalHeaders).some((key) => key.toLowerCase() === 'authorization');
-
-            for (const [key, value] of Object.entries(connectorHeaders)) {
-              if (key.toLowerCase() === 'authorization' && hasCallerAuth) {
-                continue;
-              }
-              finalHeaders[key] = value as unknown;
-            }
-          }
-        }
-      }
+      const finalUrl = url;
+      const finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
       const init: RequestInit = {
         method: finalMethod,
@@ -186,6 +138,132 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     } finally {
       clearTimeout(timeoutId);
     }
+  };
+
+  const ajv = new Ajv({ allErrors: true, strict: false });
+
+  const evalTemplate = (value: unknown, ctx: { args: Record<string, unknown>; runtimeEnv: Record<string, unknown> }): unknown => {
+    if (typeof value !== 'string') return value;
+
+    const raw = value;
+    const fullOnly = /^\s*\{\{\s*[\s\S]*?\s*\}\}\s*$/.test(raw);
+    const re = /\{\{\s*([\s\S]*?)\s*\}\}/g;
+
+    const evalExpr = (expr: string): unknown => {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function('args', 'runtimeEnv', `return (${expr});`);
+      return fn(ctx.args, ctx.runtimeEnv);
+    };
+
+    if (fullOnly) {
+      const m = raw.match(/^\s*\{\{\s*([\s\S]*?)\s*\}\}\s*$/);
+      if (!m) return raw;
+      return evalExpr(m[1]);
+    }
+
+    return raw.replace(re, (_m, expr) => {
+      const out = evalExpr(String(expr));
+      return out === null || out === undefined ? '' : String(out);
+    });
+  };
+
+  const connectorAction: HostRuntime['connectorAction'] = async ({ connector, action, args = {}, timeoutMs }) => {
+    const c = String(connector || '').trim();
+    const a = String(action || '').trim();
+    if (!c) throw new Error('connectorAction.connector is required');
+    if (!a) throw new Error('connectorAction.action is required');
+
+    const tpl = connectorTemplates[c];
+    if (!tpl) {
+      throw new Error(`Unknown connector "${c}" (template not provided to runner)`);
+    }
+
+    const endpoint = (tpl.endpoints || []).find((e) => e && e.name === a) as ConnectorEndpointV2 | undefined;
+    if (!endpoint) {
+      throw new Error(`Unknown connector action "${a}" for connector "${c}"`);
+    }
+
+    // Validate args if schema is present.
+    if (endpoint.parameters && typeof endpoint.parameters === 'object') {
+      const validate = ajv.compile(endpoint.parameters as any);
+      const ok = validate(args);
+      if (!ok) {
+        const msg = ajv.errorsText(validate.errors || [], { separator: '; ' });
+        throw new Error(`Invalid connector_action args for ${c}.${a}: ${msg}`);
+      }
+    }
+
+    const ctx = { args, runtimeEnv };
+
+    const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
+    const baseUrlEvaluated = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim();
+    if (!/^https?:\/\//i.test(baseUrlEvaluated)) {
+      throw new Error(`Invalid baseUrl for connector "${c}": must be absolute http(s) URL`);
+    }
+
+    // Resolve path variables
+    const pathVars = (endpoint.mapping && endpoint.mapping.path) || {};
+    const resolvedPath = String(endpoint.path || '').replace(/\{([^}]+)\}/g, (_m, name) => {
+      const key = String(name);
+      const expr = (pathVars as Record<string, string>)[key];
+      const val = expr !== undefined ? evalTemplate(expr, ctx) : (args as any)[key];
+      if (val === undefined || val === null || String(val) === '') {
+        throw new Error(`Missing path variable "${key}" for connector "${c}" action "${a}"`);
+      }
+      return encodeURIComponent(String(val));
+    });
+
+    const url = `${baseUrlEvaluated.replace(/\/+$/,'')}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
+
+    // Build headers (sessions first, then mapping overrides)
+    const sessionHeaders = connectorSessions[c]?.headers ?? {};
+    const headers: Record<string, unknown> = { ...sessionHeaders };
+    if (endpoint.mapping?.headers) {
+      for (const [k, v] of Object.entries(endpoint.mapping.headers)) {
+        const out = evalTemplate(v, ctx);
+        headers[k] = out as any;
+      }
+    }
+
+    // Build query/body based on mapping or requestStyle
+    const method = String(endpoint.method || 'GET').toUpperCase();
+    let finalUrl = url;
+    let body: unknown = undefined;
+
+    const mapping = endpoint.mapping;
+    if (mapping?.query) {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(mapping.query)) {
+        const out = evalTemplate(v, ctx);
+        if (out === undefined || out === null) continue;
+        qs.set(k, String(out));
+      }
+      const q = qs.toString();
+      if (q) finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${q}`;
+    }
+
+    if (method !== 'GET' && method !== 'HEAD') {
+      if (mapping?.rawBody !== undefined) {
+        body = evalTemplate(mapping.rawBody, ctx);
+      } else if (mapping?.body) {
+        const obj: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(mapping.body)) {
+          obj[k] = evalTemplate(v, ctx) as any;
+        }
+        body = obj;
+      } else {
+        // fallback: send args as JSON for non-GET when no explicit body mapping
+        body = args;
+      }
+    }
+
+    return await http({
+      method,
+      url: finalUrl,
+      headers,
+      body,
+      timeoutMs,
+    });
   };
 
   const llm = async (request: LlmHostRequest): Promise<AsyncIterable<unknown>> => {
@@ -333,5 +411,5 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     return stream as AsyncIterable<unknown>;
   };
 
-  return { http, llm };
+  return { http, connectorAction, llm };
 }

@@ -30,7 +30,7 @@ import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
-import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+// Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
 
 /**
@@ -134,7 +134,7 @@ export class ConversationService {
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: Runner;
 
-  private connectorRuntimeService!: ConnectorRuntimeService;
+  // connector_action bundles are built per-request (requires authUserId)
 
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
@@ -156,7 +156,6 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
-    this.connectorRuntimeService = new ConnectorRuntimeService();
 
     // Choose default runner based on whether a remote runner is configured.
     // When RUNNER_URL is set, server startup configures autopilot.setRunnerConfig({ url, token })
@@ -958,7 +957,8 @@ export class ConversationService {
         // This is only used by the remote runner HostRuntime and is not exposed
         // to workflows (runtimeEnv/state).
         const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
-        const connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starship.id, authUserId);
+        const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
+        const { connectorTemplates, connectorSessions } = await sessionSvc.build(starship.id, authUserId);
 
         // Build LLM runtime configuration from server env; this will be passed
         // to the remote runner so it does not need to read provider keys from
@@ -974,11 +974,13 @@ export class ConversationService {
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
-          // Extra config understood by remote runner (connector-aware HostRuntime).
-          connectors,
+          // Extra config understood by remote runner (connector_action HostRuntime).
+          connectorTemplates,
+          connectorSessions,
           llm,
         } as EngineConfig & {
-          connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+          connectorTemplates?: Record<string, unknown>;
+          connectorSessions?: Record<string, unknown>;
           llm?: { apiKey: string; baseUrl?: string };
         };
 
@@ -1145,7 +1147,8 @@ export class ConversationService {
 
       // Build connector and llm runtime config, same as addConversationMessage
       const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
-      const connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starship.id, authUserId);
+      const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
+      const { connectorTemplates, connectorSessions } = await sessionSvc.build(starship.id, authUserId);
       const env = getEnvConfig();
       const llm = env.OPENROUTER_API_KEY
         ? {
@@ -1157,10 +1160,12 @@ export class ConversationService {
       const engineConfig = {
         eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
         runtimeEnv,
-        connectors,
+        connectorTemplates,
+        connectorSessions,
         llm,
       } as EngineConfig & {
-        connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+        connectorTemplates?: Record<string, unknown>;
+        connectorSessions?: Record<string, unknown>;
         llm?: { apiKey: string; baseUrl?: string };
       };
 

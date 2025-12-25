@@ -2,6 +2,7 @@ import { Expose } from 'class-transformer';
 import {
   IsBoolean,
   IsIn,
+  IsArray,
   IsObject,
   IsOptional,
   IsString,
@@ -12,8 +13,14 @@ import {
   validate,
   ValidationError,
 } from 'class-validator';
-import type { Blueprint } from '@starships/autopilot';
-import type { ConnectorAuthType, ConnectorProvider } from '@starships/protocol';
+import type {
+  ConnectorAuthTypeV2,
+  ConnectorAuthV2,
+  ConnectorEndpointV2,
+  ConnectorProvider,
+  ConnectorTemplateRuntimeFieldsV2,
+  JsonSchemaObject,
+} from '@starships/protocol';
 
 /**
  * ConnectorTemplateEntity
@@ -42,7 +49,7 @@ export class ConnectorTemplateEntity {
   @Expose()
   @IsString()
   @Length(1, 255)
-  displayName!: string;
+  name!: string;
 
   @Expose()
   @IsString()
@@ -51,19 +58,41 @@ export class ConnectorTemplateEntity {
 
   @Expose()
   @IsString()
-  @IsIn(['oauth2', 'api_key', 'custom', 'none'])
-  authType!: ConnectorAuthType | 'none';
+  @IsIn(['oauth2', 'api_key', 'platform_jwt', 'none'])
+  authType!: ConnectorAuthTypeV2;
 
   /**
-   * runtimeConfig is an open-ended JSON object that can hold:
-   * - env key names for client_id / client_secret
-   * - extra OAuth parameters
-   * - host runtime hints for http_request connector behavior
-   * - any other non-secret configuration
+   * V2 runtime fields (stored as root columns on connector_templates).
+   *
+   * IMPORTANT: These must never contain raw secret values; only secret references.
    */
   @Expose()
+  @IsString()
+  @Length(1, 2048)
+  baseUrl!: string;
+
+  @Expose()
   @IsObject()
-  runtimeConfig!: Record<string, unknown>;
+  authJson!: ConnectorAuthV2;
+
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  variablesJson?: NonNullable<ConnectorTemplateRuntimeFieldsV2['variables']>;
+
+  @Expose()
+  @IsArray()
+  endpointsJson!: ConnectorEndpointV2[];
+
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  rateLimitJson?: NonNullable<ConnectorTemplateRuntimeFieldsV2['rateLimit']>;
+
+  @Expose()
+  @IsOptional()
+  @IsObject()
+  metadataSchemaJson?: JsonSchemaObject;
 
   // Versioning / metadata
 
@@ -86,23 +115,6 @@ export class ConnectorTemplateEntity {
   @IsBoolean()
   isEnabled!: boolean;
 
-  // Inline blueprints for connector flows
-
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  connectBlueprint?: Blueprint;
-
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  refreshBlueprint?: Blueprint;
-
-  @Expose()
-  @IsOptional()
-  @IsObject()
-  testBlueprint?: Blueprint;
-
   @Expose()
   @IsISO8601()
   createdAt!: string;
@@ -123,17 +135,19 @@ export class ConnectorTemplateEntity {
       id: dataRecord.id || 'temp-id',
       slug: dataRecord.slug || (dataRecord.provider as string | undefined) || '',
       provider: (dataRecord.provider as string) || '',
-      displayName: dataRecord.displayName || '',
+      name: dataRecord.name || '',
       description: dataRecord.description || '',
-      authType: (dataRecord.authType as ConnectorAuthType) || 'oauth2',
-      runtimeConfig: dataRecord.runtimeConfig || {},
+      authType: (dataRecord.authType as ConnectorAuthTypeV2) || 'oauth2',
+      baseUrl: (dataRecord.baseUrl as string) || '',
+      authJson: (dataRecord.authJson as ConnectorAuthV2) || ({ type: 'none' } as ConnectorAuthV2),
+      variablesJson: dataRecord.variablesJson as NonNullable<ConnectorTemplateRuntimeFieldsV2['variables']> | undefined,
+      endpointsJson: (dataRecord.endpointsJson as ConnectorEndpointV2[]) || [],
+      rateLimitJson: dataRecord.rateLimitJson as NonNullable<ConnectorTemplateRuntimeFieldsV2['rateLimit']> | undefined,
+      metadataSchemaJson: dataRecord.metadataSchemaJson as JsonSchemaObject | undefined,
       version: (dataRecord.version as string) || '1.0.0',
       category: (dataRecord.category as string) || 'connector',
       usageCount: (dataRecord.usageCount as number) ?? 0,
       isEnabled: (dataRecord.isEnabled as boolean) ?? true,
-      connectBlueprint: dataRecord.connectBlueprint as Blueprint | undefined,
-      refreshBlueprint: dataRecord.refreshBlueprint as Blueprint | undefined,
-      testBlueprint: dataRecord.testBlueprint as Blueprint | undefined,
       createdAt: dataRecord.createdAt || new Date().toISOString(),
       updatedAt: dataRecord.updatedAt || new Date().toISOString(),
     });

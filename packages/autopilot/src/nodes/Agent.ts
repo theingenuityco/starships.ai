@@ -521,21 +521,21 @@ export class Agent implements NodeHandler {
       },
     });
 
-    // Server tool authorization/execution
+    // Server tool authorization/execution (connector_action via Starships connector template endpoint)
     builder.addNode({
-      type: 'http_request',
+      type: 'connector_action',
       name: 'Authorize & Execute Tool (Server)',
-      description: 'Call Starships API to enforce permissions and execute tool remotely',
+      description: 'Execute Starships connector endpoint to enforce permissions and execute tool remotely',
       ref: httpNodeRef,
       parameters: {
         connector: 'starships',
-        method: 'POST',
-        url: `{{ "/conversations/" + String(env("CONVERSATION_ID") ?? "") + "/tool-calls/authorize-and-maybe-execute" }}`,
-        body: {
+        action: 'authorize-and-maybe-execute-tool',
+        args: {
           agentId: `{{ String(env("AGENT_ID") ?? "") }}`,
           toolSlug: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.function?.name ?? ""); })() }}`,
           toolCallId: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.id ?? ""); })() }}`,
           args: `{{ lastOutputOf("${argsNodeRef}") }}`,
+          conversationId: `{{ String(env("CONVERSATION_ID") ?? "") }}`,
         },
         timeout: 120000,
       },

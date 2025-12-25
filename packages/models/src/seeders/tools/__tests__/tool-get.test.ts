@@ -162,9 +162,9 @@ describe('Tool Get Tool', () => {
         connectorAction: connectorActionMock,
       };
 
+      // connector_action nodes do not throw on non-2xx; this tool returns the connector body payload.
       await expect(executeToolWithMockRuntime({ slug: 'missing' }, hostRuntime)).resolves.toMatchObject({
-        ok: false,
-        error: expect.stringContaining('404 Not Found'),
+        error: 'Not Found',
       });
     });
   });

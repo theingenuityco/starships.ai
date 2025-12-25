@@ -82,5 +82,5 @@ Notes:
 
 For authenticated external APIs, the **GitHub connector** docs are the canonical reference:
 
-- See `connectors/github.md` for how `connector: "github"` works with relative URLs (for example `"/user"`, `"/user/repos"`, `"/repos/{owner}/{repo}/issues"`) and OAuth App user tokens.
+- See `public-docs/connectors/README.md` and `public-docs/connectors/configuration.md` for how `connector_action` works with connector templates and injected auth (OAuth2/API key/platform JWT).
 - Use the GitHub examples as a model when designing tools for other connectors (LinkedIn, Discord, Google Drive) that rely on HttpRequest + connector + full-string templates.

@@ -177,7 +177,9 @@ All blueprint types can use any combination of these powerful node types:
 - <span style={{ color: '#0066cc' }}>**[conditional](/core-concepts/blueprints#conditional-node)**</span>
   <ExternalLink className="inline w-3 h-3" />: Routes execution based on conditions and business logic
 - <span style={{ color: '#0066cc' }}>**[http_request](/core-concepts/blueprints#http-node)**</span>
-  <ExternalLink className="inline w-3 h-3" />: Makes API calls to external services with authentication
+  <ExternalLink className="inline w-3 h-3" />: Makes raw HTTP calls to external services (absolute URLs)
+- <span style={{ color: '#0066cc' }}>**[connector_action](/core-concepts/blueprints#http-node)**</span>
+  <ExternalLink className="inline w-3 h-3" />: Makes connector-backed HTTP calls (auth/base URL/mapping from connector templates)
 - <span style={{ color: '#0066cc' }}>**[mutate](/core-concepts/blueprints#mutate-node)**</span> <ExternalLink className="inline w-3 h-3" />:
   Updates tool state and context for complex workflows
 - <span style={{ color: '#0066cc' }}>**[transform](/core-concepts/blueprints#transform-node)**</span>
@@ -254,7 +256,7 @@ Tools are organized into categories based on their primary function:
 
 ## Tool Configuration, Environment Variables & Connectors
 
-When creating custom tools, you can securely store API keys and configuration using environment variables. For many third-party APIs, Starships also provides **connectors** that guide you through configuration and automatically manage the relevant env vars:
+When creating custom tools, you can securely store non-secret configuration using environment variables. For many third-party APIs, Starships also provides **connectors** that guide you through configuration and manage encrypted secrets **outside** of tool execution.
 
 <div className="my-6">
   <img
@@ -267,18 +269,15 @@ When creating custom tools, you can securely store API keys and configuration us
   </div>
 </div>
 
-Securely store API keys, tokens, and credentials that your custom tools can access. Values are encrypted and follow standard naming conventions (uppercase, letters, numbers, underscores).
+**Important (V2 connectors):**
 
-Examples:
+- Tool/workflow code does **not** read connector tokens from env.
+- Connector secrets live in:
+  - `platform_secrets` (instance-wide; instance admins)
+  - `connector_secrets` (per-starship; managed by connect flows)
+- Tools call third-party APIs via **`connector_action`**, which injects auth server-side using the connector template + connected starship state.
 
-- LinkedIn tools typically use:
-  - `LINKEDIN_ACCESS_TOKEN`
-  - `LINKEDIN_ORG_ID` (optional)
-- Discord tools often use:
-  - `DISCORD_BOT_TOKEN` (configured as a platform secret by an instance admin)
-  - `DISCORD_DEFAULT_CHANNEL_ID` (optional)
-
-You can set these manually or connect providers from the starship settings → Environment & Connectors page; Daedalus will reference these env keys when scaffolding LinkedIn/Discord tools.
+Use environment variables for non-secret configuration (defaults, IDs, feature flags). Use connectors for secrets and third-party auth.
 
 <Callout type="info">
   **Ready to Create Custom Tools?** Work with [Daedalus](/agents/daedalus) to build tools tailored to your specific needs through natural

@@ -70,12 +70,32 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
         };
       },
       connectorAction: async ({ connector, action, args, timeoutMs }) => {
+        // Mirror Starships server contract for authorize-and-maybe-execute-tool
+        // Expected: { success: true, data: { toolCallId, result } }
+        const objArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) as Record<string, unknown>;
+        const toolSlug = String(objArgs.toolSlug ?? '');
+        const toolCallId = String(objArgs.toolCallId ?? '');
+        const toolInput = (objArgs.args && typeof objArgs.args === 'object' ? (objArgs.args as Record<string, unknown>) : {}) as Record<
+          string,
+          unknown
+        >;
+
+        const label = toolSlug === 'tool_a' ? 'A' : toolSlug === 'tool_b' ? 'B' : 'UNKNOWN';
+
         return {
           status: 200,
           statusText: 'OK',
           headers: {},
-          body: { ok: true, connector, action, args, timeoutMs },
+          body: {
+            success: true,
+            data: {
+              toolCallId,
+              result: { label, input: toolInput },
+            },
+          },
           url: `connector://${String(connector)}/${String(action)}`,
+          // preserve for debugging parity if needed
+          timeoutMs,
         };
       },
       llm: async () => {

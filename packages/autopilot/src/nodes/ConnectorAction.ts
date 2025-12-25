@@ -5,7 +5,7 @@
  */
 
 import type { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
-import type { ConnectorActionParams, ExecutionItem } from '@/types';
+import type { ConnectorActionParams, ExecutionItem, ValidationErrorCode, ValidationResult } from '@/types';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
 export class ConnectorAction implements NodeHandler {
@@ -50,11 +50,12 @@ export class ConnectorAction implements NodeHandler {
     );
   }
 
-  validate() {
-    const errors: Array<{ code: string; message: string }> = [];
+  validate(): ValidationResult {
+    const errors: Array<{ code: ValidationErrorCode; message: string }> = [];
     if (!this.params.connector) errors.push({ code: 'MISSING_REQUIRED_FIELD', message: 'connector is required' });
     if (!this.params.action) errors.push({ code: 'MISSING_REQUIRED_FIELD', message: 'action is required' });
-    return { valid: errors.length === 0, errors };
+    if (errors.length === 0) return { valid: true };
+    return { valid: false, errors };
   }
 }
 

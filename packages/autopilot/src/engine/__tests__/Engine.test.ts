@@ -182,6 +182,13 @@ describe('Engine', () => {
       const httpMock = jest.fn().mockRejectedValue(new Error('Network error'));
       const hostRuntime: HostRuntime = {
         http: httpMock as HostRuntime['http'],
+        connectorAction: (jest.fn(async ({ connector, action, args, timeoutMs }) => ({
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: { ok: true, connector, action, args, timeoutMs },
+          url: `connector://${String(connector)}/${String(action)}`,
+        })) as HostRuntime['connectorAction']),
       };
 
       const eventCallback = jest.fn();

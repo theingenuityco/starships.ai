@@ -66,7 +66,7 @@ Behavior and limits:
               if (name) updateData.name = name;
               if (description) updateData.description = description;
 
-              return { widgetId, updateData };
+              return { widgetId, ...updateData };
             }
           `,
           timeout: 3000,
@@ -74,15 +74,13 @@ Behavior and limits:
       },
       {
         ref: 'update_widget',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Update Widget',
         description: 'Update widget via API',
         parameters: {
-          method: 'PUT',
-          url: '{{ "/widgets/" + lastOutputOf("validate_input").widgetId }}',
           connector: 'starships',
-          body: '{{ JSON.stringify(lastOutputOf("validate_input").updateData) }}',
-          headers: { 'Content-Type': 'application/json' },
+          action: 'update-widget',
+          args: '{{ lastOutputOf("validate_input") }}',
           timeout: 5000,
         },
       },

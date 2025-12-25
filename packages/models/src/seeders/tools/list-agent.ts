@@ -51,13 +51,15 @@ Behavior and limits:
       },
       {
         ref: 'http_list',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'List Agents',
         description: 'GET /starships/:starshipId/agents',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents" }}',
-          method: 'GET',
           connector: 'starships',
+          action: 'list-agents',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+          },
           timeout: 5000,
         },
       },

@@ -61,7 +61,7 @@ describe('Tool List Tool', () => {
       expect(nodeTypes).toContain('start');
       expect(nodeTypes).toContain('end');
       expect(nodeTypes).toContain('code'); // summarize
-      expect(nodeTypes).toContain('http_request');
+      expect(nodeTypes).toContain('connector_action');
 
       // Verify node connectivity
       const nodeRefs = new Set(blueprint.nodes.map((n) => n.ref));

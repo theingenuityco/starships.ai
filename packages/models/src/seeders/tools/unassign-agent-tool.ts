@@ -73,13 +73,16 @@ Returns server response.
       },
       {
         ref: 'fetch_agent',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Fetch Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).agentSlug }}',
-          method: 'GET',
           connector: 'starships',
+          action: 'get-agent',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).agentSlug }}',
+          },
           timeout: 5000,
         },
       },
@@ -113,13 +116,16 @@ Returns server response.
       },
       {
         ref: 'http_update',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Unassign Tool',
         description: 'DELETE /agents/:id/tools/:toolSlug',
         parameters: {
-          url: '{{ "/agents/" + (lastOutputOf("update_tools") || {}).agentId + "/tools/" + (lastOutputOf("update_tools") || {}).toolSlug }}',
-          method: 'DELETE',
           connector: 'starships',
+          action: 'unassign-agent-tool',
+          args: {
+            agentId: '{{ (lastOutputOf("update_tools") || {}).agentId }}',
+            toolSlug: '{{ (lastOutputOf("update_tools") || {}).toolSlug }}',
+          },
           timeout: '{{ (lastOutputOf("update_tools") || {}).timeout }}',
         },
       },

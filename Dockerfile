@@ -80,6 +80,10 @@ COPY --from=builder --chown=nodejs:node /app/pnpm-lock.yaml /app/pnpm-lock.yaml
 COPY --from=builder --chown=nodejs:node /app/tsconfig.nodejs.json /app/tsconfig.nodejs.json
 COPY --from=builder --chown=nodejs:node /app/node_modules /app/node_modules
 COPY --from=builder --chown=nodejs:node /app/packages /app/packages
+#
+# Needed by the backend docs API (GET /api/v1/docs) which indexes markdown
+# from the repo-root `public-docs/` directory.
+COPY --from=builder --chown=nodejs:node /app/public-docs /app/public-docs
 
 RUN chmod +x /app/docker-entrypoint.sh /app/supervisor-entrypoint.sh
 

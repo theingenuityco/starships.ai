@@ -26,8 +26,9 @@ export class InProcessExecutor implements Executor {
       [key: string]: unknown;
     };
 
-    // Extract host-runtime-only configuration; do NOT expose this via Engine
-    // runtimeEnv or execution state so secrets remain hidden from workflows.
+    // Extract host-runtime-only configuration. NOTE: runtimeEnv is explicitly
+    // intended to be exposed to templates via env("KEY") and to user-authored
+    // Code/Mutate nodes, but MUST NOT contain secrets.
     const { connectorTemplates, connectorSessions, llm, runtimeEnv, ...engineConfig } = rawConfig;
 
     const hostRuntime = createRunnerHostRuntime({
@@ -39,6 +40,8 @@ export class InProcessExecutor implements Executor {
 
     const engine = new Engine({
       ...(engineConfig || {}),
+      // Ensure env("...") templates resolve inside the Engine (Eval uses Engine.runtimeEnv).
+      runtimeEnv: runtimeEnv ?? {},
       hostRuntime,
       eventCallback: input.onEvent
         ? async (event: unknown) => {

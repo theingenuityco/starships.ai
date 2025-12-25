@@ -188,6 +188,20 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
     const baseUrlEvaluated = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim();
     if (!/^https?:\/\//i.test(baseUrlEvaluated)) {
+      // Always log the critical diagnostics right before throwing. This is the
+      // most common cause of connector_action failures and is safe because it
+      // only includes non-secret runtimeEnv + arg keys (not values).
+      console.error('[RunnerHostRuntime] invalid connector baseUrl', {
+        connector: c,
+        action: a,
+        endpointName: endpoint.name,
+        endpointPath: endpoint.path,
+        baseUrlRaw,
+        baseUrlEvaluated,
+        runtimeEnvServerUrl: runtimeEnv['SERVER_URL'],
+        runtimeEnvKeys: Object.keys(runtimeEnv || {}),
+        argsKeys: Object.keys(args || {}),
+      });
       throw new Error(`Invalid baseUrl for connector "${c}": must be absolute http(s) URL`);
     }
 

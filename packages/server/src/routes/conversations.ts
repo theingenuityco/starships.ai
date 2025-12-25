@@ -175,7 +175,6 @@ function buildServerHostRuntime(args: {
     const fullOnly = /^\s*\{\{\s*[\s\S]*?\s*\}\}\s*$/.test(raw);
     const re = /\{\{\s*([\s\S]*?)\s*\}\}/g;
     const evalExpr = (expr: string): unknown => {
-      // eslint-disable-next-line no-new-func
       const fn = new Function('args', 'runtimeEnv', `return (${expr});`);
       return fn(ctx.args, ctx.runtimeEnv);
     };
@@ -190,121 +189,123 @@ function buildServerHostRuntime(args: {
   };
 
   const httpImpl = async (req: { method: string; url: string; headers?: Record<string, unknown>; body?: unknown; timeoutMs?: number }) => {
-      const method = String(req.method || 'GET').toUpperCase();
-      const url = String(req.url || '');
-      if (!/^https?:\/\//i.test(url)) {
-        throw new Error('HostRuntime.http requires absolute http(s) URL (use connector_action for connector-backed calls)');
-      }
+    const method = String(req.method || 'GET').toUpperCase();
+    const url = String(req.url || '');
+    if (!/^https?:\/\//i.test(url)) {
+      throw new Error('HostRuntime.http requires absolute http(s) URL (use connector_action for connector-backed calls)');
+    }
 
-      // Normalize headers to string record
-      const headers: Record<string, string> = {};
-      const h = req.headers && typeof req.headers === 'object' ? (req.headers as Record<string, unknown>) : {};
-      for (const [k, v] of Object.entries(h)) {
-        if (typeof v === 'string') headers[k] = v;
-        else if (typeof v === 'number' || typeof v === 'boolean') headers[k] = String(v);
-      }
+    // Normalize headers to string record
+    const headers: Record<string, string> = {};
+    const h = req.headers && typeof req.headers === 'object' ? (req.headers as Record<string, unknown>) : {};
+    for (const [k, v] of Object.entries(h)) {
+      if (typeof v === 'string') headers[k] = v;
+      else if (typeof v === 'number' || typeof v === 'boolean') headers[k] = String(v);
+    }
 
-      const controller = new AbortController();
-      const timeoutMs = typeof req.timeoutMs === 'number' && req.timeoutMs > 0 ? req.timeoutMs : 30000;
-      const t = setTimeout(() => controller.abort(), timeoutMs);
+    const controller = new AbortController();
+    const timeoutMs = typeof req.timeoutMs === 'number' && req.timeoutMs > 0 ? req.timeoutMs : 30000;
+    const t = setTimeout(() => controller.abort(), timeoutMs);
 
-      try {
-        const hasBody = !(method === 'GET' || method === 'HEAD') && req.body !== undefined;
-        let body: string | undefined = undefined;
-        if (hasBody) {
-          if (typeof req.body === 'string') {
-            body = req.body;
-          } else {
-            body = JSON.stringify(req.body);
-            if (!Object.keys(headers).some((k) => k.toLowerCase() === 'content-type')) {
-              headers['Content-Type'] = 'application/json';
-            }
+    try {
+      const hasBody = !(method === 'GET' || method === 'HEAD') && req.body !== undefined;
+      let body: string | undefined = undefined;
+      if (hasBody) {
+        if (typeof req.body === 'string') {
+          body = req.body;
+        } else {
+          body = JSON.stringify(req.body);
+          if (!Object.keys(headers).some((k) => k.toLowerCase() === 'content-type')) {
+            headers['Content-Type'] = 'application/json';
           }
         }
-
-        const resp = await fetch(url, {
-          method,
-          headers,
-          body,
-          signal: controller.signal,
-        });
-
-        const contentType = resp.headers.get('content-type') || '';
-        let parsedBody: unknown;
-        if (contentType.toLowerCase().includes('application/json')) {
-          parsedBody = await resp.json().catch(() => null);
-        } else {
-          parsedBody = await resp.text().catch(() => '');
-        }
-
-        const headerObj: Record<string, string> = {};
-        // Avoid Headers.entries() typing issues in non-DOM TS libs by using forEach.
-        resp.headers.forEach((value, key) => {
-          headerObj[key] = value;
-        });
-
-        return {
-          status: resp.status,
-          statusText: resp.statusText,
-          url,
-          headers: headerObj,
-          body: parsedBody,
-        };
-      } finally {
-        clearTimeout(t);
       }
-    };
 
-  const connectorActionImpl = async (req: { connector: string; action: string; args?: Record<string, unknown>; timeoutMs?: number }) => {
-      const connector = String(req.connector || '').trim();
-      const action = String(req.action || '').trim();
-      const argsObj = (req.args && typeof req.args === 'object' ? req.args : {}) as Record<string, unknown>;
-      const tpl = connectorTemplates[connector];
-      if (!tpl) throw new Error(`Unknown connector "${connector}"`);
-      const endpoint = Array.isArray(tpl.endpoints) ? tpl.endpoints.find((e: any) => e && e.name === action) : undefined;
-      if (!endpoint) throw new Error(`Unknown connector action "${action}" for connector "${connector}"`);
-
-      const ctx = { args: argsObj, runtimeEnv };
-      const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
-      const baseUrl = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim().replace(/\/+$/, '');
-
-      const path = String(endpoint.path || '').replace(/\{([^}]+)\}/g, (_m: string, name: string) => {
-        const key = String(name);
-        const expr = endpoint?.mapping?.path?.[key];
-        const val = expr !== undefined ? evalTemplate(expr, ctx) : (argsObj as any)[key];
-        if (val === undefined || val === null || String(val) === '') throw new Error(`Missing path variable "${key}"`);
-        return encodeURIComponent(String(val));
+      const resp = await fetch(url, {
+        method,
+        headers,
+        body,
+        signal: controller.signal,
       });
 
-      let finalUrl = `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
-
-      const headers: Record<string, unknown> = { ...(connectorSessions[connector]?.headers ?? {}) };
-      if (endpoint?.mapping?.headers) {
-        for (const [k, v] of Object.entries(endpoint.mapping.headers)) headers[k] = evalTemplate(v as any, ctx) as any;
-      }
-      if (endpoint?.mapping?.query) {
-        const qs = new URLSearchParams();
-        for (const [k, v] of Object.entries(endpoint.mapping.query)) {
-          const out = evalTemplate(v as any, ctx);
-          if (out === undefined || out === null) continue;
-          qs.set(k, String(out));
-        }
-        const q = qs.toString();
-        if (q) finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${q}`;
+      const contentType = resp.headers.get('content-type') || '';
+      let parsedBody: unknown;
+      if (contentType.toLowerCase().includes('application/json')) {
+        parsedBody = await resp.json().catch(() => null);
+      } else {
+        parsedBody = await resp.text().catch(() => '');
       }
 
-      const method = String(endpoint.method || 'GET').toUpperCase();
-      let body: unknown = undefined;
-      if (method !== 'GET' && method !== 'HEAD') {
-        if (endpoint?.mapping?.rawBody !== undefined) body = evalTemplate(endpoint.mapping.rawBody, ctx);
-        else if (endpoint?.mapping?.body) {
-          const obj: Record<string, unknown> = {};
-          for (const [k, v] of Object.entries(endpoint.mapping.body)) obj[k] = evalTemplate(v as any, ctx) as any;
-          body = obj;
-        } else body = argsObj;
+      const headerObj: Record<string, string> = {};
+      // Avoid Headers.entries() typing issues in non-DOM TS libs by using forEach.
+      resp.headers.forEach((value, key) => {
+        headerObj[key] = value;
+      });
+
+      return {
+        status: resp.status,
+        statusText: resp.statusText,
+        url,
+        headers: headerObj,
+        body: parsedBody,
+      };
+    } finally {
+      clearTimeout(t);
+    }
+  };
+
+  const connectorActionImpl = async (req: { connector: string; action: string; args?: Record<string, unknown>; timeoutMs?: number }) => {
+    const connector = String(req.connector || '').trim();
+    const action = String(req.action || '').trim();
+    const argsObj = (req.args && typeof req.args === 'object' ? req.args : {}) as Record<string, unknown>;
+    const tpl = connectorTemplates[connector];
+    if (!tpl) throw new Error(`Unknown connector "${connector}"`);
+    const endpoint = Array.isArray(tpl.endpoints) ? tpl.endpoints.find((e: any) => e && e.name === action) : undefined;
+    if (!endpoint) throw new Error(`Unknown connector action "${action}" for connector "${connector}"`);
+
+    const ctx = { args: argsObj, runtimeEnv };
+    const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
+    const baseUrl = String(evalTemplate(baseUrlRaw, ctx) ?? '')
+      .trim()
+      .replace(/\/+$/, '');
+
+    const path = String(endpoint.path || '').replace(/\{([^}]+)\}/g, (_m: string, name: string) => {
+      const key = String(name);
+      const expr = endpoint?.mapping?.path?.[key];
+      const val = expr !== undefined ? evalTemplate(expr, ctx) : (argsObj as any)[key];
+      if (val === undefined || val === null || String(val) === '') throw new Error(`Missing path variable "${key}"`);
+      return encodeURIComponent(String(val));
+    });
+
+    let finalUrl = `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+
+    const headers: Record<string, unknown> = { ...(connectorSessions[connector]?.headers ?? {}) };
+    if (endpoint?.mapping?.headers) {
+      for (const [k, v] of Object.entries(endpoint.mapping.headers)) headers[k] = evalTemplate(v as any, ctx) as any;
+    }
+    if (endpoint?.mapping?.query) {
+      const qs = new URLSearchParams();
+      for (const [k, v] of Object.entries(endpoint.mapping.query)) {
+        const out = evalTemplate(v as any, ctx);
+        if (out === undefined || out === null) continue;
+        qs.set(k, String(out));
       }
-      return await httpImpl({ method, url: finalUrl, headers, body, timeoutMs: req.timeoutMs });
-    };
+      const q = qs.toString();
+      if (q) finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${q}`;
+    }
+
+    const method = String(endpoint.method || 'GET').toUpperCase();
+    let body: unknown = undefined;
+    if (method !== 'GET' && method !== 'HEAD') {
+      if (endpoint?.mapping?.rawBody !== undefined) body = evalTemplate(endpoint.mapping.rawBody, ctx);
+      else if (endpoint?.mapping?.body) {
+        const obj: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(endpoint.mapping.body)) obj[k] = evalTemplate(v as any, ctx) as any;
+        body = obj;
+      } else body = argsObj;
+    }
+    return await httpImpl({ method, url: finalUrl, headers, body, timeoutMs: req.timeoutMs });
+  };
 
   return { http: httpImpl, connectorAction: connectorActionImpl };
 }
@@ -584,6 +585,28 @@ router.post(
         return;
       }
 
+      // Debug aid for common integration failures: agentId must be a nanoid-like string.
+      // This does NOT log secrets; it only logs the raw agentId and basic request shape.
+      try {
+        const rawBody = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
+        const agentIdRaw = rawBody.agentId;
+        const agentIdStr = typeof agentIdRaw === 'string' ? agentIdRaw : String(agentIdRaw ?? '');
+        const ok = /^[a-z0-9_-]{10,30}$/i.test(agentIdStr);
+        if (!ok) {
+          console.error('[authorize-and-maybe-execute] invalid agentId (pre-validate)', {
+            conversationId,
+            agentId: agentIdStr,
+            agentIdType: typeof agentIdRaw,
+            agentIdLen: agentIdStr.length,
+            toolSlug: typeof rawBody.toolSlug === 'string' ? rawBody.toolSlug : undefined,
+            toolCallId: typeof rawBody.toolCallId === 'string' ? rawBody.toolCallId : undefined,
+            bodyKeys: Object.keys(rawBody),
+          });
+        }
+      } catch {
+        // ignore debug logging failures
+      }
+
       const bodyValidation = validateData(
         z.object({
           agentId: IdSchema,
@@ -711,12 +734,12 @@ router.post(
         return;
       }
 
-      const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId };
+      const env = getEnvConfig();
+      const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId, SERVER_URL: env.SERVER_URL };
       const sessionSvc = new ConnectorActionSessionService();
       const { connectorTemplates, connectorSessions } = await sessionSvc.build(conversation.starshipId, authUserId);
       const hostRuntime = buildServerHostRuntime({ connectorTemplates, connectorSessions, runtimeEnv });
 
-      const env = getEnvConfig();
       const llm = env.OPENROUTER_API_KEY
         ? {
             apiKey: env.OPENROUTER_API_KEY,
@@ -807,11 +830,11 @@ router.post(
         return;
       }
 
-      const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId };
+      const env = getEnvConfig();
+      const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId, SERVER_URL: env.SERVER_URL };
       const sessionSvc = new ConnectorActionSessionService();
       const { connectorTemplates, connectorSessions } = await sessionSvc.build(conversation.starshipId, authUserId);
       const hostRuntime = buildServerHostRuntime({ connectorTemplates, connectorSessions, runtimeEnv });
-      const env = getEnvConfig();
       const llm = env.OPENROUTER_API_KEY
         ? {
             apiKey: env.OPENROUTER_API_KEY,

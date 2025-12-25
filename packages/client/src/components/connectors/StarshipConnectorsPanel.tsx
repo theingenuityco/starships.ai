@@ -83,14 +83,14 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const normalizedQuery = searchQuery.trim().toLowerCase()
 
   const matchesQuery = useMemo(
-    () => (entry: { displayName: string; description: string }) =>
-      !normalizedQuery || entry.displayName.toLowerCase().includes(normalizedQuery) || entry.description.toLowerCase().includes(normalizedQuery),
+    () => (entry: { name: string; description: string }) =>
+      !normalizedQuery || entry.name.toLowerCase().includes(normalizedQuery) || entry.description.toLowerCase().includes(normalizedQuery),
     [normalizedQuery]
   )
 
-  // Show connectors that have an interactive connect flow: OAuth2 or custom
-  // (e.g. GitHub App, which uses a custom connect blueprint).
-  const connectableCatalog = useMemo(() => catalog.filter(entry => entry.authType === 'oauth2' || entry.authType === 'custom'), [catalog])
+  // Only show connectors that have an interactive connect flow on the client today.
+  // Currently we only support the OAuth2 redirect flow here.
+  const connectableCatalog = useMemo(() => catalog.filter(entry => entry.authType === 'oauth2'), [catalog])
 
   if (isLoading) {
     return (
@@ -101,12 +101,12 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   }
 
   const hasAnyVisibleConnector = connectableCatalog.some(item => {
-    return matchesQuery({ displayName: item.displayName, description: item.description })
+    return matchesQuery({ name: item.name, description: item.description })
   })
 
   const renderConnectorCard = (provider: string, connectedFirst: boolean) => {
     const catalogItem = connectableCatalog.find((c: { provider: string }) => c.provider === provider)
-    if (!catalogItem || !matchesQuery({ displayName: catalogItem.displayName, description: catalogItem.description })) {
+    if (!catalogItem || !matchesQuery({ name: catalogItem.name, description: catalogItem.description })) {
       return null
     }
 
@@ -114,7 +114,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     const isConnected = state?.status === 'connected'
     if (!!isConnected !== connectedFirst) return null
 
-    const label = catalogItem.displayName
+    const label = catalogItem.name
     const logoSrc = CONNECTOR_LOGOS[provider]
 
     return (

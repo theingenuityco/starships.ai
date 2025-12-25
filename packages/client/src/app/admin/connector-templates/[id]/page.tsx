@@ -13,6 +13,7 @@ import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import type { ConnectorAuthTypeV2 } from '@starships/protocol'
 
 function formatJson(value: unknown): string {
   if (value === undefined) return ''
@@ -39,34 +40,38 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
   const { data: connector, isLoading, isError, error } = useAdminConnectorTemplate(id, isAuthenticated && isInstanceAdmin)
   const updateMutation = useUpdateAdminConnectorTemplate()
 
-  const [displayName, setDisplayName] = useState('')
+  const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [authType, setAuthType] = useState<'oauth2' | 'api_key' | 'custom' | 'none'>('oauth2')
+  const [authType, setAuthType] = useState<ConnectorAuthTypeV2>('oauth2')
   const [isEnabled, setIsEnabled] = useState(true)
   const [version, setVersion] = useState('')
   const [category, setCategory] = useState('')
 
-  const [runtimeConfigText, setRuntimeConfigText] = useState('')
-  const [connectBlueprintText, setConnectBlueprintText] = useState('')
-  const [refreshBlueprintText, setRefreshBlueprintText] = useState('')
-  const [testBlueprintText, setTestBlueprintText] = useState('')
+  const [baseUrl, setBaseUrl] = useState('')
+  const [authText, setAuthText] = useState('')
+  const [endpointsText, setEndpointsText] = useState('')
+  const [variablesText, setVariablesText] = useState('')
+  const [rateLimitText, setRateLimitText] = useState('')
+  const [metadataSchemaText, setMetadataSchemaText] = useState('')
 
   const provider = connector?.provider
   const slug = connector?.slug
 
   useEffect(() => {
     if (!connector) return
-    setDisplayName(connector.displayName || '')
+    setName(connector.name || '')
     setDescription(connector.description || '')
-    setAuthType((connector.authType as any) || 'oauth2')
-    setIsEnabled((connector as any).isEnabled !== false)
+    setAuthType(connector.authType || 'oauth2')
+    setIsEnabled(connector.isEnabled !== false)
     setVersion(connector.version || '')
     setCategory(connector.category || '')
 
-    setRuntimeConfigText(formatJson(connector.runtimeConfig || {}))
-    setConnectBlueprintText(formatJson(connector.connectBlueprint))
-    setRefreshBlueprintText(formatJson(connector.refreshBlueprint))
-    setTestBlueprintText(formatJson(connector.testBlueprint))
+    setBaseUrl(connector.baseUrl || '')
+    setAuthText(formatJson(connector.auth || { type: connector.authType || 'none' }))
+    setEndpointsText(formatJson(connector.endpoints || []))
+    setVariablesText(formatJson(connector.variables || []))
+    setRateLimitText(formatJson(connector.rateLimit || undefined))
+    setMetadataSchemaText(formatJson(connector.metadataSchema || undefined))
   }, [connector])
 
   const title = useMemo(() => (provider ? `Connector template: ${provider}` : 'Connector template'), [provider])
@@ -134,39 +139,48 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                 onClick={async () => {
                   if (!id) return
                   try {
-                    const runtimeConfig = parseOptionalJson(runtimeConfigText) as any
-                    const connectBlueprint = parseOptionalJson(connectBlueprintText) as any
-                    const refreshBlueprint = parseOptionalJson(refreshBlueprintText) as any
-                    const testBlueprint = parseOptionalJson(testBlueprintText) as any
+                    const auth = parseOptionalJson(authText) as any
+                    const endpoints = parseOptionalJson(endpointsText) as any
+                    const variables = parseOptionalJson(variablesText) as any
+                    const rateLimit = parseOptionalJson(rateLimitText) as any
+                    const metadataSchema = parseOptionalJson(metadataSchemaText) as any
 
-                    if (runtimeConfig !== undefined && (runtimeConfig === null || typeof runtimeConfig !== 'object' || Array.isArray(runtimeConfig))) {
-                      toast.error('runtimeConfig must be a JSON object')
+                    if (auth !== undefined && (auth === null || typeof auth !== 'object' || Array.isArray(auth))) {
+                      toast.error('auth must be a JSON object')
                       return
                     }
-                    for (const [name, v] of [
-                      ['connectBlueprint', connectBlueprint],
-                      ['refreshBlueprint', refreshBlueprint],
-                      ['testBlueprint', testBlueprint],
-                    ] as const) {
-                      if (v !== undefined && v !== null && (typeof v !== 'object' || Array.isArray(v))) {
-                        toast.error(`${name} must be a JSON object or null`)
-                        return
-                      }
+                    if (endpoints !== undefined && !Array.isArray(endpoints)) {
+                      toast.error('endpoints must be a JSON array')
+                      return
+                    }
+                    if (variables !== undefined && !Array.isArray(variables)) {
+                      toast.error('variables must be a JSON array')
+                      return
+                    }
+                    if (rateLimit !== undefined && (rateLimit === null || typeof rateLimit !== 'object' || Array.isArray(rateLimit))) {
+                      toast.error('rateLimit must be a JSON object')
+                      return
+                    }
+                    if (metadataSchema !== undefined && (metadataSchema === null || typeof metadataSchema !== 'object' || Array.isArray(metadataSchema))) {
+                      toast.error('metadataSchema must be a JSON object')
+                      return
                     }
 
                     await updateMutation.mutateAsync({
                       id,
                       updates: {
-                        displayName,
+                        name,
                         description,
                         authType,
                         isEnabled,
                         version,
                         category,
-                        runtimeConfig: runtimeConfig === undefined ? undefined : (runtimeConfig as any),
-                        connectBlueprint: connectBlueprint === undefined ? undefined : (connectBlueprint as any),
-                        refreshBlueprint: refreshBlueprint === undefined ? undefined : (refreshBlueprint as any),
-                        testBlueprint: testBlueprint === undefined ? undefined : (testBlueprint as any),
+                        baseUrl,
+                        auth: auth === undefined ? undefined : (auth as any),
+                        endpoints: endpoints === undefined ? undefined : (endpoints as any),
+                        variables: variables === undefined ? undefined : (variables as any),
+                        rateLimit: rateLimit === undefined ? undefined : (rateLimit as any),
+                        metadataSchema: metadataSchema === undefined ? undefined : (metadataSchema as any),
                       },
                     })
                   } catch (e: any) {
@@ -202,19 +216,19 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                         <Input value={slug || ''} readOnly />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium">Display name</label>
-                        <Input value={displayName} onChange={e => setDisplayName(e.target.value)} />
+                        <label className="text-sm font-medium">Name</label>
+                        <Input value={name} onChange={e => setName(e.target.value)} />
                       </div>
                       <div className="space-y-2">
                         <label className="text-sm font-medium">Auth type</label>
-                        <Select value={authType} onValueChange={v => setAuthType(v as any)}>
+                        <Select value={authType} onValueChange={v => setAuthType(v as ConnectorAuthTypeV2)}>
                           <SelectTrigger>
                             <SelectValue placeholder="Select auth type" />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="oauth2">oauth2</SelectItem>
                             <SelectItem value="api_key">api_key</SelectItem>
-                            <SelectItem value="custom">custom</SelectItem>
+                            <SelectItem value="platform_jwt">platform_jwt</SelectItem>
                             <SelectItem value="none">none</SelectItem>
                           </SelectContent>
                         </Select>
@@ -248,20 +262,28 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
 
                   <div className="rounded-lg border border-border/60 bg-background/70 p-5 space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">runtimeConfig (JSON)</label>
-                      <Textarea value={runtimeConfigText} onChange={e => setRuntimeConfigText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
+                      <label className="text-sm font-medium">Base URL</label>
+                      <Input value={baseUrl} onChange={e => setBaseUrl(e.target.value)} spellCheck={false} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">connectBlueprint (JSON or null)</label>
-                      <Textarea value={connectBlueprintText} onChange={e => setConnectBlueprintText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
+                      <label className="text-sm font-medium">auth (JSON)</label>
+                      <Textarea value={authText} onChange={e => setAuthText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">refreshBlueprint (JSON or null)</label>
-                      <Textarea value={refreshBlueprintText} onChange={e => setRefreshBlueprintText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
+                      <label className="text-sm font-medium">endpoints (JSON array)</label>
+                      <Textarea value={endpointsText} onChange={e => setEndpointsText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium">testBlueprint (JSON or null)</label>
-                      <Textarea value={testBlueprintText} onChange={e => setTestBlueprintText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
+                      <label className="text-sm font-medium">variables (JSON array)</label>
+                      <Textarea value={variablesText} onChange={e => setVariablesText(e.target.value)} className="min-h-[220px] font-mono text-xs" spellCheck={false} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">rateLimit (JSON)</label>
+                      <Textarea value={rateLimitText} onChange={e => setRateLimitText(e.target.value)} className="min-h-[180px] font-mono text-xs" spellCheck={false} />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">metadataSchema (JSON)</label>
+                      <Textarea value={metadataSchemaText} onChange={e => setMetadataSchemaText(e.target.value)} className="min-h-[180px] font-mono text-xs" spellCheck={false} />
                     </div>
                   </div>
                 </div>

@@ -12,7 +12,9 @@ Specification (authoritative)
   - metadata?: Record<string, unknown>
 
 Execution behavior
-- Creates a child execution using the parent as base (preserves depth, visit counts lineage).
+- Creates a child execution using the parent as base:
+  - execution depth increments (parent depth + 1)
+  - execution state is cloned so child mutations do not leak back to the parent
 - Uses a depth-aware Runner chosen by RunnerFactory.
 - `failOnNodeError: true` for nested workflow.
 - Returns the nested blueprint’s output items.

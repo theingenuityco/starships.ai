@@ -1,41 +1,46 @@
-## Connector `runtime_config` Reference (Admin / `connector_templates`)
+## Connector Templates V2 Reference (Admin / `connector_templates`)
 
-`connector_templates.runtime_config` is an **open-ended JSON object** that defines connector behavior.
-The runtime only _interprets_ a small set of keys, but unknown keys are allowed for DB-driven providers and connector blueprints.
+Connector templates are defined by root runtime fields on `connector_templates`:
+
+- `base_url` (text)
+- `auth_json` (jsonb)
+- `variables_json` (jsonb, optional)
+- `endpoints_json` (jsonb)
+- `rate_limit_json` (jsonb, optional)
+- `metadata_schema_json` (jsonb, optional)
 
 This is the source of truth used by:
 
-- The **API server** (`ConnectorService`) to run OAuth2 connector flows (start + callback completion)
-- The **runner HostRuntime** to resolve relative URLs and inject connector auth headers for `http_request`
+- The **API server** (`ConnectorService`) to run declarative OAuth2/API-key connector flows (start + callback completion / api-key connect)
+- The **runner HostRuntime** to execute `connector_action` endpoints (lookup + args validation + mapping + auth injection)
 
 > Note on secret refs
 >
-> `runtime_config` must never contain raw secret values. It contains **references** to encrypted secrets stored in:
+> `auth_json` must never contain raw secret values. It contains **references** to encrypted secrets stored in:
 >
 > - `platform_secrets` (instance-wide; instance admins only)
 > - `connector_secrets` (per-starship; created/updated by connector flows)
 
 ---
 
-### Canonical type
+### Canonical types
 
-The canonical TypeScript shape is `ConnectorRuntimeConfig` in `@starships/protocol` (`packages/protocol/src/domains/connector.ts`).
+The canonical TypeScript shapes live in `@starships/protocol` (`packages/protocol/src/domains/connector.ts`):
+
+- `ConnectorTemplateRuntimeFieldsV2`
+- `ConnectorEndpointV2`
+- `ConnectorAuthV2` and its variants
 
 ---
 
-### Top-level keys
+### Root runtime fields
 
-- **`apiBaseUrl?: string`**
-  - **Runner behavior**: when `http_request.parameters.connector` is set and `url` is **not** an absolute `http(s)://...` URL, the runner resolves it against `apiBaseUrl`.
-  - Example:
-    - `apiBaseUrl: "https://api.github.com"`, `url: "/user"` → `https://api.github.com/user`
-    - `apiBaseUrl: "https://api.github.com"`, `url: "user"` → `https://api.github.com/user`
-
-- **`oauth?: ConnectorOAuthRuntimeConfig`**
-  - Shared namespace for OAuth flow configuration **and** runtime HTTP auth injection.
-
-- **`usesPlatformJwt?: boolean`**
-  - Host-only flag for the internal `"starships"` connector: instead of reading `oauth.accessToken`, the server generates a JWT at runtime and injects `Authorization: Bearer <jwt>`.
+- **`baseUrl`** (`base_url`): absolute base URL used for endpoint resolution.
+- **`auth`** (`auth_json`): declarative auth configuration (secret refs only).
+- **`variables`** (`variables_json`, optional): named variables resolved from args/metadata/runtimeEnv.
+- **`endpoints`** (`endpoints_json`): action catalog. Each endpoint defines method/path, args JSON Schema, and mapping.
+- **`rateLimit`** (`rate_limit_json`, optional): best-effort throttling hints.
+- **`metadataSchema`** (`metadata_schema_json`, optional): JSON Schema for connector instance metadata.
 
 ---
 
@@ -135,3 +140,5 @@ Important nuance:
   }
 }
 ```
+
+

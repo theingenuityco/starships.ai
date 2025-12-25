@@ -149,6 +149,41 @@ export class ChildProcessRunner implements Runner {
             return;
           }
 
+          // HostRuntime connectorAction bridge: child -> parent
+          if (m && typeof m === 'object' && m.type === 'host_connector_action') {
+            const host = config?.hostRuntime;
+            if (!host || typeof host.connectorAction !== 'function') {
+              child.send?.({
+                type: 'host_connector_action_result',
+                id: m.id,
+                error: 'Host runtime connectorAction() not available in parent process',
+              });
+              return;
+            }
+            try {
+              type HostConnectorActionRequest = Parameters<HostRuntime['connectorAction']>[0];
+              const request = (m as { request: HostConnectorActionRequest }).request;
+              const response = await host.connectorAction(request);
+              child.send?.({
+                type: 'host_connector_action_result',
+                id: m.id,
+                response,
+              });
+            } catch (err) {
+              console.error('[ChildProcessRunner] host_connector_action error', {
+                pid: child.pid,
+                id: m.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+              child.send?.({
+                type: 'host_connector_action_result',
+                id: m.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+            return;
+          }
+
           if (!isChildMessage(msg)) return;
           if (msg.type === 'event' && config?.eventCallback) {
             const cb = config.eventCallback as (e: unknown) => Promise<void> | void;

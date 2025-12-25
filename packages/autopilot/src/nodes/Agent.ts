@@ -371,7 +371,7 @@ export class Agent implements NodeHandler {
   }
 
   /**
-   * Default blueprint variant that delegates tool execution to the Starships server via HttpRequest
+   * Default blueprint variant that delegates tool execution to the Starships server via connector_action
    * (connector: "starships"), allowing server-side enforcement of assignment + allow/ask/deny.
    *
    * Key behavior difference vs defaultAgentBlueprint():

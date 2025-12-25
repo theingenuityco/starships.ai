@@ -157,11 +157,11 @@ router.post('/admin/connector-templates', async (req: Request, res: Response): P
       version: body.version,
       category: body.category,
       baseUrl: body.baseUrl,
-      auth: body.auth as unknown as Record<string, unknown>,
-      variables: body.variables as unknown as Array<Record<string, unknown>> | undefined,
-      endpoints: body.endpoints as unknown as Array<Record<string, unknown>>,
-      rateLimit: body.rateLimit as unknown as Record<string, unknown> | undefined,
-      metadataSchema: body.metadataSchema as unknown as Record<string, unknown> | undefined,
+      auth: body.auth as unknown as ConnectorAuthV2,
+      variables: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
+      endpoints: body.endpoints as unknown as ConnectorEndpointV2[],
+      rateLimit: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
+      metadataSchema: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
     } satisfies CreateConnectorTemplateRequest);
 
     const payload: AdminConnectorTemplateResponse = {

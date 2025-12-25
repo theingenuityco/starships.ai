@@ -221,11 +221,11 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
       version: body.version,
       category: body.category,
       baseUrl: body.baseUrl,
-      authJson: body.auth as unknown as Record<string, unknown>,
-      variablesJson: body.variables as unknown as Array<Record<string, unknown>> | undefined,
-      endpointsJson: body.endpoints as unknown as Array<Record<string, unknown>>,
-      rateLimitJson: body.rateLimit as unknown as Record<string, unknown> | undefined,
-      metadataSchemaJson: body.metadataSchema as unknown as Record<string, unknown> | undefined,
+      authJson: body.auth as unknown as ConnectorAuthV2,
+      variablesJson: body.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
+      endpointsJson: body.endpoints as unknown as ConnectorEndpointV2[],
+      rateLimitJson: body.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
+      metadataSchemaJson: body.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
     });
 
     if (!updated) {

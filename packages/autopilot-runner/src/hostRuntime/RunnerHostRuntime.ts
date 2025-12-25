@@ -2,10 +2,7 @@ import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
 import type { ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2, ExprString, HttpMethod } from '@starships/protocol';
 import OpenAI from 'openai';
 
-type OpenAIChatCompletionCreateParamsNonStreaming = Omit<
-  OpenAI.Chat.ChatCompletionCreateParamsStreaming,
-  'stream' | 'stream_options'
-> & {
+type OpenAIChatCompletionCreateParamsNonStreaming = Omit<OpenAI.Chat.ChatCompletionCreateParamsStreaming, 'stream' | 'stream_options'> & {
   stream: false;
 };
 
@@ -154,7 +151,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     const re = /\{\{\s*([\s\S]*?)\s*\}\}/g;
 
     const evalExpr = (expr: string): unknown => {
-      // eslint-disable-next-line no-new-func
       const fn = new Function('args', 'runtimeEnv', `return (${expr});`);
       return fn(ctx.args, ctx.runtimeEnv);
     };
@@ -207,7 +203,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       return encodeURIComponent(String(val));
     });
 
-    const url = `${baseUrlEvaluated.replace(/\/+$/,'')}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
+    const url = `${baseUrlEvaluated.replace(/\/+$/, '')}${resolvedPath.startsWith('/') ? '' : '/'}${resolvedPath}`;
 
     // Build headers (sessions first, then mapping overrides)
     const sessionHeaders = connectorSessions[c]?.headers ?? {};
@@ -374,8 +370,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
             index: 0,
             // LLM node checks both delta and message; include full message snapshot.
             message: c?.choices?.[0]?.message,
-            finish_reason:
-              c?.choices?.[0]?.finish_reason ?? (c?.choices?.[0] as unknown as { finishReason?: unknown })?.finishReason,
+            finish_reason: c?.choices?.[0]?.finish_reason ?? (c?.choices?.[0] as unknown as { finishReason?: unknown })?.finishReason,
           },
         ],
       };
@@ -393,9 +388,10 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     // - Always force non-stream for image requests
     // - Respect explicit stream=false for text requests
     if (isImageRequest || !wantsStream) {
-      const completion = await client.chat.completions.create(
-        { ...(baseRequest as Record<string, unknown>), stream: false } as unknown as OpenAIChatCompletionCreateParamsNonStreaming
-      );
+      const completion = await client.chat.completions.create({
+        ...(baseRequest as Record<string, unknown>),
+        stream: false,
+      } as unknown as OpenAIChatCompletionCreateParamsNonStreaming);
       return wrapNonStreamAsOneChunk(completion);
     }
 

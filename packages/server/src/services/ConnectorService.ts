@@ -247,8 +247,8 @@ export class ConnectorService {
 
   /**
    * Complete generic OAuth flow for a connector. Uses connector_templates
-   * configuration (token URL, redirect path, runtime_config) to exchange the
-   * code for tokens and persist connector/env state.
+   * declarative V2 auth config (auth_json) to exchange the code for tokens and
+   * persist connector/env state.
    */
   async completeOAuthConnector(
     providerFromCallback: ConnectorProvider,

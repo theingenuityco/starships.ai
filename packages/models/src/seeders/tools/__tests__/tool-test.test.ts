@@ -120,6 +120,7 @@ describe('Tool Test Tool', () => {
     it('should fail when targetSlug is missing', async () => {
       const hostRuntime: HostRuntime = {
         http: jest.fn(async () => createMockResponse({})) as unknown as HostRuntime['http'],
+        connectorAction: jest.fn(async () => createMockResponse({})) as unknown as HostRuntime['connectorAction'],
       };
       await expect(executeToolWithMockConfig({}, hostRuntime)).resolves.toMatchObject({
         ok: false,
@@ -135,10 +136,11 @@ describe('Tool Test Tool', () => {
 
       const nested = makeNestedEchoBlueprint();
       const hostRuntime: HostRuntime = {
-        http: jest.fn(async ({ method, url, connector }) => {
-          expect(method).toBe('GET');
+        http: jest.fn(async () => createMockResponse({})) as unknown as HostRuntime['http'],
+        connectorAction: jest.fn(async ({ connector, action, args }) => {
           expect(connector).toBe('starships');
-          expect(url).toBe('/starships/test-starship/tools/demo');
+          expect(action).toBe('get-tool');
+          expect(args).toMatchObject({ starshipId: 'test-starship', slug: 'demo' });
 
           // Tools API contract: { data: Tool }
           return createMockResponse({
@@ -150,7 +152,7 @@ describe('Tool Test Tool', () => {
               blueprint: nested,
             },
           });
-        }) as unknown as HostRuntime['http'],
+        }) as unknown as HostRuntime['connectorAction'],
       };
 
       const result = (await executeToolWithMockConfig(input, hostRuntime)) as {
@@ -180,6 +182,17 @@ describe('Tool Test Tool', () => {
             },
           })
         ) as unknown as HostRuntime['http'],
+        connectorAction: jest.fn(async () =>
+          createMockResponse({
+            data: {
+              name: 'Nested Echo Tool',
+              slug: 'nested-echo',
+              description: 'Echo initial arguments from __initial__',
+              parameters: { type: 'object', properties: {} },
+              blueprint: nested,
+            },
+          })
+        ) as unknown as HostRuntime['connectorAction'],
       };
 
       const args = { a: 1, b: { deep: true } };
@@ -260,6 +273,17 @@ describe('Tool.execute return value - test-tool', () => {
           },
         })
       ) as unknown as HostRuntime['http'],
+      connectorAction: jest.fn(async () =>
+        createMockResponse({
+          data: {
+            name: 'Nested Echo Tool',
+            slug: 'nested-echo',
+            description: 'Echo initial arguments from __initial__',
+            parameters: { type: 'object', properties: {} },
+            blueprint: nested,
+          },
+        })
+      ) as unknown as HostRuntime['connectorAction'],
     };
     const args = { x: 1, y: { deep: true } };
     const options: NodeHandlerOptions = {

@@ -100,6 +100,7 @@ describe('Tool Get Tool', () => {
     it('should fail when slug is missing', async () => {
       const hostRuntime: HostRuntime = {
         http: jest.fn(async () => createMockHttpResponse({})) as HostRuntime['http'],
+        connectorAction: jest.fn(async () => createMockHttpResponse({})) as HostRuntime['connectorAction'],
       };
 
       await expect(executeToolWithMockRuntime({}, hostRuntime)).resolves.toMatchObject({
@@ -120,17 +121,20 @@ describe('Tool Get Tool', () => {
         },
       };
 
-      const httpMock = jest.fn(async ({ method, url, connector }) => {
-        expect(method).toBe('GET');
+      const connectorActionMock = jest.fn(async ({ connector, action, args }) => {
         expect(connector).toBe('starships');
-        expect(url).toBe('/starships/test-starship/tools/calc');
+        expect(action).toBe('get-tool');
+        expect(args).toMatchObject({ starshipId: 'test-starship', slug: 'calc' });
 
         return createMockHttpResponse(apiPayload, {
-          url: 'https://api.test.com/starships/test-starship/tools/calc',
+          url: 'https://api.test.com/api/v1/starships/test-starship/tools/calc',
         });
-      }) as HostRuntime['http'];
+      }) as HostRuntime['connectorAction'];
 
-      const hostRuntime: HostRuntime = { http: httpMock };
+      const hostRuntime: HostRuntime = {
+        http: jest.fn(async () => createMockHttpResponse({})) as HostRuntime['http'],
+        connectorAction: connectorActionMock,
+      };
 
       const result = await executeToolWithMockRuntime({ slug: 'calc' }, hostRuntime);
 
@@ -138,22 +142,25 @@ describe('Tool Get Tool', () => {
       const tool = result as { id: string; slug: string; name: string };
       expect(tool.slug).toBe('calc');
       expect(tool.name).toBe('Calculator');
-      expect(httpMock).toHaveBeenCalledTimes(1);
+      expect(connectorActionMock).toHaveBeenCalledTimes(1);
     });
 
     it('should handle HTTP errors gracefully', async () => {
-      const httpMock = jest.fn(async ({ url }) =>
+      const connectorActionMock = jest.fn(async ({ connector, action }) =>
         createMockHttpResponse(
           { error: 'Not Found' },
           {
             status: 404,
             statusText: 'Not Found',
-            url,
+            url: `connector://${String(connector)}/${String(action)}`,
           }
         )
-      ) as HostRuntime['http'];
+      ) as HostRuntime['connectorAction'];
 
-      const hostRuntime: HostRuntime = { http: httpMock };
+      const hostRuntime: HostRuntime = {
+        http: jest.fn(async () => createMockHttpResponse({})) as HostRuntime['http'],
+        connectorAction: connectorActionMock,
+      };
 
       await expect(executeToolWithMockRuntime({ slug: 'missing' }, hostRuntime)).resolves.toMatchObject({
         ok: false,
@@ -178,14 +185,11 @@ describe('Tool Get Tool', () => {
     it('should configure HTTP node correctly', () => {
       const bp = toolGetTool.blueprint;
       const http = bp.nodes.find((n) => n.ref === 'http_get');
-      expect(http?.type).toBe('http_request');
-      const params = (http?.parameters || {}) as Record<string, unknown> & { connector?: string };
-      expect(params.url).toBeDefined();
-      expect(params.method).toBeDefined();
-      expect(params.timeout).toBeDefined();
-      expect(params.method).toBe('GET');
-      expect(params.url).toBe('{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}');
+      expect(http?.type).toBe('connector_action');
+      const params = (http?.parameters || {}) as Record<string, unknown>;
       expect(params.connector).toBe('starships');
+      expect(params.action).toBe('get-tool');
+      expect(params.timeout).toBeDefined();
     });
   });
 });

@@ -123,14 +123,13 @@ describe('Tool List Tool', () => {
       const httpNode = blueprint.nodes.find((n) => n.ref === 'http_list');
 
       expect(httpNode).toBeDefined();
-      expect(httpNode?.type).toBe('http_request');
+      expect(httpNode?.type).toBe('connector_action');
 
       if (httpNode?.parameters) {
         const params = httpNode.parameters as Record<string, unknown>;
-        expect(params.url).toBeDefined();
-        expect(params.method).toBeDefined();
         expect(params.timeout).toBeDefined();
         expect(params.connector).toBe('starships');
+        expect(params.action).toBe('list-tools');
       }
     });
   });
@@ -167,6 +166,14 @@ describe('Tool.execute return value - list-tools', () => {
           url: 'https://api.test.com/starships/test-starship-123/tools',
         })
       ) as unknown as HostRuntime['http'],
+      connectorAction: jest.fn(async () =>
+        createMockResponse(mockResponseData, {
+          ok: true,
+          status: 200,
+          statusText: 'OK',
+          url: 'connector://starships/list-tools',
+        })
+      ) as unknown as HostRuntime['connectorAction'],
     };
 
     const options: NodeHandlerOptions = {

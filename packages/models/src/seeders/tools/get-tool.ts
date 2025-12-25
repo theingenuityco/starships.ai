@@ -51,14 +51,16 @@ Behavior and limits:
       },
       {
         ref: 'http_get',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Get Tool (Starships)',
-        description: 'Fetch tool definition via Starships tools HTTP API',
+        description: 'Fetch tool definition via Starships connector action',
         parameters: {
-          method: 'GET',
-          // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1 and inject auth.
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}',
           connector: 'starships',
+          action: 'get-tool',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
+          },
           timeout: 5000,
         },
       },

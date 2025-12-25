@@ -62,14 +62,15 @@ Automatically inferred from agent state (do not pass manually):
                 const name = input.name.trim();
                 const description = (input && typeof input.description === 'string' ? input.description.trim() : '');
                 if (!description) throw new Error('description is required when creating a new tool');
-                const body = {
+                const args = {
+                  starshipId: String(ctx.env && ctx.env('STARSHIP_ID')),
                   name,
                   description,
                   status: 'active'
                 };
                 return {
                   mode: 'create',
-                  body,
+                  args,
                   timeout: 10000
                 };
               }
@@ -87,15 +88,38 @@ Automatically inferred from agent state (do not pass manually):
         },
       },
       {
-        ref: 'http_exec',
-        type: 'http_request',
-        name: 'Execute',
-        description: 'Create or fetch tool',
+        ref: 'route_mode',
+        type: 'conditional',
+        name: 'Route Mode',
+        description: 'Route to create vs open based on prepare.mode',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" + ((lastOutputOf("prepare") || {}).mode === "create" ? "" : "/" + (lastOutputOf("prepare") || {}).slug) }}',
-          method: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? "POST" : "GET" }}',
-          body: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? (lastOutputOf("prepare") || {}).body : undefined }}',
+          condition: '{{ (lastOutputOf("prepare") || {}).mode === "create" }}',
+        },
+      },
+      {
+        ref: 'create_tool',
+        type: 'connector_action',
+        name: 'Create Tool (Starships)',
+        description: 'POST /starships/:starshipId/tools via Starships connector endpoint catalog',
+        parameters: {
           connector: 'starships',
+          action: 'create-tool',
+          args: '{{ (lastOutputOf("prepare") || {}).args }}',
+          timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
+        },
+      },
+      {
+        ref: 'get_tool',
+        type: 'connector_action',
+        name: 'Get Tool (Starships)',
+        description: 'GET /starships/:starshipId/tools/:slug via Starships connector endpoint catalog',
+        parameters: {
+          connector: 'starships',
+          action: 'get-tool',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
+          },
           timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
         },
       },
@@ -105,14 +129,17 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return tool model (created or fetched)',
         parameters: {
-          output: '{{ lastOutputOf("http_exec") }}',
+          output: '{{ lastOutputOf("create_tool") || lastOutputOf("get_tool") }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_exec' },
-      { ref: 'e3', from: 'http_exec', to: 'end_1' },
+      { ref: 'e2', from: 'prepare', to: 'route_mode' },
+      { ref: 'e3', from: 'route_mode', to: 'create_tool', condition: 'true' },
+      { ref: 'e4', from: 'create_tool', to: 'end_1' },
+      { ref: 'e5', from: 'route_mode', to: 'get_tool', condition: 'false' },
+      { ref: 'e6', from: 'get_tool', to: 'end_1' },
     ],
     metadata: {},
   },

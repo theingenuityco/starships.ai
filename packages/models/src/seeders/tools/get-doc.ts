@@ -49,15 +49,15 @@ Behavior and limits:
       },
       {
         ref: 'http_get_doc',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Get Doc (Starships)',
         description: 'Fetch documentation page via Starships docs HTTP API',
         parameters: {
-          method: 'GET',
-          // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
-          // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
-          url: '{{ "/docs/" + encodeURIComponent((lastOutputOf("validate") || {}).slug) }}',
           connector: 'starships',
+          action: 'get-doc',
+          args: {
+            slug: '{{ (lastOutputOf("validate") || {}).slug }}',
+          },
           timeout: 5000,
         },
       },

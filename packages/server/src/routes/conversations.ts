@@ -585,28 +585,6 @@ router.post(
         return;
       }
 
-      // Debug aid for common integration failures: agentId must be a nanoid-like string.
-      // This does NOT log secrets; it only logs the raw agentId and basic request shape.
-      try {
-        const rawBody = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
-        const agentIdRaw = rawBody.agentId;
-        const agentIdStr = typeof agentIdRaw === 'string' ? agentIdRaw : String(agentIdRaw ?? '');
-        const ok = /^[a-z0-9_-]{10,30}$/i.test(agentIdStr);
-        if (!ok) {
-          console.error('[authorize-and-maybe-execute] invalid agentId (pre-validate)', {
-            conversationId,
-            agentId: agentIdStr,
-            agentIdType: typeof agentIdRaw,
-            agentIdLen: agentIdStr.length,
-            toolSlug: typeof rawBody.toolSlug === 'string' ? rawBody.toolSlug : undefined,
-            toolCallId: typeof rawBody.toolCallId === 'string' ? rawBody.toolCallId : undefined,
-            bodyKeys: Object.keys(rawBody),
-          });
-        }
-      } catch {
-        // ignore debug logging failures
-      }
-
       const bodyValidation = validateData(
         z.object({
           agentId: IdSchema,

@@ -177,6 +177,26 @@ export async function up(client: Client): Promise<void> {
             'requestStyle', 'json',
             'timeoutMs', 120000
           )
+          ,
+          jsonb_build_object(
+            'name', 'list-connectors',
+            'description', 'List connectors for a starship',
+            'method', 'GET',
+            'path', '/starships/{starshipId}/connectors',
+            'parameters', jsonb_build_object(
+              'type', 'object',
+              'required', jsonb_build_array('starshipId'),
+              'properties', jsonb_build_object(
+                'starshipId', jsonb_build_object('type','string')
+              ),
+              'additionalProperties', false
+            ),
+            'mapping', jsonb_build_object(
+              'path', jsonb_build_object('starshipId', '{{ String(args.starshipId ?? runtimeEnv.STARSHIP_ID ?? "") }}')
+            ),
+            'requestStyle', 'query',
+            'timeoutMs', 5000
+          )
         ),
         updated_at = NOW()
       WHERE provider = 'starships'

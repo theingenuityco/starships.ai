@@ -144,72 +144,16 @@ export class ConnectorService {
   }
 
   /**
-   * Run a refresh blueprint for a connector, given the current env snapshot and metadata.
-   * Applies any resulting env/metadata/status/lastError changes and returns the updated connector.
+   * Refresh connector behavior is removed in v2 (no blueprint fallback).
    */
   async refreshConnector(starshipId: string, provider: ConnectorProvider): Promise<ConnectorModel | null> {
-    const template = await this.connectorTemplateRepository.findByProvider(provider);
-    if (!template || !template.refreshBlueprint) {
-      // No refresh behavior defined for this connector.
-      return null;
-    }
-
-    const connector = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
-    if (!connector) {
-      return null;
-    }
-
-    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id);
-
-    const execution = ExecutionItemUtils.createExecution();
-    const input = {
-      starshipId,
-      provider,
-      envSnapshot,
-      metadata: connector.metadata || {},
-      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
-    };
-    const initialItems = ExecutionItemUtils.wrapSingle(input);
-    execution.results.push({ nodeRef: '__initial__', items: initialItems });
-
-    const runner = RunnerFactory.getTopLevelRunner(0);
-    const resultItems = await runner.run(template.refreshBlueprint, execution);
-    const result = ExecutionItemUtils.unwrapSingle(resultItems) as
-      | {
-          env?: Record<string, string>;
-          metadata?: Record<string, unknown>;
-          status?: string;
-          lastError?: string;
-        }
-      | undefined;
-
-    if (!result || typeof result !== 'object') {
-      throw new Error(`Connector refresh blueprint for provider ${provider} did not return a valid result`);
-    }
-
-    // Apply env updates
-    if (result.env) {
-      for (const [key, value] of Object.entries(result.env)) {
-        // No user context for refresh flows; attribute to system.
-        await this.upsertConnectorSecret(starshipId, key, value, 'system', connector.id);
-      }
-    }
-
-    const updated = await this.connectorRepository.update(connector.id, {
-      status: (result.status as ConnectorModel['status']) ?? connector.status,
-      metadata: {
-        ...(connector.metadata || {}),
-        ...(result.metadata || {}),
-      },
-      lastError: result.lastError ?? null,
-    });
-
-    return updated ?? connector;
+    void starshipId;
+    void provider;
+    return null;
   }
 
   /**
-   * Run a test blueprint for a connector and return the result.
-   * Does not mutate connector or env state.
+   * Test connector behavior is removed in v2 (no blueprint fallback).
    */
   async testConnector(
     starshipId: string,
@@ -219,44 +163,9 @@ export class ConnectorService {
     error?: string;
     details?: Record<string, unknown>;
   } | null> {
-    const template = await this.connectorTemplateRepository.findByProvider(provider);
-    if (!template || !template.testBlueprint) {
-      return null;
-    }
-
-    const connector = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
-    if (!connector) {
-      return null;
-    }
-
-    const envSnapshot = await this.getConnectorEnvSnapshot(starshipId, connector.id);
-
-    const execution = ExecutionItemUtils.createExecution();
-    const input = {
-      starshipId,
-      provider,
-      envSnapshot,
-      metadata: connector.metadata || {},
-      config: (template.runtimeConfig || {}) as ConnectorRuntimeConfig,
-    };
-    const initialItems = ExecutionItemUtils.wrapSingle(input);
-    execution.results.push({ nodeRef: '__initial__', items: initialItems });
-
-    const runner = RunnerFactory.getTopLevelRunner(0);
-    const resultItems = await runner.run(template.testBlueprint, execution);
-    const result = ExecutionItemUtils.unwrapSingle(resultItems) as
-      | {
-          ok: boolean;
-          error?: string;
-          details?: Record<string, unknown>;
-        }
-      | undefined;
-
-    if (!result || typeof result !== 'object') {
-      throw new Error(`Connector test blueprint for provider ${provider} did not return a valid result`);
-    }
-
-    return result;
+    void starshipId;
+    void provider;
+    return null;
   }
 
   /**
@@ -429,7 +338,7 @@ export class ConnectorService {
       } else {
         console.error('[CONNECTOR_OAUTH] Token exchange failed with non-Axios error', {
           provider: providerFromCallback,
-          tokenUrl,
+          tokenUrl: auth.tokenUrl,
           redirectUri,
           errorMessage: (err as Error | undefined)?.message,
           errorName: (err as Error | undefined)?.name,

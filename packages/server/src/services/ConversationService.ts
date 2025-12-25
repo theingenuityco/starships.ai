@@ -893,9 +893,14 @@ export class ConversationService {
     try {
       // starship already resolved above
 
+      const env = getEnvConfig();
+
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
         CONVERSATION_ID: data.conversationId,
+        // Used by internal Starships connector templates like:
+        // {{ String(runtimeEnv.SERVER_URL ?? "") + "/api/v1" }}
+        SERVER_URL: env.SERVER_URL,
       };
 
       // Orchestrate sequentially without dynamic mention-based handoffs
@@ -966,7 +971,6 @@ export class ConversationService {
         // Build LLM runtime configuration from server env; this will be passed
         // to the remote runner so it does not need to read provider keys from
         // its own environment.
-        const env = getEnvConfig();
         const llm = env.OPENROUTER_API_KEY
           ? {
               apiKey: env.OPENROUTER_API_KEY,
@@ -1122,10 +1126,15 @@ export class ConversationService {
         })
       );
 
+      const env = getEnvConfig();
+
       const runtimeEnv = {
         STARSHIP_ID: starship.id,
         CONVERSATION_ID: conversationId,
         AGENT_ID: agentModel.id,
+        // Used by internal Starships connector templates like:
+        // {{ String(runtimeEnv.SERVER_URL ?? "") + "/api/v1" }}
+        SERVER_URL: env.SERVER_URL,
       };
 
       // Load conversation-level state context (if any)
@@ -1162,7 +1171,6 @@ export class ConversationService {
       }
       const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
       const { connectorTemplates, connectorSessions } = await sessionSvc.build(starship.id, authUserId);
-      const env = getEnvConfig();
       const llm = env.OPENROUTER_API_KEY
         ? {
             apiKey: env.OPENROUTER_API_KEY,

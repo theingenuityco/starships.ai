@@ -20,7 +20,7 @@ This page gives you a high-level map of the main node types and links to deeper 
 - **end**: exit; returns a final result. Use the `output` parameter (full-string template) to shape the returned value.
 - **code**: runs JavaScript/TypeScript-like code with `async function main(ctx) { ... }`. See [`nodes/code`](/nodes/code).
 - **http_request**: performs raw HTTP calls via the HostRuntime (absolute `http(s)://...` URLs only).
-- **connector_action**: performs connector-backed HTTP calls (base URL + auth + mapping defined by `connector_templates`).
+- **connector_action**: performs connector-backed HTTP calls (base URL + auth + mapping defined by `connector_templates`). **Required** for connector-based integrations and for Starships-hosted agent/tool execution flows where the server injects auth and enforces allow/ask/deny policies.
 - **llm**: calls an LLM provider via the host; supports tools/function calling and streaming.
 - **workflow**: runs a nested blueprint.
 - **tool**: runs another tool by slug inside a blueprint.

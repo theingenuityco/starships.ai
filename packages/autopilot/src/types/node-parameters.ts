@@ -188,7 +188,7 @@ export interface ToolParams extends BaseParams {
 
 /**
  * LLM node parameters for AI model interactions via OpenRouter
- * Note: API key is now managed by the Autopilot singleton
+ * Note: credentials/provider selection are managed by the host via `hostRuntime.llm`
  * Template expressions ({{ }}) are supported for all numeric and string fields
  */
 export interface LlmParams extends BaseParams {

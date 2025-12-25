@@ -276,6 +276,7 @@ When creating custom tools, you can securely store non-secret configuration usin
   - `platform_secrets` (instance-wide; instance admins)
   - `connector_secrets` (per-starship; managed by connect flows)
 - Tools call third-party APIs via **`connector_action`**, which injects auth server-side using the connector template + connected starship state.
+- In the hosted Starships product, **agents also rely on `connector_action`** for tool execution authorization/approval (the default Agent loop calls an internal Starships connector endpoint so the server can enforce allow/ask/deny and keep secrets out of blueprints).
 
 Use environment variables for non-secret configuration (defaults, IDs, feature flags). Use connectors for secrets and third-party auth.
 

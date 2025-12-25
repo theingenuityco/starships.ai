@@ -3,6 +3,7 @@
 What it is: High-level orchestrator that assembles a complete tool-capable conversation loop around an LLM. If no blueprint is supplied, it generates a default loop that supports tool detection, server-side tool authorization/execution, and iterative continuation.
 
 Specification (authoritative)
+
 - Handler: `packages/autopilot/src/nodes/Agent.ts`
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
   - name: string (required)
@@ -17,11 +18,12 @@ Specification (authoritative)
     - messages?: LlmMessage[]
     - tools?: ToolParams[]
     - (optional) additional state keys used by the default blueprint: `modalities`, `imageConfig`, `pendingToolCalls`, `pendingToolCallIndex`, ...
-  }
+      }
   - blueprint?: Blueprint (optional; default generated if omitted)
   - metadata?: Record<string, unknown>
 
 Generated default blueprint (when omitted)
+
 - Default blueprint: `Agent.defaultAgentBlueprintServerTools()` (see `packages/autopilot/src/nodes/Agent.ts`)
 - Key behavior: tool calls are **not executed locally** from tool blueprints in state. Instead, each tool call is delegated to the Starships host via a **`connector_action`** call:
   - `connector: "starships"`
@@ -30,6 +32,7 @@ Generated default blueprint (when omitted)
 - If the server responds with `TOOL_APPROVAL_REQUIRED`, the default blueprint appends a tool message and ends the workflow turn.
 
 Execution behavior
+
 - Execution state is created; `state` (messages/tools) is merged into `execution.state`.
 - Ordered messages:
   - systemPrompt (if provided) → state.messages → input messages (if input is `LlmMessage[]`)
@@ -43,43 +46,67 @@ Execution behavior
   - `runtimeEnv.CONVERSATION_ID` and `runtimeEnv.AGENT_ID` must be set (used by the server authorization call)
 
 Validation rules
+
 - timeout >= 1000ms, temperature 0..2, maxTokens >= 1
 - With a provided blueprint: must contain a start node; edges must reference existing node refs.
 
 Use cases
+
 - Starships-hosted tool-enabled assistants that need server-side authorization/approval.
 - Drop-in agent loop for the hosted product where the host owns tool execution and secrets.
 
 Example (minimal)
 
 ```ts
-import { Agent, type HostRuntime } from "@starships/autopilot";
+import { Agent, type HostRuntime } from '@starships/autopilot';
 
 // NOTE: The default Agent blueprint delegates tool execution to the Starships server via connector_action.
 // This example is intended for the hosted Starships environment (or a host that provides an equivalent
 // `starships` connector template endpoint).
 const hostRuntime = {} as HostRuntime; // provided by host (server), not by the blueprint
 
+const echoToolBlueprint = {
+  nodes: [
+    { ref: 's', type: 'start', name: 'Start', parameters: {} },
+    {
+      ref: 'echo',
+      type: 'end',
+      name: 'End',
+      parameters: { output: '{{ lastOutputOf("__initial__") }}' },
+    },
+  ],
+  edges: [{ ref: 'e1', from: 's', to: 'echo' }],
+};
+
 const agent = new Agent(
   {
-    name: "Assistant",
-    model: "anthropic/claude-3.5-sonnet",
-    systemPrompt: "Be helpful and concise.",
+    name: 'Assistant',
+    model: 'anthropic/claude-3.5-sonnet',
+    systemPrompt: 'Be helpful and concise.',
     state: {
-      messages: [{ role: "user", content: "Hello!" }],
-      tools: [{ name: "Echo", slug: "echo", description: "Echo back text", parameters: { type: "object", properties: { text: { type: "string" } } } }],
+      messages: [{ role: 'user', content: 'Hello!' }],
+      tools: [
+        {
+          name: 'Echo',
+          slug: 'echo',
+          description: 'Echo back text',
+          parameters: { type: 'object', properties: { text: { type: 'string' } } },
+          // Required by ToolParams; in the hosted Starships agent loop the server may execute/authorize tools,
+          // but the default blueprint still uses the presence of a blueprint as part of the allowlist check.
+          blueprint: echoToolBlueprint,
+        },
+      ],
     },
   },
   {
     hostRuntime,
-    runtimeEnv: { AGENT_ID: "<agent-id>", CONVERSATION_ID: "<conversation-id>" },
+    runtimeEnv: { AGENT_ID: '<agent-id>', CONVERSATION_ID: '<conversation-id>' },
   }
 );
 const result = await agent.execute();
 ```
 
 Cross-links
+
 - See LLM for streaming/function-calling behavior and events.
 - See Tool for argument extraction and structured error payloads.
-
-

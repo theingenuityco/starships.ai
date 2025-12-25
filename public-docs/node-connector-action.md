@@ -2,6 +2,16 @@
 
 What it is: Executes a connector template endpoint (an “action”) via `hostRuntime.connectorAction`. This is how Starships tools call external APIs with server-injected auth (OAuth/API keys/platform JWT) without exposing secrets to the blueprint.
 
+## When `connector_action` is necessary (not optional)
+
+Use `connector_action` when **any** of the following are true:
+
+- You need **auth injection** (OAuth tokens, API keys, platform JWT) that must not be visible to the blueprint.
+- You want the host to own **base URL resolution** + **path/query/header/body mapping** via `connector_templates`.
+- You are using the **default `Agent` blueprint in Starships**, which delegates tool authorization/execution to the server.
+
+Use `http_request` only for raw absolute `http(s)://...` calls where you are not relying on connector templates/sessions.
+
 Specification (authoritative)
 
 - Handler: `packages/autopilot/src/nodes/ConnectorAction.ts`
@@ -21,7 +31,6 @@ Execution behavior
   - Else: falls back to upstream input (`input?.[0]?.json`) if it’s an object
   - Else: uses `{}`
 - Calls:
-
   - `hostRuntime.connectorAction({ connector, action, args, timeoutMs })`
 
 - Wraps the host response into a single `ExecutionItem` with this JSON shape:
@@ -42,6 +51,45 @@ Important notes (current behavior)
   - auth header injection (sessions)
   - mapping `args` into path/query/headers/body
 - In `autopilot-runner` today, endpoint JSON Schema validation (`endpoint.parameters`) exists in types but is **not enforced** at runtime.
+
+## Hosted tool execution (Starships internal connector)
+
+In the Starships hosted product, the default `Agent` blueprint executes tools by calling a Starships internal connector endpoint:
+
+- `connector: "starships"`
+- `action: "authorize-and-maybe-execute-tool"`
+
+This is how Starships enforces **tool assignment** and **allow/ask/deny** policies and executes tools without exposing secrets in the blueprint.
+
+Requirements:
+
+- The Engine must be constructed with:
+  - `hostRuntime.connectorAction` (and usually `hostRuntime.llm` for the LLM node)
+  - `runtimeEnv.AGENT_ID` and `runtimeEnv.CONVERSATION_ID` (used by the default Agent blueprint)
+
+Example (as used by the default Agent blueprint):
+
+```ts
+{
+  ref: "auth_and_execute",
+  type: "connector_action",
+  name: "Authorize & Execute Tool (Server)",
+  parameters: {
+    connector: "starships",
+    action: "authorize-and-maybe-execute-tool",
+    args: {
+      agentId: '{{ String(env("AGENT_ID") ?? "") }}',
+      conversationId: '{{ String(env("CONVERSATION_ID") ?? "") }}',
+      toolSlug: '{{ /* tool slug from pending toolCalls[] */ "" }}',
+      toolCallId: '{{ /* tool call id from pending toolCalls[] */ "" }}',
+      args: '{{ /* plain-object tool args */ ({}) }}'
+    },
+    timeout: 120000
+  }
+}
+```
+
+On failure, the Starships endpoint may respond with an error code like `TOOL_APPROVAL_REQUIRED`; the default Agent blueprint stops the workflow turn in that case.
 
 Template rules (full-string only)
 
@@ -69,5 +117,4 @@ Cross-links
 
 - See `connectors/README.md` and `connectors/configuration.md` for connector templates, auth models, and endpoint mapping.
 - See `node-http-request.md` for raw absolute HTTP calls without connector auth/mapping.
-
-
+- See `node-agent.md` for the default hosted Agent behavior (server-side tool authorization/execution).

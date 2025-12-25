@@ -1,7 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
+import { useConnectApiKeyConnector, useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -11,6 +11,8 @@ import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import { CONNECTOR_LOGOS } from '@/lib/connectorLogos'
 import { motion } from 'motion/react'
+import { Textarea } from '@/components/ui/textarea'
+import { toast } from 'sonner'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -25,9 +27,13 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
   const oauthMutation = useStartOAuthConnector(starshipId)
+  const apiKeyMutation = useConnectApiKeyConnector(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
+  const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
+  const [apiKeyValue, setApiKeyValue] = useState('')
+  const [apiKeyExtraConfigText, setApiKeyExtraConfigText] = useState('')
   // GitHub connector configuration temporarily disabled on client
   // const [githubDialogOpen, setGithubDialogOpen] = useState(false)
   // const [githubInstallationId, setGithubInstallationId] = useState('')
@@ -51,6 +57,32 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     if (result) {
       window.location.href = result
     }
+  }
+
+  const openApiKeyDialog = (provider: string) => {
+    setApiKeyDialogProvider(provider)
+    setApiKeyValue('')
+    setApiKeyExtraConfigText('')
+  }
+
+  const handleApiKeyConnect = async () => {
+    if (!apiKeyDialogProvider) return
+    const trimmedKey = apiKeyValue.trim()
+    if (!trimmedKey) return
+
+    let extraConfig: Record<string, unknown> | undefined = undefined
+    const rawExtra = apiKeyExtraConfigText.trim()
+    if (rawExtra) {
+      const parsed = JSON.parse(rawExtra)
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        toast.error('extraConfig must be a JSON object')
+        return
+      }
+      extraConfig = parsed as Record<string, unknown>
+    }
+
+    await apiKeyMutation.mutateAsync({ provider: apiKeyDialogProvider as any, apiKey: trimmedKey, extraConfig })
+    setApiKeyDialogProvider(null)
   }
 
   // Google Drive and GitHub connectors are temporarily disabled on the client
@@ -88,9 +120,8 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     [normalizedQuery]
   )
 
-  // Only show connectors that have an interactive connect flow on the client today.
-  // Currently we only support the OAuth2 redirect flow here.
-  const connectableCatalog = useMemo(() => catalog.filter(entry => entry.authType === 'oauth2'), [catalog])
+  // Catalog is driven by connector_templates (enabled only). UI adapts actions based on authType.
+  const visibleCatalog = useMemo(() => catalog, [catalog])
 
   if (isLoading) {
     return (
@@ -100,12 +131,12 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     )
   }
 
-  const hasAnyVisibleConnector = connectableCatalog.some(item => {
+  const hasAnyVisibleConnector = visibleCatalog.some(item => {
     return matchesQuery({ name: item.name, description: item.description })
   })
 
   const renderConnectorCard = (provider: string, connectedFirst: boolean) => {
-    const catalogItem = connectableCatalog.find((c: { provider: string }) => c.provider === provider)
+    const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)
     if (!catalogItem || !matchesQuery({ name: catalogItem.name, description: catalogItem.description })) {
       return null
     }
@@ -116,6 +147,11 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
     const label = catalogItem.name
     const logoSrc = CONNECTOR_LOGOS[provider]
+    const authType = catalogItem.authType
+    const canDisconnect = isConnected && authType !== 'platform_jwt'
+    const isOauthConnectable = authType === 'oauth2'
+    const isApiKeyConnectable = authType === 'api_key'
+    const isManaged = authType === 'platform_jwt'
 
     return (
       <motion.div
@@ -143,6 +179,9 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   </div>
                 </div>
               </CardTitle>
+              <Badge variant="secondary" className="font-mono text-[10px]">
+                {authType}
+              </Badge>
             </div>
             <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
           </CardHeader>
@@ -152,13 +191,27 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                 size="sm"
                 variant="ghost"
                 className={`${CONNECTOR_CTA_BUTTON_CLASS} group min-w-[140px] justify-center`}
-                onClick={() => handleConnect(provider)}
-                disabled={oauthMutation.isPending}
+                onClick={() => {
+                  if (isManaged) return
+                  if (isOauthConnectable) return void handleConnect(provider)
+                  if (isApiKeyConnectable) return openApiKeyDialog(provider)
+                }}
+                disabled={oauthMutation.isPending || apiKeyMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable)}
               >
                 <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
-                {isConnected ? 'Reconnect' : `Connect ${label}`}
+                {isManaged
+                  ? 'Managed by platform'
+                  : isOauthConnectable
+                    ? isConnected
+                      ? 'Reconnect'
+                      : `Connect ${label}`
+                    : isApiKeyConnectable
+                      ? isConnected
+                        ? 'Update API key'
+                        : 'Connect with API key'
+                      : 'Not connectable'}
               </Button>
-              {isConnected && (
+              {canDisconnect && (
                 <Button
                   size="sm"
                   variant="outline"
@@ -196,10 +249,10 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
         {/* Connected first */}
-        {connectableCatalog.map(entry => renderConnectorCard(entry.provider, true))}
+        {visibleCatalog.map(entry => renderConnectorCard(entry.provider, true))}
 
         {/* Then not connected */}
-        {connectableCatalog.map(entry => renderConnectorCard(entry.provider, false))}
+        {visibleCatalog.map(entry => renderConnectorCard(entry.provider, false))}
       </div>
 
       <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>
@@ -214,6 +267,62 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             </Button>
             <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
               Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={apiKeyDialogProvider !== null} onOpenChange={open => !open && setApiKeyDialogProvider(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitlePrimitive>Connect with API key</DialogTitlePrimitive>
+            <DialogDescription>
+              {apiKeyDialogProvider ? `Enter an API key for ${apiKeyDialogProvider}. This will be stored securely for this starship.` : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="api-key">
+                API key
+              </label>
+              <Input
+                id="api-key"
+                value={apiKeyValue}
+                onChange={e => setApiKeyValue(e.target.value)}
+                placeholder="Paste your API key"
+                type="password"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="api-key-extra-config">
+                extraConfig (optional JSON object)
+              </label>
+              <Textarea
+                id="api-key-extra-config"
+                value={apiKeyExtraConfigText}
+                onChange={e => setApiKeyExtraConfigText(e.target.value)}
+                placeholder='e.g. { "accountId": "123" }'
+                className="min-h-[120px] font-mono text-xs"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 justify-end">
+            <Button type="button" variant="ghost" onClick={() => setApiKeyDialogProvider(null)} disabled={apiKeyMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                try {
+                  await handleApiKeyConnect()
+                } catch (e: any) {
+                  toast.error('Failed to connect with API key', { description: e?.message || 'Please verify your inputs.' })
+                }
+              }}
+              disabled={apiKeyMutation.isPending || !apiKeyValue.trim()}
+            >
+              {apiKeyMutation.isPending ? 'Connecting…' : 'Connect'}
             </Button>
           </DialogFooter>
         </DialogContent>

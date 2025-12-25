@@ -66,7 +66,7 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                   Platform secrets
                 </Link>
               </div>
-              <p className="text-muted-foreground mt-3">Manage connector templates (enabled/disabled, runtime config and blueprints) for this instance.</p>
+              <p className="text-muted-foreground mt-3">Manage connector templates (enabled/disabled, runtime fields like auth/baseUrl/endpoints) for this instance.</p>
             </div>
 
             <section className="space-y-4">
@@ -75,8 +75,8 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                   <thead className="bg-muted/50">
                     <tr>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Provider</th>
-                      <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Display name</th>
-                      <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Auth</th>
+                      <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Name</th>
+                      <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Auth type</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Enabled</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Version</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Updated</th>

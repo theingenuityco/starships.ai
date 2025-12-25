@@ -46,11 +46,10 @@ Because templates are **full-string only**, Code nodes are the preferred place t
 ```js
 async function main(ctx) {
   const input = ctx.input || {};
-  const type = input.type || 'all';
-  const sort = input.sort || 'updated';
+  const q = input.q || 'hello';
 
   return {
-    url: `/user/repos?type=${encodeURIComponent(type)}&sort=${encodeURIComponent(sort)}`,
+    url: `https://example.com/search?q=${encodeURIComponent(q)}`,
   };
 }
 ```
@@ -63,7 +62,7 @@ async function main(ctx) {
   "parameters": {
     "method": "GET",
     "url": "{{ (lastOutputOf('build_url') || {}).url }}",
-    "connector": "github"
+    "timeout": 15000
   }
 }
 ```
@@ -75,7 +74,7 @@ This avoids partial templates like `"/user/repos?type={{ ... }}&sort={{ ... }}"`
 Code nodes **cannot** call connectors or the HostRuntime directly (there is no `ctx.hostRuntime.http`). To talk to external services:
 
 - Build request data (URL, headers, body) in a Code node, then
-- Use an `http_request` node with `connector` and templates to actually perform the call.
+- Use an `http_request` node to actually perform the call (absolute URLs only), or a `connector_action` node for connector-backed calls.
 
 This keeps secrets and network configuration in the host, not inside user-authored code.
 

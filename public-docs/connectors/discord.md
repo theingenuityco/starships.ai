@@ -1,64 +1,53 @@
-## Discord Connector
+## Discord Connector – Technical Reference (V2)
 
-The **Discord connector** lets tools call the Discord HTTP API (for example, posting messages as a bot) through the `http_request` node using `connector: "discord"`.  
-Secrets (bot token, etc.) are managed by the platform and injected by the HostRuntime; tools never see raw tokens.
+Discord API calls in Starships are made via the **`connector_action`** node, which executes an endpoint from the Discord **connector template** (`connector_templates.endpoints_json`). Auth is injected server-side; workflows never see tokens.
 
-- **What “connect” means for Discord**
-  - Discord runtime auth uses an instance-wide **bot token** (platform secret, typically `DISCORD_BOT_TOKEN`).
-  - The “connect” flow is still starship-scoped: a starship must have the `discord` connector marked **connected** for workflows to use it.
-  - The OAuth callback query params (e.g. `guild_id`, `permissions`) are copied into connector metadata automatically (excluding OAuth plumbing like `code` and `state`).
-
-- **How to call Discord from a tool**
-  - Use a `http_request` node with:
-    - `connector: "discord"`
-    - `url`: a **relative** Discord API path (the runtime prefixes the correct base URL)
-    - `method`: `"GET"`, `"POST"`, etc.
-    - `headers` / `body`: only non-secret fields (JSON payload, content strings, channel IDs, etc.).
-  - The HostRuntime:
-    - Normalizes the URL against `https://discord.com` (for example, `"/api/channels/.../messages"` → `https://discord.com/api/channels/.../messages`).
-    - Injects an `Authorization: Bot <token>` header using the configured bot token (a platform secret such as `DISCORD_BOT_TOKEN`).
-  - If you explicitly set an `Authorization` header, it **wins** and the connector will not override it.
-
-> Note: Discord is “connector-scoped” even though the runtime token is a platform secret.
->
-> The bot token is instance-wide, but HostRuntime will only expose the `discord` connector to workflows when the
-> connector is marked **connected** for the current starship. This lets an admin control which starships are allowed
-> to send Discord API calls using the shared bot.
+If you’re looking for the underlying template/runtime shape, see `public-docs/connectors/configuration.md`.
 
 ---
 
-### Common operations
+### “Connect” behavior (current)
 
-These are the main Discord surfaces this connector is typically used for. Exact JSON fields should follow Discord’s current REST API docs, but this describes the shapes tools can rely on.
-
-- **1. Send a message to a channel**
-  - **Purpose**: post a text (or embed-rich) message into a specific channel.
-  - **Example call (blueprint parameters)**:
-    - `method: "POST"`
-    - `url: "{{ '/api/channels/' + input.channelId + '/messages' }}"`
-    - `connector: "discord"`
-    - `body`: `"{{ { content: input.message } }}"`
-  - **Typical tool parameters**:
-    - `channelId` (string, required): Discord channel ID to post into.
-    - `message` (string, required): message text.
-  - **Outputs to surface**:
-    - Message ID, channel ID, timestamp, and any other fields useful for follow-up actions.
-
-- **2. Basic channel / guild checks (optional)**
-  - **Purpose**: validate that a channel/guild exists and that the bot has access before sending messages.
-  - **Example calls**:
-    - `GET /api/channels/{channelId}`
-    - `GET /api/guilds/{guildId}`
-    - Always called with `connector: "discord"` and relative URLs.
-  - **Typical uses in tools**:
-    - Fail fast with a clear error if a channel or guild is invalid or inaccessible.
-    - Optionally read metadata (names, types) for user-facing confirmation.
+- The connect flow is **starship-scoped**: a starship must have the `discord` connector marked **connected** for the runtime to inject auth headers for it.
+- On OAuth callback completion, the server copies non-plumbing query params into connector metadata (for example `guild_id`, `permissions`), excluding `code` and `state`.
 
 ---
 
-### Design notes for tools using this connector
+### Recommended template shape (example)
 
-- **Channel/guild IDs are not secrets**: accept them as tool parameters or configuration; do not try to read them from hidden env.
-- **Let the connector handle auth**: always use `connector: "discord"` with relative URLs; do not manually inject the bot token.
-- **Handle permission errors clearly**: treat `403` responses as missing permissions/intents and return actionable error messages.
-- **Keep Discord logic localized**: keep Discord-specific `http_request` nodes together so it’s easy to adjust paths or payloads if the API changes.
+Set:
+
+- `baseUrl`: `https://discord.com`
+- Add endpoints for the calls your tools need.
+
+Example endpoints you might define:
+
+- `get-current-user` → `GET /api/users/@me`
+- `get-guild` → `GET /api/guilds/{guildId}`
+
+---
+
+### Using Discord in a tool (example `connector_action`)
+
+Once the template defines an endpoint named `get-guild`, a blueprint can call it like this:
+
+```ts
+{
+  ref: "discord_get_guild",
+  type: "connector_action",
+  name: "Discord: Get Guild",
+  parameters: {
+    connector: "discord",
+    action: "get-guild",
+    args: { guildId: "1234567890" },
+    timeout: 15000
+  }
+}
+```
+
+---
+
+### Troubleshooting
+
+- `Unknown connector action "X"`: add the endpoint to the template (`endpoints_json`).
+- `401/403`: connector not connected for the starship or token is missing/expired/insufficient.

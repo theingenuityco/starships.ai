@@ -1,244 +1,104 @@
-# Tool Calling in Autopilot
+# Tool calling in Autopilot
 
-This document explains how to implement and use function calling (tools) in the autopilot package.
+Autopilot supports function calling (“tools”) by combining:
 
-## Overview
+- **LLM node**: exposes tool schemas to the model (via the host runtime)
+- **ToolParams**: the tool definition shape (name/slug/schema + a blueprint)
+- **Tool node**: executes a tool by running its nested blueprint with object arguments
+- **Agent node** (optional): orchestrates a tool loop around the LLM
 
-The tool calling system allows LLMs to dynamically call functions during their execution. The architecture consists of:
+## ToolParams (the canonical tool definition)
 
-- **Tool Node**: Executes tool logic as regular workflow nodes
-- **LLM Node**: Includes tools in OpenRouter function calling format
-- **Agent**: Orchestrates tool calling loop via dynamic blueprint generation
+`ToolParams` is defined in `packages/autopilot/src/types/node-parameters.ts`:
 
-## Implementation
+- **name**: human-friendly display name (required)
+- **slug**: stable function name presented to LLMs (required)
+- **description**: tool description (required)
+- **parameters**: JSON Schema (required; `type: "object"` and `properties`)
+- **blueprint**: nested blueprint executed by the Tool node (required; must include a `start` node)
+- **toolCallId**: optional correlation id for tool call events/results
 
-### 1. Tool Definition
+## HostRuntime requirement (LLM)
 
-Define tools using `ToolParams`:
+The `llm` node requires a host-provided `hostRuntime.llm`. Autopilot does **not** store API keys, and the `autopilot` singleton is **not** a credentials manager.
 
-```typescript
-import { ToolParams } from '@starships/autopilot';
+Your host runtime is responsible for:
 
-const calculatorTool: ToolParams = {
-  name: 'calculator',
-  description: 'Perform mathematical calculations',
-  parameters: {
-    type: 'object',
-    properties: {
-      expression: {
-        type: 'string',
-        description: 'Mathematical expression to evaluate',
-      },
-    },
-    required: ['expression'],
-  },
-};
-```
+- Selecting a provider (OpenRouter/OpenAI/Anthropic/etc.)
+- Providing credentials (env/secret store/OAuth)
+- Converting `ToolParams[]` into provider-native tool definitions (use `tool.slug` as the function name when present)
 
-### 2. Agent with Tools
+See `@starships/autopilot-runner`’s `RunnerHostRuntime` for a working OpenRouter/OpenAI-compatible implementation.
 
-Create an agent with tools enabled:
+## How tool execution works (local Tool node pattern)
 
-```typescript
-import { Agent, autopilot } from '@starships/autopilot';
+1. **LLM** returns `toolCalls[].function.arguments` as a JSON string (provider format).
+2. A **Code** node materializes those arguments into a **plain object**.
+3. The **Tool** node executes the tool’s `blueprint` using that object as the tool input.
 
-// Configure API key
-autopilot.setCredentials({
-  openrouterApiKey: 'sk-or-v1-your-key',
-});
+Important: the Tool node is strict about arguments:
 
-const agent = new Agent({
-  name: 'MathAssistant',
-  model: 'anthropic/claude-3.5-sonnet',
-  tools: [calculatorTool], // Tools array enables function calling
-});
+- `null`/`undefined`/empty string → `{}`  
+- plain object → passthrough  
+- anything else (including non-empty strings) → error
 
-// Execute with user input
-const result = await agent.execute('What is 25 * 4 + 17?');
-```
+## Example: calculator tool definition
 
-### 3. Tool Execution
-
-- Tools must include a `blueprint` in `ToolParams`.
-- The Tool node executes that blueprint using a fresh Engine + Execution (same pattern as the Workflow node).
-- Pass any runtime configuration as regular tool arguments; they will be available as initial input (`$json`) to the tool blueprint.
-
-- The Tool node is a lightweight wrapper and is intentionally stateless. It does not parse tool arguments.
-- The Tool node consumes pre-parsed `arguments_json` produced by the LLM. In the built-in Agent loop, a small Code node materializes `arguments_json` into a plain object and passes it as the Tool input. External orchestrators may also pass a plain object directly as the Tool node's input to make it available as the initial `$json` for the tool blueprint.
-
-## Architecture Details
-
-### Agent Blueprint Generation
-
-When an agent has tools, it automatically creates a dynamic blueprint:
-
-```
-Start -> LLM -> Conditional(has toolCalls?)
-  -> Yes: Tool -> Mutate(append result) -> Back to LLM
-  -> No: End
-```
-
-### Tool Execution Flow
-
-1. **LLM Node**: Receives messages, includes tools schema, may respond with toolCalls
-2. **Conditional Node**: Checks if LLM wants to call tools
-3. **Tool Node**: Executes the requested tool
-4. **Mutate Node**: Appends tool result to conversation
-5. **Loop**: Returns to LLM with tool result until no more tool calls
-
-### Single Tool Call per Assistant Response
-
-- By default, Autopilot disables parallel tool calls so the model emits at most one tool call in a single assistant message. This is configured in [`LLM.execute()`](packages/autopilot/src/nodes/LLM.ts:30) by setting the request option `parallel_tool_calls: false` when tools are provided.
-- This keeps tool usage deterministic and avoids multi-tool fan-out in one turn. The Agent loop may still issue another tool call on a subsequent LLM turn after a tool_result is appended (sequential, not parallel).
-
-### Template Expressions
-
-The system uses JavaScript template expressions for dynamic data access:
-
-```javascript
-// Check for tool calls
-`exists(lastOutputOf("llm_1")?.choices[0].message.toolCalls)`
-// Get tool name
-`{{ lastOutputOf("llm_1")?.choices[0].message.toolCalls[0].function.name }}`
-// Convert tool result to string
-`{{ String(lastOutputOf("tool_1")) }}`;
-```
-
-## Usage Examples
-
-### Simple Calculator
-
-```typescript
-const agent = new Agent({
+```ts
+const calculatorTool = {
   name: 'Calculator',
-  model: 'anthropic/claude-3-haiku',
-  tools: [calculatorTool],
-});
-
-const result = await agent.execute('Calculate 15 * 7 + 23');
-```
-
-### Multi-Tool Agent
-
-```typescript
-const agent = new Agent({
-  name: 'Assistant',
-  model: 'anthropic/claude-3.5-sonnet',
-  tools: [calculatorTool, timeTool, echoTool],
-});
-
-const result = await agent.execute('What time is it in Tokyo and what is 42 * 17?');
-```
-
-### Conversational Tool Use
-
-```typescript
-const agent = new Agent({
-  name: 'ConversationAssistant',
-  model: 'anthropic/claude-3.5-sonnet',
-  systemPrompt: 'You are a helpful math assistant.',
-  state: {
-    tools: [calculatorTool],
-    messages: [],
-  },
-});
-
-// First message
-await agent.execute('What is 25 + 17?');
-
-// Follow-up (remembers context)
-await agent.execute('Now multiply that by 3');
-```
-
-## Extending with Custom Tools
-
-Define a custom tool entirely in data by embedding a Blueprint in `ToolParams`. When a `blueprint` is present, the Tool node executes it using the same Engine + Execution pattern as the Workflow node. The tool call arguments (from the LLM or provided input) are passed as the initial input to the blueprint.
-
-Example:
-
-```typescript
-import { ToolParams } from '@starships/autopilot';
-
-export const sendEmailTool: ToolParams = {
-  name: 'send_email',
-  description: 'Send an email via HTTP API',
+  slug: 'calculator',
+  description: 'Add two numbers',
   parameters: {
     type: 'object',
     properties: {
-      to: { type: 'string', description: 'Recipient email address' },
-      subject: { type: 'string', description: 'Email subject' },
-      body: { type: 'string', description: 'Email body (text)' },
-      apiKey: { type: 'string', description: 'API key for the provider' },
+      a: { type: 'number', description: 'First number' },
+      b: { type: 'number', description: 'Second number' },
     },
-    required: ['to', 'subject', 'body', 'apiKey'],
+    required: ['a', 'b'],
   },
   blueprint: {
     nodes: [
-      { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
+      { ref: 's', type: 'start', name: 'Start', parameters: {} },
       {
-        ref: 'http_1',
-        type: 'http_request',
-        name: 'Send Email',
-        description: 'Call provider API',
+        ref: 'add',
+        type: 'code',
+        name: 'Add',
         parameters: {
-          url: 'https://example-mail.api/send',
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: 'Bearer {{ input.apiKey }}',
-          },
-          body: {
-            to: '{{ input.to }}',
-            subject: '{{ input.subject }}',
-            body: '{{ input.body }}',
-          },
+          code: `
+            async function main(ctx) {
+              const { a, b } = ctx.input || {};
+              return { sum: Number(a) + Number(b) };
+            }
+          `,
         },
       },
-      { ref: 'end_1', type: 'end', name: 'Done', description: '', parameters: {} },
+      { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("add") }}' } },
     ],
     edges: [
-      { ref: 'e1', from: 'start_1', to: 'http_1' },
-      { ref: 'e2', from: 'http_1', to: 'end_1' },
+      { ref: 'e1', from: 's', to: 'add' },
+      { ref: 'e2', from: 'add', to: 'e' },
     ],
-    metadata: {},
   },
 };
 ```
 
-Notes:
+## Agent node note (Starships-hosted vs local tools)
 
-- No code changes required for new tools. Provide `ToolParams` with a `blueprint`, and include it in the agent’s `tools` array for function calling schema.
-- Pass any configuration/secrets as normal tool arguments (e.g., `apiKey`). The Tool node forwards arguments as the initial `input` of the blueprint.
+Autopilot ships an `Agent` node with a default blueprint. In the Starships hosted product, that default blueprint delegates tool authorization/execution to the server via a `connector_action` call (so the host can enforce allow/ask/deny policies and keep secrets out of blueprints).
 
-## Key Benefits
+Even in that mode, tools are still represented as `ToolParams` and must include a `blueprint` (it’s used as part of the allowlist check in the default blueprint).
 
-- **Clean Architecture**: Each component has single responsibility
-- **Reuses Infrastructure**: Leverages existing nodes, templates, mutations
-- **No External Dependencies**: Uses existing autopilot components
-- **Dynamic Execution**: Creates tool calling loops automatically
-- **Memory Integration**: Works with agent memory system
+## Code node requirement (inside tools)
 
-## Using Code node inside tools (module-style)
+When authoring `code` nodes inside tool blueprints, you must define:
 
-When authoring tool blueprints that include a `code` node, write code as a module with an entrypoint:
-
-```javascript
+```js
 async function main(ctx) {
-  // Access tool arguments via ctx.input
-  // Access workflow state via ctx.state
-  // Read prior node output via ctx.lastOutputOf('node_ref')
-  // In Starships, ctx.env is reserved; only ctx.env('STARSHIP_ID') may be present.
   return { ok: true };
 }
 ```
 
-- Globals: standard JS built-ins and `console` are available. Timers (`setTimeout`, `setInterval`), `require`, `import`, `eval`, `Function`, `process`, `global`, and `globalThis` are blocked.
-- The old top-level `return` style is no longer supported.
+Top-level `return ...` is not supported; the engine always calls `await main(ctx)`.
 
-## Error handling and loop prevention
 
-- Tools execute their own blueprint with failOnNodeError enabled. On failure, the Tool node returns an ExecutionItem that sets `error` and also provides `json` with a structured payload:
-  - `{ ok: false, error: "<message>", details: { stack?: string, nodeRef?: string, depth: number, runner: "local" | "child", toolName: string, toolCallId?: string, timestamp: string } }`
-  - This allows inline mutations to execute and publish a detailed tool message for the LLM.
-- The Agent’s default blueprint serializes the `json` payload when present (including `details`). If `json` is missing, it falls back to the `error` string. The tool role message therefore contains all available diagnostics that the LLM can reason about.
-- This prevents infinite loops when a tool fails (for example, Test Tool), because the LLM now receives a concrete tool response (even on failure) and can proceed without repeatedly issuing the same tool call.

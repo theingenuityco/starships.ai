@@ -6,7 +6,6 @@ import type {
   ConnectorModel,
   ConnectorAuthOAuth2V2,
   ConnectorAuthApiKeyV2,
-  ConnectorAuthPlatformJwtV2,
   SecretRef,
   SecretRefType,
 } from '@starships/protocol';
@@ -88,7 +87,12 @@ export class ConnectorService {
     userId: string,
     provider: ConnectorProvider,
     template: ConnectorTemplateEntity,
-    output: { envUpdates?: Record<string, string>; metadata?: Record<string, unknown>; status?: ConnectorModel['status']; lastError?: string | null }
+    output: {
+      envUpdates?: Record<string, string>;
+      metadata?: Record<string, unknown>;
+      status?: ConnectorModel['status'];
+      lastError?: string | null;
+    }
   ): Promise<{ connector: ConnectorModel; starshipSlug?: string }> {
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
 
@@ -279,7 +283,9 @@ export class ConnectorService {
     const clientId = await this.resolvePlatformSecret(clientIdRef.key);
     const clientSecret = await this.resolvePlatformSecret(clientSecretRef.key);
     if (!clientId || !clientSecret) {
-      throw new Error(`OAuth is not configured for provider ${providerFromCallback}. Missing envs: ${clientIdRef.key}, ${clientSecretRef.key}`);
+      throw new Error(
+        `OAuth is not configured for provider ${providerFromCallback}. Missing envs: ${clientIdRef.key}, ${clientSecretRef.key}`
+      );
     }
 
     const stateValidation = await validateOAuthState(stateToken);
@@ -429,7 +435,9 @@ export class ConnectorService {
       if (existing) {
         const scopes =
           template.authType === 'oauth2'
-            ? (Array.isArray((template.authJson as any)?.scopes) ? (template.authJson as any).scopes.map((s: any) => String(s)) : [])
+            ? Array.isArray((template.authJson as any)?.scopes)
+              ? (template.authJson as any).scopes.map((s: any) => String(s))
+              : []
             : [];
 
         return {
@@ -454,7 +462,9 @@ export class ConnectorService {
       const status = template.provider === 'starships' ? 'connected' : 'disconnected';
       const scopes =
         template.authType === 'oauth2'
-          ? (Array.isArray((template.authJson as any)?.scopes) ? (template.authJson as any).scopes.map((s: any) => String(s)) : [])
+          ? Array.isArray((template.authJson as any)?.scopes)
+            ? (template.authJson as any).scopes.map((s: any) => String(s))
+            : []
           : [];
 
       return {

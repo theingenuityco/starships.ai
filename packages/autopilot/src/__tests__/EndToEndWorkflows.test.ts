@@ -50,6 +50,13 @@ describe('End-to-End Workflow Execution', () => {
     hostRuntime = {
       http: httpMock as HostRuntime['http'],
       llm: llmMock as HostRuntime['llm'],
+      connectorAction: (jest.fn(async ({ connector, action, args, timeoutMs }) => ({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: { ok: true, connector, action, args, timeoutMs },
+        url: `connector://${String(connector)}/${String(action)}`,
+      })) as HostRuntime['connectorAction']),
     };
   });
 

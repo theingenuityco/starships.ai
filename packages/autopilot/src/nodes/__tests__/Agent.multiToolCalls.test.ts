@@ -69,6 +69,15 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
           },
         };
       },
+      connectorAction: async ({ connector, action, args, timeoutMs }) => {
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: { ok: true, connector, action, args, timeoutMs },
+          url: `connector://${String(connector)}/${String(action)}`,
+        };
+      },
       llm: async () => {
         llmCallCount++;
 

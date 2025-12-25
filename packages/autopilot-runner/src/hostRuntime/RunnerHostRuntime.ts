@@ -1,7 +1,13 @@
 import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
-import type { ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
+import type { ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2, ExprString, HttpMethod } from '@starships/protocol';
 import OpenAI from 'openai';
-import Ajv from 'ajv';
+
+type OpenAIChatCompletionCreateParamsNonStreaming = Omit<
+  OpenAI.Chat.ChatCompletionCreateParamsStreaming,
+  'stream' | 'stream_options'
+> & {
+  stream: false;
+};
 
 /**
  * Connector sessions passed from the embedding host (API server) to the runner.
@@ -140,8 +146,6 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     }
   };
 
-  const ajv = new Ajv({ allErrors: true, strict: false });
-
   const evalTemplate = (value: unknown, ctx: { args: Record<string, unknown>; runtimeEnv: Record<string, unknown> }): unknown => {
     if (typeof value !== 'string') return value;
 
@@ -178,19 +182,9 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       throw new Error(`Unknown connector "${c}" (template not provided to runner)`);
     }
 
-    const endpoint = (tpl.endpoints || []).find((e) => e && e.name === a) as ConnectorEndpointV2 | undefined;
+    const endpoint = tpl.endpoints.find((e: ConnectorEndpointV2) => e.name === a);
     if (!endpoint) {
       throw new Error(`Unknown connector action "${a}" for connector "${c}"`);
-    }
-
-    // Validate args if schema is present.
-    if (endpoint.parameters && typeof endpoint.parameters === 'object') {
-      const validate = ajv.compile(endpoint.parameters as any);
-      const ok = validate(args);
-      if (!ok) {
-        const msg = ajv.errorsText(validate.errors || [], { separator: '; ' });
-        throw new Error(`Invalid connector_action args for ${c}.${a}: ${msg}`);
-      }
     }
 
     const ctx = { args, runtimeEnv };
@@ -202,11 +196,11 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     }
 
     // Resolve path variables
-    const pathVars = (endpoint.mapping && endpoint.mapping.path) || {};
+    const pathVars: Record<string, ExprString> = endpoint.mapping?.path ?? {};
     const resolvedPath = String(endpoint.path || '').replace(/\{([^}]+)\}/g, (_m, name) => {
       const key = String(name);
-      const expr = (pathVars as Record<string, string>)[key];
-      const val = expr !== undefined ? evalTemplate(expr, ctx) : (args as any)[key];
+      const expr = pathVars[key];
+      const val = expr !== undefined ? evalTemplate(expr, ctx) : args[key];
       if (val === undefined || val === null || String(val) === '') {
         throw new Error(`Missing path variable "${key}" for connector "${c}" action "${a}"`);
       }
@@ -221,12 +215,12 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     if (endpoint.mapping?.headers) {
       for (const [k, v] of Object.entries(endpoint.mapping.headers)) {
         const out = evalTemplate(v, ctx);
-        headers[k] = out as any;
+        headers[k] = out;
       }
     }
 
     // Build query/body based on mapping or requestStyle
-    const method = String(endpoint.method || 'GET').toUpperCase();
+    const method: HttpMethod = endpoint.method;
     let finalUrl = url;
     let body: unknown = undefined;
 
@@ -248,7 +242,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       } else if (mapping?.body) {
         const obj: Record<string, unknown> = {};
         for (const [k, v] of Object.entries(mapping.body)) {
-          obj[k] = evalTemplate(v, ctx) as any;
+          obj[k] = evalTemplate(v, ctx);
         }
         body = obj;
       } else {
@@ -288,10 +282,9 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       },
     });
 
-    const modalities = (request as unknown as { modalities?: unknown }).modalities;
+    const modalities = request.modalities;
     const isImageRequest = Array.isArray(modalities) && modalities.includes('image');
-    const requestedStream = (request as unknown as { stream?: unknown }).stream;
-    const wantsStream = typeof requestedStream === 'boolean' ? requestedStream : true;
+    const wantsStream = typeof request.stream === 'boolean' ? request.stream : true;
 
     const baseRequest: Record<string, unknown> = {
       model: request.model,
@@ -305,7 +298,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       if (Array.isArray(modalities) && modalities.length > 0) {
         baseRequest.modalities = modalities;
       }
-      const imageConfig = (request as unknown as { imageConfig?: unknown }).imageConfig;
+      const imageConfig = request.imageConfig;
       if (imageConfig && typeof imageConfig === 'object') {
         // OpenRouter expects snake_case
         baseRequest.image_config = imageConfig;
@@ -368,19 +361,21 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       baseRequest.tools = tools;
     }
 
-    const wrapNonStreamAsOneChunk = (completion: any): AsyncIterable<unknown> => {
+    const wrapNonStreamAsOneChunk = (completion: unknown): AsyncIterable<unknown> => {
+      const c = completion as OpenAI.Chat.Completions.ChatCompletion;
       const oneChunk = {
-        id: completion?.id,
-        object: completion?.object,
-        created: completion?.created,
-        model: completion?.model,
-        usage: completion?.usage,
+        id: c?.id,
+        object: (c as unknown as { object?: unknown })?.object,
+        created: (c as unknown as { created?: unknown })?.created,
+        model: c?.model,
+        usage: (c as unknown as { usage?: unknown })?.usage,
         choices: [
           {
             index: 0,
             // LLM node checks both delta and message; include full message snapshot.
-            message: completion?.choices?.[0]?.message,
-            finish_reason: completion?.choices?.[0]?.finish_reason ?? completion?.choices?.[0]?.finishReason,
+            message: c?.choices?.[0]?.message,
+            finish_reason:
+              c?.choices?.[0]?.finish_reason ?? (c?.choices?.[0] as unknown as { finishReason?: unknown })?.finishReason,
           },
         ],
       };
@@ -398,7 +393,9 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     // - Always force non-stream for image requests
     // - Respect explicit stream=false for text requests
     if (isImageRequest || !wantsStream) {
-      const completion = (await client.chat.completions.create({ ...(baseRequest as any), stream: false } as any)) as any;
+      const completion = await client.chat.completions.create(
+        { ...(baseRequest as Record<string, unknown>), stream: false } as unknown as OpenAIChatCompletionCreateParamsNonStreaming
+      );
       return wrapNonStreamAsOneChunk(completion);
     }
 

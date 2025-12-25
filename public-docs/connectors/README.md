@@ -10,7 +10,7 @@ Connectors let Starships tools and agents talk to third‑party platforms (like 
     - **Connector secrets** (`connector_secrets`): per-starship encrypted secrets (OAuth access/refresh tokens, etc.).
   - **Tools make requests** using `http_request` with a `connector` slug (for example `"linkedin"`, `"discord"`, `"google_drive"`, `"github"`).
   - **At execution time, HostRuntime**
-    - Resolves **relative URLs** (those that are not `https://...`) against the connector’s configured `apiBaseUrl`.
+    - Resolves **relative URLs** (those that are not absolute `http(s)://...` URLs) against the connector’s configured `apiBaseUrl`.
     - Injects configured connector headers (typically `Authorization`) **without exposing them to the workflow**.
     - Never overwrites a caller-supplied `Authorization` header (escape hatch).
 

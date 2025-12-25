@@ -17,7 +17,7 @@ Secrets (OAuth tokens, etc.) are managed by the platform and injected by the Hos
 
 - **Auth injection**
   - For `connector: "google_drive"`, the HostRuntime:
-    - Retrieves a Google Drive access token for the current starship from encrypted per-starship connector secrets (`GOOGLE_DRIVE_ACCESS_TOKEN`).
+    - Retrieves a Google Drive access token for the current starship from encrypted per-starship `connector_secrets` (key configured by `runtime_config.oauth.accessToken`, defaulting to `GOOGLE_DRIVE_ACCESS_TOKEN` in built-in templates).
     - Injects an `Authorization: Bearer <access_token>` header into the outgoing request.
   - If you explicitly set an `Authorization` header (any casing) in `parameters.headers`, that value **takes precedence** and the connector does not overwrite it.
 
@@ -31,7 +31,7 @@ Secrets (OAuth tokens, etc.) are managed by the platform and injected by the Hos
   - `body?: object | string | null`
     - Optional. Objects are JSON-stringified by the runtime; strings are sent as-is.
   - `timeout?: number`
-    - Optional. Milliseconds; must be ≥ 1000. Default is ~30000ms.
+    - Optional. Milliseconds; must be **≥ 1000**. Default is `30000`.
   - `connector: "google_drive"`
     - Required for Google Drive connector behavior (URL normalization + auth injection).
 
@@ -76,12 +76,6 @@ Typical inputs:
 - **Connector**: `"google_drive"`
 
 You can use this pattern when you need raw file contents; the response `body` will contain the file data (string or binary-like string depending on the API’s response headers).
-
-#### 2.3 Upload a file (simple upload)
-
-- **Method**: `POST`
-- **URL**: `"/upload/drive/v3/files?uploadType=media"`
-- **Connector**: `"google_drive"`
 
 **Blueprint node (DSL – download by fileId):**
 
@@ -150,7 +144,8 @@ Typical inputs:
 
 ### 4. OAuth scopes (what the connector is allowed to do)
 
-The Google Drive connector is configured by the instance admin and typically requests the broad Drive scope:
+The Google Drive connector’s OAuth scopes are configured on the connector template via `runtime_config.oauth.scopes`.
+In the built-in template, this is set to the broad Drive scope:
 
 - `https://www.googleapis.com/auth/drive`
 

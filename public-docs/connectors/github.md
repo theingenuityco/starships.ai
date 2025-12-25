@@ -5,7 +5,7 @@ This document specifies how to call GitHub APIs from tools using the `http_reque
 Auth is provided by a **GitHub OAuth App user token**:
 
 - **Platform secrets** (instance admin): `GH_APP_CLIENT_ID`, `GH_APP_CLIENT_SECRET`
-- **Per-starship connector secrets** (encrypted DB store): `GH_APP_ACCESS_TOKEN`, `GH_APP_REFRESH_TOKEN`
+- **Per-starship connector secrets** (`connector_secrets`): `GH_APP_ACCESS_TOKEN`, `GH_APP_REFRESH_TOKEN` (optional)
   Tools never see the OAuth client secret or raw access/refresh tokens.
 
 At the GitHub side, this is equivalent to a token that acts **as the authenticated user**:
@@ -17,8 +17,10 @@ At the GitHub side, this is equivalent to a token that acts **as the authenticat
 
 In this deployment, the OAuth flow requests the following capabilities:
 
-- `repo` – full control of private and public repositories the user can access (read and write code, issues, pull requests, releases, etc.).
-- `read:org` – read organization membership and basic organization data.
+- `repo`
+- `read:org`
+
+These scopes are configured on the connector template via `runtime_config.oauth.scopes` (instance admins can change them).
 
 The connector can therefore:
 
@@ -36,17 +38,14 @@ The connector can therefore:
   - Endpoints that are specific to GitHub App installations (for example, `/installation/repositories`) are **not** the primary target for this connector; prefer user-scoped endpoints like `/user`, `/user/repos`, `/repos/{owner}/{repo}/...`, `/orgs/{org}/...`.
 
 - **URL resolution**
-  - When `connector: "github"` is set and `url` starts with `/`, the HostRuntime resolves:
-    - `url: "/repos/..."` → `https://api.github.com/repos/...`
-    - `url: "/orgs/..."` → `https://api.github.com/orgs/...`
-    - Any other `"/..."` path → `https://api.github.com/...`
-  - If `url` is an absolute `https://...` URL, it is used as-is (no prefixing).
+  - When `connector: "github"` is set and `url` is **not** an absolute `http(s)://...` URL, the runner resolves it against the connector template’s `runtime_config.apiBaseUrl` (default: `https://api.github.com`).
+  - If `url` is an absolute `http(s)://...` URL, it is used as-is (no prefixing).
 
 - **Auth injection**
   - For `connector: "github"`, the HostRuntime:
     - Uses the configured GitHub App (`GH_APP_CLIENT_ID` / `GH_APP_CLIENT_SECRET`) to complete the OAuth 2.0 code exchange for the current starship.
-    - Stores the resulting `GH_APP_ACCESS_TOKEN` (and optional `GH_APP_REFRESH_TOKEN`) in the encrypted per-starship connector secrets store for that starship.
-    - Injects an `Authorization: Bearer <access_token>` header into the outgoing request using the stored `GH_APP_ACCESS_TOKEN`.
+    - Stores the resulting access/refresh tokens into per-starship `connector_secrets` using the keys configured by the connector template’s `runtime_config.oauth.accessToken` / `runtime_config.oauth.refreshToken` (built-in defaults are `GH_APP_ACCESS_TOKEN` / `GH_APP_REFRESH_TOKEN`).
+    - Injects an `Authorization: Bearer <access_token>` header into the outgoing request using the stored access token.
   - If you explicitly set an `Authorization` header (any casing) in `parameters.headers`, that value **takes precedence** and the connector does not overwrite it.
 
 - **Relevant `http_request` parameters**
@@ -59,7 +58,7 @@ The connector can therefore:
   - `body?: object | string | null`
     - Optional. Objects are JSON-stringified by the runtime; strings are sent as-is.
   - `timeout?: number`
-    - Optional. Milliseconds; must be ≥ 1000. Default is ~30000ms.
+    - Optional. Milliseconds; must be **≥ 1000**. Default is `30000`.
   - `connector: "github"`
     - Required for GitHub connector behavior (URL normalization + auth injection).
 

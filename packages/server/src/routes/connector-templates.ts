@@ -5,13 +5,15 @@ import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
-import type { Blueprint } from '@starships/autopilot';
 import type {
   AdminConnectorTemplateListResponse,
   AdminConnectorTemplateResponse,
   AuthUser,
+  ConnectorAuthV2,
+  ConnectorEndpointV2,
   ConnectorTemplateAdminModel,
   ConnectorTemplateModel,
+  ConnectorTemplateRuntimeFieldsV2,
   CreateConnectorTemplateRequest,
   UpdateConnectorTemplateRequest,
 } from '@starships/protocol';
@@ -40,30 +42,33 @@ const TemplateTextSchema = z
 
 const UpdateConnectorTemplateSchema = z
   .object({
-    displayName: TemplateTextSchema.max(255).optional(),
+    name: TemplateTextSchema.max(255).optional(),
     description: TemplateTextSchema.max(1024).optional(),
-    authType: z.enum(['oauth2', 'api_key', 'custom', 'none']).optional(),
+    authType: z.enum(['oauth2', 'api_key', 'platform_jwt', 'none']).optional(),
     isEnabled: z.boolean().optional(),
     version: z.string().trim().min(1).max(20).optional(),
     category: z.string().trim().min(1).max(100).optional(),
-    runtimeConfig: z.record(z.string(), z.unknown()).optional(),
-    // Blueprint is a structured DSL object; we keep runtime validation permissive here.
-    connectBlueprint: z.unknown().nullable().optional(),
-    refreshBlueprint: z.unknown().nullable().optional(),
-    testBlueprint: z.unknown().nullable().optional(),
+    baseUrl: z.string().trim().min(1).max(2048).optional(),
+    auth: z.record(z.string(), z.unknown()).optional(),
+    variables: z.array(z.record(z.string(), z.unknown())).optional(),
+    endpoints: z.array(z.record(z.string(), z.unknown())).optional(),
+    rateLimit: z.record(z.string(), z.unknown()).optional(),
+    metadataSchema: z.record(z.string(), z.unknown()).optional(),
   })
   .refine(
     (body) =>
-      body.displayName !== undefined ||
+      body.name !== undefined ||
       body.description !== undefined ||
       body.authType !== undefined ||
       body.isEnabled !== undefined ||
       body.version !== undefined ||
       body.category !== undefined ||
-      body.runtimeConfig !== undefined ||
-      body.connectBlueprint !== undefined ||
-      body.refreshBlueprint !== undefined ||
-      body.testBlueprint !== undefined,
+      body.baseUrl !== undefined ||
+      body.auth !== undefined ||
+      body.variables !== undefined ||
+      body.endpoints !== undefined ||
+      body.rateLimit !== undefined ||
+      body.metadataSchema !== undefined,
     { message: 'At least one field must be provided' }
   );
 
@@ -71,17 +76,18 @@ const CreateConnectorTemplateSchema = z.object({
   id: TemplateIdOrProviderSchema.optional(),
   slug: z.string().trim().min(1).max(255).optional(),
   provider: z.string().trim().min(1).max(255),
-  displayName: TemplateTextSchema.max(255),
+  name: TemplateTextSchema.max(255),
   description: TemplateTextSchema.max(1024),
-  authType: z.enum(['oauth2', 'api_key', 'custom', 'none']),
+  authType: z.enum(['oauth2', 'api_key', 'platform_jwt', 'none']),
   isEnabled: z.boolean().optional(),
   version: z.string().trim().min(1).max(20).optional(),
   category: z.string().trim().min(1).max(100).optional(),
-  runtimeConfig: z.record(z.string(), z.unknown()).optional(),
-  // Blueprint is a structured DSL object; we keep runtime validation permissive here.
-  connectBlueprint: z.unknown().nullable().optional(),
-  refreshBlueprint: z.unknown().nullable().optional(),
-  testBlueprint: z.unknown().nullable().optional(),
+  baseUrl: z.string().trim().min(1).max(2048),
+  auth: z.record(z.string(), z.unknown()),
+  variables: z.array(z.record(z.string(), z.unknown())).optional(),
+  endpoints: z.array(z.record(z.string(), z.unknown())),
+  rateLimit: z.record(z.string(), z.unknown()).optional(),
+  metadataSchema: z.record(z.string(), z.unknown()).optional(),
 });
 
 function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateModel {
@@ -89,7 +95,7 @@ function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateMo
     id: entity.id,
     slug: entity.slug,
     provider: entity.provider,
-    displayName: entity.displayName,
+    name: entity.name,
     description: entity.description,
     authType: entity.authType,
     isEnabled: Boolean(entity.isEnabled),
@@ -104,10 +110,12 @@ function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateMo
 function toAdminModel(entity: ConnectorTemplateEntity): ConnectorTemplateAdminModel {
   return {
     ...toTemplateSummary(entity),
-    runtimeConfig: entity.runtimeConfig || {},
-    connectBlueprint: entity.connectBlueprint ?? null,
-    refreshBlueprint: entity.refreshBlueprint ?? null,
-    testBlueprint: entity.testBlueprint ?? null,
+    baseUrl: entity.baseUrl,
+    auth: entity.authJson as unknown as ConnectorAuthV2,
+    variables: entity.variablesJson as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
+    endpoints: entity.endpointsJson as unknown as ConnectorEndpointV2[],
+    rateLimit: entity.rateLimitJson as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
+    metadataSchema: entity.metadataSchemaJson as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
   };
 }
 
@@ -142,16 +150,18 @@ router.post('/admin/connector-templates', async (req: Request, res: Response): P
       id: body.id,
       slug: body.slug,
       provider: body.provider,
-      displayName: body.displayName,
+      name: body.name,
       description: body.description,
       authType: body.authType,
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
-      runtimeConfig: body.runtimeConfig,
-      connectBlueprint: (body.connectBlueprint as Blueprint | null | undefined) ?? undefined,
-      refreshBlueprint: (body.refreshBlueprint as Blueprint | null | undefined) ?? undefined,
-      testBlueprint: (body.testBlueprint as Blueprint | null | undefined) ?? undefined,
+      baseUrl: body.baseUrl,
+      auth: body.auth as unknown as Record<string, unknown>,
+      variables: body.variables as unknown as Array<Record<string, unknown>> | undefined,
+      endpoints: body.endpoints as unknown as Array<Record<string, unknown>>,
+      rateLimit: body.rateLimit as unknown as Record<string, unknown> | undefined,
+      metadataSchema: body.metadataSchema as unknown as Record<string, unknown> | undefined,
     } satisfies CreateConnectorTemplateRequest);
 
     const payload: AdminConnectorTemplateResponse = {
@@ -204,16 +214,18 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
     }
 
     const updated = await repo.update(existing.id, {
-      displayName: body.displayName,
+      name: body.name,
       description: body.description,
       authType: body.authType,
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
-      runtimeConfig: body.runtimeConfig,
-      connectBlueprint: body.connectBlueprint as Blueprint | null | undefined,
-      refreshBlueprint: body.refreshBlueprint as Blueprint | null | undefined,
-      testBlueprint: body.testBlueprint as Blueprint | null | undefined,
+      baseUrl: body.baseUrl,
+      authJson: body.auth as unknown as Record<string, unknown>,
+      variablesJson: body.variables as unknown as Array<Record<string, unknown>> | undefined,
+      endpointsJson: body.endpoints as unknown as Array<Record<string, unknown>>,
+      rateLimitJson: body.rateLimit as unknown as Record<string, unknown> | undefined,
+      metadataSchemaJson: body.metadataSchema as unknown as Record<string, unknown> | undefined,
     });
 
     if (!updated) {

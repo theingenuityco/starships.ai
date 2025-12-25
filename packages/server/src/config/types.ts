@@ -1,1 +1,1 @@
-export type { ConnectorProvider, ConnectorAuthType } from '@starships/protocol';
+export type { ConnectorProvider, ConnectorAuthTypeV2 as ConnectorAuthType } from '@starships/protocol';

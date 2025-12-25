@@ -67,14 +67,20 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
   // Overriding body to make it a string or object
   body?: Record<string, unknown> | string | null;
 
-  /**
-   * Optional connector identifier/slug to execute this HTTP request through.
-   * When provided, the host runtime may resolve connector records and inject
-   * secrets/policies before performing the request.
-   */
-  connector?: string;
-
   // Custom properties for convenience
+  timeout?: number;
+}
+
+/**
+ * Connector Action node parameters for connector-backed API actions.
+ *
+ * This executes a connector template endpoint (action) with validated args,
+ * via HostRuntime.connectorAction.
+ */
+export interface ConnectorActionParams extends BaseParams {
+  connector: string;
+  action: string;
+  args?: Record<string, unknown>;
   timeout?: number;
 }
 
@@ -344,6 +350,7 @@ export type NodeParameters =
   | AgentParams
   | UserPromptParams
   | HttpRequestParams
+  | ConnectorActionParams
   | LlmParams
   | WorkflowParams
   | ToolParams

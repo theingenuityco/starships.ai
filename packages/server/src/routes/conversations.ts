@@ -16,7 +16,7 @@ import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
-import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+import { ConnectorActionSessionService } from '@/services/ConnectorActionSessionService';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
@@ -162,23 +162,39 @@ function getSafeErrorMessageWithCause(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function buildConnectorHostRuntime(connectors: Record<string, { baseUrl: string; headers: Record<string, string> }>) {
-  return {
-    http: async (req: {
-      method: string;
-      url: string;
-      headers?: Record<string, unknown>;
-      body?: unknown;
-      timeoutMs?: number;
-      connector?: string;
-    }) => {
-      const method = String(req.method || 'GET').toUpperCase();
-      const connector = typeof req.connector === 'string' ? req.connector : undefined;
-      const connectorCfg = connector ? connectors?.[connector] : undefined;
+function buildServerHostRuntime(args: {
+  connectorTemplates: Record<string, any>;
+  connectorSessions: Record<string, { headers: Record<string, string> }>;
+  runtimeEnv: Record<string, unknown>;
+}) {
+  const { connectorTemplates, connectorSessions, runtimeEnv } = args;
 
-      const rawUrl = String(req.url || '');
-      const url =
-        connectorCfg && !/^https?:\/\//i.test(rawUrl) ? `${connectorCfg.baseUrl}${rawUrl.startsWith('/') ? '' : '/'}${rawUrl}` : rawUrl;
+  const evalTemplate = (value: unknown, ctx: { args: Record<string, unknown>; runtimeEnv: Record<string, unknown> }): unknown => {
+    if (typeof value !== 'string') return value;
+    const raw = value;
+    const fullOnly = /^\s*\{\{\s*[\s\S]*?\s*\}\}\s*$/.test(raw);
+    const re = /\{\{\s*([\s\S]*?)\s*\}\}/g;
+    const evalExpr = (expr: string): unknown => {
+      // eslint-disable-next-line no-new-func
+      const fn = new Function('args', 'runtimeEnv', `return (${expr});`);
+      return fn(ctx.args, ctx.runtimeEnv);
+    };
+    if (fullOnly) {
+      const m = raw.match(/^\s*\{\{\s*([\s\S]*?)\s*\}\}\s*$/);
+      return m ? evalExpr(m[1]) : raw;
+    }
+    return raw.replace(re, (_m, expr) => {
+      const out = evalExpr(String(expr));
+      return out === null || out === undefined ? '' : String(out);
+    });
+  };
+
+  const httpImpl = async (req: { method: string; url: string; headers?: Record<string, unknown>; body?: unknown; timeoutMs?: number }) => {
+      const method = String(req.method || 'GET').toUpperCase();
+      const url = String(req.url || '');
+      if (!/^https?:\/\//i.test(url)) {
+        throw new Error('HostRuntime.http requires absolute http(s) URL (use connector_action for connector-backed calls)');
+      }
 
       // Normalize headers to string record
       const headers: Record<string, string> = {};
@@ -186,12 +202,6 @@ function buildConnectorHostRuntime(connectors: Record<string, { baseUrl: string;
       for (const [k, v] of Object.entries(h)) {
         if (typeof v === 'string') headers[k] = v;
         else if (typeof v === 'number' || typeof v === 'boolean') headers[k] = String(v);
-      }
-      if (connectorCfg?.headers) {
-        // Connector headers take precedence unless explicitly overridden
-        for (const [k, v] of Object.entries(connectorCfg.headers)) {
-          if (!(k in headers)) headers[k] = v;
-        }
       }
 
       const controller = new AbortController();
@@ -243,8 +253,60 @@ function buildConnectorHostRuntime(connectors: Record<string, { baseUrl: string;
       } finally {
         clearTimeout(t);
       }
-    },
-  };
+    };
+
+  const connectorActionImpl = async (req: { connector: string; action: string; args?: Record<string, unknown>; timeoutMs?: number }) => {
+      const connector = String(req.connector || '').trim();
+      const action = String(req.action || '').trim();
+      const argsObj = (req.args && typeof req.args === 'object' ? req.args : {}) as Record<string, unknown>;
+      const tpl = connectorTemplates[connector];
+      if (!tpl) throw new Error(`Unknown connector "${connector}"`);
+      const endpoint = Array.isArray(tpl.endpoints) ? tpl.endpoints.find((e: any) => e && e.name === action) : undefined;
+      if (!endpoint) throw new Error(`Unknown connector action "${action}" for connector "${connector}"`);
+
+      const ctx = { args: argsObj, runtimeEnv };
+      const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
+      const baseUrl = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim().replace(/\/+$/, '');
+
+      const path = String(endpoint.path || '').replace(/\{([^}]+)\}/g, (_m: string, name: string) => {
+        const key = String(name);
+        const expr = endpoint?.mapping?.path?.[key];
+        const val = expr !== undefined ? evalTemplate(expr, ctx) : (argsObj as any)[key];
+        if (val === undefined || val === null || String(val) === '') throw new Error(`Missing path variable "${key}"`);
+        return encodeURIComponent(String(val));
+      });
+
+      let finalUrl = `${baseUrl}${path.startsWith('/') ? '' : '/'}${path}`;
+
+      const headers: Record<string, unknown> = { ...(connectorSessions[connector]?.headers ?? {}) };
+      if (endpoint?.mapping?.headers) {
+        for (const [k, v] of Object.entries(endpoint.mapping.headers)) headers[k] = evalTemplate(v as any, ctx) as any;
+      }
+      if (endpoint?.mapping?.query) {
+        const qs = new URLSearchParams();
+        for (const [k, v] of Object.entries(endpoint.mapping.query)) {
+          const out = evalTemplate(v as any, ctx);
+          if (out === undefined || out === null) continue;
+          qs.set(k, String(out));
+        }
+        const q = qs.toString();
+        if (q) finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${q}`;
+      }
+
+      const method = String(endpoint.method || 'GET').toUpperCase();
+      let body: unknown = undefined;
+      if (method !== 'GET' && method !== 'HEAD') {
+        if (endpoint?.mapping?.rawBody !== undefined) body = evalTemplate(endpoint.mapping.rawBody, ctx);
+        else if (endpoint?.mapping?.body) {
+          const obj: Record<string, unknown> = {};
+          for (const [k, v] of Object.entries(endpoint.mapping.body)) obj[k] = evalTemplate(v as any, ctx) as any;
+          body = obj;
+        } else body = argsObj;
+      }
+      return await httpImpl({ method, url: finalUrl, headers, body, timeoutMs: req.timeoutMs });
+    };
+
+  return { http: httpImpl, connectorAction: connectorActionImpl };
 }
 
 async function executeToolBlueprint(args: {
@@ -649,10 +711,10 @@ router.post(
         return;
       }
 
-      const connectorRuntime = new ConnectorRuntimeService();
-      const connectors = await connectorRuntime.buildConnectorHttpConfig(conversation.starshipId, authUserId);
-      const hostRuntime = buildConnectorHostRuntime(connectors);
       const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId };
+      const sessionSvc = new ConnectorActionSessionService();
+      const { connectorTemplates, connectorSessions } = await sessionSvc.build(conversation.starshipId, authUserId);
+      const hostRuntime = buildServerHostRuntime({ connectorTemplates, connectorSessions, runtimeEnv });
 
       const env = getEnvConfig();
       const llm = env.OPENROUTER_API_KEY
@@ -662,9 +724,10 @@ router.post(
           }
         : undefined;
 
-      // Align with remote-runner expectations: pass connector + llm config as runnerConfig keys.
+      // Align with remote-runner expectations: pass connector templates/sessions + llm config as runnerConfig keys.
       const runnerConfig: Record<string, unknown> = {
-        connectors,
+        connectorTemplates,
+        connectorSessions,
         llm,
         runtimeEnv,
         hostRuntime,
@@ -744,9 +807,10 @@ router.post(
         return;
       }
 
-      const connectorRuntime = new ConnectorRuntimeService();
-      const connectors = await connectorRuntime.buildConnectorHttpConfig(conversation.starshipId, authUserId);
-      const hostRuntime = buildConnectorHostRuntime(connectors);
+      const runtimeEnv = { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId };
+      const sessionSvc = new ConnectorActionSessionService();
+      const { connectorTemplates, connectorSessions } = await sessionSvc.build(conversation.starshipId, authUserId);
+      const hostRuntime = buildServerHostRuntime({ connectorTemplates, connectorSessions, runtimeEnv });
       const env = getEnvConfig();
       const llm = env.OPENROUTER_API_KEY
         ? {
@@ -756,9 +820,10 @@ router.post(
         : undefined;
 
       const runnerConfig: Record<string, unknown> = {
-        connectors,
+        connectorTemplates,
+        connectorSessions,
         llm,
-        runtimeEnv: { STARSHIP_ID: conversation.starshipId, CONVERSATION_ID: conversationId },
+        runtimeEnv,
         hostRuntime,
       };
 

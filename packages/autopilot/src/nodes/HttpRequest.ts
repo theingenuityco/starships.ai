@@ -81,7 +81,6 @@ export class HttpRequest implements NodeHandler {
       headers,
       body: bodyData ?? undefined,
       timeoutMs,
-      connector: this.params.connector,
     });
 
     const httpResponse: HttpResponse = {
@@ -139,14 +138,16 @@ export class HttpRequest implements NodeHandler {
     if (this.params.url) {
       const urlValue = this.params.url;
 
-      // When using connectors, relative URLs (e.g. "/starships/{starshipId}/tools") are valid and
-      // should be resolved by the HostRuntime/http connector layer. Only enforce strict
-      // URL parsing for absolute URLs with an explicit scheme.
+      // HttpRequest is raw HTTP; require absolute URLs with scheme to avoid
+      // hidden baseUrl behavior (connectors are handled by connector_action).
       const isAbsolute = typeof urlValue === 'string' && /^https?:\/\//i.test(urlValue);
-
-      if (isAbsolute) {
+      if (!isAbsolute) {
+        errors.push({
+          code: 'INVALID_PARAMETERS',
+          message: 'URL must be an absolute http(s) URL (use connector_action for connector-backed relative paths)',
+        });
+      } else {
         try {
-          // Validate absolute URL format
           new URL(urlValue);
         } catch {
           errors.push({

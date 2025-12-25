@@ -2,7 +2,8 @@
 
 This document specifies how to call LinkedIn APIs from tools using the `http_request` node with `connector: "linkedin"`.
 
-Auth is provided by a **LinkedIn OAuth 2.0 access token**, stored per‑starship in the encrypted connector secrets store as `LINKEDIN_ACCESS_TOKEN` and injected at runtime. Tools never see the raw token.
+Auth is provided by a **LinkedIn OAuth 2.0 access token**, stored per‑starship in encrypted `connector_secrets` and injected at runtime. In the built-in template, the access token key is `LINKEDIN_ACCESS_TOKEN` (configured via `runtime_config.oauth.accessToken`).
+Tools never see the raw token.
 
 ---
 
@@ -20,7 +21,7 @@ LinkedIn has two main endpoint families used by this connector, with slightly di
 - **`/rest/*` endpoints (new Posts API and related Marketing APIs)**
   - Required:
     - `X-RestLi-Protocol-Version: 2.0.0`
-    - `LinkedIn-Version: {Version in YYYYMM or YYYYMMDD format}` – exact values depend on the specific Marketing product/version.
+    - `LinkedIn-Version: {Version in YYYYMM or YYYYMMDD format}` – when required by the specific API/version you are calling (follow LinkedIn’s docs).
   - Optional / connector-managed:
     - `Authorization: Bearer <token>` (injected by the LinkedIn connector)
 
@@ -65,7 +66,7 @@ The connector does **not** enforce which endpoint you use; it only manages auth 
 
 - **Auth injection**
   - For `connector: "linkedin"`, the HostRuntime:
-    - Looks up the current starship’s decrypted connector secrets and reads `LINKEDIN_ACCESS_TOKEN`.
+    - Looks up the current starship’s decrypted `connector_secrets` and reads the access token key configured by `runtime_config.oauth.accessToken` (built-in default: `LINKEDIN_ACCESS_TOKEN`).
     - Injects an `Authorization: Bearer <access_token>` header into the outgoing request **if** you did not explicitly supply any `Authorization` header.
   - If you explicitly set an `Authorization` header (any casing) in `parameters.headers`, that value **takes precedence** and the connector does not overwrite it.
 
@@ -79,9 +80,9 @@ The connector does **not** enforce which endpoint you use; it only manages auth 
   - `body?: object | string | null`
     - Optional. Objects are JSON‑stringified by the runtime; strings are sent as‑is.
   - `timeout?: number`
-    - Optional. Milliseconds; must be ≥ 1000. Default is ~30000ms.
+    - Optional. Milliseconds; must be **≥ 1000**. Default is `30000`.
   - `connector: "linkedin"`
-    - Required for LinkedIn connector behavior (URL normalization + auth + Rest.li headers).
+    - Required for LinkedIn connector behavior (URL normalization + auth injection).
 
 ---
 
@@ -89,7 +90,9 @@ The connector does **not** enforce which endpoint you use; it only manages auth 
 
 LinkedIn OAuth is initiated and completed by the backend `ConnectorService` and UI; tools only see the resulting connector.
 
-- **Scopes requested by this connector** (`ConnectorService.LINKEDIN_SCOPES`):
+- **Scopes requested by this connector**:
+  - These are configured on the connector template via `runtime_config.oauth.scopes` (instance admins can change them).
+  - The built-in template commonly includes:
   - Member‑level:
     - `r_basicprofile` – access basic profile fields for the authenticated member.
     - `w_member_social` – create posts on behalf of the authenticated member.
@@ -511,6 +514,6 @@ Relevant LinkedIn docs:
 When using the LinkedIn connector in Starships:
 
 - Always use **`connector: "linkedin"` + relative URLs** (`/rest/...` or `/v2/...`).
-- Assume `Authorization`, `X-RestLi-Protocol-Version`, and `LinkedIn-Version` are injected automatically unless you override them.
+- Assume only `Authorization` is connector-managed by default; set LinkedIn-specific headers (`X-RestLi-Protocol-Version`, `LinkedIn-Version`, etc.) explicitly when required by the endpoint you are calling.
 - Use the Posts API for creating and managing posts, and `/v2/me` + organization lookup flows to determine appropriate `author` URNs.
 - Handle LinkedIn’s permission and visibility rules at the tool level, with clear, human‑readable error messages.

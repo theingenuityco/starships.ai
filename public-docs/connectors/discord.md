@@ -3,6 +3,11 @@
 The **Discord connector** lets tools call the Discord HTTP API (for example, posting messages as a bot) through the `http_request` node using `connector: "discord"`.  
 Secrets (bot token, etc.) are managed by the platform and injected by the HostRuntime; tools never see raw tokens.
 
+- **What “connect” means for Discord**
+  - Discord runtime auth uses an instance-wide **bot token** (platform secret, typically `DISCORD_BOT_TOKEN`).
+  - The “connect” flow is still starship-scoped: a starship must have the `discord` connector marked **connected** for workflows to use it.
+  - The OAuth callback query params (e.g. `guild_id`, `permissions`) are copied into connector metadata automatically (excluding OAuth plumbing like `code` and `state`).
+
 - **How to call Discord from a tool**
   - Use a `http_request` node with:
     - `connector: "discord"`

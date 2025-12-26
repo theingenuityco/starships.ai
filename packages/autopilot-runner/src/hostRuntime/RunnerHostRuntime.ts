@@ -41,6 +41,12 @@ export interface RunnerHostRuntimeOptions {
   connectorSessions?: Record<string, ConnectorSession | undefined>;
 
   /**
+   * Connector instance metadata (non-secret) keyed by connector slug/provider.
+   * This is used for template evaluation in connector_action baseUrl/mappings.
+   */
+  connectorMetadata?: Record<string, Record<string, unknown> | undefined>;
+
+  /**
    * Non-secret runtime env values (same as Engine runtimeEnv). Needed for
    * template expression evaluation in connector_action mappings.
    */
@@ -68,6 +74,7 @@ export interface RunnerHostRuntimeOptions {
 export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}): HostRuntime {
   const connectorTemplates = options.connectorTemplates ?? {};
   const connectorSessions = options.connectorSessions ?? {};
+  const connectorMetadata = options.connectorMetadata ?? {};
   const runtimeEnv = options.runtimeEnv ?? {};
 
   const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
@@ -143,7 +150,15 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     }
   };
 
-  const evalTemplate = (value: unknown, ctx: { args: Record<string, unknown>; runtimeEnv: Record<string, unknown> }): unknown => {
+  const evalTemplate = (
+    value: unknown,
+    ctx: {
+      args: Record<string, unknown>;
+      runtimeEnv: Record<string, unknown>;
+      metadata: Record<string, unknown>;
+      vars: Record<string, unknown>;
+    }
+  ): unknown => {
     if (typeof value !== 'string') return value;
 
     const raw = value;
@@ -151,8 +166,19 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     const re = /\{\{\s*([\s\S]*?)\s*\}\}/g;
 
     const evalExpr = (expr: string): unknown => {
-      const fn = new Function('args', 'runtimeEnv', `return (${expr});`);
-      return fn(ctx.args, ctx.runtimeEnv);
+      // Provide a merged scope so templates can reference:
+      // - args / runtimeEnv / metadata (explicit objects)
+      // - connector variables directly by name (e.g. {{ shop }})
+      const scope = {
+        args: ctx.args,
+        runtimeEnv: ctx.runtimeEnv,
+        metadata: ctx.metadata,
+        vars: ctx.vars,
+        ...ctx.vars,
+      };
+
+      const fn = new Function('scope', `with (scope) { return (${expr}); }`);
+      return fn(scope);
     };
 
     if (fullOnly) {
@@ -183,7 +209,37 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       throw new Error(`Unknown connector action "${a}" for connector "${c}"`);
     }
 
-    const ctx = { args, runtimeEnv };
+    const metadata = (connectorMetadata[c] ?? {}) as Record<string, unknown>;
+
+    // Resolve connector variables (declared in template) into a flat scope.
+    // These are also spread into the template scope to support {{ varName }}.
+    const vars: Record<string, unknown> = {};
+    for (const v of tpl.variables ?? []) {
+      if (!v || typeof v.name !== 'string' || !v.name.trim()) continue;
+      const name = v.name.trim();
+      const source = v.source;
+      const key = typeof v.key === 'string' ? v.key : '';
+      let rawValue: unknown;
+
+      if (source === 'args') rawValue = (args as Record<string, unknown>)[key];
+      else if (source === 'runtimeEnv') rawValue = (runtimeEnv as Record<string, unknown>)[key];
+      else if (source === 'metadata') rawValue = (metadata as Record<string, unknown>)[key];
+
+      if (v.transform && typeof v.transform === 'string' && v.transform.trim()) {
+        // Provide `value` to transforms (in addition to args/runtimeEnv/metadata/vars).
+        const transformCtx = {
+          args,
+          runtimeEnv,
+          metadata,
+          vars: { ...vars, value: rawValue },
+        };
+        rawValue = evalTemplate(v.transform, transformCtx);
+      }
+
+      vars[name] = rawValue;
+    }
+
+    const ctx = { args, runtimeEnv, metadata, vars };
 
     const baseUrlRaw = endpoint.baseUrlOverride || tpl.baseUrl;
     const baseUrlEvaluated = String(evalTemplate(baseUrlRaw, ctx) ?? '').trim();

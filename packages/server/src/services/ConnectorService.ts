@@ -21,6 +21,7 @@ import { getEnvConfig } from '@starships/env';
 import axios from 'axios';
 import { generateOAuthState, validateOAuthState } from '@/utils/jwt';
 import { PlatformSecretService } from './PlatformSecretService';
+import { AppError } from '@starships/errors';
 
 /**
  * Connector Service - Layer 4
@@ -62,6 +63,40 @@ export class ConnectorService {
     const fromDb = await this.platformSecretService.getSecret(envKey);
     if (fromDb && fromDb.trim()) return fromDb.trim();
     return undefined;
+  }
+
+  /**
+   * Extract simple {{var}} placeholders from a URL template string.
+   * Intentionally does NOT support arbitrary expressions.
+   */
+  private extractUrlTemplateVars(url: string): string[] {
+    const vars = new Set<string>();
+    const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
+    for (const match of url.matchAll(re)) {
+      const name = match[1]?.trim();
+      if (name) vars.add(name);
+    }
+    return Array.from(vars);
+  }
+
+  /**
+   * Resolve {{var}} placeholders from metadata. Throws if any are missing.
+   */
+  private resolveUrlTemplate(url: string, metadata: Record<string, unknown>, label: string): string {
+    const vars = this.extractUrlTemplateVars(url);
+    if (!vars.length) return url;
+
+    for (const v of vars) {
+      const raw = metadata?.[v];
+      const val = typeof raw === 'string' ? raw.trim() : raw === undefined || raw === null ? '' : String(raw).trim();
+      if (!val) {
+        throw new AppError(`Missing required metadata field: ${v}`, 'MISSING_REQUIRED_FIELD', 400, {
+          details: { field: v, source: label },
+        });
+      }
+      url = url.replace(new RegExp(`\\{\\{\\s*${v}\\s*\\}\\}`, 'g'), val);
+    }
+    return url;
   }
 
   /**
@@ -187,6 +222,17 @@ export class ConnectorService {
           name: tpl.name,
           description: tpl.description,
           authType: tpl.authType as ConnectorCatalogItem['authType'],
+          ...(tpl.authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
+            ? {
+                oauthRequiredMetadataKeys: Array.from(
+                  new Set([
+                    ...this.extractUrlTemplateVars((tpl.authJson as unknown as ConnectorAuthOAuth2V2).authorizationUrl),
+                    ...this.extractUrlTemplateVars((tpl.authJson as unknown as ConnectorAuthOAuth2V2).tokenUrl),
+                  ])
+                ),
+                metadataSchema: tpl.metadataSchemaJson ?? undefined,
+              }
+            : {}),
         })
       );
   }
@@ -199,7 +245,12 @@ export class ConnectorService {
    * (e.g. GitHub App), this delegates URL construction to a provider-specific
    * connect blueprint.
    */
-  async startConnector(starshipId: string, userId: string, provider: ConnectorProvider): Promise<string> {
+  async startConnector(
+    starshipId: string,
+    userId: string,
+    provider: ConnectorProvider,
+    opts?: { metadata?: Record<string, unknown> }
+  ): Promise<string> {
     const template = await this.loadTemplateOrThrow(provider);
     if (template.isEnabled === false) {
       throw new Error(`Connector ${provider} is disabled by the instance admin`);
@@ -211,6 +262,35 @@ export class ConnectorService {
     const auth = template.authJson as unknown as ConnectorAuthOAuth2V2;
     if (!auth || auth.type !== 'oauth2') {
       throw new Error(`Connector ${provider} is missing oauth2 auth_json configuration`);
+    }
+
+    // If OAuth URLs contain {{vars}}, require them before redirecting.
+    const requiredVars = Array.from(
+      new Set([...this.extractUrlTemplateVars(auth.authorizationUrl), ...this.extractUrlTemplateVars(auth.tokenUrl)])
+    );
+
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
+    const mergedMetadata: Record<string, unknown> = {
+      ...(existing?.metadata || {}),
+      ...(opts?.metadata || {}),
+    };
+
+    const missingVars = requiredVars.filter((v) => {
+      const raw = mergedMetadata[v];
+      if (raw === undefined || raw === null) return true;
+      if (typeof raw === 'string' && raw.trim().length === 0) return true;
+      return false;
+    });
+
+    if (missingVars.length) {
+      throw new AppError(`Missing required metadata fields for OAuth: ${missingVars.join(', ')}`, 'MISSING_REQUIRED_FIELD', 400, {
+        details: {
+          kind: 'connector_oauth_pre_metadata',
+          provider,
+          missingMetadataKeys: missingVars,
+          metadataSchema: template.metadataSchemaJson ?? undefined,
+        },
+      });
     }
 
     const clientIdRef = this.parseSecretRef(auth.clientIdRef, 'auth.clientIdRef');
@@ -246,7 +326,16 @@ export class ConnectorService {
       if (typeof v === 'string') params.set(k, v);
     }
 
-    return `${auth.authorizationUrl}?${params.toString()}`;
+    // Persist (merged) metadata so token exchange can resolve {{vars}} later.
+    if (requiredVars.length) {
+      await this.applyConnectOutput(starshipId, userId, provider, template, {
+        status: 'pending',
+        metadata: mergedMetadata,
+      });
+    }
+
+    const resolvedAuthUrl = this.resolveUrlTemplate(auth.authorizationUrl, mergedMetadata, 'auth.authorizationUrl');
+    return `${resolvedAuthUrl}?${params.toString()}`;
   }
 
   /**
@@ -308,6 +397,24 @@ export class ConnectorService {
     const env = getEnvConfig();
     const redirectUri = `${env.PUBLIC_URL}/api/v1/connectors/${encodeURIComponent(String(providerFromCallback))}/callback`;
 
+    const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, providerFromCallback);
+
+    // Compose metadata for URL resolution (prefer pre-collected metadata; fall back to callback query).
+    const callbackMetadata: Record<string, unknown> = {};
+    if (callbackQuery && typeof callbackQuery === 'object') {
+      const excluded = new Set(['code', 'state']);
+      for (const [key, val] of Object.entries(callbackQuery)) {
+        if (!key || excluded.has(key)) continue;
+        if (val !== undefined) callbackMetadata[key] = val;
+      }
+    }
+    const mergedMetadata: Record<string, unknown> = {
+      ...(existing?.metadata || {}),
+      ...callbackMetadata,
+    };
+
+    const resolvedTokenUrl = this.resolveUrlTemplate(auth.tokenUrl, mergedMetadata, 'auth.tokenUrl');
+
     const tokenPayload = {
       grant_type: 'authorization_code',
       code,
@@ -325,7 +432,7 @@ export class ConnectorService {
 
     let tokenResponse;
     try {
-      tokenResponse = await axios.post(auth.tokenUrl, tokenForm, {
+      tokenResponse = await axios.post(resolvedTokenUrl, tokenForm, {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
           Accept: 'application/json',
@@ -336,7 +443,7 @@ export class ConnectorService {
         // Keep error logs minimal and safe (no code/state/client_secret leakage).
         console.error('[CONNECTOR_OAUTH] Token exchange failed', {
           provider: providerFromCallback,
-          tokenUrl: auth.tokenUrl,
+          tokenUrl: resolvedTokenUrl,
           redirectUri,
           status: err.response?.status,
           responseData: err.response?.data,
@@ -344,7 +451,7 @@ export class ConnectorService {
       } else {
         console.error('[CONNECTOR_OAUTH] Token exchange failed with non-Axios error', {
           provider: providerFromCallback,
-          tokenUrl: auth.tokenUrl,
+          tokenUrl: resolvedTokenUrl,
           redirectUri,
           errorMessage: (err as Error | undefined)?.message,
           errorName: (err as Error | undefined)?.name,

@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
 import { useAdminConnectorTemplates, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
@@ -70,6 +71,12 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
             </div>
 
             <section className="space-y-4">
+              <div className="flex items-center justify-end">
+                <Button onClick={() => router.push('/admin/connector-templates/new')}>
+                  <Icon name="plus" className="h-4 w-4 mr-1" />
+                  New connector template
+                </Button>
+              </div>
               <div className="w-full rounded-md border overflow-visible">
                 <table className="w-full">
                   <thead className="bg-muted/50">

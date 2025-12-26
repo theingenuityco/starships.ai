@@ -19,6 +19,11 @@ export class InProcessExecutor implements Executor {
        */
       connectorSessions?: Record<string, ConnectorSession | undefined>;
       /**
+       * Connector instance metadata (non-secret) passed from embedding host.
+       * Used for template evaluation in baseUrl/mappings.
+       */
+      connectorMetadata?: Record<string, Record<string, unknown> | undefined>;
+      /**
        * Optional LLM runtime configuration used by HostRuntime.llm. When set,
        * the runner does not need to read provider keys from its own env.
        */
@@ -29,11 +34,12 @@ export class InProcessExecutor implements Executor {
     // Extract host-runtime-only configuration. NOTE: runtimeEnv is explicitly
     // intended to be exposed to templates via env("KEY") and to user-authored
     // Code/Mutate nodes, but MUST NOT contain secrets.
-    const { connectorTemplates, connectorSessions, llm, runtimeEnv, ...engineConfig } = rawConfig;
+    const { connectorTemplates, connectorSessions, connectorMetadata, llm, runtimeEnv, ...engineConfig } = rawConfig;
 
     const hostRuntime = createRunnerHostRuntime({
       connectorTemplates: connectorTemplates ?? {},
       connectorSessions: connectorSessions ?? {},
+      connectorMetadata: connectorMetadata ?? {},
       runtimeEnv: runtimeEnv ?? {},
       llm,
     });

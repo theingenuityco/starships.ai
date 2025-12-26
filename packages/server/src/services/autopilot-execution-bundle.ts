@@ -20,7 +20,7 @@ export async function buildAutopilotExecutionBundle(args: {
   const env = getEnvConfig();
 
   const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
-  const { connectorTemplates, connectorSessions } = await sessionSvc.build(args.starshipId, args.authUserId);
+  const { connectorTemplates, connectorSessions, connectorMetadata } = await sessionSvc.build(args.starshipId, args.authUserId);
 
   const llm = env.OPENROUTER_API_KEY
     ? {
@@ -33,6 +33,7 @@ export async function buildAutopilotExecutionBundle(args: {
     runtimeEnv: args.runtimeEnv,
     connectorTemplates,
     connectorSessions,
+    connectorMetadata,
     llm,
   };
 

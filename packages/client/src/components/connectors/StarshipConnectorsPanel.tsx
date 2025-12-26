@@ -115,13 +115,17 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const normalizedQuery = searchQuery.trim().toLowerCase()
 
   const matchesQuery = useMemo(
-    () => (entry: { name: string; description: string }) =>
-      !normalizedQuery || entry.name.toLowerCase().includes(normalizedQuery) || entry.description.toLowerCase().includes(normalizedQuery),
+    () => (entry: { name: string; description: string }) => !normalizedQuery || entry.name.toLowerCase().includes(normalizedQuery) || entry.description.toLowerCase().includes(normalizedQuery),
     [normalizedQuery]
   )
 
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on authType.
   const visibleCatalog = useMemo(() => catalog, [catalog])
+
+  const getProviderLabel = (provider: string | null | undefined) => {
+    if (!provider) return ''
+    return visibleCatalog.find((c: { provider: string }) => c.provider === provider)?.name ?? provider
+  }
 
   if (isLoading) {
     return (
@@ -259,7 +263,9 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
-            <DialogDescription>{pendingDisconnect ? `If you disconnect ${pendingDisconnect}, any tools that rely on this connector will stop working until you reconnect.` : null}</DialogDescription>
+            <DialogDescription>
+              {pendingDisconnect ? `If you disconnect ${getProviderLabel(pendingDisconnect)}, any tools that rely on this connector will stop working until you reconnect.` : null}
+            </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2 justify-end">
             <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>
@@ -276,22 +282,14 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Connect with API key</DialogTitlePrimitive>
-            <DialogDescription>
-              {apiKeyDialogProvider ? `Enter an API key for ${apiKeyDialogProvider}. This will be stored securely for this starship.` : null}
-            </DialogDescription>
+            <DialogDescription>{apiKeyDialogProvider ? `Enter an API key for ${getProviderLabel(apiKeyDialogProvider)}. This will be stored securely for this starship.` : null}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="api-key">
                 API key
               </label>
-              <Input
-                id="api-key"
-                value={apiKeyValue}
-                onChange={e => setApiKeyValue(e.target.value)}
-                placeholder="Paste your API key"
-                type="password"
-              />
+              <Input id="api-key" value={apiKeyValue} onChange={e => setApiKeyValue(e.target.value)} placeholder="Paste your API key" type="password" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="api-key-extra-config">

@@ -432,12 +432,23 @@ export class ConnectorService {
 
     return visibleTemplates.map<ConnectorListItem>((template) => {
       const existing = byProvider.get(template.provider);
+      const templateRuntime = {
+        id: template.id,
+        provider: template.provider,
+        name: template.name,
+        description: template.description,
+        authType: template.authType,
+        version: template.version,
+        category: template.category,
+        baseUrl: template.baseUrl,
+        endpoints: template.endpointsJson ?? [],
+      } satisfies ConnectorListItem['template'];
 
       if (existing) {
         const scopes =
           template.authType === 'oauth2'
-            ? Array.isArray((template.authJson as any)?.scopes)
-              ? (template.authJson as any).scopes.map((s: any) => String(s))
+            ? (template.authJson as ConnectorAuthOAuth2V2).type === 'oauth2'
+              ? ((template.authJson as ConnectorAuthOAuth2V2).scopes?.map((s) => String(s)) ?? [])
               : []
             : [];
 
@@ -453,6 +464,7 @@ export class ConnectorService {
           scopes,
           // Expose non-secret connector metadata to tools/agents.
           metadata: existing.metadata || {},
+          template: templateRuntime,
         };
       }
 
@@ -463,8 +475,8 @@ export class ConnectorService {
       const status = template.provider === 'starships' ? 'connected' : 'disconnected';
       const scopes =
         template.authType === 'oauth2'
-          ? Array.isArray((template.authJson as any)?.scopes)
-            ? (template.authJson as any).scopes.map((s: any) => String(s))
+          ? (template.authJson as ConnectorAuthOAuth2V2).type === 'oauth2'
+            ? ((template.authJson as ConnectorAuthOAuth2V2).scopes?.map((s) => String(s)) ?? [])
             : []
           : [];
 
@@ -478,6 +490,7 @@ export class ConnectorService {
         updatedAt: now,
         scopes,
         metadata: {},
+        template: templateRuntime,
       };
     });
   }

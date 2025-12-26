@@ -210,7 +210,7 @@ export async function up(client: Client): Promise<void> {
       },
 
       // ---------------------------------------------------------------------
-      // Agents (used by seeded tools: list-agent, get-agent, open-agent, edit-agent, assign/unassign-agent-tool)
+      // Agents (used by seeded tools: list-agents, get-agent, open-agent, edit-agent, assign/unassign-agent-tool)
       // ---------------------------------------------------------------------
       {
         name: 'list-agents',
@@ -692,5 +692,3 @@ export async function down(client: Client): Promise<void> {
     throw error;
   }
 }
-
-

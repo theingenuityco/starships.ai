@@ -133,30 +133,25 @@ from the message send endpoint so callers can inspect status and results.
       },
       {
         ref: 'create_child_conversation',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Create Child Conversation',
         description: 'POST /conversations - create a new child conversation linked to current one',
         parameters: {
-          method: 'POST',
-          url: '{{ "/conversations" }}',
           connector: 'starships',
-          body: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const slug = prep.slug || "";\n            const title = "Delegated • " + (slug || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentSlug: slug || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
+          action: 'create-conversation',
+          args: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const slug = prep.slug || "";\n            const title = "Delegated • " + (slug || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentSlug: slug || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
           timeout: 10000,
         },
       },
       {
         ref: 'send_message_new',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Send Message (New Child)',
         description: 'POST /conversations/:conversationId/messages - send message into new child conversation',
         parameters: {
-          method: 'POST',
-          url: '{{ (() => {\n            const raw = lastOutputOf("create_child_conversation") || {};\n            const hasBody = raw && typeof raw === "object" && Object.prototype.hasOwnProperty.call(raw, "body");\n            const payload = hasBody ? raw.body : raw;\n            const data = payload && typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;\n            const cid = data && typeof data === "object" && data.id ? String(data.id) : "";\n            return cid ? "/conversations/" + cid + "/messages" : "";\n          })() }}',
           connector: 'starships',
-          body: {
-            content: '{{ (lastOutputOf("prepare") || {}).content }}',
-            sync: true,
-          },
+          action: 'send-message',
+          args: '{{ (() => {\n            const raw = lastOutputOf("create_child_conversation") || {};\n            const hasBody = raw && typeof raw === "object" && Object.prototype.hasOwnProperty.call(raw, "body");\n            const payload = hasBody ? raw.body : raw;\n            const data = payload && typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;\n            const cid = data && typeof data === "object" && data.id ? String(data.id) : "";\n            return {\n              conversationId: cid,\n              content: (lastOutputOf("prepare") || {}).content,\n              sync: true,\n            };\n          })() }}',
           timeout: 300000,
         },
       },
@@ -235,14 +230,14 @@ from the message send endpoint so callers can inspect status and results.
       },
       {
         ref: 'send_message_existing',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Send Message (Existing Child)',
         description: 'POST /conversations/:conversationId/messages - send message into existing child conversation',
         parameters: {
-          method: 'POST',
-          url: '{{ "/conversations/" + ((lastOutputOf("prepare") || {}).childConversationId || "") + "/messages" }}',
           connector: 'starships',
-          body: {
+          action: 'send-message',
+          args: {
+            conversationId: '{{ (lastOutputOf("prepare") || {}).childConversationId }}',
             content: '{{ (lastOutputOf("prepare") || {}).content }}',
             sync: true,
           },

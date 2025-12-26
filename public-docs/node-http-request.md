@@ -6,13 +6,12 @@ Specification (authoritative)
 
 - Handler: `packages/autopilot/src/nodes/HttpRequest.ts`
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
-  - url: string (required) — absolute (`https://...`) or relative (`/path`) when used with connectors
+  - url: string (required) — **absolute** `http(s)://...` URL
   - method: string (required) — one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
   - headers?: Record<string,string> | Headers | [string, string][]
   - body?: object | string | null
   - timeout?: number (ms; default 30000)
-  - connector?: string (optional) — logical connector name used by the HostRuntime for auth/URL handling; the exact values are defined by the host environment
-  - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, connector
+  - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs
 
 Body selection rules
 
@@ -35,7 +34,7 @@ Response parsing
 Return value (shape)
 
 ```ts
-{ status: number, statusText: string, headers: Record<string,string>, body: unknown, url: string }
+{ status: number, statusText: string, headers: Record<string, unknown>, body: unknown, url: string }
 ```
 
 Error behavior
@@ -47,15 +46,14 @@ Error behavior
 Validation rules
 
 - url required:
-  - If it starts with `http://` or `https://`, it must be a valid absolute URL.
-  - Relative URLs (starting with `/`) are allowed and are normalized by the HostRuntime (for example when using connectors).
+  - Must be a valid absolute `http://` or `https://` URL.
 - method required; must be one of the supported methods.
 - timeout (if provided) must be >= 1000ms.
 
 ### Template rules (full-string only)
 
 - The Engine resolves string parameters in **full-only** mode: a string is only evaluated when the **entire** value is a single `{{ ... }}` template.
-- This applies to `url`, `headers`, and `body` on `http_request` nodes (including when you use `connector`).
+- This applies to `url`, `headers`, and `body` on `http_request` nodes.
 - **Bad (partial templates)**:
 
   ```ts
@@ -83,7 +81,7 @@ Validation rules
           const input = ctx.input || {};
           const state = input.state || "open";
           return {
-            url: "/repos/" + input.owner + "/" + input.repo + "?state=" + state
+            url: "https://api.example.com/repos/" + input.owner + "/" + input.repo + "?state=" + state
           };
         }
       `,
@@ -93,12 +91,11 @@ Validation rules
 
   // Downstream HttpRequest node uses a single full-string template
   {
-    ref: "github_list_issues",
+    ref: "http_call",
     type: "http_request",
     parameters: {
       method: "GET",
       url: "{{ (lastOutputOf('build_url') || {}).url }}",
-      connector: "github",
       timeout: 15000
     }
   }
@@ -123,47 +120,18 @@ Example (POST JSON)
 }
 ```
 
-### Using connectors
+### Connectors are not handled by HttpRequest (V2)
 
-- `connector` is an optional logical name understood by the HostRuntime. It controls how URLs are normalized and how auth headers are injected; the `HttpRequest` node itself just forwards `connector` to the runtime.
-- When `url` is relative (starts with `/`), the HostRuntime will typically prefix it with a base API URL configured in the host environment.
-- If you explicitly set an `Authorization` header in `parameters.headers`, it always takes precedence; connector logic should not override it.
-- The concrete connector names and their behaviors (for example which auth headers they inject or how they normalize URLs) are defined by the host runtime and deployment configuration, not by the Autopilot engine itself.
+In the current runtime, **connectors are executed via the `connector_action` node**, not via `http_request`.
 
-**Connector header guard rails**
-
-- Many connectors will automatically inject:
-  - `Authorization` (for example, `Bearer <token>` or `Bot <token>`),
-  - Protocol/version headers (for example, `X-RestLi-Protocol-Version` for LinkedIn),
-  - And for object bodies, `Content-Type: application/json` via the HostRuntime.
-- In normal usage, you should **not** set these headers yourself:
-  - Only set `Authorization` or protocol/version headers if you intentionally want to override the connector’s defaults.
-  - Rely on the runtime to set `Content-Type` when `body` is an object; set it manually only when sending a raw string or non-JSON payload.
-
-Example (blueprint using a connector)
-
-```ts
-{
-  ref: "http_call",
-  type: "http_request",
-  name: "Call external service via connector",
-  parameters: {
-    method: "GET",
-    // Relative path; HostRuntime/connector will resolve it against its base API URL
-    url: "/some/resource",
-    // Logical connector name understood by the HostRuntime; may be static or resolved from templates/env
-    connector: "my-connector",
-    timeout: 5000
-  }
-}
-```
-
-If `connector` is omitted or set to an unrecognized string, the request behaves like a normal HTTP call; the HostRuntime may still normalize relative URLs according to its configuration, but no connector-specific auth behavior is guaranteed.
+- Use `http_request` for **raw HTTP** to absolute URLs you fully control.
+- Use `connector_action` for **connector-backed** calls (base URL + auth + mapping defined in `connector_templates`).
 
 Cross-links
 
 - See Transform for output reshaping after an HTTP call.
 - See Engine for template resolution rules applied to parameters and how HostRuntime is constructed.
+- See ConnectorAction for connector-backed calls (auth/baseUrl/mapping handled by the host runtime).
 
 ### Notes
 

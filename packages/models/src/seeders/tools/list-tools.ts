@@ -37,15 +37,15 @@ Behavior and limits:
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
         ref: 'http_list',
-        type: 'http_request',
-        name: 'List Tools (HTTP)',
-        description: 'List tools via Starships HTTP API',
+        type: 'connector_action',
+        name: 'List Tools (Starships)',
+        description: 'List tools via Starships connector action',
         parameters: {
-          method: 'GET',
-          // Relative path; HostRuntime/connector will prefix SERVER_URL/api/v1, inject auth,
-          // and use STARSHIP_ID from env.
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools" }}',
           connector: 'starships',
+          action: 'list-tools',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+          },
           timeout: 5000,
         },
       },

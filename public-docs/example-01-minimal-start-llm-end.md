@@ -4,12 +4,36 @@ Goal: Smallest useful blueprint that streams a model response and returns it via
 
 Requirements
 
-- The host environment must provide a valid OpenRouter API key via `OPENROUTER_API_KEY` (for local SDK usage). In hosted Starships, this is wired through the Starships configuration key `OPEN_ROUTER_KEY` and surfaced to the runtime as `OPENROUTER_API_KEY`.
+- For standalone SDK usage, you must provide:
+  - `OPENROUTER_API_KEY` (in your process env)
+  - a `hostRuntime.llm` implementation (below uses the OpenAI SDK pointed at OpenRouter)
 
 Code
 
 ```ts
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import OpenAI from 'openai';
+import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+
+const apiKey = process.env.OPENROUTER_API_KEY;
+if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+
+const hostRuntime: HostRuntime = {
+  http: async () => {
+    throw new Error('HostRuntime.http not configured for this example');
+  },
+  connectorAction: async () => {
+    throw new Error('HostRuntime.connectorAction not configured for this example');
+  },
+  llm: async (req) => {
+    // The LLM node expects an AsyncIterable of provider-native streaming chunks.
+    return await openai.chat.completions.create({
+      model: req.model,
+      messages: req.messages as any,
+      stream: true,
+    });
+  },
+};
 
 const blueprint = {
   nodes: [
@@ -36,7 +60,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine();
+const engine = new Engine({ hostRuntime });
 const exec = ExecutionItemUtils.createExecution();
 const out = await engine.executeBlueprint(blueprint, exec);
 // out[0].json → LLMResponse

@@ -103,7 +103,7 @@ Automatically inferred from agent state (do not pass manually):
                   throw new Error('STARSHIP_ID missing');
                 }
                 // Create draft
-                const body = {
+                const args = {
                   starshipId: String(starshipId),
                   name: input.name,
                   description: (input && input.description) || '',
@@ -113,19 +113,19 @@ Automatically inferred from agent state (do not pass manually):
                 
                 // Add optional numeric fields if provided
                 if (typeof input.temperature === 'number') {
-                  body.temperature = input.temperature;
+                  args.temperature = input.temperature;
                 }
                 if (typeof input.maxTokens === 'number') {
-                  body.maxTokens = input.maxTokens;
+                  args.maxTokens = input.maxTokens;
                 }
                 if (Array.isArray(input.previewPrompts)) {
                   const prompts = input.previewPrompts.filter((p) => typeof p === 'string' && p.trim()).slice(0, 10);
-                  if (prompts.length > 0) body.previewPrompts = prompts;
+                  if (prompts.length > 0) args.previewPrompts = prompts;
                 }
                 
                 return {
                   mode: 'create',
-                  body,
+                  args,
                   timeout: 10000
                 };
               }
@@ -143,15 +143,38 @@ Automatically inferred from agent state (do not pass manually):
         },
       },
       {
-        ref: 'http_exec',
-        type: 'http_request',
-        name: 'Execute',
-        description: 'Create or fetch agent',
+        ref: 'route_mode',
+        type: 'conditional',
+        name: 'Route Mode',
+        description: 'Route to create vs open based on prepare.mode',
         parameters: {
-          url: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? "/agents" : "/agents/" + (lastOutputOf("prepare") || {}).slug }}',
-          method: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? "POST" : "GET" }}',
-          body: '{{ (lastOutputOf("prepare") || {}).mode === "create" ? (lastOutputOf("prepare") || {}).body : undefined }}',
+          condition: '{{ (lastOutputOf("prepare") || {}).mode === "create" }}',
+        },
+      },
+      {
+        ref: 'create_agent',
+        type: 'connector_action',
+        name: 'Create Agent (Starships)',
+        description: 'POST /agents via Starships connector endpoint catalog',
+        parameters: {
           connector: 'starships',
+          action: 'create-agent',
+          args: '{{ (lastOutputOf("prepare") || {}).args }}',
+          timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
+        },
+      },
+      {
+        ref: 'get_agent',
+        type: 'connector_action',
+        name: 'Get Agent (Starships)',
+        description: 'GET /starships/:starshipId/agents/:slug via Starships connector endpoint catalog',
+        parameters: {
+          connector: 'starships',
+          action: 'get-agent',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
+          },
           timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
         },
       },
@@ -161,14 +184,17 @@ Automatically inferred from agent state (do not pass manually):
         name: 'End',
         description: 'Return agent model (created or fetched)',
         parameters: {
-          output: '{{ lastOutputOf("http_exec") }}',
+          output: '{{ lastOutputOf("create_agent") || lastOutputOf("get_agent") }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'prepare' },
-      { ref: 'e2', from: 'prepare', to: 'http_exec' },
-      { ref: 'e3', from: 'http_exec', to: 'end_1' },
+      { ref: 'e2', from: 'prepare', to: 'route_mode' },
+      { ref: 'e3', from: 'route_mode', to: 'create_agent', condition: 'true' },
+      { ref: 'e4', from: 'create_agent', to: 'end_1' },
+      { ref: 'e5', from: 'route_mode', to: 'get_agent', condition: 'false' },
+      { ref: 'e6', from: 'get_agent', to: 'end_1' },
     ],
     metadata: {},
   },

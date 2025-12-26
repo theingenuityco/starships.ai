@@ -63,13 +63,16 @@ Behavior and limits:
       },
       {
         ref: 'http_get',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Get Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug }}',
-          method: 'GET',
           connector: 'starships',
+          action: 'get-agent',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
+          },
           timeout: 5000,
         },
       },

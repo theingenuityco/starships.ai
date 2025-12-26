@@ -4,8 +4,6 @@
  * Types for managing third-party connectors at the starship level.
  */
 
-import type { Blueprint } from '@starships/autopilot';
-
 // ============================================================================
 // CONNECTOR TYPES
 // ============================================================================
@@ -22,63 +20,186 @@ export type ConnectorProvider = 'linkedin' | 'discord' | 'starships' | 'google_d
 export type ConnectorStatus = 'disconnected' | 'pending' | 'connected' | 'error';
 
 // ============================================================================
-// CONNECTOR TEMPLATE RUNTIME CONFIG (runtime_config JSON)
+// CONNECTOR TEMPLATE V2 (ROOT RUNTIME FIELDS)
 // ============================================================================
 
 /**
- * ConnectorTokenRef
+ * SecretRef
  *
- * References a secret used by connector runtime.
+ * References an encrypted secret value without embedding it in templates.
+ * - platform_secret: instance-wide (managed by instance admins)
+ * - connector_secret: per-starship (managed by connector connect flows)
  */
-export type ConnectorSecretRefType = 'platform_secret' | 'connector_secret';
+export type SecretRefType = 'platform_secret' | 'connector_secret';
 
-export interface ConnectorSecretRef {
-  type: ConnectorSecretRefType;
+export interface SecretRef {
+  type: SecretRefType;
   key: string;
 }
 
-export type ConnectorTokenRef = ConnectorSecretRef;
-
 /**
- * ConnectorOAuthRuntimeConfig
+ * ExprString
  *
- * Configuration under connector_templates.runtime_config.oauth.
- * This is intentionally open-ended (extends Record) to support DB-driven providers.
+ * String that may contain template expressions, interpreted by the HostRuntime.
+ * Example: `"{{ String(args.channel).trim() }}"`
  */
-export interface ConnectorOAuthRuntimeConfig extends Record<string, unknown> {
-  // OAuth app credentials (host/platform secrets)
-  clientId?: ConnectorTokenRef; // secret ref holding the OAuth client id
-  clientSecret?: ConnectorTokenRef; // secret ref holding the OAuth client secret
+export type ExprString = string;
 
-  // Stored credentials (per-starship connector_secrets) OR platform refs
-  accessToken?: ConnectorTokenRef;
-  refreshToken?: ConnectorTokenRef; // secret ref holding refresh token
-  apiKey?: ConnectorTokenRef; // secret ref holding api key
+export type JsonSchemaObject = Record<string, unknown>;
 
-  // OAuth endpoints + behavior
-  authorizeUrl?: string;
-  tokenUrl?: string;
-  redirectPath?: string;
-  scopes?: string[];
-  params?: Record<string, unknown>;
+export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD';
 
-  // HostRuntime HTTP auth injection behavior
-  authHeaderName?: string;
-  authPrefix?: string; // e.g. "Bearer", "Bot", or "" for no prefix
+export type RequestStyle = 'auto' | 'query' | 'json' | 'form' | 'multipart';
+
+export type MultipartPart =
+  | {
+      kind: 'field';
+      name: string;
+      value: ExprString;
+      contentType?: string;
+    }
+  | {
+      kind: 'file';
+      name: string;
+      /**
+       * Expression resolving to a file-like object. Canonical expected shape:
+       * `{ filename?: string; contentType?: string; base64: string }`
+       */
+      file: ExprString;
+      contentType?: string;
+      filename?: ExprString;
+    };
+
+export interface ConnectorEndpointV2 {
+  name: string; // action key used by connector_action.action
+  description?: string;
+
+  method: HttpMethod;
+  path: string; // supports `{var}` placeholders
+  baseUrlOverride?: string;
+
+  /**
+   * JSON Schema for validating connector_action.args for this endpoint.
+   * If omitted, args are treated as `{}`.
+   */
+  parameters?: JsonSchemaObject;
+
+  /**
+   * Default mapping when `mapping` is not provided:
+   * - auto: GET/HEAD -> query, others -> json
+   */
+  requestStyle?: RequestStyle;
+
+  /**
+   * Full-power mapping with explicit placement and expressions.
+   * When provided, it overrides requestStyle defaults.
+   */
+  mapping?: {
+    path?: Record<string, ExprString>;
+    query?: Record<string, ExprString>;
+    headers?: Record<string, ExprString>;
+
+    // JSON body mapping
+    body?: Record<string, ExprString>;
+    rawBody?: ExprString;
+
+    // application/x-www-form-urlencoded
+    form?: Record<string, ExprString>;
+
+    // multipart/form-data
+    multipart?: {
+      parts: MultipartPart[];
+    };
+  };
+
+  response?: {
+    select?: ExprString;
+  };
+
+  timeoutMs?: number;
 }
 
 /**
- * ConnectorRuntimeConfig
+ * ConnectorAuthV2
  *
- * Root configuration for connector templates (connector_templates.runtime_config).
- * Still open-ended, but with common keys typed.
+ * Declarative auth configuration stored on connector_templates.auth_json.
+ * Must never contain raw secret values; only SecretRefs.
  */
-export interface ConnectorRuntimeConfig extends Record<string, unknown> {
-  apiBaseUrl?: string;
-  oauth?: ConnectorOAuthRuntimeConfig;
+export type ConnectorAuthTypeV2 = 'oauth2' | 'api_key' | 'platform_jwt' | 'none';
 
-  // Host-only special behavior
-  usesPlatformJwt?: boolean; // used by the internal "starships" connector
+export interface ConnectorAuthNoneV2 {
+  type: 'none';
+}
+
+export interface ConnectorAuthPlatformJwtV2 {
+  type: 'platform_jwt';
+  headerName?: string; // default "Authorization"
+  tokenPrefix?: string; // default "Bearer"
+}
+
+export interface ConnectorAuthApiKeyV2 {
+  type: 'api_key';
+  apiKeyRef: SecretRef;
+  injection: {
+    style: 'header' | 'query';
+    headerName?: string; // default "Authorization"
+    queryParamName?: string; // required when style = query
+    tokenPrefix?: string; // default "" (raw key)
+  };
+}
+
+export interface ConnectorAuthOAuth2V2 {
+  type: 'oauth2';
+
+  clientIdRef: SecretRef; // must be platform_secret
+  clientSecretRef: SecretRef; // must be platform_secret
+
+  authorizationUrl: string;
+  tokenUrl: string;
+
+  scopes?: string[];
+  scopeDelimiter?: ' ' | ',';
+  extraAuthorizeParams?: Record<string, string>;
+
+  accessTokenRef: SecretRef;
+  refreshTokenRef?: SecretRef;
+
+  injection: {
+    style: 'header' | 'query';
+    headerName?: string; // default "Authorization"
+    queryParamName?: string; // required when style = query
+    tokenPrefix?: string; // default "Bearer"
+  };
+
+  tokenResponse?: {
+    accessTokenField?: string; // default "access_token"
+    refreshTokenField?: string; // default "refresh_token"
+    expiresInField?: string; // default "expires_in"
+    scopeField?: string; // default "scope"
+    tokenTypeField?: string; // default "token_type"
+  };
+}
+
+export type ConnectorAuthV2 = ConnectorAuthNoneV2 | ConnectorAuthPlatformJwtV2 | ConnectorAuthApiKeyV2 | ConnectorAuthOAuth2V2;
+
+export interface ConnectorTemplateRuntimeFieldsV2 {
+  baseUrl: string;
+  auth: ConnectorAuthV2;
+  variables?: Array<{
+    name: string;
+    description?: string;
+    required?: boolean;
+    source: 'args' | 'metadata' | 'runtimeEnv';
+    key: string;
+    transform?: ExprString;
+  }>;
+  endpoints: ConnectorEndpointV2[];
+  rateLimit?: {
+    tier?: string;
+    burstLimit?: number;
+    requestsPerMinute?: number;
+  };
+  metadataSchema?: JsonSchemaObject;
 }
 
 /**
@@ -125,13 +246,11 @@ export interface ConnectorListResponse {
   connectors: ConnectorListItem[];
 }
 
-export type ConnectorAuthType = 'oauth2' | 'api_key' | 'custom' | 'none';
-
 export interface ConnectorCatalogItem {
   provider: ConnectorProvider;
-  displayName: string;
+  name: string;
   description: string;
-  authType: ConnectorAuthType;
+  authType: ConnectorAuthTypeV2;
 }
 
 export interface ConnectorCatalogResponse {
@@ -148,9 +267,9 @@ export interface ConnectorTemplateModel {
   id: string;
   slug: string;
   provider: ConnectorProvider;
-  displayName: string;
+  name: string;
   description: string;
-  authType: ConnectorAuthType;
+  authType: ConnectorAuthTypeV2;
   isEnabled: boolean;
   version: string;
   category: string;
@@ -162,14 +281,15 @@ export interface ConnectorTemplateModel {
 /**
  * ConnectorTemplateAdminModel
  *
- * Instance-admin view of a connector template, including runtime configuration
- * and (optional) inline autopilot blueprints.
+ * Instance-admin view of a connector template, including runtime fields.
  */
 export interface ConnectorTemplateAdminModel extends ConnectorTemplateModel {
-  runtimeConfig: ConnectorRuntimeConfig;
-  connectBlueprint?: Blueprint | null;
-  refreshBlueprint?: Blueprint | null;
-  testBlueprint?: Blueprint | null;
+  baseUrl: string;
+  auth: ConnectorAuthV2;
+  variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
+  endpoints: ConnectorEndpointV2[];
+  rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
+  metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
 
 // ============================================================================
@@ -185,16 +305,18 @@ export interface AdminConnectorTemplateResponse {
 }
 
 export interface UpdateConnectorTemplateRequest {
-  displayName?: string;
+  name?: string;
   description?: string;
-  authType?: ConnectorAuthType;
+  authType?: ConnectorAuthTypeV2;
   isEnabled?: boolean;
   version?: string;
   category?: string;
-  runtimeConfig?: ConnectorRuntimeConfig;
-  connectBlueprint?: Blueprint | null;
-  refreshBlueprint?: Blueprint | null;
-  testBlueprint?: Blueprint | null;
+  baseUrl?: string;
+  auth?: ConnectorAuthV2;
+  variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
+  endpoints?: ConnectorEndpointV2[];
+  rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
+  metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
 
 export interface CreateConnectorTemplateRequest {
@@ -207,16 +329,20 @@ export interface CreateConnectorTemplateRequest {
    */
   slug?: string;
   provider: ConnectorProvider;
-  displayName: string;
+  name: string;
   description: string;
-  authType: ConnectorAuthType;
+  authType: ConnectorAuthTypeV2;
   isEnabled?: boolean;
   version?: string;
   category?: string;
-  runtimeConfig?: ConnectorRuntimeConfig;
-  connectBlueprint?: Blueprint | null;
-  refreshBlueprint?: Blueprint | null;
-  testBlueprint?: Blueprint | null;
+
+  // runtime fields (root columns in connector_templates)
+  baseUrl: string;
+  auth: ConnectorAuthV2;
+  variables?: ConnectorTemplateRuntimeFieldsV2['variables'];
+  endpoints: ConnectorEndpointV2[];
+  rateLimit?: ConnectorTemplateRuntimeFieldsV2['rateLimit'];
+  metadataSchema?: ConnectorTemplateRuntimeFieldsV2['metadataSchema'];
 }
 
 export interface ConnectWithApiKeyRequest {
@@ -236,93 +362,24 @@ export interface StartOAuthResponse {
 }
 
 // ============================================================================
-// CONNECTOR BLUEPRINT IO CONTRACTS
+// CONNECTOR ACTION (connector_action node) IO CONTRACTS
 // ============================================================================
 
-export interface ConnectorConnectInput {
-  starshipId: string;
-  provider: ConnectorProvider;
-
-  authType: ConnectorAuthType;
-  phase: 'start' | 'complete';
-
-  // OAuth-specific fields
-  authorizeUrl?: string;
-  tokenUrl?: string;
-  scopes?: string[];
-  redirectPath?: string;
-  stateToken?: string;
-  code?: string;
-  callbackQuery?: Record<string, unknown>;
-
-  // API key / custom payload from HTTP API
-  apiKeyPayload?: {
-    apiKey?: string;
-    extraConfig?: Record<string, unknown>;
-  };
-
-  /**
-   * Provider-specific configuration derived from connector_templates.runtime_config.
-   * Must never contain raw secrets; those remain server-side only. Blueprints may
-   * rely on this config for non-secret options such as env key names, OAuth
-   * parameters, or other connector behavior hints.
-   */
-  config?: ConnectorRuntimeConfig;
+export interface ConnectorActionRequest {
+  connector: ConnectorProvider;
+  action: string;
+  args?: Record<string, unknown>;
+  timeoutMs?: number;
 }
 
-export interface ConnectorConnectOutput {
+export interface ConnectorActionResponse {
+  status: number;
+  statusText: string;
+  headers: Record<string, unknown>;
+  body: unknown;
+  url: string;
   /**
-   * For OAuth "start" phase, the URL the client should redirect the user to.
+   * Optional convenience projection when endpoint.response.select is configured.
    */
-  authorizationUrl?: string;
-
-  /**
-   * Environment variables to persist for this connector (per starship).
-   * Keys map directly to the existing environments table.
-   */
-  env?: Record<string, string>;
-
-  /**
-   * Connector metadata to persist on the connectors row.
-   */
-  metadata?: Record<string, unknown>;
-
-  /**
-   * Optional status override for the connector after this flow completes.
-   */
-  status?: ConnectorStatus;
-
-  /**
-   * Optional lastError value for the connector.
-   */
-  lastError?: string;
-}
-
-export interface ConnectorRefreshInput {
-  starshipId: string;
-  provider: ConnectorProvider;
-  envSnapshot: Record<string, string>;
-  metadata?: Record<string, unknown>;
-  config?: ConnectorRuntimeConfig;
-}
-
-export interface ConnectorRefreshOutput {
-  env?: Record<string, string>;
-  metadata?: Record<string, unknown>;
-  status?: ConnectorStatus;
-  lastError?: string;
-}
-
-export interface ConnectorTestInput {
-  starshipId: string;
-  provider: ConnectorProvider;
-  envSnapshot: Record<string, string>;
-  metadata?: Record<string, unknown>;
-  config?: ConnectorRuntimeConfig;
-}
-
-export interface ConnectorTestOutput {
-  ok: boolean;
-  error?: string;
-  details?: Record<string, unknown>;
+  selected?: unknown;
 }

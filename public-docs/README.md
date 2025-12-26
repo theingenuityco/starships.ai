@@ -12,6 +12,7 @@ This folder documents the Engine/Eval and each Autopilot node type with precise,
 - [Mutate](./node-mutate.md)
 - [Code](./node-code.md)
 - [HttpRequest](./node-http-request.md)
+- [ConnectorAction](./node-connector-action.md)
 - [LLM](./node-llm.md)
 - [UserPrompt](./node-user-prompt.md)
 - [Workflow](./node-workflow.md)
@@ -20,7 +21,7 @@ This folder documents the Engine/Eval and each Autopilot node type with precise,
 
 - Connectors
   - [Overview](./connectors/README.md)
-  - [Runtime config](./connectors/runtime-config.md)
+  - [Configuration](./connectors/configuration.md)
   - [LinkedIn](./connectors/linkedin.md)
   - [Discord](./connectors/discord.md)
   - [Google Drive](./connectors/google-drive.md)
@@ -57,8 +58,12 @@ Tips for agents (DSL-only)
 
 Tips for SDK/Engine users
 
-- You can paste the Blueprint (DSL) JSON directly into a TypeScript file as `const blueprint = <that JSON>` and run it with `new Engine().executeBlueprint(...)`.
-- Provide any non-secret configuration via `new Engine({ runtimeEnv })` and subscribe to `eventCallback` if you need streaming/events. LLM/API keys are read from the host environment or managed via server-side connectors, not passed through the blueprint.
+- You can paste the Blueprint (DSL) JSON directly into a TypeScript file as `const blueprint = <that JSON>`.
+- To actually execute it, you typically need to construct the Engine with a `hostRuntime`:
+  - `http_request` requires `hostRuntime.http`
+  - `llm` and `agent` require `hostRuntime.llm`
+  - `connector_action` requires `hostRuntime.connectorAction`
+- Provide any non-secret configuration via `new Engine({ runtimeEnv })` and subscribe to `eventCallback` if you need streaming/events. Credentials are owned by the host (environment variables, secret stores, OAuth sessions) and are not passed through the blueprint.
 
 Examples
 
@@ -82,5 +87,5 @@ Notes:
 
 For authenticated external APIs, the **GitHub connector** docs are the canonical reference:
 
-- See `connectors/github.md` for how `connector: "github"` works with relative URLs (for example `"/user"`, `"/user/repos"`, `"/repos/{owner}/{repo}/issues"`) and OAuth App user tokens.
-- Use the GitHub examples as a model when designing tools for other connectors (LinkedIn, Discord, Google Drive) that rely on HttpRequest + connector + full-string templates.
+- See `public-docs/connectors/README.md` and `public-docs/connectors/configuration.md` for how `connector_action` works with connector templates and injected auth (OAuth2/API key/platform JWT).
+- Use the GitHub examples as a model when designing tools for other connectors (LinkedIn, Discord, Google Drive) that rely on `connector_action` (not `http_request`) so the host can inject auth and base URLs.

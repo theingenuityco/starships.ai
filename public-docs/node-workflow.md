@@ -3,6 +3,7 @@
 What it is: Executes an embedded blueprint as a nested workflow and returns its final output.
 
 Specification (authoritative)
+
 - Handler: `packages/autopilot/src/nodes/Workflow.ts`
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
   - name: string (required)
@@ -12,12 +13,16 @@ Specification (authoritative)
   - metadata?: Record<string, unknown>
 
 Execution behavior
-- Creates a child execution using the parent as base (preserves depth, visit counts lineage).
+
+- Creates a child execution using the parent as base:
+  - execution depth increments (parent depth + 1)
+  - execution state is cloned so child mutations do not leak back to the parent
 - Uses a depth-aware Runner chosen by RunnerFactory.
 - `failOnNodeError: true` for nested workflow.
 - Returns the nested blueprint’s output items.
 
 Validation rules
+
 - blueprint must exist and be an object with:
   - nodes: array
   - edges: array
@@ -25,6 +30,7 @@ Validation rules
 - Edge references are validated: `from` and `to` must exist as node refs.
 
 Use cases
+
 - Encapsulate reusable subflows (e.g., sanitize input, complex pre/post-processing).
 - Provide a composable building block for larger graphs.
 
@@ -41,7 +47,8 @@ Example (summarize)
         { ref: "s", type: "start", name: "Start", parameters: {} },
         { ref: "llm", type: "llm", name: "Summarize", parameters: {
             model: "anthropic/claude-3.5-sonnet",
-            messages: [ { role: "user", content: "Summarize this: {{ input }}" } ]
+            // Engine resolves handler parameters in full-only mode; use a single template that returns the final string.
+            messages: [ { role: "user", content: '{{ `Summarize this: ${String(input ?? "")}` }}' } ]
         } },
         { ref: "e", type: "end", name: "End", parameters: { output: '{{ lastOutputOf("llm") }}' } }
       ],
@@ -55,7 +62,6 @@ Example (summarize)
 ```
 
 Cross-links
+
 - See Engine for parameter resolution and inline operations.
 - See Start/End for input and final result conventions.
-
-

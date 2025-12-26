@@ -305,39 +305,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
       return `${env.PUBLIC_URL}${basePath}?${params.toString()}`;
     };
 
-    // Custom connectors (authType = 'custom', e.g. GitHub App) delegate
-    // completion to a provider-specific connect blueprint via
-    // completeCustomConnector. The service method inspects the connector
-    // template's authType, so we don't hard-code provider ids here.
-    try {
-      const { starshipId, starshipSlug } = await connectorService.completeCustomConnector(
-        provider as ConnectorProvider,
-        state,
-        req.query as Record<string, unknown>
-      );
-
-      const redirectParams = new URLSearchParams({
-        connector: provider,
-        status: 'success',
-      });
-
-      const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
-      res.redirect(redirectUrl);
-      return;
-    } catch (customError) {
-      const msg = (customError as Error | undefined)?.message || '';
-      // Expected path for non-custom connectors: completeCustomConnector throws when authType !== 'custom'.
-      // Avoid noisy logs; just fall through to the OAuth2 handler below.
-      if (!msg.includes('does not use custom authentication')) {
-        console.error('[CONNECTOR_CALLBACK] Custom connector completion failed; falling back to oauth2', {
-          provider,
-          errorMessage: msg,
-          errorName: (customError as Error | undefined)?.name,
-        });
-      }
-      // Fall through to generic OAuth error handling below when connector is
-      // not custom or completion fails.
-    }
+    // Custom connector completion is removed in v2 (no fallback).
 
     if (error || !code) {
       try {

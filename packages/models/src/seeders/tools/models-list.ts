@@ -43,14 +43,13 @@ Behavior and limits:
       { ref: 'start_1', type: 'start', name: 'Start', description: '', parameters: {} },
       {
         ref: 'http_models',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'List Models (Starships)',
         description: 'List models via Starships OpenRouter proxy API',
         parameters: {
-          method: 'GET',
-          // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
-          url: '/openrouter/models',
           connector: 'starships',
+          action: 'list-models',
+          args: {},
           timeout: 10000,
         },
       },

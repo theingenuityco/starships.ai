@@ -5,7 +5,39 @@ Goal: Let the model call a calculator tool. Tool enforces object arguments.
 Code
 
 ```ts
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import OpenAI from 'openai';
+import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+
+const apiKey = process.env.OPENROUTER_API_KEY;
+if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+
+const hostRuntime: HostRuntime = {
+  http: async () => {
+    throw new Error('HostRuntime.http not configured for this example');
+  },
+  connectorAction: async () => {
+    throw new Error('HostRuntime.connectorAction not configured for this example');
+  },
+  llm: async (req) => {
+    const tools = Array.isArray(req.tools) && req.tools.length
+      ? req.tools.map((t: any) => ({
+          type: 'function',
+          function: {
+            name: (typeof t.slug === 'string' && t.slug.trim().length ? t.slug : t.name) || 'tool',
+            description: typeof t.description === 'string' ? t.description : '',
+            parameters: t.parameters,
+          },
+        }))
+      : undefined;
+    return await openai.chat.completions.create({
+      model: req.model,
+      messages: req.messages as any,
+      tools: tools as any,
+      stream: true,
+    });
+  },
+};
 
 const toolBlueprint = {
   nodes: [
@@ -126,7 +158,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine();
+const engine = new Engine({ hostRuntime });
 const exec = ExecutionItemUtils.createExecution();
 const out = await engine.executeBlueprint(blueprint, exec);
 ```

@@ -5,7 +5,28 @@ Goal: Resume a paused execution and demonstrate visit-count limits for cycles.
 Resume
 
 ```ts
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import OpenAI from 'openai';
+import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+
+const apiKey = process.env.OPENROUTER_API_KEY;
+if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+
+const hostRuntime: HostRuntime = {
+  http: async () => {
+    throw new Error('HostRuntime.http not configured for this example');
+  },
+  connectorAction: async () => {
+    throw new Error('HostRuntime.connectorAction not configured for this example');
+  },
+  llm: async (req) => {
+    return await openai.chat.completions.create({
+      model: req.model,
+      messages: req.messages as any,
+      stream: true,
+    });
+  },
+};
 
 const blueprint = {
   nodes: [
@@ -19,13 +40,26 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine();
+const engine = new Engine({ hostRuntime });
 const exec = ExecutionItemUtils.createExecution();
-// First run partially:
-await engine.executeBlueprint(blueprint, exec);
-engine.pause(exec);
-// ... persist `exec` externally ...
-// Later, resume from current node:
+
+// Resume is driven by `execution.currentNodeRef`. If set, Engine starts from that node.
+// Pausing is best done from an `eventCallback` while the workflow is running.
+const eventCallback = async (evt) => {
+  if (evt.type === 'node_completed' && evt.data?.execution?.currentNodeRef === 's') {
+    // Pause after Start finishes so the next Engine call can "resume" at llm.
+    engine.pause(evt.data.execution);
+    // IMPORTANT: Engine.pause() pauses *the execution*, but Engine.currentNodeRef points at the last executed node.
+    // For a linear flow like start -> llm -> end, set the next node explicitly before persisting.
+    evt.data.execution.currentNodeRef = 'llm';
+  }
+};
+
+const engineWithPause = new Engine({ hostRuntime, eventCallback });
+await engineWithPause.executeBlueprint(blueprint, exec);
+
+// ... persist `exec` externally (it now has currentNodeRef = 'llm') ...
+
 engine.resume(exec);
 await engine.executeBlueprint(blueprint, exec);
 ```

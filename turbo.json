@@ -59,7 +59,7 @@
       "outputs": ["dist/**"]
     },
     "@starships/autopilot-runner#build": {
-      "dependsOn": ["@starships/autopilot#build"],
+      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.local", "buf.yaml", "buf.gen.yaml", "src/proto/**"],
       "outputs": ["dist/**", "src/gen/**"]
     },
@@ -191,8 +191,8 @@
       "outputs": []
     },
     "@starships/autopilot-runner#type-check": {
-      "dependsOn": ["@starships/autopilot#build"],
-      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**"],
+      "dependsOn": ["@starships/autopilot#build", "@starships/protocol#build"],
+      "inputs": ["$TURBO_DEFAULT$", "tsconfig.json", "../../packages/autopilot/dist/**", "../../packages/protocol/dist/**"],
       "outputs": []
     },
     "@starships/docs#type-check": {

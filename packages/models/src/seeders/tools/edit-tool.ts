@@ -99,13 +99,16 @@ Automatically inferred from agent state (do not pass manually):
       },
       {
         ref: 'fetch_tool',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Fetch Tool by Slug',
         description: 'GET /starships/:starshipId/tools/:slug to resolve tool ID',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + (lastOutputOf("prepare") || {}).slug }}',
-          method: 'GET',
           connector: 'starships',
+          action: 'get-tool',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
+          },
           timeout: 5000,
         },
       },
@@ -128,7 +131,7 @@ Automatically inferred from agent state (do not pass manually):
 
               return {
                 toolId: String(toolData.id),
-                body: prep.body
+                ...(prep.body || {})
               };
             }
           `,
@@ -137,14 +140,13 @@ Automatically inferred from agent state (do not pass manually):
       },
       {
         ref: 'http_update',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Update Tool',
         description: 'PUT /tools/:id with partial updates',
         parameters: {
-          url: '{{ "/tools/" + (lastOutputOf("prepare_update") || {}).toolId }}',
-          method: 'PUT',
-          body: '{{ (lastOutputOf("prepare_update") || {}).body }}',
           connector: 'starships',
+          action: 'update-tool',
+          args: '{{ lastOutputOf("prepare_update") }}',
           timeout: 10000,
         },
       },

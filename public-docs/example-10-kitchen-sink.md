@@ -5,7 +5,59 @@ Goal: Combine HTTP → Transform → LLM+Tools → Conditional → Tool → Muta
 Code (abridged)
 
 ```ts
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import OpenAI from 'openai';
+import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+
+const apiKey = process.env.OPENROUTER_API_KEY;
+if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+
+const hostRuntime: HostRuntime = {
+  http: async ({ method, url, headers = {}, body, timeoutMs }) => {
+    const controller = new AbortController();
+    const timeout = typeof timeoutMs === 'number' && timeoutMs > 0 ? timeoutMs : 30000;
+    const t = setTimeout(() => controller.abort(), timeout);
+    try {
+      const finalMethod = String(method || 'GET').toUpperCase();
+      const init: RequestInit = { method: finalMethod, headers: headers as any, signal: controller.signal };
+      if (body !== undefined && finalMethod !== 'GET' && finalMethod !== 'HEAD') {
+        init.body = typeof body === 'string' ? body : JSON.stringify(body);
+        const h = new Headers(init.headers as any);
+        if (typeof body !== 'string' && !h.has('content-type')) h.set('content-type', 'application/json');
+        init.headers = h;
+      }
+      const resp = await fetch(url, init);
+      const contentType = resp.headers.get('content-type') || '';
+      const respBody = contentType.includes('application/json') ? await resp.json().catch(() => resp.text()) : await resp.text();
+      const responseHeaders: Record<string, string> = {};
+      resp.headers.forEach((v, k) => (responseHeaders[k] = v));
+      return { status: resp.status, statusText: resp.statusText, headers: responseHeaders, body: respBody, url: resp.url };
+    } finally {
+      clearTimeout(t);
+    }
+  },
+  connectorAction: async () => {
+    throw new Error('HostRuntime.connectorAction not configured for this example');
+  },
+  llm: async (req) => {
+    const tools = Array.isArray(req.tools) && req.tools.length
+      ? req.tools.map((t: any) => ({
+          type: 'function',
+          function: {
+            name: (typeof t.slug === 'string' && t.slug.trim().length ? t.slug : t.name) || 'tool',
+            description: typeof t.description === 'string' ? t.description : '',
+            parameters: t.parameters,
+          },
+        }))
+      : undefined;
+    return await openai.chat.completions.create({
+      model: req.model,
+      messages: req.messages as any,
+      tools: tools as any,
+      stream: true,
+    });
+  },
+};
 
 const toolEcho = {
   nodes: [
@@ -50,7 +102,8 @@ const blueprint = {
       name: 'Summarize',
       parameters: {
         model: 'anthropic/claude-3.5-sonnet',
-        messages: [{ role: 'user', content: 'Summarize: {{ lastOutputOf("http")?.body?.title }}' }],
+        // Full-only templates: the entire string must be a single {{ ... }} expression.
+        messages: [{ role: 'user', content: `{{ "Summarize: " + String(lastOutputOf("http")?.body?.title ?? "") }}` }],
         tools: [
           {
             name: 'Echo',
@@ -142,7 +195,7 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine();
+const engine = new Engine({ hostRuntime });
 const exec = ExecutionItemUtils.createExecution();
 const out = await engine.executeBlueprint(blueprint, exec);
 ```

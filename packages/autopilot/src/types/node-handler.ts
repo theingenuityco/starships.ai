@@ -74,18 +74,22 @@ export interface HostRuntime {
    * HTTP execution entrypoint.
    *
    * All HTTP performed by Autopilot nodes should flow through this method.
-   * When connector is provided, the host may resolve connector records,
-   * inject secrets, and apply connector-specific policies before performing
-   * the actual request.
    */
-  http(request: {
-    method: string;
+  http(request: { method: string; url: string; headers?: Record<string, unknown>; body?: unknown; timeoutMs?: number }): Promise<{
+    status: number;
+    statusText: string;
+    headers: Record<string, unknown>;
+    body: unknown;
     url: string;
-    headers?: Record<string, unknown>;
-    body?: unknown;
-    timeoutMs?: number;
-    connector?: string;
-  }): Promise<{
+  }>;
+
+  /**
+   * Connector action execution entrypoint.
+   *
+   * Executes a connector template endpoint (action) with validated args,
+   * resolving baseUrl/variables/mapping/auth entirely inside the host runtime.
+   */
+  connectorAction(request: { connector: string; action: string; args?: Record<string, unknown>; timeoutMs?: number }): Promise<{
     status: number;
     statusText: string;
     headers: Record<string, unknown>;

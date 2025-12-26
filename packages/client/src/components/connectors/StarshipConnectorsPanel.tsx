@@ -374,7 +374,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               const prop = preOauthSchema?.properties?.[key]
               const label = (prop?.title as string) || key
               const desc = (prop?.description as string) || ''
-              const placeholder = key === 'shop' ? 'my-store (without .myshopify.com)' : ''
+              const placeholder = (Array.isArray(prop?.examples) && typeof prop.examples[0] === 'string' ? prop.examples[0] : '') || (typeof prop?.default === 'string' ? prop.default : '') || ''
 
               return (
                 <div key={key} className="space-y-1">
@@ -382,12 +382,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                     {label}
                   </label>
                   {desc ? <div className="text-xs text-muted-foreground">{desc}</div> : null}
-                  <Input
-                    id={`pre-oauth-${key}`}
-                    value={preOauthValues[key] ?? ''}
-                    onChange={e => setPreOauthValues(prev => ({ ...prev, [key]: e.target.value }))}
-                    placeholder={placeholder}
-                  />
+                  <Input id={`pre-oauth-${key}`} value={preOauthValues[key] ?? ''} onChange={e => setPreOauthValues(prev => ({ ...prev, [key]: e.target.value }))} placeholder={placeholder} />
                   {preOauthErrors[key] ? <div className="text-xs text-destructive">{preOauthErrors[key]}</div> : null}
                 </div>
               )

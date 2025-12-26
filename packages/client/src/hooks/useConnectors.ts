@@ -137,7 +137,7 @@ export function useStartOAuthConnector(starshipId: string) {
       const code = error?.response?.data?.error?.code
       const details = error?.response?.data?.error?.details
 
-      // For dynamic OAuth URLs (e.g. Shopify), the UI should prompt for metadata instead of toasting.
+      // For dynamic OAuth URLs (e.g. tenant-specific URLs), the UI should prompt for metadata instead of toasting.
       if (code === 'MISSING_REQUIRED_FIELD' && details?.kind === 'connector_oauth_pre_metadata') {
         return
       }

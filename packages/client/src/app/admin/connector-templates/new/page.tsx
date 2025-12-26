@@ -35,12 +35,12 @@ function defaultAuthForType(authType: ConnectorAuthTypeV2): any {
   if (authType === 'oauth2') {
     return {
       type: 'oauth2',
-      clientIdRef: { type: 'platform_secret', key: 'SHOPIFY_CLIENT_ID' },
-      clientSecretRef: { type: 'platform_secret', key: 'SHOPIFY_CLIENT_SECRET' },
-      authorizationUrl: 'https://{{shop}}.myshopify.com/admin/oauth/authorize',
-      tokenUrl: 'https://{{shop}}.myshopify.com/admin/oauth/access_token',
+      clientIdRef: { type: 'platform_secret', key: 'OAUTH_CLIENT_ID' },
+      clientSecretRef: { type: 'platform_secret', key: 'OAUTH_CLIENT_SECRET' },
+      authorizationUrl: 'https://example.com/oauth/authorize',
+      tokenUrl: 'https://example.com/oauth/token',
       scopes: [],
-      accessTokenRef: { type: 'connector_secret', key: 'SHOPIFY_ACCESS_TOKEN' },
+      accessTokenRef: { type: 'connector_secret', key: 'ACCESS_TOKEN' },
       injection: { style: 'header', headerName: 'Authorization', tokenPrefix: 'Bearer' },
     }
   }
@@ -235,11 +235,11 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Provider *</label>
-                    <Input value={provider} onChange={e => setProvider(e.target.value)} placeholder="shopify" spellCheck={false} />
+                    <Input value={provider} onChange={e => setProvider(e.target.value)} placeholder="example" spellCheck={false} />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">Name *</label>
-                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="Shopify" />
+                    <Input value={name} onChange={e => setName(e.target.value)} placeholder="Example" />
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium">ID (optional)</label>

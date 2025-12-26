@@ -240,6 +240,34 @@ export interface ConnectorListItem {
    * For example, Discord stores guild_id and permissions here.
    */
   metadata?: Record<string, unknown>;
+
+  /**
+   * Template fields for this connector provider, joined from connector_templates.
+   *
+   * NOTE: This intentionally mixes concerns (connector instance + template definition),
+   * but is convenient for callers that need runtime endpoint definitions (e.g. Daedalus).
+   */
+  template?: ConnectorTemplateRuntimePublicModel;
+}
+
+/**
+ * ConnectorTemplateRuntimePublicModel
+ *
+ * Public (non-admin) view of connector template runtime fields that are safe to
+ * expose broadly, typically to drive UI or agent/runtime decisions.
+ */
+export interface ConnectorTemplateRuntimePublicModel {
+  id: string;
+  provider: ConnectorProvider;
+  name: string;
+  description: string;
+  authType: ConnectorAuthTypeV2;
+  version: string;
+  category: string;
+
+  // runtime fields
+  baseUrl: string;
+  endpoints: ConnectorEndpointV2[];
 }
 
 export interface ConnectorListResponse {

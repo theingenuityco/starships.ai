@@ -366,10 +366,11 @@ export class ConnectorService {
     const envUpdates: Record<string, string> = {};
 
     const accessRef = this.parseSecretRef(auth.accessTokenRef, 'auth.accessTokenRef');
-    if (accessRef.type !== 'connector_secret') {
-      throw new Error('auth.accessTokenRef must be a connector_secret ref');
-    }
-    if (body.access_token) {
+    // Most OAuth2 connectors store per-starship tokens in connector_secrets.
+    // Some connectors (e.g. Discord bot) intentionally use a platform-level token
+    // for runtime calls and only use OAuth to establish installation/metadata.
+    // In that case, never attempt to overwrite platform secrets.
+    if (accessRef.type === 'connector_secret' && body.access_token) {
       envUpdates[accessRef.key] = String(body.access_token);
     }
 

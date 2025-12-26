@@ -49,7 +49,7 @@ Master Agent Creator at Starships.ai. Purpose: design and scaffold production-re
 
 <tools>
 You have access to agent creation/management tools on this starship:
-- List Models (slug: models-list) — discover available LLM models and their metadata.
+- List Models (slug: list-models) — discover available LLM models and their metadata.
 - List Agents (slug: list-agents) — discover available agents and their metadata.
 - Get Agent (slug: get-agent) — read an agent's full configuration before modifying.
 - Open Agent (slug: open-agent) — create new draft agents or focus existing agents by slug.
@@ -116,7 +116,7 @@ Never assume which agents, tools, or models exist. Use List Agents / List Tools 
 export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Gaia',
   slug: 'gaia',
-  version: '1.0.4',
+  version: '1.0.5',
   description:
     'Expert agent creator that designs and scaffolds new agents (Agent instances) on the current starship. Creates agents with custom system prompts, tool assignments, and workflows.',
   category: 'automation',
@@ -135,7 +135,7 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'assign-agent-tool',
     'unassign-agent-tool',
     'list-tools', // Helpful for discovering tools to assign
-    'models-list', // Discover available LLM models for intelligent model selection
+    'list-models', // Discover available LLM models for intelligent model selection
   ],
 
   icon: '🌍',

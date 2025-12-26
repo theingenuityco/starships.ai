@@ -448,7 +448,7 @@ export async function up(client: Client): Promise<void> {
       },
 
       // ---------------------------------------------------------------------
-      // OpenRouter proxy (used by seeded tool: models-list)
+      // OpenRouter proxy (used by seeded tool: list-models)
       // ---------------------------------------------------------------------
       {
         name: 'list-models',

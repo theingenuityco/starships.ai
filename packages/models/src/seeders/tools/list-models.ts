@@ -2,12 +2,12 @@ import type { ToolParams } from '@starships/autopilot';
 import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
- * Tool: models_list
+ * Tool: list_models
  * List all available OpenRouter models via the Starships HTTP API.
  */
 export const modelsListTool: ToolParams = {
   name: 'List Models',
-  slug: 'models-list',
+  slug: 'list-models',
   description: `List all available LLM models.
 
 When to use:
@@ -104,10 +104,12 @@ export const modelsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   parameters: modelsListTool.parameters,
   blueprint: modelsListTool.blueprint,
 
-  slug: 'models-list',
-  version: '1.0.2',
+  slug: 'list-models',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{} // returns array of model IDs as strings (e.g., "anthropic/claude-sonnet-4.5")',
   requiresApiKey: false,
   configurationFields: [],
 };
+
+

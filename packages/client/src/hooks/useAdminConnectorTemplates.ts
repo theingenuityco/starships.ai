@@ -5,6 +5,7 @@ import type {
   AdminConnectorTemplateListResponse,
   AdminConnectorTemplateResponse,
   ApiResponse,
+  CreateConnectorTemplateRequest,
   ConnectorTemplateAdminModel,
   ConnectorTemplateModel,
   UpdateConnectorTemplateRequest,
@@ -59,6 +60,24 @@ export function useUpdateAdminConnectorTemplate() {
     onError: (error: any) => {
       const message = error?.response?.data?.error || error?.message || 'Failed to update connector template'
       toast.error('Failed to update connector template', { description: message })
+    },
+  })
+}
+
+export function useCreateAdminConnectorTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (payload: CreateConnectorTemplateRequest): Promise<ConnectorTemplateAdminModel> => {
+      const response: FetchResponse<ApiResponse<AdminConnectorTemplateResponse>> = await api.post(`/api/v1/admin/connector-templates`, payload)
+      return response.data.data.connector
+    },
+    onSuccess: connector => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all })
+      toast.success('Connector template created', { description: connector.provider })
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to create connector template'
+      toast.error('Failed to create connector template', { description: message })
     },
   })
 }

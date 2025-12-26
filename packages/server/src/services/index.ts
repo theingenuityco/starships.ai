@@ -1,35 +1,27 @@
-/**
- * Services Index - Centralized Service Exports
- *
- * Exports all services for the starships system.
- */
-
-// Existing comprehensive services
 export { AgentService } from './AgentService';
-export { AttachmentService } from './AttachmentService';
-export { UserService } from './UserService';
-
-// Core data management services
-export { ConversationService } from './ConversationService';
-export { MessageService } from './MessageService';
-
-// Migrated services from @starships/models
 export { AgentTemplateService } from './AgentTemplateService';
-
-// Avatar generation (OpenRouter image models via Autopilot runner)
+export { AttachmentService } from './AttachmentService';
 export { AvatarGenerationService } from './AvatarGenerationService';
-
-// Agent execution services (replacing agents/ directory)
-export { ToolService } from './ToolService';
-
-// Streaming services
-export { StreamingService } from './StreamingService';
-export { WebSocketService } from './WebSocketService';
-
-// Registration orchestration service
+export { BalanceValidationService } from './BalanceValidationService';
+export { BillingService, InsufficientFundsError } from './BillingService';
+export { ConnectorActionSessionService } from './ConnectorActionSessionService';
+export { ConnectorSecretService } from './ConnectorSecretService';
+export { ConnectorService } from './ConnectorService';
+export { ConversationService } from './ConversationService';
+export { EmailService } from './EmailService';
+export { ImportExportService } from './ImportExportService';
+export { MessageService } from './MessageService';
+export { PlatformSecretService } from './PlatformSecretService';
+export { PromoService } from './PromoService';
 export { RegistrationOrchestrator } from './RegistrationOrchestrator';
-
-// Service Factory for centralized service creation
+export { ResumeTokenService } from './ResumeTokenService';
+export { ScheduleService } from './ScheduleService';
 export { ServiceFactory } from './ServiceFactory';
-
-// Note: Workflow execution engine has been moved to @starships/autopilot package
+export { StarshipService } from './StarshipService';
+export { StreamingService } from './StreamingService';
+export { StripeService } from './StripeService';
+export { TopupService } from './TopupService';
+export { UsageService } from './UsageService';
+export { UserService } from './UserService';
+export { WalletService } from './WalletService';
+export { WebSocketService } from './WebSocketService';

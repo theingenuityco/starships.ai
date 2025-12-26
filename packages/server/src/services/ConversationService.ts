@@ -21,10 +21,11 @@ import { AgentModel, ConversationModel, ConversationStatus, Message, MessageMode
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
+import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import OpenAI from 'openai';
 import { Operation } from 'fast-json-patch';
 import type { Runner } from '@starships/autopilot';
-import { BillingService, InsufficientFundsError } from '@/services/BillingService';
+import { BillingService } from '@/services/BillingService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
@@ -903,6 +904,17 @@ export class ConversationService {
         SERVER_URL: env.SERVER_URL,
       };
 
+      // Build connector/LLM runtime config ONCE for this turn (reused across agent hops).
+      const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
+      if (!authUserId) {
+        throw new Error('Missing authUserId for connector_action session build');
+      }
+      const { engineConfig: baseEngineConfig } = await buildAutopilotExecutionBundle({
+        starshipId: starship.id,
+        authUserId,
+        runtimeEnv,
+      });
+
       // Orchestrate sequentially without dynamic mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {
         const agentModel = agentQueue.shift()!;
@@ -958,38 +970,10 @@ export class ConversationService {
         // Attribute streamed content to the current agent
         this.currentAgentForConversation.set(data.conversationId, { id: agentModel.id, name: agentModel.name });
 
-        // Build connector HTTP configuration for this starship/user context.
-        // This is only used by the remote runner HostRuntime and is not exposed
-        // to workflows (runtimeEnv/state).
-        const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
-        if (!authUserId) {
-          throw new Error('Missing authUserId for connector_action session build');
-        }
-        const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
-        const { connectorTemplates, connectorSessions } = await sessionSvc.build(starship.id, authUserId);
-
-        // Build LLM runtime configuration from server env; this will be passed
-        // to the remote runner so it does not need to read provider keys from
-        // its own environment.
-        const llm = env.OPENROUTER_API_KEY
-          ? {
-              apiKey: env.OPENROUTER_API_KEY,
-              baseUrl: 'https://openrouter.ai/api/v1',
-            }
-          : undefined;
-
         const engineConfig = {
+          ...(baseEngineConfig as object),
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
-          runtimeEnv,
-          // Extra config understood by remote runner (connector_action HostRuntime).
-          connectorTemplates,
-          connectorSessions,
-          llm,
-        } as EngineConfig & {
-          connectorTemplates?: Record<string, unknown>;
-          connectorSessions?: Record<string, unknown>;
-          llm?: { apiKey: string; baseUrl?: string };
-        };
+        } as EngineConfig & Record<string, unknown>;
 
         // Optional per-turn multimodal output configuration (OpenRouter image generation):
         // Agent.execute merges params.state into execution.state, so attach to agent params.state BEFORE construction.
@@ -1164,31 +1148,21 @@ export class ConversationService {
         },
       } as unknown as AgentParams;
 
-      // Build connector and llm runtime config, same as addConversationMessage
+      // Build connector/LLM runtime config (same bundle as normal agent execution)
       const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
       if (!authUserId) {
         throw new Error('Missing authUserId for connector_action session build');
       }
-      const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
-      const { connectorTemplates, connectorSessions } = await sessionSvc.build(starship.id, authUserId);
-      const llm = env.OPENROUTER_API_KEY
-        ? {
-            apiKey: env.OPENROUTER_API_KEY,
-            baseUrl: 'https://openrouter.ai/api/v1',
-          }
-        : undefined;
+      const { engineConfig: baseEngineConfig } = await buildAutopilotExecutionBundle({
+        starshipId: starship.id,
+        authUserId,
+        runtimeEnv,
+      });
 
       const engineConfig = {
+        ...(baseEngineConfig as object),
         eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
-        runtimeEnv,
-        connectorTemplates,
-        connectorSessions,
-        llm,
-      } as EngineConfig & {
-        connectorTemplates?: Record<string, unknown>;
-        connectorSessions?: Record<string, unknown>;
-        llm?: { apiKey: string; baseUrl?: string };
-      };
+      } as EngineConfig & Record<string, unknown>;
 
       this.currentAgentForConversation.set(conversationId, { id: agentModel.id, name: agentModel.name });
 

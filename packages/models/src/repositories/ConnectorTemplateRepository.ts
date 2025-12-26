@@ -12,6 +12,35 @@ export class ConnectorTemplateRepository extends BaseRepository {
     super('ConnectorTemplateRepository');
   }
 
+  /**
+   * IMPORTANT:
+   * node-postgres serializes JavaScript arrays as PostgreSQL array literals (e.g. {"a","b"}).
+   * When the destination column is JSONB, that encoding is NOT valid JSON (JSON arrays are ["a","b"]).
+   *
+   * This is why updates to connector_templates.endpoints_json (and variables_json when non-empty)
+   * can fail with: `invalid input syntax for type json` / `Expected ":", but found ",".`
+   *
+   * To ensure JSONB columns always receive valid JSON, we explicitly JSON.stringify any object/array
+   * values for known JSONB columns before passing params to pg.
+   */
+  private normalizeJsonbUpdateValue(value: unknown): unknown {
+    if (value === undefined) return undefined;
+    if (value === null) return null;
+    if (typeof value === 'object') return JSON.stringify(value);
+    return value;
+  }
+
+  private normalizeJsonbColumns(dbRecord: Record<string, unknown>): Record<string, unknown> {
+    const out: Record<string, unknown> = { ...dbRecord };
+    const jsonbColumns = ['auth_json', 'variables_json', 'endpoints_json', 'rate_limit_json', 'metadata_schema_json'] as const;
+    for (const col of jsonbColumns) {
+      if (col in out) {
+        out[col] = this.normalizeJsonbUpdateValue(out[col]);
+      }
+    }
+    return out;
+  }
+
   private async generateUniqueTemplateSlug(baseSlug: string): Promise<string> {
     const connection = this.getConnection();
     const base = (baseSlug || '').trim();
@@ -127,7 +156,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
         await ConnectorTemplateEntity.validate(entityProps);
 
         const entity = toEntityInstance(ConnectorTemplateEntity, entityProps);
-        const databaseFormat = toDatabase(entity);
+        const databaseFormat = this.normalizeJsonbColumns(toDatabase(entity));
         const result = await this.createEntity<Record<string, unknown>>('connector_templates', databaseFormat);
         return fromDatabase(ConnectorTemplateEntity, result);
       },
@@ -162,7 +191,7 @@ export class ConnectorTemplateRepository extends BaseRepository {
           throw new Error('id is required');
         }
 
-        const dbUpdates = toDatabase(updates as unknown as Record<string, unknown>);
+        const dbUpdates = this.normalizeJsonbColumns(toDatabase(updates as unknown as Record<string, unknown>));
         const connection = this.getConnection();
         const updated = await this.updateEntity<Record<string, unknown>>('connector_templates', id, dbUpdates, connection);
         return updated ? fromDatabase(ConnectorTemplateEntity, updated) : null;

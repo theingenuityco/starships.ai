@@ -5,7 +5,28 @@ Goal: Capture `content_chunk`, `content_complete`, and `tool_call_detected` even
 Code
 
 ```ts
-import { Engine, ExecutionItemUtils } from '@starships/autopilot';
+import OpenAI from 'openai';
+import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+
+const apiKey = process.env.OPENROUTER_API_KEY;
+if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
+const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
+
+const hostRuntime: HostRuntime = {
+  http: async () => {
+    throw new Error('HostRuntime.http not configured for this example');
+  },
+  connectorAction: async () => {
+    throw new Error('HostRuntime.connectorAction not configured for this example');
+  },
+  llm: async (req) => {
+    return await openai.chat.completions.create({
+      model: req.model,
+      messages: req.messages as any,
+      stream: true,
+    });
+  },
+};
 
 const events: Array<{ type: string; data: unknown }> = [];
 const eventCallback = async (evt) => {
@@ -33,11 +54,10 @@ const blueprint = {
   ],
 };
 
-const engine = new Engine({ eventCallback });
+const engine = new Engine({ eventCallback, hostRuntime });
 const exec = ExecutionItemUtils.createExecution();
 await engine.executeBlueprint(blueprint, exec);
 
 // events now contains a timeline including:
 // - workflow_started, node_started (llm), content_chunk*, content_complete, node_completed, workflow_completed
 ```
-

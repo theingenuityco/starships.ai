@@ -23,11 +23,11 @@ Context (`EvalContext`)
     - 1 item → `item.json`
     - N>1 items → `item.json[]`
   - exists(value: unknown): boolean
-  - env(key: string): unknown — host-provided env lookup (in Starships, only `env('STARSHIP_ID')` is populated; all other keys are undefined)
+  - env(key: string): unknown — host-provided runtime env lookup (values come from `Engine({ runtimeEnv })`)
 
 Notable behaviors
 
-- `lastOutputOf` throws with a descriptive message when the referenced ref is missing, surfaces common causes like referencing a nodeRef that hasn’t executed yet or referencing across scopes.
+- `lastOutputOf(ref)` returns `undefined` when the referenced node has not produced output yet (or does not exist in the current execution history).
 - Expressions are sanitized to unescape common JSON-escaped sequences before compiling.
 - Recursion limits apply during traversal for resolution (implementation internal).
 
@@ -37,7 +37,7 @@ Validation
 
 Security
 
-- Expressions run in a restricted function scope with only the provided context. Access to global process/environment is controlled via the provided env helper and does not inherit untrusted globals.
+- Expressions are evaluated using `new Function(...)` with `with (ctx) { ... }`. This is **not a hardened sandbox**. If you execute untrusted blueprints, you must run Autopilot inside an isolate (child process/container/VM) or replace Eval with a hardened evaluator.
 
 Cross-links
 
@@ -63,9 +63,13 @@ Common mistakes and how to fix them
     - Transform value example: "{{ input.user.first + ' ' + input.user.last }}"
     - Conditional example: "{{ state.retryCount < 3 ? 'retry' : 'stop' }}"
 
-- HttpRequest + connectors
-  - Problem: Using partial templates in `parameters.url` or `parameters.body` when calling external APIs (for example, `"/repos/{{ input.owner }}/{{ input.repo }}/issues?state={{ input.state || 'open' }}"`).
+- HttpRequest URL/body building (full-only templates)
+  - Problem: Using partial templates in `parameters.url` or `parameters.body` (for example, `"/repos/{{ input.owner }}/{{ input.repo }}/issues?state={{ input.state || 'open' }}"`).
   - Fix: Either:
     - Use a single full-string template: `url: "{{ '/repos/' + input.owner + '/' + input.repo + '/issues?state=' + (input.state || 'open') }}"`, or
     - Build `{ url }` in a Code node and reference it from HttpRequest: `url: "{{ (lastOutputOf('build_url') || {}).url }}"`.
-  - See `node-http-request.md`, `node-code.md`, and the connector docs (for example `connectors/github.md`) for end-to-end examples.
+  - See `node-http-request.md` and `node-code.md` for end-to-end examples.
+
+- Connector-backed calls
+  - Use `connector_action` (not `http_request`) when you need baseUrl/auth/mapping managed by the host runtime.
+  - See `connectors/README.md` and `connectors/github.md`.

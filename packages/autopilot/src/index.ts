@@ -18,6 +18,7 @@ export { BaseNode } from './nodes/BaseNode';
 export { Workflow } from './nodes/Workflow';
 export { LLM } from './nodes/LLM';
 export { HttpRequest } from './nodes/HttpRequest';
+export { ConnectorAction } from './nodes/ConnectorAction';
 export { Agent } from './nodes/Agent';
 export { Conditional } from './nodes/Conditional';
 export { Transform } from './nodes/Transform';

@@ -21,6 +21,9 @@ let eventBuffer = [];
 // HostRuntime HTTP bridging
 let nextHttpRequestId = 1;
 const pendingHttpRequests = new Map();
+// HostRuntime connectorAction bridging
+let nextConnectorActionRequestId = 1;
+const pendingConnectorActions = new Map();
 
 // Sanitize objects before sending over IPC: remove functions and non-cloneable values.
 // This prevents host_http requests from getting stuck when parameters accidentally
@@ -87,6 +90,13 @@ function createHostRuntimeBridge() {
         const safeRequest = sanitizeForIpc(request);
         safeSend({ type: 'host_http', id, request: safeRequest });
       }),
+    connectorAction: (request) =>
+      new Promise((resolve, reject) => {
+        const id = nextConnectorActionRequestId++;
+        pendingConnectorActions.set(id, { resolve, reject });
+        const safeRequest = sanitizeForIpc(request);
+        safeSend({ type: 'host_connector_action', id, request: safeRequest });
+      }),
   };
 }
 
@@ -107,6 +117,19 @@ process.on('message', async (msg) => {
       return;
     }
     pendingHttpRequests.delete(msg.id);
+    if (msg.error) {
+      entry.reject(new Error(String(msg.error)));
+    } else {
+      entry.resolve(msg.response);
+    }
+    return;
+  }
+
+  // Handle HostRuntime connectorAction results from parent
+  if (msg.type === 'host_connector_action_result') {
+    const entry = pendingConnectorActions.get(msg.id);
+    if (!entry) return;
+    pendingConnectorActions.delete(msg.id);
     if (msg.error) {
       entry.reject(new Error(String(msg.error)));
     } else {

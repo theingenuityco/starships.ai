@@ -73,13 +73,16 @@ Returns server response indicating success.
       },
       {
         ref: 'fetch_agent',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Fetch Agent',
         description: 'GET /starships/:starshipId/agents/:slug',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).agentSlug }}',
-          method: 'GET',
           connector: 'starships',
+          action: 'get-agent',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).agentSlug }}',
+          },
           timeout: 5000,
         },
       },
@@ -120,15 +123,15 @@ Returns server response indicating success.
       },
       {
         ref: 'http_update',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Assign Tool',
         description: 'POST /agents/:id/tools/:toolSlug',
         parameters: {
-          url: '{{ "/agents/" + (lastOutputOf("update_tools") || {}).agentId + "/tools/" + (lastOutputOf("update_tools") || {}).toolSlug }}',
-          method: 'POST',
           connector: 'starships',
-          body: {
-            starshipId: '{{ env("STARSHIP_ID") }}',
+          action: 'assign-agent-tool',
+          args: {
+            agentId: '{{ (lastOutputOf("update_tools") || {}).agentId }}',
+            toolSlug: '{{ (lastOutputOf("update_tools") || {}).toolSlug }}',
           },
           timeout: '{{ (lastOutputOf("update_tools") || {}).timeout }}',
         },

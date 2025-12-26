@@ -42,6 +42,13 @@ describe('Sophisticated Workflows', () => {
     }));
     hostRuntime = {
       http: httpMock as HostRuntime['http'],
+      connectorAction: (jest.fn(async ({ connector, action, args, timeoutMs }) => ({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: { ok: true, connector, action, args, timeoutMs },
+        url: `connector://${String(connector)}/${String(action)}`,
+      })) as HostRuntime['connectorAction']),
     };
 
     // Default OpenAI mock for LLM streaming (overridden in specific tests as needed)

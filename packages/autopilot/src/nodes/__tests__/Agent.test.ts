@@ -176,7 +176,7 @@ describe('Agent Node Handler', () => {
       expect(blueprint.nodes.some((node) => node.type === 'llm')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'end')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'conditional')).toBe(true);
-      expect(blueprint.nodes.some((node) => node.type === 'http_request')).toBe(true);
+      expect(blueprint.nodes.some((node) => node.type === 'connector_action')).toBe(true);
       expect(blueprint.nodes.some((node) => node.type === 'mutate')).toBe(true);
       expect(blueprint.edges).toHaveLength(15); // Updated count to match actual blueprint generation
     });

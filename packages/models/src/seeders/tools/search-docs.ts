@@ -41,7 +41,7 @@ Behavior and limits:
             async function main(ctx) {
               const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
               const q = typeof input.q === 'string' ? input.q : '';
-              const limit = typeof input.limit === 'number' ? input.limit : undefined;
+              const limit = typeof input.limit === 'number' && input.limit > 0 ? input.limit : 20;
               return { q, limit };
             }
           `,
@@ -50,15 +50,13 @@ Behavior and limits:
       },
       {
         ref: 'http_search',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Search Docs (Starships)',
         description: 'Search documentation via Starships docs HTTP API',
         parameters: {
-          method: 'GET',
-          // Relative path; HostRuntime will prefix SERVER_URL/api/v1 and inject auth.
-          // NOTE: URL must be provided as a single full-string template expression (no partial {{ }} templates).
-          url: '{{ (() => { const input = lastOutputOf("prepare") || {}; const q = input.q || ""; const limit = input.limit == null ? "" : String(input.limit); const enc = encodeURIComponent; return "/docs?q=" + enc(q) + "&limit=" + enc(limit); })() }}',
           connector: 'starships',
+          action: 'search-docs',
+          args: '{{ lastOutputOf("prepare") }}',
           timeout: 5000,
         },
       },

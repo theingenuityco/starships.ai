@@ -22,6 +22,7 @@ export type NodeType =
   | 'start'
   | 'end'
   | 'http_request'
+  | 'connector_action'
   | 'llm'
   | 'workflow'
   | 'transform'

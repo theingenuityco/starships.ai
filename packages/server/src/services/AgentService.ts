@@ -35,7 +35,6 @@ import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
-import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
 import { AttachmentService } from './AttachmentService';
 
 export interface ConversationRequest {
@@ -70,14 +69,12 @@ export class AgentService {
   // Kept for future use (runtime secrets, connector context, etc.)
 
   private connectorSecretService: ConnectorSecretService;
-  private connectorRuntimeService: ConnectorRuntimeService;
 
   constructor() {
     this.agentRepository = new AgentRepository();
     this.starshipRepository = new StarshipRepository();
     this.messageService = new MessageService();
     this.connectorSecretService = new ConnectorSecretService();
-    this.connectorRuntimeService = new ConnectorRuntimeService();
   }
 
   /**

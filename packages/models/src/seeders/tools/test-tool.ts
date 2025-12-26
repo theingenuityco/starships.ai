@@ -78,15 +78,16 @@ export const toolTestTool: ToolParams = {
       },
       {
         ref: 'http_get_tool',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Get Tool (Starships)',
-        description: 'Fetch tool definition via Starships tools HTTP API',
+        description: 'Fetch tool definition via Starships connector action',
         parameters: {
-          method: 'GET',
-          // Relative path; HostRuntime will prefix SERVER_URL/api/v1, inject auth,
-          // and use STARSHIP_ID from env.
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/tools/" + lastOutputOf("prepare").slug }}',
           connector: 'starships',
+          action: 'get-tool',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ lastOutputOf("prepare").slug }}',
+          },
           timeout: 5000,
         },
       },

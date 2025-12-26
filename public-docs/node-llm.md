@@ -5,18 +5,23 @@ What it is: Streams model outputs via OpenRouter (OpenAI-compatible API) with re
 Specification (authoritative)
 
 - Handler: `packages/autopilot/src/nodes/LLM.ts`
-- Requires an OpenRouter-compatible API key provided by the hosting runtime (for example via environment variables or host callbacks). The key is never exposed to workflows.
+- Requires `hostRuntime.llm` (provided by the embedding host). Credentials/API keys are owned by the host and are never exposed to workflows.
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
   - model: string (required) — e.g., "anthropic/claude-3.5-sonnet"
-  - messages: array | string (required) — if array, coerced to canonical `LlmMessage[]`; if string with templates, resolved
+  - messages: array (required; non-empty)
+    - If you need to compute messages dynamically, use a full-string template that resolves to an array (e.g. `messages: "{{ state.messages }}"`).
+    - A literal string is not accepted by validation unless it resolves (via templates) to an array.
+  - stream?: boolean|string — when false, the host runtime must return a non-stream request wrapped as an AsyncIterable (see HostRuntime notes)
   - temperature?: number|string (0..2)
   - maxTokens?: number|string (>=1)
   - timeout?: number|string (ms)
   - topP?: number|string (0..1)
   - frequencyPenalty?: number|string (-2..2)
   - presencePenalty?: number|string (-2..2)
-  - tools?: ToolParams[] | string — enables function calling; sets `tools` and `tool_choice: 'auto'`, `parallel_tool_calls: false`
+  - tools?: ToolParams[] | string — enables function calling; the host runtime converts these ToolParams into provider-native tool definitions (OpenAI/OpenRouter function tools)
   - reasoning?: { effort?: 'low'|'medium'|'high'; max_tokens?: number; exclude?: boolean; enabled?: boolean }
+  - modalities?: ('text'|'image')[] | string
+  - imageConfig?: Record<string, unknown> | string
 
 Message normalization and conversion
 
@@ -75,9 +80,9 @@ Validation rules (strict)
 
 Edge cases and guarantees
 
-- `parallel_tool_calls` is set to false to prevent multiple tool calls within a single assistant response.
+- Tool naming: for OpenAI/OpenRouter function calling, the host runtime should use `tool.slug` as the function name when present (falling back to `tool.name` if slug is missing).
 - Provider-snapshot toolCalls are respected; arguments snapshot is used as a fallback if delta assembly yields shorter content.
-- Errors are surfaced with descriptive messages; handler throws if API key is missing.
+- Errors are surfaced with descriptive messages; missing credentials should be detected/raised by the host runtime (not by the blueprint).
 
 Example (chat with tools)
 

@@ -16,7 +16,7 @@ ctx surface (prefixed to avoid collisions)
 
 - input: unwrapped input item (`ctx.input`)
 - state: execution.state (`ctx.state`)
-- env(key): host-provided env lookup (in Starships, only `ctx.env('STARSHIP_ID')` is populated; custom env keys are not supported)
+- env(key): host-provided runtime env lookup (values come from `Engine({ runtimeEnv })`)
 - lastOutputOf(ref): latest output json for ref within current execution (`ctx.lastOutputOf(ref)`)
 - console shim: log/error/warn (scoped)
 
@@ -36,7 +36,7 @@ Execution behavior
 
 - Code nodes do **not** receive the HostRuntime or any HTTP helper surface.
 - There is **no** `ctx.hostRuntime.http` or equivalent; all outbound HTTP must go through `http_request` nodes.
-- Use Code to **prepare data** (URLs, bodies, headers, shapes) and then hand it to an `http_request` node, rather than calling external APIs directly from Code.
+- Use Code to **prepare data** (URLs, bodies, headers, shapes) and then hand it to an `http_request` node (absolute URLs only), rather than calling external APIs directly from Code.
 
 Validation rules
 
@@ -106,16 +106,14 @@ Because templates are evaluated in **full-string** mode, the recommended pattern
 {
   ref: "build_url",
   type: "code",
-  name: "Build GitHub URL",
+  name: "Build URL",
   parameters: {
     code: `
       async function main(ctx) {
         const input = ctx.input || {};
-        const type = input.type || "all";
-        const sort = input.sort || "updated";
+        const q = input.q || "hello";
         return {
-          url: "/user/repos?type=" + encodeURIComponent(type) +
-               "&sort=" + encodeURIComponent(sort)
+          url: "https://example.com/search?q=" + encodeURIComponent(q)
         };
       }
     `,
@@ -128,13 +126,12 @@ Because templates are evaluated in **full-string** mode, the recommended pattern
 
 ```ts
 {
-  ref: "github_list_repos",
+  ref: "http_call",
   type: "http_request",
-  name: "GitHub List Repos",
+  name: "HTTP Call",
   parameters: {
     method: "GET",
     url: "{{ (lastOutputOf('build_url') || {}).url }}",
-    connector: "github",
     timeout: 15000
   }
 }
@@ -147,4 +144,8 @@ This pattern avoids invalid partial templates like:
 url: "/user/repos?type={{ ctx.input.type || 'all' }}&sort={{ ctx.input.sort || 'updated' }}";
 ```
 
-and keeps all logic inside Code while letting HttpRequest + connectors handle URL resolution and auth injection.
+and keeps all logic inside Code while letting HttpRequest handle network execution.
+
+### Connector-backed calls
+
+If you need connector-backed auth/base URL behavior, do **not** use `http_request`. Use a `connector_action` node (configured by `connector_templates`).

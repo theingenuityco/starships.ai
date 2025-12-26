@@ -30,7 +30,7 @@ import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
-import { ConnectorRuntimeService } from '@/services/ConnectorRuntimeService';
+// Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
 
 /**
@@ -134,7 +134,7 @@ export class ConversationService {
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: Runner;
 
-  private connectorRuntimeService!: ConnectorRuntimeService;
+  // connector_action bundles are built per-request (requires authUserId)
 
   // Autopilot configuration
   private static readonly AUTOPILOT_CONFIG: AutopilotConfig = {
@@ -156,7 +156,6 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
-    this.connectorRuntimeService = new ConnectorRuntimeService();
 
     // Choose default runner based on whether a remote runner is configured.
     // When RUNNER_URL is set, server startup configures autopilot.setRunnerConfig({ url, token })
@@ -894,9 +893,14 @@ export class ConversationService {
     try {
       // starship already resolved above
 
+      const env = getEnvConfig();
+
       const runtimeEnv: Record<string, unknown> = {
         STARSHIP_ID: starship.id,
         CONVERSATION_ID: data.conversationId,
+        // Used by internal Starships connector templates like:
+        // {{ String(runtimeEnv.SERVER_URL ?? "") + "/api/v1" }}
+        SERVER_URL: env.SERVER_URL,
       };
 
       // Orchestrate sequentially without dynamic mention-based handoffs
@@ -958,12 +962,15 @@ export class ConversationService {
         // This is only used by the remote runner HostRuntime and is not exposed
         // to workflows (runtimeEnv/state).
         const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
-        const connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starship.id, authUserId);
+        if (!authUserId) {
+          throw new Error('Missing authUserId for connector_action session build');
+        }
+        const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
+        const { connectorTemplates, connectorSessions } = await sessionSvc.build(starship.id, authUserId);
 
         // Build LLM runtime configuration from server env; this will be passed
         // to the remote runner so it does not need to read provider keys from
         // its own environment.
-        const env = getEnvConfig();
         const llm = env.OPENROUTER_API_KEY
           ? {
               apiKey: env.OPENROUTER_API_KEY,
@@ -974,11 +981,13 @@ export class ConversationService {
         const engineConfig = {
           eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
-          // Extra config understood by remote runner (connector-aware HostRuntime).
-          connectors,
+          // Extra config understood by remote runner (connector_action HostRuntime).
+          connectorTemplates,
+          connectorSessions,
           llm,
         } as EngineConfig & {
-          connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+          connectorTemplates?: Record<string, unknown>;
+          connectorSessions?: Record<string, unknown>;
           llm?: { apiKey: string; baseUrl?: string };
         };
 
@@ -1071,7 +1080,9 @@ export class ConversationService {
     try {
       const conversation = await this.getConversationById(conversationId);
       const turnActive =
-        conversation?.state && typeof conversation.state === 'object' && (conversation.state as { turnActive?: boolean }).turnActive === true;
+        conversation?.state &&
+        typeof conversation.state === 'object' &&
+        (conversation.state as { turnActive?: boolean }).turnActive === true;
       if (turnActive) {
         ConversationService.activeCancellations.delete(conversationId);
         throw new ConflictError('A turn is already in progress for this conversation. Please wait for it to complete.');
@@ -1115,21 +1126,31 @@ export class ConversationService {
         })
       );
 
+      const env = getEnvConfig();
+
       const runtimeEnv = {
         STARSHIP_ID: starship.id,
         CONVERSATION_ID: conversationId,
         AGENT_ID: agentModel.id,
+        // Used by internal Starships connector templates like:
+        // {{ String(runtimeEnv.SERVER_URL ?? "") + "/api/v1" }}
+        SERVER_URL: env.SERVER_URL,
       };
 
       // Load conversation-level state context (if any)
-      const conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as Record<string, unknown>;
+      const conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as Record<
+        string,
+        unknown
+      >;
 
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
       // Guard against NULL/undefined persisted JSONB state
       const baseState =
-        agentModel.state && typeof agentModel.state === 'object' ? (agentModel.state as Record<string, unknown>) : ({ messages: [], tools: [] } as any);
+        agentModel.state && typeof agentModel.state === 'object'
+          ? (agentModel.state as Record<string, unknown>)
+          : ({ messages: [], tools: [] } as any);
 
       const agentWithTools: AgentParams = {
         ...(agentModel as any),
@@ -1145,8 +1166,11 @@ export class ConversationService {
 
       // Build connector and llm runtime config, same as addConversationMessage
       const authUserId = ctx?.authContext?.userId ?? (conversation as { userId?: string }).userId;
-      const connectors = await this.connectorRuntimeService.buildConnectorHttpConfig(starship.id, authUserId);
-      const env = getEnvConfig();
+      if (!authUserId) {
+        throw new Error('Missing authUserId for connector_action session build');
+      }
+      const sessionSvc = new (await import('@/services/ConnectorActionSessionService')).ConnectorActionSessionService();
+      const { connectorTemplates, connectorSessions } = await sessionSvc.build(starship.id, authUserId);
       const llm = env.OPENROUTER_API_KEY
         ? {
             apiKey: env.OPENROUTER_API_KEY,
@@ -1157,10 +1181,12 @@ export class ConversationService {
       const engineConfig = {
         eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
         runtimeEnv,
-        connectors,
+        connectorTemplates,
+        connectorSessions,
         llm,
       } as EngineConfig & {
-        connectors?: Record<string, { baseUrl: string; headers: Record<string, string> }>;
+        connectorTemplates?: Record<string, unknown>;
+        connectorSessions?: Record<string, unknown>;
         llm?: { apiKey: string; baseUrl?: string };
       };
 

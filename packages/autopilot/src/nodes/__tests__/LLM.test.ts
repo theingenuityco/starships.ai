@@ -34,6 +34,13 @@ describe('LLM Node Handler', () => {
     hostRuntime = {
       // HTTP is unused in these tests but required by the HostRuntime type
       http: jest.fn() as HostRuntime['http'],
+      connectorAction: (jest.fn(async ({ connector, action, args, timeoutMs }) => ({
+        status: 200,
+        statusText: 'OK',
+        headers: {},
+        body: { ok: true, connector, action, args, timeoutMs },
+        url: `connector://${String(connector)}/${String(action)}`,
+      })) as HostRuntime['connectorAction']),
       llm: llmMock as HostRuntime['llm'],
     };
   });

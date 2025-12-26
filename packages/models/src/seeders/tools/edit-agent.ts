@@ -130,13 +130,16 @@ Automatically inferred from agent state (do not pass manually):
       },
       {
         ref: 'fetch_agent',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Fetch Agent by Slug',
         description: 'GET /starships/:starshipId/agents/:slug to resolve agent ID',
         parameters: {
-          url: '{{ "/starships/" + env("STARSHIP_ID") + "/agents/" + (lastOutputOf("prepare") || {}).slug }}',
-          method: 'GET',
           connector: 'starships',
+          action: 'get-agent',
+          args: {
+            starshipId: '{{ env("STARSHIP_ID") }}',
+            slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
+          },
           timeout: 5000,
         },
       },
@@ -159,7 +162,7 @@ Automatically inferred from agent state (do not pass manually):
 
               return {
                 agentId: String(agentData.id),
-                body: prep.body
+                ...(prep.body || {})
               };
             }
           `,
@@ -168,14 +171,13 @@ Automatically inferred from agent state (do not pass manually):
       },
       {
         ref: 'http_update',
-        type: 'http_request',
+        type: 'connector_action',
         name: 'Update Agent',
         description: 'PUT /agents/:id with partial updates',
         parameters: {
-          url: '{{ "/agents/" + (lastOutputOf("prepare_update") || {}).agentId }}',
-          method: 'PUT',
-          body: '{{ (lastOutputOf("prepare_update") || {}).body }}',
           connector: 'starships',
+          action: 'update-agent',
+          args: '{{ lastOutputOf("prepare_update") }}',
           timeout: 10000,
         },
       },

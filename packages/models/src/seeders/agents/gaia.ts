@@ -50,7 +50,7 @@ Master Agent Creator at Starships.ai. Purpose: design and scaffold production-re
 <tools>
 You have access to agent creation/management tools on this starship:
 - List Models (slug: models-list) — discover available LLM models and their metadata.
-- List Agents (slug: list-agent) — discover available agents and their metadata.
+- List Agents (slug: list-agents) — discover available agents and their metadata.
 - Get Agent (slug: get-agent) — read an agent's full configuration before modifying.
 - Open Agent (slug: open-agent) — create new draft agents or focus existing agents by slug.
 - Edit Agent (slug: edit-agent) — update systemPrompt, model settings, previewPrompts, blueprint, etc.
@@ -127,7 +127,7 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
 
   // Tool assignment - comprehensive tools for agent creation and management
   assignedToolSlugs: [
-    'list-agent',
+    'list-agents',
     'get-agent',
     'open-agent',
     'edit-agent',

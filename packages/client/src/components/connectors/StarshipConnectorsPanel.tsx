@@ -4,7 +4,6 @@ import Icon from '@/components/primitives/Icon'
 import { useConnectApiKeyConnector, useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DialogTitlePrimitive } from '@/components/ui/dialog'
 import { useMemo, useState } from 'react'
@@ -34,6 +33,11 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
   const [apiKeyValue, setApiKeyValue] = useState('')
   const [apiKeyExtraConfigText, setApiKeyExtraConfigText] = useState('')
+  const [preOauthProvider, setPreOauthProvider] = useState<string | null>(null)
+  const [preOauthMissingKeys, setPreOauthMissingKeys] = useState<string[]>([])
+  const [preOauthSchema, setPreOauthSchema] = useState<any>(null)
+  const [preOauthValues, setPreOauthValues] = useState<Record<string, string>>({})
+  const [preOauthErrors, setPreOauthErrors] = useState<Record<string, string>>({})
   // GitHub connector configuration temporarily disabled on client
   // const [githubDialogOpen, setGithubDialogOpen] = useState(false)
   // const [githubInstallationId, setGithubInstallationId] = useState('')
@@ -53,10 +57,83 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   }
 
   const handleConnect = async (provider: string) => {
-    const result = await oauthMutation.mutateAsync(provider as any)
-    if (result) {
-      window.location.href = result
+    const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)
+    const requiredKeys = (catalogItem as any)?.oauthRequiredMetadataKeys as string[] | undefined
+    const schemaFromCatalog = (catalogItem as any)?.metadataSchema
+    const existingMetadata = ((getConnectorState(provider)?.metadata || {}) as Record<string, unknown>) || {}
+
+    if (Array.isArray(requiredKeys) && requiredKeys.length) {
+      const missing = requiredKeys.filter(k => {
+        const raw = existingMetadata[k]
+        if (raw === undefined || raw === null) return true
+        if (typeof raw === 'string' && raw.trim().length === 0) return true
+        return false
+      })
+      if (missing.length) {
+        setPreOauthProvider(provider)
+        setPreOauthMissingKeys(missing)
+        setPreOauthSchema(schemaFromCatalog || null)
+        setPreOauthValues({})
+        setPreOauthErrors({})
+        return
+      }
     }
+
+    try {
+      const result = await oauthMutation.mutateAsync(provider as any)
+      if (result) window.location.href = result
+    } catch (err: any) {
+      const code = err?.response?.data?.error?.code
+      const details = err?.response?.data?.error?.details
+
+      if (code === 'MISSING_REQUIRED_FIELD' && details?.kind === 'connector_oauth_pre_metadata') {
+        setPreOauthProvider(provider)
+        setPreOauthMissingKeys(Array.isArray(details?.missingMetadataKeys) ? details.missingMetadataKeys : [])
+        setPreOauthSchema(details?.metadataSchema || null)
+        setPreOauthValues({})
+        setPreOauthErrors({})
+        return
+      }
+
+      const errorMessage = err?.response?.data?.error?.message || err?.message || 'Failed to start connector OAuth flow'
+      toast.error(`Failed to connect ${provider}`, { description: errorMessage })
+    }
+  }
+
+  const validatePreOauth = (keys: string[], values: Record<string, string>, schema: any): Record<string, string> => {
+    const errors: Record<string, string> = {}
+    const properties = schema?.properties && typeof schema.properties === 'object' ? schema.properties : {}
+    for (const k of keys) {
+      const v = (values?.[k] ?? '').trim()
+      if (!v) {
+        errors[k] = 'Required'
+        continue
+      }
+      const prop = properties?.[k]
+      const pattern = typeof prop?.pattern === 'string' ? prop.pattern : null
+      if (pattern) {
+        try {
+          const re = new RegExp(pattern)
+          if (!re.test(v)) errors[k] = 'Invalid format'
+        } catch {
+          // ignore invalid regex in schema
+        }
+      }
+    }
+    return errors
+  }
+
+  const submitPreOauth = async () => {
+    if (!preOauthProvider) return
+    const errors = validatePreOauth(preOauthMissingKeys, preOauthValues, preOauthSchema)
+    setPreOauthErrors(errors)
+    if (Object.keys(errors).length) return
+
+    const result = await oauthMutation.mutateAsync({
+      provider: preOauthProvider as any,
+      metadata: Object.fromEntries(Object.entries(preOauthValues).map(([k, v]) => [k, v.trim()])),
+    } as any)
+    if (result) window.location.href = result
   }
 
   const openApiKeyDialog = (provider: string) => {
@@ -179,9 +256,6 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   </div>
                 </div>
               </CardTitle>
-              <Badge variant="secondary" className="font-mono text-[10px]">
-                {authType}
-              </Badge>
             </div>
             <p className="text-sm text-muted-foreground">{catalogItem.description}</p>
           </CardHeader>
@@ -267,6 +341,69 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
             </Button>
             <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
               Disconnect
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={preOauthProvider !== null}
+        onOpenChange={open => {
+          if (!open) {
+            setPreOauthProvider(null)
+            setPreOauthMissingKeys([])
+            setPreOauthSchema(null)
+            setPreOauthValues({})
+            setPreOauthErrors({})
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitlePrimitive>Connect {preOauthProvider}</DialogTitlePrimitive>
+            <DialogDescription>This connector needs a bit of info before we can start OAuth.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            {preOauthMissingKeys.map(key => {
+              const prop = preOauthSchema?.properties?.[key]
+              const label = (prop?.title as string) || key
+              const desc = (prop?.description as string) || ''
+              const placeholder = key === 'shop' ? 'my-store (without .myshopify.com)' : ''
+
+              return (
+                <div key={key} className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground" htmlFor={`pre-oauth-${key}`}>
+                    {label}
+                  </label>
+                  {desc ? <div className="text-xs text-muted-foreground">{desc}</div> : null}
+                  <Input
+                    id={`pre-oauth-${key}`}
+                    value={preOauthValues[key] ?? ''}
+                    onChange={e => setPreOauthValues(prev => ({ ...prev, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                  />
+                  {preOauthErrors[key] ? <div className="text-xs text-destructive">{preOauthErrors[key]}</div> : null}
+                </div>
+              )
+            })}
+          </div>
+          <DialogFooter className="flex gap-2 justify-end">
+            <Button type="button" variant="ghost" onClick={() => setPreOauthProvider(null)} disabled={oauthMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                try {
+                  await submitPreOauth()
+                } catch (e: any) {
+                  const errorMessage = e?.response?.data?.error?.message || e?.message || 'Please verify your inputs.'
+                  toast.error('Failed to start OAuth', { description: errorMessage })
+                }
+              }}
+              disabled={oauthMutation.isPending}
+            >
+              {oauthMutation.isPending ? 'Continuing…' : 'Next'}
             </Button>
           </DialogFooter>
         </DialogContent>

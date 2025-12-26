@@ -12,15 +12,18 @@ COPY package.json pnpm-workspace.yaml pnpm-lock.yaml* ./
 COPY tsconfig.json tsconfig.nodejs.json ./
 # Pre-copy package manifests for filtered workspaces
 COPY packages/autopilot/package.json ./packages/autopilot/package.json
+COPY packages/protocol/package.json ./packages/protocol/package.json
 COPY packages/autopilot-runner/package.json ./packages/autopilot-runner/package.json
 # Install only required workspaces with hoisted node linker for local deps
 RUN echo "node-linker=hoisted" >> packages/autopilot-runner/.npmrc \
-  && pnpm install -w --filter @starships/autopilot --filter @starships/autopilot-runner --frozen-lockfile
-# Copy sources for the two workspaces
+  && pnpm install -w --filter @starships/autopilot --filter @starships/protocol --filter @starships/autopilot-runner --frozen-lockfile
+# Copy sources for the required workspaces
 COPY packages/autopilot/ ./packages/autopilot/
+COPY packages/protocol/ ./packages/protocol/
 COPY packages/autopilot-runner/ ./packages/autopilot-runner/
-# Build dependencies in order: autopilot first, then generate runner types, then build runner
+# Build dependencies in order: autopilot -> protocol -> generate runner types -> runner
 RUN pnpm -C packages/autopilot build
+RUN pnpm -C packages/protocol build
 RUN set -eux; \
   case "${TARGETARCH}" in \
     amd64) BUF_ARCH="x86_64" ;; \
@@ -43,6 +46,11 @@ RUN mkdir -p /app/packages/autopilot
 COPY --from=build /app/packages/autopilot/package.json /app/packages/autopilot/package.json
 COPY --from=build /app/packages/autopilot/dist /app/packages/autopilot/dist
 COPY --from=build /app/packages/autopilot/node_modules /app/packages/autopilot/node_modules
+# Provide workspace-linked @starships/protocol package in runtime
+RUN mkdir -p /app/packages/protocol
+COPY --from=build /app/packages/protocol/package.json /app/packages/protocol/package.json
+COPY --from=build /app/packages/protocol/dist /app/packages/protocol/dist
+COPY --from=build /app/packages/protocol/node_modules /app/packages/protocol/node_modules
 COPY --from=build /app/node_modules /app/node_modules
 USER 1000:1000
 CMD ["node", "dist/index.js"]

@@ -33,7 +33,7 @@ Delegation orchestrator for this starship. Your primary job is to understand the
 
 <tools>
 You have access to agent‑management and delegation tools on this starship:
-- List Agents (slug: list-agent) — discover available agents and their metadata.
+- List Agents (slug: list-agents) — discover available agents and their metadata.
 - Call Agent (slug: call-agent) — create or continue child conversations that run another agent.
 - List Tools (slug: list-tools) — discover available tools; use this when it helps you understand agent/tool coverage.
 
@@ -89,7 +89,7 @@ Never assume which agents exist. Always call List Agents when you intend to dele
 
 <context>
 - Function names vs slugs:
-  - "List Agents" (list-agent)
+  - "List Agents" (list-agents)
   - "Call Agent" (call-agent)
   - "List Tools" (list-tools)
 - Conversations:
@@ -145,7 +145,7 @@ export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
   maxTokens: 3000,
 
   // Tool assignment – agent management and delegation tools
-  assignedToolSlugs: ['list-agent', 'call-agent', 'list-tools'],
+  assignedToolSlugs: ['list-agents', 'call-agent', 'list-tools'],
 
   icon: '🎼',
   previewPrompts: [

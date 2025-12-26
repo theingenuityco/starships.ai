@@ -280,7 +280,7 @@ export interface ConnectorCatalogItem {
   description: string;
   authType: ConnectorAuthTypeV2;
   /**
-   * For OAuth2 connectors whose OAuth URLs contain {{vars}} (e.g. Shopify shop subdomain),
+   * For OAuth2 connectors whose OAuth URLs contain {{vars}} (e.g. a tenant subdomain),
    * the client should collect these values before initiating OAuth.
    */
   oauthRequiredMetadataKeys?: string[];
@@ -396,7 +396,7 @@ export interface ConnectWithApiKeyResponse {
  * StartOAuthRequest
  *
  * Optional metadata that may be required to construct dynamic OAuth URLs
- * (e.g. Shopify shop subdomain).
+ * (e.g. a tenant subdomain).
  */
 export interface StartOAuthRequest {
   metadata?: Record<string, unknown>;

@@ -3,7 +3,13 @@ import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { ConnectorService } from '@/services/ConnectorService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
-import type { ConnectorCatalogResponse, ConnectorListResponse, ConnectWithApiKeyRequest, StartOAuthResponse } from '@starships/protocol';
+import type {
+  ConnectorCatalogResponse,
+  ConnectorListResponse,
+  ConnectWithApiKeyRequest,
+  StartOAuthRequest,
+  StartOAuthResponse,
+} from '@starships/protocol';
 import { IdSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -29,6 +35,10 @@ const ApiKeyConnectSchema = z.object({
 const ProviderParamSchema = z.object({
   id: IdSchema,
   provider: z.string().min(1, 'provider is required'),
+});
+
+const StartOAuthBodySchema = z.object({
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 // GET /connectors/catalog - Static connector catalog
@@ -242,9 +252,14 @@ async function startConnectorHandler(req: Request, res: Response): Promise<void>
 
     if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
 
+    const bodyValidation = validateData(StartOAuthBodySchema, (req.body ?? {}) as StartOAuthRequest, res, 'start connector payload');
+    if (!bodyValidation) return;
+
     const connectorService = new ConnectorService();
 
-    const authorizationUrl = await connectorService.startConnector(starshipId, userId, provider as ConnectorProvider);
+    const authorizationUrl = await connectorService.startConnector(starshipId, userId, provider as ConnectorProvider, {
+      metadata: bodyValidation.metadata,
+    });
 
     const response: StartOAuthResponse = {
       authorizationUrl,

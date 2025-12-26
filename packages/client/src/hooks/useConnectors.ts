@@ -8,6 +8,8 @@ import type {
   ConnectorListResponse,
   ConnectorModel,
   ConnectorProvider,
+  StartOAuthRequest,
+  StartOAuthResponse,
 } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
@@ -115,16 +117,34 @@ export function useTestConnector(starshipId: string) {
 
 export function useStartOAuthConnector(starshipId: string) {
   return useMutation({
-    mutationFn: async (provider: ConnectorProvider): Promise<string> => {
-      const response: FetchResponse<ApiResponse<{ authorizationUrl: string }>> = await api.post(`/api/v1/starships/${starshipId}/connectors/${provider}/start`)
+    mutationFn: async (
+      input:
+        | ConnectorProvider
+        | {
+            provider: ConnectorProvider
+            metadata?: StartOAuthRequest['metadata']
+          }
+    ): Promise<string> => {
+      const provider = typeof input === 'string' ? input : input.provider
+      const body: StartOAuthRequest | undefined = typeof input === 'string' ? undefined : { metadata: input.metadata }
+      const response: FetchResponse<ApiResponse<StartOAuthResponse>> = await api.post(
+        `/api/v1/starships/${starshipId}/connectors/${provider}/start`,
+        body,
+      )
       return response.data.data.authorizationUrl
     },
     onError: (error: any, provider) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to start connector OAuth flow'
-      const providerLabel = provider ? provider.charAt(0).toUpperCase() + provider.slice(1) : 'Connector'
-      toast.error(`Failed to connect ${providerLabel}`, {
-        description: errorMessage,
-      })
+      const code = error?.response?.data?.error?.code
+      const details = error?.response?.data?.error?.details
+
+      // For dynamic OAuth URLs (e.g. Shopify), the UI should prompt for metadata instead of toasting.
+      if (code === 'MISSING_REQUIRED_FIELD' && details?.kind === 'connector_oauth_pre_metadata') {
+        return
+      }
+
+      const errorMessage = error?.response?.data?.error?.message || error?.message || 'Failed to start connector OAuth flow'
+      const providerLabel = provider ? String(provider).charAt(0).toUpperCase() + String(provider).slice(1) : 'Connector'
+      toast.error(`Failed to connect ${providerLabel}`, { description: errorMessage })
     },
   })
 }

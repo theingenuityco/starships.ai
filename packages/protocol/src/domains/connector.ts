@@ -279,6 +279,16 @@ export interface ConnectorCatalogItem {
   name: string;
   description: string;
   authType: ConnectorAuthTypeV2;
+  /**
+   * For OAuth2 connectors whose OAuth URLs contain {{vars}} (e.g. Shopify shop subdomain),
+   * the client should collect these values before initiating OAuth.
+   */
+  oauthRequiredMetadataKeys?: string[];
+  /**
+   * Optional JSON schema describing connector metadata. Safe to expose (non-secret).
+   * Used by the UI to validate pre-OAuth metadata inputs.
+   */
+  metadataSchema?: JsonSchemaObject;
 }
 
 export interface ConnectorCatalogResponse {
@@ -382,8 +392,15 @@ export interface ConnectWithApiKeyResponse {
   connector: ConnectorModel;
 }
 
-// Reserved for future request fields; currently empty.
-export type StartOAuthRequest = Record<string, never>;
+/**
+ * StartOAuthRequest
+ *
+ * Optional metadata that may be required to construct dynamic OAuth URLs
+ * (e.g. Shopify shop subdomain).
+ */
+export interface StartOAuthRequest {
+  metadata?: Record<string, unknown>;
+}
 
 export interface StartOAuthResponse {
   authorizationUrl: string;

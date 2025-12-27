@@ -1,7 +1,8 @@
 import type { AgentModel, CreateAgentRequest } from '../domains/agent';
+import type { CreateConnectorTemplateRequest } from '../domains/connector';
 import type { ToolModel, CreateToolRequest } from '../domains/tool';
 
-export type ImportExportKind = 'agent' | 'tool';
+export type ImportExportKind = 'agent' | 'tool' | 'connector_template';
 
 /**
  * Shared container/envelope for importing/exporting resources as JSON.
@@ -25,7 +26,7 @@ export interface ImportExportContainerV1<K extends ImportExportKind = ImportExpo
     app?: string;
     version?: string;
   };
-  payload: K extends 'agent' ? AgentExportPayloadV1 : ToolExportPayloadV1;
+  payload: K extends 'agent' ? AgentExportPayloadV1 : K extends 'tool' ? ToolExportPayloadV1 : ConnectorTemplateExportPayloadV1;
 }
 
 /**
@@ -56,8 +57,19 @@ export interface ToolExportPayloadV1 {
   };
 }
 
+/**
+ * Export payload for a Connector Template (instance-scoped).
+ *
+ * Notes:
+ * - We export a create-compatible shape (based on CreateConnectorTemplateRequest) so it can be re-imported.
+ * - This object must NOT contain any raw secret values (auth should use SecretRefs only).
+ */
+export interface ConnectorTemplateExportPayloadV1 {
+  connectorTemplate: CreateConnectorTemplateRequest;
+}
+
 export interface StarshipImportResponse {
-  kind: ImportExportKind;
+  kind: 'agent' | 'tool';
   warnings?: string[];
   agent?: AgentModel;
   tool?: ToolModel;

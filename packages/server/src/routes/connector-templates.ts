@@ -7,6 +7,7 @@ import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import type {
   AdminConnectorTemplateListResponse,
+  AdminConnectorTemplateImportResponse,
   AdminConnectorTemplateResponse,
   AuthUser,
   ConnectorAuthV2,
@@ -15,6 +16,8 @@ import type {
   ConnectorTemplateModel,
   ConnectorTemplateRuntimeFieldsV2,
   CreateConnectorTemplateRequest,
+  ImportExportContainerV1,
+  ConnectorTemplateExportPayloadV1,
   UpdateConnectorTemplateRequest,
 } from '@starships/protocol';
 import { ConnectorTemplateEntity, ConnectorTemplateRepository } from '@starships/models';
@@ -122,6 +125,192 @@ function toAdminModel(entity: ConnectorTemplateEntity): ConnectorTemplateAdminMo
 // ============================================================================
 // ADMIN CONNECTOR TEMPLATES (INSTANCE ADMIN ONLY)
 // ============================================================================
+
+/**
+ * GET /admin/connector-templates/:id/export
+ * Export a connector template as a JSON container (instance admin only).
+ */
+router.get('/admin/connector-templates/:id/export', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const params = validateData(z.object({ id: TemplateIdOrProviderSchema }), req.params, res, 'connector template id');
+    if (!params) return;
+
+    const repo = new ConnectorTemplateRepository();
+    const template = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
+      return;
+    }
+
+    const safeAuth = (template.authJson && typeof template.authJson === 'object' && !Array.isArray(template.authJson)
+      ? template.authJson
+      : { type: 'none' }) as unknown as ConnectorAuthV2;
+    const safeVariables = (Array.isArray(template.variablesJson)
+      ? template.variablesJson
+      : undefined) as unknown as ConnectorTemplateRuntimeFieldsV2['variables'];
+    const safeEndpoints = (Array.isArray(template.endpointsJson) ? template.endpointsJson : []) as unknown as ConnectorEndpointV2[];
+    const safeRateLimit =
+      template.rateLimitJson && typeof template.rateLimitJson === 'object' && !Array.isArray(template.rateLimitJson)
+        ? (template.rateLimitJson as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'])
+        : undefined;
+    const safeMetadataSchema =
+      template.metadataSchemaJson && typeof template.metadataSchemaJson === 'object' && !Array.isArray(template.metadataSchemaJson)
+        ? (template.metadataSchemaJson as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'])
+        : undefined;
+
+    const payload: ConnectorTemplateExportPayloadV1 = {
+      connectorTemplate: {
+        // Stable ids are useful for templates; allow explicit id/slug to be preserved on re-import.
+        id: template.id,
+        slug: template.slug,
+        provider: template.provider,
+        name: template.name,
+        description: template.description,
+        authType: template.authType,
+        isEnabled: Boolean(template.isEnabled),
+        version: template.version,
+        category: template.category,
+        baseUrl: template.baseUrl,
+        auth: safeAuth,
+        variables: safeVariables,
+        endpoints: safeEndpoints,
+        rateLimit: safeRateLimit,
+        metadataSchema: safeMetadataSchema,
+      },
+    };
+
+    const container: ImportExportContainerV1<'connector_template'> = {
+      schemaVersion: '1',
+      kind: 'connector_template',
+      exportedAt: new Date().toISOString(),
+      metadata: {
+        fromProvider: template.provider,
+        fromSlug: template.slug,
+        fromId: template.id,
+      },
+      source: {
+        app: 'starships.ai',
+        version: process.env.npm_package_version,
+      },
+      payload,
+    };
+
+    sendSuccess(res, container);
+  } catch (error) {
+    handleError(error, res, 'exporting connector template');
+  }
+});
+
+/**
+ * POST /admin/connector-templates/import
+ * Import (upsert) a connector template from an export container (instance admin only).
+ */
+router.post('/admin/connector-templates/import', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const ContainerSchema = z.object({
+      schemaVersion: z.literal('1'),
+      kind: z.literal('connector_template'),
+      exportedAt: z.string().min(1),
+      metadata: z.record(z.string(), z.unknown()).optional(),
+      source: z
+        .object({
+          app: z.string().optional(),
+          version: z.string().optional(),
+        })
+        .optional(),
+      payload: z.object({
+        connectorTemplate: z.object({
+          id: z.string().trim().min(1).optional(),
+          slug: z.string().trim().min(1).optional(),
+          provider: z.string().trim().min(1),
+          name: z.string().trim().min(1),
+          description: z.string().trim().min(1),
+          authType: z.enum(['oauth2', 'api_key', 'platform_jwt', 'none']),
+          isEnabled: z.boolean().optional(),
+          version: z.string().trim().min(1).optional(),
+          category: z.string().trim().min(1).optional(),
+          baseUrl: z.string().trim().min(1),
+          auth: z.record(z.string(), z.unknown()),
+          variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
+          endpoints: z.array(z.record(z.string(), z.unknown())),
+          rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
+          metadataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
+        }),
+      }),
+    });
+
+    const body = validateData(ContainerSchema, req.body, res, 'connector template import container');
+    if (!body) return;
+
+    const warnings: string[] = [];
+    // Zod schema intentionally validates a safe-but-loose JSON shape; cast through unknown to satisfy TS.
+    const ctRaw = body.payload.connectorTemplate as unknown as CreateConnectorTemplateRequest;
+    const ctRawNullable = ctRaw as unknown as {
+      variables?: unknown;
+      rateLimit?: unknown;
+      metadataSchema?: unknown;
+    };
+    // Normalize nulls (common when JSONB columns are null) into undefined for optional fields.
+    const ct: CreateConnectorTemplateRequest = {
+      ...ctRaw,
+      variables: ctRawNullable.variables === null ? undefined : ctRaw.variables,
+      rateLimit: ctRawNullable.rateLimit === null ? undefined : ctRaw.rateLimit,
+      metadataSchema: ctRawNullable.metadataSchema === null ? undefined : ctRaw.metadataSchema,
+    };
+
+    const repo = new ConnectorTemplateRepository();
+
+    // Prefer explicit id match, then provider match (provider is effectively unique at the template level).
+    const existing = (ct.id ? await repo.findById(ct.id) : null) ?? (await repo.findByProvider(ct.provider));
+
+    let saved: ConnectorTemplateEntity;
+    let created = false;
+
+    if (existing) {
+      if (ct.slug && ct.slug !== existing.slug) {
+        warnings.push(`Imported slug "${ct.slug}" ignored; existing slug is "${existing.slug}".`);
+      }
+      if (ct.id && ct.id !== existing.id) {
+        warnings.push(`Imported id "${ct.id}" ignored; updating existing template id "${existing.id}".`);
+      }
+
+      const updated =
+        (await repo.update(existing.id, {
+          name: ct.name,
+          description: ct.description,
+          authType: ct.authType,
+          isEnabled: ct.isEnabled,
+          version: ct.version,
+          category: ct.category,
+          baseUrl: ct.baseUrl,
+          authJson: ct.auth as unknown as ConnectorAuthV2,
+          variablesJson: ct.variables as unknown as ConnectorTemplateRuntimeFieldsV2['variables'],
+          endpointsJson: ct.endpoints as unknown as ConnectorEndpointV2[],
+          rateLimitJson: ct.rateLimit as unknown as ConnectorTemplateRuntimeFieldsV2['rateLimit'],
+          metadataSchemaJson: ct.metadataSchema as unknown as ConnectorTemplateRuntimeFieldsV2['metadataSchema'],
+        })) ?? undefined;
+
+      if (!updated) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: existing.id });
+        return;
+      }
+      saved = updated;
+    } else {
+      created = true;
+      saved = await repo.create(ct);
+    }
+
+    const payload: AdminConnectorTemplateImportResponse = {
+      connector: toAdminModel(saved),
+      created,
+      warnings: warnings.length ? warnings : undefined,
+    };
+
+    sendSuccess(res, payload, created ? 201 : 200);
+  } catch (error) {
+    handleError(error, res, 'importing connector template');
+  }
+});
 
 // GET /admin/connector-templates - List connector templates (summaries)
 router.get('/admin/connector-templates', async (req: Request, res: Response): Promise<void> => {

@@ -6,15 +6,94 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
-import { useAdminConnectorTemplates, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
+import { ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS, useAdminConnectorTemplates, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
+import api from '@/lib/api'
+import type { ApiResponse, AdminConnectorTemplateImportResponse, ImportExportContainerV1 } from '@starships/protocol'
+import type { FetchResponse } from '@/lib/types'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import React, { useRef, useState } from 'react'
+import { toast } from 'sonner'
+import { useQueryClient } from '@tanstack/react-query'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 export default function AdminConnectorTemplatesPage(): React.JSX.Element {
   const router = useRouter()
   const { isAuthenticated, isInstanceAdmin } = useAuth()
+  const queryClient = useQueryClient()
   const { data: connectors = [], isLoading, isError, error } = useAdminConnectorTemplates(isAuthenticated && isInstanceAdmin)
   const updateMutation = useUpdateAdminConnectorTemplate()
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const [isImporting, setIsImporting] = useState(false)
+  const [isExportingId, setIsExportingId] = useState<string | null>(null)
+
+  const downloadJson = (filename: string, data: unknown) => {
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handlePickFile = () => {
+    if (!fileInputRef.current) return
+    fileInputRef.current.value = ''
+    fileInputRef.current.click()
+  }
+
+  const handleFileSelected = async (file: File | null) => {
+    if (!file) return
+    setIsImporting(true)
+    try {
+      const text = await file.text()
+      let parsed: unknown
+      try {
+        parsed = JSON.parse(text)
+      } catch {
+        throw new Error('Invalid JSON file')
+      }
+
+      const resp: FetchResponse<ApiResponse<AdminConnectorTemplateImportResponse>> = await api.post('/api/v1/admin/connector-templates/import', parsed)
+      const result = resp.data.data
+      if (!result?.connector) throw new Error('Import failed: empty response')
+
+      await queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all })
+
+      const action = result.created ? 'Created' : 'Updated'
+      const provider = result.connector.provider
+      if (Array.isArray(result.warnings) && result.warnings.length > 0) {
+        toast.success(`${action} ${provider}`, { description: result.warnings.join('\n') })
+      } else {
+        toast.success(`${action} ${provider}`)
+      }
+    } catch (e: any) {
+      toast.error('Import failed', { description: e?.message || 'Unknown error' })
+    } finally {
+      setIsImporting(false)
+    }
+  }
+
+  const exportConnectorTemplateJson = async (id: string, provider?: string) => {
+    setIsExportingId(id)
+    try {
+      const resp: FetchResponse<ApiResponse<ImportExportContainerV1>> = await api.get(`/api/v1/admin/connector-templates/${id}/export`)
+      const container = resp.data.data
+      if (!container) throw new Error('Export failed: empty response')
+
+      const base = provider ? `connector-template-${provider}` : `connector-template-${id}`
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-')
+      downloadJson(`${base}__${stamp}.json`, container)
+      toast.success('Exported JSON')
+    } catch (e: any) {
+      toast.error('Export failed', { description: e?.message || 'Unknown error' })
+    } finally {
+      setIsExportingId(null)
+    }
+  }
 
   if (!isAuthenticated) {
     return (
@@ -71,7 +150,12 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
             </div>
 
             <section className="space-y-4">
-              <div className="flex items-center justify-end">
+              <div className="flex items-center justify-end gap-2">
+                <input ref={fileInputRef} type="file" accept="application/json,.json" className="hidden" onChange={e => void handleFileSelected(e.target.files?.[0] ?? null)} />
+                <Button type="button" variant="outline" onClick={handlePickFile} disabled={isImporting}>
+                  <Icon name="upload" className="h-4 w-4 mr-1" />
+                  {isImporting ? 'Importing…' : 'Import JSON'}
+                </Button>
                 <Button onClick={() => router.push('/admin/connector-templates/new')}>
                   <Icon name="plus" className="h-4 w-4 mr-1" />
                   New connector template
@@ -87,26 +171,27 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Enabled</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Version</th>
                       <th className="border-b px-4 py-3 text-left text-sm font-medium whitespace-nowrap">Updated</th>
+                      <th className="border-b px-4 py-3 text-right text-sm font-medium whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody>
                     {isLoading && (
                       <tr>
-                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
+                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={7}>
                           Loading…
                         </td>
                       </tr>
                     )}
                     {isError && !isLoading && (
                       <tr>
-                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
+                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={7}>
                           {(error as any)?.message || 'Failed to load connector templates.'}
                         </td>
                       </tr>
                     )}
                     {!isLoading && !isError && connectors.length === 0 && (
                       <tr>
-                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={6}>
+                        <td className="px-4 py-6 text-sm text-muted-foreground" colSpan={7}>
                           No connector templates found.
                         </td>
                       </tr>
@@ -142,6 +227,35 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                           </td>
                           <td className="px-4 py-3 text-sm font-mono">{c.version}</td>
                           <td className="px-4 py-3 text-sm">{new Date(c.updatedAt).toLocaleString()}</td>
+                          <td className="px-4 py-3 text-sm text-right">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0"
+                                  disabled={isExportingId === c.id}
+                                  onClick={e => e.stopPropagation()}
+                                  title="Connector template actions"
+                                >
+                                  <Icon name="dots-vertical" className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-44" onClick={e => e.stopPropagation()}>
+                                <DropdownMenuItem
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    void exportConnectorTemplateJson(c.id, c.provider)
+                                  }}
+                                  className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                                >
+                                  <Icon name="download" className="w-4 h-4 text-muted-foreground" />
+                                  <span>{isExportingId === c.id ? 'Exporting…' : 'Export JSON'}</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </td>
                         </tr>
                       ))}
                   </tbody>

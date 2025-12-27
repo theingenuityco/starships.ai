@@ -342,6 +342,15 @@ export interface AdminConnectorTemplateResponse {
   connector: ConnectorTemplateAdminModel;
 }
 
+export interface AdminConnectorTemplateImportResponse {
+  connector: ConnectorTemplateAdminModel;
+  /**
+   * True when a new template was created; false when an existing template was updated (upsert).
+   */
+  created: boolean;
+  warnings?: string[];
+}
+
 export interface UpdateConnectorTemplateRequest {
   name?: string;
   description?: string;

@@ -2,13 +2,13 @@
 
 import React, { useRef, useState } from 'react'
 import api from '@/lib/api'
-import type { ImportExportKind, ImportExportContainerV1, ApiResponse, StarshipImportResponse } from '@starships/protocol'
+import type { ImportExportContainerV1, ApiResponse, StarshipImportResponse } from '@starships/protocol'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import type { FetchResponse } from '@/lib/types'
 
 type Props = {
-  kind: ImportExportKind
+  kind: 'agent' | 'tool'
   starshipId: string
   exportResourceId?: string
   exportFileBaseName?: string

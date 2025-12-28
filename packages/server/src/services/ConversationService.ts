@@ -2618,34 +2618,9 @@ export class ConversationService {
       }
 
       case 'tool_call_detected': {
-        // Drop nested tool call detections (only emit from top-level LLM)
-        if ((event.executionDepth ?? 0) > 0) {
-          break;
-        }
-
-        // Enforce balance before executing any tool logic
-        try {
-          const stoppedTool = await this.maybeAutoStopForLowBalance(conversationId);
-          if (stoppedTool) {
-            break;
-          }
-        } catch {
-          /* non-fatal: balance auto-stop during tool_call_detected */
-        }
-        const toolEvt = event as ToolEvent;
-
-        // Broadcast tool_call_detected via ui_action event channel
-        // This triggers UI form opening for specific tools like tool_create
-        if (this.streamingService && this.streamingService.isActive(conversationId)) {
-          const payload = {
-            __ui_action: 'tool_call_detected',
-            toolCallId: toolEvt.data?.toolCallId,
-            toolName: toolEvt.data?.toolName,
-          };
-          await this.streamingService.broadcastUIAction(conversationId, payload);
-        } else {
-          console.warn('[STREAMING] ⚠️ StreamingService not active, cannot broadcast tool_call_detected');
-        }
+        // Intentionally no-op:
+        // The client conversation UI no longer auto-navigates to builders based on tool calls.
+        // Balance enforcement is handled at 'tool_started' (and other execution boundaries).
         break;
       }
 

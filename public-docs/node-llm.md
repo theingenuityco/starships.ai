@@ -26,8 +26,11 @@ Specification (authoritative)
 Image generation (OpenRouter)
 
 - To request images from OpenRouter-compatible models, set:
-  - `modalities: ['image','text']` (OpenRouter expects both; `['image']` may not work)
-  - `imageConfig: { aspect_ratio?: '1:1'|'16:9'|'9:16'|string, ... }`
+  - `modalities: ['image','text']`
+  - `imageConfig: { aspect_ratio?: '1:1'|'16:9'|'9:16'|string, num_images?: number, ... }`
+- Defaults applied by the Autopilot LLM node (before calling `hostRuntime.llm`):
+  - If `modalities` includes `'image'`, the node ensures `'text'` is also present.
+  - If `modalities` includes `'image'`, the node defaults `imageConfig.num_images` to `1` (override by setting `imageConfig.num_images` explicitly).
 - Host runtime mapping:
   - The LLM node passes `modalities` and `imageConfig` to `hostRuntime.llm(...)`.
   - If your host runtime calls OpenRouter via the OpenAI SDK, map `imageConfig` → `image_config` (snake_case), per OpenRouter’s extension.

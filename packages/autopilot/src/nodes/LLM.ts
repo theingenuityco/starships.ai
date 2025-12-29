@@ -186,9 +186,33 @@ export class LLM extends BaseNode<LlmParams> {
 
       // Delegate provider selection and credential management to HostRuntime;
       // the host returns an AsyncIterable of provider-native chunks.
-      const modalities = this.coerceMaybeJson<Array<'text' | 'image'>>(params.modalities);
-      const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
+      let modalities = this.coerceMaybeJson<Array<'text' | 'image'>>(params.modalities);
+      let imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
+
+      // Root defaults for OpenRouter image generation:
+      // - Ensure 'text' is included when requesting 'image' (OpenRouter commonly expects both)
+      // - Default to a single image unless explicitly overridden via imageConfig.num_images
+      const modalitiesArr = Array.isArray(modalities) ? modalities : undefined;
+      const isImageRequest = !!modalitiesArr && modalitiesArr.includes('image');
+      if (isImageRequest) {
+        if (!modalitiesArr!.includes('text')) {
+          modalities = [...modalitiesArr!, 'text'];
+        }
+
+        const cfg: Record<string, unknown> = imageConfig && typeof imageConfig === 'object' ? { ...imageConfig } : {};
+        const rawNumImages = cfg['num_images'];
+        const parsedNumImages =
+          typeof rawNumImages === 'number'
+            ? rawNumImages
+            : typeof rawNumImages === 'string'
+              ? Number.parseInt(rawNumImages, 10)
+              : undefined;
+        const numImages = Number.isFinite(parsedNumImages) && (parsedNumImages as number) >= 1 ? (parsedNumImages as number) : 1;
+        cfg['num_images'] = numImages;
+        imageConfig = cfg;
+      }
+
       const stream = await hostRuntime.llm({
         model: params.model,
         messages: this.convertMessagesToOpenAI(sourceMessages),

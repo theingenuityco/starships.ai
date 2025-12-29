@@ -2459,7 +2459,7 @@ export class ConversationService {
                     // Replace each inline image data URL with a stable marker.
                     // The actual image content will be provided to clients via attachmentIds.
                     for (const [url, id] of urlToId.entries()) {
-                      contentString = contentString.split(url).join(`attachment:${id}`);
+                      contentString = contentString.split(url).join(`attachment://${id}`);
                     }
                   }
                 }

@@ -6,6 +6,7 @@ Key points
 
 - The LLM node passes `modalities` and `imageConfig` to `hostRuntime.llm(...)`.
 - If you call OpenRouter via the OpenAI SDK, map `imageConfig` → `image_config` (snake_case) on the outbound request.
+- The Autopilot LLM node defaults `imageConfig.num_images` to `1` when `modalities` includes `'image'` (override by setting `imageConfig.num_images` explicitly).
 - OpenRouter typically returns generated images on the assistant message under `images[]`, where each item often looks like:
   - `{ image_url: { url: "data:image/png;base64,..." } }`
 - In the Starships hosted product, those base64 data URLs are automatically stored as **attachments** (so they do not bloat message rows).
@@ -55,7 +56,7 @@ const blueprint = {
         model: 'openai/gpt-image-1',
         messages: [{ role: 'user', content: 'Generate a clean product photo of a red starship on a white background.' }],
         modalities: ['image', 'text'],
-        imageConfig: { aspect_ratio: '1:1' },
+        imageConfig: { aspect_ratio: '1:1', num_images: 1 },
       },
     },
     { ref: 'e', type: 'end', name: 'End', parameters: { output: '{{ lastOutputOf("img") }}' } },

@@ -704,7 +704,7 @@ router.post(
         }
         if (urlToId.size > 0) {
           for (const [url, id] of urlToId.entries()) {
-            content = content.split(url).join(`attachment:${id}`);
+            content = content.split(url).join(`attachment://${id}`);
           }
         }
       }

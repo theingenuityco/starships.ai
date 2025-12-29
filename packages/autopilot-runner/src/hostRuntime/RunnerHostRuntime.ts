@@ -345,7 +345,10 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
     // OpenRouter image generation (OpenRouter extension):
     // - modalities: ['image','text']
-    // - image_config: { aspect_ratio: '16:9', ... }
+    // - image_config: { aspect_ratio: '16:9', num_images: 1, ... }
+    //
+    // NOTE: Root defaults (like `num_images: 1`) are applied in the Autopilot LLM node
+    // before the request reaches the host runtime, so this layer should mostly just map fields.
     try {
       if (Array.isArray(modalities) && modalities.length > 0) {
         baseRequest.modalities = modalities;

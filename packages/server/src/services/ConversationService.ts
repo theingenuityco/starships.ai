@@ -1543,23 +1543,14 @@ export class ConversationService {
       return;
     }
 
-    // Skip workflow/node control events from nested executions (depth>0) to avoid duplicates
-    if (
-      event.type === 'workflow_started' ||
-      event.type === 'workflow_completed' ||
-      event.type === 'workflow_failed' ||
-      event.type === 'workflow_paused' ||
-      event.type === 'workflow_resumed' ||
-      event.type === 'node_started' ||
-      event.type === 'node_completed' ||
-      event.type === 'node_failed'
-    ) {
-      const depthRoot = event.executionDepth ?? 0;
-      if (depthRoot > 0) {
-        // Skip these events from nested workflows (depth > 0) to prevent duplication
-        return;
-      }
+    // Skip ALL events from nested executions (depth>0).
+    // In the hosted product, tool blueprints may internally run LLM/workflow nodes. Those nested
+    // events must not hijack the outer conversation streaming shell / turn lifecycle.
+    if ((event.executionDepth ?? 0) > 0) {
+      return;
     }
+
+    // (Nested workflow/node control events are implicitly skipped by the blanket guard above.)
 
     switch (event.type) {
       case 'workflow_started': {

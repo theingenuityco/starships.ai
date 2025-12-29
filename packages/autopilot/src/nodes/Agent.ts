@@ -536,6 +536,7 @@ export class Agent implements NodeHandler {
           toolCallId: `{{ (() => { const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : []; const idx = Number.isFinite(Number(state?.pendingToolCallIndex)) ? Number(state?.pendingToolCallIndex) : 0; return String(pending?.[idx]?.id ?? ""); })() }}`,
           args: `{{ lastOutputOf("${argsNodeRef}") }}`,
           conversationId: `{{ String(env("CONVERSATION_ID") ?? "") }}`,
+          parentExecutionDepth: `{{ Number(depth ?? 0) }}`,
         },
         timeout: 120000,
       },

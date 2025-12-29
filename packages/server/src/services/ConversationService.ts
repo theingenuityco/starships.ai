@@ -2573,6 +2573,13 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // Nested workflows (e.g. a tool blueprint that contains its own llm node) also emit workflow_completed.
+        // Only the root (depth=0) workflow should end the conversation turn / broadcast turn_completed,
+        // otherwise the outer agent loop gets cut off.
+        if ((event.executionDepth ?? 0) > 0) {
+          break;
+        }
+
         // Ensure the active assistant streaming shell is finalized before emitting 'complete'
         if (this.streamingService && this.streamingService.isActive(conversationId)) {
           try {
@@ -2668,6 +2675,12 @@ export class ConversationService {
       }
 
       case 'workflow_failed': {
+        // Same as workflow_completed: ignore nested workflow failures so they don't
+        // terminate the outer agent turn prematurely (root workflow handles surfacing).
+        if ((event.executionDepth ?? 0) > 0) {
+          break;
+        }
+
         const execEvent = event as ExecutionEvent;
         const execution: Execution | undefined = execEvent.data?.execution;
         console.error('[STREAMING] Workflow failed:', execution?.results);

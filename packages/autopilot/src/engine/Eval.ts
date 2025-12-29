@@ -41,6 +41,16 @@ export interface EvalContext {
   currentNodeRef?: string;
 
   /**
+   * Execution nesting depth:
+   * - 0 = top-level workflow
+   * - 1+ = nested workflows (e.g. tool-invoked blueprints)
+   *
+   * Safe to expose to templates and useful when calling host APIs that need to
+   * preserve parent/child relationships.
+   */
+  depth: number;
+
+  /**
    * Last output for the given nodeRef with wrapper removed.
    *
    * - If the node produced 0 items: returns undefined
@@ -121,6 +131,7 @@ export class Eval {
       outputs: execution.results, // Use array format directly
       status: execution.status,
       currentNodeRef: execution.currentNodeRef,
+      depth: execution.depth ?? 0,
 
       lastOutputOf: (nodeRef: string) => {
         if (!nodeRef) return undefined;

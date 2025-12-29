@@ -19,6 +19,7 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
+import type { Execution } from '@starships/autopilot';
 import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
@@ -169,11 +170,21 @@ async function executeToolBlueprint(args: {
   toolConfig: Record<string, unknown>;
   toolArgs: Record<string, unknown>;
   runnerConfig: Record<string, unknown>;
+  parentExecutionDepth?: number;
 }): Promise<unknown> {
-  const execution = ExecutionItemUtils.createExecution();
+  // IMPORTANT (hosted Starships):
+  // Tool blueprints are executed inside an outer agent turn. If we run them as a depth=0 execution,
+  // they emit workflow_started/workflow_completed with executionDepth=0 and will be interpreted by
+  // the ConversationService as the *outer* turn completing (premature stop).
+  //
+  // So: run tool executions as a nested depth>0 execution, matching how Tool nodes execute sub-blueprints.
+  // We still select the runner based on top-level semantics (remote when RUNNER_URL is configured).
+  const parentDepth = Number.isFinite(Number(args.parentExecutionDepth)) ? Number(args.parentExecutionDepth) : 0;
+  const parentExecution: Execution = { status: 'not_started', state: {}, results: [], depth: Math.max(0, parentDepth) };
+  const execution = ExecutionItemUtils.createExecution(undefined, parentExecution);
   const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
   execution.results.push({ nodeRef: '__initial__', items: initial });
-  const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
+  const runner = RunnerFactory.getTopLevelRunner(0);
   const items = await runner.run(args.blueprint, execution, { failOnNodeError: true, ...(args.runnerConfig as unknown as EngineConfig) });
   return ExecutionItemUtils.unwrapSingle(items);
 }
@@ -445,6 +456,7 @@ router.post(
           toolSlug: z.string().min(1),
           toolCallId: z.string().min(1),
           args: z.record(z.string(), z.unknown()).optional(),
+          parentExecutionDepth: z.coerce.number().int().min(0).optional(),
         }),
         req.body,
         res,
@@ -452,11 +464,12 @@ router.post(
       );
       if (!bodyValidation) return;
 
-      const { agentId, toolSlug, toolCallId, args } = bodyValidation as {
+      const { agentId, toolSlug, toolCallId, args, parentExecutionDepth } = bodyValidation as {
         agentId: string;
         toolSlug: string;
         toolCallId: string;
         args?: Record<string, unknown>;
+        parentExecutionDepth?: number;
       };
 
       const conversationService = new ConversationService();
@@ -574,6 +587,7 @@ router.post(
         toolConfig: (tool.configuration || {}) as Record<string, unknown>,
         toolArgs: args || {},
         runnerConfig: engineConfig,
+        parentExecutionDepth,
       });
 
       sendSuccess(res, { toolCallId, result }, 200);

@@ -65,28 +65,28 @@ function tryParseJSON(value: any): any {
   return value
 }
 
-// Base64 image tool results are persisted as attachments and replaced in JSON/text with `attachment:<id>`.
-// For display, replace those markers with a friendly label so users don't see raw tokens.
-function replaceAttachmentMarkersInText(text: string, getLabel?: (id: string) => string): string {
+// Base64 image tool results are persisted as attachments and replaced in JSON/text with `attachment://<id>`.
+// For display, replace those markers with a usable URL (prefer presigned previewUrl when available).
+function replaceAttachmentMarkersInText(text: string, getUrl?: (id: string) => string): string {
   if (typeof text !== 'string') return text as any
   if (!text.includes('attachment:')) return text
-  return text.replace(/attachment:([a-z0-9-]+)/gi, (_m, id: string) => {
-    const label = getLabel ? getLabel(id) : ''
-    return label ? `[attachment: ${label}]` : '[attachment]'
+  return text.replace(/attachment:(?:\/\/)?([a-z0-9-]+)/gi, (_m, id: string) => {
+    const url = getUrl ? getUrl(id) : ''
+    return url || `attachment://${id}`
   })
 }
 
-function replaceAttachmentMarkersInJson(value: unknown, getLabel?: (id: string) => string): unknown {
+function replaceAttachmentMarkersInJson(value: unknown, getUrl?: (id: string) => string): unknown {
   if (typeof value === 'string') {
-    return replaceAttachmentMarkersInText(value, getLabel)
+    return replaceAttachmentMarkersInText(value, getUrl)
   }
   if (Array.isArray(value)) {
-    return value.map(v => replaceAttachmentMarkersInJson(v, getLabel))
+    return value.map(v => replaceAttachmentMarkersInJson(v, getUrl))
   }
   if (value && typeof value === 'object') {
     const rec = value as Record<string, unknown>
     const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(rec)) out[k] = replaceAttachmentMarkersInJson(v, getLabel)
+    for (const [k, v] of Object.entries(rec)) out[k] = replaceAttachmentMarkersInJson(v, getUrl)
     return out
   }
   return value
@@ -115,11 +115,12 @@ export function ConversationMessageContent({
 
   // Fetch attachments metadata
   const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(attachmentIds, starshipId)
-  const attachmentLabelForId = useMemo(() => {
+  const attachmentUrlForId = useMemo(() => {
     const map = new Map<string, string>()
     for (const a of attachments || []) {
-      const label = a.mimeType?.startsWith('image/') ? (a.filename || 'image') : (a.filename || 'file')
-      map.set(a.id, label)
+      if (typeof a.previewUrl === 'string' && a.previewUrl.length > 0) {
+        map.set(a.id, a.previewUrl)
+      }
     }
     return (id: string) => map.get(id) || ''
   }, [attachments])
@@ -212,13 +213,13 @@ export function ConversationMessageContent({
   }, [displayContent])
 
   const displayContentSanitized = useMemo(() => {
-    return replaceAttachmentMarkersInText(displayContent, attachmentLabelForId)
-  }, [displayContent, attachmentLabelForId])
+    return replaceAttachmentMarkersInText(displayContent, attachmentUrlForId)
+  }, [displayContent, attachmentUrlForId])
 
   const parsedJsonSanitized = useMemo(() => {
     if (!parsedJson) return null
-    return replaceAttachmentMarkersInJson(parsedJson, attachmentLabelForId)
-  }, [parsedJson, attachmentLabelForId])
+    return replaceAttachmentMarkersInJson(parsedJson, attachmentUrlForId)
+  }, [parsedJson, attachmentUrlForId])
 
   // Collapsible should always start closed; users can expand manually
 
@@ -618,13 +619,13 @@ export function ConversationMessageContent({
                                       const t = (resultContent || '').trim()
                                       if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
                                         return JSON.stringify(
-                                          replaceAttachmentMarkersInJson(JSON.parse(t), attachmentLabelForId),
+                                          replaceAttachmentMarkersInJson(JSON.parse(t), attachmentUrlForId),
                                           null,
                                           2
                                         )
                                       }
                                     } catch {}
-                                    return replaceAttachmentMarkersInText(resultContent, attachmentLabelForId)
+                                    return replaceAttachmentMarkersInText(resultContent, attachmentUrlForId)
                                   })()}
                                 </code>
                               </pre>

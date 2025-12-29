@@ -52,6 +52,7 @@ export class Code extends BaseNode<CodeParams> {
         outputs: execution?.results || [],
         status: execution?.status ?? 'not_started',
         currentNodeRef: execution?.currentNodeRef,
+        depth: execution?.depth ?? 0,
         lastOutputOf,
         exists: (value: unknown) => value !== undefined && value !== null,
         env: (key: string) => (typeof key === 'string' ? (runtimeEnv as Record<string, unknown>)[key] : undefined),

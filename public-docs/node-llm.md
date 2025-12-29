@@ -23,6 +23,21 @@ Specification (authoritative)
   - modalities?: ('text'|'image')[] | string
   - imageConfig?: Record<string, unknown> | string
 
+Image generation (OpenRouter)
+
+- To request images from OpenRouter-compatible models, set:
+  - `modalities: ['image','text']` (OpenRouter expects both; `['image']` may not work)
+  - `imageConfig: { aspect_ratio?: '1:1'|'16:9'|'9:16'|string, ... }`
+- Host runtime mapping:
+  - The LLM node passes `modalities` and `imageConfig` to `hostRuntime.llm(...)`.
+  - If your host runtime calls OpenRouter via the OpenAI SDK, map `imageConfig` → `image_config` (snake_case), per OpenRouter’s extension.
+- Output shape:
+  - Providers typically include generated images on the assistant message under an `images` field.
+  - On OpenRouter, each item commonly looks like `{ image_url: { url: "data:image/png;base64,..." } }`.
+- Starships hosted product behavior:
+  - The server converts any generated `data:image/...;base64,...` payloads into **attachments** (S3 + `attachments` rows).
+  - Messages store only `attachmentIds` (and replace the raw data URL with a small `attachment:<id>` marker internally).
+
 Message normalization and conversion
 
 - Input `messages` are coerced into canonical `LlmMessage[]`:
@@ -111,6 +126,26 @@ Example (chat with tools)
         blueprint: { nodes: [...], edges: [...] }
       }
     ]
+  }
+}
+```
+
+Example (image generation)
+
+```ts
+{
+  ref: "llm_image",
+  type: "llm",
+  name: "Generate image",
+  parameters: {
+    // Pick an image-capable model on OpenRouter
+    model: "openai/gpt-image-1",
+    messages: [
+      { role: "user", content: "Generate a clean product photo of a red starship on a white background." }
+    ],
+    // OpenRouter image generation expects both modalities present.
+    modalities: ["image", "text"],
+    imageConfig: { aspect_ratio: "1:1" }
   }
 }
 ```

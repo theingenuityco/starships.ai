@@ -79,6 +79,7 @@ Examples
 - [example-10-kitchen-sink.md](./example-10-kitchen-sink.md)
 - [example-11-quirks-and-gotchas.md](./example-11-quirks-and-gotchas.md)
 - [example-12-resume-and-visit-limits.md](./example-12-resume-and-visit-limits.md)
+- [example-13-llm-image-generation.md](./example-13-llm-image-generation.md)
 
 Notes:
 

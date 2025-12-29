@@ -12,13 +12,13 @@ Code
 
 ```ts
 import OpenAI from 'openai';
-import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+import { Engine, ExecutionItemUtils } from '@starships/autopilot';
 
 const apiKey = process.env.OPENROUTER_API_KEY;
 if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
 const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
 
-const hostRuntime: HostRuntime = {
+const hostRuntime = {
   http: async () => {
     throw new Error('HostRuntime.http not configured for this example');
   },
@@ -27,11 +27,16 @@ const hostRuntime: HostRuntime = {
   },
   llm: async (req) => {
     // The LLM node expects an AsyncIterable of provider-native streaming chunks.
-    return await openai.chat.completions.create({
+    const request = {
       model: req.model,
-      messages: req.messages as any,
+      messages: req.messages,
       stream: true,
-    });
+      // Optional OpenRouter image generation support
+      ...(Array.isArray(req.modalities) && req.modalities.length > 0 ? { modalities: req.modalities } : {}),
+      ...(req.imageConfig && typeof req.imageConfig === 'object' ? { image_config: req.imageConfig } : {}), // OpenRouter expects snake_case
+    };
+
+    return await openai.chat.completions.create(request);
   },
 };
 

@@ -65,6 +65,33 @@ function tryParseJSON(value: any): any {
   return value
 }
 
+// Base64 image tool results are persisted as attachments and replaced in JSON/text with `attachment:<id>`.
+// For display, replace those markers with a friendly label so users don't see raw tokens.
+function replaceAttachmentMarkersInText(text: string, getLabel?: (id: string) => string): string {
+  if (typeof text !== 'string') return text as any
+  if (!text.includes('attachment:')) return text
+  return text.replace(/attachment:([a-z0-9-]+)/gi, (_m, id: string) => {
+    const label = getLabel ? getLabel(id) : ''
+    return label ? `[attachment: ${label}]` : '[attachment]'
+  })
+}
+
+function replaceAttachmentMarkersInJson(value: unknown, getLabel?: (id: string) => string): unknown {
+  if (typeof value === 'string') {
+    return replaceAttachmentMarkersInText(value, getLabel)
+  }
+  if (Array.isArray(value)) {
+    return value.map(v => replaceAttachmentMarkersInJson(v, getLabel))
+  }
+  if (value && typeof value === 'object') {
+    const rec = value as Record<string, unknown>
+    const out: Record<string, unknown> = {}
+    for (const [k, v] of Object.entries(rec)) out[k] = replaceAttachmentMarkersInJson(v, getLabel)
+    return out
+  }
+  return value
+}
+
 export function ConversationMessageContent({
   content,
   messageId,
@@ -88,6 +115,14 @@ export function ConversationMessageContent({
 
   // Fetch attachments metadata
   const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(attachmentIds, starshipId)
+  const attachmentLabelForId = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const a of attachments || []) {
+      const label = a.mimeType?.startsWith('image/') ? (a.filename || 'image') : (a.filename || 'file')
+      map.set(a.id, label)
+    }
+    return (id: string) => map.get(id) || ''
+  }, [attachments])
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
@@ -175,6 +210,15 @@ export function ConversationMessageContent({
     } catch {}
     return null as any
   }, [displayContent])
+
+  const displayContentSanitized = useMemo(() => {
+    return replaceAttachmentMarkersInText(displayContent, attachmentLabelForId)
+  }, [displayContent, attachmentLabelForId])
+
+  const parsedJsonSanitized = useMemo(() => {
+    if (!parsedJson) return null
+    return replaceAttachmentMarkersInJson(parsedJson, attachmentLabelForId)
+  }, [parsedJson, attachmentLabelForId])
 
   // Collapsible should always start closed; users can expand manually
 
@@ -420,7 +464,7 @@ export function ConversationMessageContent({
       {messageType !== 'tool_result' && (
         <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content', enableCopy && !isStreaming && 'pr-6')}>
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {displayContent}
+            {displayContentSanitized}
           </ReactMarkdown>
         </div>
       )}
@@ -573,10 +617,14 @@ export function ConversationMessageContent({
                                     try {
                                       const t = (resultContent || '').trim()
                                       if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                        return JSON.stringify(JSON.parse(t), null, 2)
+                                        return JSON.stringify(
+                                          replaceAttachmentMarkersInJson(JSON.parse(t), attachmentLabelForId),
+                                          null,
+                                          2
+                                        )
                                       }
                                     } catch {}
-                                    return resultContent
+                                    return replaceAttachmentMarkersInText(resultContent, attachmentLabelForId)
                                   })()}
                                 </code>
                               </pre>
@@ -658,12 +706,22 @@ export function ConversationMessageContent({
                 Tool Result (Standalone)
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() =>
+                handleCopyCodeBlock(
+                  parsedJsonSanitized ? JSON.stringify(parsedJsonSanitized, null, 2) : displayContentSanitized,
+                  `${messageId}-tool-result`
+                )
+              }
+            >
               {copiedStates[`${messageId}-tool-result`] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
             </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
-            <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
+            <code>{parsedJsonSanitized ? JSON.stringify(parsedJsonSanitized, null, 2) : displayContentSanitized}</code>
           </pre>
         </Card>
       )}

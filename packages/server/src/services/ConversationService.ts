@@ -301,7 +301,13 @@ export class ConversationService {
     return null;
   }
 
-  private static parseBase64ImageDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
+  /**
+   * Parse a base64 image data URL (e.g. "data:image/png;base64,...") into a buffer.
+   *
+   * Exposed as a shared helper so routes/services that persist tool results can
+   * convert inline base64 images into proper attachments (S3) instead of bloating DB rows.
+   */
+  static parseBase64ImageDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
     if (typeof dataUrl !== 'string') return null;
     const m = dataUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\n\r]+)$/i);
     if (!m) return null;
@@ -314,6 +320,19 @@ export class ConversationService {
     } catch {
       return null;
     }
+  }
+
+  /**
+   * Extract base64-encoded image data URLs from an arbitrary string.
+   * This is intentionally conservative (image/* + base64 only) to avoid false positives.
+   */
+  static extractBase64ImageDataUrlsFromText(text: string): string[] {
+    if (typeof text !== 'string') return [];
+    if (!text.includes('data:image/')) return [];
+    const re = /data:image\/[a-z0-9.+-]+;base64,[a-z0-9+/=\n\r]+/gi;
+    const matches = text.match(re);
+    if (!matches || matches.length === 0) return [];
+    return Array.from(new Set(matches));
   }
 
   /**
@@ -2388,11 +2407,62 @@ export class ConversationService {
                 const agent = role === 'assistant' ? this.currentAgentForConversation.get(conversationId) : undefined;
                 const pendingAttachmentIds =
                   role === 'assistant' ? this.streamingGeneratedAttachmentIds.get(conversationId) || [] : ([] as string[]);
-                const starship = pendingAttachmentIds.length > 0 ? await this.getConversationStarship(conversationId) : null;
 
                 // Extract string content (LLM responses are always string, not ContentBlock[])
-                const contentString =
-                  typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
+                let contentString = typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
+
+                // If a tool (or any message) emitted an inline base64 image, store it as an attachment
+                // and replace the huge data URL in content with a small marker.
+                const inlineImageUrls = ConversationService.extractBase64ImageDataUrlsFromText(contentString);
+                const needsStarship = pendingAttachmentIds.length > 0 || inlineImageUrls.length > 0;
+                const starshipForAttachments = needsStarship ? await this.getConversationStarship(conversationId) : null;
+                const inlineAttachmentIds: string[] = [];
+                if (inlineImageUrls.length > 0 && starshipForAttachments) {
+                  const attachmentService = new AttachmentService();
+                  const urlToId = new Map<string, string>();
+                  for (let idx = 0; idx < inlineImageUrls.length; idx++) {
+                    const url = inlineImageUrls[idx];
+                    const parsed = ConversationService.parseBase64ImageDataUrl(url);
+                    if (!parsed) continue;
+
+                    const ext =
+                      parsed.mimeType === 'image/png'
+                        ? 'png'
+                        : parsed.mimeType === 'image/jpeg'
+                          ? 'jpg'
+                          : parsed.mimeType === 'image/webp'
+                            ? 'webp'
+                            : parsed.mimeType === 'image/gif'
+                              ? 'gif'
+                              : 'png';
+                    const filename = `generated_${Date.now()}_${idx}.${ext}`;
+
+                    try {
+                      const attachment = await attachmentService.createAttachment({
+                        starshipId: starshipForAttachments.id,
+                        conversationId,
+                        filename,
+                        mimeType: parsed.mimeType,
+                        buffer: parsed.buffer,
+                      });
+                      inlineAttachmentIds.push(attachment.id);
+                      urlToId.set(url, attachment.id);
+                    } catch (err) {
+                      console.warn('[STREAMING] Failed to persist inline base64 image attachment', {
+                        conversationId,
+                        error: err instanceof Error ? err.message : String(err),
+                      });
+                    }
+                  }
+
+                  if (urlToId.size > 0) {
+                    // Replace each inline image data URL with a stable marker.
+                    // The actual image content will be provided to clients via attachmentIds.
+                    for (const [url, id] of urlToId.entries()) {
+                      contentString = contentString.split(url).join(`attachment:${id}`);
+                    }
+                  }
+                }
 
                 const persistedMsg = await this.messageService.createMessage({
                   conversationId,
@@ -2403,15 +2473,20 @@ export class ConversationService {
                   ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
                   ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
                   ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
-                  ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
+                  ...((pendingAttachmentIds.length > 0 || inlineAttachmentIds.length > 0) && role === 'assistant'
+                    ? { attachmentIds: [...pendingAttachmentIds, ...inlineAttachmentIds] }
+                    : inlineAttachmentIds.length > 0 && role === 'tool'
+                      ? { attachmentIds: inlineAttachmentIds }
+                      : {}),
                 });
 
                 // Link generated attachments to the persisted assistant message (best-effort)
-                if (role === 'assistant' && pendingAttachmentIds.length > 0 && starship) {
+                if (role === 'assistant' && (pendingAttachmentIds.length > 0 || inlineAttachmentIds.length > 0) && starshipForAttachments) {
                   try {
                     const attachmentService = new AttachmentService();
+                    const allIds = [...pendingAttachmentIds, ...inlineAttachmentIds];
                     await Promise.all(
-                      pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
+                      allIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starshipForAttachments.id).catch(() => false))
                     );
                   } catch {
                     // Non-fatal

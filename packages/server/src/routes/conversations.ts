@@ -13,6 +13,7 @@ import { ResumeTokenService } from '@/services/ResumeTokenService';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { AgentService } from '@/services/AgentService';
 import { MessageService } from '@/services/MessageService';
+import { AttachmentService } from '@/services/AttachmentService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
@@ -657,10 +658,56 @@ router.post(
       });
 
       const messageService = new MessageService();
-      const content = JSON.stringify({
+      let content = JSON.stringify({
         success: true,
         data: { result, approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId },
       });
+
+      // If the tool result contains inline base64-encoded images (data:image/...;base64,...),
+      // persist them as attachments and replace the huge data URLs in the stored JSON.
+      const inlineImageUrls = ConversationService.extractBase64ImageDataUrlsFromText(content);
+      const inlineAttachmentIds: string[] = [];
+      if (inlineImageUrls.length > 0) {
+        const attachmentService = new AttachmentService();
+        const urlToId = new Map<string, string>();
+        for (let idx = 0; idx < inlineImageUrls.length; idx++) {
+          const url = inlineImageUrls[idx];
+          const parsed = ConversationService.parseBase64ImageDataUrl(url);
+          if (!parsed) continue;
+          const ext =
+            parsed.mimeType === 'image/png'
+              ? 'png'
+              : parsed.mimeType === 'image/jpeg'
+                ? 'jpg'
+                : parsed.mimeType === 'image/webp'
+                  ? 'webp'
+                  : parsed.mimeType === 'image/gif'
+                    ? 'gif'
+                    : 'png';
+          const filename = `generated_${Date.now()}_${idx}.${ext}`;
+          try {
+            const attachment = await attachmentService.createAttachment({
+              starshipId: conversation.starshipId,
+              conversationId,
+              filename,
+              mimeType: parsed.mimeType,
+              buffer: parsed.buffer,
+            });
+            inlineAttachmentIds.push(attachment.id);
+            urlToId.set(url, attachment.id);
+          } catch (err) {
+            console.warn('[tool-approval] Failed to persist inline base64 image attachment', {
+              conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+        }
+        if (urlToId.size > 0) {
+          for (const [url, id] of urlToId.entries()) {
+            content = content.split(url).join(`attachment:${id}`);
+          }
+        }
+      }
 
       // Do NOT persist any interim tool result before approval; this message is the first persisted tool result for this call.
       const created = await messageService.createMessage({
@@ -669,6 +716,7 @@ router.post(
         content,
         messageType: 'tool_result',
         toolCallId: approval.toolCallId,
+        ...(inlineAttachmentIds.length > 0 ? { attachmentIds: inlineAttachmentIds } : {}),
       });
 
       // Best-effort broadcast: update last message (after client supports replace for non-assistant)

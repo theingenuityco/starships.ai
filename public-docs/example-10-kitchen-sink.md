@@ -6,23 +6,23 @@ Code (abridged)
 
 ```ts
 import OpenAI from 'openai';
-import { Engine, ExecutionItemUtils, type HostRuntime } from '@starships/autopilot';
+import { Engine, ExecutionItemUtils } from '@starships/autopilot';
 
 const apiKey = process.env.OPENROUTER_API_KEY;
 if (!apiKey) throw new Error('OPENROUTER_API_KEY is required');
 const openai = new OpenAI({ apiKey, baseURL: 'https://openrouter.ai/api/v1' });
 
-const hostRuntime: HostRuntime = {
+const hostRuntime = {
   http: async ({ method, url, headers = {}, body, timeoutMs }) => {
     const controller = new AbortController();
     const timeout = typeof timeoutMs === 'number' && timeoutMs > 0 ? timeoutMs : 30000;
     const t = setTimeout(() => controller.abort(), timeout);
     try {
       const finalMethod = String(method || 'GET').toUpperCase();
-      const init: RequestInit = { method: finalMethod, headers: headers as any, signal: controller.signal };
+      const init = { method: finalMethod, headers, signal: controller.signal };
       if (body !== undefined && finalMethod !== 'GET' && finalMethod !== 'HEAD') {
         init.body = typeof body === 'string' ? body : JSON.stringify(body);
-        const h = new Headers(init.headers as any);
+        const h = new Headers(init.headers);
         if (typeof body !== 'string' && !h.has('content-type')) h.set('content-type', 'application/json');
         init.headers = h;
       }
@@ -40,22 +40,29 @@ const hostRuntime: HostRuntime = {
     throw new Error('HostRuntime.connectorAction not configured for this example');
   },
   llm: async (req) => {
-    const tools = Array.isArray(req.tools) && req.tools.length
-      ? req.tools.map((t: any) => ({
-          type: 'function',
-          function: {
-            name: (typeof t.slug === 'string' && t.slug.trim().length ? t.slug : t.name) || 'tool',
-            description: typeof t.description === 'string' ? t.description : '',
-            parameters: t.parameters,
-          },
-        }))
-      : undefined;
-    return await openai.chat.completions.create({
+    const tools =
+      Array.isArray(req.tools) && req.tools.length
+        ? req.tools.map((t) => ({
+            type: 'function',
+            function: {
+              name: t.slug || t.name || 'tool',
+              description: t.description || '',
+              parameters: t.parameters,
+            },
+          }))
+        : undefined;
+
+    const request = {
       model: req.model,
-      messages: req.messages as any,
-      tools: tools as any,
+      messages: req.messages,
+      tools,
       stream: true,
-    });
+      // Optional OpenRouter image generation support
+      ...(Array.isArray(req.modalities) && req.modalities.length > 0 ? { modalities: req.modalities } : {}),
+      ...(req.imageConfig && typeof req.imageConfig === 'object' ? { image_config: req.imageConfig } : {}), // OpenRouter expects snake_case
+    };
+
+    return await openai.chat.completions.create(request);
   },
 };
 

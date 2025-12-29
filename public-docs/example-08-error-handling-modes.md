@@ -16,10 +16,10 @@ const hostRuntime: HostRuntime = {
     const t = setTimeout(() => controller.abort(), timeout);
     try {
       const finalMethod = String(method || 'GET').toUpperCase();
-      const init: RequestInit = { method: finalMethod, headers: headers as any, signal: controller.signal };
+      const init = { method: finalMethod, headers, signal: controller.signal };
       if (body !== undefined && finalMethod !== 'GET' && finalMethod !== 'HEAD') {
         init.body = typeof body === 'string' ? body : JSON.stringify(body);
-        const h = new Headers(init.headers as any);
+        const h = new Headers(init.headers);
         if (typeof body !== 'string' && !h.has('content-type')) h.set('content-type', 'application/json');
         init.headers = h;
       }

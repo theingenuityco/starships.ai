@@ -140,38 +140,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Removed in-conversation builder overlays; now using dedicated routes
   // Removed UI action handling
 
-  // View is always 'conversation' now; builders have dedicated routes
-  const [viewMode] = useState<'conversation'>('conversation')
-  const viewModeRef = useRef<'conversation'>('conversation')
-  // Track applied tool call keys to accumulate across messages
-  const appliedToolCallKeysRef = useRef<Set<string>>(new Set())
-  // Track last conversation id to reset applied set
-  const lastAppliedConversationRef = useRef<string | null>(null)
   // Deduplicate UI action payloads across sources
   const lastUIActionKeyRef = useRef<string | null>(null)
-
-  // Removed overlay state; no longer used without in-page builders
-  const [isMessageOverlayExpanded] = useState(false)
-  const wasOpenedByStreamingRef = useRef(false)
-
-  // Track pending tool calls for completion detection
-  const pendingToolCallsRef = useRef<Map<string, { toolName: string; args: any; completed?: boolean }>>(new Map())
-  // Track toolCallIds we've already navigated for to avoid duplicate route pushes
-  const navigatedToolCallIdsRef = useRef<Set<string>>(new Set())
-  // Navigation baseline for current streaming turn to avoid acting on old messages
-  const navPrevStreamingRef = useRef<boolean>(false)
-  const navTurnStartIdxRef = useRef<number | null>(null)
-  // Creation flow guard for tool builder routing during current turn
-  const toolCreationFlowActiveRef = useRef<boolean>(false)
-  const setToolCreationFlowFlag = (on: boolean) => {
-    try {
-      if (!currentConversationIdRef.current) return
-      const key = `toolCreationFlow:${currentConversationIdRef.current}`
-      if (typeof window === 'undefined' || !window.sessionStorage) return
-      if (on) window.sessionStorage.setItem(key, JSON.stringify({ ts: Date.now() }))
-      else window.sessionStorage.removeItem(key)
-    } catch {}
-  }
 
   const queryClient = useQueryClient()
 
@@ -583,19 +553,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [selectedAgent?.id])
 
-  // Keep view mode ref in sync to avoid stale closure issues
-  useEffect(() => {
-    viewModeRef.current = viewMode
-  }, [viewMode])
-
-  // Reset applied tool-calls tracker when conversation changes
-  useEffect(() => {
-    if (lastAppliedConversationRef.current !== currentConversationId) {
-      appliedToolCallKeysRef.current.clear()
-      lastAppliedConversationRef.current = currentConversationId ?? null
-    }
-  }, [currentConversationId])
-
   // Focus after conversation becomes ready
   useEffect(() => {
     if (currentConversationId) {
@@ -621,140 +578,89 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Removed manual agent builder toggle (route-based only)
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
-  const handleUIPayload = useCallback((payload: any) => {
-    try {
-      if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
-      const key = JSON.stringify(payload)
-      if (lastUIActionKeyRef.current === key) return
-      lastUIActionKeyRef.current = key
+  const handleUIPayload = useCallback(
+    (payload: any) => {
+      try {
+        if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
+        const key = JSON.stringify(payload)
+        if (lastUIActionKeyRef.current === key) return
+        lastUIActionKeyRef.current = key
 
-      const action = (payload as any).__ui_action as string
+        const action = (payload as any).__ui_action as string
 
-      // Builders are route-based now; no in-place form updates
+        // Builders are route-based now; no in-place form updates
 
-      switch (action) {
-        case 'conversation_title_updated': {
-          const cid = (payload as any)?.conversationId
-          try {
-            if (starshipId) {
-              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
-            }
-            if (cid) {
-              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
-            }
-          } catch {}
-          break
-        }
-        case 'child_conversation_created': {
-          try {
-            const sid = (payload as any)?.starshipId || starshipId
-            if (sid) {
-              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
-            }
-          } catch {}
-          break
-        }
-        case 'tool_approval_required': {
-          try {
-            const approvalId = String((payload as any)?.approvalId || '')
-            const cid = String((payload as any)?.conversationId || '')
-            const agentId = String((payload as any)?.agentId || '')
-            const toolSlug = String((payload as any)?.toolSlug || '')
-            const toolCallId = String((payload as any)?.toolCallId || '')
-            const args = (payload as any)?.args
-
-            if (!approvalId || !cid || !agentId || !toolSlug || !toolCallId) break
-
-            const currentCid = currentConversationIdRef.current || externalConversationId || null
-            if (currentCid && cid !== currentCid) break
-
-            setPendingToolApproval({
-              approvalId,
-              conversationId: cid,
-              starshipId: (payload as any)?.starshipId,
-              agentId,
-              agentName: (payload as any)?.agentName,
-              toolSlug,
-              toolCallId,
-              args: args && typeof args === 'object' ? args : undefined,
-            })
-          } catch {}
-          break
-        }
-        case 'tool_approval_resolved': {
-          try {
-            const approvalId = String((payload as any)?.approvalId || '')
-            if (approvalId && pendingToolApproval?.approvalId === approvalId) {
-              setPendingToolApproval(null)
-              setToolApprovalBusy(null)
-            }
-          } catch {}
-          break
-        }
-        case 'tool_call_detected': {
-          const toolName = (payload as any).toolName
-          const toolNameLc = typeof toolName === 'string' ? toolName.toLowerCase() : ''
-          const toolCallId = (payload as any).toolCallId
-
-          // Store tool call info for later completion handling
-          if (toolCallId) {
-            pendingToolCallsRef.current.set(toolCallId, { toolName, args: {} })
-          }
-
-          // Navigate to tool builder route for tool actions
-          const toolBuilderSlugFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
-          if (toolBuilderSlugFragments.some(s => toolNameLc.includes(s)) || toolNameLc.includes('tool-blueprint-')) {
+        switch (action) {
+          case 'conversation_title_updated': {
+            const cid = (payload as any)?.conversationId
             try {
-              const toolSlug = (payload as any)?.slug || (payload as any)?.toolSlug || 'new'
-              const slug = starshipSlug
-              if (slug) {
-                const convId = currentConversationIdRef.current || externalConversationId || null
-                const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                router.push(`/ship/${slug}/tool/${encodeURIComponent(toolSlug)}${q}`)
-              } else {
-                // If slug missing, do nothing special
+              if (starshipId) {
+                queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
               }
-            } catch {
-              // ignore navigation error
-            }
+              if (cid) {
+                queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
+              }
+            } catch {}
+            break
           }
-
-          // Navigate to agent builder for agent actions
-          const agentBuilderSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
-          if (agentBuilderSlugFragments.some(s => toolNameLc.includes(s))) {
+          case 'child_conversation_created': {
             try {
-              const isOpenAgent = toolNameLc.includes('open-agent')
-              let nextAgentSlug = (payload as any)?.slug || (payload as any)?.agentSlug
-              // Do NOT fallback to selected agent; for open-agent without slug, go to 'new'
-              if (!nextAgentSlug && isOpenAgent) {
-                nextAgentSlug = 'new'
+              const sid = (payload as any)?.starshipId || starshipId
+              if (sid) {
+                queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
               }
-              const slug = starshipSlug
-              if (slug) {
-                const convId = currentConversationIdRef.current || externalConversationId || null
-                const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                if (nextAgentSlug) {
-                  router.push(`/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`)
-                }
-              } else {
-                // If slug missing, do nothing special
-              }
-            } catch {
-              // ignore navigation error
-            }
+            } catch {}
+            break
           }
-          break
+          case 'tool_approval_required': {
+            try {
+              const approvalId = String((payload as any)?.approvalId || '')
+              const cid = String((payload as any)?.conversationId || '')
+              const agentId = String((payload as any)?.agentId || '')
+              const toolSlug = String((payload as any)?.toolSlug || '')
+              const toolCallId = String((payload as any)?.toolCallId || '')
+              const args = (payload as any)?.args
+
+              if (!approvalId || !cid || !agentId || !toolSlug || !toolCallId) break
+
+              const currentCid = currentConversationIdRef.current || externalConversationId || null
+              if (currentCid && cid !== currentCid) break
+
+              setPendingToolApproval({
+                approvalId,
+                conversationId: cid,
+                starshipId: (payload as any)?.starshipId,
+                agentId,
+                agentName: (payload as any)?.agentName,
+                toolSlug,
+                toolCallId,
+                args: args && typeof args === 'object' ? args : undefined,
+              })
+            } catch {}
+            break
+          }
+          case 'tool_approval_resolved': {
+            try {
+              const approvalId = String((payload as any)?.approvalId || '')
+              if (approvalId && pendingToolApproval?.approvalId === approvalId) {
+                setPendingToolApproval(null)
+                setToolApprovalBusy(null)
+              }
+            } catch {}
+            break
+          }
+
+          // All tool form management is handled in dedicated routes now
+
+          default:
+            break
         }
-
-        // All tool form management is handled in dedicated routes now
-
-        default:
-          break
+      } catch {
+        // ignore
       }
-    } catch {
-      // ignore
-    }
-  }, [queryClient, router, starshipId, starshipSlug, externalConversationId, pendingToolApproval?.approvalId])
+    },
+    [queryClient, router, starshipId, starshipSlug, externalConversationId, pendingToolApproval?.approvalId]
+  )
 
   const handleApproveTool = useCallback(async () => {
     if (!pendingToolApproval?.approvalId || !pendingToolApproval?.conversationId) return
@@ -784,34 +690,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       setToolApprovalBusy(null)
     }
   }, [pendingToolApproval, toolApprovalBusy])
-
-  // Handle tool completion for entity-modifying tools
-  const handleToolComplete = useCallback(
-    async (toolName: string, toolArgs: any) => {
-      try {
-        // Agent tools - fetch and sync agent data
-        const agentTools = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
-        if (agentTools.includes(toolName) && toolArgs?.slug) {
-          // Fetch complete agent data by slug
-          const agent = await agentAPI.getBySlug(toolArgs.slug)
-
-          // In dedicated route, the page handles syncing; nothing to update here
-        }
-
-        // Tool tools - fetch and sync tool data
-        const toolTools = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
-        if (toolTools.includes(toolName) && toolArgs?.slug) {
-          // Fetch complete tool data by slug
-          const tool = await toolAPI.getBySlug(starshipId, toolArgs.slug)
-
-          // In dedicated route, the page handles syncing; nothing to update here
-        }
-      } catch (error) {
-        console.error('Failed to fetch entity after tool completion:', error)
-      }
-    },
-    [starshipId]
-  )
 
   // Stream-dependent side-effects are handled within the provider context to avoid duplicate SSE connections
   function StreamSideEffects() {
@@ -937,129 +815,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
     // Removed UI action JSON parsing during streaming
 
-    // Track turn boundaries for navigation baseline
-    useEffect(() => {
-      const was = navPrevStreamingRef.current
-      if (!was && uiStreaming) {
-        // Turn just started: record baseline so we only act on new messages
-        navTurnStartIdxRef.current = liveMessages.length
-        toolCreationFlowActiveRef.current = false
-        setToolCreationFlowFlag(false)
-      }
-      if (was && !uiStreaming) {
-        // Turn ended: clear baseline and navigated ids
-        navTurnStartIdxRef.current = null
-        navigatedToolCallIdsRef.current.clear()
-        toolCreationFlowActiveRef.current = false
-        setToolCreationFlowFlag(false)
-      }
-      navPrevStreamingRef.current = Boolean(uiStreaming)
-    }, [uiStreaming, liveMessages.length])
-
-    // Proactive navigation on tool calls (only during active streaming; only new messages after turn start)
-    useEffect(() => {
-      if (!uiStreaming || !currentConversationId || !liveMessages.length || !starshipSlug) return
-      if (navTurnStartIdxRef.current === null) return
-      const newMessages = (liveMessages as any[]).slice(navTurnStartIdxRef.current as number)
-
-      // PRIORITY PASS: If any open-tool without slug exists in this turn, immediately route to /tool/new
-      if (!toolCreationFlowActiveRef.current) {
-        for (let i = 0; i < newMessages.length; i++) {
-          const msg = newMessages[i] as any
-          if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
-          for (const tc of msg.toolCalls as any[]) {
-            const rawName = tc?.function?.name as string | undefined
-            const name = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-            if (!name) continue
-            let args: any = tc?.function?.arguments
-            if (typeof args === 'string') {
-              try {
-                args = JSON.parse(args)
-              } catch {}
-            }
-            if (name.includes('open-tool')) {
-              const toolSlug = args?.slug || args?.toolSlug
-              if (!toolSlug) {
-                const convId = currentConversationIdRef.current || externalConversationId || null
-                const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-                try {
-                  toolCreationFlowActiveRef.current = true
-                  setToolCreationFlowFlag(true)
-                  router.push(`/ship/${starshipSlug}/tool/new${q}`)
-                } catch {}
-                return
-              }
-            }
-          }
-        }
-      }
-
-      for (let i = 0; i < newMessages.length; i++) {
-        const msg = newMessages[i] as any
-        if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
-        for (const tc of msg.toolCalls as any[]) {
-          const id = tc?.id as string | undefined
-          if (!id || navigatedToolCallIdsRef.current.has(id)) continue
-          const rawName = tc?.function?.name as string | undefined
-          const name = typeof rawName === 'string' ? rawName.toLowerCase() : ''
-          if (!name) continue
-
-          const toolFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
-          const agentFragments = ['open-agent', 'edit-agent']
-
-          let args: any = tc?.function?.arguments
-          if (typeof args === 'string') {
-            try {
-              args = JSON.parse(args)
-            } catch {}
-          }
-
-          if (toolFragments.some(f => name.includes(f)) || name.includes('tool-blueprint-')) {
-            const isOpen = name.includes('open-tool')
-            const isEdit = name.includes('edit-tool')
-            let toolSlug = args?.slug || args?.toolSlug
-            const convId = currentConversationIdRef.current || externalConversationId || null
-            const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-            try {
-              if (isOpen && !toolSlug) {
-                // Creation flow: go to /tool/new and mark creation flag for this turn
-                toolCreationFlowActiveRef.current = true
-                setToolCreationFlowFlag(true)
-                router.push(`/ship/${starshipSlug}/tool/new${q}`)
-                navigatedToolCallIdsRef.current.add(id)
-                return
-              }
-              if ((isOpen || isEdit) && toolSlug) {
-                // Respect creation-flow guard to avoid slug jumps within same turn
-                if (toolCreationFlowActiveRef.current) {
-                  navigatedToolCallIdsRef.current.add(id)
-                  return
-                }
-                router.push(`/ship/${starshipSlug}/tool/${encodeURIComponent(toolSlug)}${q}`)
-                navigatedToolCallIdsRef.current.add(id)
-                return
-              }
-            } catch {}
-          }
-          if (agentFragments.some(f => name.includes(f))) {
-            const isOpen = name.includes('open-agent')
-            const isEdit = name.includes('edit-agent')
-            let agentSlug = args?.slug || args?.agentSlug
-            if (isOpen && !agentSlug) agentSlug = 'new'
-            if (isEdit && !agentSlug) continue
-            if (!isOpen && !isEdit) continue
-            const convId = currentConversationIdRef.current || externalConversationId || null
-            const q = convId ? `?conversationId=${encodeURIComponent(convId)}` : ''
-            try {
-              router.push(`/ship/${starshipSlug}/agent/${encodeURIComponent(agentSlug)}${q}`)
-            } catch {}
-            navigatedToolCallIdsRef.current.add(id)
-            return
-          }
-        }
-      }
-    }, [uiStreaming, currentConversationId, externalConversationId, liveMessages, starshipSlug, router])
-
     // Removed Tool completion follow-ups (handled in builder routes)
 
     // Removed UI action channel consumption
@@ -1145,14 +900,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}
-        <div
-          ref={inputContainerRef}
-          className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-4 sm:pt-6 lg:pt-10 pb-10')}
-        >
-          <div
-            className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-16 sm:mt-24 lg:mt-40')}
-            data-message-input
-          >
+        <div ref={inputContainerRef} className={cn('px-6 pb-4 pt-2', !showMessagesArea && 'pt-4 sm:pt-6 lg:pt-10 pb-10')}>
+          <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-16 sm:mt-24 lg:mt-40')} data-message-input>
             {/* Keep the input mounted across the welcome -> conversation transition to avoid losing focus. */}
             <div className={cn('mb-8 text-center opacity-100', showMessagesArea && 'hidden')} key="welcome-header">
               <h1 className="text-3xl font-normal mb-2 text-foreground">{`Welcome to your starship, ${starshipName}`}</h1>
@@ -1185,9 +934,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                         <p className="text-sm font-medium text-foreground">
                           Approve tool call: <span className="font-mono text-xs">{pendingToolApproval.toolSlug}</span>
                         </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          Agent: {pendingToolApproval.agentName || pendingToolApproval.agentId}
-                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">Agent: {pendingToolApproval.agentName || pendingToolApproval.agentId}</p>
                         {pendingToolApproval.args ? (
                           <div className="mt-2">
                             <button

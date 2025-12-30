@@ -1,8 +1,10 @@
 import express, { Request, Response, Router } from 'express';
+import crypto from 'crypto';
 import Stripe from 'stripe';
 import { TopupRepository, WalletRepository, LedgerRepository, getConnection } from '@starships/models';
 import { logger } from '@/utils/logger';
 import { CREDITS_PER_USD, toCreditsString } from '@/config/credits';
+import { PlatformSecretService } from '@/services/PlatformSecretService';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
@@ -11,9 +13,13 @@ const router: Router = Router();
 /**
  * Shopify mandatory compliance (GDPR) webhooks
  *
- * For now we simply ACK with 200 to unblock connector creation.
- * IMPORTANT: We intentionally use express.raw so we can add HMAC verification
- * later without breaking the request body signature validation.
+ * Shopify typically delivers multiple topics to a single subscription URI.
+ * We branch on `X-Shopify-Topic` and must verify `X-Shopify-Hmac-Sha256`.
+ *
+ * Shopify requirements (per docs):
+ * - Handle POST requests with a JSON body and `Content-Type: application/json`
+ * - If HMAC is invalid (or missing), return 401 Unauthorized
+ * - Otherwise return a 200-series status quickly
  *
  * Shopify topics:
  * - customers/data_request
@@ -22,14 +28,68 @@ const router: Router = Router();
  */
 const shopifyRawJson = express.raw({ type: 'application/json' });
 
-function ackShopifyComplianceWebhook(_req: Request, res: Response): void {
-  // Shopify expects a 200 response quickly. We'll add verification + async handling later.
+function safeEqual(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a, 'utf8');
+  const bBuf = Buffer.from(b, 'utf8');
+  if (aBuf.length !== bBuf.length) return false;
+  return crypto.timingSafeEqual(aBuf, bBuf);
+}
+
+async function resolveShopifyClientSecret(): Promise<string | undefined> {
+  // Shopify webhook verification uses the app's OAuth client secret (a.k.a. API secret key).
+  // This project stores connector secrets in platform_secrets (DB-backed); no env fallback.
+  try {
+    const svc = new PlatformSecretService();
+    const fromDb = await svc.getSecret('SHOPIFY_CLIENT_SECRET');
+    return typeof fromDb === 'string' && fromDb.trim() ? fromDb.trim() : undefined;
+  } catch (err) {
+    logger.warn('[WEBHOOK] Failed to resolve Shopify client secret from platform secrets', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+    return undefined;
+  }
+}
+
+function computeShopifyHmacBase64(secret: string, rawBody: Buffer): string {
+  return crypto.createHmac('sha256', secret).update(rawBody).digest('base64');
+}
+
+async function shopifyComplianceWebhookHandler(req: Request, res: Response): Promise<void> {
+  const topic = (req.get('X-Shopify-Topic') || '').trim();
+  const hmacHeader = (req.get('X-Shopify-Hmac-Sha256') || '').trim();
+
+  const allowedTopics = new Set(['customers/data_request', 'customers/redact', 'shop/redact']);
+  if (!topic || !allowedTopics.has(topic)) {
+    // Don't accidentally ACK unknown topics on this endpoint.
+    res.status(404).send('Not found');
+    return;
+  }
+
+  const secret = await resolveShopifyClientSecret();
+  if (!secret) {
+    logger.warn('[WEBHOOK] Shopify client secret not configured (platform secret SHOPIFY_CLIENT_SECRET)', { topic });
+    res.status(500).send('Shopify client secret not configured');
+    return;
+  }
+
+  const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
+  const computed = computeShopifyHmacBase64(secret, rawBody);
+  if (!hmacHeader || !safeEqual(computed, hmacHeader)) {
+    res.status(401).send('Unauthorized');
+    return;
+  }
+
+  // Shopify expects a fast 200 response. We can add async processing later.
   res.status(200).json({ received: true });
 }
 
-router.post('/webhooks/shopify/customers/data_request', shopifyRawJson, ackShopifyComplianceWebhook);
-router.post('/webhooks/shopify/customers/redact', shopifyRawJson, ackShopifyComplianceWebhook);
-router.post('/webhooks/shopify/shop/redact', shopifyRawJson, ackShopifyComplianceWebhook);
+/**
+ * POST /api/v1/webhooks
+ *
+ * Recommended Shopify compliance subscription URI:
+ * - `${PUBLIC_URL}/api/v1/webhooks`
+ */
+router.post('/webhooks', shopifyRawJson, shopifyComplianceWebhookHandler);
 
 /**
  * POST /api/v1/webhooks/stripe

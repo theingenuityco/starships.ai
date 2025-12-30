@@ -35,17 +35,15 @@ function safeEqual(a: string, b: string): boolean {
   return crypto.timingSafeEqual(aBuf, bBuf);
 }
 
-async function resolveShopifyAppSecret(): Promise<string | undefined> {
-  // Prefer env for local dev; production should store secrets in platform_secrets.
-  const fromEnv = process.env.SHOPIFY_API_SECRET?.trim();
-  if (fromEnv) return fromEnv;
-
+async function resolveShopifyClientSecret(): Promise<string | undefined> {
+  // Shopify webhook verification uses the app's OAuth client secret (a.k.a. API secret key).
+  // This project stores connector secrets in platform_secrets (DB-backed); no env fallback.
   try {
     const svc = new PlatformSecretService();
-    const fromDb = await svc.getSecret('SHOPIFY_API_SECRET');
+    const fromDb = await svc.getSecret('SHOPIFY_CLIENT_SECRET');
     return typeof fromDb === 'string' && fromDb.trim() ? fromDb.trim() : undefined;
   } catch (err) {
-    logger.warn('[WEBHOOK] Failed to resolve Shopify app secret from platform secrets', {
+    logger.warn('[WEBHOOK] Failed to resolve Shopify client secret from platform secrets', {
       error: err instanceof Error ? err.message : String(err),
     });
     return undefined;
@@ -67,10 +65,10 @@ async function shopifyComplianceWebhookHandler(req: Request, res: Response): Pro
     return;
   }
 
-  const secret = await resolveShopifyAppSecret();
+  const secret = await resolveShopifyClientSecret();
   if (!secret) {
-    logger.warn('[WEBHOOK] Shopify webhook secret not configured', { topic });
-    res.status(500).send('Shopify webhook secret not configured');
+    logger.warn('[WEBHOOK] Shopify client secret not configured (platform secret SHOPIFY_CLIENT_SECRET)', { topic });
+    res.status(500).send('Shopify client secret not configured');
     return;
   }
 

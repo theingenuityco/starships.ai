@@ -9,6 +9,29 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 const router: Router = Router();
 
 /**
+ * Shopify mandatory compliance (GDPR) webhooks
+ *
+ * For now we simply ACK with 200 to unblock connector creation.
+ * IMPORTANT: We intentionally use express.raw so we can add HMAC verification
+ * later without breaking the request body signature validation.
+ *
+ * Shopify topics:
+ * - customers/data_request
+ * - customers/redact
+ * - shop/redact
+ */
+const shopifyRawJson = express.raw({ type: 'application/json' });
+
+function ackShopifyComplianceWebhook(_req: Request, res: Response): void {
+  // Shopify expects a 200 response quickly. We'll add verification + async handling later.
+  res.status(200).json({ received: true });
+}
+
+router.post('/webhooks/shopify/customers/data_request', shopifyRawJson, ackShopifyComplianceWebhook);
+router.post('/webhooks/shopify/customers/redact', shopifyRawJson, ackShopifyComplianceWebhook);
+router.post('/webhooks/shopify/shop/redact', shopifyRawJson, ackShopifyComplianceWebhook);
+
+/**
  * POST /api/v1/webhooks/stripe
  * Stripe webhook to finalize wallet top-ups
  *

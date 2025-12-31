@@ -138,7 +138,8 @@ export class ConnectorTemplateRepository extends BaseRepository {
           provider: data.provider,
           name: data.name,
           description: data.description,
-          authType: data.authType,
+          // Persist denormalized auth_type for DB filtering/legacy reasons, derived from auth_json.type.
+          authType: ((data.auth as unknown as { type?: string })?.type || 'none') as CreateConnectorTemplateRequest['auth']['type'],
           baseUrl: data.baseUrl,
           authJson: data.auth as ConnectorAuthV2,
           variablesJson: (data.variables as ConnectorTemplateRuntimeFieldsV2['variables']) ?? undefined,

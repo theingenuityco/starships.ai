@@ -196,7 +196,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     [normalizedQuery]
   )
 
-  // Catalog is driven by connector_templates (enabled only). UI adapts actions based on authType.
+  // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
   const visibleCatalog = useMemo(() => catalog, [catalog])
 
   const getProviderLabel = (provider: string | null | undefined) => {
@@ -228,7 +228,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
     const label = catalogItem.name
     const logoSrc = CONNECTOR_LOGOS[provider]
-    const authType = catalogItem.authType
+    const authType = catalogItem.auth?.type
     const canDisconnect = isConnected && authType !== 'platform_jwt'
     const isOauthConnectable = authType === 'oauth2'
     const isApiKeyConnectable = authType === 'api_key'

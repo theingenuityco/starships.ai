@@ -45,6 +45,49 @@ The canonical TypeScript shapes live in `@starships/protocol`:
 
 ---
 
+### Admin create/update payloads (important: `authType` vs `auth.type`)
+
+When **creating/updating** a connector template via the admin API (e.g. `POST /admin/connector-templates`), the payload includes both:
+
+- **`authType`**: a **root-level** string used for catalog/UI and quick filtering.
+- **`auth.type`**: a **nested** discriminator inside the `auth` object that defines the auth variant.
+
+These two values must match.
+
+**Current server behavior (DX improvement):**
+
+- You may **omit** `authType` and the server will **derive it from** `auth.type`.
+- If you provide both and they **don’t match**, the server returns a validation error that explicitly calls this out.
+
+Example (minimal create payload; `authType` omitted and derived from `auth.type`):
+
+```json
+{
+  "provider": "example",
+  "name": "Example",
+  "description": "Example connector",
+  "baseUrl": "https://api.example.com",
+  "auth": { "type": "api_key" },
+  "endpoints": []
+}
+```
+
+Example (explicit `authType`, must match `auth.type`):
+
+```json
+{
+  "provider": "example",
+  "name": "Example",
+  "description": "Example connector",
+  "authType": "api_key",
+  "baseUrl": "https://api.example.com",
+  "auth": { "type": "api_key" },
+  "endpoints": []
+}
+```
+
+---
+
 ### Expression strings (`ExprString`) and template syntax
 
 Many connector template fields are **expression strings** (`ExprString`) evaluated by the runner at runtime.

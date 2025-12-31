@@ -45,6 +45,41 @@ The canonical TypeScript shapes live in `@starships/protocol`:
 
 ---
 
+### Expression strings (`ExprString`) and template syntax
+
+Many connector template fields are **expression strings** (`ExprString`) evaluated by the runner at runtime.
+
+**Supported expression syntax:**
+
+- Use **double curly braces**: `{{ ... }}`
+- Inside `{{ ... }}`, you can reference:
+  - `args` (the `connector_action.args` object)
+  - `runtimeEnv` (non-secret runtime env passed to the runner)
+  - `metadata` (connector instance metadata, non-secret)
+  - `vars` (connector template variables resolved by the runner)
+
+**Important:** single-curly placeholders like `{args.type}` are **not supported** and will be sent literally to the external API.
+Single-curly braces in `endpoint.path` (e.g. `/items/{id}`) are **path placeholders**, not mapping templates.
+
+Example (query mapping):
+
+```json
+{
+  "name": "get-documentation",
+  "path": "/context",
+  "method": "GET",
+  "mapping": {
+    "query": {
+      "type": "{{ String(args.type) }}",
+      "query": "{{ String(args.query) }}",
+      "libraryId": "{{ String(args.libraryId) }}"
+    }
+  }
+}
+```
+
+---
+
 ### SecretRef (how auth points at secrets)
 
 A SecretRef is:

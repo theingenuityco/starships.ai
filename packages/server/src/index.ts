@@ -9,7 +9,7 @@ import * as Sentry from '@sentry/node';
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection, migrationRunner, seedUpdateDeployedInstances } from '@starships/models';
+import { createConnection, migrationRunner, seedUpdateDeployedInstances, seedToolTemplates, seedAgentTemplates } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -150,6 +150,12 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
+
+    // Seed tool and agent templates (idempotent - safe to run multiple times)
+    console.log('🌱 Seeding tool and agent templates...');
+    await seedToolTemplates();
+    await seedAgentTemplates();
+    console.log('✅ Tool and agent templates seeded');
 
     // Version flow: sync deployed instances to latest DB templates.
     // (Intentionally idempotent and should not block startup on failure.)

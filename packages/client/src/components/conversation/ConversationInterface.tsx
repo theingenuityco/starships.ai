@@ -905,7 +905,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             {/* Keep the input mounted across the welcome -> conversation transition to avoid losing focus. */}
             <div className={cn('mb-8 text-center opacity-100', showMessagesArea && 'hidden')} key="welcome-header">
               <h1 className="text-3xl font-normal mb-2 text-foreground">{`Welcome to your starship, ${starshipName}`}</h1>
-              <p className="text-base text-muted-foreground">{starterSlogan}</p>
             </div>
 
             <div className={cn('mb-6', (!shouldShowWelcomeCard || showMessagesArea) && 'hidden')} key="welcome-card">
@@ -924,9 +923,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
 
               <div key="message-input">
-                <div className={cn('mb-1', showMessagesArea && 'hidden')}>
-                  <p className="text-xs font-medium text-muted-foreground">and give instructions</p>
-                </div>
                 {showMessagesArea && pendingToolApproval ? (
                   <div className="mb-3 rounded-2xl border border-border/60 bg-card/80 shadow-sm px-4 py-3">
                     <div className="flex items-start justify-between gap-4">

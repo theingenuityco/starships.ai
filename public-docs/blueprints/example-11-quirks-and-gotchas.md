@@ -25,7 +25,7 @@
   - For complex URLs, prefer either:
     - One expression that returns the final URL string, or
     - A Code node that returns `{ url }`, then an HttpRequest node with `url: "{{ (lastOutputOf('build_url') || {}).url }}"`.
-  - For connector-backed calls, use `connector_action` (not `http_request`). See `connectors/README.md`.
+  - For connector-backed calls, use `connector_action` (not `http_request`). See `../connectors/README.md`.
 
 - Mutate vs Transform
   - Transform changes input→output; Mutate changes `execution.state`.

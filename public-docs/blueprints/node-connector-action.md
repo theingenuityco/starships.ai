@@ -115,6 +115,6 @@ Example (connector_action list issues)
 
 Cross-links
 
-- See `connectors/README.md` and `connectors/connector_templates.md` for connector templates, auth models, and endpoint mapping.
+- See `../connectors/README.md` and `../connectors/connector_templates.md` for connector templates, auth models, and endpoint mapping.
 - See `node-http-request.md` for raw absolute HTTP calls without connector auth/mapping.
 - See `node-agent.md` for the default hosted Agent behavior (server-side tool authorization/execution).

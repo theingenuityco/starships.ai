@@ -17,7 +17,7 @@ Specification (authoritative)
 - Handler: `packages/autopilot/src/nodes/ConnectorAction.ts`
 - Runtime implementation (runner): `packages/autopilot-runner/src/hostRuntime/RunnerHostRuntime.ts` (`connectorAction`)
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
-  - connector: string (required) — connector slug/provider (e.g. `"github"`, `"discord"`, `"google_drive"`, `"linkedin"`, `"starships"`)
+  - connector: string (required) — connector slug/provider (e.g. `"starships"` or any provider configured via `connector_templates`)
   - action: string (required) — endpoint name from the connector template (e.g. `"list-issues"`)
   - args?: Record<string, unknown> (optional)
   - timeout?: number (ms; default 30000)
@@ -97,15 +97,15 @@ Template rules (full-string only)
   - Use a full-string template that returns an object, e.g. `args: "{{ ({ owner: input.owner, repo: input.repo }) }}"`
   - Or use a Code node to construct `{ args }` and pass it as upstream input (then omit `parameters.args`).
 
-Example (GitHub list issues)
+Example (connector_action list issues)
 
 ```ts
 {
-  ref: "github_list_issues",
+  ref: "connector_list_issues",
   type: "connector_action",
-  name: "GitHub: List Issues",
+  name: "Connector: List Issues",
   parameters: {
-    connector: "github",
+    connector: "example",
     action: "list-issues",
     args: { owner: "octo-org", repo: "octo-repo", state: "open" },
     timeout: 15000
@@ -115,6 +115,6 @@ Example (GitHub list issues)
 
 Cross-links
 
-- See `connectors/README.md` and `connectors/configuration.md` for connector templates, auth models, and endpoint mapping.
+- See `connectors/README.md` and `connectors/connector_templates.md` for connector templates, auth models, and endpoint mapping.
 - See `node-http-request.md` for raw absolute HTTP calls without connector auth/mapping.
 - See `node-agent.md` for the default hosted Agent behavior (server-side tool authorization/execution).

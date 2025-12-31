@@ -368,40 +368,25 @@ export function useConversationStop() {
       }
 
       try {
+        // Optimistically flip streaming off and mark complete in local cache so UI hides Stop immediately
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
+          const chunks = Array.isArray(old) ? old.slice() : []
+          chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
+          chunks.push({ type: 'complete' })
+          return chunks
+        })
+      } catch {}
+
+      try {
+        // Clear any stale streamed chunks and force fresh stream attach
+        queryClient.removeQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
         // Best-effort: drop resume token so we don't resume a stale turn
         try {
           if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${conversationId}:resumeToken`)
         } catch {}
-
-        // Build updated chunks: preserve existing + add completion markers
-        const updatedChunks = Array.isArray(existingChunks) ? existingChunks.slice() : []
-        updatedChunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
-        updatedChunks.push({ type: 'complete' })
-        updatedChunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
-        console.log('[STOP] Updated chunks:', updatedChunks.length, 'chunks (added 3 completion chunks)')
-        console.log(
-          '[STOP] Last 3 chunks:',
-          updatedChunks.slice(-3).map(c => c.type)
-        )
-
-        // Update cache with preserved chunks + completion events
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), updatedChunks)
-        console.log('[STOP] Set query data with completion chunks')
-
-        // Verify the update took - check multiple times to see if it persists
-        const verifyChunks1 = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined
-        const hasTurnCompleted1 = Array.isArray(verifyChunks1) && verifyChunks1.some(c => c.type === 'turn_completed')
-        const lastChunkType1 = verifyChunks1 && verifyChunks1.length > 0 ? verifyChunks1[verifyChunks1.length - 1].type : 'none'
-        console.log('[STOP] Verification 1 - hasTurnCompleted:', hasTurnCompleted1, 'chunks length:', verifyChunks1?.length, 'last chunk type:', lastChunkType1)
-
-        // CRITICAL: Don't call invalidateQueries immediately because it triggers a refetch
-        // that overwrites our optimistic update. The server will send its own turn_completed
-        // event through the SSE connection (or on reconnect), which will naturally update state.
-        // Our optimistic update is sufficient to immediately update the UI state.
-        console.log('[STOP] Skipping invalidateQueries to preserve optimistic update - server will send turn_completed naturally')
-      } catch (err) {
-        console.error('[STOP] Error in cache update', err)
-      }
+        // Kick a refetch to rebuild state
+        await queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } catch {}
     },
     [queryClient]
   )
@@ -709,6 +694,16 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       if (msg?.role === 'assistant' && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (messages[messages.length - 1] as any).streaming) {
         messages.pop()
       }
+      // IMPORTANT: Don't replace a stopped assistant message with a persisted version
+      // If the last message was stopped, keep it as-is (it's the partial that was stopped)
+      if (msg?.role === 'assistant' && messages.length > 0) {
+        const lastMsg: any = messages[messages.length - 1]
+        if (lastMsg?.role === 'assistant' && lastMsg?._stopped === true) {
+          // This message was stopped - don't replace it with the persisted version
+          // The persisted version would be the complete message, but we want to keep the stopped partial
+          return messages
+        }
+      }
       return [...messages, { ...msg }]
     }
     case 'replace_whole_message': {
@@ -908,7 +903,13 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     lastChunkAny?.type === 'append' ? `append:${String(lastChunkAny?.message?.role || '')}:${String(lastChunkAny?.message?.id || '')}` : lastChunkAny?.type ? String(lastChunkAny.type) : 'none'
   const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
 
-  const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunksRevisionKey])
+  // CRITICAL FIX: Depend on chunks array directly, not just revision key
+  // The revision key might not change when chunks are updated in place or when
+  // intermediate chunks change but the last chunk stays the same
+  const computedMessages = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return []
+    return chunks.reduce(reduceMessages, [] as ClientMessage[])
+  }, [chunks, chunksRevisionKey])
 
   // Detect if current session has any live streaming signals (placeholder or deltas)
   const hasLiveStreamHint = useMemo(() => {
@@ -1015,29 +1016,47 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   }, [chunksRevisionKey])
 
   // Server-authoritative turn state: derive from latest turn_* or turn_state events
+  // IMPORTANT: Only consider turn events that come AFTER the last user message to avoid
+  // using stale turn state from a previous turn (e.g., after stopping and sending a new message)
   const serverTurnActive = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) {
       console.log('[STREAM] serverTurnActive: false (no chunks)')
       return false
     }
+    // Find the index of the last user message to only consider events after it
+    let lastUserMessageIdx = -1
     for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (c?.type === 'append' && c?.message?.role === 'user') {
+        lastUserMessageIdx = i
+        break
+      }
+    }
+
+    // Scan backwards from the end, but only consider events after the last user message
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      // Stop if we've gone past the last user message (only consider events in the current turn)
+      if (lastUserMessageIdx >= 0 && i < lastUserMessageIdx) {
+        break
+      }
+
       const c: any = chunks[i]
       if (!c) continue
       if (c.type === 'turn_started') {
-        console.log('[STREAM] serverTurnActive: true (found turn_started at index', i, ')')
+        console.log('[STREAM] serverTurnActive: true (found turn_started at index', i, 'after last user at', lastUserMessageIdx, ')')
         return true
       }
       if (c.type === 'turn_completed') {
-        console.log('[STREAM] serverTurnActive: false (found turn_completed at index', i, ')')
+        console.log('[STREAM] serverTurnActive: false (found turn_completed at index', i, 'after last user at', lastUserMessageIdx, ')')
         return false
       }
       if (c.type === 'turn_state') {
         const active = Boolean(c.payload?.turnActive)
-        console.log('[STREAM] serverTurnActive:', active, '(found turn_state at index', i, ')')
+        console.log('[STREAM] serverTurnActive:', active, '(found turn_state at index', i, 'after last user at', lastUserMessageIdx, ')')
         return active
       }
     }
-    console.log('[STREAM] serverTurnActive: false (no turn events found in', chunks.length, 'chunks)')
+    console.log('[STREAM] serverTurnActive: false (no turn events found after last user at', lastUserMessageIdx, 'in', chunks.length, 'chunks)')
     return false
   }, [chunksRevisionKey])
 
@@ -1089,12 +1108,28 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     // If assistant is streaming, the normal path will handle responding.
     if (isAssistantStreaming) return false
 
-    // Scan backwards until we reach the most recent *server* turn completion.
+    // Find the index of the last user message to only consider events after it
+    let lastUserMessageIdx = -1
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (c?.type === 'append' && c?.message?.role === 'user') {
+        lastUserMessageIdx = i
+        break
+      }
+    }
+
+    // Scan backwards until we reach the most recent *server* turn completion or the last user message.
     // This works even if the server appends the user message after we seeded the local turn_started.
     // (The previous logic broke early on the user append and missed the local marker.)
     const maxScan = Math.min(chunks.length, 250)
     for (let n = 1; n <= maxScan; n++) {
-      const c: any = chunks[chunks.length - n]
+      const idx = chunks.length - n
+      // Stop if we've gone past the last user message (only consider events in the current turn)
+      if (lastUserMessageIdx >= 0 && idx < lastUserMessageIdx) {
+        break
+      }
+
+      const c: any = chunks[idx]
       if (!c) continue
       if (c.type === 'turn_completed') return false
       if (c.type === 'turn_started' && c.payload?.local === true) return true
@@ -1150,9 +1185,99 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
   }, [computedMessages, hasCompleteEvent])
 
+  // Check if there's any assistant message (complete or incomplete) after the last user message
+  // IMPORTANT: Check both chunks (for real-time updates) and computedMessages (for final state)
+  // This ensures we detect assistant messages even during streaming or when chunks are being processed
+  const hasAnyAssistantAfterLastUser = useMemo(() => {
+    // First, check chunks directly for immediate detection (catches messages during streaming)
+    // This is critical because computedMessages might lag behind chunk updates
+    if (Array.isArray(chunks) && chunks.length > 0) {
+      let lastUserChunkIdx = -1
+      // Find the last user message in chunks
+      for (let i = chunks.length - 1; i >= 0; i--) {
+        const c: any = chunks[i]
+        if (c?.type === 'append' && c?.message?.role === 'user') {
+          lastUserChunkIdx = i
+          break
+        }
+      }
+      // Check if there's any assistant-related chunk after the last user
+      if (lastUserChunkIdx >= 0) {
+        for (let i = lastUserChunkIdx + 1; i < chunks.length; i++) {
+          const c: any = chunks[i]
+          // Check for assistant message append (new message created)
+          if (c?.type === 'append' && c?.message?.role === 'assistant') {
+            return true
+          }
+          // Check for assistant content chunks (streaming in progress)
+          if (c?.type === 'append_chunk' || c?.type === 'replace_content' || c?.type === 'replace_reasoning') {
+            return true
+          }
+          // Check for whole message replacement (final persisted message)
+          if (c?.type === 'replace_whole_message' && c?.message?.role === 'assistant') {
+            return true
+          }
+          // Check for assistant message updates (id, updatedAt, etc.)
+          if (c?.type === 'update_last_assistant') {
+            return true
+          }
+        }
+      }
+    }
+
+    // Fallback: check computedMessages for final state (catches cases where chunks were processed)
+    if (Array.isArray(computedMessages) && computedMessages.length > 0) {
+      let lastUserIdx = -1
+      for (let i = computedMessages.length - 1; i >= 0; i--) {
+        if (computedMessages[i].role === 'user') {
+          lastUserIdx = i
+          break
+        }
+      }
+      if (lastUserIdx >= 0) {
+        // Check if there's any assistant message after the last user (even if incomplete)
+        for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
+          if (computedMessages[i].role === 'assistant') {
+            return true
+          }
+        }
+      }
+    }
+    return false
+  }, [chunksRevisionKey, computedMessages])
+
+  // Track when turn_started was received to implement timeout for stuck states
+  const turnStartedTime = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return null
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (c?.type === 'turn_started') {
+        // Check if this turn_started is after the last user message
+        let lastUserIdx = -1
+        for (let j = i - 1; j >= 0; j--) {
+          const prevC: any = chunks[j]
+          if (prevC?.type === 'append' && prevC?.message?.role === 'user') {
+            lastUserIdx = j
+            break
+          }
+        }
+        if (lastUserIdx < i) {
+          // This turn_started is after the last user message
+          const payload = c?.payload || {}
+          const timestamp = payload?.at ? Date.parse(payload.at) : payload?.local ? Date.now() : null
+          return timestamp || null
+        }
+      }
+    }
+    return null
+  }, [chunksRevisionKey])
+
   // Awaiting assistant: prefer server turn state; show awaiting when turn is active but no streaming caret
+  // IMPORTANT: Don't show "awaiting" if the assistant has already started responding (even if incomplete)
   const isAwaitingAssistant = useMemo(() => {
     if (hasCompleteEvent) return false
+    // If there's already an assistant message (even incomplete), we're not awaiting - the assistant has started
+    if (hasAnyAssistantAfterLastUser) return false
     // If server says the turn is active, we're awaiting whenever the assistant isn't streaming text
     // AND we are not currently waiting on tool results (tools panel/widget handles its own spinner).
     if (serverTurnActive && !isAssistantStreaming && !isAwaitingToolResults) return true
@@ -1160,7 +1285,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     if (preStreamExpired) return false
     // Otherwise, fall back to local pending-turn state to bridge create/route-change gaps.
     return localTurnPendingActive
-  }, [serverTurnActive, isAssistantStreaming, isAwaitingToolResults, hasCompleteEvent, preStreamExpired, localTurnPendingActive])
+  }, [serverTurnActive, isAssistantStreaming, isAwaitingToolResults, hasCompleteEvent, preStreamExpired, localTurnPendingActive, hasAnyAssistantAfterLastUser])
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant || isAwaitingToolResults
@@ -1168,19 +1293,70 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Debug logging for stop debugging
   useEffect(() => {
     if (conversationId) {
+      // Find last user message index in chunks
+      let lastUserChunkIdx = -1
+      for (let i = chunks.length - 1; i >= 0; i--) {
+        const c: any = chunks[i]
+        if (c?.type === 'append' && c?.message?.role === 'user') {
+          lastUserChunkIdx = i
+          break
+        }
+      }
+
+      // Get chunks after last user message
+      const chunksAfterUser = lastUserChunkIdx >= 0 ? chunks.slice(lastUserChunkIdx + 1) : []
+
       console.log('[STREAM] State update:', {
         conversationId,
         chunksLength: chunks.length,
+        computedMessagesLength: computedMessages.length,
+        chunksRevisionKey,
+        lastUserChunkIdx,
+        chunksAfterUserCount: chunksAfterUser.length,
+        chunksAfterUserTypes: chunksAfterUser.slice(0, 10).map((c: any) => ({
+          type: c?.type,
+          role: c?.message?.role,
+          hasContent: !!(c?.message?.content || c?.content),
+        })),
         hasCompleteEvent,
         isAssistantStreaming,
         isAwaitingAssistant,
         isAwaitingToolResults,
         isResponding,
         serverTurnActive,
-        chunksRevisionKey,
+        hasAnyAssistantAfterLastUser,
+        lastComputedMessage:
+          computedMessages.length > 0
+            ? {
+                role: computedMessages[computedMessages.length - 1]?.role,
+                id: computedMessages[computedMessages.length - 1]?.id,
+                hasContent: !!computedMessages[computedMessages.length - 1]?.content,
+                streaming: (computedMessages[computedMessages.length - 1] as any)?.streaming,
+              }
+            : null,
+        allComputedMessages: computedMessages.map((m: any) => ({
+          role: m.role,
+          id: m.id,
+          hasContent: !!m.content,
+          streaming: m.streaming,
+        })),
       })
     }
-  }, [conversationId, hasCompleteEvent, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults, isResponding, serverTurnActive, chunksRevisionKey, chunks.length])
+  }, [
+    conversationId,
+    hasCompleteEvent,
+    isAssistantStreaming,
+    isAwaitingAssistant,
+    isAwaitingToolResults,
+    isResponding,
+    serverTurnActive,
+    chunksRevisionKey,
+    chunks.length,
+    computedMessages.length,
+    hasAnyAssistantAfterLastUser,
+    computedMessages,
+    chunks,
+  ])
 
   // Fallback: if after connection there are no messages yet, fetch baseline once via REST
   useEffect(() => {
@@ -1258,6 +1434,21 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any[] | undefined) => {
           const next = Array.isArray(old) ? old.slice() : []
+          // Clear any stale streaming state from previous turns by ensuring the last assistant message
+          // (if any) is marked as non-streaming before adding the new user message
+          if (next.length > 0) {
+            const lastChunk: any = next[next.length - 1]
+            // If the last chunk is a streaming assistant message, mark it as non-streaming
+            if (lastChunk?.type === 'append' && lastChunk?.message?.role === 'assistant' && lastChunk?.message?.streaming === true) {
+              next[next.length - 1] = {
+                ...lastChunk,
+                message: { ...lastChunk.message, streaming: false },
+              }
+            }
+            // Also handle append_chunk or other streaming-related chunks that might be at the end
+            // by ensuring any assistant message in the computed state would be non-streaming
+            // (This is handled by the reducer when processing chunks, but we ensure here for safety)
+          }
           // Ensure the optimistic user message exists before the local turn_started so lastUserSerial is stable.
           next.push({ type: 'append', message: tempUser })
           next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
@@ -1268,7 +1459,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     onSuccess: (_res, variables) => {
       // Don't refetch - the SSE stream is already active and will receive new messages automatically
       // Refetching would close the existing connection and open a new one, causing the server
-      // to lose the connection while the agent is still broadcasting
+      // to lose the connection while the agent is still broadcasting, and also causes duplicate messages
     },
     onError: (error: any, variables) => {
       const status = error?.response?.status

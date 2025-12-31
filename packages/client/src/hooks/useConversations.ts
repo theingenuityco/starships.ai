@@ -368,25 +368,48 @@ export function useConversationStop() {
       }
 
       try {
-        // Optimistically flip streaming off and mark complete in local cache so UI hides Stop immediately
-        // IMPORTANT: Don't remove queries or invalidate - this causes refetch that loads persisted messages
-        // which can include duplicates or complete messages that were persisted after stop
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
-          const chunks = Array.isArray(old) ? old.slice() : []
-          chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
-          chunks.push({ type: 'complete' })
-          chunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
-          return chunks
-        })
+        // Find the last assistant message chunk and mark it as stopped
+        // This prevents it from being replaced by the persisted complete version
+        const chunks = Array.isArray(existingChunks) ? existingChunks.slice() : []
+
+        // Find and mark the last assistant message as stopped
+        for (let i = chunks.length - 1; i >= 0; i--) {
+          const c: any = chunks[i]
+          if (c?.type === 'append' && c?.message?.role === 'assistant') {
+            // Mark this message as stopped so it won't be replaced by persisted version
+            chunks[i] = {
+              ...c,
+              message: {
+                ...c.message,
+                streaming: false,
+                _stopped: true, // Client-side flag to prevent replacement
+              },
+            }
+            break
+          } else if (c?.type === 'replace_whole_message' && c?.message?.role === 'assistant') {
+            chunks[i] = {
+              ...c,
+              message: {
+                ...c.message,
+                streaming: false,
+                _stopped: true,
+              },
+            }
+            break
+          }
+        }
+
+        // Add completion markers
+        chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
+        chunks.push({ type: 'complete' })
+        chunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
+
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), chunks)
 
         // Best-effort: drop resume token so we don't resume a stale turn
         try {
           if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${conversationId}:resumeToken`)
         } catch {}
-
-        // CRITICAL: Don't remove queries or invalidate - the server will send turn_completed via SSE
-        // Removing/invalidating causes a refetch that loads persisted messages, which can be duplicates
-        // or complete messages that were persisted after stop was called
       } catch {}
     },
     [queryClient]
@@ -695,6 +718,15 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       if (msg?.role === 'assistant' && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (messages[messages.length - 1] as any).streaming) {
         messages.pop()
       }
+      // IMPORTANT: Don't add a persisted assistant message if we already have a stopped partial
+      // The stopped partial has _stopped: true flag, and we want to keep it instead of the complete persisted version
+      if (msg?.role === 'assistant' && messages.length > 0) {
+        const lastMsg: any = messages[messages.length - 1]
+        if (lastMsg?.role === 'assistant' && lastMsg?._stopped === true) {
+          // We have a stopped partial message - don't replace it with the persisted complete version
+          return messages
+        }
+      }
       return [...messages, { ...msg }]
     }
     case 'replace_whole_message': {
@@ -714,6 +746,12 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       if (typeof incoming?.id === 'string') {
         const idx = messages.findIndex((m: any) => m?.id === incoming.id)
         if (idx !== -1) {
+          // IMPORTANT: Don't replace a stopped message with a persisted version
+          const existing: any = messages[idx]
+          if (existing?._stopped === true && incoming.role === 'assistant') {
+            // This message was stopped - keep the stopped partial, don't replace with persisted complete
+            return messages
+          }
           messages[idx] = (incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage
           return messages
         }
@@ -723,6 +761,14 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       if (messages.length === 0) {
         return [(incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage]
       }
+
+      // IMPORTANT: Don't replace a stopped assistant message with a persisted version
+      const lastMsg: any = messages[messages.length - 1]
+      if (lastMsg?._stopped === true && incoming.role === 'assistant') {
+        // This message was stopped - keep the stopped partial, don't replace with persisted complete
+        return messages
+      }
+
       messages[messages.length - 1] = (incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage
       return messages
     }
@@ -858,16 +904,17 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
 export function useConversationStreamed(conversationId: string | null, starshipId?: string | null, options?: { enabled?: boolean }) {
   const queryClient = useQueryClient()
 
-  // Compute baselineLength from cached chunks to let the server replay any missed messages on reconnect
-  const cachedChunks = conversationId ? (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) : undefined
-  const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
-
   const enabledFlag = options?.enabled !== false
 
   const messagesQuery = useQuery({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
     queryFn: streamedQuery({
       queryFn: async (_ctx: any) => {
+        // Calculate baselineLength fresh on each query execution to ensure it's always accurate
+        // This prevents the server from sending duplicate messages we already have
+        const cachedChunks = conversationId ? (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) : undefined
+        const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).filter((m: any) => !m._stopped).length : 0
+
         const token = await getCurrentToken()
         return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal, baselineLength)
       },
@@ -1448,11 +1495,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       } catch {}
     },
     onSuccess: (_res, variables) => {
-      // After sending a message, ensure SSE connection is active
-      // This is critical after a stop, where the connection was cancelled
+      // After sending a message, re-establish SSE connection if it was cancelled (from a stop)
+      // The baselineLength is now calculated fresh in queryFn, so duplicates won't occur
       const convId = (variables as any)?.conversationId as string | undefined
-      if (convId) {
-        // Check if the last chunk was turn_completed (from stop) - if so, we need to re-establish connection
+      if (!convId) return
+
+      try {
         const chunks = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(convId)) as StreamedChunk[] | undefined
         const lastChunk = Array.isArray(chunks) && chunks.length > 0 ? chunks[chunks.length - 1] : null
         const wasStopped = lastChunk?.type === 'turn_completed'
@@ -1461,20 +1509,19 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const queryState = queryClient.getQueryState(CONVERSATION_QUERY_KEYS.messages(convId))
         const isFetching = queryState?.fetchStatus === 'fetching'
 
-        // Re-establish connection if:
-        // 1. We stopped previously (last chunk was turn_completed), OR
-        // 2. Connection is not active (not fetching)
-        if (wasStopped || !isFetching) {
-          // Clear resume token to avoid resuming from a stopped turn
+        // Clear resume token after a stop
+        if (wasStopped) {
           try {
             if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${convId}:resumeToken`)
           } catch {}
-          // Remove queries first to clear cache, then invalidate to re-establish connection
-          // This prevents mixing old chunks with new messages (which causes duplicates)
-          queryClient.removeQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(convId) })
+        }
+
+        // Re-establish connection if it was stopped or is not active
+        // Since baselineLength is calculated fresh in queryFn, this won't cause duplicates
+        if (wasStopped || !isFetching) {
           queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(convId) })
         }
-      }
+      } catch {}
     },
     onError: (error: any, variables) => {
       const status = error?.response?.status

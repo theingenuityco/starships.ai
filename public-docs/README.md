@@ -1,27 +1,16 @@
-## Starships Autopilot Reference
+## Starships Public Docs
 
-This folder documents the Engine/Eval and each Autopilot node type with precise, testable specifications.
+This folder contains documentation for the Starships workflow system, including blueprint/node references, connectors, and widgets.
 
-- Core
-  - [Engine](./engine.md)
-  - [Eval](./eval.md)
-- [Start](./node-start.md)
-- [End](./node-end.md)
-- [Conditional](./node-conditional.md)
-- [Transform](./node-transform.md)
-- [Mutate](./node-mutate.md)
-- [Code](./node-code.md)
-- [HttpRequest](./node-http-request.md)
-- [ConnectorAction](./node-connector-action.md)
-- [LLM](./node-llm.md)
-- [UserPrompt](./node-user-prompt.md)
-- [Workflow](./node-workflow.md)
-- [Tool](./node-tool.md)
-- [Agent](./node-agent.md)
+- **Blueprints (Autopilot)**
+  - [Blueprints reference](./blueprints/README.md)
 
-- Connectors
-  - [Overview](./connectors/README.md)
+- **Connectors**
+  - [Connectors reference](./connectors/README.md)
   - [Connector templates](./connectors/connector_templates.md)
+
+- **Widgets**
+  - [Widgets](./widgets/README.md)
 
 Audience and access modes
 
@@ -63,18 +52,7 @@ Tips for SDK/Engine users
 
 Examples
 
-- [example-01-minimal-start-llm-end.md](./example-01-minimal-start-llm-end.md)
-- [example-02-llm-with-upstream-input.md](./example-02-llm-with-upstream-input.md)
-- [example-03-function-calling-basic-tool.md](./example-03-function-calling-basic-tool.md)
-- [example-04-http-request-transform.md](./example-04-http-request-transform.md)
-- [example-05-conditional-routing.md](./example-05-conditional-routing.md)
-- [example-06-inline-operations.md](./example-06-inline-operations.md)
-- [example-07-agent-default-blueprint.md](./example-07-agent-default-blueprint.md)
-- [example-08-error-handling-modes.md](./example-08-error-handling-modes.md)
-- [example-09-events-and-streaming.md](./example-09-events-and-streaming.md)
-- [example-10-kitchen-sink.md](./example-10-kitchen-sink.md)
-- [example-11-quirks-and-gotchas.md](./example-11-quirks-and-gotchas.md)
-- [example-12-resume-and-visit-limits.md](./example-12-resume-and-visit-limits.md)
+Blueprint examples live under [Blueprints reference](./blueprints/README.md#examples).
 
 Notes:
 

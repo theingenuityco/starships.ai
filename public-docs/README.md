@@ -21,11 +21,7 @@ This folder documents the Engine/Eval and each Autopilot node type with precise,
 
 - Connectors
   - [Overview](./connectors/README.md)
-  - [Configuration](./connectors/configuration.md)
-  - [LinkedIn](./connectors/linkedin.md)
-  - [Discord](./connectors/discord.md)
-  - [Google Drive](./connectors/google-drive.md)
-  - [GitHub](./connectors/github.md)
+  - [Connector templates](./connectors/connector_templates.md)
 
 Audience and access modes
 
@@ -85,7 +81,7 @@ Notes:
 - Template expressions use `{{ ... }}` and are resolved by the Engine prior to handler execution (full-only mode). Inline fields are executed post-handler; see Engine.
 - Execution input/output items are arrays of `ExecutionItem` internally; examples show plain JSON for clarity.
 
-For authenticated external APIs, the **GitHub connector** docs are the canonical reference:
+For authenticated external APIs via connectors:
 
-- See `public-docs/connectors/README.md` and `public-docs/connectors/configuration.md` for how `connector_action` works with connector templates and injected auth (OAuth2/API key/platform JWT).
-- Use the GitHub examples as a model when designing tools for other connectors (LinkedIn, Discord, Google Drive) that rely on `connector_action` (not `http_request`) so the host can inject auth and base URLs.
+- See `public-docs/connectors/README.md` and `public-docs/connectors/connector_templates.md` for how `connector_action` works with connector templates and injected auth (OAuth2/API key/platform JWT).
+- Use the generic `connector_action` patterns as a model when designing tools for any connector-backed integration (not `http_request`) so the host can inject auth and base URLs.

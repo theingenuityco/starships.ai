@@ -720,11 +720,34 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       }
       // IMPORTANT: Don't add a persisted assistant message if we already have a stopped partial
       // The stopped partial has _stopped: true flag, and we want to keep it instead of the complete persisted version
-      if (msg?.role === 'assistant' && messages.length > 0) {
-        const lastMsg: any = messages[messages.length - 1]
-        if (lastMsg?.role === 'assistant' && lastMsg?._stopped === true) {
-          // We have a stopped partial message - don't replace it with the persisted complete version
-          return messages
+      // Check both by ID (if available) and by content/timestamp matching to catch all cases
+      if (msg?.role === 'assistant') {
+        // First check by ID if the incoming message has one
+        if (msg?.id) {
+          const existingById = messages.find((m: any) => m?.id === msg.id)
+          if (existingById && (existingById as any)?._stopped === true) {
+            // We have a stopped message with the same ID - don't replace it
+            return messages
+          }
+        }
+        // Also check if the last assistant message is stopped (common case)
+        if (messages.length > 0) {
+          const lastMsg: any = messages[messages.length - 1]
+          if (lastMsg?.role === 'assistant' && lastMsg?._stopped === true) {
+            // Check if this incoming message matches the stopped one by content/timestamp
+            // This handles cases where the stopped message doesn't have an ID yet
+            const msgContent = typeof msg?.content === 'string' ? msg.content : ''
+            const lastContent = typeof lastMsg?.content === 'string' ? lastMsg.content : ''
+            const contentMatches = msgContent.length > 0 && lastContent.length > 0 && msgContent.startsWith(lastContent)
+            const msgTs = Date.parse(String(msg?.createdAt || msg?.updatedAt || ''))
+            const lastTs = Date.parse(String(lastMsg?.createdAt || lastMsg?.updatedAt || ''))
+            const tsMatches = !Number.isNaN(msgTs) && !Number.isNaN(lastTs) && Math.abs(msgTs - lastTs) <= 30_000
+            // If content matches (incoming is a superset of stopped) and timestamps are close, it's the same message
+            if (contentMatches && tsMatches) {
+              // We have a stopped partial message - don't replace it with the persisted complete version
+              return messages
+            }
+          }
         }
       }
       return [...messages, { ...msg }]
@@ -912,8 +935,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       queryFn: async (_ctx: any) => {
         // Calculate baselineLength fresh on each query execution to ensure it's always accurate
         // This prevents the server from sending duplicate messages we already have
+        // IMPORTANT: Include stopped messages in baselineLength - they're still persisted messages
+        // that the server knows about, we just don't want them replaced with complete versions
         const cachedChunks = conversationId ? (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) : undefined
-        const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).filter((m: any) => !m._stopped).length : 0
+        const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
 
         const token = await getCurrentToken()
         return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal, baselineLength)

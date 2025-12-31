@@ -261,7 +261,11 @@ export interface ConnectorTemplateRuntimePublicModel {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
+  /**
+   * Minimal auth descriptor for UI/catalog decisions without exposing full auth config.
+   * Source of truth is connector_templates.auth_json.type.
+   */
+  auth: { type: ConnectorAuthTypeV2 };
   version: string;
   category: string;
 
@@ -278,7 +282,7 @@ export interface ConnectorCatalogItem {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
+  auth: { type: ConnectorAuthTypeV2 };
   /**
    * For OAuth2 connectors whose OAuth URLs contain {{vars}} (e.g. a tenant subdomain),
    * the client should collect these values before initiating OAuth.
@@ -307,7 +311,7 @@ export interface ConnectorTemplateModel {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
+  auth: { type: ConnectorAuthTypeV2 };
   isEnabled: boolean;
   version: string;
   category: string;
@@ -354,7 +358,6 @@ export interface AdminConnectorTemplateImportResponse {
 export interface UpdateConnectorTemplateRequest {
   name?: string;
   description?: string;
-  authType?: ConnectorAuthTypeV2;
   isEnabled?: boolean;
   version?: string;
   category?: string;
@@ -378,7 +381,6 @@ export interface CreateConnectorTemplateRequest {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
   isEnabled?: boolean;
   version?: string;
   category?: string;

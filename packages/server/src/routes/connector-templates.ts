@@ -52,7 +52,6 @@ const UpdateConnectorTemplateSchema = z
   .object({
     name: TemplateTextSchema.max(255).optional(),
     description: TemplateTextSchema.max(1024).optional(),
-    authType: AuthTypeSchema.optional(),
     isEnabled: z.boolean().optional(),
     version: z.string().trim().min(1).max(20).optional(),
     category: z.string().trim().min(1).max(100).optional(),
@@ -67,7 +66,6 @@ const UpdateConnectorTemplateSchema = z
     (body) =>
       body.name !== undefined ||
       body.description !== undefined ||
-      body.authType !== undefined ||
       body.isEnabled !== undefined ||
       body.version !== undefined ||
       body.category !== undefined ||
@@ -78,68 +76,24 @@ const UpdateConnectorTemplateSchema = z
       body.rateLimit !== undefined ||
       body.metadataSchema !== undefined,
     { message: 'At least one field must be provided' }
-  )
-  .superRefine((body, ctx) => {
-    if (body.authType !== undefined && body.auth?.type !== undefined && body.authType !== body.auth.type) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['authType'],
-        message: `authType (root) must match auth.type (nested). Received authType="${body.authType}" and auth.type="${body.auth.type}".`,
-      });
-    }
-  })
-  .transform((body) => {
-    // DRY: if caller updates auth but omits authType, derive it from auth.type.
-    if (body.auth && body.authType === undefined) {
-      return { ...body, authType: body.auth.type };
-    }
-    return body;
-  });
+  );
 
-const CreateConnectorTemplateSchema = z
-  .object({
-    id: TemplateIdOrProviderSchema.optional(),
-    slug: z.string().trim().min(1).max(255).optional(),
-    provider: z.string().trim().min(1).max(255),
-    name: TemplateTextSchema.max(255),
-    description: TemplateTextSchema.max(1024),
-    // Backward-compatible DX: allow omitting authType and derive it from auth.type.
-    authType: AuthTypeSchema.optional(),
-    isEnabled: z.boolean().optional(),
-    version: z.string().trim().min(1).max(20).optional(),
-    category: z.string().trim().min(1).max(100).optional(),
-    baseUrl: z.string().trim().min(1).max(2048),
-    auth: AuthObjectSchema,
-    variables: z.array(z.record(z.string(), z.unknown())).optional(),
-    endpoints: z.array(z.record(z.string(), z.unknown())),
-    rateLimit: z.record(z.string(), z.unknown()).optional(),
-    metadataSchema: z.record(z.string(), z.unknown()).optional(),
-  })
-  .superRefine((body, ctx) => {
-    const derived = body.auth?.type;
-    const effectiveAuthType = body.authType ?? derived;
-
-    if (!effectiveAuthType) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['authType'],
-        message: 'Missing required field: authType (root level). Provide authType or provide auth.type to derive it.',
-      });
-      return;
-    }
-
-    if (body.authType !== undefined && body.auth?.type !== undefined && body.authType !== body.auth.type) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ['authType'],
-        message: `authType (root) must match auth.type (nested). Received authType="${body.authType}" and auth.type="${body.auth.type}".`,
-      });
-    }
-  })
-  .transform((body) => ({
-    ...body,
-    authType: (body.authType ?? body.auth.type) as z.infer<typeof AuthTypeSchema>,
-  }));
+const CreateConnectorTemplateSchema = z.object({
+  id: TemplateIdOrProviderSchema.optional(),
+  slug: z.string().trim().min(1).max(255).optional(),
+  provider: z.string().trim().min(1).max(255),
+  name: TemplateTextSchema.max(255),
+  description: TemplateTextSchema.max(1024),
+  isEnabled: z.boolean().optional(),
+  version: z.string().trim().min(1).max(20).optional(),
+  category: z.string().trim().min(1).max(100).optional(),
+  baseUrl: z.string().trim().min(1).max(2048),
+  auth: AuthObjectSchema,
+  variables: z.array(z.record(z.string(), z.unknown())).optional(),
+  endpoints: z.array(z.record(z.string(), z.unknown())),
+  rateLimit: z.record(z.string(), z.unknown()).optional(),
+  metadataSchema: z.record(z.string(), z.unknown()).optional(),
+});
 
 function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateModel {
   return {
@@ -148,7 +102,7 @@ function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateMo
     provider: entity.provider,
     name: entity.name,
     description: entity.description,
-    authType: entity.authType,
+    auth: { type: ((entity.authJson as unknown as { type?: string })?.type || 'none') as z.infer<typeof AuthTypeSchema> },
     isEnabled: Boolean(entity.isEnabled),
     version: entity.version,
     category: entity.category,
@@ -214,7 +168,6 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
         provider: template.provider,
         name: template.name,
         description: template.description,
-        authType: template.authType,
         isEnabled: Boolean(template.isEnabled),
         version: template.version,
         category: template.category,
@@ -267,47 +220,22 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
         })
         .optional(),
       payload: z.object({
-        connectorTemplate: z
-          .object({
-            id: z.string().trim().min(1).optional(),
-            slug: z.string().trim().min(1).optional(),
-            provider: z.string().trim().min(1),
-            name: z.string().trim().min(1),
-            description: z.string().trim().min(1),
-            // Allow legacy/handwritten imports to omit authType; derive from auth.type.
-            authType: AuthTypeSchema.optional(),
-            isEnabled: z.boolean().optional(),
-            version: z.string().trim().min(1).optional(),
-            category: z.string().trim().min(1).optional(),
-            baseUrl: z.string().trim().min(1),
-            auth: AuthObjectSchema,
-            variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
-            endpoints: z.array(z.record(z.string(), z.unknown())),
-            rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
-            metadataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
-          })
-          .superRefine((ct, ctx) => {
-            const effectiveAuthType = ct.authType ?? ct.auth?.type;
-            if (!effectiveAuthType) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['authType'],
-                message: 'Missing required field: authType (root level). Provide authType or provide auth.type to derive it.',
-              });
-              return;
-            }
-            if (ct.authType !== undefined && ct.auth?.type !== undefined && ct.authType !== ct.auth.type) {
-              ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                path: ['authType'],
-                message: `authType (root) must match auth.type (nested). Received authType="${ct.authType}" and auth.type="${ct.auth.type}".`,
-              });
-            }
-          })
-          .transform((ct) => ({
-            ...ct,
-            authType: (ct.authType ?? ct.auth.type) as z.infer<typeof AuthTypeSchema>,
-          })),
+        connectorTemplate: z.object({
+          id: z.string().trim().min(1).optional(),
+          slug: z.string().trim().min(1).optional(),
+          provider: z.string().trim().min(1),
+          name: z.string().trim().min(1),
+          description: z.string().trim().min(1),
+          isEnabled: z.boolean().optional(),
+          version: z.string().trim().min(1).optional(),
+          category: z.string().trim().min(1).optional(),
+          baseUrl: z.string().trim().min(1),
+          auth: AuthObjectSchema,
+          variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
+          endpoints: z.array(z.record(z.string(), z.unknown())),
+          rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
+          metadataSchema: z.record(z.string(), z.unknown()).nullable().optional(),
+        }),
       }),
     });
 
@@ -350,7 +278,8 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
         (await repo.update(existing.id, {
           name: ct.name,
           description: ct.description,
-          authType: ct.authType,
+          // Persist a denormalized auth_type column for DB filtering/legacy reasons, derived from auth_json.type.
+          authType: ct.auth.type,
           isEnabled: ct.isEnabled,
           version: ct.version,
           category: ct.category,
@@ -413,7 +342,6 @@ router.post('/admin/connector-templates', async (req: Request, res: Response): P
       provider: body.provider,
       name: body.name,
       description: body.description,
-      authType: body.authType,
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
@@ -477,7 +405,8 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
     const updated = await repo.update(existing.id, {
       name: body.name,
       description: body.description,
-      authType: body.authType,
+      // Persist a denormalized auth_type column for DB filtering/legacy reasons, derived from auth_json.type.
+      authType: body.auth ? body.auth.type : undefined,
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,

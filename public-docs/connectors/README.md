@@ -28,3 +28,10 @@ Connectors let Starships tools and agents talk to third‑party platforms via th
 - **Troubleshooting**
   - If you see an error like `Unknown connector "<name>"` or `Unknown connector action "<action>"`, it usually means the template is missing or the endpoint name does not exist.
   - `401/403` responses from the external API usually mean missing/expired tokens or insufficient permissions/scopes; reconnect the connector and/or adjust the app/bot permissions.
+
+---
+
+### Examples
+
+- **API key connector template**: `example-api-key.md`
+- **OAuth2 connector template**: `example-oauth2.md`

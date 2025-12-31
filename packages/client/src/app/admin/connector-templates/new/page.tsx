@@ -207,7 +207,6 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                       provider: provider.trim(),
                       name: name.trim(),
                       description: description.trim(),
-                      authType,
                       isEnabled,
                       version: version.trim() || undefined,
                       category: category.trim() || undefined,

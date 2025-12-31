@@ -202,7 +202,7 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                         <tr key={c.id} className="border-b last:border-0 transition-colors hover:bg-muted/30 cursor-pointer" onClick={() => router.push(`/admin/connector-templates/${c.id}`)}>
                           <td className="px-4 py-3 text-sm font-mono">{c.provider}</td>
                           <td className="px-4 py-3 text-sm">{c.name}</td>
-                          <td className="px-4 py-3 text-sm font-mono">{c.authType}</td>
+                          <td className="px-4 py-3 text-sm font-mono">{c.auth?.type}</td>
                           <td className="px-4 py-3 text-sm">
                             <div
                               className="inline-flex items-center gap-2"

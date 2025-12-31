@@ -342,40 +342,66 @@ export function useConversationStop() {
   return useCallback(
     async (conversationId: string) => {
       if (!conversationId) return
+      console.log('[STOP] Starting stop for conversation', conversationId)
+
       try {
         // Abort SSE locally
         await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
-      } catch {}
+        console.log('[STOP] Cancelled queries')
+      } catch (err) {
+        console.warn('[STOP] Error cancelling queries', err)
+      }
 
-      // Optimistically flip streaming off and mark complete in local cache so UI hides Stop immediately
-      try {
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
-          const chunks = Array.isArray(old) ? old.slice() : []
-          chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
-          chunks.push({ type: 'complete' })
-          return chunks
-        })
-      } catch {}
+      // Capture existing chunks BEFORE removing so we can preserve them
+      const existingChunks = (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) || []
+      console.log('[STOP] Captured existing chunks:', existingChunks.length, 'chunks')
 
       try {
         // Signal server to persist partials and cancel autopilot
         await api.post(`/api/v1/conversations/${conversationId}/stop`)
+        console.log('[STOP] Server stop endpoint called')
       } catch (error: any) {
         const msg = getSafeErrorMessage(error)
+        console.error('[STOP] Server stop failed', error)
         toast.error('Failed to stop response', { description: msg })
         return
       }
 
       try {
-        // Clear any stale streamed chunks and force fresh stream attach
-        queryClient.removeQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
         // Best-effort: drop resume token so we don't resume a stale turn
         try {
           if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${conversationId}:resumeToken`)
         } catch {}
-        // Kick a refetch to rebuild state
-        await queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
-      } catch {}
+
+        // Build updated chunks: preserve existing + add completion markers
+        const updatedChunks = Array.isArray(existingChunks) ? existingChunks.slice() : []
+        updatedChunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
+        updatedChunks.push({ type: 'complete' })
+        updatedChunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
+        console.log('[STOP] Updated chunks:', updatedChunks.length, 'chunks (added 3 completion chunks)')
+        console.log(
+          '[STOP] Last 3 chunks:',
+          updatedChunks.slice(-3).map(c => c.type)
+        )
+
+        // Update cache with preserved chunks + completion events
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), updatedChunks)
+        console.log('[STOP] Set query data with completion chunks')
+
+        // Verify the update took - check multiple times to see if it persists
+        const verifyChunks1 = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined
+        const hasTurnCompleted1 = Array.isArray(verifyChunks1) && verifyChunks1.some(c => c.type === 'turn_completed')
+        const lastChunkType1 = verifyChunks1 && verifyChunks1.length > 0 ? verifyChunks1[verifyChunks1.length - 1].type : 'none'
+        console.log('[STOP] Verification 1 - hasTurnCompleted:', hasTurnCompleted1, 'chunks length:', verifyChunks1?.length, 'last chunk type:', lastChunkType1)
+
+        // CRITICAL: Don't call invalidateQueries immediately because it triggers a refetch
+        // that overwrites our optimistic update. The server will send its own turn_completed
+        // event through the SSE connection (or on reconnect), which will naturally update state.
+        // Our optimistic update is sufficient to immediately update the UI state.
+        console.log('[STOP] Skipping invalidateQueries to preserve optimistic update - server will send turn_completed naturally')
+      } catch (err) {
+        console.error('[STOP] Error in cache update', err)
+      }
     },
     [queryClient]
   )
@@ -972,25 +998,46 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   // Check if we've received a 'turn_completed' event in the chunk stream
   const hasCompleteEvent = useMemo(() => {
-    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      console.log('[STREAM] hasCompleteEvent: false (no chunks)')
+      return false
+    }
     for (let i = chunks.length - 1; i >= 0; i--) {
-      if (chunks[i].type === 'turn_completed') return true
+      if (chunks[i].type === 'turn_completed') {
+        console.log('[STREAM] hasCompleteEvent: true (found turn_completed at index', i, 'of', chunks.length, 'chunks)')
+        return true
+      }
       // Stop checking once we hit a new 'append' of a user message (new turn started)
       if (chunks[i].type === 'append' && (chunks[i] as any).message?.role === 'user') break
     }
+    console.log('[STREAM] hasCompleteEvent: false (no turn_completed found in', chunks.length, 'chunks)')
     return false
   }, [chunksRevisionKey])
 
   // Server-authoritative turn state: derive from latest turn_* or turn_state events
   const serverTurnActive = useMemo(() => {
-    if (!Array.isArray(chunks) || chunks.length === 0) return false
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      console.log('[STREAM] serverTurnActive: false (no chunks)')
+      return false
+    }
     for (let i = chunks.length - 1; i >= 0; i--) {
       const c: any = chunks[i]
       if (!c) continue
-      if (c.type === 'turn_started') return true
-      if (c.type === 'turn_completed') return false
-      if (c.type === 'turn_state') return Boolean(c.payload?.turnActive)
+      if (c.type === 'turn_started') {
+        console.log('[STREAM] serverTurnActive: true (found turn_started at index', i, ')')
+        return true
+      }
+      if (c.type === 'turn_completed') {
+        console.log('[STREAM] serverTurnActive: false (found turn_completed at index', i, ')')
+        return false
+      }
+      if (c.type === 'turn_state') {
+        const active = Boolean(c.payload?.turnActive)
+        console.log('[STREAM] serverTurnActive:', active, '(found turn_state at index', i, ')')
+        return active
+      }
     }
+    console.log('[STREAM] serverTurnActive: false (no turn events found in', chunks.length, 'chunks)')
     return false
   }, [chunksRevisionKey])
 
@@ -1117,6 +1164,23 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant || isAwaitingToolResults
+
+  // Debug logging for stop debugging
+  useEffect(() => {
+    if (conversationId) {
+      console.log('[STREAM] State update:', {
+        conversationId,
+        chunksLength: chunks.length,
+        hasCompleteEvent,
+        isAssistantStreaming,
+        isAwaitingAssistant,
+        isAwaitingToolResults,
+        isResponding,
+        serverTurnActive,
+        chunksRevisionKey,
+      })
+    }
+  }, [conversationId, hasCompleteEvent, isAssistantStreaming, isAwaitingAssistant, isAwaitingToolResults, isResponding, serverTurnActive, chunksRevisionKey, chunks.length])
 
   // Fallback: if after connection there are no messages yet, fetch baseline once via REST
   useEffect(() => {

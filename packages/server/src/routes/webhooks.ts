@@ -4,8 +4,10 @@ import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
 import { StripeWebhookService } from '@/services/StripeWebhookService';
+import { getEnvConfig } from '@starships/env';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 const router: Router = Router();
 
@@ -94,9 +96,25 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
     return;
   }
 
+  const signingSecret = (envConfig.STRIPE_WEBHOOK_SECRET || '').trim();
+  if (!signingSecret) {
+    logger.error('[WEBHOOK] STRIPE_WEBHOOK_SECRET is not configured; refusing to process Stripe webhooks');
+    res.status(500).send('Stripe webhook signing secret not configured');
+    return;
+  }
+
+  // express.raw() should produce a Buffer; if a JSON parser ran first, the body may already be consumed.
+  if (!Buffer.isBuffer(req.body)) {
+    logger.error('[WEBHOOK] Stripe webhook received non-raw body; cannot verify signature safely', {
+      bodyType: typeof req.body,
+    });
+    res.status(400).send('Invalid webhook payload');
+    return;
+  }
+
   let event: Stripe.Event;
   try {
-    event = stripe.webhooks.constructEvent(req.body, sig, process.env.STRIPE_WEBHOOK_SECRET as string);
+    event = stripe.webhooks.constructEvent(req.body, sig, signingSecret);
   } catch (err) {
     logger.error('[WEBHOOK] Stripe signature verification failed', {
       error: err instanceof Error ? err.message : String(err),

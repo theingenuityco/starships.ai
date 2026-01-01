@@ -4,8 +4,10 @@ import Stripe from 'stripe';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
 import { sendSuccess, handleError } from '@/utils/responseHelpers';
+import { getEnvConfig } from '@starships/env';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 const router: Router = Router();
 
 /**

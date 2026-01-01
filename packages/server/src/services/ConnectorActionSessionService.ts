@@ -3,6 +3,7 @@ import { ConnectorRepository, ConnectorTemplateRepository } from '@starships/mod
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { PlatformSecretService } from './PlatformSecretService';
 import { generateJWT } from '@/utils/jwt';
+import { buildBasicAuthHeaderValue } from '@/utils/basicAuth';
 
 export interface ConnectorSession {
   headers: Record<string, string>;
@@ -108,6 +109,23 @@ export class ConnectorActionSessionService {
         const prefix = typeof inj.tokenPrefix === 'string' ? inj.tokenPrefix : '';
         connectorSessions[provider] = {
           headers: { [headerName]: prefix ? `${prefix} ${token}` : token },
+        };
+        continue;
+      }
+
+      if (type === 'basic') {
+        const username = await this.resolveSecretRef(starshipId, auth.usernameRef, decrypted as Record<string, unknown>);
+        if (!username) continue;
+        const password = auth.passwordRef
+          ? await this.resolveSecretRef(starshipId, auth.passwordRef, decrypted as Record<string, unknown>)
+          : '';
+        // If passwordRef is provided but missing/blank, don't expose a session (connector isn't ready).
+        if (auth.passwordRef && password === undefined) continue;
+
+        const headerName =
+          typeof auth.headerName === 'string' && auth.headerName.trim() ? auth.headerName.trim() : 'Authorization';
+        connectorSessions[provider] = {
+          headers: { [headerName]: buildBasicAuthHeaderValue(username, password ?? '') },
         };
         continue;
       }

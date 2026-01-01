@@ -166,9 +166,11 @@ export class StripeService {
   }
 
   /**
-   * Create a Stripe Checkout Session for subscribing a starship to Frigate ($20/mo).
+   * Create a Stripe Checkout Session for subscribing a starship to a paid ship class (generic).
+   *
+   * The plan definition (ship_class, entitlements, monthly credits) lives in Stripe Price metadata.
    */
-  static async createFrigateSubscriptionCheckoutSession(params: {
+  static async createSubscriptionCheckoutSession(params: {
     stripeCustomerId: string;
     starshipId: string;
     starshipSlug?: string;
@@ -177,9 +179,7 @@ export class StripeService {
     priceId: string;
   }): Promise<Stripe.Checkout.Session> {
     const { stripeCustomerId, starshipId, starshipSlug, userId, idempotencyKey, priceId } = params;
-    if (!priceId || !priceId.trim()) {
-      throw new Error('Missing STRIPE_FRIGATE_PRICE_ID');
-    }
+    if (!priceId || !priceId.trim()) throw new Error('Missing priceId');
 
     const session = await stripe.checkout.sessions.create(
       {
@@ -189,23 +189,23 @@ export class StripeService {
         // Useful for routing and idempotency in webhook handlers
         client_reference_id: starshipId,
         metadata: {
-          kind: 'ship_class_upgrade',
-          ship_class: 'frigate',
+          kind: 'ship_class_subscription',
           starship_id: starshipId,
           starship_slug: starshipSlug ?? null,
           user_id: userId,
           idempotency_key: idempotencyKey,
+          price_id: priceId,
         },
         subscription_data: {
           metadata: {
-            kind: 'ship_class_upgrade',
-            ship_class: 'frigate',
+            kind: 'ship_class_subscription',
             starship_id: starshipId,
             user_id: userId,
+            price_id: priceId,
           },
         },
-        success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=success&upgrade=frigate`,
-        cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=cancelled&upgrade=frigate`,
+        success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=success`,
+        cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=cancelled`,
         expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
       },
       { idempotencyKey }

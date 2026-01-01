@@ -4,7 +4,6 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
-import { FrigateSubscriptionService } from '@/services/FrigateSubscriptionService';
 import { rateLimiters } from '@/middleware/rateLimiter';
 import { AgentService } from '@/services/AgentService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
@@ -18,6 +17,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
+import { SubscriptionCheckoutService } from '@/services/SubscriptionCheckoutService';
 
 const router: Router = Router();
 
@@ -90,13 +90,27 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
 });
 
 /**
- * POST /starships/:id/upgrade/frigate
- * Starts a Stripe subscription checkout to upgrade this starship to Frigate ($20/mo).
+ * POST /starships/:id/subscribe
+ * Starts a Stripe subscription checkout for a given Stripe Price ID.
+ *
+ * Plan definitions live in Stripe Price metadata (Option A).
+ * Request body: { priceId: string }
  */
-router.post('/starships/:id/upgrade/frigate', rateLimiters.financial, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.post('/starships/:id/subscribe', rateLimiters.financial, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
     const userId = (req as any).user!.id as string;
+
+    const bodyValidation = validateData(
+      z.object({
+        priceId: z.string().min(1, 'priceId is required'),
+      }),
+      req.body,
+      res,
+      'subscription checkout'
+    );
+    if (!bodyValidation) return;
+    const { priceId } = bodyValidation;
 
     const starshipService = new StarshipService();
     const hasAccess = await starshipService.hasAccess(userId, starshipId);
@@ -105,12 +119,11 @@ router.post('/starships/:id/upgrade/frigate', rateLimiters.financial, jwtAuthMid
       return;
     }
 
-    const service = new FrigateSubscriptionService();
-    const { checkoutUrl } = await service.createCheckoutSession({ userId, starshipId });
-
+    const service = new SubscriptionCheckoutService();
+    const { checkoutUrl } = await service.createCheckoutSession({ userId, starshipId, priceId });
     sendSuccess(res, { checkoutUrl }, 201);
   } catch (error) {
-    handleError(error, res, 'creating frigate upgrade checkout');
+    handleError(error, res, 'creating subscription checkout');
   }
 });
 

@@ -12,6 +12,21 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
  */
 export class StripeService {
   /**
+   * Create or retrieve a Stripe Customer for a user.
+   * Note: Customer creation is idempotent from our side by persisting users.stripe_customer_id.
+   */
+  static async createCustomer(params: { userId: string; email?: string | null }): Promise<Stripe.Customer> {
+    const email = params.email ?? undefined;
+    const customer = await stripe.customers.create({
+      ...(email ? { email } : {}),
+      metadata: {
+        user_id: params.userId,
+      },
+    });
+    return customer;
+  }
+
+  /**
    * Create a Stripe Checkout Session for wallet topup
    */
   static async createCheckoutSession({
@@ -148,6 +163,55 @@ export class StripeService {
       logger.error('[STRIPE] Failed to retrieve checkout session', { sessionId, operation: 'getCheckoutSession' }, error as Error);
       throw error;
     }
+  }
+
+  /**
+   * Create a Stripe Checkout Session for subscribing a starship to Frigate ($20/mo).
+   */
+  static async createFrigateSubscriptionCheckoutSession(params: {
+    stripeCustomerId: string;
+    starshipId: string;
+    starshipSlug?: string;
+    userId: string;
+    idempotencyKey: string;
+    priceId: string;
+  }): Promise<Stripe.Checkout.Session> {
+    const { stripeCustomerId, starshipId, starshipSlug, userId, idempotencyKey, priceId } = params;
+    if (!priceId || !priceId.trim()) {
+      throw new Error('Missing STRIPE_FRIGATE_PRICE_ID');
+    }
+
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'subscription',
+        customer: stripeCustomerId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        // Useful for routing and idempotency in webhook handlers
+        client_reference_id: starshipId,
+        metadata: {
+          kind: 'ship_class_upgrade',
+          ship_class: 'frigate',
+          starship_id: starshipId,
+          starship_slug: starshipSlug ?? null,
+          user_id: userId,
+          idempotency_key: idempotencyKey,
+        },
+        subscription_data: {
+          metadata: {
+            kind: 'ship_class_upgrade',
+            ship_class: 'frigate',
+            starship_id: starshipId,
+            user_id: userId,
+          },
+        },
+        success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=success&upgrade=frigate`,
+        cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=cancelled&upgrade=frigate`,
+        expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
+      },
+      { idempotencyKey }
+    );
+
+    return session;
   }
 }
 

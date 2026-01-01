@@ -16,6 +16,11 @@ import type { TemplateCategory } from '../index';
 export type StarshipStatus = 'active' | 'inactive';
 
 /**
+ * Starship class (tier) definitions
+ */
+export type ShipClass = 'scout' | 'frigate';
+
+/**
  * Billing period options
  */
 export type BillingPeriod = 'monthly' | 'yearly';
@@ -32,7 +37,9 @@ export interface StarshipModel {
   slug: string;
   ownerId: string; // Foreign key to User
   name: string;
+  shipClass: ShipClass;
   maxAgents: number;
+  maxConcurrentTurns: number;
   status: StarshipStatus;
   createdAt: string;
   updatedAt: string;
@@ -49,6 +56,9 @@ export interface UpdateStarshipRequest {
   name?: string;
   slug?: string; // Optional - will be auto-generated from name if not provided
   status?: StarshipStatus;
+  maxAgents?: number;
+  maxConcurrentTurns?: number;
+  shipClass?: ShipClass;
 }
 
 /**
@@ -117,4 +127,11 @@ export interface StarshipDetailsResponse extends StarshipResponse {
  */
 export interface CreateStarshipRequest {
   name: string;
+}
+
+/**
+ * Create a Stripe Checkout Session for upgrading a starship to Frigate (subscription).
+ */
+export interface CreateFrigateCheckoutResponse {
+  checkoutUrl: string;
 }

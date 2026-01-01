@@ -145,6 +145,62 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
           }
 
           if (!row) {
+            // If this session is for a ship class upgrade subscription, handle it here.
+            const kind = session.metadata?.kind;
+            const shipClass = session.metadata?.ship_class;
+            if (kind === 'ship_class_upgrade' && shipClass === 'frigate') {
+              const starshipId = session.metadata?.starship_id || session.client_reference_id || undefined;
+              const userId = session.metadata?.user_id || undefined;
+              const subscriptionId =
+                typeof session.subscription === 'string'
+                  ? session.subscription
+                  : (session.subscription as Stripe.Subscription | null)?.id;
+              const customerId =
+                typeof session.customer === 'string' ? session.customer : (session.customer as Stripe.Customer | null)?.id;
+
+              if (!starshipId || !userId || !subscriptionId || !customerId) {
+                logger.warn('[WEBHOOK] Frigate checkout.session.completed missing identifiers', {
+                  sessionId: session.id,
+                  starshipId,
+                  userId,
+                  subscriptionId,
+                  customerId,
+                });
+                return;
+              }
+
+              // Upsert mapping (one subscription per starship). Entitlements + credits are granted on invoice.paid.
+              await client.query(
+                `
+                INSERT INTO starship_subscriptions (
+                  id,
+                  starship_id,
+                  user_id,
+                  stripe_customer_id,
+                  stripe_subscription_id,
+                  status,
+                  created_at,
+                  updated_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+                ON CONFLICT (starship_id) DO UPDATE
+                SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+                    stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                    status = EXCLUDED.status,
+                    updated_at = NOW()
+                `,
+                [`starship-sub-${subscriptionId}`, starshipId, userId, customerId, subscriptionId, 'incomplete']
+              );
+
+              logger.info('[WEBHOOK] Recorded frigate subscription mapping from checkout.session.completed', {
+                starshipId,
+                subscriptionId,
+                customerId,
+                sessionId: session.id,
+              });
+              return;
+            }
+
             logger.warn('[WEBHOOK] No matching topup for checkout.session.completed', {
               sessionId: session.id,
               clientRef: session.client_reference_id,
@@ -189,6 +245,207 @@ router.post('/webhooks/stripe', express.raw({ type: 'application/json' }), async
               creditsPerUsd: Number(CREDITS_PER_USD),
             },
           });
+        });
+
+        break;
+      }
+
+      /**
+       * Subscription monthly credit grants: grant +1000 credits on successful invoice payment.
+       */
+      case 'invoice.paid': {
+        const invoice = event.data.object as Stripe.Invoice;
+        const invoiceId = invoice.id;
+        const invoiceAny = invoice as unknown as { subscription?: unknown };
+        const subscriptionRaw = invoiceAny.subscription as any;
+        const subscriptionId = typeof subscriptionRaw === 'string' ? subscriptionRaw : (subscriptionRaw as { id?: string } | null)?.id;
+        if (!subscriptionId) break;
+
+        const connection = getConnection();
+        await connection.transaction(async (client) => {
+          // Lock subscription mapping row to ensure idempotency under concurrency
+          const subRes = await client.query<{
+            starship_id: string;
+            user_id: string;
+            stripe_customer_id: string;
+            status: string;
+          }>('SELECT * FROM starship_subscriptions WHERE stripe_subscription_id = $1 FOR UPDATE', [subscriptionId]);
+          const subRow = subRes.rows?.[0] ?? null;
+          if (!subRow) {
+            logger.warn('[WEBHOOK] invoice.paid but no starship_subscriptions mapping found', { subscriptionId, invoiceId });
+            return;
+          }
+
+          // Mark as active (invoice paid implies an active/paid period)
+          await client.query(
+            `UPDATE starship_subscriptions
+               SET status = $1,
+                   updated_at = NOW()
+             WHERE stripe_subscription_id = $2`,
+            ['active', subscriptionId]
+          );
+
+          // Apply Frigate entitlements
+          await client.query(
+            `UPDATE starships
+                SET ship_class = 'frigate',
+                    max_agents = 12,
+                    max_concurrent_turns = 2,
+                    updated_at = NOW()
+              WHERE id = $1`,
+            [subRow.starship_id]
+          );
+
+          // Lock wallet
+          const walletRes = await client.query<{ id: string }>('SELECT id FROM wallets WHERE starship_id = $1 FOR UPDATE', [subRow.starship_id]);
+          const walletRow = walletRes.rows?.[0] ?? null;
+          if (!walletRow) {
+            logger.warn('[WEBHOOK] invoice.paid: wallet not found for starship', { starshipId: subRow.starship_id, invoiceId });
+            return;
+          }
+
+          // Idempotency: if we've already granted for this invoice, exit
+          const existingRes = await client.query<{ id: string }>(
+            `SELECT id
+               FROM wallet_ledger
+              WHERE wallet_id = $1
+                AND type = 'ADJUSTMENT'
+                AND (meta ->> 'invoiceId') = $2
+              LIMIT 1`,
+            [walletRow.id, invoiceId]
+          );
+          if ((existingRes.rows?.[0] ?? null) !== null) {
+            logger.info('[WEBHOOK] invoice.paid grant already applied (idempotent exit)', { walletId: walletRow.id, invoiceId });
+            return;
+          }
+
+          const creditsGranted = toCreditsString(1000);
+          const walletRepo = new WalletRepository();
+          const ledgerRepo = new LedgerRepository();
+
+          const { balance } = await walletRepo.incrementBalanceReturningWithClient(client, walletRow.id, creditsGranted);
+          await ledgerRepo.createWithClient(client, {
+            walletId: walletRow.id,
+            type: 'ADJUSTMENT',
+            amount: creditsGranted,
+            balanceAfter: balance,
+            meta: {
+              reason: 'SUBSCRIPTION_CREDIT_GRANT',
+              shipClass: 'frigate',
+              invoiceId,
+              subscriptionId,
+              starshipId: subRow.starship_id,
+              creditsGranted,
+              stripeEvent: event.id,
+            },
+          });
+        });
+
+        break;
+      }
+
+      /**
+       * Subscription state updates: upgrade/downgrade entitlements based on Stripe status.
+       * Credits are granted only on invoice.paid.
+       */
+      case 'customer.subscription.updated':
+      case 'customer.subscription.deleted': {
+        const subscription = event.data.object as Stripe.Subscription;
+        const subscriptionId = subscription.id;
+        const status = subscription.status;
+        const cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end);
+        const subAny = subscription as unknown as { current_period_start?: number; current_period_end?: number };
+        const cps = subAny.current_period_start ? new Date(subAny.current_period_start * 1000).toISOString() : null;
+        const cpe = subAny.current_period_end ? new Date(subAny.current_period_end * 1000).toISOString() : null;
+
+        const connection = getConnection();
+        await connection.transaction(async (client) => {
+          // Try to find mapping row; if missing, attempt to upsert from metadata
+          let row = (
+            await client.query<{
+              starship_id: string;
+              user_id: string;
+            }>('SELECT starship_id, user_id FROM starship_subscriptions WHERE stripe_subscription_id = $1 FOR UPDATE', [subscriptionId])
+          ).rows?.[0];
+
+          if (!row) {
+            const starshipId = subscription.metadata?.starship_id;
+            const userId = subscription.metadata?.user_id;
+            const customerId = typeof subscription.customer === 'string' ? subscription.customer : (subscription.customer as any)?.id;
+            if (starshipId && userId && customerId) {
+              await client.query(
+                `
+                INSERT INTO starship_subscriptions (
+                  id,
+                  starship_id,
+                  user_id,
+                  stripe_customer_id,
+                  stripe_subscription_id,
+                  status,
+                  current_period_start,
+                  current_period_end,
+                  cancel_at_period_end,
+                  created_at,
+                  updated_at
+                )
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())
+                ON CONFLICT (starship_id) DO UPDATE
+                SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+                    stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+                    status = EXCLUDED.status,
+                    current_period_start = EXCLUDED.current_period_start,
+                    current_period_end = EXCLUDED.current_period_end,
+                    cancel_at_period_end = EXCLUDED.cancel_at_period_end,
+                    updated_at = NOW()
+                `,
+                [`starship-sub-${subscriptionId}`, starshipId, userId, customerId, subscriptionId, status, cps, cpe, cancelAtPeriodEnd]
+              );
+              row = { starship_id: starshipId, user_id: userId };
+            } else {
+              logger.warn('[WEBHOOK] subscription update without mapping and missing metadata', {
+                subscriptionId,
+                status,
+                hasStarshipId: Boolean(starshipId),
+                hasUserId: Boolean(userId),
+              });
+              return;
+            }
+          } else {
+            // Update mapping fields
+            await client.query(
+              `UPDATE starship_subscriptions
+                  SET status = $1,
+                      current_period_start = $2,
+                      current_period_end = $3,
+                      cancel_at_period_end = $4,
+                      updated_at = NOW()
+                WHERE stripe_subscription_id = $5`,
+              [status, cps, cpe, cancelAtPeriodEnd, subscriptionId]
+            );
+          }
+
+          const isPaying = status === 'active' || status === 'trialing';
+          if (isPaying) {
+            await client.query(
+              `UPDATE starships
+                  SET ship_class = 'frigate',
+                      max_agents = 12,
+                      max_concurrent_turns = 2,
+                      updated_at = NOW()
+                WHERE id = $1`,
+              [row.starship_id]
+            );
+          } else {
+            await client.query(
+              `UPDATE starships
+                  SET ship_class = 'scout',
+                      max_agents = LEAST(max_agents, 5),
+                      max_concurrent_turns = 1,
+                      updated_at = NOW()
+                WHERE id = $1`,
+              [row.starship_id]
+            );
+          }
         });
 
         break;

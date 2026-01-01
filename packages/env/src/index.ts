@@ -100,6 +100,8 @@ export function getEnvConfig(): EnvironmentConfig {
     STRIPE_SECRET_KEY: process.env.STRIPE_SECRET_KEY || '',
     STRIPE_PUBLISHABLE_KEY: process.env.STRIPE_PUBLISHABLE_KEY || '',
     STRIPE_WEBHOOK_SECRET: process.env.STRIPE_WEBHOOK_SECRET,
+    // Subscription pricing (optional; required only if enabling Frigate upgrades)
+    STRIPE_FRIGATE_PRICE_ID: process.env.STRIPE_FRIGATE_PRICE_ID,
 
     // Google Analytics
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID,

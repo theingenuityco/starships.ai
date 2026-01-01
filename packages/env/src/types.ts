@@ -43,6 +43,7 @@ export interface EnvironmentConfig {
   STRIPE_SECRET_KEY: string;
   STRIPE_PUBLISHABLE_KEY: string;
   STRIPE_WEBHOOK_SECRET?: string;
+  STRIPE_FRIGATE_PRICE_ID?: string;
 
   // Google Analytics
   GA_MEASUREMENT_ID?: string;

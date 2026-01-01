@@ -258,6 +258,8 @@ export class StripeWebhookService {
       logger.warn('[WEBHOOK] invoice.paid missing subscription.metadata.starship_id', { subscriptionId, invoiceId });
       return;
     }
+    const userId = subscription.metadata?.user_id || null;
+    const customerId = typeof subscription.customer === 'string' ? subscription.customer : (subscription.customer as any)?.id;
     const item0 = subscription.items?.data?.[0];
     const price = item0?.price as Stripe.Price | undefined;
     if (!price) {
@@ -281,6 +283,31 @@ export class StripeWebhookService {
 
     const connection = getConnection();
     await connection.transaction(async (client) => {
+      // Persist subscription mapping (enables plan switching/cancellation flows).
+      if (customerId && userId) {
+        await client.query(
+          `
+          INSERT INTO starship_subscriptions (
+            id,
+            starship_id,
+            user_id,
+            stripe_customer_id,
+            stripe_subscription_id,
+            status,
+            created_at,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (starship_id) DO UPDATE
+          SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+              stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+              status = EXCLUDED.status,
+              updated_at = NOW()
+          `,
+          [`starship-sub-${subscriptionId}`, starshipId, userId, customerId, subscriptionId, 'active']
+        );
+      }
+
       // Apply entitlements from Stripe plan metadata
       await client.query(
         `UPDATE starships
@@ -353,6 +380,33 @@ export class StripeWebhookService {
     const isPaying = status === 'active' || status === 'trialing';
     const connection = getConnection();
     await connection.transaction(async (client) => {
+      // Best-effort upsert mapping for later management
+      const customerId = typeof subscription.customer === 'string' ? subscription.customer : (subscription.customer as any)?.id;
+      const userId = subscription.metadata?.user_id || null;
+      if (customerId && userId) {
+        await client.query(
+          `
+          INSERT INTO starship_subscriptions (
+            id,
+            starship_id,
+            user_id,
+            stripe_customer_id,
+            stripe_subscription_id,
+            status,
+            created_at,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (starship_id) DO UPDATE
+          SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+              stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+              status = EXCLUDED.status,
+              updated_at = NOW()
+          `,
+          [`starship-sub-${subscriptionId}`, starshipId, userId, customerId, subscriptionId, status]
+        );
+      }
+
       if (!isPaying) {
         await client.query(
           `UPDATE starships

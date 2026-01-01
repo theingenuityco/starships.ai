@@ -18,6 +18,7 @@ import { z } from 'zod';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
 import { SubscriptionCheckoutService } from '@/services/SubscriptionCheckoutService';
+import { SubscriptionManagementService } from '@/services/SubscriptionManagementService';
 
 const router: Router = Router();
 
@@ -126,6 +127,48 @@ router.post('/starships/:id/subscribe', rateLimiters.financial, jwtAuthMiddlewar
     handleError(error, res, 'creating subscription checkout');
   }
 });
+
+/**
+ * POST /starships/:id/subscription/change
+ * Change the starship's subscription plan to the provided Stripe priceId.
+ *
+ * If no subscription exists yet, falls back to starting a Checkout Session (mode=subscription).
+ */
+router.post(
+  '/starships/:id/subscription/change',
+  rateLimiters.financial,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const starshipId = req.params.id;
+      const userId = (req as any).user!.id as string;
+
+      const bodyValidation = validateData(
+        z.object({
+          priceId: z.string().min(1, 'priceId is required'),
+        }),
+        req.body,
+        res,
+        'subscription plan change'
+      );
+      if (!bodyValidation) return;
+      const { priceId } = bodyValidation;
+
+      const starshipService = new StarshipService();
+      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      if (!hasAccess) {
+        sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+        return;
+      }
+
+      const svc = new SubscriptionManagementService();
+      const result = await svc.changePlan({ userId, starshipId, priceId });
+      sendSuccess(res, result, 200);
+    } catch (error) {
+      handleError(error, res, 'changing subscription plan');
+    }
+  }
+);
 
 // GET /starships/:id - Get specific starship (supports both ID and slug) (OpenAPI pattern)
 router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

@@ -1,7 +1,7 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { useConnectApiKeyConnector, useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
+import { useConnectApiKeyConnector, useConnectBasicAuthConnector, useConnectorCatalog, useDisconnectConnector, useStarshipConnectors, useStartOAuthConnector } from '@/hooks/useConnectors'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -27,12 +27,17 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   const disconnectMutation = useDisconnectConnector(starshipId)
   const oauthMutation = useStartOAuthConnector(starshipId)
   const apiKeyMutation = useConnectApiKeyConnector(starshipId)
+  const basicMutation = useConnectBasicAuthConnector(starshipId)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
   const [apiKeyValue, setApiKeyValue] = useState('')
   const [apiKeyExtraConfigText, setApiKeyExtraConfigText] = useState('')
+  const [basicDialogProvider, setBasicDialogProvider] = useState<string | null>(null)
+  const [basicUsernameValue, setBasicUsernameValue] = useState('')
+  const [basicPasswordValue, setBasicPasswordValue] = useState('')
+  const [basicExtraConfigText, setBasicExtraConfigText] = useState('')
   const [preOauthProvider, setPreOauthProvider] = useState<string | null>(null)
   const [preOauthMissingKeys, setPreOauthMissingKeys] = useState<string[]>([])
   const [preOauthSchema, setPreOauthSchema] = useState<any>(null)
@@ -162,6 +167,38 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     setApiKeyDialogProvider(null)
   }
 
+  const openBasicDialog = (provider: string) => {
+    setBasicDialogProvider(provider)
+    setBasicUsernameValue('')
+    setBasicPasswordValue('')
+    setBasicExtraConfigText('')
+  }
+
+  const handleBasicConnect = async () => {
+    if (!basicDialogProvider) return
+    const username = basicUsernameValue.trim()
+    if (!username) return
+
+    let extraConfig: Record<string, unknown> | undefined = undefined
+    const rawExtra = basicExtraConfigText.trim()
+    if (rawExtra) {
+      const parsed = JSON.parse(rawExtra)
+      if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        toast.error('extraConfig must be a JSON object')
+        return
+      }
+      extraConfig = parsed as Record<string, unknown>
+    }
+
+    await basicMutation.mutateAsync({
+      provider: basicDialogProvider as any,
+      username,
+      password: basicPasswordValue.trim() ? basicPasswordValue : undefined,
+      extraConfig,
+    })
+    setBasicDialogProvider(null)
+  }
+
   // Google Drive and GitHub connectors are temporarily disabled on the client
   // const handleGoogleDriveConnect = async () => {
   //   const result = await googleDriveMutation.mutateAsync()
@@ -232,6 +269,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     const canDisconnect = isConnected && authType !== 'platform_jwt'
     const isOauthConnectable = authType === 'oauth2'
     const isApiKeyConnectable = authType === 'api_key'
+    const isBasicConnectable = authType === 'basic'
     const isManaged = authType === 'platform_jwt'
 
     return (
@@ -273,8 +311,15 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   if (isManaged) return
                   if (isOauthConnectable) return void handleConnect(provider)
                   if (isApiKeyConnectable) return openApiKeyDialog(provider)
+                  if (isBasicConnectable) return openBasicDialog(provider)
                 }}
-                disabled={oauthMutation.isPending || apiKeyMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable)}
+                disabled={
+                  oauthMutation.isPending ||
+                  apiKeyMutation.isPending ||
+                  basicMutation.isPending ||
+                  isManaged ||
+                  (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)
+                }
               >
                 <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
                 {isManaged
@@ -287,6 +332,10 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                       ? isConnected
                         ? 'Update API key'
                         : 'Connect with API key'
+                      : isBasicConnectable
+                        ? isConnected
+                          ? 'Update credentials'
+                          : 'Connect with Basic auth'
                       : 'Not connectable'}
               </Button>
               {canDisconnect && (
@@ -453,6 +502,73 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
               disabled={apiKeyMutation.isPending || !apiKeyValue.trim()}
             >
               {apiKeyMutation.isPending ? 'Connecting…' : 'Connect'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={basicDialogProvider !== null} onOpenChange={open => !open && setBasicDialogProvider(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitlePrimitive>Connect with Basic auth</DialogTitlePrimitive>
+            <DialogDescription>
+              {basicDialogProvider ? `Enter credentials for ${getProviderLabel(basicDialogProvider)}. These will be stored securely for this starship.` : null}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-username">
+                Username / API key
+              </label>
+              <Input
+                id="basic-username"
+                value={basicUsernameValue}
+                onChange={e => setBasicUsernameValue(e.target.value)}
+                placeholder="API key or username"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-password">
+                Password (optional)
+              </label>
+              <Input
+                id="basic-password"
+                type="password"
+                value={basicPasswordValue}
+                onChange={e => setBasicPasswordValue(e.target.value)}
+                placeholder="Leave empty if not required"
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-extra-config">
+                extraConfig (optional JSON object)
+              </label>
+              <Textarea
+                id="basic-extra-config"
+                value={basicExtraConfigText}
+                onChange={e => setBasicExtraConfigText(e.target.value)}
+                placeholder='e.g. { "accountId": "123" }'
+                className="min-h-[120px] font-mono text-xs"
+                spellCheck={false}
+              />
+            </div>
+          </div>
+          <DialogFooter className="flex gap-2 justify-end">
+            <Button type="button" variant="ghost" onClick={() => setBasicDialogProvider(null)} disabled={basicMutation.isPending}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                try {
+                  await handleBasicConnect()
+                } catch (e: any) {
+                  toast.error('Failed to connect with Basic auth', { description: e?.message || 'Please verify your inputs.' })
+                }
+              }}
+              disabled={basicMutation.isPending || !basicUsernameValue.trim()}
+            >
+              {basicMutation.isPending ? 'Connecting…' : 'Connect'}
             </Button>
           </DialogFooter>
         </DialogContent>

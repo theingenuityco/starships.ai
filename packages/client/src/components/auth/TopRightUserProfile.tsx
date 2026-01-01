@@ -63,7 +63,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
 
   const handleAccountClick = useCallback(() => {
     if (!activeStarshipSlug) return
-    router.push(`/ship/${activeStarshipSlug}/settings/profile`)
+    router.push(`/ship/${activeStarshipSlug}/settings/my-profile`)
   }, [router, activeStarshipSlug])
 
   const handleLogoutClick = useCallback(async () => {

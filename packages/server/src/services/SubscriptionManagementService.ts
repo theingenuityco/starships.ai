@@ -17,6 +17,18 @@ function isShipClass(value: string): value is ShipClass {
   return value === 'scout' || value === 'frigate' || value === 'cruiser';
 }
 
+function shipClassRank(shipClass: ShipClass): number {
+  // Lower rank means "lower tier". Used to detect upgrade vs downgrade.
+  switch (shipClass) {
+    case 'scout':
+      return 0;
+    case 'frigate':
+      return 1;
+    case 'cruiser':
+      return 2;
+  }
+}
+
 function readRequiredPlanMetadata(price: Stripe.Price): {
   shipClass: ShipClass;
   maxAgents: number;
@@ -100,10 +112,37 @@ export class SubscriptionManagementService {
     const item = existing.items?.data?.[0];
     if (!item?.id) throw new AppError('Subscription has no items', 'INTERNAL_SERVER_ERROR', 500);
 
-    // Update subscription to the new price
+    // Determine whether this is a downgrade (apply at next renewal) vs upgrade (apply immediately).
+    const nextPrice = await stripe.prices.retrieve(priceId);
+    const nextPlan = readRequiredPlanMetadata(nextPrice);
+    const currentRank = shipClassRank(starship.shipClass);
+    const nextRank = shipClassRank(nextPlan.shipClass);
+    const isDowngrade = nextRank < currentRank;
+
+    if (isDowngrade) {
+      // Downgrades take effect next renewal. Product requirement: ideally the subscription will NOT renew,
+      // so we cancel at period end (the starship will revert to Scout when Stripe marks the subscription non-paying).
+      await stripe.subscriptions.update(subscriptionId, {
+        cancel_at_period_end: true,
+        proration_behavior: 'none',
+        metadata: {
+          ...(existing.metadata || {}),
+          starship_id: starshipId,
+          user_id: userId,
+          pending_downgrade_to: 'scout',
+          requested_price_id: priceId,
+        },
+      });
+
+      // Do NOT apply entitlements immediately; webhook will enforce Scout once the subscription ends.
+      return { mode: 'updated' };
+    }
+
+    // Upgrades/same-tier switches apply immediately (with prorations) for UX.
     await stripe.subscriptions.update(subscriptionId, {
       items: [{ id: item.id, price: priceId }],
       proration_behavior: 'create_prorations',
+      cancel_at_period_end: false,
       metadata: {
         ...(existing.metadata || {}),
         starship_id: starshipId,
@@ -113,12 +152,10 @@ export class SubscriptionManagementService {
     });
 
     // Apply entitlements immediately for UX (credits are still granted on invoice.paid).
-    const price = await stripe.prices.retrieve(priceId);
-    const plan = readRequiredPlanMetadata(price);
     await this.starshipRepo.update(starshipId, {
-      shipClass: plan.shipClass,
-      maxAgents: plan.maxAgents,
-      maxConcurrentTurns: plan.maxConcurrentTurns,
+      shipClass: nextPlan.shipClass,
+      maxAgents: nextPlan.maxAgents,
+      maxConcurrentTurns: nextPlan.maxConcurrentTurns,
     });
 
     return { mode: 'updated' };

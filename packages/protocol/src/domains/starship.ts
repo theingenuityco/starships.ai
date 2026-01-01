@@ -135,3 +135,15 @@ export interface CreateStarshipRequest {
 export interface CreateFrigateCheckoutResponse {
   checkoutUrl: string;
 }
+
+/**
+ * Starship subscription status (for billing UI).
+ *
+ * Note: Scout/free may have no active Stripe subscription; fields can be null.
+ */
+export interface StarshipSubscriptionStatusResponse {
+  subscriptionId: string | null;
+  status: string | null;
+  cancelAtPeriodEnd: boolean;
+  renewAt: string | null; // ISO datetime of next renewal / period end
+}

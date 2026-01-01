@@ -1,10 +1,10 @@
 import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
 import { CREDITS_PER_USD } from '@/config/credits';
+import { getEnvConfig } from '@starships/env';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2025-09-30.clover',
-});
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 /**
  * Stripe Service - Handles Stripe payment operations
@@ -112,10 +112,10 @@ export class StripeService {
               credits_granted: String(creditsGranted),
             },
           },
-          success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/success?topupId=${encodeURIComponent(
+          success_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/success?topupId=${encodeURIComponent(
             topupId
           )}&amount=${encodeURIComponent(amountUsd.toFixed(2))}`,
-          cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/failure?topupId=${encodeURIComponent(
+          cancel_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/failure?topupId=${encodeURIComponent(
             topupId
           )}`,
           expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
@@ -204,8 +204,8 @@ export class StripeService {
             price_id: priceId,
           },
         },
-        success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=success`,
-        cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=cancelled`,
+        success_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=success`,
+        cancel_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=cancelled`,
         expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
       },
       { idempotencyKey }

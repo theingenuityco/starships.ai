@@ -2,15 +2,27 @@ import Stripe from 'stripe';
 import { getConnection, StarshipRepository, UserRepository } from '@starships/models';
 import { AppError } from '@starships/errors';
 import { StripeService } from '@/services/StripeService';
+import { getEnvConfig } from '@starships/env';
+import type { ShipClass } from '@starships/protocol';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 function parseIntOrNull(v: unknown): number | null {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-function readRequiredPlanMetadata(price: Stripe.Price): { shipClass: string; maxAgents: number; maxConcurrentTurns: number; monthlyCredits: number } {
+function isShipClass(value: string): value is ShipClass {
+  return value === 'scout' || value === 'frigate' || value === 'cruiser';
+}
+
+function readRequiredPlanMetadata(price: Stripe.Price): {
+  shipClass: ShipClass;
+  maxAgents: number;
+  maxConcurrentTurns: number;
+  monthlyCredits: number;
+} {
   const md = price.metadata || {};
   const shipClass = (md.ship_class || md.shipClass || '').toString();
   const maxAgents = parseIntOrNull(md.max_agents ?? md.maxAgents);
@@ -18,6 +30,9 @@ function readRequiredPlanMetadata(price: Stripe.Price): { shipClass: string; max
   const monthlyCredits = parseIntOrNull(md.monthly_credits ?? md.monthlyCredits);
   if (!shipClass || maxAgents === null || maxConcurrentTurns === null || monthlyCredits === null) {
     throw new AppError('Plan metadata missing required keys', 'VALIDATION_ERROR', 400, { details: { metadata: md } });
+  }
+  if (!isShipClass(shipClass)) {
+    throw new AppError('Plan metadata ship_class is invalid', 'VALIDATION_ERROR', 400, { details: { shipClass } });
   }
   return { shipClass, maxAgents, maxConcurrentTurns, monthlyCredits };
 }
@@ -101,15 +116,13 @@ export class SubscriptionManagementService {
     const price = await stripe.prices.retrieve(priceId);
     const plan = readRequiredPlanMetadata(price);
     await this.starshipRepo.update(starshipId, {
-      shipClass: plan.shipClass as any,
+      shipClass: plan.shipClass,
       maxAgents: plan.maxAgents,
       maxConcurrentTurns: plan.maxConcurrentTurns,
-    } as any);
+    });
 
     return { mode: 'updated' };
   }
 }
 
 export default SubscriptionManagementService;
-
-

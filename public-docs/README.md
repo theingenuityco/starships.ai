@@ -61,5 +61,5 @@ Notes:
 
 For authenticated external APIs via connectors:
 
-- See `public-docs/connectors/README.md` and `public-docs/connectors/connector_templates.md` for how `connector_action` works with connector templates and injected auth (OAuth2/API key/platform JWT).
+- See `public-docs/connectors/README.md` and `public-docs/connectors/connector_templates.md` for how `connector_action` works with connector templates and injected auth (OAuth2/API key/basic/platform JWT).
 - Use the generic `connector_action` patterns as a model when designing tools for any connector-backed integration (not `http_request`) so the host can inject auth and base URLs.

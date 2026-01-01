@@ -53,7 +53,7 @@ export class StarshipEntity implements StarshipModel {
   name!: string;
 
   @Expose()
-  @IsEnum(['scout', 'frigate'])
+  @IsEnum(['scout', 'frigate', 'cruiser'])
   shipClass!: ShipClass;
 
   @Expose()

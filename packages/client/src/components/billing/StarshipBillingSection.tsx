@@ -11,7 +11,8 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useStarship, STARSHIP_QUERY_KEYS } from '@/hooks/useStarships'
-import { useFrigateUpgradeCheckout } from '@/hooks/useFrigateUpgrade'
+import { useSubscriptionPlans } from '@/hooks/useSubscriptionPlans'
+import { useSubscribeStarship } from '@/hooks/useSubscribeStarship'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/hooks/useToast'
 
@@ -26,9 +27,10 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
   const enabled = Boolean(starshipId)
   const { data: wallet, isLoading, error } = useWallet(starshipId || '', enabled)
   const { data: starship } = useStarship(starshipId || '', enabled)
+  const { data: plans } = useSubscriptionPlans(true)
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
-  const upgradeMutation = useFrigateUpgradeCheckout()
+  const subscribeMutation = useSubscribeStarship()
   const { toast } = useToast()
 
   // After successful Stripe redirect, refresh wallet balance
@@ -40,10 +42,10 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
     }
   }, [searchParams, queryClient, starshipId])
 
-  const handleUpgrade = async () => {
+  const handleSubscribe = async (priceId: string) => {
     if (!starshipId) return
     try {
-      const result = await upgradeMutation.mutateAsync({ starshipId })
+      const result = await subscribeMutation.mutateAsync({ starshipId, priceId })
       if (result.checkoutUrl) window.location.href = result.checkoutUrl
       else throw new Error('No checkout URL received')
     } catch (e) {
@@ -83,10 +85,21 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
                   </div>
                 </div>
 
-                {starship.shipClass === 'scout' && (
-                  <Button onClick={handleUpgrade} disabled={upgradeMutation.isPending} className="w-full">
-                    {upgradeMutation.isPending ? 'Redirecting…' : 'Upgrade to frigate ($20/mo)'}
-                  </Button>
+                {/* Paid plan options (from Stripe Price metadata). Add a new plan in Stripe and it appears here without code changes. */}
+                {starship.shipClass === 'scout' && Array.isArray(plans) && plans.length > 0 && (
+                  <div className="space-y-2">
+                    {plans.map(plan => (
+                      <Button
+                        key={plan.priceId}
+                        onClick={() => handleSubscribe(plan.priceId)}
+                        disabled={subscribeMutation.isPending}
+                        className="w-full"
+                        variant="default"
+                      >
+                        {subscribeMutation.isPending ? 'Redirecting…' : `Upgrade to ${plan.displayName}${plan.unitAmount ? ` (${(plan.unitAmount / 100).toFixed(2)} ${plan.currency.toUpperCase()}/${plan.interval ?? 'mo'})` : ''}`}
+                      </Button>
+                    ))}
+                  </div>
                 )}
               </CardContent>
             </Card>

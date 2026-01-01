@@ -57,5 +57,3 @@ export class StarshipTurnLeaseService {
 }
 
 export default StarshipTurnLeaseService;
-
-

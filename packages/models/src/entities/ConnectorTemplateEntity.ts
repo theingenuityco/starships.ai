@@ -58,7 +58,7 @@ export class ConnectorTemplateEntity {
 
   @Expose()
   @IsString()
-  @IsIn(['oauth2', 'api_key', 'platform_jwt', 'none'])
+  @IsIn(['oauth2', 'api_key', 'basic', 'platform_jwt', 'none'])
   authType!: ConnectorAuthTypeV2;
 
   /**

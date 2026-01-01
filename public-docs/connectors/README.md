@@ -34,4 +34,5 @@ Connectors let Starships tools and agents talk to third‑party platforms via th
 ### Examples
 
 - **API key connector template**: `example-api-key.md`
+- **Basic auth connector template**: `example-basic.md`
 - **OAuth2 connector template**: `example-oauth2.md`

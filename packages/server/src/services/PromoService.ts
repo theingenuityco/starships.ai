@@ -2,6 +2,9 @@ import Stripe from 'stripe';
 import { LedgerRepository, PromoRedemptionRepository, WalletRepository, getConnection } from '@starships/models';
 import { StarshipService } from '@/services/StarshipService';
 import type { RedeemPromoRequest, RedeemPromoResponse } from '@starships/protocol';
+import { getEnvConfig } from '@starships/env';
+
+const envConfig = getEnvConfig();
 
 export class PromoService {
   private stripe: Stripe;
@@ -11,7 +14,7 @@ export class PromoService {
   private starshipService: StarshipService;
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+    this.stripe = new Stripe(envConfig.STRIPE_SECRET_KEY, {
       apiVersion: '2025-12-15.clover',
     });
     this.walletRepo = new WalletRepository();

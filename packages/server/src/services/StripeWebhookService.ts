@@ -39,10 +39,22 @@ function readRequiredPlanMetadata(price: Stripe.Price): {
   const maxConcurrentTurns = parseIntOrNull(md.max_concurrent_turns ?? md.maxConcurrentTurns);
   const monthlyCredits = parseIntOrNull(md.monthly_credits ?? md.monthlyCredits);
 
-  if (!shipClass || maxAgents === null || maxConcurrentTurns === null || monthlyCredits === null) {
-    throw new Error('MISSING_PLAN_METADATA');
+  const missing: string[] = [];
+  if (!shipClass) missing.push('ship_class');
+  if (maxAgents === null) missing.push('max_agents');
+  if (maxConcurrentTurns === null) missing.push('max_concurrent_turns');
+  if (monthlyCredits === null) missing.push('monthly_credits');
+
+  if (missing.length) {
+    throw new Error(`MISSING_PLAN_METADATA:${missing.join(',')}`);
   }
-  return { shipClass, maxAgents, maxConcurrentTurns, monthlyCredits };
+  // TS doesn't narrow through the `missing[]` bookkeeping above, so assert non-null after we validate.
+  return {
+    shipClass,
+    maxAgents: maxAgents as number,
+    maxConcurrentTurns: maxConcurrentTurns as number,
+    monthlyCredits: monthlyCredits as number,
+  };
 }
 
 export class StripeWebhookService {

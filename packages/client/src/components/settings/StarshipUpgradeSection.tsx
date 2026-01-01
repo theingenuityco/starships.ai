@@ -34,18 +34,25 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
   const params = useParams<{ slug?: string }>()
   const routeSlug = params?.slug
 
+  const invalidateBillingState = React.useCallback(async (): Promise<void> => {
+    if (!starshipId) return
+    const tasks: Array<Promise<unknown>> = []
+    tasks.push(queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) }))
+    tasks.push(queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) }))
+    tasks.push(queryClient.invalidateQueries({ queryKey: STARSHIP_SUBSCRIPTION_QUERY_KEYS.status(starshipId) }))
+    if (routeSlug) {
+      tasks.push(queryClient.invalidateQueries({ queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', routeSlug] as const }))
+    }
+    await Promise.all(tasks)
+  }, [queryClient, starshipId, routeSlug])
+
   // After successful Stripe redirect, refresh starship + wallet UI.
   useEffect(() => {
     const status = searchParams.get('status')
     if (status === 'success' && starshipId) {
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
-      queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
-      queryClient.invalidateQueries({ queryKey: STARSHIP_SUBSCRIPTION_QUERY_KEYS.status(starshipId) })
-      if (routeSlug) {
-        queryClient.invalidateQueries({ queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', routeSlug] as const })
-      }
+      void invalidateBillingState()
     }
-  }, [searchParams, queryClient, starshipId, routeSlug])
+  }, [searchParams, starshipId, invalidateBillingState])
 
   const handleSubscribe = async (priceId: string) => {
     try {
@@ -54,12 +61,7 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
         if (result.checkoutUrl) window.location.href = result.checkoutUrl
         else throw new Error('No checkout URL received')
       } else {
-        queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
-        queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
-        queryClient.invalidateQueries({ queryKey: STARSHIP_SUBSCRIPTION_QUERY_KEYS.status(starshipId) })
-        if (routeSlug) {
-          queryClient.invalidateQueries({ queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', routeSlug] as const })
-        }
+        await invalidateBillingState()
       }
     } catch (e) {
       toast({
@@ -73,8 +75,10 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
   const handleCancelDowngrade = async () => {
     try {
       await cancelDowngradeMutation.mutateAsync({ starshipId })
-      queryClient.invalidateQueries({ queryKey: STARSHIP_SUBSCRIPTION_QUERY_KEYS.status(starshipId) })
-      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: STARSHIP_SUBSCRIPTION_QUERY_KEYS.status(starshipId) }),
+        queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) }),
+      ])
     } catch (e) {
       toast({
         title: 'Cancel Downgrade Failed',

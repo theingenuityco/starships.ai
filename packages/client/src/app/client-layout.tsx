@@ -94,11 +94,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         if (section === 'management') return 'Management | Starships.ai'
         if (section === 'schedules') return 'Schedules | Starships.ai'
 
-        if (section === 'billing') {
-          if (parts[2] === 'topup' && parts[3] === 'success') return 'Top-up Successful | Starships.ai'
-          if (parts[2] === 'topup' && parts[3] === 'failure') return 'Top-up Failed | Starships.ai'
-          return 'Billing | Starships.ai'
-        }
+        if (section === 'billing') return 'Billing | Starships.ai'
 
         return 'Starship | Starships.ai'
       }

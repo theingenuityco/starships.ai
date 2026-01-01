@@ -4,6 +4,8 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
+import { FrigateSubscriptionService } from '@/services/FrigateSubscriptionService';
+import { rateLimiters } from '@/middleware/rateLimiter';
 import { AgentService } from '@/services/AgentService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
@@ -41,7 +43,7 @@ const checkAuth = (req: Request, res: Response): boolean => {
 router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
-    const { name, maxAgents = 8 } = req.body;
+    const { name } = req.body;
 
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
 
@@ -67,7 +69,10 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: name.trim(),
-      maxAgents,
+      // New starships are created as Scout class by default
+      shipClass: 'scout',
+      maxAgents: 5,
+      maxConcurrentTurns: 1,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
@@ -81,6 +86,31 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
     );
   } catch (error) {
     handleError(error, res, 'creating starship');
+  }
+});
+
+/**
+ * POST /starships/:id/upgrade/frigate
+ * Starts a Stripe subscription checkout to upgrade this starship to Frigate ($20/mo).
+ */
+router.post('/starships/:id/upgrade/frigate', rateLimiters.financial, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const starshipId = req.params.id;
+    const userId = (req as any).user!.id as string;
+
+    const starshipService = new StarshipService();
+    const hasAccess = await starshipService.hasAccess(userId, starshipId);
+    if (!hasAccess) {
+      sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+      return;
+    }
+
+    const service = new FrigateSubscriptionService();
+    const { checkoutUrl } = await service.createCheckoutSession({ userId, starshipId });
+
+    sendSuccess(res, { checkoutUrl }, 201);
+  } catch (error) {
+    handleError(error, res, 'creating frigate upgrade checkout');
   }
 });
 

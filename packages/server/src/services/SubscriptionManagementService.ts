@@ -112,6 +112,20 @@ export class SubscriptionManagementService {
     const item = existing.items?.data?.[0];
     if (!item?.id) throw new AppError('Subscription has no items', 'INTERNAL_SERVER_ERROR', 500);
 
+    // Ensure the subscription is linkable back to our domain model.
+    // The webhook handler that applies entitlements on `invoice.paid` relies on
+    // `subscription.metadata.starship_id` and `subscription.metadata.user_id`.
+    const needsLinkMetadata = existing.metadata?.starship_id !== starshipId || existing.metadata?.user_id !== userId;
+    if (needsLinkMetadata) {
+      await stripe.subscriptions.update(subscriptionId, {
+        metadata: {
+          ...(existing.metadata || {}),
+          starship_id: starshipId,
+          user_id: userId,
+        },
+      });
+    }
+
     // If the existing subscription is not in a paying state, do NOT attempt an in-place update.
     // Instead, redirect the user through Checkout to (re)establish a valid payment flow.
     // This commonly happens if a prior checkout attempt left the subscription in `incomplete`/`unpaid`.
@@ -140,10 +154,7 @@ export class SubscriptionManagementService {
     if (isDowngrade) {
       // Downgrades take effect next renewal. Product requirement: ideally the subscription will NOT renew,
       // so we cancel at period end (the starship will revert to Scout when Stripe marks the subscription non-paying).
-      const scheduleId =
-        typeof (existing as unknown as { schedule?: unknown }).schedule === 'string'
-          ? ((existing as unknown as { schedule?: string }).schedule as string)
-          : ((existing as unknown as { schedule?: { id: string } | null }).schedule?.id ?? null);
+      const scheduleId = typeof existing.schedule === 'string' ? existing.schedule : (existing.schedule?.id ?? null);
 
       // If Stripe has already put this subscription under a schedule, we must update the schedule (Stripe forbids
       // changing cancellation behavior directly on the subscription).
@@ -157,8 +168,8 @@ export class SubscriptionManagementService {
         }
 
         const currentItem = existing.items?.data?.[0];
-        const currentPriceId =
-          typeof currentItem?.price === 'string' ? currentItem.price : (currentItem?.price as Stripe.Price | undefined)?.id;
+        const currentPrice = currentItem?.price;
+        const currentPriceId = !currentPrice ? null : typeof currentPrice === 'string' ? currentPrice : currentPrice.id;
         const nextRenewalAt = currentItem?.current_period_end ?? null;
         if (!currentPriceId) throw new AppError('Subscription item missing price', 'INTERNAL_SERVER_ERROR', 500);
         if (!nextRenewalAt) throw new AppError('Subscription item missing current_period_end', 'INTERNAL_SERVER_ERROR', 500);
@@ -200,27 +211,45 @@ export class SubscriptionManagementService {
       return { mode: 'updated' };
     }
 
-    // Upgrades/same-tier switches apply immediately (with prorations) for UX.
-    await stripe.subscriptions.update(subscriptionId, {
-      items: [{ id: item.id, price: priceId }],
-      proration_behavior: 'create_prorations',
-      cancel_at_period_end: false,
-      metadata: {
-        ...(existing.metadata || {}),
-        starship_id: starshipId,
-        user_id: userId,
-        price_id: priceId,
+    // Upgrades/same-tier switches:
+    // Per Stripe docs, the recommended hosted redirect flow for changing an existing subscription is
+    // Billing Portal deep links (subscription_update_confirm). This ensures the customer is redirected
+    // to Stripe to confirm/pay (including SCA) when required.
+    //
+    // We do NOT apply entitlements immediately; webhook `invoice.paid` enforces entitlements.
+    //
+    // Docs: customer-management/portal-deep-links.md (flow_data.type=subscription_update_confirm)
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: stripeCustomerId,
+      // Used when the customer exits the Portal (e.g. clicks “Return to business”).
+      return_url: `${envConfig.PUBLIC_URL}/ship/${starship.slug}/settings/my-starship?status=cancelled`,
+      flow_data: {
+        type: 'subscription_update_confirm',
+        // Ensure an automatic redirect after the customer completes the plan change in the Portal.
+        after_completion: {
+          type: 'redirect',
+          redirect: {
+            return_url: `${envConfig.PUBLIC_URL}/ship/${starship.slug}/settings/my-starship?status=success`,
+          },
+        },
+        subscription_update_confirm: {
+          subscription: subscriptionId,
+          items: [
+            {
+              id: item.id,
+              quantity: item.quantity ?? 1,
+              price: priceId,
+            },
+          ],
+        },
       },
     });
 
-    // Apply entitlements immediately for UX (credits are still granted on invoice.paid).
-    await this.starshipRepo.update(starshipId, {
-      shipClass: nextPlan.shipClass,
-      maxAgents: nextPlan.maxAgents,
-      maxConcurrentTurns: nextPlan.maxConcurrentTurns,
-    });
+    if (!portalSession.url) {
+      throw new AppError('Failed to create Stripe Billing Portal session', 'INTERNAL_SERVER_ERROR', 500);
+    }
 
-    return { mode: 'updated' };
+    return { mode: 'checkout', checkoutUrl: portalSession.url };
   }
 }
 

@@ -112,6 +112,24 @@ export class SubscriptionManagementService {
     const item = existing.items?.data?.[0];
     if (!item?.id) throw new AppError('Subscription has no items', 'INTERNAL_SERVER_ERROR', 500);
 
+    // If the existing subscription is not in a paying state, do NOT attempt an in-place update.
+    // Instead, redirect the user through Checkout to (re)establish a valid payment flow.
+    // This commonly happens if a prior checkout attempt left the subscription in `incomplete`/`unpaid`.
+    const isPaying = existing.status === 'active' || existing.status === 'trialing';
+    if (!isPaying) {
+      const idempotencyKey = `sub-${starshipId}-${priceId}-${Date.now()}`;
+      const session = await StripeService.createSubscriptionCheckoutSession({
+        stripeCustomerId,
+        starshipId,
+        starshipSlug: starship.slug,
+        userId,
+        idempotencyKey,
+        priceId,
+      });
+      if (!session.url) throw new AppError('Failed to create Stripe checkout session', 'INTERNAL_SERVER_ERROR', 500);
+      return { mode: 'checkout', checkoutUrl: session.url };
+    }
+
     // Determine whether this is a downgrade (apply at next renewal) vs upgrade (apply immediately).
     const nextPrice = await stripe.prices.retrieve(priceId);
     const nextPlan = readRequiredPlanMetadata(nextPrice);

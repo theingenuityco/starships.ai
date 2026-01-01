@@ -22,7 +22,7 @@ export default function AccountTopBar({ dirty, saving, onReset, formId = 'accoun
           <Icon name="shield" className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h2 className="text-lg font-semibold">Account</h2>
+          <h2 className="text-lg font-semibold">My Profile</h2>
           <p className="text-sm text-muted-foreground">Manage your profile and security.</p>
         </div>
         <div className="ml-auto flex items-center gap-2">

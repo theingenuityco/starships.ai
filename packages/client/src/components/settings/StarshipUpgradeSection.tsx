@@ -15,6 +15,7 @@ import { useSubscribeStarship } from '@/hooks/useSubscribeStarship'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { useToast } from '@/hooks/useToast'
 import { useStarshipSubscriptionStatus, STARSHIP_SUBSCRIPTION_QUERY_KEYS } from '@/hooks/useStarshipSubscriptionStatus'
+import { useCancelDowngradeStarship } from '@/hooks/useCancelDowngradeStarship'
 
 export interface StarshipUpgradeSectionProps {
   starshipId: string
@@ -26,6 +27,7 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
   const { data: plans } = useSubscriptionPlans(true)
   const { data: subscriptionStatus } = useStarshipSubscriptionStatus(starshipId, enabled)
   const subscribeMutation = useSubscribeStarship()
+  const cancelDowngradeMutation = useCancelDowngradeStarship()
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
@@ -63,6 +65,20 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
       toast({
         title: 'Plan Change Failed',
         description: e instanceof Error ? e.message : 'Failed to change plan. Please try again.',
+        variant: 'destructive',
+      })
+    }
+  }
+
+  const handleCancelDowngrade = async () => {
+    try {
+      await cancelDowngradeMutation.mutateAsync({ starshipId })
+      queryClient.invalidateQueries({ queryKey: STARSHIP_SUBSCRIPTION_QUERY_KEYS.status(starshipId) })
+      queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
+    } catch (e) {
+      toast({
+        title: 'Cancel Downgrade Failed',
+        description: e instanceof Error ? e.message : 'Failed to cancel downgrade. Please try again.',
         variant: 'destructive',
       })
     }
@@ -141,13 +157,6 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
                           ? `Downgrade to ${plan.displayName}`
                           : `Switch to ${plan.displayName}`
 
-                  const renewalLine =
-                    isCurrent && subscriptionStatus?.renewAt
-                      ? subscriptionStatus.cancelAtPeriodEnd
-                        ? `Will be downgraded to Scout from ${formatPlanDate(subscriptionStatus.renewAt)}`
-                        : `Plan will renew on ${formatPlanDate(subscriptionStatus.renewAt)} if not cancelled`
-                      : null
-
                   return (
                     <div
                       key={plan.priceId}
@@ -223,13 +232,31 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
                           >
                             {ctaText}
                           </Button>
-                          {renewalLine ? <div className="mt-2 text-[11px] text-muted-foreground">{renewalLine}</div> : null}
                         </div>
                       </div>
                     </div>
                   )
                 })}
             </div>
+            {subscriptionStatus?.renewAt ? (
+              <div className="rounded-2xl border bg-muted/10 p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-semibold">Subscription status</div>
+                    <div className="mt-1 text-xs text-muted-foreground">
+                      {subscriptionStatus.cancelAtPeriodEnd
+                        ? `Will be downgraded to Scout from ${formatPlanDate(subscriptionStatus.renewAt)}`
+                        : `Plan will renew on ${formatPlanDate(subscriptionStatus.renewAt)}`}
+                    </div>
+                  </div>
+                  {subscriptionStatus.cancelAtPeriodEnd ? (
+                    <Button type="button" size="sm" variant="outline" onClick={handleCancelDowngrade} disabled={cancelDowngradeMutation.isPending} className="shrink-0">
+                      {cancelDowngradeMutation.isPending ? 'Cancelling…' : 'Cancel downgrade'}
+                    </Button>
+                  ) : null}
+                </div>
+              </div>
+            ) : null}
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <Icon name="external-link" className="h-3.5 w-3.5" />
               You will be redirected to Stripe to complete your payment.

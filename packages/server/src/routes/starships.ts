@@ -176,6 +176,82 @@ router.post(
 );
 
 /**
+ * POST /starships/:id/subscription/cancel-downgrade
+ * If a subscription is set to end at period end (pending downgrade-to-scout), undo that and keep it renewing.
+ */
+router.post(
+  '/starships/:id/subscription/cancel-downgrade',
+  rateLimiters.financial,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const starshipId = req.params.id;
+      const userId = (req as any).user!.id as string;
+
+      const paramValidation = validateData(z.object({ id: IdSchema }), { id: starshipId }, res, 'cancel downgrade');
+      if (!paramValidation) return;
+
+      const starshipService = new StarshipService();
+      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      if (!hasAccess) {
+        sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+        return;
+      }
+
+      const connection = getConnection();
+      const row = await connection.queryOne<{ stripe_subscription_id: string }>(
+        `SELECT stripe_subscription_id
+           FROM starship_subscriptions
+          WHERE starship_id = $1
+            AND status NOT IN ('canceled')
+          ORDER BY updated_at DESC
+          LIMIT 1`,
+        [starshipId]
+      );
+
+      if (!row?.stripe_subscription_id) {
+        sendSuccess(res, { ok: true }, 200);
+        return;
+      }
+
+      const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['items.data'] });
+      const scheduleId =
+        typeof (subscription as unknown as { schedule?: unknown }).schedule === 'string'
+          ? ((subscription as unknown as { schedule?: string }).schedule as string)
+          : ((subscription as unknown as { schedule?: { id: string } | null }).schedule?.id ?? null);
+
+      if (scheduleId) {
+        // Detach schedule so we can update cancellation behavior on the subscription.
+        await stripe.subscriptionSchedules.release(scheduleId);
+      }
+
+      await stripe.subscriptions.update(subscription.id, {
+        cancel_at_period_end: false,
+        proration_behavior: 'none',
+        metadata: {
+          ...(subscription.metadata || {}),
+          pending_downgrade_to: '',
+          requested_price_id: '',
+        },
+      });
+
+      // Best-effort update local mirror.
+      await connection.query(
+        `UPDATE starship_subscriptions
+            SET cancel_at_period_end = false,
+                updated_at = NOW()
+          WHERE starship_id = $1`,
+        [starshipId]
+      );
+
+      sendSuccess(res, { ok: true }, 200);
+    } catch (error) {
+      handleError(error, res, 'cancelling downgrade');
+    }
+  }
+);
+
+/**
  * GET /starships/:id/subscription/status
  * Returns the starship's Stripe subscription renewal/cancellation state for billing UI.
  */

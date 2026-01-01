@@ -61,19 +61,15 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
                   </TabsTrigger>
-                  <TabsTrigger
-                    value="usage"
-                    disabled={!isInstanceAdmin}
-                    className="gap-2 rounded-xl px-3 py-1 border border-slate-300/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-100/70 via-background to-transparent text-slate-800 dark:text-slate-100 data-[state=active]:border-slate-300/80 dark:data-[state=active]:border-slate-600/80 data-[state=active]:from-slate-100 disabled:opacity-60"
-                  >
-                    <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
-                    <span>Analytics</span>
-                    {!isInstanceAdmin ? (
-                      <span className="ml-1 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-2 py-0.5 text-[10px] font-semibold text-white">
-                        Pro
-                      </span>
-                    ) : null}
-                  </TabsTrigger>
+                  {isInstanceAdmin ? (
+                    <TabsTrigger
+                      value="usage"
+                      className="gap-2 rounded-xl px-3 py-1 border border-slate-300/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-100/70 via-background to-transparent text-slate-800 dark:text-slate-100 data-[state=active]:border-slate-300/80 dark:data-[state=active]:border-slate-600/80 data-[state=active]:from-slate-100"
+                    >
+                      <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
+                      <span>Analytics</span>
+                    </TabsTrigger>
+                  ) : null}
                 </TabsList>
               </div>
 

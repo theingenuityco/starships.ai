@@ -46,12 +46,18 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
     if (!starshipId) return
     try {
       const result = await subscribeMutation.mutateAsync({ starshipId, priceId })
-      if (result.checkoutUrl) window.location.href = result.checkoutUrl
-      else throw new Error('No checkout URL received')
+      if (result.mode === 'checkout') {
+        if (result.checkoutUrl) window.location.href = result.checkoutUrl
+        else throw new Error('No checkout URL received')
+      } else {
+        // Updated immediately (Stripe subscription item updated); refresh starship + wallet UI.
+        queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
+        queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
+      }
     } catch (e) {
       toast({
-        title: 'Upgrade Failed',
-        description: e instanceof Error ? e.message : 'Failed to start upgrade checkout. Please try again.',
+        title: 'Plan Change Failed',
+        description: e instanceof Error ? e.message : 'Failed to change plan. Please try again.',
         variant: 'destructive',
       })
     }
@@ -86,17 +92,23 @@ export default function StarshipBillingSection({ starshipId }: StarshipBillingSe
                 </div>
 
                 {/* Paid plan options (from Stripe Price metadata). Add a new plan in Stripe and it appears here without code changes. */}
-                {starship.shipClass === 'scout' && Array.isArray(plans) && plans.length > 0 && (
+                {Array.isArray(plans) && plans.length > 0 && (
                   <div className="space-y-2">
                     {plans.map(plan => (
                       <Button
                         key={plan.priceId}
                         onClick={() => handleSubscribe(plan.priceId)}
-                        disabled={subscribeMutation.isPending}
+                        disabled={subscribeMutation.isPending || plan.shipClass === starship.shipClass}
                         className="w-full"
                         variant="default"
                       >
-                        {subscribeMutation.isPending ? 'Redirecting…' : `Upgrade to ${plan.displayName}${plan.unitAmount ? ` (${(plan.unitAmount / 100).toFixed(2)} ${plan.currency.toUpperCase()}/${plan.interval ?? 'mo'})` : ''}`}
+                        {plan.shipClass === starship.shipClass
+                          ? `Current: ${plan.displayName}`
+                          : subscribeMutation.isPending
+                            ? 'Redirecting…'
+                            : `${plan.entitlements.monthlyCredits === 0 ? 'Switch to' : 'Switch to'} ${plan.displayName}${
+                                plan.unitAmount !== null ? ` (${(plan.unitAmount / 100).toFixed(2)} ${plan.currency.toUpperCase()}/${plan.interval ?? 'mo'})` : ''
+                              }`}
                       </Button>
                     ))}
                   </div>

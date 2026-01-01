@@ -9,10 +9,19 @@ export const SUBSCRIBE_STARSHIP_MUTATION_KEYS = {
 
 export function useSubscribeStarship() {
   return useMutation({
-    mutationFn: async ({ starshipId, priceId }: { starshipId: string; priceId: string }): Promise<{ checkoutUrl: string }> => {
-      const response: FetchResponse<ApiResponse<{ checkoutUrl: string }>> = await api.post(`/api/v1/starships/${starshipId}/subscribe`, {
+    mutationFn: async ({
+      starshipId,
+      priceId,
+    }: {
+      starshipId: string
+      priceId: string
+    }): Promise<{ mode: 'checkout' | 'updated'; checkoutUrl?: string }> => {
+      const response: FetchResponse<ApiResponse<{ mode: 'checkout' | 'updated'; checkoutUrl?: string }>> = await api.post(
+        `/api/v1/starships/${starshipId}/subscription/change`,
+        {
         priceId,
-      })
+        }
+      )
       return response.data.data
     },
   })

@@ -215,7 +215,14 @@ router.get(
       }
 
       const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['items.data'] });
-      const cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end);
+      // If the subscription is managed by a schedule, Stripe may block direct cancel_at_period_end updates.
+      // In that case, interpret end_behavior=cancel as "cancel at period end" for UI purposes.
+      const scheduleId =
+        typeof (subscription as unknown as { schedule?: unknown }).schedule === 'string'
+          ? ((subscription as unknown as { schedule?: string }).schedule as string)
+          : ((subscription as unknown as { schedule?: { id: string } | null }).schedule?.id ?? null);
+      const schedule = scheduleId ? await stripe.subscriptionSchedules.retrieve(scheduleId) : null;
+      const cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end) || Boolean(schedule && schedule.end_behavior === 'cancel');
       const status = subscription.status ?? null;
 
       const item0 = subscription.items?.data?.[0];

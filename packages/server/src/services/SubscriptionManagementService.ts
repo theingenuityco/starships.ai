@@ -122,17 +122,61 @@ export class SubscriptionManagementService {
     if (isDowngrade) {
       // Downgrades take effect next renewal. Product requirement: ideally the subscription will NOT renew,
       // so we cancel at period end (the starship will revert to Scout when Stripe marks the subscription non-paying).
-      await stripe.subscriptions.update(subscriptionId, {
-        cancel_at_period_end: true,
-        proration_behavior: 'none',
-        metadata: {
-          ...(existing.metadata || {}),
-          starship_id: starshipId,
-          user_id: userId,
-          pending_downgrade_to: 'scout',
-          requested_price_id: priceId,
-        },
-      });
+      const scheduleId =
+        typeof (existing as unknown as { schedule?: unknown }).schedule === 'string'
+          ? ((existing as unknown as { schedule?: string }).schedule as string)
+          : ((existing as unknown as { schedule?: { id: string } | null }).schedule?.id ?? null);
+
+      // If Stripe has already put this subscription under a schedule, we must update the schedule (Stripe forbids
+      // changing cancellation behavior directly on the subscription).
+      if (scheduleId) {
+        const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+        const phaseStart = schedule.phases?.[0]?.start_date ?? schedule.current_phase?.start_date ?? null;
+        if (!phaseStart) {
+          throw new AppError('Subscription schedule missing phase start_date', 'INTERNAL_SERVER_ERROR', 500, {
+            details: { scheduleId },
+          });
+        }
+
+        const currentItem = existing.items?.data?.[0];
+        const currentPriceId =
+          typeof currentItem?.price === 'string' ? currentItem.price : (currentItem?.price as Stripe.Price | undefined)?.id;
+        const nextRenewalAt = currentItem?.current_period_end ?? null;
+        if (!currentPriceId) throw new AppError('Subscription item missing price', 'INTERNAL_SERVER_ERROR', 500);
+        if (!nextRenewalAt) throw new AppError('Subscription item missing current_period_end', 'INTERNAL_SERVER_ERROR', 500);
+
+        await stripe.subscriptionSchedules.update(scheduleId, {
+          end_behavior: 'cancel',
+          proration_behavior: 'none',
+          metadata: {
+            ...(schedule.metadata || {}),
+            starship_id: starshipId,
+            user_id: userId,
+            pending_downgrade_to: 'scout',
+            requested_price_id: priceId,
+          },
+          phases: [
+            {
+              start_date: phaseStart,
+              end_date: nextRenewalAt,
+              items: [{ price: currentPriceId, quantity: currentItem?.quantity ?? 1 }],
+              proration_behavior: 'none',
+            },
+          ],
+        });
+      } else {
+        await stripe.subscriptions.update(subscriptionId, {
+          cancel_at_period_end: true,
+          proration_behavior: 'none',
+          metadata: {
+            ...(existing.metadata || {}),
+            starship_id: starshipId,
+            user_id: userId,
+            pending_downgrade_to: 'scout',
+            requested_price_id: priceId,
+          },
+        });
+      }
 
       // Do NOT apply entitlements immediately; webhook will enforce Scout once the subscription ends.
       return { mode: 'updated' };

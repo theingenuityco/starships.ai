@@ -2,8 +2,10 @@ import Stripe from 'stripe';
 import { TopupRepository, WalletRepository, LedgerRepository, getConnection } from '@starships/models';
 import { logger } from '@/utils/logger';
 import { CREDITS_PER_USD, toCreditsString } from '@/config/credits';
+import { getEnvConfig } from '@starships/env';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 type TopupRow = {
   id: string;
@@ -18,6 +20,17 @@ type TopupRow = {
 function parseIntOrNull(v: unknown): number | null {
   const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
   return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function hasId(v: unknown): v is { id: string } {
+  if (!v || typeof v !== 'object') return false;
+  return 'id' in v && typeof (v as { id?: unknown }).id === 'string';
+}
+
+function expandableId(v: unknown): string | null {
+  if (typeof v === 'string') return v;
+  if (hasId(v)) return v.id;
+  return null;
 }
 
 function readRequiredPlanMetadata(price: Stripe.Price): {
@@ -79,6 +92,22 @@ export class StripeWebhookService {
   private static async handleCheckoutSessionCompleted(event: Stripe.Event): Promise<void> {
     const session = event.data.object as Stripe.Checkout.Session;
 
+    // Subscription checkout completion (ship class upgrades) — only handle sessions created by our code.
+    // StripeService.createSubscriptionCheckoutSession sets:
+    // - session.mode = 'subscription'
+    // - session.metadata.kind = 'ship_class_subscription'
+    if (session.mode === 'subscription') {
+      if (session.metadata?.kind !== 'ship_class_subscription') {
+        logger.warn('[WEBHOOK] subscription checkout completed with unexpected/missing metadata.kind', {
+          sessionId: session.id,
+          kind: session.metadata?.kind ?? null,
+        });
+        return;
+      }
+      await this.handleShipClassSubscriptionCheckoutCompleted(event, session);
+      return;
+    }
+
     const paymentIntentId =
       typeof session.payment_intent === 'string' ? (session.payment_intent as string) : (session.payment_intent?.id as string | undefined);
 
@@ -89,7 +118,8 @@ export class StripeWebhookService {
         : null;
 
       if (!row && session.client_reference_id) {
-        row = (await client.query<TopupRow>('SELECT * FROM topups WHERE id = $1 FOR UPDATE', [session.client_reference_id])).rows?.[0] ?? null;
+        row =
+          (await client.query<TopupRow>('SELECT * FROM topups WHERE id = $1 FOR UPDATE', [session.client_reference_id])).rows?.[0] ?? null;
       }
 
       if (!row) {
@@ -144,22 +174,23 @@ export class StripeWebhookService {
   private static async handleChargeSucceeded(event: Stripe.Event): Promise<void> {
     const charge = event.data.object as Stripe.Charge;
     const paymentIntentId =
-      typeof charge.payment_intent === 'string' ? (charge.payment_intent as string) : (charge.payment_intent as Stripe.PaymentIntent | null)?.id;
+      typeof charge.payment_intent === 'string'
+        ? (charge.payment_intent as string)
+        : (charge.payment_intent as Stripe.PaymentIntent | null)?.id;
 
     const stripeChargeId = charge.id;
 
     const topupRepo = new TopupRepository();
     let topup = paymentIntentId ? await topupRepo.findByStripePaymentIntent(paymentIntentId) : null;
 
-    if (!topup && charge.metadata && (charge.metadata as any).topup_id) {
-      topup = await topupRepo.findById((charge.metadata as any).topup_id);
+    const topupIdFromCharge = charge.metadata?.['topup_id'];
+    if (!topup && topupIdFromCharge) {
+      topup = await topupRepo.findById(topupIdFromCharge);
     }
 
     if (!topup) {
-      logger.warn('[WEBHOOK] charge.succeeded received but no matching topup found', {
-        paymentIntentId,
-        stripeChargeId,
-      });
+      // charge.succeeded can be emitted for subscription invoice payments as well; only topups are handled here.
+      logger.debug('[WEBHOOK] charge.succeeded ignored (no matching topup)', { paymentIntentId, stripeChargeId });
       return;
     }
 
@@ -220,12 +251,12 @@ export class StripeWebhookService {
 
     if (event.type === 'payment_intent.payment_failed') {
       const pi = event.data.object as Stripe.PaymentIntent;
-      topupId = (pi.metadata as any)?.topup_id as string | undefined;
+      topupId = pi.metadata?.['topup_id'];
     }
 
     if (event.type === 'charge.failed') {
       const charge = event.data.object as Stripe.Charge;
-      topupId = (charge.metadata as any)?.topup_id as string | undefined;
+      topupId = charge.metadata?.['topup_id'];
     }
 
     if (!topupId) return;
@@ -241,12 +272,124 @@ export class StripeWebhookService {
   // SUBSCRIPTIONS (Option A: plan lives in Stripe Price metadata)
   // ---------------------------------------------------------------------------
 
-  private static async handleInvoicePaid(event: Stripe.Event): Promise<void> {
-    const invoice = event.data.object as Stripe.Invoice;
+  private static async handleShipClassSubscriptionCheckoutCompleted(event: Stripe.Event, session: Stripe.Checkout.Session): Promise<void> {
+    // Concrete shape: StripeService.createSubscriptionCheckoutSession sets session.metadata.kind.
+    if (session.metadata?.kind !== 'ship_class_subscription') {
+      logger.warn('[WEBHOOK] subscription checkout completed ignored (unexpected metadata.kind)', {
+        sessionId: session.id,
+        kind: session.metadata?.kind ?? null,
+      });
+      return;
+    }
+
+    const invoiceId = expandableId(session.invoice as unknown);
+    const subscriptionId = expandableId(session.subscription as unknown);
+
+    logger.info('[WEBHOOK] subscription checkout completed', {
+      sessionId: session.id,
+      invoiceId: invoiceId ?? null,
+      subscriptionId: subscriptionId ?? null,
+      clientRef: session.client_reference_id ?? null,
+      kind: session.metadata?.kind ?? null,
+    });
+
+    if (invoiceId) {
+      // Reuse invoice-driven logic so credit granting remains idempotent (keyed by invoiceId).
+      await this.applyEntitlementsAndCreditsForPaidInvoice({ invoiceId, stripeEventId: event.id });
+      return;
+    }
+
+    if (!subscriptionId) {
+      logger.warn('[WEBHOOK] subscription checkout completed missing subscription/invoice', {
+        sessionId: session.id,
+        mode: session.mode,
+        clientRef: session.client_reference_id,
+        metadata: session.metadata,
+      });
+      return;
+    }
+
+    // Apply entitlements from subscription; credits are granted on invoice.paid (requires invoiceId for idempotency).
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ['items.data.price'],
+    });
+    const starshipId = subscription.metadata?.starship_id;
+    if (!starshipId) {
+      logger.warn('[WEBHOOK] subscription checkout completed missing subscription.metadata.starship_id', {
+        subscriptionId,
+        sessionId: session.id,
+      });
+      return;
+    }
+
+    const userId = subscription.metadata?.user_id || null;
+    const customerId = expandableId(subscription.customer as unknown);
+    const item0 = subscription.items?.data?.[0];
+    const price = item0?.price as Stripe.Price | undefined;
+    if (!price) {
+      logger.warn('[WEBHOOK] subscription checkout completed missing subscription.items[0].price', {
+        subscriptionId,
+        sessionId: session.id,
+      });
+      return;
+    }
+
+    let plan: { shipClass: string; maxAgents: number; maxConcurrentTurns: number; monthlyCredits: number };
+    try {
+      plan = readRequiredPlanMetadata(price);
+    } catch (e) {
+      logger.warn('[WEBHOOK] subscription checkout completed missing required price metadata', {
+        subscriptionId,
+        sessionId: session.id,
+        priceId: price.id,
+        error: e instanceof Error ? e.message : String(e),
+        metadata: price.metadata,
+      });
+      return;
+    }
+
+    const connection = getConnection();
+    await connection.transaction(async (client) => {
+      if (customerId && userId) {
+        await client.query(
+          `
+          INSERT INTO starship_subscriptions (
+            id,
+            starship_id,
+            user_id,
+            stripe_customer_id,
+            stripe_subscription_id,
+            status,
+            created_at,
+            updated_at
+          )
+          VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())
+          ON CONFLICT (starship_id) DO UPDATE
+          SET stripe_customer_id = EXCLUDED.stripe_customer_id,
+              stripe_subscription_id = EXCLUDED.stripe_subscription_id,
+              status = EXCLUDED.status,
+              updated_at = NOW()
+          `,
+          [`starship-sub-${subscriptionId}`, starshipId, userId, customerId, subscriptionId, subscription.status ?? 'active']
+        );
+      }
+
+      await client.query(
+        `UPDATE starships
+            SET ship_class = $2,
+                max_agents = $3,
+                max_concurrent_turns = $4,
+                updated_at = NOW()
+          WHERE id = $1`,
+        [starshipId, plan.shipClass, plan.maxAgents, plan.maxConcurrentTurns]
+      );
+    });
+  }
+
+  private static async applyEntitlementsAndCreditsForPaidInvoice(params: { invoiceId: string; stripeEventId: string }): Promise<void> {
+    const invoice = await stripe.invoices.retrieve(params.invoiceId);
     const invoiceId = invoice.id;
-    const invoiceAny = invoice as unknown as { subscription?: unknown };
-    const subscriptionRaw = invoiceAny.subscription as unknown;
-    const subscriptionId = typeof subscriptionRaw === 'string' ? subscriptionRaw : (subscriptionRaw as { id?: string } | null)?.id;
+    const subscriptionId = expandableId((invoice as unknown as { subscription?: unknown }).subscription as unknown);
     if (!subscriptionId) return;
 
     // Retrieve subscription + expanded price to read plan metadata (Option A).
@@ -255,15 +398,15 @@ export class StripeWebhookService {
     });
     const starshipId = subscription.metadata?.starship_id;
     if (!starshipId) {
-      logger.warn('[WEBHOOK] invoice.paid missing subscription.metadata.starship_id', { subscriptionId, invoiceId });
+      logger.warn('[WEBHOOK] paid invoice missing subscription.metadata.starship_id', { subscriptionId, invoiceId });
       return;
     }
     const userId = subscription.metadata?.user_id || null;
-    const customerId = typeof subscription.customer === 'string' ? subscription.customer : (subscription.customer as any)?.id;
+    const customerId = expandableId(subscription.customer as unknown);
     const item0 = subscription.items?.data?.[0];
     const price = item0?.price as Stripe.Price | undefined;
     if (!price) {
-      logger.warn('[WEBHOOK] invoice.paid missing subscription.items[0].price', { subscriptionId, invoiceId });
+      logger.warn('[WEBHOOK] paid invoice missing subscription.items[0].price', { subscriptionId, invoiceId });
       return;
     }
 
@@ -271,7 +414,7 @@ export class StripeWebhookService {
     try {
       plan = readRequiredPlanMetadata(price);
     } catch (e) {
-      logger.warn('[WEBHOOK] invoice.paid missing required price metadata', {
+      logger.warn('[WEBHOOK] paid invoice missing required price metadata', {
         subscriptionId,
         invoiceId,
         priceId: price.id,
@@ -323,7 +466,7 @@ export class StripeWebhookService {
       const walletRes = await client.query<{ id: string }>('SELECT id FROM wallets WHERE starship_id = $1 FOR UPDATE', [starshipId]);
       const walletRow = walletRes.rows?.[0] ?? null;
       if (!walletRow) {
-        logger.warn('[WEBHOOK] invoice.paid: wallet not found for starship', { starshipId, invoiceId });
+        logger.warn('[WEBHOOK] paid invoice: wallet not found for starship', { starshipId, invoiceId });
         return;
       }
 
@@ -338,7 +481,7 @@ export class StripeWebhookService {
         [walletRow.id, invoiceId]
       );
       if ((existingRes.rows?.[0] ?? null) !== null) {
-        logger.info('[WEBHOOK] invoice.paid grant already applied (idempotent exit)', { walletId: walletRow.id, invoiceId });
+        logger.info('[WEBHOOK] paid invoice grant already applied (idempotent exit)', { walletId: walletRow.id, invoiceId });
         return;
       }
 
@@ -360,10 +503,16 @@ export class StripeWebhookService {
           starshipId,
           priceId: price.id,
           creditsGranted,
-          stripeEvent: event.id,
+          stripeEvent: params.stripeEventId,
         },
       });
     });
+  }
+
+  private static async handleInvoicePaid(event: Stripe.Event): Promise<void> {
+    const invoice = event.data.object as Stripe.Invoice;
+    if (!invoice?.id) return;
+    await this.applyEntitlementsAndCreditsForPaidInvoice({ invoiceId: invoice.id, stripeEventId: event.id });
   }
 
   private static async handleSubscriptionChanged(event: Stripe.Event): Promise<void> {
@@ -381,7 +530,7 @@ export class StripeWebhookService {
     const connection = getConnection();
     await connection.transaction(async (client) => {
       // Best-effort upsert mapping for later management
-      const customerId = typeof subscription.customer === 'string' ? subscription.customer : (subscription.customer as any)?.id;
+      const customerId = expandableId(subscription.customer as unknown);
       const userId = subscription.metadata?.user_id || null;
       if (customerId && userId) {
         await client.query(
@@ -426,5 +575,3 @@ export class StripeWebhookService {
 }
 
 export default StripeWebhookService;
-
-

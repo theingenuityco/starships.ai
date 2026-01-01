@@ -14,7 +14,7 @@ import AccountForm from '@/components/profile/AccountForm'
 import { useAuth } from '@/hooks/useAuth'
 import { MyStarshipSettingsSection } from '@/components/settings/MyStarshipSettingsSection'
 
-const ALL_TABS = ['profile', 'my-starship', 'usage', 'billing'] as const
+const ALL_TABS = ['profile', 'my-starship', 'billing', 'usage'] as const
 type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
@@ -51,21 +51,28 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
                   <TabsTrigger value="profile" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="user" className="h-4 w-4" />
-                    <span>Profile</span>
+                    <span>My Profile</span>
                   </TabsTrigger>
                   <TabsTrigger value="my-starship" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="rocket" className="h-4 w-4" />
                     <span>My starship</span>
                   </TabsTrigger>
-                  {isInstanceAdmin && (
-                    <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
-                      <Icon name="activity" className="h-4 w-4" />
-                      <span>Analytics</span>
-                    </TabsTrigger>
-                  )}
                   <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="usage"
+                    disabled={!isInstanceAdmin}
+                    className="gap-2 rounded-xl px-3 py-1 border border-slate-300/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-100/70 via-background to-transparent text-slate-800 dark:text-slate-100 data-[state=active]:border-slate-300/80 dark:data-[state=active]:border-slate-600/80 data-[state=active]:from-slate-100 disabled:opacity-60"
+                  >
+                    <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
+                    <span>Analytics</span>
+                    {!isInstanceAdmin ? (
+                      <span className="ml-1 rounded-full bg-gradient-to-r from-fuchsia-500 to-indigo-500 px-2 py-0.5 text-[10px] font-semibold text-white">
+                        Pro
+                      </span>
+                    ) : null}
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -85,7 +92,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               {isInstanceAdmin && (
                 <TabsContent value="usage">
                   <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
-                    {starshipData?.id && <ShipManagement starshipId={starshipData.id} />}
+                    {starshipData?.id ? <ShipManagement starshipId={starshipData.id} /> : null}
                   </section>
                 </TabsContent>
               )}

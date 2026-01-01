@@ -176,11 +176,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
         </div>
       </div>
 
-      <form
-        id={formId}
-        onSubmit={onSave}
-        className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start"
-      >
+      <form id={formId} onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start">
         {starship.id && (
           <div className="xl:col-span-2">
             <StarshipUpgradeSection starshipId={starship.id} />
@@ -233,17 +229,10 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     <span
                       className={[
                         'inline-flex h-5 items-center gap-1 rounded-full border px-2 text-[11px] font-medium',
-                        starship.status === 'active'
-                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
-                          : 'border-border/60 bg-muted/20 text-muted-foreground',
+                        starship.status === 'active' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400' : 'border-border/60 bg-muted/20 text-muted-foreground',
                       ].join(' ')}
                     >
-                      <span
-                        className={[
-                          'h-1.5 w-1.5 rounded-full',
-                          starship.status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground/60',
-                        ].join(' ')}
-                      />
+                      <span className={['h-1.5 w-1.5 rounded-full', starship.status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground/60'].join(' ')} />
                       {statusLabels[starship.status]}
                     </span>
                   </div>
@@ -316,13 +305,12 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                   {nameChanged ? (
                     <>
                       <p className="text-[11px] text-muted-foreground">
-                        After you save, your starship URL will be{' '}
-                        <span className="font-mono">/ship/{generatedSlug}-xxxxxx</span>.
+                        After you save, your starship URL will be <span className="font-mono">/ship/{generatedSlug}-xxxxxx</span>.
                       </p>
                     </>
                   ) : (
                     <p className="text-[11px] text-muted-foreground">
-                      Your starship URL is <span className="font-mono">/ship/{starship.slug}</span>.
+                      Your starship URL is <span className="font-mono">/ship/{starship.slug}</span>
                     </p>
                   )}
                 </div>
@@ -334,5 +322,3 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
     </>
   )
 }
-
-

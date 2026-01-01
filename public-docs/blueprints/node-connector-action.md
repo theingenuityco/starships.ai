@@ -1,12 +1,13 @@
 ## Node: ConnectorAction
 
-What it is: Executes a connector template endpoint (an “action”) via `hostRuntime.connectorAction`. This is how Starships tools call external APIs with server-injected auth (OAuth/API keys/platform JWT) without exposing secrets to the blueprint.
+What it is: Executes a connector template endpoint (an “action”) via `hostRuntime.connectorAction`. This is how Starships tools call external APIs with server-injected auth (OAuth/API keys/basic auth/platform JWT) without exposing secrets to the blueprint.
 
 ## When `connector_action` is necessary (not optional)
 
 Use `connector_action` when **any** of the following are true:
 
 - You need **auth injection** (OAuth tokens, API keys, platform JWT) that must not be visible to the blueprint.
+- You need **Basic auth** (RFC 7617) that must not be visible to the blueprint.
 - You want the host to own **base URL resolution** + **path/query/header/body mapping** via `connector_templates`.
 - You are using the **default `Agent` blueprint in Starships**, which delegates tool authorization/execution to the server.
 

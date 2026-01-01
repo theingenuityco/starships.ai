@@ -14,16 +14,16 @@ import AccountForm from '@/components/profile/AccountForm'
 import { useAuth } from '@/hooks/useAuth'
 import { MyStarshipSettingsSection } from '@/components/settings/MyStarshipSettingsSection'
 
-const ALL_TABS = ['profile', 'my-starship', 'billing', 'usage'] as const
+const ALL_TABS = ['my-profile', 'my-starship', 'billing', 'usage'] as const
 type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
   const { isInstanceAdmin, isLoading: authLoading } = useAuth()
-  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'my-starship', 'billing'] as const)
+  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['my-profile', 'my-starship', 'billing'] as const)
   const isValidTab = visibleTabs.includes(tab as TabValue)
-  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'profile'
+  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'my-profile'
 
   useEffect(() => {
     if (authLoading) return
@@ -49,7 +49,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
             <Tabs value={currentTab} onValueChange={value => router.push(`/ship/${slug}/settings/${value}`)} className="space-y-6">
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
-                  <TabsTrigger value="profile" className="gap-2 rounded-xl px-3 py-1">
+                  <TabsTrigger value="my-profile" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="user" className="h-4 w-4" />
                     <span>My Profile</span>
                   </TabsTrigger>
@@ -77,8 +77,8 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                 </TabsList>
               </div>
 
-              <TabsContent value="profile">
-                <section aria-labelledby="profile-section" className="bg-background">
+              <TabsContent value="my-profile">
+                <section aria-labelledby="my-profile-section" className="bg-background">
                   <AccountForm />
                 </section>
               </TabsContent>

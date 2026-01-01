@@ -66,6 +66,11 @@ export function TopRightUserProfile(): React.JSX.Element | null {
     router.push(`/ship/${activeStarshipSlug}/settings/my-profile`)
   }, [router, activeStarshipSlug])
 
+  const handleMyStarshipClick = useCallback(() => {
+    if (!activeStarshipSlug) return
+    router.push(`/ship/${activeStarshipSlug}/settings/my-starship`)
+  }, [router, activeStarshipSlug])
+
   const handleLogoutClick = useCallback(async () => {
     await logout()
     router.push('/')
@@ -120,7 +125,13 @@ export function TopRightUserProfile(): React.JSX.Element | null {
               <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
                 <Icon name="user" className={navMenuItemIconClassName} />
               </div>
-              Account
+              My Profile
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleMyStarshipClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
+              <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
+                <Icon name="rocket" className={navMenuItemIconClassName} />
+              </div>
+              My Starship
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleBillingClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
               <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>

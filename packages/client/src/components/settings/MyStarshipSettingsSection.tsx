@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { STARSHIP_QUERY_KEYS, useUpdateStarship } from '@/hooks/useStarships'
+import { useStarshipAgents } from '@/hooks/useAgents'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
@@ -53,6 +54,10 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   const queryClient = useQueryClient()
   const { userId, userName, userAvatar, isInstanceAdmin } = useAuth()
   const updateStarship = useUpdateStarship()
+
+  const { data: deployedAgents, isLoading: isAgentsLoading } = useStarshipAgents(starship?.id ?? '', Boolean(starship?.id))
+  const deployedAgentsCount = Array.isArray(deployedAgents) ? deployedAgents.length : 0
+  const maxAgentsLabel = isAgentsLoading ? `…/${starship?.maxAgents ?? '—'}` : `${deployedAgentsCount}/${starship?.maxAgents ?? '—'}`
 
   const canEdit = useMemo(() => {
     if (!starship) return false
@@ -202,14 +207,14 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                 <div className="rounded-lg border border-border/60 bg-muted/10 p-3">
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <Icon name="users" className="h-3.5 w-3.5" />
-                    Max agents
+                    Agents Deployed
                   </div>
-                  <div className="mt-1 text-sm font-semibold">{starship.maxAgents}</div>
+                  <div className="mt-1 text-sm font-semibold tabular-nums">{maxAgentsLabel}</div>
                 </div>
                 <div className="rounded-lg border border-border/60 bg-muted/10 p-3">
                   <div className="text-xs text-muted-foreground flex items-center gap-1">
                     <Icon name="zap" className="h-3.5 w-3.5" />
-                    Concurrent turns
+                    Parallel Tasks
                   </div>
                   <div className="mt-1 text-sm font-semibold">{starship.maxConcurrentTurns}</div>
                 </div>

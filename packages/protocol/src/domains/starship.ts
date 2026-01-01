@@ -18,7 +18,7 @@ export type StarshipStatus = 'active' | 'inactive';
 /**
  * Starship class (tier) definitions
  */
-export type ShipClass = 'scout' | 'frigate';
+export type ShipClass = 'scout' | 'frigate' | 'cruiser';
 
 /**
  * Billing period options

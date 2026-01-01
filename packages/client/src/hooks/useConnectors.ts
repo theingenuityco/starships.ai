@@ -2,6 +2,7 @@ import api from '@/lib/api'
 import type {
   ApiResponse,
   ConnectWithApiKeyRequest,
+  ConnectWithBasicAuthRequest,
   ConnectorCatalogItem,
   ConnectorCatalogResponse,
   ConnectorListItem,
@@ -165,6 +166,42 @@ export function useConnectApiKeyConnector(starshipId: string) {
       const payload: ConnectWithApiKeyRequest = { apiKey, extraConfig }
       const response: FetchResponse<ApiResponse<{ connector: ConnectorModel }>> = await api.post(
         `/api/v1/starships/${starshipId}/connectors/${provider}/api-key`,
+        payload
+      )
+      return response.data.data.connector
+    },
+    onSuccess: (_, vars) => {
+      queryClient.invalidateQueries({ queryKey: CONNECTOR_QUERY_KEYS.byStarship(starshipId) })
+      toast.success('Connector connected', {
+        description: `${String(vars.provider).charAt(0).toUpperCase() + String(vars.provider).slice(1)} connector has been connected.`,
+      })
+    },
+    onError: (error: any, vars) => {
+      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to connect connector'
+      const providerLabel = vars?.provider ? String(vars.provider).charAt(0).toUpperCase() + String(vars.provider).slice(1) : 'Connector'
+      toast.error(`Failed to connect ${providerLabel}`, { description: errorMessage })
+    },
+  })
+}
+
+export function useConnectBasicAuthConnector(starshipId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({
+      provider,
+      username,
+      password,
+      extraConfig,
+    }: {
+      provider: ConnectorProvider
+      username: string
+      password?: string
+      extraConfig?: Record<string, unknown>
+    }): Promise<ConnectorModel> => {
+      const payload: ConnectWithBasicAuthRequest = { username, password, extraConfig }
+      const response: FetchResponse<ApiResponse<{ connector: ConnectorModel }>> = await api.post(
+        `/api/v1/starships/${starshipId}/connectors/${provider}/basic`,
         payload
       )
       return response.data.data.connector

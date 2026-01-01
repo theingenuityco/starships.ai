@@ -426,6 +426,20 @@ export interface ConnectWithApiKeyResponse {
   connector: ConnectorModel;
 }
 
+export interface ConnectWithBasicAuthRequest {
+  username: string;
+  /**
+   * Optional; only required if the connector template auth config includes passwordRef.
+   * When omitted and passwordRef is not configured, the runtime defaults to empty password.
+   */
+  password?: string;
+  extraConfig?: Record<string, unknown>;
+}
+
+export interface ConnectWithBasicAuthResponse {
+  connector: ConnectorModel;
+}
+
 /**
  * StartOAuthRequest
  *

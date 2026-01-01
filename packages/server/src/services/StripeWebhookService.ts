@@ -295,7 +295,15 @@ export class StripeWebhookService {
 
     if (invoiceId) {
       // Reuse invoice-driven logic so credit granting remains idempotent (keyed by invoiceId).
-      await this.applyEntitlementsAndCreditsForPaidInvoice({ invoiceId, stripeEventId: event.id });
+      // Require subscriptionId explicitly (do not attempt to infer from invoice retrieval).
+      if (!subscriptionId) {
+        logger.warn('[WEBHOOK] subscription checkout completed missing subscriptionId (cannot apply entitlements)', {
+          sessionId: session.id,
+          invoiceId,
+        });
+        return;
+      }
+      await this.applyEntitlementsAndCreditsForPaidInvoice({ invoiceId, subscriptionId, stripeEventId: event.id });
       return;
     }
 
@@ -386,11 +394,13 @@ export class StripeWebhookService {
     });
   }
 
-  private static async applyEntitlementsAndCreditsForPaidInvoice(params: { invoiceId: string; stripeEventId: string }): Promise<void> {
-    const invoice = await stripe.invoices.retrieve(params.invoiceId);
-    const invoiceId = invoice.id;
-    const subscriptionId = expandableId((invoice as unknown as { subscription?: unknown }).subscription as unknown);
-    if (!subscriptionId) return;
+  private static async applyEntitlementsAndCreditsForPaidInvoice(params: {
+    invoiceId: string;
+    subscriptionId: string;
+    stripeEventId: string;
+  }): Promise<void> {
+    const invoiceId = params.invoiceId;
+    const subscriptionId = params.subscriptionId;
 
     // Retrieve subscription + expanded price to read plan metadata (Option A).
     const subscription = await stripe.subscriptions.retrieve(subscriptionId, {
@@ -452,7 +462,7 @@ export class StripeWebhookService {
       }
 
       // Apply entitlements from Stripe plan metadata
-      await client.query(
+      const updateRes = await client.query(
         `UPDATE starships
             SET ship_class = $2,
                 max_agents = $3,
@@ -461,6 +471,27 @@ export class StripeWebhookService {
           WHERE id = $1`,
         [starshipId, plan.shipClass, plan.maxAgents, plan.maxConcurrentTurns]
       );
+      logger.info('[WEBHOOK] Applied subscription entitlements to starship', {
+        starshipId,
+        shipClass: plan.shipClass,
+        maxAgents: plan.maxAgents,
+        maxConcurrentTurns: plan.maxConcurrentTurns,
+        invoiceId,
+        subscriptionId,
+        rowCount: (updateRes as unknown as { rowCount?: number }).rowCount ?? null,
+      });
+
+      const verifyRes = await client.query<{ ship_class: string; max_agents: number; max_concurrent_turns: number }>(
+        `SELECT ship_class, max_agents, max_concurrent_turns FROM starships WHERE id = $1`,
+        [starshipId]
+      );
+      const verified = verifyRes.rows?.[0] ?? null;
+      logger.info('[WEBHOOK] Verified starship entitlements after update', {
+        starshipId,
+        verified,
+        invoiceId,
+        subscriptionId,
+      });
 
       // Lock wallet
       const walletRes = await client.query<{ id: string }>('SELECT id FROM wallets WHERE starship_id = $1 FOR UPDATE', [starshipId]);
@@ -512,7 +543,12 @@ export class StripeWebhookService {
   private static async handleInvoicePaid(event: Stripe.Event): Promise<void> {
     const invoice = event.data.object as Stripe.Invoice;
     if (!invoice?.id) return;
-    await this.applyEntitlementsAndCreditsForPaidInvoice({ invoiceId: invoice.id, stripeEventId: event.id });
+    const subscriptionId = expandableId((invoice as unknown as { subscription?: unknown }).subscription as unknown);
+    if (!subscriptionId) {
+      logger.warn('[WEBHOOK] invoice.paid missing invoice.subscription (cannot apply entitlements)', { invoiceId: invoice.id });
+      return;
+    }
+    await this.applyEntitlementsAndCreditsForPaidInvoice({ invoiceId: invoice.id, subscriptionId, stripeEventId: event.id });
   }
 
   private static async handleSubscriptionChanged(event: Stripe.Event): Promise<void> {

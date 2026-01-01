@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useParams, useSearchParams } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
 
 import Icon from '@/components/primitives/Icon'
@@ -27,6 +27,8 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
   const { toast } = useToast()
   const queryClient = useQueryClient()
   const searchParams = useSearchParams()
+  const params = useParams<{ slug?: string }>()
+  const routeSlug = params?.slug
 
   // After successful Stripe redirect, refresh starship + wallet UI.
   useEffect(() => {
@@ -34,8 +36,11 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
     if (status === 'success' && starshipId) {
       queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
       queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
+      if (routeSlug) {
+        queryClient.invalidateQueries({ queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', routeSlug] as const })
+      }
     }
-  }, [searchParams, queryClient, starshipId])
+  }, [searchParams, queryClient, starshipId, routeSlug])
 
   const handleSubscribe = async (priceId: string) => {
     try {
@@ -46,6 +51,9 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
       } else {
         queryClient.invalidateQueries({ queryKey: STARSHIP_QUERY_KEYS.detail(starshipId) })
         queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
+        if (routeSlug) {
+          queryClient.invalidateQueries({ queryKey: [...STARSHIP_QUERY_KEYS.all, 'slug', routeSlug] as const })
+        }
       }
     } catch (e) {
       toast({

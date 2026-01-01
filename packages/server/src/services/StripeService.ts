@@ -204,8 +204,8 @@ export class StripeService {
             price_id: priceId,
           },
         },
-        success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=success`,
-        cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?status=cancelled`,
+        success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=success`,
+        cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=cancelled`,
         expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
       },
       { idempotencyKey }

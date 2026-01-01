@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { STARSHIP_QUERY_KEYS, useUpdateStarship } from '@/hooks/useStarships'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
@@ -13,6 +14,7 @@ import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } 
 import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
+import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
 
 interface MyStarshipSettingsSectionProps {
   starship?: StarshipModel
@@ -31,6 +33,12 @@ const statusLabels: Record<StarshipStatus, string> = {
   inactive: 'Inactive',
 }
 
+function formatHumanDateTime(value: string): string {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return value
+  return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(d)
+}
+
 function generateSlug(name: string): string {
   return name
     .toLowerCase()
@@ -43,7 +51,7 @@ function generateSlug(name: string): string {
 export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = false }: MyStarshipSettingsSectionProps) {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { userId, isInstanceAdmin } = useAuth()
+  const { userId, userName, userAvatar, isInstanceAdmin } = useAuth()
   const updateStarship = useUpdateStarship()
 
   const canEdit = useMemo(() => {
@@ -173,6 +181,12 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
         onSubmit={onSave}
         className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start"
       >
+        {starship.id && (
+          <div className="xl:col-span-2">
+            <StarshipUpgradeSection starshipId={starship.id} />
+          </div>
+        )}
+
         {/* Left column: overview */}
         <div className="space-y-6">
           <Card className={PROFILE_SECTION_CARD_CLASS}>
@@ -185,16 +199,6 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                 <div className="space-y-1">
                   <div className="text-lg font-semibold leading-tight">{starship.name}</div>
                   <div className="text-xs text-muted-foreground font-mono">/{starship.slug}</div>
-                </div>
-                <div className="flex flex-col items-end gap-2">
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2.5 py-1 text-xs">
-                    <Icon name="layers" className="h-3.5 w-3.5 text-muted-foreground" />
-                    {shipClassLabels[starship.shipClass]}
-                  </span>
-                  <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2.5 py-1 text-xs">
-                    <Icon name="power" className="h-3.5 w-3.5 text-muted-foreground" />
-                    {statusLabels[starship.status]}
-                  </span>
                 </div>
               </div>
 
@@ -212,6 +216,65 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     Concurrent turns
                   </div>
                   <div className="mt-1 text-sm font-semibold">{starship.maxConcurrentTurns}</div>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-border/60 bg-muted/10 p-3">
+                <div className="space-y-2">
+                  <div className="flex h-6 items-center justify-between gap-4">
+                    <span className="text-xs text-muted-foreground">Ship class</span>
+                    <span className="inline-flex h-5 items-center gap-1 rounded-full border border-border/60 bg-muted/20 px-2 text-[11px] font-medium">
+                      <Icon name="layers" className="h-3.5 w-3.5 text-muted-foreground" />
+                      {shipClassLabels[starship.shipClass]}
+                    </span>
+                  </div>
+                  <div className="flex h-6 items-center justify-between gap-4">
+                    <span className="text-xs text-muted-foreground">Status</span>
+                    <span
+                      className={[
+                        'inline-flex h-5 items-center gap-1 rounded-full border px-2 text-[11px] font-medium',
+                        starship.status === 'active'
+                          ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+                          : 'border-border/60 bg-muted/20 text-muted-foreground',
+                      ].join(' ')}
+                    >
+                      <span
+                        className={[
+                          'h-1.5 w-1.5 rounded-full',
+                          starship.status === 'active' ? 'bg-emerald-500' : 'bg-muted-foreground/60',
+                        ].join(' ')}
+                      />
+                      {statusLabels[starship.status]}
+                    </span>
+                  </div>
+                  <div className="flex h-6 items-center justify-between gap-4">
+                    <span className="text-xs text-muted-foreground">Owner</span>
+                    {starship.ownerId === userId ? (
+                      <div className="flex h-6 items-center gap-2">
+                        <Avatar className="h-5 w-5 rounded-full">
+                          {typeof userAvatar === 'string' && /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(userAvatar.trim()) ? (
+                            <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} />
+                          ) : null}
+                          <AvatarFallback className="rounded-full text-[9px] leading-none">
+                            {typeof userAvatar === 'string' && userAvatar.trim() && !/^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(userAvatar.trim())
+                              ? userAvatar.trim()
+                              : (userName || 'You').slice(0, 1).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="text-xs font-medium">{userName || 'You'}</span>
+                      </div>
+                    ) : (
+                      <span className="text-xs font-medium">—</span>
+                    )}
+                  </div>
+                  <div className="flex h-6 items-center justify-between gap-4">
+                    <span className="text-xs text-muted-foreground">Created</span>
+                    <span className="text-xs font-medium tabular-nums">{formatHumanDateTime(starship.createdAt)}</span>
+                  </div>
+                  <div className="flex h-6 items-center justify-between gap-4">
+                    <span className="text-xs text-muted-foreground">Updated</span>
+                    <span className="text-xs font-medium tabular-nums">{formatHumanDateTime(starship.updatedAt)}</span>
+                  </div>
                 </div>
               </div>
             </CardContent>
@@ -262,36 +325,6 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                       Your starship URL is <span className="font-mono">/ship/{starship.slug}</span>.
                     </p>
                   )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className={PROFILE_SECTION_CARD_CLASS}>
-            <CardHeader className="pb-4">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Icon name="info" className="h-4 w-4 text-primary" />
-                Technical details
-              </CardTitle>
-              <CardDescription className="text-sm">Reference fields (read-only).</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-1 flex-col gap-3">
-              <div className="grid grid-cols-1 gap-2 text-sm md:grid-cols-2">
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-muted-foreground">Starship ID</span>
-                  <span className="font-mono">{starship.id}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-muted-foreground">Owner ID</span>
-                  <span className="font-mono">{starship.ownerId}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-muted-foreground">Created</span>
-                  <span className="font-mono">{new Date(starship.createdAt).toISOString()}</span>
-                </div>
-                <div className="flex items-center justify-between gap-4">
-                  <span className="text-muted-foreground">Updated</span>
-                  <span className="font-mono">{new Date(starship.updatedAt).toISOString()}</span>
                 </div>
               </div>
             </CardContent>

@@ -215,10 +215,7 @@ router.post(
       }
 
       const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['items.data'] });
-      const scheduleId =
-        typeof (subscription as unknown as { schedule?: unknown }).schedule === 'string'
-          ? ((subscription as unknown as { schedule?: string }).schedule as string)
-          : ((subscription as unknown as { schedule?: { id: string } | null }).schedule?.id ?? null);
+      const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id ?? null;
 
       if (scheduleId) {
         // Detach schedule so we can update cancellation behavior on the subscription.

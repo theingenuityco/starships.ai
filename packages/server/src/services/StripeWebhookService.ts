@@ -22,15 +22,9 @@ function parseIntOrNull(v: unknown): number | null {
   return Number.isFinite(n) ? Math.trunc(n) : null;
 }
 
-function hasId(v: unknown): v is { id: string } {
-  if (!v || typeof v !== 'object') return false;
-  return 'id' in v && typeof (v as { id?: unknown }).id === 'string';
-}
-
-function expandableId(v: unknown): string | null {
-  if (typeof v === 'string') return v;
-  if (hasId(v)) return v.id;
-  return null;
+function idFromExpandable<T extends { id: string }>(v: string | T | null | undefined): string | null {
+  if (!v) return null;
+  return typeof v === 'string' ? v : v.id;
 }
 
 function readRequiredPlanMetadata(price: Stripe.Price): {
@@ -282,8 +276,8 @@ export class StripeWebhookService {
       return;
     }
 
-    const invoiceId = expandableId(session.invoice as unknown);
-    const subscriptionId = expandableId(session.subscription as unknown);
+    const invoiceId = idFromExpandable<Stripe.Invoice>(session.invoice);
+    const subscriptionId = idFromExpandable<Stripe.Subscription>(session.subscription);
 
     logger.info('[WEBHOOK] subscription checkout completed', {
       sessionId: session.id,
@@ -331,10 +325,10 @@ export class StripeWebhookService {
     }
 
     const userId = subscription.metadata?.user_id || null;
-    const customerId = expandableId(subscription.customer as unknown);
+    const customerId = idFromExpandable<Stripe.Customer | Stripe.DeletedCustomer>(subscription.customer);
     const item0 = subscription.items?.data?.[0];
-    const price = item0?.price as Stripe.Price | undefined;
-    if (!price) {
+    const price = item0?.price;
+    if (!price || typeof price === 'string') {
       logger.warn('[WEBHOOK] subscription checkout completed missing subscription.items[0].price', {
         subscriptionId,
         sessionId: session.id,
@@ -412,10 +406,10 @@ export class StripeWebhookService {
       return;
     }
     const userId = subscription.metadata?.user_id || null;
-    const customerId = expandableId(subscription.customer as unknown);
+    const customerId = idFromExpandable<Stripe.Customer | Stripe.DeletedCustomer>(subscription.customer);
     const item0 = subscription.items?.data?.[0];
-    const price = item0?.price as Stripe.Price | undefined;
-    if (!price) {
+    const price = item0?.price;
+    if (!price || typeof price === 'string') {
       logger.warn('[WEBHOOK] paid invoice missing subscription.items[0].price', { subscriptionId, invoiceId });
       return;
     }
@@ -543,11 +537,54 @@ export class StripeWebhookService {
   private static async handleInvoicePaid(event: Stripe.Event): Promise<void> {
     const invoice = event.data.object as Stripe.Invoice;
     if (!invoice?.id) return;
-    const subscriptionId = expandableId((invoice as unknown as { subscription?: unknown }).subscription as unknown);
+
+    const extractSubscriptionId = (inv: Stripe.Invoice): string | null => {
+      // 1) Invoice parent can include subscription details (common for billing_reason=subscription_update)
+      if (inv.parent?.type === 'subscription_details') {
+        const sub = inv.parent.subscription_details?.subscription;
+        if (sub) return typeof sub === 'string' ? sub : sub.id;
+      }
+
+      // 2) Look for subscription reference on the line items themselves
+      for (const ln of inv.lines?.data ?? []) {
+        const ls = ln.subscription;
+        if (ls) return typeof ls === 'string' ? ls : ls.id;
+        if (ln.parent?.type === 'subscription_item_details') {
+          const s = ln.parent.subscription_item_details?.subscription ?? null;
+          if (s) return s;
+        }
+      }
+
+      return null;
+    };
+
+    let subscriptionId = extractSubscriptionId(invoice);
+
+    // Stripe can emit invoice events where `invoice.subscription` is null in the event payload.
+    // If so, retrieve the invoice from Stripe to resolve the linked subscription (if any).
     if (!subscriptionId) {
-      logger.warn('[WEBHOOK] invoice.paid missing invoice.subscription (cannot apply entitlements)', { invoiceId: invoice.id });
+      try {
+        const fresh = await stripe.invoices.retrieve(invoice.id, {
+          expand: ['parent.subscription_details.subscription', 'lines.data.subscription'],
+        });
+        subscriptionId = extractSubscriptionId(fresh);
+      } catch (e) {
+        logger.warn('[WEBHOOK] invoice.paid failed to retrieve invoice to resolve subscription', {
+          invoiceId: invoice.id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+    }
+
+    if (!subscriptionId) {
+      logger.warn('[WEBHOOK] invoice.paid missing invoice.subscription (cannot apply entitlements)', {
+        invoiceId: invoice.id,
+        eventType: event.type,
+        billingReason: invoice.billing_reason ?? null,
+      });
       return;
     }
+
     await this.applyEntitlementsAndCreditsForPaidInvoice({ invoiceId: invoice.id, subscriptionId, stripeEventId: event.id });
   }
 
@@ -566,7 +603,7 @@ export class StripeWebhookService {
     const connection = getConnection();
     await connection.transaction(async (client) => {
       // Best-effort upsert mapping for later management
-      const customerId = expandableId(subscription.customer as unknown);
+      const customerId = idFromExpandable<Stripe.Customer | Stripe.DeletedCustomer>(subscription.customer);
       const userId = subscription.metadata?.user_id || null;
       if (customerId && userId) {
         await client.query(
@@ -603,8 +640,46 @@ export class StripeWebhookService {
           [starshipId]
         );
       } else {
-        // Entitlements are enforced on invoice.paid; keep as-is here.
-        await client.query(`UPDATE starships SET updated_at = NOW() WHERE id = $1`, [starshipId]);
+        // If the subscription is paying, enforce entitlements based on the current subscription price metadata.
+        // This makes plan changes via Billing Portal take effect immediately after Stripe confirms the update,
+        // even if invoice.paid is delayed or missing. Credits are still granted on invoice.paid.
+        const fresh = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['items.data.price'] });
+        const item0 = fresh.items?.data?.[0];
+        const price = item0?.price;
+        if (!price || typeof price === 'string') {
+          logger.warn('[WEBHOOK] subscription update missing items[0].price; cannot apply entitlements', {
+            subscriptionId,
+            starshipId,
+            status,
+          });
+          await client.query(`UPDATE starships SET updated_at = NOW() WHERE id = $1`, [starshipId]);
+          return;
+        }
+
+        let plan: { shipClass: string; maxAgents: number; maxConcurrentTurns: number; monthlyCredits: number };
+        try {
+          plan = readRequiredPlanMetadata(price);
+        } catch (e) {
+          logger.warn('[WEBHOOK] subscription update missing required price metadata; cannot apply entitlements', {
+            subscriptionId,
+            starshipId,
+            priceId: price.id,
+            error: e instanceof Error ? e.message : String(e),
+            metadata: price.metadata,
+          });
+          await client.query(`UPDATE starships SET updated_at = NOW() WHERE id = $1`, [starshipId]);
+          return;
+        }
+
+        await client.query(
+          `UPDATE starships
+              SET ship_class = $2,
+                  max_agents = $3,
+                  max_concurrent_turns = $4,
+                  updated_at = NOW()
+            WHERE id = $1`,
+          [starshipId, plan.shipClass, plan.maxAgents, plan.maxConcurrentTurns]
+        );
       }
     });
   }

@@ -19,8 +19,13 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
 import { SubscriptionCheckoutService } from '@/services/SubscriptionCheckoutService';
 import { SubscriptionManagementService } from '@/services/SubscriptionManagementService';
+import { getConnection } from '@starships/models';
+import { getEnvConfig } from '@starships/env';
+import Stripe from 'stripe';
 
 const router: Router = Router();
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
@@ -166,6 +171,82 @@ router.post(
       sendSuccess(res, result, 200);
     } catch (error) {
       handleError(error, res, 'changing subscription plan');
+    }
+  }
+);
+
+/**
+ * GET /starships/:id/subscription/status
+ * Returns the starship's Stripe subscription renewal/cancellation state for billing UI.
+ */
+router.get(
+  '/starships/:id/subscription/status',
+  rateLimiters.apiAuthenticated,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const starshipId = req.params.id;
+      const userId = (req as any).user!.id as string;
+
+      const paramValidation = validateData(z.object({ id: IdSchema }), { id: starshipId }, res, 'subscription status');
+      if (!paramValidation) return;
+
+      const starshipService = new StarshipService();
+      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      if (!hasAccess) {
+        sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+        return;
+      }
+
+      const connection = getConnection();
+      const row = await connection.queryOne<{ stripe_subscription_id: string }>(
+        `SELECT stripe_subscription_id
+           FROM starship_subscriptions
+          WHERE starship_id = $1
+            AND status NOT IN ('canceled')
+          ORDER BY updated_at DESC
+          LIMIT 1`,
+        [starshipId]
+      );
+
+      if (!row?.stripe_subscription_id) {
+        sendSuccess(res, { subscriptionId: null, status: null, cancelAtPeriodEnd: false, renewAt: null }, 200);
+        return;
+      }
+
+      const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['items.data'] });
+      const cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end);
+      const status = subscription.status ?? null;
+
+      const item0 = subscription.items?.data?.[0];
+      const currentPeriodEndSeconds =
+        (subscription as unknown as { current_period_end?: unknown }).current_period_end ??
+        (item0 as unknown as { current_period_end?: unknown } | undefined)?.current_period_end ??
+        null;
+      const currentPeriodStartSeconds =
+        (subscription as unknown as { current_period_start?: unknown }).current_period_start ??
+        (item0 as unknown as { current_period_start?: unknown } | undefined)?.current_period_start ??
+        null;
+
+      const cpe = typeof currentPeriodEndSeconds === 'number' ? currentPeriodEndSeconds : null;
+      const cps = typeof currentPeriodStartSeconds === 'number' ? currentPeriodStartSeconds : null;
+      const renewAt = cpe ? new Date(cpe * 1000).toISOString() : null;
+
+      // Best-effort cache into DB for other consumers.
+      await connection.query(
+        `UPDATE starship_subscriptions
+            SET status = COALESCE($2, status),
+                cancel_at_period_end = $3,
+                current_period_start = COALESCE(to_timestamp($4::double precision), current_period_start),
+                current_period_end = COALESCE(to_timestamp($5::double precision), current_period_end),
+                updated_at = NOW()
+          WHERE starship_id = $1`,
+        [starshipId, status, cancelAtPeriodEnd, cps, cpe]
+      );
+
+      sendSuccess(res, { subscriptionId: subscription.id, status, cancelAtPeriodEnd, renewAt }, 200);
+    } catch (error) {
+      handleError(error, res, 'fetching subscription status');
     }
   }
 );

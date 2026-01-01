@@ -178,7 +178,7 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
                         <div className="flex items-center justify-between gap-3 text-xs">
                           <span className="inline-flex items-center gap-1 text-muted-foreground">
                             <Icon name="zap" className="h-3.5 w-3.5" />
-                            Parallel conversations
+                            Parallel Tasks
                           </span>
                           <span className="font-semibold tabular-nums">{plan.entitlements.maxConcurrentTurns}</span>
                         </div>

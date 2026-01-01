@@ -12,15 +12,16 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 import AccountForm from '@/components/profile/AccountForm'
 import { useAuth } from '@/hooks/useAuth'
+import { MyStarshipSettingsSection } from '@/components/settings/MyStarshipSettingsSection'
 
-const ALL_TABS = ['profile', 'usage', 'billing'] as const
+const ALL_TABS = ['profile', 'my-starship', 'usage', 'billing'] as const
 type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
   const { isInstanceAdmin, isLoading: authLoading } = useAuth()
-  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'billing'] as const)
+  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'my-starship', 'billing'] as const)
   const isValidTab = visibleTabs.includes(tab as TabValue)
   const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'profile'
 
@@ -29,7 +30,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
     if (!isValidTab) router.replace(`/ship/${slug}/settings/${currentTab}`)
   }, [router, slug, currentTab, isValidTab, authLoading])
 
-  const { data: starshipData } = useStarshipBySlug(slug, true)
+  const { data: starshipData, isLoading: starshipLoading } = useStarshipBySlug(slug, true)
 
   return (
     <PageLayout>
@@ -52,6 +53,10 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <Icon name="user" className="h-4 w-4" />
                     <span>Profile</span>
                   </TabsTrigger>
+                  <TabsTrigger value="my-starship" className="gap-2 rounded-xl px-3 py-1">
+                    <Icon name="rocket" className="h-4 w-4" />
+                    <span>My starship</span>
+                  </TabsTrigger>
                   {isInstanceAdmin && (
                     <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
                       <Icon name="activity" className="h-4 w-4" />
@@ -68,6 +73,12 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
               <TabsContent value="profile">
                 <section aria-labelledby="profile-section" className="bg-background">
                   <AccountForm />
+                </section>
+              </TabsContent>
+
+              <TabsContent value="my-starship">
+                <section aria-labelledby="my-starship-section" className="bg-background">
+                  <MyStarshipSettingsSection starship={starshipData} starshipSlug={slug} isLoading={starshipLoading} />
                 </section>
               </TabsContent>
 

@@ -7,6 +7,7 @@ import type {
   ConnectorCatalogResponse,
   ConnectorListResponse,
   ConnectWithApiKeyRequest,
+  ConnectWithBasicAuthRequest,
   StartOAuthRequest,
   StartOAuthResponse,
 } from '@starships/protocol';
@@ -29,6 +30,12 @@ interface OAuthStateContext {
 
 const ApiKeyConnectSchema = z.object({
   apiKey: z.string().min(1, 'API key is required'),
+  extraConfig: z.record(z.string(), z.unknown()).optional(),
+});
+
+const BasicConnectSchema = z.object({
+  username: z.string().min(1, 'username is required'),
+  password: z.string().optional(),
   extraConfig: z.record(z.string(), z.unknown()).optional(),
 });
 
@@ -190,6 +197,44 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
     sendSuccess(res, { connector });
   } catch (error) {
     handleError(error, res, 'connecting connector via API key');
+  }
+});
+
+// POST /starships/:id/connectors/:provider/basic - Connect via HTTP Basic auth
+router.post('/starships/:id/connectors/:provider/basic', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const paramsValidation = validateData(
+      ProviderParamSchema,
+      { id: req.params.id, provider: req.params.provider },
+      res,
+      'connector parameters'
+    );
+    if (!paramsValidation) return;
+
+    const { id: starshipId, provider } = paramsValidation;
+
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+
+    const bodyValidation = validateData(
+      BasicConnectSchema,
+      req.body as ConnectWithBasicAuthRequest,
+      res,
+      'basic auth connector payload'
+    );
+    if (!bodyValidation) return;
+
+    const connectorService = new ConnectorService();
+    const connector = await connectorService.connectWithBasicAuth(starshipId, provider, bodyValidation as ConnectWithBasicAuthRequest, userId);
+
+    sendSuccess(res, { connector });
+  } catch (error) {
+    handleError(error, res, 'connecting connector via basic auth');
   }
 });
 

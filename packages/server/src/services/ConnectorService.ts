@@ -3,9 +3,11 @@ import type {
   ConnectorListItem,
   ConnectorProvider,
   ConnectWithApiKeyRequest,
+  ConnectWithBasicAuthRequest,
   ConnectorModel,
   ConnectorAuthOAuth2V2,
   ConnectorAuthApiKeyV2,
+  ConnectorAuthBasicV2,
   SecretRef,
   SecretRefType,
 } from '@starships/protocol';
@@ -634,6 +636,58 @@ export class ConnectorService {
 
     const { connector } = await this.applyConnectOutput(starshipId, userId, provider, template, {
       envUpdates: { [ref.key]: payload.apiKey },
+      metadata: { ...(payload.extraConfig || {}) },
+      status: 'connected',
+    });
+    return connector;
+  }
+
+  /**
+   * Connect a provider using HTTP Basic authentication (RFC 7617).
+   *
+   * Stores username/password into connector_secrets based on template SecretRefs.
+   */
+  async connectWithBasicAuth(
+    starshipId: string,
+    provider: ConnectorProvider,
+    payload: ConnectWithBasicAuthRequest,
+    userId: string
+  ) {
+    const template = await this.loadTemplateOrThrow(provider);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${provider} is disabled by the instance admin`);
+    }
+
+    if ((template.authJson as unknown as { type?: string })?.type !== 'basic') {
+      throw new Error(`Connector ${provider} does not use Basic authentication (auth.type is not "basic")`);
+    }
+
+    const auth = template.authJson as unknown as ConnectorAuthBasicV2;
+    if (!auth || auth.type !== 'basic') {
+      throw new Error(`Connector ${provider} is missing basic auth_json configuration`);
+    }
+
+    const usernameRef = this.parseSecretRef(auth.usernameRef, 'auth.usernameRef');
+    if (usernameRef.type !== 'connector_secret') {
+      throw new Error('auth.usernameRef must be a connector_secret ref');
+    }
+
+    const envUpdates: Record<string, string> = { [usernameRef.key]: payload.username };
+
+    // If the template is configured with passwordRef, require the payload to include password (may be empty string).
+    if (auth.passwordRef) {
+      const passwordRef = this.parseSecretRef(auth.passwordRef, 'auth.passwordRef');
+      if (passwordRef.type !== 'connector_secret') {
+        throw new Error('auth.passwordRef must be a connector_secret ref');
+      }
+      if (payload.password === undefined) {
+        throw new Error('password is required for this connector (template auth.passwordRef is configured)');
+      }
+      envUpdates[passwordRef.key] = payload.password;
+    }
+
+    const { connector } = await this.applyConnectOutput(starshipId, userId, provider, template, {
+      envUpdates,
       metadata: { ...(payload.extraConfig || {}) },
       status: 'connected',
     });

@@ -33,7 +33,7 @@ interface UserProfileProps {
  * Shows user name and starship name with logout functionality via tooltip
  */
 export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', onClick, active = false, starshipName, centerInContainer = false, collapsedSize = 'sm' }: UserProfileProps) {
-  const { user, userName, userEmail, isAuthenticated, logout, userAvatar } = useAuth()
+  const { user, userName, userEmail, isAuthenticated, logout, userAvatar, isInstanceAdmin } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
 
@@ -48,7 +48,8 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
     const parts = typeof pathname === 'string' ? pathname.split('/') : []
     const slug = parts[1] === 'ship' && parts.length > 2 ? parts[2] : null
     if (!slug) return
-    router.push(`/ship/${slug}/settings/usage`)
+    const defaultTab = isInstanceAdmin ? 'usage' : 'my-profile'
+    router.push(`/ship/${slug}/settings/${defaultTab}`)
   }
 
   const handleLogout = async () => {

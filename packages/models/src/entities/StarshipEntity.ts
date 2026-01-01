@@ -5,7 +5,7 @@
  * Follows the layered architecture pattern established by ConversationEntity and MessageEntity.
  */
 
-import type { StarshipModel, StarshipStatus } from '@starships/protocol';
+import type { ShipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
 import { IsEnum, IsISO8601, IsNumber, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
@@ -53,10 +53,20 @@ export class StarshipEntity implements StarshipModel {
   name!: string;
 
   @Expose()
+  @IsEnum(['scout', 'frigate', 'cruiser'])
+  shipClass!: ShipClass;
+
+  @Expose()
   @IsNumber()
   @Min(1)
   @Max(50) // Reasonable upper limit
   maxAgents!: number;
+
+  @Expose()
+  @IsNumber()
+  @Min(1)
+  @Max(10) // Reasonable upper limit (adjust as we add more tiers)
+  maxConcurrentTurns!: number;
 
   @Expose()
   @IsEnum(['active', 'inactive'])
@@ -88,7 +98,9 @@ export class StarshipEntity implements StarshipModel {
         slug: dataRecord.slug || '',
         ownerId: dataRecord.ownerId || '',
         name: dataRecord.name || '',
-        maxAgents: dataRecord.maxAgents ?? 8,
+        shipClass: (dataRecord.shipClass as ShipClass) ?? 'scout',
+        maxAgents: dataRecord.maxAgents ?? 5,
+        maxConcurrentTurns: dataRecord.maxConcurrentTurns ?? 1,
         status: dataRecord.status || 'active',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),

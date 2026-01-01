@@ -4,6 +4,7 @@
 
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { StarshipService } from '@/services/StarshipService';
+import { rateLimiters } from '@/middleware/rateLimiter';
 import { AgentService } from '@/services/AgentService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
@@ -16,8 +17,15 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
+import { SubscriptionCheckoutService } from '@/services/SubscriptionCheckoutService';
+import { SubscriptionManagementService } from '@/services/SubscriptionManagementService';
+import { getConnection } from '@starships/models';
+import { getEnvConfig } from '@starships/env';
+import Stripe from 'stripe';
 
 const router: Router = Router();
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
@@ -41,7 +49,7 @@ const checkAuth = (req: Request, res: Response): boolean => {
 router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = (req as any).user!.id;
-    const { name, maxAgents = 8 } = req.body;
+    const { name } = req.body;
 
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
 
@@ -67,7 +75,10 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: name.trim(),
-      maxAgents,
+      // New starships are created as Scout class by default
+      shipClass: 'scout',
+      maxAgents: 5,
+      maxConcurrentTurns: 1,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
@@ -83,6 +94,242 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
     handleError(error, res, 'creating starship');
   }
 });
+
+/**
+ * POST /starships/:id/subscribe
+ * Starts a Stripe subscription checkout for a given Stripe Price ID.
+ *
+ * Plan definitions live in Stripe Price metadata (Option A).
+ * Request body: { priceId: string }
+ */
+router.post('/starships/:id/subscribe', rateLimiters.financial, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const starshipId = req.params.id;
+    const userId = (req as any).user!.id as string;
+
+    const bodyValidation = validateData(
+      z.object({
+        priceId: z.string().min(1, 'priceId is required'),
+      }),
+      req.body,
+      res,
+      'subscription checkout'
+    );
+    if (!bodyValidation) return;
+    const { priceId } = bodyValidation;
+
+    const starshipService = new StarshipService();
+    const hasAccess = await starshipService.hasAccess(userId, starshipId);
+    if (!hasAccess) {
+      sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+      return;
+    }
+
+    const service = new SubscriptionCheckoutService();
+    const { checkoutUrl } = await service.createCheckoutSession({ userId, starshipId, priceId });
+    sendSuccess(res, { checkoutUrl }, 201);
+  } catch (error) {
+    handleError(error, res, 'creating subscription checkout');
+  }
+});
+
+/**
+ * POST /starships/:id/subscription/change
+ * Change the starship's subscription plan to the provided Stripe priceId.
+ *
+ * If no subscription exists yet, falls back to starting a Checkout Session (mode=subscription).
+ */
+router.post(
+  '/starships/:id/subscription/change',
+  rateLimiters.financial,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const starshipId = req.params.id;
+      const userId = (req as any).user!.id as string;
+
+      const bodyValidation = validateData(
+        z.object({
+          priceId: z.string().min(1, 'priceId is required'),
+        }),
+        req.body,
+        res,
+        'subscription plan change'
+      );
+      if (!bodyValidation) return;
+      const { priceId } = bodyValidation;
+
+      const starshipService = new StarshipService();
+      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      if (!hasAccess) {
+        sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+        return;
+      }
+
+      const svc = new SubscriptionManagementService();
+      const result = await svc.changePlan({ userId, starshipId, priceId });
+      sendSuccess(res, result, 200);
+    } catch (error) {
+      handleError(error, res, 'changing subscription plan');
+    }
+  }
+);
+
+/**
+ * POST /starships/:id/subscription/cancel-downgrade
+ * If a subscription is set to end at period end (pending downgrade-to-scout), undo that and keep it renewing.
+ */
+router.post(
+  '/starships/:id/subscription/cancel-downgrade',
+  rateLimiters.financial,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const starshipId = req.params.id;
+      const userId = (req as any).user!.id as string;
+
+      const paramValidation = validateData(z.object({ id: IdSchema }), { id: starshipId }, res, 'cancel downgrade');
+      if (!paramValidation) return;
+
+      const starshipService = new StarshipService();
+      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      if (!hasAccess) {
+        sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+        return;
+      }
+
+      const connection = getConnection();
+      const row = await connection.queryOne<{ stripe_subscription_id: string }>(
+        `SELECT stripe_subscription_id
+           FROM starship_subscriptions
+          WHERE starship_id = $1
+            AND status NOT IN ('canceled')
+          ORDER BY updated_at DESC
+          LIMIT 1`,
+        [starshipId]
+      );
+
+      if (!row?.stripe_subscription_id) {
+        sendSuccess(res, { ok: true }, 200);
+        return;
+      }
+
+      const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['items.data'] });
+      const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id ?? null;
+
+      if (scheduleId) {
+        // Detach schedule so we can update cancellation behavior on the subscription.
+        await stripe.subscriptionSchedules.release(scheduleId);
+      }
+
+      await stripe.subscriptions.update(subscription.id, {
+        cancel_at_period_end: false,
+        proration_behavior: 'none',
+        metadata: {
+          ...(subscription.metadata || {}),
+          pending_downgrade_to: '',
+          requested_price_id: '',
+        },
+      });
+
+      // Best-effort update local mirror.
+      await connection.query(
+        `UPDATE starship_subscriptions
+            SET cancel_at_period_end = false,
+                updated_at = NOW()
+          WHERE starship_id = $1`,
+        [starshipId]
+      );
+
+      sendSuccess(res, { ok: true }, 200);
+    } catch (error) {
+      handleError(error, res, 'cancelling downgrade');
+    }
+  }
+);
+
+/**
+ * GET /starships/:id/subscription/status
+ * Returns the starship's Stripe subscription renewal/cancellation state for billing UI.
+ */
+router.get(
+  '/starships/:id/subscription/status',
+  rateLimiters.apiAuthenticated,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const starshipId = req.params.id;
+      const userId = (req as any).user!.id as string;
+
+      const paramValidation = validateData(z.object({ id: IdSchema }), { id: starshipId }, res, 'subscription status');
+      if (!paramValidation) return;
+
+      const starshipService = new StarshipService();
+      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      if (!hasAccess) {
+        sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
+        return;
+      }
+
+      const connection = getConnection();
+      const row = await connection.queryOne<{ stripe_subscription_id: string }>(
+        `SELECT stripe_subscription_id
+           FROM starship_subscriptions
+          WHERE starship_id = $1
+            AND status NOT IN ('canceled')
+          ORDER BY updated_at DESC
+          LIMIT 1`,
+        [starshipId]
+      );
+
+      if (!row?.stripe_subscription_id) {
+        sendSuccess(res, { subscriptionId: null, status: null, cancelAtPeriodEnd: false, renewAt: null }, 200);
+        return;
+      }
+
+      const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['items.data'] });
+      // If the subscription is managed by a schedule, Stripe may block direct cancel_at_period_end updates.
+      // In that case, interpret end_behavior=cancel as "cancel at period end" for UI purposes.
+      const scheduleId =
+        typeof (subscription as unknown as { schedule?: unknown }).schedule === 'string'
+          ? ((subscription as unknown as { schedule?: string }).schedule as string)
+          : ((subscription as unknown as { schedule?: { id: string } | null }).schedule?.id ?? null);
+      const schedule = scheduleId ? await stripe.subscriptionSchedules.retrieve(scheduleId) : null;
+      const cancelAtPeriodEnd = Boolean(subscription.cancel_at_period_end) || Boolean(schedule && schedule.end_behavior === 'cancel');
+      const status = subscription.status ?? null;
+
+      const item0 = subscription.items?.data?.[0];
+      const currentPeriodEndSeconds =
+        (subscription as unknown as { current_period_end?: unknown }).current_period_end ??
+        (item0 as unknown as { current_period_end?: unknown } | undefined)?.current_period_end ??
+        null;
+      const currentPeriodStartSeconds =
+        (subscription as unknown as { current_period_start?: unknown }).current_period_start ??
+        (item0 as unknown as { current_period_start?: unknown } | undefined)?.current_period_start ??
+        null;
+
+      const cpe = typeof currentPeriodEndSeconds === 'number' ? currentPeriodEndSeconds : null;
+      const cps = typeof currentPeriodStartSeconds === 'number' ? currentPeriodStartSeconds : null;
+      const renewAt = cpe ? new Date(cpe * 1000).toISOString() : null;
+
+      // Best-effort cache into DB for other consumers.
+      await connection.query(
+        `UPDATE starship_subscriptions
+            SET status = COALESCE($2, status),
+                cancel_at_period_end = $3,
+                current_period_start = COALESCE(to_timestamp($4::double precision), current_period_start),
+                current_period_end = COALESCE(to_timestamp($5::double precision), current_period_end),
+                updated_at = NOW()
+          WHERE starship_id = $1`,
+        [starshipId, status, cancelAtPeriodEnd, cps, cpe]
+      );
+
+      sendSuccess(res, { subscriptionId: subscription.id, status, cancelAtPeriodEnd, renewAt }, 200);
+    } catch (error) {
+      handleError(error, res, 'fetching subscription status');
+    }
+  }
+);
 
 // GET /starships/:id - Get specific starship (supports both ID and slug) (OpenAPI pattern)
 router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

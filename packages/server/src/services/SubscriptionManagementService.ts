@@ -1,0 +1,302 @@
+import Stripe from 'stripe';
+import { getConnection, StarshipRepository, UserRepository } from '@starships/models';
+import { AppError } from '@starships/errors';
+import { StripeService } from '@/services/StripeService';
+import { getEnvConfig } from '@starships/env';
+import type { ShipClass } from '@starships/protocol';
+
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
+
+function parseIntOrNull(v: unknown): number | null {
+  const n = typeof v === 'string' ? Number(v) : typeof v === 'number' ? v : NaN;
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+function isShipClass(value: string): value is ShipClass {
+  return value === 'scout' || value === 'frigate' || value === 'cruiser';
+}
+
+function shipClassRank(shipClass: ShipClass): number {
+  // Lower rank means "lower tier". Used to detect upgrade vs downgrade.
+  switch (shipClass) {
+    case 'scout':
+      return 0;
+    case 'frigate':
+      return 1;
+    case 'cruiser':
+      return 2;
+  }
+}
+
+function readRequiredPlanMetadata(price: Stripe.Price): {
+  shipClass: ShipClass;
+  maxAgents: number;
+  maxConcurrentTurns: number;
+  monthlyCredits: number;
+} {
+  const md = price.metadata || {};
+  const shipClass = (md.ship_class || md.shipClass || '').toString();
+  const maxAgents = parseIntOrNull(md.max_agents ?? md.maxAgents);
+  const maxConcurrentTurns = parseIntOrNull(md.max_concurrent_turns ?? md.maxConcurrentTurns);
+  const monthlyCredits = parseIntOrNull(md.monthly_credits ?? md.monthlyCredits);
+  if (!shipClass || maxAgents === null || maxConcurrentTurns === null || monthlyCredits === null) {
+    throw new AppError('Plan metadata missing required keys', 'VALIDATION_ERROR', 400, { details: { metadata: md } });
+  }
+  if (!isShipClass(shipClass)) {
+    throw new AppError('Plan metadata ship_class is invalid', 'VALIDATION_ERROR', 400, { details: { shipClass } });
+  }
+  return { shipClass, maxAgents, maxConcurrentTurns, monthlyCredits };
+}
+
+export class SubscriptionManagementService {
+  private readonly userRepo = new UserRepository();
+  private readonly starshipRepo = new StarshipRepository();
+
+  private static advisoryKeyFromString(input: string): number {
+    // Generate a stable int32-ish key from a string (pattern used elsewhere in repo).
+    const hashInt = BigInt('0x' + Buffer.from(input).toString('hex').slice(0, 15));
+    return Number(hashInt % BigInt(2147483647));
+  }
+
+  private async requireValidRecurringPlan(priceId: string): Promise<{ price: Stripe.Price; plan: ReturnType<typeof readRequiredPlanMetadata> }> {
+    const price = await stripe.prices.retrieve(priceId);
+    if (!price?.active || !price.recurring) {
+      throw new AppError('Invalid subscription plan', 'VALIDATION_ERROR', 400, { details: { priceId } });
+    }
+    const plan = readRequiredPlanMetadata(price);
+    return { price, plan };
+  }
+
+  /**
+   * Change a starship's subscription plan to the given Stripe Price ID.
+   *
+   * Behavior:
+   * - If the starship has an existing subscription (tracked in DB), update it in Stripe.
+   * - Otherwise, create a new Checkout Session and return checkoutUrl.
+   */
+  async changePlan(params: {
+    userId: string;
+    starshipId: string;
+    priceId: string;
+  }): Promise<{ mode: 'checkout' | 'updated'; checkoutUrl?: string }> {
+    const { userId, starshipId, priceId } = params;
+    if (!priceId?.trim()) throw new AppError('Missing priceId', 'VALIDATION_ERROR', 400);
+
+    const [user, starship] = await Promise.all([this.userRepo.findById(userId), this.starshipRepo.findById(starshipId)]);
+    if (!user) throw new AppError('User not found', 'RESOURCE_NOT_FOUND', 404);
+    if (!starship) throw new AppError('Starship not found', 'STARSHIP_NOT_FOUND', 404);
+    if (starship.ownerId !== userId) {
+      throw new AppError('Access denied to this starship', 'FORBIDDEN', 403, { details: { starshipId } });
+    }
+
+    // Prevent privilege escalation via arbitrary price IDs: require a valid recurring plan with required metadata.
+    // (Also allows us to enforce downgrade constraints against current usage.)
+    const { plan: nextPlan } = await this.requireValidRecurringPlan(priceId);
+
+    // Ensure customer id
+    let stripeCustomerId = user.stripeCustomerId;
+    if (!stripeCustomerId) {
+      const customer = await StripeService.createCustomer({ userId: user.id, email: user.email ?? null });
+      stripeCustomerId = customer.id;
+      await this.userRepo.update(user.id, { stripeCustomerId });
+    }
+
+    const connection = getConnection();
+    // Serialize plan changes per-starship to avoid races where multiple concurrent changes create
+    // duplicate Stripe flows or overwrite each other's metadata.
+    return await connection.transaction(async (client) => {
+      const key = SubscriptionManagementService.advisoryKeyFromString(`starship-subscription:${starshipId}`);
+      await client.query('SELECT pg_advisory_xact_lock($1)', [key]);
+
+      // Try to find existing subscription id for this starship.
+      const row = (await client.query<{ stripe_subscription_id: string; status: string }>(
+        `SELECT stripe_subscription_id, status
+           FROM starship_subscriptions
+          WHERE starship_id = $1
+            AND status NOT IN ('canceled')
+          ORDER BY updated_at DESC
+          LIMIT 1
+          FOR UPDATE`,
+        [starshipId]
+      )).rows?.[0];
+
+      if (!row?.stripe_subscription_id) {
+        // No known subscription; start checkout.
+        const idempotencyKey = `sub-${starshipId}-${priceId}-${Date.now()}`;
+        const session = await StripeService.createSubscriptionCheckoutSession({
+          stripeCustomerId,
+          starshipId,
+          starshipSlug: starship.slug,
+          userId,
+          idempotencyKey,
+          priceId,
+        });
+        if (!session.url) throw new AppError('Failed to create Stripe checkout session', 'INTERNAL_SERVER_ERROR', 500);
+        return { mode: 'checkout', checkoutUrl: session.url };
+      }
+
+      const subscriptionId = row.stripe_subscription_id;
+      const existing = await stripe.subscriptions.retrieve(subscriptionId, { expand: ['items.data'] });
+      const item = existing.items?.data?.[0];
+      if (!item?.id) throw new AppError('Subscription has no items', 'INTERNAL_SERVER_ERROR', 500);
+
+      // Ensure the subscription is linkable back to our domain model.
+      // The webhook handler that applies entitlements on `invoice.paid` relies on
+      // `subscription.metadata.starship_id` and `subscription.metadata.user_id`.
+      const needsLinkMetadata = existing.metadata?.starship_id !== starshipId || existing.metadata?.user_id !== userId;
+      if (needsLinkMetadata) {
+        await stripe.subscriptions.update(subscriptionId, {
+          metadata: {
+            ...(existing.metadata || {}),
+            starship_id: starshipId,
+            user_id: userId,
+          },
+        });
+      }
+
+      // If the existing subscription is not in a paying state, do NOT attempt an in-place update.
+      // Instead, redirect the user through Checkout to (re)establish a valid payment flow.
+      // This commonly happens if a prior checkout attempt left the subscription in `incomplete`/`unpaid`.
+      const isPaying = existing.status === 'active' || existing.status === 'trialing';
+      if (!isPaying) {
+        const idempotencyKey = `sub-${starshipId}-${priceId}-${Date.now()}`;
+        const session = await StripeService.createSubscriptionCheckoutSession({
+          stripeCustomerId,
+          starshipId,
+          starshipSlug: starship.slug,
+          userId,
+          idempotencyKey,
+          priceId,
+        });
+        if (!session.url) throw new AppError('Failed to create Stripe checkout session', 'INTERNAL_SERVER_ERROR', 500);
+        return { mode: 'checkout', checkoutUrl: session.url };
+      }
+
+      // Determine whether this is a downgrade (apply at next renewal) vs upgrade (apply immediately).
+      const currentRank = shipClassRank(starship.shipClass);
+      const nextRank = shipClassRank(nextPlan.shipClass);
+      const isDowngrade = nextRank < currentRank;
+
+      if (isDowngrade) {
+        // Validate current usage fits within the requested plan limits.
+        const deployedCountRes = await client.query<{ count: string }>(
+          `SELECT COUNT(*)::text as count
+             FROM agents
+            WHERE starship_id = $1
+              AND deployed_at IS NOT NULL`,
+          [starshipId]
+        );
+        const deployedCount = Number(deployedCountRes.rows?.[0]?.count ?? '0') || 0;
+        if (deployedCount > nextPlan.maxAgents) {
+          throw new AppError(
+            `Cannot downgrade: ${deployedCount} agents deployed but next plan allows max ${nextPlan.maxAgents}`,
+            'OPERATION_NOT_ALLOWED',
+            400,
+            { details: { deployedCount, maxAgents: nextPlan.maxAgents, requestedShipClass: nextPlan.shipClass } }
+          );
+        }
+
+        // Downgrades take effect next renewal. Product requirement: ideally the subscription will NOT renew,
+        // so we cancel at period end (the starship will revert to Scout when Stripe marks the subscription non-paying).
+        const scheduleId = typeof existing.schedule === 'string' ? existing.schedule : (existing.schedule?.id ?? null);
+
+        // If Stripe has already put this subscription under a schedule, we must update the schedule (Stripe forbids
+        // changing cancellation behavior directly on the subscription).
+        if (scheduleId) {
+          const schedule = await stripe.subscriptionSchedules.retrieve(scheduleId);
+          const phaseStart = schedule.phases?.[0]?.start_date ?? schedule.current_phase?.start_date ?? null;
+          if (!phaseStart) {
+            throw new AppError('Subscription schedule missing phase start_date', 'INTERNAL_SERVER_ERROR', 500, {
+              details: { scheduleId },
+            });
+          }
+
+          const currentItem = existing.items?.data?.[0];
+          const currentPrice = currentItem?.price;
+          const currentPriceId = !currentPrice ? null : typeof currentPrice === 'string' ? currentPrice : currentPrice.id;
+          const nextRenewalAt = currentItem?.current_period_end ?? null;
+          if (!currentPriceId) throw new AppError('Subscription item missing price', 'INTERNAL_SERVER_ERROR', 500);
+          if (!nextRenewalAt) throw new AppError('Subscription item missing current_period_end', 'INTERNAL_SERVER_ERROR', 500);
+
+          await stripe.subscriptionSchedules.update(scheduleId, {
+            end_behavior: 'cancel',
+            proration_behavior: 'none',
+            metadata: {
+              ...(schedule.metadata || {}),
+              starship_id: starshipId,
+              user_id: userId,
+              pending_downgrade_to: 'scout',
+              requested_price_id: priceId,
+            },
+            phases: [
+              {
+                start_date: phaseStart,
+                end_date: nextRenewalAt,
+                items: [{ price: currentPriceId, quantity: currentItem?.quantity ?? 1 }],
+                proration_behavior: 'none',
+              },
+            ],
+          });
+        } else {
+          await stripe.subscriptions.update(subscriptionId, {
+            cancel_at_period_end: true,
+            proration_behavior: 'none',
+            metadata: {
+              ...(existing.metadata || {}),
+              starship_id: starshipId,
+              user_id: userId,
+              pending_downgrade_to: 'scout',
+              requested_price_id: priceId,
+            },
+          });
+        }
+
+        // Do NOT apply entitlements immediately; webhook will enforce Scout once the subscription ends.
+        return { mode: 'updated' };
+      }
+
+      // Upgrades/same-tier switches:
+      // Per Stripe docs, the recommended hosted redirect flow for changing an existing subscription is
+      // Billing Portal deep links (subscription_update_confirm). This ensures the customer is redirected
+      // to Stripe to confirm/pay (including SCA) when required.
+      //
+      // We do NOT apply entitlements immediately; webhook `invoice.paid` enforces entitlements.
+      //
+      // Docs: customer-management/portal-deep-links.md (flow_data.type=subscription_update_confirm)
+      const portalSession = await stripe.billingPortal.sessions.create({
+        customer: stripeCustomerId,
+        // Used when the customer exits the Portal (e.g. clicks “Return to business”).
+        return_url: `${envConfig.PUBLIC_URL}/ship/${starship.slug}/settings/my-starship?status=cancelled`,
+        flow_data: {
+          type: 'subscription_update_confirm',
+          // Ensure an automatic redirect after the customer completes the plan change in the Portal.
+          after_completion: {
+            type: 'redirect',
+            redirect: {
+              return_url: `${envConfig.PUBLIC_URL}/ship/${starship.slug}/settings/my-starship?status=success`,
+            },
+          },
+          subscription_update_confirm: {
+            subscription: subscriptionId,
+            items: [
+              {
+                id: item.id,
+                quantity: item.quantity ?? 1,
+                price: priceId,
+              },
+            ],
+          },
+        },
+      });
+
+      if (!portalSession.url) {
+        throw new AppError('Failed to create Stripe Billing Portal session', 'INTERNAL_SERVER_ERROR', 500);
+      }
+
+      return { mode: 'checkout', checkoutUrl: portalSession.url };
+    });
+  }
+}
+
+export default SubscriptionManagementService;

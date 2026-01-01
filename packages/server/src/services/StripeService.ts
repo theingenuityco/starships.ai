@@ -1,16 +1,31 @@
 import Stripe from 'stripe';
 import { logger } from '@/utils/logger';
 import { CREDITS_PER_USD } from '@/config/credits';
+import { getEnvConfig } from '@starships/env';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-  apiVersion: '2025-09-30.clover',
-});
+const envConfig = getEnvConfig();
+const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
 /**
  * Stripe Service - Handles Stripe payment operations
  * Layered architecture: Controller -> Service -> Stripe SDK
  */
 export class StripeService {
+  /**
+   * Create or retrieve a Stripe Customer for a user.
+   * Note: Customer creation is idempotent from our side by persisting users.stripe_customer_id.
+   */
+  static async createCustomer(params: { userId: string; email?: string | null }): Promise<Stripe.Customer> {
+    const email = params.email ?? undefined;
+    const customer = await stripe.customers.create({
+      ...(email ? { email } : {}),
+      metadata: {
+        user_id: params.userId,
+      },
+    });
+    return customer;
+  }
+
   /**
    * Create a Stripe Checkout Session for wallet topup
    */
@@ -97,10 +112,11 @@ export class StripeService {
               credits_granted: String(creditsGranted),
             },
           },
-          success_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/success?topupId=${encodeURIComponent(
+          // Return users back to the Billing tab (where they initiated the top-up) and show a status callout there.
+          success_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?topup=success&topupId=${encodeURIComponent(
             topupId
           )}&amount=${encodeURIComponent(amountUsd.toFixed(2))}`,
-          cancel_url: `${process.env.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/billing/topup/failure?topupId=${encodeURIComponent(
+          cancel_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/billing?topup=cancelled&topupId=${encodeURIComponent(
             topupId
           )}`,
           expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
@@ -148,6 +164,55 @@ export class StripeService {
       logger.error('[STRIPE] Failed to retrieve checkout session', { sessionId, operation: 'getCheckoutSession' }, error as Error);
       throw error;
     }
+  }
+
+  /**
+   * Create a Stripe Checkout Session for subscribing a starship to a paid ship class (generic).
+   *
+   * The plan definition (ship_class, entitlements, monthly credits) lives in Stripe Price metadata.
+   */
+  static async createSubscriptionCheckoutSession(params: {
+    stripeCustomerId: string;
+    starshipId: string;
+    starshipSlug?: string;
+    userId: string;
+    idempotencyKey: string;
+    priceId: string;
+  }): Promise<Stripe.Checkout.Session> {
+    const { stripeCustomerId, starshipId, starshipSlug, userId, idempotencyKey, priceId } = params;
+    if (!priceId || !priceId.trim()) throw new Error('Missing priceId');
+
+    const session = await stripe.checkout.sessions.create(
+      {
+        mode: 'subscription',
+        customer: stripeCustomerId,
+        line_items: [{ price: priceId, quantity: 1 }],
+        // Useful for routing and idempotency in webhook handlers
+        client_reference_id: starshipId,
+        metadata: {
+          kind: 'ship_class_subscription',
+          starship_id: starshipId,
+          starship_slug: starshipSlug ?? null,
+          user_id: userId,
+          idempotency_key: idempotencyKey,
+          price_id: priceId,
+        },
+        subscription_data: {
+          metadata: {
+            kind: 'ship_class_subscription',
+            starship_id: starshipId,
+            user_id: userId,
+            price_id: priceId,
+          },
+        },
+        success_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=success`,
+        cancel_url: `${envConfig.PUBLIC_URL}/ship/${starshipSlug ?? starshipId}/settings/my-starship?status=cancelled`,
+        expires_at: Math.floor(Date.now() / 1000) + 24 * 60 * 60, // 24 hours
+      },
+      { idempotencyKey }
+    );
+
+    return session;
   }
 }
 

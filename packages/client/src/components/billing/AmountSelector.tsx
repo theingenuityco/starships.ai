@@ -125,11 +125,7 @@ export default function AmountSelector({ starshipId, className = '', variant = '
                 ${presetUsd.toFixed(2)}
               </div>
             </div>
-            {isSelected && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-primary rounded-full flex items-center justify-center">
-                <div className="w-2 h-2 bg-primary-foreground rounded-full"></div>
-              </div>
-            )}
+            {/* Selected styling is conveyed via border/bg/shadow; no dot badge. */}
           </button>
             )
           })()

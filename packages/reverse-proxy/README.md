@@ -1,14 +1,15 @@
 # @starships/reverse-proxy
 
-A lean development reverse proxy for the starships.ai monorepo. This proxy routes requests between the Next.js frontend and Express backend during development, providing a single entry point for all traffic.
+A lean development reverse proxy for the **starships.ai** monorepo. It provides a **single local origin** (default `http://localhost:8080`) and routes traffic to the UI, API, and docs site so the client can use same-origin `/api/*` requests.
 
 ## Purpose
 
 In development, this reverse proxy:
 
 - Provides a single entry point at `http://localhost:8080`
-- Routes `/api/*` requests to the backend server (port 4000)
-- Routes all other requests to the Next.js frontend (port 3000)
+- Routes `/api/*` requests to the backend server (default `http://localhost:4000`)
+- Routes `/docs/*` requests to the docs site (default `http://localhost:3001`)
+- Routes all other requests to the Next.js client (default `http://localhost:3000`)
 - Enables WebSocket support for Next.js HMR (Hot Module Replacement)
 - Provides consistent routing behavior between development and production
 
@@ -26,6 +27,7 @@ This will:
 1. Start the reverse proxy at `http://localhost:8080`
 2. Start the Next.js frontend at `http://localhost:3000`
 3. Start the Express backend at `http://localhost:4000`
+4. Start the docs site at `http://localhost:3001`
 
 Then access your application at: **`http://localhost:8080`**
 
@@ -144,6 +146,7 @@ pnpm --filter @starships/reverse-proxy dev
 
 | Path Pattern     | Target          | Description                            |
 | ---------------- | --------------- | -------------------------------------- |
+| `/docs/*`        | Docs (3001)     | Documentation site (Next.js + MDX)     |
 | `/api/*`         | Backend (4000)  | API endpoints (preserves full path)    |
 | `/_proxy/health` | Proxy           | Health check endpoint                  |
 | `/*`             | Frontend (3000) | All other routes (pages, assets, etc.) |
@@ -189,8 +192,9 @@ Response:
 Browser
    ↓
 [Reverse Proxy :8080]
-   ├── /api/* → [Backend :4000]
-   └── /*     → [Frontend :3000]
+   ├── /docs/* → [Docs :3001]
+   ├── /api/*  → [Backend :4000]
+   └── /*      → [Frontend :3000]
 ```
 
 ## Logging
@@ -214,7 +218,7 @@ If a backend service is unavailable, the proxy returns:
 This reverse proxy is **intended for development use only**. In production:
 
 - Nginx handles routing at the ingress level
-- Next.js rewrites handle API routing
+- Your ingress/reverse-proxy should route `/api/*` to the server and `/docs/*` to the docs site (or host docs separately)
 - The proxy is not deployed or used
 
 ## Troubleshooting

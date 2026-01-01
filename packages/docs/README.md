@@ -1,43 +1,45 @@
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
+# @starships/docs
 
-Run development server:
+Documentation site for **starships.ai** (Next.js + Fumadocs). This is the human-facing docs UI served at `/docs`.
+
+> Note: this is separate from `public-docs/`, which is markdown indexed by the API for in-product/agent consumption via `GET /api/v1/docs`.
+
+## Run
+
+From the repo root (recommended):
 
 ```bash
-npm run dev
-# or
+pnpm install
+cp .env.example .env
 pnpm dev
-# or
-yarn dev
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+Then open `http://localhost:8080/docs` (routed via `@starships/reverse-proxy`).
 
-## Explore
+To run only this package:
 
-In the project, you can see:
+```bash
+pnpm -w --filter @starships/docs dev
+```
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+Default port is `3001` (`DOCS_PORT`).
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+## Content & structure
 
-### Fumadocs MDX
+- **MDX content** lives in `packages/docs/content/docs/`
+- **Fumadocs source** is wired via `lib/source.ts` and `source.config.ts`
+- **Search** is implemented as a Next.js route handler at `app/api/search/route.ts`
+- **LLM export**: `app/llms-full.txt/route.ts` provides a plain-text export for LLM tooling
 
-A `source.config.ts` config file has been included, you can customise different options like frontmatter schema.
+## Environment
 
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
+This package reads environment variables from the monorepo root during local development (see `next.config.mjs` and `@starships/env`). Common variables include:
 
-## Learn More
+- `DOCS_PORT` (default 3001)
+- `PUBLIC_URL` (used for canonical URLs/redirects)
+- `ENABLE_INDEXING` (controls robots/sitemap behavior)
 
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
+## Links
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.dev) - learn about Fumadocs
+- Root: `../../README.md`
+- Public docs (agent-indexed): `../../public-docs/README.md`

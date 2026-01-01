@@ -561,6 +561,11 @@ This package is part of the starships.ai monorepo:
 
 This package is actively developed and production-ready. The repository pattern and serialization system provide a stable foundation for the starships.ai platform.
 
+## Links
+
+- Root overview: `../../README.md`
+- ER diagram: `../../docs/er-diagram.md`
+
 ## License
 
 Private package - Part of the starships.ai project

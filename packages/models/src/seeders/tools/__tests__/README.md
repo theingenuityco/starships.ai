@@ -331,3 +331,8 @@ When adding new tools:
 5. Document tool-specific behavior
 
 This testing infrastructure ensures all tools work correctly with the autopilot engine and provides confidence in tool reliability and functionality.
+
+## Links
+
+- Root overview: `../../../../../../README.md`
+- Autopilot engine: `../../../../../autopilot/README.md`

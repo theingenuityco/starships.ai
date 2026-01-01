@@ -227,6 +227,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                           <SelectContent>
                             <SelectItem value="oauth2">oauth2</SelectItem>
                             <SelectItem value="api_key">api_key</SelectItem>
+                            <SelectItem value="basic">basic</SelectItem>
                             <SelectItem value="platform_jwt">platform_jwt</SelectItem>
                             <SelectItem value="none">none</SelectItem>
                           </SelectContent>

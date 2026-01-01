@@ -4,7 +4,7 @@ This page is the **complete schema reference** for **connector templates** (the 
 
 Connector templates define:
 
-- **How a connector authenticates** (OAuth2 / API key / platform JWT / none)
+- **How a connector authenticates** (OAuth2 / API key / basic / platform JWT / none)
 - **Which actions exist** (endpoints catalog)
 - **How requests are built** (base URL + path/query/header/body mapping)
 - **Optional runtime knobs** (rate limits, metadata schema, variables)
@@ -100,7 +100,7 @@ Top-level runtime fields stored on the template:
   - Absolute base URL used when resolving endpoints.
   - May be an expression string (see “ExprString”) but must evaluate to an absolute `http(s)://...` URL at runtime.
 - **`auth: ConnectorAuthV2`**
-  - Declarative auth configuration (OAuth2 / API key / platform JWT / none).
+  - Declarative auth configuration (OAuth2 / API key / basic / platform JWT / none).
   - Must use `SecretRef` objects instead of embedding any secrets.
 - **`variables?: Variable[]`**
   - Optional list of variables the runtime can resolve from `args`, connector `metadata`, or `runtimeEnv`.
@@ -241,6 +241,35 @@ OAuth2 redirect behavior (no template field):
 
 - Callback route: `GET /api/v1/connectors/:provider/callback`
 - Redirect URI: `${PUBLIC_URL}/api/v1/connectors/<provider>/callback`
+
+#### `type: "basic"`
+
+HTTP Basic Authentication (RFC 7617):
+
+- Header: `Authorization: Basic base64("username:password")`
+- Common API-key-only case: `base64("API_KEY:")` (empty password, trailing colon)
+
+```json
+{
+  "type": "basic",
+  "usernameRef": { "type": "connector_secret", "key": "API_KEY" }
+}
+```
+
+Optional password:
+
+```json
+{
+  "type": "basic",
+  "usernameRef": { "type": "connector_secret", "key": "ACCOUNT_SID" },
+  "passwordRef": { "type": "connector_secret", "key": "AUTH_TOKEN" }
+}
+```
+
+Behavior notes (current implementation):
+
+- The server builds a session header as `Authorization: Basic <base64>` (header name defaults to `Authorization`).
+- `passwordRef` defaults to the empty string when omitted.
 
 ---
 

@@ -43,7 +43,7 @@ const TemplateTextSchema = z
   .max(5000)
   .refine((val) => !/<[^>]*>/.test(val), { message: 'HTML tags are not allowed' });
 
-const AuthTypeSchema = z.enum(['oauth2', 'api_key', 'platform_jwt', 'none']);
+const AuthTypeSchema = z.enum(['oauth2', 'api_key', 'basic', 'platform_jwt', 'none']);
 
 // Loose-but-validated: require `auth.type`, allow additional keys for forward-compat.
 const AuthObjectSchema = z.object({ type: AuthTypeSchema }).passthrough();

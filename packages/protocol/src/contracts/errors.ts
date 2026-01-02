@@ -104,7 +104,9 @@ export type StandardErrorCode =
   // Promo specific
   | 'PROMO_CODE_INVALID'
   | 'PROMO_CODE_EXPIRED'
-  | 'PROMO_CODE_EXHAUSTED';
+  | 'PROMO_CODE_EXHAUSTED'
+  // Endpoint specific (410 Gone)
+  | 'ENDPOINT_DEPRECATED';
 
 /**
  * Base error interface

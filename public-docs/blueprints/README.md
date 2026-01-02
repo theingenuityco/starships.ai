@@ -40,3 +40,8 @@ Related references
 - [Connectors](../connectors/README.md)
 - [Widgets](../widgets/README.md)
 
+## Links
+
+- Root overview: `../../README.md`
+- Autopilot engine (SDK): `../../packages/autopilot/README.md`
+

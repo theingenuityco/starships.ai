@@ -163,6 +163,10 @@ When adding new domain types or contracts:
 3. Add it to the main `src/index.ts` exports
 4. Update consuming packages to use the new types
 
-## API Reference
+## API reference
 
-For complete API documentation and examples, see the [API Design Guide](../../docs/api-design.md).
+This repo does not currently maintain a single OpenAPI document. For practical examples and platform concepts, see:
+
+- Root overview: `../../README.md`
+- Docs site content: `../docs/content/docs/`
+- Agent-/blueprint-facing references: `../../public-docs/`

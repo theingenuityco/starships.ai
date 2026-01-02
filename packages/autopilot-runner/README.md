@@ -2,6 +2,8 @@
 
 Low-latency runner exposing Execute and ExecuteStream via ConnectRPC (HTTP/2), backed by an in-process Engine and an in-memory queue.
 
+This service is used by `@starships/server` when `RUNNER_URL` is set (see `.env.example`). If `RUNNER_URL` is unset, Autopilot falls back to a local child-process runner.
+
 ## Install & Run
 
 ```bash

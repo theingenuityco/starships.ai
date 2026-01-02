@@ -59,6 +59,7 @@ Minimum needed for a useful local dev loop:
 
 - **Postgres**: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE`
 - **Auth**: `JWT_SECRET` (32+ chars)
+- **Secrets**: `ENCRYPTION_KEY` (Required for platform/connector secrets; must be a 32+ character random string)
 - **LLM** (recommended): `OPENROUTER_API_KEY` (used by agent execution and avatar generation)
 - **Runner** (optional): set `RUNNER_URL` to use the remote runner; unset it to use the local child-process runner.
 

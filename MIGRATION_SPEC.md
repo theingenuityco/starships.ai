@@ -29,12 +29,13 @@
   - [x] Updated server connection in [`packages/server/src/index.ts`](packages/server/src/index.ts)
 
 - [x] **Schema Design Phase** (100% Complete)
-  - [x] Created comprehensive PostgreSQL schema [`000_postgresql_schema.sql`](packages/models/migrations/000_postgresql_schema.sql)
+  - [x] Created comprehensive PostgreSQL schema migration [`000_postgresql_schema.ts`](packages/models/src/migrations/000_postgresql_schema.ts)
+  - [x] Documented schema evolution as **TypeScript migrations** in [`packages/models/src/migrations/*.ts`](packages/models/src/migrations/)
   - [x] Designed 17 main tables with proper relationships
   - [x] Created 3 junction tables for many-to-many relationships
   - [x] Added comprehensive indexes including full-text search
   - [x] Implemented JSONB columns for flexible data storage
-  - [x] Added automatic timestamp triggers
+  - [x] Standardized timestamps (`created_at`, `updated_at`) with **application-managed** `updated_at` updates (no DB triggers)
 
 - [x] **Database Layer Phase** (100% Complete)
   - [x] Created new [`PostgresConnection`](packages/models/src/helpers/database/postgres-connection.ts) class
@@ -145,7 +146,7 @@
    - Comprehensive B-tree indexes on foreign keys
    - GIN indexes for JSONB columns
    - Full-text search using PostgreSQL's built-in capabilities
-   - Automatic updated_at triggers
+   - `updated_at` maintained by application code (repositories set it on updates)
 
 4. **Data Types**:
    - `VARCHAR(255)` for IDs and names
@@ -186,6 +187,31 @@ const result = await connection.queryOne<UserModel>('SELECT * FROM users WHERE e
 ---
 
 ## 🛠️ Technical Implementation Details
+
+### **Migration System (TypeScript-based)**
+
+**Important**: This repo does **not** use standalone `.sql` migration files. The schema and all incremental changes are defined as **TypeScript migration modules** under:
+
+- [`packages/models/src/migrations/*.ts`](packages/models/src/migrations/)
+
+Each migration exports an `async up(client)` function and runs SQL via `client.query(...)` (the runtime passes a `PostgresConnection` which implements this interface). The initial schema is defined in:
+
+- [`packages/models/src/migrations/000_postgresql_schema.ts`](packages/models/src/migrations/000_postgresql_schema.ts)
+
+Migrations are discovered and applied by the migration runner:
+
+- [`packages/models/src/scripts/migration-runner.ts`](packages/models/src/scripts/migration-runner.ts)
+
+**How migrations are applied**:
+
+- On server startup, the API server creates the PostgreSQL connection and then applies pending migrations via `migrationRunner.runAllPendingMigrations()` (see [`packages/server/src/index.ts`](packages/server/src/index.ts)).
+- Applied migrations are tracked in the `migration_history` table (created automatically if missing).
+- Migrations are ordered by their numeric prefix (e.g. `000_`, `001_`, ...), then lexicographically.
+
+**Notes / limitations**:
+
+- Rollbacks are currently **not implemented** for the TypeScript migration runner (`rollbackMigration` returns an error).
+- In production builds, migrations are loaded from compiled `.js` files (the runner detects `/dist/` and loads `dist/migrations/*.js`).
 
 ### **Database Connection**
 
@@ -298,8 +324,8 @@ interface PostgresConfig {
    # Start PostgreSQL
    pnpm run postgres:install
 
-   # Run schema migration
-   psql -h localhost -U postgres -d starships -f packages/models/migrations/000_postgresql_schema.sql
+   # Migrations are applied automatically when the API server starts
+   pnpm --filter @starships/server dev
    ```
 
 ### **Common Issues & Solutions**
@@ -356,7 +382,7 @@ interface PostgresConfig {
 - **17 Tables**: users, starships, agents, agent_templates, tools, tool_templates, workflows, blueprints, nodes, edges, conversations, messages, executions, connector_secrets, usage, waitlist
 - **3 Junction Tables**: agent_tools, agent_template_tool_templates, conversation_agents
 - **35+ Indexes**: Including full-text search and performance indexes
-- **Auto-triggers**: For updated_at timestamps
+- **Timestamps**: `created_at`/`updated_at` columns with `updated_at` updated by application code (no triggers)
 - **Extensions**: UUID generation and trigram search
 
 ### **Repository Conversion Checklist** (✅ Pattern Established)

@@ -66,7 +66,7 @@ This is not a complete OpenAPI spec, but these are the endpoints most developers
 
 ### Health
 
-- `GET /health`
+- `GET /api/v1/health`
 
 ### Auth
 

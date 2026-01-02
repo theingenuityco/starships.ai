@@ -372,30 +372,124 @@ export function useConversationStop() {
         // This prevents it from being replaced by the persisted complete version
         const chunks = Array.isArray(existingChunks) ? existingChunks.slice() : []
 
+        // First, compute the current messages to see if there's a streaming assistant message
+        const currentMessages = chunks.reduce(reduceMessages, [] as ClientMessage[])
+        const lastAssistant = currentMessages.length > 0 && currentMessages[currentMessages.length - 1]?.role === 'assistant' ? currentMessages[currentMessages.length - 1] : null
+        const isStreaming = lastAssistant && (lastAssistant as any)?.streaming === true
+        const hasChunks = lastAssistant && Array.isArray((lastAssistant as any)?.chunks) && (lastAssistant as any).chunks.length > 0
+
         // Find and mark the last assistant message as stopped
+        let foundMessageChunk = false
         for (let i = chunks.length - 1; i >= 0; i--) {
           const c: any = chunks[i]
           if (c?.type === 'append' && c?.message?.role === 'assistant') {
+            // CRITICAL: Use the computed lastAssistant message which has accumulated chunks from append_chunk events
+            // This ensures we get all the chunks that were added after the append event
+            let messageContent = typeof lastAssistant?.content === 'string' ? lastAssistant.content : ''
+            const messageChunks = Array.isArray((lastAssistant as any)?.chunks) ? (lastAssistant as any).chunks : []
+
+            // Fallback to message in chunk if lastAssistant doesn't have chunks
+            if (messageChunks.length === 0) {
+              const chunkMessageChunks = Array.isArray(c?.message?.chunks) ? c.message.chunks : []
+              if (chunkMessageChunks.length > 0) {
+                messageChunks.push(...chunkMessageChunks)
+              }
+            }
+
+            // Accumulate content from chunks if needed
+            if (messageChunks.length > 0 && !messageContent) {
+              messageContent = messageChunks.map((ch: any) => (typeof ch?.content === 'string' ? ch.content : '')).join('')
+            }
+
             // Mark this message as stopped so it won't be replaced by persisted version
+            console.log('[STOP] Found existing append chunk, marking as stopped:', {
+              index: i,
+              messageId: c?.message?.id,
+              lastAssistantId: lastAssistant?.id,
+              hasContent: messageContent.length > 0,
+              hasChunks: messageChunks.length > 0,
+              contentLength: messageContent.length,
+            })
             chunks[i] = {
               ...c,
               message: {
                 ...c.message,
+                content: messageContent, // Ensure content is set from chunks
                 streaming: false,
                 _stopped: true, // Client-side flag to prevent replacement
+                chunks: messageChunks.length > 0 ? messageChunks : undefined, // Preserve chunks
               },
             }
+            foundMessageChunk = true
             break
           } else if (c?.type === 'replace_whole_message' && c?.message?.role === 'assistant') {
+            // CRITICAL: Accumulate content from chunks if message has chunks but empty content
+            let messageContent = typeof c?.message?.content === 'string' ? c.message.content : ''
+            const messageChunks = Array.isArray(c?.message?.chunks) ? c.message.chunks : []
+            if (messageChunks.length > 0 && !messageContent) {
+              messageContent = messageChunks.map((ch: any) => (typeof ch?.content === 'string' ? ch.content : '')).join('')
+            }
+
+            console.log('[STOP] Found existing replace_whole_message chunk, marking as stopped:', {
+              index: i,
+              messageId: c?.message?.id,
+              hasContent: messageContent.length > 0,
+              hasChunks: messageChunks.length > 0,
+            })
             chunks[i] = {
               ...c,
               message: {
                 ...c.message,
+                content: messageContent, // Ensure content is set from chunks
                 streaming: false,
                 _stopped: true,
+                chunks: messageChunks.length > 0 ? messageChunks : undefined, // Preserve chunks
               },
             }
+            foundMessageChunk = true
             break
+          }
+        }
+
+        console.log('[STOP] Message chunk search result:', {
+          foundMessageChunk,
+          isStreaming,
+          hasLastAssistant: !!lastAssistant,
+          lastAssistantId: lastAssistant?.id,
+          lastAssistantHasChunks: hasChunks,
+        })
+
+        // CRITICAL FIX: If no message chunk found but we have a streaming assistant,
+        // create an append chunk to preserve the partial message
+        if (!foundMessageChunk && isStreaming && lastAssistant) {
+          // Accumulate content from chunks if available
+          let accumulatedContent = typeof lastAssistant.content === 'string' ? lastAssistant.content : ''
+          const messageChunks = Array.isArray((lastAssistant as any)?.chunks) ? (lastAssistant as any).chunks : []
+          if (messageChunks.length > 0 && !accumulatedContent) {
+            // Build content from chunks
+            accumulatedContent = messageChunks.map((c: any) => (typeof c?.content === 'string' ? c.content : '')).join('')
+          }
+
+          // Only create append chunk if there's actual content to preserve
+          if (accumulatedContent.length > 0 || messageChunks.length > 0) {
+            console.log('[STOP] Creating append chunk to preserve stopped partial message:', {
+              messageId: lastAssistant.id,
+              chunksCount: messageChunks.length,
+              contentLength: accumulatedContent.length,
+              hasContent: accumulatedContent.length > 0,
+            })
+
+            // Create an append chunk with the current partial message, marked as stopped
+            // Preserve chunks array and accumulated content
+            const stoppedMessage: ClientMessage = {
+              ...lastAssistant,
+              content: accumulatedContent, // Ensure content is set from chunks
+              streaming: false,
+              _stopped: true,
+              chunks: messageChunks.length > 0 ? messageChunks : undefined, // Preserve chunks
+            } as ClientMessage
+
+            chunks.push({ type: 'append', message: stoppedMessage })
           }
         }
 
@@ -403,6 +497,16 @@ export function useConversationStop() {
         chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
         chunks.push({ type: 'complete' })
         chunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
+
+        console.log('[STOP] Final chunks array:', {
+          totalChunks: chunks.length,
+          stoppedChunks: chunks.filter((c: any) => c?.message?._stopped === true).length,
+          lastFewChunks: chunks.slice(-5).map((c: any) => ({
+            type: c?.type,
+            messageId: c?.message?.id,
+            isStopped: c?.message?._stopped,
+          })),
+        })
 
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), chunks)
 
@@ -756,8 +860,19 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
         return messages
       }
       // If a streaming placeholder exists at the end, drop it before appending a persisted assistant message.
-      if (msg?.role === 'assistant' && messages.length > 0 && messages[messages.length - 1].role === 'assistant' && (messages[messages.length - 1] as any).streaming) {
-        messages.pop()
+      // CRITICAL: Don't remove stopped messages - they should be preserved
+      if (msg?.role === 'assistant' && messages.length > 0) {
+        const lastMsg: any = messages[messages.length - 1]
+        if (lastMsg?.role === 'assistant' && (lastMsg as any).streaming && !(lastMsg as any)?._stopped) {
+          console.log('[REDUCE-APPEND] Removing streaming placeholder before appending persisted message')
+          messages.pop()
+        } else if (lastMsg?.role === 'assistant' && (lastMsg as any)?._stopped) {
+          console.log('[REDUCE-APPEND] Preserving stopped message, not removing:', {
+            messageId: lastMsg?.id,
+            isStreaming: (lastMsg as any).streaming,
+            isStopped: (lastMsg as any)?._stopped,
+          })
+        }
       }
       // IMPORTANT: Don't add a persisted assistant message if we already have a stopped partial
       // The stopped partial has _stopped: true flag, and we want to keep it instead of the complete persisted version
@@ -777,23 +892,40 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
           const lastMsg: any = messages[messages.length - 1]
           if (lastMsg?.role === 'assistant' && lastMsg?._stopped === true) {
             // Check if this incoming message matches the stopped one by content/timestamp
-            // This handles cases where the stopped message doesn't have an ID yet
+            // This handles cases where the stopped message doesn't have an ID yet or has a different ID
             const msgContent = typeof msg?.content === 'string' ? msg.content : ''
             const lastContent = typeof lastMsg?.content === 'string' ? lastMsg.content : ''
-            const contentMatches = msgContent.length > 0 && lastContent.length > 0 && msgContent.startsWith(lastContent)
+            // Also check chunks if content is empty
+            const lastChunks = Array.isArray((lastMsg as any)?.chunks) ? (lastMsg as any).chunks : []
+            const lastChunksContent = lastChunks.map((c: any) => (typeof c?.content === 'string' ? c.content : '')).join('')
+            const effectiveLastContent = lastContent || lastChunksContent
+
+            // Content matches if incoming starts with stopped content, or they're the same
+            const contentMatches =
+              (msgContent.length > 0 && effectiveLastContent.length > 0 && msgContent.startsWith(effectiveLastContent)) ||
+              (msgContent.length > 0 && effectiveLastContent.length > 0 && effectiveLastContent.startsWith(msgContent)) ||
+              (msgContent === effectiveLastContent && msgContent.length > 0)
+
             const msgTs = Date.parse(String(msg?.createdAt || msg?.updatedAt || ''))
             const lastTs = Date.parse(String(lastMsg?.createdAt || lastMsg?.updatedAt || ''))
             const tsMatches = !Number.isNaN(msgTs) && !Number.isNaN(lastTs) && Math.abs(msgTs - lastTs) <= 30_000
+
             console.log('[REDUCE-APPEND] Checking stopped assistant match:', {
               lastMsgId: lastMsg?.id,
+              incomingMsgId: msg?.id,
               lastMsgStopped: lastMsg?._stopped,
               contentMatches,
               tsMatches,
               msgContentLength: msgContent.length,
-              lastContentLength: lastContent.length,
+              lastContentLength: effectiveLastContent.length,
+              hasLastChunks: lastChunks.length > 0,
+              msgContentPreview: msgContent.substring(0, 50),
+              lastContentPreview: effectiveLastContent.substring(0, 50),
             })
-            // If content matches (incoming is a superset of stopped) and timestamps are close, it's the same message
-            if (contentMatches && tsMatches) {
+
+            // If content matches (incoming is a superset/subset/equal to stopped) and timestamps are close, it's the same message
+            // OR if timestamps match exactly and we have any content overlap, it's likely the same message
+            if ((contentMatches && tsMatches) || (tsMatches && msgContent.length > 0 && effectiveLastContent.length > 0)) {
               // We have a stopped partial message - don't replace it with the persisted complete version
               console.log('[REDUCE-APPEND] Stopped assistant message matched by content/timestamp, skipping')
               return messages

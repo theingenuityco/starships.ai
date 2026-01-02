@@ -1237,7 +1237,7 @@ export class ConversationService {
     // Mark as stopped since this is called from stopConversation
     console.log('[STOP] 🛑 stopConversation called:', { conversationId });
     let persistedMsg: MessageModel | null = await this.persistActivePartial(conversationId, true);
-    
+
     // After persisting a stopped message, update lastPersistedIndex to account for the assistant message
     // that was just persisted, so node_completed doesn't try to persist it again
     if (persistedMsg) {

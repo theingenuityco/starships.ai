@@ -227,8 +227,20 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const conversationMessages = await conversationService.getConversationMessages(conversationId);
       const serverCount = conversationMessages.length;
 
-      // Use the larger of client hint and server truth to avoid undercounting
-      const baseLength = Math.max(clientBase, serverCount);
+      // CRITICAL FIX: Trust the client's baselineLength when it's provided
+      // The client knows its own state better than we do, especially after stop/continue cycles
+      // where messages might be persisted but the client hasn't received them yet via SSE.
+      // Only use serverCount if clientBase is 0 (initial connection) or if serverCount is significantly lower
+      // (which would indicate the client is out of sync in a bad way)
+      const baseLength = clientBase > 0 ? Math.min(clientBase, serverCount) : serverCount;
+      
+      console.log('[SSE-SERVER] Establishing SSE connection:', {
+        conversationId,
+        clientBase,
+        serverCount,
+        baseLength,
+        messageIds: conversationMessages.map((m: any) => ({ id: m.id, role: m.role, content: typeof m.content === 'string' ? m.content.substring(0, 50) : m.content })),
+      });
 
       // Establish SSE connection with normalized baseline
       streamingService.addConnection(conversationId, res, { baseLength });
@@ -266,11 +278,23 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
         if (!claims || claims.c !== conversationId) {
           // Invalid token; use baseline mode
-          const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
-          const messagesToSend = conversationMessages.slice(startIndexForSend);
+          // Use same logic as non-resumeToken path - trust clientBase when provided
+          const baselineMessageIds = new Set<string>();
+          let messagesToSend: typeof conversationMessages = [];
+          
+          if (clientBase === 0) {
+            messagesToSend = conversationMessages;
+          } else if (clientBase < serverCount && serverCount - clientBase <= 2) {
+            const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
+            messagesToSend = conversationMessages.slice(startIndexForSend);
+          }
+          // If clientBase >= serverCount or gap too large, don't send baseline
 
           if (messagesToSend.length > 0) {
             for (const message of messagesToSend) {
+              if (message?.id) {
+                baselineMessageIds.add(String(message.id));
+              }
               await streamingService.broadcastMessage(conversationId, message);
             }
           }
@@ -282,39 +306,111 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             startIdx = idx >= 0 ? idx + 1 : 0;
           }
           const persistedTail = conversationMessages.slice(startIdx);
+          
+          console.log('[SSE-SERVER] ResumeToken path - sending persisted tail:', {
+            conversationId,
+            resumeTokenMessageId: claims.m,
+            startIdx,
+            persistedTailCount: persistedTail.length,
+            messageIds: persistedTail.map((m: any) => ({ id: m.id, role: m.role, content: typeof m.content === 'string' ? m.content.substring(0, 50) : m.content })),
+          });
+          
+          // Track message IDs that were sent to avoid replaying them as deltas
+          const baselineMessageIds = new Set<string>();
           let replayHasAssistantShell = false;
           if (persistedTail.length > 0) {
             for (const message of persistedTail) {
+              if (message?.id) {
+                baselineMessageIds.add(String(message.id));
+              }
+              console.log('[SSE-SERVER] ResumeToken - Broadcasting persisted message:', { id: message.id, role: message.role });
               await streamingService.broadcastMessage(conversationId, message);
             }
             const lastAssistant = [...persistedTail].reverse().find((msg) => (msg as { role?: string })?.role === 'assistant');
             replayHasAssistantShell = !!lastAssistant;
           }
 
+          console.log('[SSE-SERVER] ResumeToken - Replaying buffered events:', {
+            conversationId,
+            baselineMessageIdsCount: baselineMessageIds.size,
+            baselineMessageIds: Array.from(baselineMessageIds),
+            replayHasAssistantShell,
+            turnActiveFlag,
+          });
+
           // 2) Replay current-turn buffered events (skip 'message' to avoid duplicate persisted messages)
           const minContentPosition = typeof claims.p === 'number' ? claims.p : undefined;
+          // baselineMessageIds already contains all persisted tail message IDs
           await streamingService.replayCurrentTurn(conversationId, {
             minContentPosition,
             skipAssistantShell: !turnActiveFlag || replayHasAssistantShell,
             turnIsActive: turnActiveFlag,
+            baselineMessageIds, // Pass baseline message IDs to skip deltas that add them
           });
         }
       } else {
-        // Send only messages the client may be missing based on their baselineLength hint
-        const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
-        const messagesToSend = conversationMessages.slice(startIndexForSend);
+        // CRITICAL FIX: If client provided a baselineLength > 0, trust it completely
+        // The client knows its own state better than we do, especially after stop/continue cycles.
+        // Only send baseline messages if clientBase is 0 (initial connection) or if we detect
+        // the client is significantly behind (which shouldn't happen in normal operation).
+        const baselineMessageIds = new Set<string>();
+        let messagesToSend: typeof conversationMessages = [];
+        let baselineHasAssistant = false;
+        
+        if (clientBase === 0) {
+          // Initial connection - send all messages
+          messagesToSend = conversationMessages;
+          baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');
+        } else if (clientBase < serverCount) {
+          // Client is behind - but only send if the gap is reasonable (not duplicates from previous cycles)
+          // Only send if serverCount - clientBase <= 2 (allows for 1-2 new messages, not 4+ duplicates)
+          if (serverCount - clientBase <= 2) {
+            const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
+            messagesToSend = conversationMessages.slice(startIndexForSend);
+            baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');
+          } else {
+            // Gap is too large - likely duplicates from previous cycles, don't send baseline
+            console.log('[SSE-SERVER] Skipping baseline send - gap too large (likely duplicates):', {
+              conversationId,
+              clientBase,
+              serverCount,
+              gap: serverCount - clientBase,
+            });
+          }
+        }
+        // If clientBase >= serverCount, client is up to date, don't send baseline
+
+        console.log('[SSE-SERVER] Sending baseline messages:', {
+          conversationId,
+          clientBase,
+          serverCount,
+          messagesToSendCount: messagesToSend.length,
+          messageIds: messagesToSend.map((m: any) => ({ id: m.id, role: m.role, content: typeof m.content === 'string' ? m.content.substring(0, 50) : m.content })),
+        });
 
         if (messagesToSend.length > 0) {
           for (const message of messagesToSend) {
+            if (message?.id) {
+              baselineMessageIds.add(String(message.id));
+            }
+            console.log('[SSE-SERVER] Broadcasting baseline message:', { id: message.id, role: message.role });
             await streamingService.broadcastMessage(conversationId, message);
           }
         }
 
+        console.log('[SSE-SERVER] Baseline message IDs tracked:', Array.from(baselineMessageIds));
+
         // Also replay current turn events to cover race where streaming started just before connect
-        const baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');
+        console.log('[SSE-SERVER] Replaying buffered events:', {
+          conversationId,
+          baselineHasAssistant,
+          turnActiveFlag,
+          baselineMessageIdsCount: baselineMessageIds.size,
+        });
         await streamingService.replayCurrentTurn(conversationId, {
           skipAssistantShell: !turnActiveFlag || baselineHasAssistant,
           turnIsActive: turnActiveFlag,
+          baselineMessageIds, // Pass baseline message IDs to skip deltas that add them
         });
       }
 

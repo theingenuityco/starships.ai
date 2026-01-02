@@ -70,11 +70,18 @@ This is not a complete OpenAPI spec, but these are the endpoints most developers
 
 ### Auth
 
-- `POST /auth/register`
-- `POST /auth/login`
-- `GET /auth/me`
-- `GET /auth/:provider` and `GET /auth/:provider/callback` (Google/GitHub OAuth)
-- `POST /auth/oauth/exchange` (exchange short-lived auth code for JWT)
+- Implementation reference: `packages/server/src/routes/auth.ts` (see routes around lines 291-1001 for token/agent, verify-email, oauth/accounts, and password reset flows)
+- `POST /auth/register`: Register a new user (rate limited).
+- `POST /auth/login`: Login with email/password (rate limited; returns 403 if email is not verified).
+- `GET /auth/me`: Get current user details (requires JWT via `Authorization: Bearer <token>`).
+- `POST /auth/forgot-password`: Request a password reset email. Notes: rate limited (`sensitive`); always returns a generic success message to prevent user enumeration.
+- `POST /auth/reset-password`: Reset password using a reset token. Notes: rate limited (`sensitive`); `token` must be a 64-char hex string; requires `newPassword` + `confirmPassword`.
+- `GET /auth/verify-email?token=...`: Verify email address using a verification token. Notes: `token` must be a 64-char hex string; redirects to `${PUBLIC_URL}/login?verification=success|error` (not a JSON API response).
+- OAuth:
+  - `GET /auth/:provider` and `GET /auth/:provider/callback`: OAuth initiation/callback (Google/GitHub).
+  - `POST /auth/oauth/exchange`: Exchange a short-lived, single-use `auth_code` for a JWT (JWT is returned in the response body; do not pass JWTs via URLs).
+- `GET /auth/oauth/accounts`: List the current user's linked OAuth accounts (requires JWT).
+- `POST /auth/token/agent`: Issue a user+agent-scoped JWT for acting via a specific agent on a starship. Notes: requires JWT; validates agent ↔ starship and verifies user access.
 
 ### Starships (workspaces)
 

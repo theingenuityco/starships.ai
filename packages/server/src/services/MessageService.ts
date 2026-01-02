@@ -27,8 +27,8 @@ export class MessageService {
   /**
    * Create a new message with streaming support
    */
-  async createMessage(request: Message & { conversationId: string; attachmentIds?: string[] }): Promise<MessageModel> {
-    // Create message with all available properties including toolCalls, toolCallId, agentId, agentName, and attachmentIds
+  async createMessage(request: Message & { conversationId: string; attachmentIds?: string[]; stoppedAt?: string | null }): Promise<MessageModel> {
+    // Create message with all available properties including toolCalls, toolCallId, agentId, agentName, attachmentIds, and stoppedAt
     const message = await this.messageRepository.create({
       role: request.role,
       content: request.content,
@@ -40,6 +40,7 @@ export class MessageService {
       ...(request.agentId && { agentId: request.agentId }),
       ...(request.agentName && { agentName: request.agentName }),
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
+      ...(request.stoppedAt !== undefined && { stoppedAt: request.stoppedAt }),
     });
 
     // Link attachments to message if provided

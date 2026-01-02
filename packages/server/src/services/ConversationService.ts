@@ -223,7 +223,7 @@ export class ConversationService {
   }
 
   /** Persist the currently active streaming assistant partial (content/reasoning only) if any. */
-  private async persistActivePartial(conversationId: string): Promise<MessageModel | null> {
+  private async persistActivePartial(conversationId: string, isStopped: boolean = false): Promise<MessageModel | null> {
     // If we've already persisted the active stream for this conversation, skip
     if (this.activeStreamPersisted.has(conversationId)) {
       return null;
@@ -263,6 +263,16 @@ export class ConversationService {
     ) {
       const agent = this.currentAgentForConversation.get(conversationId);
       const starship = await this.getConversationStarship(conversationId);
+      const stoppedAt = isStopped ? new Date().toISOString() : undefined;
+      if (isStopped) {
+        console.log('[STOP] 💾 Persisting stopped message:', {
+          conversationId,
+          contentLength: partialContent?.length || 0,
+          hasReasoning: !!partialReasoning,
+          stoppedAt,
+        });
+      }
+
       const persistedMsg = await this.messageService.createMessage({
         conversationId,
         role: 'assistant',
@@ -271,7 +281,16 @@ export class ConversationService {
         ...(partialReasoning ? { reasoning: partialReasoning } : {}),
         ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
         ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
+        ...(stoppedAt ? { stoppedAt } : {}),
       });
+
+      if (isStopped) {
+        console.log('[STOP] ✅ Stopped message persisted:', {
+          messageId: persistedMsg.id,
+          stoppedAt: persistedMsg.stoppedAt,
+          conversationId,
+        });
+      }
 
       // Link generated attachments to the persisted message (best-effort)
       try {
@@ -1215,7 +1234,24 @@ export class ConversationService {
     }
 
     // Persist the active streaming partial (if any), regardless of prior assistant messages this turn
-    let persistedMsg: MessageModel | null = await this.persistActivePartial(conversationId);
+    // Mark as stopped since this is called from stopConversation
+    console.log('[STOP] 🛑 stopConversation called:', { conversationId });
+    let persistedMsg: MessageModel | null = await this.persistActivePartial(conversationId, true);
+    
+    // After persisting a stopped message, update lastPersistedIndex to account for the assistant message
+    // that was just persisted, so node_completed doesn't try to persist it again
+    if (persistedMsg) {
+      // Get the current lastPersistedIndex
+      const currentIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
+      // Increment by 1 to account for the assistant message we just persisted
+      // This assumes the next message in execution state would be the assistant message
+      this.lastPersistedIndex.set(conversationId, currentIndex + 1);
+      console.log('[STOP] Updated lastPersistedIndex after persist:', {
+        conversationId,
+        previousIndex: currentIndex,
+        newIndex: currentIndex + 1,
+      });
+    }
 
     // If we have cached usage from streaming but no content_complete occurred, persist usage now
     try {
@@ -1335,8 +1371,32 @@ export class ConversationService {
       }
     }
 
-    // Clear all in-memory state for this conversation's turn now that it has stopped
-    this.clearStreamingState(conversationId);
+    // Clear streaming accumulators but preserve lastPersistedIndex to prevent duplicate persistence
+    // when node_completed fires after stop (execution might still be running)
+    this.streamingContent.delete(conversationId);
+    this.streamingToolCalls.delete(conversationId);
+    this.streamingReasoning.delete(conversationId);
+    this.streamingGeneratedAttachmentIds.delete(conversationId);
+    this.streamingGeneratedImageUrlSeen.delete(conversationId);
+    this.ringBuffer.delete(conversationId);
+    this.latestStreamingUsage.delete(conversationId);
+    this.streamSeq.delete(conversationId);
+    this.snapshotPreferred.delete(conversationId);
+    this.toolCallSeq.delete(conversationId);
+    this.placeholderEmitted.delete(conversationId);
+    this.generationId.delete(conversationId);
+    this.accumulatedLength.delete(conversationId);
+    this.nextChunkPosition.delete(conversationId);
+    this.chunkProcessingLock.delete(conversationId);
+    // DO NOT clear lastPersistedIndex here - it's needed to prevent duplicate persistence
+    // when node_completed fires after stop
+    this.lowBalanceStopTriggered.delete(conversationId);
+    this.lastLowBalanceCheckAt.delete(conversationId);
+    this.suppressCompleteFor.delete(conversationId);
+    this.activeStreamPersisted.delete(conversationId);
+    this.assistantPersistedThisTurn.delete(conversationId);
+    this.currentAgentForConversation.delete(conversationId);
+    this.lastToolCallsBroadcastHash.delete(conversationId);
   }
 
   /**
@@ -1585,6 +1645,24 @@ export class ConversationService {
         if (msgs) {
           const baselineIndex = msgs.length - 1;
           this.lastPersistedIndex.set(conversationId, baselineIndex);
+
+          // DEBUG: Log execution state to understand what messages are in state
+          console.log('[TURN_STARTED] Setting lastPersistedIndex:', {
+            conversationId,
+            executionStateMessagesLength: msgs.length,
+            baselineIndex,
+            lastPersistedIndexBefore: this.lastPersistedIndex.get(conversationId),
+            stateMessageRoles: msgs.slice(-5).map((m: unknown) => {
+              const msg = m as { role?: unknown; content?: unknown };
+              return { role: msg.role, contentPrefix: typeof msg.content === 'string' ? msg.content.substring(0, 30) : 'N/A' };
+            }),
+          });
+        } else {
+          console.log('[TURN_STARTED] No messages in execution state:', {
+            conversationId,
+            hasState: !!state,
+            hasExecution: !!execution,
+          });
         }
 
         // Persist turn_started state and notify clients
@@ -2350,6 +2428,20 @@ export class ConversationService {
             // Get last persisted index for this conversation
             const lastIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
 
+            // DEBUG: Log state and index to understand why duplicates are created
+            console.log('[NODE_COMPLETED] Processing messages from state:', {
+              conversationId,
+              stateMessagesLength: stateMessages.length,
+              lastPersistedIndex: lastIndex,
+              willProcessFrom: lastIndex + 1,
+              willProcessCount: stateMessages.length - (lastIndex + 1),
+              stateMessageRoles: stateMessages.slice(Math.max(0, lastIndex - 2), lastIndex + 5).map((m, idx) => ({
+                index: Math.max(0, lastIndex - 2) + idx,
+                role: m.role,
+                contentPrefix: typeof m.content === 'string' ? m.content.substring(0, 30) : 'N/A',
+              })),
+            });
+
             // Type guard for state messages coming from Autopilot mutations
             const isStateMsg = (m: unknown): m is LlmMessage => {
               if (!m || typeof m !== 'object') return false;
@@ -2373,6 +2465,16 @@ export class ConversationService {
 
               // Skip system messages (ephemeral, not persisted)
               if (role === 'system') {
+                continue;
+              }
+
+              // For assistant messages, check if we've already persisted one this turn
+              // This prevents duplicates when a message was stopped and persisted via persistActivePartial
+              if (
+                role === 'assistant' &&
+                (this.assistantPersistedThisTurn.has(conversationId) || this.activeStreamPersisted.has(conversationId))
+              ) {
+                // Update index to skip this message since it was already persisted
                 continue;
               }
 
@@ -2400,6 +2502,16 @@ export class ConversationService {
                 // Extract string content (LLM responses are always string, not ContentBlock[])
                 const contentString =
                   typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
+
+                // DEBUG: Log before persisting to understand why duplicates are created
+                console.log('[NODE_COMPLETED] About to persist message:', {
+                  conversationId,
+                  role,
+                  messageIndex: i,
+                  lastPersistedIndex: lastIndex,
+                  contentPrefix: contentString.substring(0, 50),
+                  stateMessagesLength: stateMessages.length,
+                });
 
                 const persistedMsg = await this.messageService.createMessage({
                   conversationId,

@@ -56,7 +56,7 @@ export class MessageRepository extends BaseRepository {
     );
   }
 
-  async create(entity: Message & { conversationId: string; starshipId?: string; attachmentIds?: string[] }): Promise<MessageModel> {
+  async create(entity: Message & { conversationId: string; starshipId?: string; attachmentIds?: string[]; stoppedAt?: string | null }): Promise<MessageModel> {
     return this.executeWithErrorHandling(
       async () => {
         const now = new Date().toISOString();
@@ -90,6 +90,7 @@ export class MessageRepository extends BaseRepository {
           ...(entity.agentId ? { agentId: entity.agentId } : {}),
           ...(entity.agentName ? { agentName: entity.agentName } : {}),
           ...(entity.attachmentIds ? { attachmentIds: entity.attachmentIds } : {}),
+          ...(entity.stoppedAt !== undefined ? { stoppedAt: entity.stoppedAt } : {}),
         };
 
         // Validate with all required fields present (toolCalls must be an array for validation)

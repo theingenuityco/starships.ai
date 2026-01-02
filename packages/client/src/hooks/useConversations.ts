@@ -33,6 +33,8 @@ interface ClientMessage extends MessageModel {
     position: number
     timestamp: number
   }>
+  // stoppedAt is inherited from MessageModel, but explicitly listed here for clarity
+  stoppedAt?: string | null
 }
 
 // Create message request interface (local definition since it's not in protocol)
@@ -342,178 +344,43 @@ export function useConversationStop() {
   return useCallback(
     async (conversationId: string) => {
       if (!conversationId) return
-      console.log('[STOP] Starting stop for conversation', conversationId)
+
+      console.log('[STOP] 🛑 User requested stop:', { conversationId })
 
       try {
         // Abort SSE locally
         await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
-        console.log('[STOP] Cancelled queries')
       } catch (err) {
-        console.warn('[STOP] Error cancelling queries', err)
+        console.warn('[STOP] ⚠️ Error cancelling queries', err)
       }
 
-      // Capture existing chunks BEFORE removing so we can preserve them
-      const existingChunks = (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) || []
-      console.log('[STOP] Captured existing chunks:', existingChunks.length, 'chunks')
-
       try {
-        // Signal server to persist partials and cancel autopilot
+        // Signal server to persist partials (with stoppedAt) and cancel autopilot
         await api.post(`/api/v1/conversations/${conversationId}/stop`)
-        console.log('[STOP] Server stop endpoint called')
+        console.log('[STOP] ✅ Server stop endpoint called - message will be persisted with stoppedAt')
       } catch (error: any) {
         const msg = getSafeErrorMessage(error)
-        console.error('[STOP] Server stop failed', error)
+        console.error('[STOP] ❌ Server stop failed:', error)
         toast.error('Failed to stop response', { description: msg })
         return
       }
 
+      // Optimistic update: mark streaming as false and add completion markers
+      // Server will send the persisted message with stoppedAt set, which reduceMessages will respect
       try {
-        // Find the last assistant message chunk and mark it as stopped
-        // This prevents it from being replaced by the persisted complete version
-        const chunks = Array.isArray(existingChunks) ? existingChunks.slice() : []
-
-        // First, compute the current messages to see if there's a streaming assistant message
-        const currentMessages = chunks.reduce(reduceMessages, [] as ClientMessage[])
-        const lastAssistant = currentMessages.length > 0 && currentMessages[currentMessages.length - 1]?.role === 'assistant' ? currentMessages[currentMessages.length - 1] : null
-        const isStreaming = lastAssistant && (lastAssistant as any)?.streaming === true
-        const hasChunks = lastAssistant && Array.isArray((lastAssistant as any)?.chunks) && (lastAssistant as any).chunks.length > 0
-
-        // Find and mark the last assistant message as stopped
-        let foundMessageChunk = false
-        for (let i = chunks.length - 1; i >= 0; i--) {
-          const c: any = chunks[i]
-          if (c?.type === 'append' && c?.message?.role === 'assistant') {
-            // CRITICAL: Use the computed lastAssistant message which has accumulated chunks from append_chunk events
-            // This ensures we get all the chunks that were added after the append event
-            let messageContent = typeof lastAssistant?.content === 'string' ? lastAssistant.content : ''
-            const messageChunks = Array.isArray((lastAssistant as any)?.chunks) ? (lastAssistant as any).chunks : []
-
-            // Fallback to message in chunk if lastAssistant doesn't have chunks
-            if (messageChunks.length === 0) {
-              const chunkMessageChunks = Array.isArray(c?.message?.chunks) ? c.message.chunks : []
-              if (chunkMessageChunks.length > 0) {
-                messageChunks.push(...chunkMessageChunks)
-              }
-            }
-
-            // Accumulate content from chunks if needed
-            if (messageChunks.length > 0 && !messageContent) {
-              messageContent = messageChunks.map((ch: any) => (typeof ch?.content === 'string' ? ch.content : '')).join('')
-            }
-
-            // Mark this message as stopped so it won't be replaced by persisted version
-            console.log('[STOP] Found existing append chunk, marking as stopped:', {
-              index: i,
-              messageId: c?.message?.id,
-              lastAssistantId: lastAssistant?.id,
-              hasContent: messageContent.length > 0,
-              hasChunks: messageChunks.length > 0,
-              contentLength: messageContent.length,
-            })
-            chunks[i] = {
-              ...c,
-              message: {
-                ...c.message,
-                content: messageContent, // Ensure content is set from chunks
-                streaming: false,
-                _stopped: true, // Client-side flag to prevent replacement
-                chunks: messageChunks.length > 0 ? messageChunks : undefined, // Preserve chunks
-              },
-            }
-            foundMessageChunk = true
-            break
-          } else if (c?.type === 'replace_whole_message' && c?.message?.role === 'assistant') {
-            // CRITICAL: Accumulate content from chunks if message has chunks but empty content
-            let messageContent = typeof c?.message?.content === 'string' ? c.message.content : ''
-            const messageChunks = Array.isArray(c?.message?.chunks) ? c.message.chunks : []
-            if (messageChunks.length > 0 && !messageContent) {
-              messageContent = messageChunks.map((ch: any) => (typeof ch?.content === 'string' ? ch.content : '')).join('')
-            }
-
-            console.log('[STOP] Found existing replace_whole_message chunk, marking as stopped:', {
-              index: i,
-              messageId: c?.message?.id,
-              hasContent: messageContent.length > 0,
-              hasChunks: messageChunks.length > 0,
-            })
-            chunks[i] = {
-              ...c,
-              message: {
-                ...c.message,
-                content: messageContent, // Ensure content is set from chunks
-                streaming: false,
-                _stopped: true,
-                chunks: messageChunks.length > 0 ? messageChunks : undefined, // Preserve chunks
-              },
-            }
-            foundMessageChunk = true
-            break
-          }
-        }
-
-        console.log('[STOP] Message chunk search result:', {
-          foundMessageChunk,
-          isStreaming,
-          hasLastAssistant: !!lastAssistant,
-          lastAssistantId: lastAssistant?.id,
-          lastAssistantHasChunks: hasChunks,
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
+          const chunks = Array.isArray(old) ? old.slice() : []
+          chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
+          chunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
+          return chunks
         })
+      } catch {}
 
-        // CRITICAL FIX: If no message chunk found but we have a streaming assistant,
-        // create an append chunk to preserve the partial message
-        if (!foundMessageChunk && isStreaming && lastAssistant) {
-          // Accumulate content from chunks if available
-          let accumulatedContent = typeof lastAssistant.content === 'string' ? lastAssistant.content : ''
-          const messageChunks = Array.isArray((lastAssistant as any)?.chunks) ? (lastAssistant as any).chunks : []
-          if (messageChunks.length > 0 && !accumulatedContent) {
-            // Build content from chunks
-            accumulatedContent = messageChunks.map((c: any) => (typeof c?.content === 'string' ? c.content : '')).join('')
-          }
-
-          // Only create append chunk if there's actual content to preserve
-          if (accumulatedContent.length > 0 || messageChunks.length > 0) {
-            console.log('[STOP] Creating append chunk to preserve stopped partial message:', {
-              messageId: lastAssistant.id,
-              chunksCount: messageChunks.length,
-              contentLength: accumulatedContent.length,
-              hasContent: accumulatedContent.length > 0,
-            })
-
-            // Create an append chunk with the current partial message, marked as stopped
-            // Preserve chunks array and accumulated content
-            const stoppedMessage: ClientMessage = {
-              ...lastAssistant,
-              content: accumulatedContent, // Ensure content is set from chunks
-              streaming: false,
-              _stopped: true,
-              chunks: messageChunks.length > 0 ? messageChunks : undefined, // Preserve chunks
-            } as ClientMessage
-
-            chunks.push({ type: 'append', message: stoppedMessage })
-          }
+      // Best-effort: drop resume token so we don't resume a stale turn
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem(`conv:${conversationId}:resumeToken`)
         }
-
-        // Add completion markers
-        chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
-        chunks.push({ type: 'complete' })
-        chunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
-
-        console.log('[STOP] Final chunks array:', {
-          totalChunks: chunks.length,
-          stoppedChunks: chunks.filter((c: any) => c?.message?._stopped === true).length,
-          lastFewChunks: chunks.slice(-5).map((c: any) => ({
-            type: c?.type,
-            messageId: c?.message?.id,
-            isStopped: c?.message?._stopped,
-          })),
-        })
-
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), chunks)
-
-        // Best-effort: drop resume token so we don't resume a stale turn
-        try {
-          if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${conversationId}:resumeToken`)
-        } catch {}
       } catch {}
     },
     [queryClient]
@@ -800,14 +667,6 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       const msg = chunk.message
       const messages = clone(acc)
 
-      console.log('[REDUCE-APPEND] Processing append chunk:', {
-        msgId: msg?.id,
-        msgRole: msg?.role,
-        msgContent: typeof msg?.content === 'string' ? msg.content.substring(0, 50) : msg.content,
-        currentMessagesCount: messages.length,
-        currentMessageIds: messages.map((m: any) => ({ id: m.id, role: m.role, isTemp: typeof m.id === 'string' && m.id.startsWith('temp-') })),
-      })
-
       // If we optimistically added a temp user message (on send), replace it with the
       // server-persisted user message when it arrives to avoid duplicates.
       // IMPORTANT: Search backwards through ALL messages, not just the last one, because
@@ -825,26 +684,14 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
             const msgTs = Date.parse(String((msg as any)?.createdAt || (msg as any)?.updatedAt || ''))
             const tsOk = !Number.isNaN(candidateTs) && !Number.isNaN(msgTs) ? Math.abs(msgTs - candidateTs) <= 30_000 : true
 
-            console.log('[REDUCE-APPEND] Checking user message candidate:', {
-              index: i,
-              candidateId: candidate?.id,
-              isTempUser,
-              sameContent,
-              tsOk,
-              candidateTs,
-              msgTs,
-            })
-
             if (isTempUser && sameContent && tsOk) {
               // Replace the temp user message with the persisted one
-              console.log('[REDUCE-APPEND] Replacing temp user message at index', i)
               messages[i] = { ...msg }
               return messages
             }
 
             // If we found a persisted user message with same content and timestamp, it's already there
             if (!isTempUser && sameContent && tsOk) {
-              console.log('[REDUCE-APPEND] Duplicate user message detected, skipping')
               return messages
             }
 
@@ -853,87 +700,59 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
           }
         }
       } catch (e) {
-        console.warn('[REDUCE-APPEND] Error in user message deduplication:', e)
+        console.warn('[STREAM] Error in user message deduplication:', e)
       }
       if (msg?.id && messages.some(m => m.id === msg.id)) {
-        console.log('[REDUCE-APPEND] Duplicate message by ID detected, skipping:', msg.id)
         return messages
       }
       // If a streaming placeholder exists at the end, drop it before appending a persisted assistant message.
-      // CRITICAL: Don't remove stopped messages - they should be preserved
+      // Don't remove stopped messages - server says they're stopped (stoppedAt is set)
       if (msg?.role === 'assistant' && messages.length > 0) {
         const lastMsg: any = messages[messages.length - 1]
-        if (lastMsg?.role === 'assistant' && (lastMsg as any).streaming && !(lastMsg as any)?._stopped) {
-          console.log('[REDUCE-APPEND] Removing streaming placeholder before appending persisted message')
+        if (lastMsg?.role === 'assistant' && (lastMsg as any).streaming && !lastMsg?.stoppedAt) {
           messages.pop()
-        } else if (lastMsg?.role === 'assistant' && (lastMsg as any)?._stopped) {
-          console.log('[REDUCE-APPEND] Preserving stopped message, not removing:', {
-            messageId: lastMsg?.id,
-            isStreaming: (lastMsg as any).streaming,
-            isStopped: (lastMsg as any)?._stopped,
-          })
         }
       }
-      // IMPORTANT: Don't add a persisted assistant message if we already have a stopped partial
-      // The stopped partial has _stopped: true flag, and we want to keep it instead of the complete persisted version
-      // Check both by ID (if available) and by content/timestamp matching to catch all cases
+      // Don't add a persisted assistant message if we already have a stopped message
+      // Server is authoritative: if stoppedAt is set, the message was stopped
       if (msg?.role === 'assistant') {
-        // First check by ID if the incoming message has one
+        // Check by ID if the incoming message has one
         if (msg?.id) {
           const existingById = messages.find((m: any) => m?.id === msg.id)
-          if (existingById && (existingById as any)?._stopped === true) {
-            // We have a stopped message with the same ID - don't replace it
-            console.log('[REDUCE-APPEND] Stopped assistant message with same ID detected, skipping:', msg.id)
+          if (existingById?.stoppedAt) {
+            // Server says this message was stopped - keep it, don't replace
+            console.log('[STREAM] ✅ Preserving stopped message (by ID):', {
+              messageId: msg.id,
+              stoppedAt: existingById.stoppedAt,
+              reason: 'Server says message was stopped',
+            })
             return messages
           }
         }
-        // Also check if the last assistant message is stopped (common case)
+        // Check if the last assistant message is stopped (common case)
         if (messages.length > 0) {
           const lastMsg: any = messages[messages.length - 1]
-          if (lastMsg?.role === 'assistant' && lastMsg?._stopped === true) {
-            // Check if this incoming message matches the stopped one by content/timestamp
-            // This handles cases where the stopped message doesn't have an ID yet or has a different ID
-            const msgContent = typeof msg?.content === 'string' ? msg.content : ''
-            const lastContent = typeof lastMsg?.content === 'string' ? lastMsg.content : ''
-            // Also check chunks if content is empty
-            const lastChunks = Array.isArray((lastMsg as any)?.chunks) ? (lastMsg as any).chunks : []
-            const lastChunksContent = lastChunks.map((c: any) => (typeof c?.content === 'string' ? c.content : '')).join('')
-            const effectiveLastContent = lastContent || lastChunksContent
-
-            // Content matches if incoming starts with stopped content, or they're the same
-            const contentMatches =
-              (msgContent.length > 0 && effectiveLastContent.length > 0 && msgContent.startsWith(effectiveLastContent)) ||
-              (msgContent.length > 0 && effectiveLastContent.length > 0 && effectiveLastContent.startsWith(msgContent)) ||
-              (msgContent === effectiveLastContent && msgContent.length > 0)
-
-            const msgTs = Date.parse(String(msg?.createdAt || msg?.updatedAt || ''))
-            const lastTs = Date.parse(String(lastMsg?.createdAt || lastMsg?.updatedAt || ''))
-            const tsMatches = !Number.isNaN(msgTs) && !Number.isNaN(lastTs) && Math.abs(msgTs - lastTs) <= 30_000
-
-            console.log('[REDUCE-APPEND] Checking stopped assistant match:', {
-              lastMsgId: lastMsg?.id,
-              incomingMsgId: msg?.id,
-              lastMsgStopped: lastMsg?._stopped,
-              contentMatches,
-              tsMatches,
-              msgContentLength: msgContent.length,
-              lastContentLength: effectiveLastContent.length,
-              hasLastChunks: lastChunks.length > 0,
-              msgContentPreview: msgContent.substring(0, 50),
-              lastContentPreview: effectiveLastContent.substring(0, 50),
+          if (lastMsg?.role === 'assistant' && lastMsg?.stoppedAt) {
+            // Server says this message was stopped - keep it, don't replace
+            console.log('[STREAM] ✅ Preserving stopped message (last assistant):', {
+              messageId: lastMsg.id,
+              stoppedAt: lastMsg.stoppedAt,
+              incomingMessageId: msg.id,
+              reason: 'Server says message was stopped',
             })
-
-            // If content matches (incoming is a superset/subset/equal to stopped) and timestamps are close, it's the same message
-            // OR if timestamps match exactly and we have any content overlap, it's likely the same message
-            if ((contentMatches && tsMatches) || (tsMatches && msgContent.length > 0 && effectiveLastContent.length > 0)) {
-              // We have a stopped partial message - don't replace it with the persisted complete version
-              console.log('[REDUCE-APPEND] Stopped assistant message matched by content/timestamp, skipping')
-              return messages
-            }
+            return messages
           }
         }
       }
-      console.log('[REDUCE-APPEND] Adding new message, final count:', messages.length + 1)
+      // Log when we receive a message with stoppedAt from server
+      if (msg?.stoppedAt) {
+        console.log('[STREAM] 📥 Received stopped message from server:', {
+          messageId: msg.id,
+          role: msg.role,
+          stoppedAt: msg.stoppedAt,
+          contentLength: typeof msg.content === 'string' ? msg.content.length : 0,
+        })
+      }
       return [...messages, { ...msg }]
     }
     case 'replace_whole_message': {
@@ -953,10 +772,16 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
       if (typeof incoming?.id === 'string') {
         const idx = messages.findIndex((m: any) => m?.id === incoming.id)
         if (idx !== -1) {
-          // IMPORTANT: Don't replace a stopped message with a persisted version
+          // Don't replace a stopped message - server is authoritative
           const existing: any = messages[idx]
-          if (existing?._stopped === true && incoming.role === 'assistant') {
-            // This message was stopped - keep the stopped partial, don't replace with persisted complete
+          if (existing?.stoppedAt && incoming.role === 'assistant' && !incoming.stoppedAt) {
+            // Server says existing message was stopped - keep it, don't replace with non-stopped version
+            console.log('[STREAM] ✅ Preserving stopped message (replace_whole_message by ID):', {
+              messageId: existing.id,
+              stoppedAt: existing.stoppedAt,
+              incomingHasStoppedAt: !!incoming.stoppedAt,
+              reason: 'Existing message was stopped, incoming is not',
+            })
             return messages
           }
           messages[idx] = (incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage
@@ -969,10 +794,17 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
         return [(incoming.role === 'assistant' ? normalizeAssistantFinal(incoming) : incoming) as ClientMessage]
       }
 
-      // IMPORTANT: Don't replace a stopped assistant message with a persisted version
+      // Don't replace a stopped assistant message - server is authoritative
       const lastMsg: any = messages[messages.length - 1]
-      if (lastMsg?._stopped === true && incoming.role === 'assistant') {
-        // This message was stopped - keep the stopped partial, don't replace with persisted complete
+      if (lastMsg?.stoppedAt && incoming.role === 'assistant' && !incoming.stoppedAt) {
+        // Server says existing message was stopped - keep it, don't replace with non-stopped version
+        console.log('[STREAM] ✅ Preserving stopped message (replace_whole_message last):', {
+          messageId: lastMsg.id,
+          stoppedAt: lastMsg.stoppedAt,
+          incomingMessageId: incoming.id,
+          incomingHasStoppedAt: !!incoming.stoppedAt,
+          reason: 'Last message was stopped, incoming is not',
+        })
         return messages
       }
 
@@ -999,15 +831,16 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
         }
       }
 
-      // CRITICAL FIX: If the last assistant message is stopped, don't apply chunks to it
-      // Chunks from stopped messages should not be applied (they would corrupt the message)
+      // If the last assistant message is stopped, don't apply chunks to it
+      // Server says it's stopped (stoppedAt is set), so don't apply new chunks
       if (idx >= 0) {
         const lastAssistant: any = messages[idx]
-        if (lastAssistant?._stopped === true) {
-          console.log('[REDUCE-APPEND-CHUNK] Skipping chunk - last assistant message is stopped:', {
-            idx,
-            messageId: lastAssistant?.id,
-            chunkWhich: chunk.which,
+        if (lastAssistant?.stoppedAt) {
+          console.log('[STREAM] ⏹️ Skipping chunk for stopped message:', {
+            messageId: lastAssistant.id,
+            stoppedAt: lastAssistant.stoppedAt,
+            chunkType: chunk.which,
+            reason: 'Message was stopped, no new chunks should be applied',
           })
           return messages // Don't apply chunk to stopped message
         }
@@ -1140,13 +973,20 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const computedMessages = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]) : []
         const baselineLength = computedMessages.length
 
-        console.log('[SSE-CONNECT] Client establishing SSE connection:', {
-          conversationId,
-          chunksCount: Array.isArray(cachedChunks) ? cachedChunks.length : 0,
-          computedMessagesCount: computedMessages.length,
-          baselineLength,
-          messageIds: computedMessages.map((m: any) => ({ id: m.id, role: m.role, content: typeof m.content === 'string' ? m.content.substring(0, 50) : m.content, stopped: m._stopped })),
-        })
+        // Log stopped messages for verification
+        const stoppedMessages = computedMessages.filter((m: any) => m.stoppedAt)
+        if (stoppedMessages.length > 0) {
+          console.log('[STREAM] 🔌 Reconnecting - found stopped messages:', {
+            conversationId,
+            stoppedCount: stoppedMessages.length,
+            stoppedMessages: stoppedMessages.map((m: any) => ({
+              id: m.id,
+              role: m.role,
+              stoppedAt: m.stoppedAt,
+              contentLength: typeof m.content === 'string' ? m.content.length : 0,
+            })),
+          })
+        }
 
         const token = await getCurrentToken()
         return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal, baselineLength)
@@ -1271,18 +1111,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Check if we've received a 'turn_completed' event in the chunk stream
   const hasCompleteEvent = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) {
-      console.log('[STREAM] hasCompleteEvent: false (no chunks)')
       return false
     }
     for (let i = chunks.length - 1; i >= 0; i--) {
       if (chunks[i].type === 'turn_completed') {
-        console.log('[STREAM] hasCompleteEvent: true (found turn_completed at index', i, 'of', chunks.length, 'chunks)')
         return true
       }
       // Stop checking once we hit a new 'append' of a user message (new turn started)
       if (chunks[i].type === 'append' && (chunks[i] as any).message?.role === 'user') break
     }
-    console.log('[STREAM] hasCompleteEvent: false (no turn_completed found in', chunks.length, 'chunks)')
     return false
   }, [chunksRevisionKey])
 
@@ -1291,7 +1128,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // using stale turn state from a previous turn (e.g., after stopping and sending a new message)
   const serverTurnActive = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) {
-      console.log('[STREAM] serverTurnActive: false (no chunks)')
       return false
     }
     // Find the index of the last user message to only consider events after it
@@ -1314,20 +1150,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const c: any = chunks[i]
       if (!c) continue
       if (c.type === 'turn_started') {
-        console.log('[STREAM] serverTurnActive: true (found turn_started at index', i, 'after last user at', lastUserMessageIdx, ')')
         return true
       }
       if (c.type === 'turn_completed') {
-        console.log('[STREAM] serverTurnActive: false (found turn_completed at index', i, 'after last user at', lastUserMessageIdx, ')')
         return false
       }
       if (c.type === 'turn_state') {
-        const active = Boolean(c.payload?.turnActive)
-        console.log('[STREAM] serverTurnActive:', active, '(found turn_state at index', i, 'after last user at', lastUserMessageIdx, ')')
-        return active
+        return Boolean(c.payload?.turnActive)
       }
     }
-    console.log('[STREAM] serverTurnActive: false (no turn events found after last user at', lastUserMessageIdx, 'in', chunks.length, 'chunks)')
     return false
   }, [chunksRevisionKey])
 
@@ -1561,73 +1392,26 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Unified responder state for UI (input gating and gap loader)
   const isResponding = isAssistantStreaming || isAwaitingAssistant || isAwaitingToolResults
 
-  // Debug logging for stop debugging
+  // Log stopped messages for verification
   useEffect(() => {
     if (conversationId) {
-      // Find last user message index in chunks
-      let lastUserChunkIdx = -1
-      for (let i = chunks.length - 1; i >= 0; i--) {
-        const c: any = chunks[i]
-        if (c?.type === 'append' && c?.message?.role === 'user') {
-          lastUserChunkIdx = i
-          break
-        }
+      const stoppedMessages = computedMessages.filter((m: any) => m.stoppedAt)
+      if (stoppedMessages.length > 0) {
+        console.log('[STREAM] 📊 Current state - stopped messages:', {
+          conversationId,
+          stoppedCount: stoppedMessages.length,
+          stoppedMessages: stoppedMessages.map((m: any) => ({
+            id: m.id,
+            role: m.role,
+            stoppedAt: m.stoppedAt,
+            contentLength: typeof m.content === 'string' ? m.content.length : 0,
+            streaming: m.streaming,
+          })),
+          totalMessages: computedMessages.length,
+        })
       }
-
-      // Get chunks after last user message
-      const chunksAfterUser = lastUserChunkIdx >= 0 ? chunks.slice(lastUserChunkIdx + 1) : []
-
-      console.log('[STREAM] State update:', {
-        conversationId,
-        chunksLength: chunks.length,
-        computedMessagesLength: computedMessages.length,
-        chunksRevisionKey,
-        lastUserChunkIdx,
-        chunksAfterUserCount: chunksAfterUser.length,
-        chunksAfterUserTypes: chunksAfterUser.slice(0, 10).map((c: any) => ({
-          type: c?.type,
-          role: c?.message?.role,
-          hasContent: !!(c?.message?.content || c?.content),
-        })),
-        hasCompleteEvent,
-        isAssistantStreaming,
-        isAwaitingAssistant,
-        isAwaitingToolResults,
-        isResponding,
-        serverTurnActive,
-        hasAnyAssistantAfterLastUser,
-        lastComputedMessage:
-          computedMessages.length > 0
-            ? {
-                role: computedMessages[computedMessages.length - 1]?.role,
-                id: computedMessages[computedMessages.length - 1]?.id,
-                hasContent: !!computedMessages[computedMessages.length - 1]?.content,
-                streaming: (computedMessages[computedMessages.length - 1] as any)?.streaming,
-              }
-            : null,
-        allComputedMessages: computedMessages.map((m: any) => ({
-          role: m.role,
-          id: m.id,
-          hasContent: !!m.content,
-          streaming: m.streaming,
-        })),
-      })
     }
-  }, [
-    conversationId,
-    hasCompleteEvent,
-    isAssistantStreaming,
-    isAwaitingAssistant,
-    isAwaitingToolResults,
-    isResponding,
-    serverTurnActive,
-    chunksRevisionKey,
-    chunks.length,
-    computedMessages.length,
-    hasAnyAssistantAfterLastUser,
-    computedMessages,
-    chunks,
-  ])
+  }, [conversationId, computedMessages])
 
   // Fallback: if after connection there are no messages yet, fetch baseline once via REST
   useEffect(() => {

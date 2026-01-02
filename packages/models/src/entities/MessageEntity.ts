@@ -108,6 +108,12 @@ export class MessageEntity implements MessageModel {
   @IsString({ each: true })
   attachmentIds?: string[];
 
+  // Timestamp when message was stopped mid-stream (null if completed normally)
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  stoppedAt?: string | null;
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution

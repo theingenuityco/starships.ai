@@ -142,9 +142,11 @@ Click any template to see detailed information:
 Deployment is simple and automatic:
 
 1. **Select Template** → Review capabilities and requirements
-2. **Confirm Deployment** → Verify template, starship, and model details
-3. **Automatic Installation** → Template converts to active instance, tools install automatically
+2. **Confirm Deployment** → Verify template and model details (deployment currently targets the first starship: `starships[0]`)
+3. **Automatic Installation** → Template converts to active instance and tools install automatically
 4. **Ready to Use** → Instant availability with optimal settings
+
+**Note**: The current implementation does not include a starship selection UI. If a marketplace project has multiple starships, deployment will use the first one in the list (`starships[0]`).
 
 **Behind the Scenes**: Templates deploy with modular design, automatic dependency management, rollback protection, and security validation.
 

@@ -123,13 +123,14 @@ erDiagram
         timestamp updated_at
     }
 
-    %% Environment Variables
-    environments {
+    %% Connector secrets (encrypted at rest)
+    connector_secrets {
         string id PK
         string starship_id FK
         string key
         text encrypted_value
         string description
+        string connector_id "Optional; managing connector (if any)"
         string created_by
         timestamp created_at
         timestamp updated_at
@@ -185,7 +186,7 @@ erDiagram
     starships ||--o{ tools : "hosts"
     starships ||--o{ conversations : "contains"
     starships ||--o{ messages : "belongs_to"
-    starships ||--o{ environments : "has_vars"
+    starships ||--o{ connector_secrets : "has_secrets"
     starships ||--o{ usage : "tracks_usage"
 
     %% Agent System Relationships
@@ -215,7 +216,7 @@ graph TD
     S --> A[Agent]
     S --> T[Tool]
     S --> C[Conversation]
-    S --> E[Environment]
+    S --> CS[ConnectorSecret]
 
     %% Template System
     AT[AgentTemplate] --> A
@@ -272,7 +273,7 @@ graph TD
 
 - **JSONB Storage**: Complex objects (agent state, tool blueprints, metadata) stored as JSONB for flexibility
 - **Removed Tables**: `workflows`, `blueprints`, `executions`, `nodes`, and `edges` tables removed - no repository implementations
-- **Environment Security**: Environment variables stored with encryption via `encrypted_value` field
+- **Connector secret security**: Connector secrets stored with encryption via `encrypted_value` field
 - **Conversation Agents**: Many-to-many relationship between conversations and agents via junction table
 
 ### Technical Implementation Notes
@@ -287,7 +288,7 @@ graph TD
 ### Migration Changes (v2.1.0)
 
 - **Removed Tables**: `workflows`, `blueprints`, and `executions` tables removed - no repository implementations exist
-- **Environment Table**: Uses `encrypted_value` with `description` and `created_by` tracking
+- **Connector secrets table (`connector_secrets`)**: Uses `encrypted_value` with `description`, `created_by`, and optional `connector_id` tracking
 - **Nodes/Edges Tables**: Previously removed - data stored as JSONB within agent/tool blueprints
 - **Repository Alignment**: Schema strictly reflects actual repository implementations
 - **Full-text Search**: Added index for `agent_templates` table for marketplace search functionality

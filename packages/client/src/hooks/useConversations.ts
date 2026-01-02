@@ -695,23 +695,64 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
     case 'append': {
       const msg = chunk.message
       const messages = clone(acc)
+
+      console.log('[REDUCE-APPEND] Processing append chunk:', {
+        msgId: msg?.id,
+        msgRole: msg?.role,
+        msgContent: typeof msg?.content === 'string' ? msg.content.substring(0, 50) : msg.content,
+        currentMessagesCount: messages.length,
+        currentMessageIds: messages.map((m: any) => ({ id: m.id, role: m.role, isTemp: typeof m.id === 'string' && m.id.startsWith('temp-') })),
+      })
+
       // If we optimistically added a temp user message (on send), replace it with the
       // server-persisted user message when it arrives to avoid duplicates.
+      // IMPORTANT: Search backwards through ALL messages, not just the last one, because
+      // there might be turn_started chunks or other events after the temp user message.
       try {
         if (msg?.role === 'user' && messages.length > 0) {
-          const last: any = messages[messages.length - 1]
-          const lastIsTempUser = typeof last?.id === 'string' && last.id.startsWith('temp-user-')
-          const sameContent = typeof last?.content === 'string' && typeof (msg as any)?.content === 'string' && last.content === (msg as any).content
-          const lastTs = Date.parse(String(last?.createdAt || last?.updatedAt || ''))
-          const msgTs = Date.parse(String((msg as any)?.createdAt || (msg as any)?.updatedAt || ''))
-          const tsOk = !Number.isNaN(lastTs) && !Number.isNaN(msgTs) ? Math.abs(msgTs - lastTs) <= 30_000 : true
-          if (lastIsTempUser && sameContent && tsOk) {
-            messages[messages.length - 1] = { ...msg }
-            return messages
+          // Search backwards to find the most recent user message (could be temp or persisted)
+          for (let i = messages.length - 1; i >= 0; i--) {
+            const candidate: any = messages[i]
+            if (candidate?.role !== 'user') continue
+
+            const isTempUser = typeof candidate?.id === 'string' && candidate.id.startsWith('temp-user-')
+            const sameContent = typeof candidate?.content === 'string' && typeof (msg as any)?.content === 'string' && candidate.content === (msg as any).content
+            const candidateTs = Date.parse(String(candidate?.createdAt || candidate?.updatedAt || ''))
+            const msgTs = Date.parse(String((msg as any)?.createdAt || (msg as any)?.updatedAt || ''))
+            const tsOk = !Number.isNaN(candidateTs) && !Number.isNaN(msgTs) ? Math.abs(msgTs - candidateTs) <= 30_000 : true
+
+            console.log('[REDUCE-APPEND] Checking user message candidate:', {
+              index: i,
+              candidateId: candidate?.id,
+              isTempUser,
+              sameContent,
+              tsOk,
+              candidateTs,
+              msgTs,
+            })
+
+            if (isTempUser && sameContent && tsOk) {
+              // Replace the temp user message with the persisted one
+              console.log('[REDUCE-APPEND] Replacing temp user message at index', i)
+              messages[i] = { ...msg }
+              return messages
+            }
+
+            // If we found a persisted user message with same content and timestamp, it's already there
+            if (!isTempUser && sameContent && tsOk) {
+              console.log('[REDUCE-APPEND] Duplicate user message detected, skipping')
+              return messages
+            }
+
+            // Stop searching once we've checked the most recent user message
+            break
           }
         }
-      } catch {}
+      } catch (e) {
+        console.warn('[REDUCE-APPEND] Error in user message deduplication:', e)
+      }
       if (msg?.id && messages.some(m => m.id === msg.id)) {
+        console.log('[REDUCE-APPEND] Duplicate message by ID detected, skipping:', msg.id)
         return messages
       }
       // If a streaming placeholder exists at the end, drop it before appending a persisted assistant message.
@@ -727,6 +768,7 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
           const existingById = messages.find((m: any) => m?.id === msg.id)
           if (existingById && (existingById as any)?._stopped === true) {
             // We have a stopped message with the same ID - don't replace it
+            console.log('[REDUCE-APPEND] Stopped assistant message with same ID detected, skipping:', msg.id)
             return messages
           }
         }
@@ -742,14 +784,24 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
             const msgTs = Date.parse(String(msg?.createdAt || msg?.updatedAt || ''))
             const lastTs = Date.parse(String(lastMsg?.createdAt || lastMsg?.updatedAt || ''))
             const tsMatches = !Number.isNaN(msgTs) && !Number.isNaN(lastTs) && Math.abs(msgTs - lastTs) <= 30_000
+            console.log('[REDUCE-APPEND] Checking stopped assistant match:', {
+              lastMsgId: lastMsg?.id,
+              lastMsgStopped: lastMsg?._stopped,
+              contentMatches,
+              tsMatches,
+              msgContentLength: msgContent.length,
+              lastContentLength: lastContent.length,
+            })
             // If content matches (incoming is a superset of stopped) and timestamps are close, it's the same message
             if (contentMatches && tsMatches) {
               // We have a stopped partial message - don't replace it with the persisted complete version
+              console.log('[REDUCE-APPEND] Stopped assistant message matched by content/timestamp, skipping')
               return messages
             }
           }
         }
       }
+      console.log('[REDUCE-APPEND] Adding new message, final count:', messages.length + 1)
       return [...messages, { ...msg }]
     }
     case 'replace_whole_message': {
@@ -938,7 +990,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         // IMPORTANT: Include stopped messages in baselineLength - they're still persisted messages
         // that the server knows about, we just don't want them replaced with complete versions
         const cachedChunks = conversationId ? (queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId)) as StreamedChunk[] | undefined) : undefined
-        const baselineLength = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]).length : 0
+        const computedMessages = Array.isArray(cachedChunks) ? cachedChunks.reduce(reduceMessages, [] as ClientMessage[]) : []
+        const baselineLength = computedMessages.length
+
+        console.log('[SSE-CONNECT] Client establishing SSE connection:', {
+          conversationId,
+          chunksCount: Array.isArray(cachedChunks) ? cachedChunks.length : 0,
+          computedMessagesCount: computedMessages.length,
+          baselineLength,
+          messageIds: computedMessages.map((m: any) => ({ id: m.id, role: m.role, content: typeof m.content === 'string' ? m.content.substring(0, 50) : m.content, stopped: m._stopped })),
+        })
 
         const token = await getCurrentToken()
         return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal, baselineLength)

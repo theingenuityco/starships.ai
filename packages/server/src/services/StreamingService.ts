@@ -173,19 +173,34 @@ export class StreamingService {
    */
   async broadcastDelta(streamId: string, delta: Operation): Promise<void> {
     const conns = this.connections.get(streamId);
-    if (!conns || conns.size === 0) return;
+    const hasActiveConnections = conns && conns.size > 0;
+    
+    const msgId = delta.op === 'add' && delta.path === '/messages/-' && delta.value ? (delta.value as { id?: unknown })?.id : null;
+    
+    console.log('[BROADCAST-DELTA] Broadcasting delta:', {
+      streamId,
+      hasActiveConnections,
+      deltaOp: delta.op,
+      deltaPath: delta.path,
+      messageId: msgId,
+      willBuffer: !hasActiveConnections,
+    });
 
     // Buffer logical (pre-normalization) delta once per stream
     this.bufferLogicalEvent(streamId, 'delta', delta);
 
-    await Promise.all(
-      Array.from(conns).map(async (connection) => {
-        if (connection && !connection.res.destroyed) {
-          const normalized = this.normalizeDelta(streamId, delta, connection);
-          this.sendEventToStream(streamId, connection.res, 'delta', normalized);
-        }
-      })
-    );
+    if (hasActiveConnections) {
+      await Promise.all(
+        Array.from(conns).map(async (connection) => {
+          if (connection && !connection.res.destroyed) {
+            const normalized = this.normalizeDelta(streamId, delta, connection);
+            this.sendEventToStream(streamId, connection.res, 'delta', normalized);
+          }
+        })
+      );
+    } else {
+      console.log('[BROADCAST-DELTA] No active connections, delta buffered for replay');
+    }
   }
 
   /**
@@ -705,6 +720,7 @@ export class StreamingService {
       minContentPosition?: number;
       skipAssistantShell?: boolean;
       turnIsActive?: boolean;
+      baselineMessageIds?: Set<string>; // Message IDs already sent in baseline to skip in replay
     }
   ): Promise<void> {
     const conns = this.connections.get(streamId);
@@ -769,7 +785,22 @@ export class StreamingService {
           }
 
           const skip = evt.type === 'delta' ? this.shouldSkipDelta(evt.payload as Operation, opts) : false;
-          if (skip) continue;
+          if (skip) {
+            console.log('[REPLAY] Skipping delta (shouldSkipDelta):', { type: evt.type, path: (evt.payload as Operation)?.path });
+            continue;
+          }
+          
+          // Skip deltas that add messages already sent in baseline
+          if (evt.type === 'delta') {
+            const delta = evt.payload as Operation;
+            if (delta.op === 'add' && delta.path === '/messages/-' && delta.value) {
+              const msg = delta.value as { id?: unknown };
+              if (msg?.id && opts?.baselineMessageIds?.has(String(msg.id))) {
+                console.log('[REPLAY] Skipping delta - message already in baseline:', { msgId: msg.id, baselineIds: Array.from(opts.baselineMessageIds || []) });
+                continue; // Skip this delta - message was already sent in baseline
+              }
+            }
+          }
           replayedAny = true;
           switch (evt.type) {
             case 'delta': {
@@ -825,6 +856,7 @@ export class StreamingService {
     opts?: {
       minContentPosition?: number;
       skipAssistantShell?: boolean;
+      baselineMessageIds?: Set<string>;
     }
   ): boolean {
     if (!delta || typeof delta !== 'object') return false;

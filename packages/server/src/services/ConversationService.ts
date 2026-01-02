@@ -816,6 +816,13 @@ export class ConversationService {
         path: '/messages/-',
         value: userMessage,
       };
+      console.log('[BROADCAST] Broadcasting user message delta:', {
+        conversationId: data.conversationId,
+        messageId: userMessage.id,
+        messageRole: userMessage.role,
+        messageContent: typeof userMessage.content === 'string' ? userMessage.content.substring(0, 50) : userMessage.content,
+        hasActiveConnection: this.streamingService.isActive(data.conversationId),
+      });
       await this.streamingService.broadcastDelta(data.conversationId, userMessageDelta);
     }
 

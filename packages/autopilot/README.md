@@ -106,10 +106,20 @@ Use the `tool` node to expose functions (calculator, get_current_time, echo). Se
 
 Subscribe via `eventCallback` for `workflow_*`, `node_*`, and `content_chunk` events.
 
+## Runners (local vs remote)
+
+Autopilot can execute blueprints in different ways:
+
+- **Local runner**: executes in-process (used for nested workflows).
+- **Child-process runner**: executes out-of-process for isolation (default top-level runner when `RUNNER_URL` is not set).
+- **Remote runner**: executes via `@starships/autopilot-runner` when `RUNNER_URL` is set on the host. The host must also call `autopilot.setRunnerConfig({ url, token })`.
+
+In this monorepo, `@starships/server` sets runner config on startup and `RunnerFactory` chooses remote vs local based on `RUNNER_URL`.
+
 ## Integration notes
 
 - Credentials (OpenAI/Anthropic) are provided by host app; Autopilot focuses on execution
-- Used by `@starships/server` conversation pipeline; no standalone HTTP `/workflows/execute` route in server
+- Used by `@starships/server` conversation pipeline; there is no generic “execute blueprint” HTTP route intended for public use
 
 ## Links
 

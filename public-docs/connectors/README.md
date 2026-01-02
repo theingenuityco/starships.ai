@@ -36,3 +36,8 @@ Connectors let Starships tools and agents talk to third‑party platforms via th
 - **API key connector template**: `example-api-key.md`
 - **Basic auth connector template**: `example-basic.md`
 - **OAuth2 connector template**: `example-oauth2.md`
+
+## Links
+
+- Root overview: `../../README.md`
+- Blueprint node reference (`connector_action`): `../blueprints/node-connector-action.md`

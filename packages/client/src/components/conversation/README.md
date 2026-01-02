@@ -216,10 +216,9 @@ const handleStatusChange = async status => {
 
 ### Planned Features
 
-- Real-time message streaming
 - Advanced threading and reply functionality
-- File attachment support
-- Voice message recording
+- Rich file attachment previews (attachments are supported end-to-end; UI can be extended)
+- Voice message recording (UI scaffolding exists)
 - Message search and filtering
 - Conversation templates
 - Export/import functionality

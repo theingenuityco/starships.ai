@@ -1,72 +1,65 @@
 # @starships/client
 
-Next.js frontend for Starships. Provides the UI for planning, running, and observing agent workflows.
+Next.js (App Router) frontend for **starships.ai**. This package renders the product UI for managing starships (workspaces), agents, tools, connectors, conversations, schedules, and billing.
 
-## Run & debug
+## How it talks to the backend
+
+The client uses **same-origin** requests to the API (e.g. `fetch('/api/v1/auth/me')`). In development and production, `/api/*` is expected to be routed to `@starships/server` by a reverse proxy / ingress (see `@starships/reverse-proxy`).
+
+## Run (recommended)
+
+From the repo root:
 
 ```bash
 pnpm install
-cp .env.example .env.local
-pnpm dev # http://localhost:3000
-```
-
-Key envs:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:4000
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-SERVER_URL=http://localhost:4000
-```
-
-Scripts:
-
-```bash
+cp .env.example .env
 pnpm dev
-pnpm build && pnpm start
-pnpm type-check && pnpm lint
 ```
 
-## App map
+Then open:
+- App: `http://localhost:8080`
+- Docs: `http://localhost:8080/docs`
+- API health: `http://localhost:8080/api/v1/health`
 
-- `/` landing and demo
-- `/login` authentication
-- `/ship/[slug]` starship workspace
-  - `/conversations` chat and streaming
-- `/marketplace` agent templates
+## Run this package alone (advanced)
 
-## Interactive demo (recommended)
+If you start only the client (`pnpm --filter @starships/client dev`), you must still ensure that:
+- `/api/*` routes to the server (e.g. via `@starships/reverse-proxy`, or your own proxy)
+- the server can reach Postgres (and Redis if using schedules)
 
-1. Start API (`packages/server`) and client
-2. Visit `/` and sign in. Create a starship if prompted
-3. Go to `/ship/[slug]/conversations`, start a conversation, observe SSE streaming
+## App routes (high-level)
 
-## Integration points
-
-- API base: `NEXT_PUBLIC_API_URL`
-- Streaming: Server-Sent Events (GET `/api/v1/conversations/:id/messages?stream=true`)
-- Auth: JWT header forwarding; login page provided
+- **Auth & account**
+  - `/login`
+  - `/profile`
+  - `/forgot-password`, `/reset-password`
+- **Starship workspace**
+  - `/ship/[slug]/conversations` (SSE streaming turn output)
+  - `/ship/[slug]/agents`
+  - `/ship/[slug]/tools`
+  - `/ship/[slug]/connectors`
+  - `/ship/[slug]/schedules`
+  - `/ship/[slug]/billing/*`
+  - `/ship/[slug]/settings/*`
+- **Marketplace**
+  - `/marketplace` (tool templates and other catalog content)
+- **Instance admin (guarded by `isInstanceAdmin`)**
+  - `/admin/platform-secrets`
+  - `/admin/connector-templates/*`
+  - `/admin/agents/pending`
 
 ## Troubleshooting
 
-1. Backend connection
+- **API requests 404 in the browser**: you’re likely hitting the client directly (port 3000) without a proxy/ingress mapping `/api/*` to the server.
+- **Streaming not updating**: verify the SSE endpoint works:
 
 ```bash
-echo $NEXT_PUBLIC_API_URL
-curl -s $NEXT_PUBLIC_API_URL/api/v1/health | jq .
+curl -N -H "Accept: text/event-stream" "http://localhost:8080/api/v1/conversations/<id>/messages?stream=true"
 ```
-
-2. SSE not streaming
-
-- Check `Accept: text/event-stream` and CORS
-
-3. Auth issues
-
-- Ensure JWT is present and not expired
 
 ## Links
 
 - Root: `../../README.md`
 - Server: `../server/README.md`
-- Autopilot: `../autopilot/README.md`
-
-Out-of-date? Open an issue with a screenshot and steps.
+- Reverse proxy: `../reverse-proxy/README.md`
+- Autopilot engine: `../autopilot/README.md`

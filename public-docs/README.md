@@ -54,6 +54,13 @@ Examples
 
 Blueprint examples live under [Blueprints reference](./blueprints/README.md#examples).
 
+## How these docs are consumed in starships.ai
+
+`@starships/server` exposes a lightweight docs index/search API that reads from `public-docs/` by default:
+
+- `GET /api/v1/docs?q=...`
+- `GET /api/v1/docs/<slug>`
+
 Notes:
 
 - Template expressions use `{{ ... }}` and are resolved by the Engine prior to handler execution (full-only mode). Inline fields are executed post-handler; see Engine.

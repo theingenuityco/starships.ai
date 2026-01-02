@@ -67,7 +67,7 @@ export function ToolTemplateCard({ template, onInstall, onClick }: ToolTemplateC
       case 'data':
         return <Icon name="bar-chart" className="w-4 h-4" />
       case 'communication':
-        return <Icon name="user"s className="w-4 h-4"  />
+        return <Icon name="users" className="w-4 h-4" />
       default:
         return <Icon name="wrench" className="w-4 h-4" />
     }

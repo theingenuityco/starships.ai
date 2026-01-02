@@ -99,14 +99,16 @@ export API="http://localhost:8080/api/v1"
 
 Register + login (password auth):
 
+Note: passwords must be **8+ characters** and include **uppercase + lowercase + number + special character**.
+
 ```bash
 curl -s -X POST "$API/auth/register" \
   -H "Content-Type: application/json" \
-  -d '{"email":"dev@example.com","password":"password123","displayName":"Dev"}' | jq .
+  -d '{"email":"dev@example.com","password":"Password123!","displayName":"Dev"}' | jq .
 
 TOKEN="$(curl -s -X POST "$API/auth/login" \
   -H "Content-Type: application/json" \
-  -d '{"email":"dev@example.com","password":"password123"}' | jq -r '.data.token')"
+  -d '{"email":"dev@example.com","password":"Password123!"}' | jq -r '.data.token')"
 ```
 
 Create a conversation, send a message, then stream SSE:

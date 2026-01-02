@@ -866,6 +866,21 @@ function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessa
           }
         }
       }
+
+      // CRITICAL FIX: If the last assistant message is stopped, don't apply chunks to it
+      // Chunks from stopped messages should not be applied (they would corrupt the message)
+      if (idx >= 0) {
+        const lastAssistant: any = messages[idx]
+        if (lastAssistant?._stopped === true) {
+          console.log('[REDUCE-APPEND-CHUNK] Skipping chunk - last assistant message is stopped:', {
+            idx,
+            messageId: lastAssistant?.id,
+            chunkWhich: chunk.which,
+          })
+          return messages // Don't apply chunk to stopped message
+        }
+      }
+
       // If no assistant exists yet, create a shell
       if (idx === -1) {
         const shell: ClientMessage = {

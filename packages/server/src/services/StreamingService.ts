@@ -738,29 +738,56 @@ export class StreamingService {
         const buffer = fullBuffer.slice(0, end);
         if (buffer.length === 0) continue;
 
-        // Prefer replaying from the most recent turn_started so that turn lifecycle events
-        // (including turn_completed) are always delivered on resume.
+        // CRITICAL FIX: Find the last 'complete' or 'turn_completed' event first
+        // We should only replay events from turns that started AFTER the last completion
+        let lastCompleteIdx = -1;
+        let lastTurnCompletedIdx = -1;
+        for (let i = buffer.length - 1; i >= 0; i--) {
+          if (buffer[i].type === 'complete' && lastCompleteIdx === -1) {
+            lastCompleteIdx = i;
+          }
+          if (buffer[i].type === 'turn_completed' && lastTurnCompletedIdx === -1) {
+            lastTurnCompletedIdx = i;
+          }
+          if (lastCompleteIdx !== -1 && lastTurnCompletedIdx !== -1) break;
+        }
+        const lastTurnEndIdx = Math.max(lastCompleteIdx, lastTurnCompletedIdx);
+        
+        // Now find the most recent turn_started that comes AFTER the last turn end
+        // This ensures we only replay events from active/incomplete turns
         let from = 0;
         let turnStartedIdx = -1;
-        for (let i = buffer.length - 1; i >= 0; i--) {
-          if (buffer[i].type === 'turn_started') {
-            turnStartedIdx = i;
-            break;
-          }
-        }
-        if (turnStartedIdx >= 0) {
-          from = turnStartedIdx;
-        } else {
-          // Fallback: start after the last 'complete' event to avoid replaying past turns indefinitely.
-          let lastComplete = -1;
-          for (let i = buffer.length - 1; i >= 0; i--) {
-            if (buffer[i].type === 'complete') {
-              lastComplete = i;
+        if (lastTurnEndIdx >= 0) {
+          // Look for turn_started AFTER the last completion
+          for (let i = lastTurnEndIdx + 1; i < buffer.length; i++) {
+            if (buffer[i].type === 'turn_started') {
+              turnStartedIdx = i;
+              from = i;
               break;
             }
           }
-          from = Math.max(lastComplete + 1, 0);
-          if (from >= buffer.length) continue;
+          // If no turn_started after completion, start after the completion
+          if (turnStartedIdx === -1) {
+            from = lastTurnEndIdx + 1;
+          }
+        } else {
+          // No completion found - find the most recent turn_started (fallback)
+          for (let i = buffer.length - 1; i >= 0; i--) {
+            if (buffer[i].type === 'turn_started') {
+              turnStartedIdx = i;
+              from = i;
+              break;
+            }
+          }
+          // If still no turn_started, start from beginning
+          if (turnStartedIdx === -1) {
+            from = 0;
+          }
+        }
+        
+        if (from >= buffer.length) {
+          console.log('[REPLAY] No events to replay after turn end:', { from, bufferLength: buffer.length, lastTurnEndIdx });
+          continue;
         }
 
         // Check if turn_completed exists in the replay window
@@ -774,6 +801,15 @@ export class StreamingService {
 
         const lastEvt = buffer[buffer.length - 1];
         let replayedAny = false;
+        
+        console.log('[REPLAY] Replay configuration:', {
+          conversationId: streamId,
+          from,
+          bufferLength: buffer.length,
+          lastTurnEndIdx,
+          turnStartedIdx,
+          willReplayFrom: from < buffer.length,
+        });
 
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
@@ -782,6 +818,29 @@ export class StreamingService {
           // If turn is inactive, skip turn_started events to prevent client from thinking turn is active
           if (evt.type === 'turn_started' && opts?.turnIsActive === false) {
             continue;
+          }
+          
+          // CRITICAL FIX: Skip ALL deltas (especially chunks) that come before or at the last turn end
+          // These belong to a stopped/completed turn and would corrupt the new message
+          // This is a safety check in case 'from' calculation didn't work correctly
+          if (evt.type === 'delta' && lastTurnEndIdx >= 0 && i <= lastTurnEndIdx) {
+            const delta = evt.payload as Operation;
+            const isChunkDelta = delta.op === 'add' && /\/chunks\/-$/.test(delta.path || '');
+            const isReplaceWholeMessage = delta.op === 'replace' && delta.path === '/messages/-1';
+            const isMessageAdd = delta.op === 'add' && delta.path === '/messages/-';
+            // Skip all deltas from completed turns - chunks, message replacements, and message adds
+            if (isChunkDelta || isReplaceWholeMessage || isMessageAdd) {
+              console.log('[REPLAY] Skipping delta from stopped/completed turn (before/at turn end):', {
+                index: i,
+                lastTurnEndIdx,
+                path: delta.path,
+                op: delta.op,
+                isChunkDelta,
+                isReplaceWholeMessage,
+                isMessageAdd,
+              });
+              continue;
+            }
           }
 
           const skip = evt.type === 'delta' ? this.shouldSkipDelta(evt.payload as Operation, opts) : false;

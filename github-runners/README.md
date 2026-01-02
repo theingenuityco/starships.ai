@@ -1,16 +1,14 @@
-# GitHub Self-Hosted Runners on AWS
+# GitHub self-hosted runners on AWS
 
-Ephemeral self-hosted GitHub Actions runners using AWS Lambda and EC2 Spot instances.
+Infrastructure for **ephemeral self-hosted GitHub Actions runners** used by the starships.ai repository. The design uses an AWS Lambda webhook handler to provision short-lived EC2 (Spot) instances that register as runners, execute a single job, and terminate.
 
-## ✅ Current Status
+This is operational/infra documentation and is independent of the product runtime (client/server/autopilot). It supports CI/CD for this monorepo.
 
-- **Lambda Functions**: ✅ Deployed and working
-- **API Gateway**: ✅ Configured with webhook endpoint
-- **GitHub App**: ✅ Created and configured
-- **Webhook Integration**: ✅ Connected and receiving events
-- **EC2 Launch**: 🔄 Ready for testing
+## Current status
 
-## 📁 Directory Structure
+This README may contain “status” notes that drift over time. Prefer CloudWatch logs and actual workflow runs as the source of truth.
+
+## Directory structure
 
 ```
 github-runners/
@@ -29,9 +27,9 @@ github-runners/
     └── terraform.tfvars        # Your configuration (git-ignored)
 ```
 
-## 🚀 Quick Commands
+## Quick commands
 
-### Update Lambda Function
+### Update Lambda function
 
 ```bash
 cd lambda
@@ -40,13 +38,13 @@ cd ../terraform
 terraform apply
 ```
 
-### Check Lambda Logs
+### Check Lambda logs
 
 ```bash
 aws logs tail /aws/lambda/github-runner-webhook --follow --region us-east-1
 ```
 
-### Monitor EC2 Instances
+### Monitor EC2 instances
 
 ```bash
 aws ec2 describe-instances \
@@ -55,7 +53,7 @@ aws ec2 describe-instances \
   --output table
 ```
 
-## 🔧 Configuration
+## Configuration
 
 ### Instance types & architecture
 
@@ -76,28 +74,28 @@ Edit `lambda/handler.py` line 208:
 RUNNER_VERSION="2.321.0"  # Update to latest version
 ```
 
-## 📊 Cost Monitoring
+## Cost monitoring
 
 Current setup (t3.medium spot instances):
 
 - **Per job**: ~$0.002 (5 min average)
 - **Monthly estimate**: $15-20 (1000 jobs)
 
-## ⚠️ Known Issues & TODO
+## Known issues & TODO
 
 1. **Add monitoring**: CloudWatch dashboard for runner metrics
 2. **Add fallback**: On-demand instances when spot unavailable
 3. **Optimize startup**: Custom AMI with pre-installed tools
 4. **Add caching**: S3 cache for dependencies
 
-## 🔐 Security
+## Security
 
 - Ephemeral runners (terminate after each job)
 - Private subnet with NAT gateway (if needed)
 - Minimal IAM permissions
 - Webhook signature verification
 
-## 📝 Troubleshooting
+## Troubleshooting
 
 ### Lambda not receiving webhooks
 
@@ -116,7 +114,7 @@ Current setup (t3.medium spot instances):
 2. Check runner registration token
 3. Review EC2 user data logs
 
-## 🔄 Next Steps
+## Next steps
 
 1. Test with actual PR/push events
 2. Monitor first few job runs

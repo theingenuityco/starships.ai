@@ -1,6 +1,6 @@
 ---
 title: Marketplace
-description: Discover, deploy, and customize pre-built agents and tools with one-click deployment
+description: Discover, deploy, and customize pre-built agents with one-click deployment
 icon: Store
 ---
 
@@ -40,7 +40,7 @@ import {
 
 ## What is the Marketplace?
 
-The Marketplace is Starships.ai's **template ecosystem** - a curated collection of production-ready agents and tools that you can deploy instantly. Instead of building from scratch:
+The Marketplace is Starships.ai's **template ecosystem** - a curated collection of production-ready agent templates that you can deploy instantly. Instead of building from scratch:
 
 - **<Search className="inline w-4 h-4" /> Discover** proven solutions for your specific use case
 - **<Zap className="inline w-4 h-4" /> Deploy** with one click to your starship
@@ -54,7 +54,7 @@ The Marketplace is Starships.ai's **template ecosystem** - a curated collection 
     className="w-full rounded-lg border border-border/20 shadow-lg"
   />
   <div className="text-sm text-muted-foreground text-center mt-2">
-    The Marketplace: Search, filter, and deploy agents and tools instantly
+    The Marketplace: Search, filter, and deploy agents instantly
   </div>
 </div>
 
@@ -80,24 +80,22 @@ Click "Deploy" and confirm your selection. The template will be automatically co
 
 <Step icon={<CheckCircle />}>
 ### Start Using Immediately
-Your new agent or tool is ready to use! Access it through your starship's interface and begin your first conversation. Learn more about the [universal agent architecture](/core-concepts/agents#universal-agent-architecture).
+Your new agent is ready to use! Access it through your starship's interface and begin your first conversation. Learn more about the [universal agent architecture](/core-concepts/agents#universal-agent-architecture).
 </Step>
 </Steps>
 
 ---
 
-## Discover Templates
+## Discover Agents
 
-Find the perfect template with powerful search and filtering:
+Find the right agent with search and category filters:
 
-- **<Search className="inline w-4 h-4" /> Universal Search**: Real-time search across names, descriptions, and capabilities
+- **<Search className="inline w-4 h-4" /> Search**: Real-time search across agent names and descriptions
 - **<Package className="inline w-4 h-4" /> 9 Categories**: Coding, Creative, Analysis, Support, Integration, Automation, Data, Communication, General
-- **<BarChart className="inline w-4 h-4" /> Smart Sorting**: Most popular, recently updated, best ratings
 
-Each template card shows:
+Each agent card shows:
 
-- **Agent Templates**: Avatar, category, description, model info, usage stats, preview prompts
-- **Tool Templates**: Icon, configuration needs, code examples, integration notes
+- **Agent Templates**: Avatar, category, description, model info, usage stats, and included tools (when applicable)
 
 ---
 
@@ -144,9 +142,11 @@ Click any template to see detailed information:
 Deployment is simple and automatic:
 
 1. **Select Template** → Review capabilities and requirements
-2. **Confirm Deployment** → Verify template, starship, and model details
-3. **Automatic Installation** → Template converts to active instance, tools install automatically
+2. **Confirm Deployment** → Verify template and model details (deployment currently targets the first starship: `starships[0]`)
+3. **Automatic Installation** → Template converts to active instance and tools install automatically
 4. **Ready to Use** → Instant availability with optimal settings
+
+**Note**: The current implementation does not include a starship selection UI. If a marketplace project has multiple starships, deployment will use the first one in the list (`starships[0]`).
 
 **Behind the Scenes**: Templates deploy with modular design, automatic dependency management, rollback protection, and security validation.
 

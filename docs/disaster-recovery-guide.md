@@ -42,7 +42,7 @@ This document outlines the disaster recovery process for the Starships.ai produc
 - **Resource Type:** EBS Volume
 - **Current Volume ID:** Get dynamically using:
   ```bash
-  kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="starships-data-starships-app-0")].spec.csi.volumeHandle}'
+  kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="postgres-data-postgres-0")].spec.csi.volumeHandle}'
   ```
 - **Size:** 30 GB
 - **Type:** gp3 (encrypted with KMS)
@@ -137,7 +137,7 @@ echo "AWS Region: $AWS_REGION"
 **Identify the issue:**
 ```bash
 # Check database connectivity
-kubectl exec starships-app-0 -n starships-prod -- \
+kubectl exec postgres-0 -n starships-prod -- \
   psql -U postgres -d starships -c "SELECT COUNT(*) FROM users;"
 
 # Check pod status
@@ -151,7 +151,7 @@ kubectl get pv
 **Document current state:**
 ```bash
 # Save current data counts for verification
-kubectl exec starships-app-0 -n starships-prod -- \
+kubectl exec postgres-0 -n starships-prod -- \
   psql -U postgres -d starships -c "\dt" > /tmp/tables-before-recovery.txt
 
 # Save PV/PVC configuration
@@ -183,23 +183,41 @@ SNAPSHOT_ID="snap-XXXXX"  # Replace with actual snapshot ID
 
 ### Step 3: Stop the Application
 
-**Scale down the StatefulSet:**
+**Workload targets (important):**
+
+- `starships-app` is a **Deployment** (stateless app)
+- `postgres` is a **StatefulSet** (database + persistent volume)
+
+**Scale down Deployments to stop database writes:**
 ```bash
-# Scale down to stop database writes
-kubectl scale statefulset starships-app -n starships-prod --replicas=0
+# Scale down application + background workers (all can write to Postgres)
+kubectl scale deployment starships-app -n starships-prod --replicas=0
+kubectl scale deployment starships-schedule-scheduler -n starships-prod --replicas=0
+kubectl scale deployment starships-schedule-worker -n starships-prod --replicas=0
 
-# Wait for pod to terminate
-kubectl wait --for=delete pod/starships-app-0 -n starships-prod --timeout=120s
+# Wait for app pods to terminate
+# (kubectl wait returns non-zero if no pods match; ignore that case)
+kubectl wait --for=delete pod -n starships-prod -l app=starships-ai,environment=production --timeout=180s || true
 
-# Verify pod is terminated
-POD_COUNT=$(kubectl get pods -n starships-prod -l app=starships-ai --no-headers 2>/dev/null | wc -l)
+# Verify app pods are terminated
+POD_COUNT=$(kubectl get pods -n starships-prod -l app=starships-ai,environment=production --no-headers 2>/dev/null | wc -l)
 if [ "$POD_COUNT" -ne 0 ]; then
   echo "❌ ERROR: Pod failed to terminate"
-  kubectl get pods -n starships-prod -l app=starships-ai
+  kubectl get pods -n starships-prod -l app=starships-ai,environment=production
   exit 1
 fi
 
-echo "✅ Pod terminated successfully"
+echo "✅ App pods terminated successfully"
+```
+
+**Scale down Postgres StatefulSet so the volume can be safely restored:**
+```bash
+kubectl scale statefulset postgres -n starships-prod --replicas=0
+
+# Wait for the Postgres pod to terminate (releases the EBS volume attachment)
+kubectl wait --for=delete pod/postgres-0 -n starships-prod --timeout=180s || true
+
+echo "✅ Postgres pod terminated successfully"
 ```
 
 ### Step 4: Create Volume from Backup
@@ -211,7 +229,7 @@ NODE_AZ=$(kubectl get nodes -o jsonpath='{.items[0].metadata.labels.topology\.ku
 echo "Cluster nodes are in AZ: $NODE_AZ"
 
 # Alternatively, get AZ from existing PV
-EXISTING_AZ=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="starships-data-starships-app-0")].spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[?(@.key=="topology.kubernetes.io/zone")].values[0]}')
+EXISTING_AZ=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="postgres-data-postgres-0")].spec.nodeAffinity.required.nodeSelectorTerms[0].matchExpressions[?(@.key=="topology.kubernetes.io/zone")].values[0]}')
 echo "Existing volume AZ: $EXISTING_AZ"
 ```
 
@@ -265,18 +283,18 @@ aws ec2 describe-volumes \
 **Get current PV/PVC names:**
 ```bash
 # Get PV name
-PV_NAME=$(kubectl get pvc starships-data-starships-app-0 -n starships-prod -o jsonpath='{.spec.volumeName}')
+PV_NAME=$(kubectl get pvc postgres-data-postgres-0 -n starships-prod -o jsonpath='{.spec.volumeName}')
 echo "Current PV: $PV_NAME"
 
 # Get PVC UID (needed for binding)
-PVC_UID=$(kubectl get pvc starships-data-starships-app-0 -n starships-prod -o jsonpath='{.metadata.uid}')
+PVC_UID=$(kubectl get pvc postgres-data-postgres-0 -n starships-prod -o jsonpath='{.metadata.uid}')
 echo "PVC UID: $PVC_UID"
 ```
 
 **Delete PVC and PV:**
 ```bash
-# Delete PVC (StatefulSet will recreate it)
-kubectl delete pvc starships-data-starships-app-0 -n starships-prod
+# Delete PVC (Postgres StatefulSet will recreate it on scale-up)
+kubectl delete pvc postgres-data-postgres-0 -n starships-prod
 
 # Delete PV
 kubectl delete pv $PV_NAME
@@ -339,28 +357,38 @@ echo "✅ PV is available and ready for binding"
 
 ### Step 6: Restore Application
 
-**Scale up StatefulSet:**
+**Scale up Postgres first (recreates PVC and re-attaches restored volume):**
 ```bash
-# Scale up (will automatically create PVC and bind to available PV)
-kubectl scale statefulset starships-app -n starships-prod --replicas=1
+# Scale up Postgres (will automatically create PVC and bind to available PV)
+kubectl scale statefulset postgres -n starships-prod --replicas=1
 
-# Monitor PVC creation and binding
-watch kubectl get pvc -n starships-prod
-# Wait until STATUS shows "Bound"
+# Verify PVC is bound
+kubectl get pvc postgres-data-postgres-0 -n starships-prod
+# Wait until STATUS shows "Bound" before continuing
 
-# Wait for pod to be ready
-kubectl wait --for=condition=ready pod/starships-app-0 -n starships-prod --timeout=300s
+# Wait for Postgres pod to be ready
+kubectl wait --for=condition=ready pod/postgres-0 -n starships-prod --timeout=300s
 
 if [ $? -ne 0 ]; then
   echo "❌ ERROR: Pod failed to become ready"
-  kubectl describe pod starships-app-0 -n starships-prod
+  kubectl describe pod postgres-0 -n starships-prod
   exit 1
 fi
 
 # Check pod status
-POD_STATUS=$(kubectl get pod starships-app-0 -n starships-prod -o jsonpath='{.status.phase}')
+POD_STATUS=$(kubectl get pod postgres-0 -n starships-prod -o jsonpath='{.status.phase}')
 echo "✅ Pod is ready! Status: $POD_STATUS"
-kubectl get pods -n starships-prod -l app=starships-ai
+kubectl get pods -n starships-prod -l app=postgres
+```
+
+**Scale the application Deployments back up:**
+```bash
+kubectl scale deployment starships-app -n starships-prod --replicas=1
+kubectl scale deployment starships-schedule-scheduler -n starships-prod --replicas=1
+kubectl scale deployment starships-schedule-worker -n starships-prod --replicas=1
+
+kubectl rollout status deployment/starships-app -n starships-prod --timeout=300s
+kubectl get pods -n starships-prod -l app=starships-ai,environment=production
 ```
 
 ### Step 7: Verify AWS Backup Protection
@@ -408,14 +436,14 @@ echo "✅ Backup tag added. Volume will be automatically backed up at next sched
 
 **Check database connectivity:**
 ```bash
-kubectl exec starships-app-0 -n starships-prod -- \
+kubectl exec postgres-0 -n starships-prod -- \
   psql -U postgres -d starships -c "SELECT version();"
 ```
 
 **Verify table counts:**
 ```bash
 # Check critical tables
-kubectl exec starships-app-0 -n starships-prod -- \
+kubectl exec postgres-0 -n starships-prod -- \
   psql -U postgres -d starships -c "
     SELECT
       'users' as table_name, COUNT(*) as count FROM users
@@ -431,7 +459,7 @@ kubectl exec starships-app-0 -n starships-prod -- \
 **Verify recent data:**
 ```bash
 # Check most recent users
-kubectl exec starships-app-0 -n starships-prod -- \
+kubectl exec postgres-0 -n starships-prod -- \
   psql -U postgres -d starships -c "
     SELECT email, created_at
     FROM users
@@ -452,7 +480,7 @@ aws ec2 describe-volumes \
   --output table
 
 # Verify from inside pod
-kubectl exec starships-app-0 -n starships-prod -- df -h | grep nvme
+kubectl exec postgres-0 -n starships-prod -- df -h | grep nvme
 ```
 
 ### Verify Application Health
@@ -460,11 +488,11 @@ kubectl exec starships-app-0 -n starships-prod -- df -h | grep nvme
 **Check health endpoints:**
 ```bash
 # Backend health check
-kubectl exec starships-app-0 -n starships-prod -- \
+kubectl exec deploy/starships-app -n starships-prod -- \
   wget -q -O- http://localhost:4000/api/v1/health
 
 # Check all services are running
-kubectl exec starships-app-0 -n starships-prod -- ps aux | grep -E "postgres|node|next"
+kubectl exec deploy/starships-app -n starships-prod -- ps aux | grep -E "node|next"
 ```
 
 **Test application functionality:**
@@ -492,18 +520,18 @@ curl -I https://starships.ai/api/v1/health
 **Solution:**
 ```bash
 # Check PVC and PV compatibility
-kubectl describe pvc starships-data-starships-app-0 -n starships-prod
+kubectl describe pvc postgres-data-postgres-0 -n starships-prod
 kubectl describe pv $PV_NAME
 
 # Verify storage class matches
-kubectl get pvc starships-data-starships-app-0 -n starships-prod -o jsonpath='{.spec.storageClassName}'
+kubectl get pvc postgres-data-postgres-0 -n starships-prod -o jsonpath='{.spec.storageClassName}'
 kubectl get pv $PV_NAME -o jsonpath='{.spec.storageClassName}'
 
 # Check node affinity
 kubectl get pv $PV_NAME -o jsonpath='{.spec.nodeAffinity}'
 
 # Force binding by patching PV with correct claimRef
-kubectl patch pv $PV_NAME -p '{"spec":{"claimRef":{"name":"starships-data-starships-app-0","namespace":"starships-prod","uid":"'$PVC_UID'"}}}'
+kubectl patch pv $PV_NAME -p '{"spec":{"claimRef":{"name":"postgres-data-postgres-0","namespace":"starships-prod","uid":"'$PVC_UID'"}}}'
 ```
 
 ### Issue: Pod Fails to Start After Recovery
@@ -515,7 +543,7 @@ kubectl patch pv $PV_NAME -p '{"spec":{"claimRef":{"name":"starships-data-starsh
 **Solution:**
 ```bash
 # Check pod events
-kubectl describe pod starships-app-0 -n starships-prod
+kubectl describe pod postgres-0 -n starships-prod
 
 # Check volume attachment status
 kubectl get volumeattachment
@@ -524,7 +552,7 @@ kubectl get volumeattachment
 kubectl get pods -n kube-system -l app=ebs-csi-controller
 
 # Check node where pod is scheduled
-kubectl get pod starships-app-0 -n starships-prod -o jsonpath='{.spec.nodeName}'
+kubectl get pod postgres-0 -n starships-prod -o jsonpath='{.spec.nodeName}'
 
 # Ensure volume is in same AZ as node
 aws ec2 describe-volumes --volume-ids $NEW_VOLUME_ID --region ap-south-1 --query 'Volumes[0].AvailabilityZone'
@@ -648,7 +676,7 @@ aws backup list-recovery-points-by-backup-vault \
 **Create on-demand backup to verify:**
 ```bash
 # Get new volume ID
-NEW_VOLUME_ID=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="starships-data-starships-app-0")].spec.csi.volumeHandle}')
+NEW_VOLUME_ID=$(kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="postgres-data-postgres-0")].spec.csi.volumeHandle}')
 
 # Create test backup
 aws backup start-backup-job \
@@ -807,7 +835,7 @@ aws backup list-backup-jobs \
 
 ```bash
 # Get current volume ID
-kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="starships-data-starships-app-0")].spec.csi.volumeHandle}'
+kubectl get pv -o jsonpath='{.items[?(@.spec.claimRef.name=="postgres-data-postgres-0")].spec.csi.volumeHandle}'
 
 # Get latest snapshot
 aws backup list-recovery-points-by-backup-vault \
@@ -833,12 +861,13 @@ aws backup get-backup-selection \
 kubectl get pods,pvc,pv -n starships-prod
 
 # Test database connection
-kubectl exec starships-app-0 -n starships-prod -- psql -U postgres -c "SELECT 1"
+kubectl exec postgres-0 -n starships-prod -- psql -U postgres -c "SELECT 1"
 ```
 
 ### Related Documentation
 
-- [k8s/prod/03-deployment.yaml](../k8s/prod/03-deployment.yaml) - StatefulSet configuration
+- [k8s/prod/03-deployment.yaml](../k8s/prod/03-deployment.yaml) - Application Deployment configuration
+- [k8s/prod/13-postgres-statefulset.yaml](../k8s/prod/13-postgres-statefulset.yaml) - Postgres StatefulSet configuration
 - [k8s/prod/01-storage-class.yaml](../k8s/prod/01-storage-class.yaml) - Storage class configuration
 - [Dockerfile](../Dockerfile) - Application container configuration
 

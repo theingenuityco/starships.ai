@@ -14,6 +14,7 @@ import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-
 import { AgentService } from '@/services/AgentService';
 import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
+import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
@@ -988,6 +989,21 @@ router.post(
         return;
       }
 
+      // Starship-level concurrency gate (Scout=1, Frigate=2).
+      // IMPORTANT: acquire this before persisting/charging the user message.
+      const leaseService = new StarshipTurnLeaseService();
+      let turnLeaseId: string | undefined;
+      try {
+        turnLeaseId = await leaseService.acquire({
+          starshipId: starship.id,
+          conversationId,
+          maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 1,
+        });
+      } catch (e) {
+        handleError(e, res, 'acquiring starship concurrency slot');
+        return;
+      }
+
       // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.
       // If debit fails, delete the message and return 402 (do not start the turn).
       const messageService = new MessageService();
@@ -1020,8 +1036,10 @@ router.post(
             currentCredits: wallet.balance,
             requiredCredits: requiredCredits.toFixed(6),
           });
+          if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
           return;
         }
+        if (turnLeaseId) await leaseService.release(turnLeaseId).catch(() => undefined);
         throw e;
       }
 
@@ -1062,7 +1080,7 @@ router.post(
               ...(imageConfig && { imageConfig }),
             },
             { authContext: req.authContext },
-            { preCreatedUserMessage: userMessage }
+            { preCreatedUserMessage: userMessage, turnLeaseId }
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
@@ -1098,11 +1116,13 @@ router.post(
             ...(imageConfig && { imageConfig }),
           },
           { authContext: req.authContext },
-          { preCreatedUserMessage: userMessage }
+          { preCreatedUserMessage: userMessage, turnLeaseId }
         )
         .catch((error) => {
           // Background conversation processing failure; main request already acknowledged
           console.error('Conversation processing failed:', error);
+          // Best-effort lease cleanup in case the failure occurred before ConversationService could release it.
+          if (turnLeaseId) void leaseService.release(turnLeaseId).catch(() => undefined);
         });
 
       // Acknowledge request; client should be listening on GET SSE channel for updates

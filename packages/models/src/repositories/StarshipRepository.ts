@@ -66,7 +66,7 @@ export class StarshipRepository extends BaseRepository {
   }
 
   async create(
-    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'> & { maxAgents?: number }
+    entity: Omit<StarshipModel, 'id' | 'createdAt' | 'updatedAt' | 'slug'> & { maxAgents?: number; maxConcurrentTurns?: number }
   ): Promise<StarshipModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -78,7 +78,9 @@ export class StarshipRepository extends BaseRepository {
         const starshipData = {
           ...entity,
           slug,
-          maxAgents: entity.maxAgents ?? 8, // Default to 8 agents
+          shipClass: entity.shipClass ?? 'scout',
+          maxAgents: entity.maxAgents ?? 5, // Default to Scout limit
+          maxConcurrentTurns: entity.maxConcurrentTurns ?? 1, // Default to Scout concurrency
           status: entity.status || 'active', // Default to active
           createdAt: now,
           updatedAt: now,

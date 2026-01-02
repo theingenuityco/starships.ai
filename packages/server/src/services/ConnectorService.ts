@@ -3,9 +3,11 @@ import type {
   ConnectorListItem,
   ConnectorProvider,
   ConnectWithApiKeyRequest,
+  ConnectWithBasicAuthRequest,
   ConnectorModel,
   ConnectorAuthOAuth2V2,
   ConnectorAuthApiKeyV2,
+  ConnectorAuthBasicV2,
   SecretRef,
   SecretRefType,
 } from '@starships/protocol';
@@ -217,12 +219,14 @@ export class ConnectorService {
     return templates
       .filter((tpl) => tpl.isEnabled !== false)
       .map(
-        (tpl): ConnectorCatalogItem => ({
-          provider: tpl.provider as ConnectorProvider,
-          name: tpl.name,
-          description: tpl.description,
-          authType: tpl.authType as ConnectorCatalogItem['authType'],
-          ...(tpl.authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
+        (tpl): ConnectorCatalogItem => {
+          const authType = ((tpl.authJson as unknown as { type?: string })?.type || 'none') as ConnectorCatalogItem['auth']['type'];
+          return {
+            provider: tpl.provider as ConnectorProvider,
+            name: tpl.name,
+            description: tpl.description,
+            auth: { type: authType },
+            ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
             ? {
                 oauthRequiredMetadataKeys: Array.from(
                   new Set([
@@ -233,7 +237,8 @@ export class ConnectorService {
                 metadataSchema: tpl.metadataSchemaJson ?? undefined,
               }
             : {}),
-        })
+          };
+        }
       );
   }
 
@@ -255,8 +260,8 @@ export class ConnectorService {
     if (template.isEnabled === false) {
       throw new Error(`Connector ${provider} is disabled by the instance admin`);
     }
-    if (template.authType !== 'oauth2') {
-      throw new Error(`Connector ${provider} does not support start flow for authType ${template.authType}`);
+    if ((template.authJson as unknown as { type?: string })?.type !== 'oauth2') {
+      throw new Error(`Connector ${provider} does not support OAuth start flow (auth.type is not "oauth2")`);
     }
 
     const auth = template.authJson as unknown as ConnectorAuthOAuth2V2;
@@ -354,8 +359,8 @@ export class ConnectorService {
       throw new Error(`Connector ${providerFromCallback} is disabled by the instance admin`);
     }
 
-    if (template.authType !== 'oauth2') {
-      throw new Error(`Connector ${providerFromCallback} does not use OAuth2 authentication`);
+    if ((template.authJson as unknown as { type?: string })?.type !== 'oauth2') {
+      throw new Error(`Connector ${providerFromCallback} does not use OAuth2 authentication (auth.type is not "oauth2")`);
     }
 
     const auth = template.authJson as unknown as ConnectorAuthOAuth2V2;
@@ -539,12 +544,15 @@ export class ConnectorService {
 
     return visibleTemplates.map<ConnectorListItem>((template) => {
       const existing = byProvider.get(template.provider);
+      const templateAuthType = ((template.authJson as unknown as { type?: string })?.type || 'none') as NonNullable<
+        ConnectorListItem['template']
+      >['auth']['type'];
       const templateRuntime = {
         id: template.id,
         provider: template.provider,
         name: template.name,
         description: template.description,
-        authType: template.authType,
+        auth: { type: templateAuthType },
         version: template.version,
         category: template.category,
         baseUrl: template.baseUrl,
@@ -553,7 +561,7 @@ export class ConnectorService {
 
       if (existing) {
         const scopes =
-          template.authType === 'oauth2'
+          templateAuthType === 'oauth2'
             ? (template.authJson as ConnectorAuthOAuth2V2).type === 'oauth2'
               ? ((template.authJson as ConnectorAuthOAuth2V2).scopes?.map((s) => String(s)) ?? [])
               : []
@@ -581,7 +589,7 @@ export class ConnectorService {
       // require additional managed env vars.
       const status = template.provider === 'starships' ? 'connected' : 'disconnected';
       const scopes =
-        template.authType === 'oauth2'
+        templateAuthType === 'oauth2'
           ? (template.authJson as ConnectorAuthOAuth2V2).type === 'oauth2'
             ? ((template.authJson as ConnectorAuthOAuth2V2).scopes?.map((s) => String(s)) ?? [])
             : []
@@ -613,8 +621,8 @@ export class ConnectorService {
       throw new Error(`Connector ${provider} is disabled by the instance admin`);
     }
 
-    if (template.authType !== 'api_key') {
-      throw new Error(`Connector ${provider} does not use API key authentication`);
+    if ((template.authJson as unknown as { type?: string })?.type !== 'api_key') {
+      throw new Error(`Connector ${provider} does not use API key authentication (auth.type is not "api_key")`);
     }
 
     const auth = template.authJson as unknown as ConnectorAuthApiKeyV2;
@@ -628,6 +636,58 @@ export class ConnectorService {
 
     const { connector } = await this.applyConnectOutput(starshipId, userId, provider, template, {
       envUpdates: { [ref.key]: payload.apiKey },
+      metadata: { ...(payload.extraConfig || {}) },
+      status: 'connected',
+    });
+    return connector;
+  }
+
+  /**
+   * Connect a provider using HTTP Basic authentication (RFC 7617).
+   *
+   * Stores username/password into connector_secrets based on template SecretRefs.
+   */
+  async connectWithBasicAuth(
+    starshipId: string,
+    provider: ConnectorProvider,
+    payload: ConnectWithBasicAuthRequest,
+    userId: string
+  ) {
+    const template = await this.loadTemplateOrThrow(provider);
+    if (template.isEnabled === false) {
+      throw new Error(`Connector ${provider} is disabled by the instance admin`);
+    }
+
+    if ((template.authJson as unknown as { type?: string })?.type !== 'basic') {
+      throw new Error(`Connector ${provider} does not use Basic authentication (auth.type is not "basic")`);
+    }
+
+    const auth = template.authJson as unknown as ConnectorAuthBasicV2;
+    if (!auth || auth.type !== 'basic') {
+      throw new Error(`Connector ${provider} is missing basic auth_json configuration`);
+    }
+
+    const usernameRef = this.parseSecretRef(auth.usernameRef, 'auth.usernameRef');
+    if (usernameRef.type !== 'connector_secret') {
+      throw new Error('auth.usernameRef must be a connector_secret ref');
+    }
+
+    const envUpdates: Record<string, string> = { [usernameRef.key]: payload.username };
+
+    // If the template is configured with passwordRef, require the payload to include password (may be empty string).
+    if (auth.passwordRef) {
+      const passwordRef = this.parseSecretRef(auth.passwordRef, 'auth.passwordRef');
+      if (passwordRef.type !== 'connector_secret') {
+        throw new Error('auth.passwordRef must be a connector_secret ref');
+      }
+      if (payload.password === undefined) {
+        throw new Error('password is required for this connector (template auth.passwordRef is configured)');
+      }
+      envUpdates[passwordRef.key] = payload.password;
+    }
+
+    const { connector } = await this.applyConnectOutput(starshipId, userId, provider, template, {
+      envUpdates,
       metadata: { ...(payload.extraConfig || {}) },
       status: 'connected',
     });

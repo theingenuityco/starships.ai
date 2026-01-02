@@ -61,13 +61,13 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
     if (!connector) return
     setName(connector.name || '')
     setDescription(connector.description || '')
-    setAuthType(connector.authType || 'oauth2')
+    setAuthType((connector.auth?.type as ConnectorAuthTypeV2 | undefined) || 'none')
     setIsEnabled(connector.isEnabled !== false)
     setVersion(connector.version || '')
     setCategory(connector.category || '')
 
     setBaseUrl(connector.baseUrl || '')
-    setAuthText(formatJson(connector.auth || { type: connector.authType || 'none' }))
+    setAuthText(formatJson(connector.auth || { type: 'none' }))
     setEndpointsText(formatJson(connector.endpoints || []))
     setVariablesText(formatJson(connector.variables || []))
     setRateLimitText(formatJson(connector.rateLimit || undefined))
@@ -171,7 +171,6 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                       updates: {
                         name,
                         description,
-                        authType,
                         isEnabled,
                         version,
                         category,
@@ -228,6 +227,7 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                           <SelectContent>
                             <SelectItem value="oauth2">oauth2</SelectItem>
                             <SelectItem value="api_key">api_key</SelectItem>
+                            <SelectItem value="basic">basic</SelectItem>
                             <SelectItem value="platform_jwt">platform_jwt</SelectItem>
                             <SelectItem value="none">none</SelectItem>
                           </SelectContent>

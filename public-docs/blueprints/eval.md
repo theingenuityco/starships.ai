@@ -72,4 +72,4 @@ Common mistakes and how to fix them
 
 - Connector-backed calls
   - Use `connector_action` (not `http_request`) when you need baseUrl/auth/mapping managed by the host runtime.
-  - See `connectors/README.md` and `connectors/github.md`.
+  - See `../connectors/README.md` and `../connectors/connector_templates.md`.

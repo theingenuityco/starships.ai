@@ -51,6 +51,13 @@ function defaultAuthForType(authType: ConnectorAuthTypeV2): any {
       injection: { style: 'header', headerName: 'Authorization', tokenPrefix: 'Bearer' },
     }
   }
+  if (authType === 'basic') {
+    return {
+      type: 'basic',
+      // Common API-key-only case: put the key in usernameRef and omit passwordRef.
+      usernameRef: { type: 'connector_secret', key: 'API_KEY' },
+    }
+  }
   if (authType === 'platform_jwt') {
     return { type: 'platform_jwt', headerName: 'Authorization', tokenPrefix: 'Bearer' }
   }
@@ -207,7 +214,6 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                       provider: provider.trim(),
                       name: name.trim(),
                       description: description.trim(),
-                      authType,
                       isEnabled,
                       version: version.trim() || undefined,
                       category: category.trim() || undefined,
@@ -258,6 +264,7 @@ export default function AdminConnectorTemplateNewPage(): React.JSX.Element {
                       <SelectContent>
                         <SelectItem value="oauth2">oauth2</SelectItem>
                         <SelectItem value="api_key">api_key</SelectItem>
+                        <SelectItem value="basic">basic</SelectItem>
                         <SelectItem value="platform_jwt">platform_jwt</SelectItem>
                         <SelectItem value="none">none</SelectItem>
                       </SelectContent>

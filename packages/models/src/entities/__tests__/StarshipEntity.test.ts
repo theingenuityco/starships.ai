@@ -24,7 +24,9 @@ describe('StarshipEntity', () => {
       starship.slug = 'test-starship';
       starship.ownerId = 'user-456';
       starship.name = 'Test Starship';
+      starship.shipClass = 'scout';
       starship.maxAgents = 3;
+      starship.maxConcurrentTurns = 1;
       starship.status = 'active';
       starship.createdAt = '2024-01-01T00:00:00.000Z';
       starship.updatedAt = '2024-01-02T12:00:00.000Z';
@@ -37,7 +39,9 @@ describe('StarshipEntity', () => {
         owner_id: 'user-456',
 
         name: 'Test Starship',
+        ship_class: 'scout',
         max_agents: 3,
+        max_concurrent_turns: 1,
         status: 'active',
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-01-02T12:00:00.000Z',
@@ -53,7 +57,9 @@ describe('StarshipEntity', () => {
         ownerId: 'user-456',
 
         name: 'Test Starship',
+        shipClass: 'scout',
         maxAgents: 3,
+        maxConcurrentTurns: 1,
         status: 'active',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
@@ -66,7 +72,9 @@ describe('StarshipEntity', () => {
       expect(entity.slug).toBe('test-starship');
       // Class property removed - no longer needed
       expect(entity.status).toBe('active');
+      expect(entity.shipClass).toBe('scout');
       expect(entity.maxAgents).toBe(3);
+      expect(entity.maxConcurrentTurns).toBe(1);
     });
 
     it('should deserialize array of database records', async () => {
@@ -77,7 +85,9 @@ describe('StarshipEntity', () => {
           ownerId: 'user-456',
 
           name: 'Starship 1',
+          shipClass: 'scout',
           maxAgents: 3,
+          maxConcurrentTurns: 1,
           status: 'active',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T12:00:00.000Z',
@@ -88,7 +98,9 @@ describe('StarshipEntity', () => {
           ownerId: 'user-789',
 
           name: 'Starship 2',
+          shipClass: 'scout',
           maxAgents: 5,
+          maxConcurrentTurns: 1,
           status: 'inactive',
           createdAt: '2024-01-02T00:00:00.000Z',
           updatedAt: '2024-01-02T12:00:00.000Z',

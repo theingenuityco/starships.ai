@@ -25,13 +25,15 @@ export interface MigrationResult {
 
 export class MigrationRunner {
   private connection: ReturnType<typeof getConnection> | null = null;
-  private migrationsPath = join(__dirname, '../../migrations');
+  private migrationsPath = join(__dirname, '../migrations');
 
   private isDistBuild(): boolean {
     return __dirname.includes('/dist/') || __dirname.includes('\\dist\\');
   }
 
   private getMigrationsPath(): string {
+    // In dist build: migrations are at dist/migrations (from dist/scripts -> ../migrations)
+    // In source: migrations are at src/migrations (from src/scripts -> ../migrations)
     return this.isDistBuild() ? join(__dirname, '../migrations') : this.migrationsPath;
   }
 

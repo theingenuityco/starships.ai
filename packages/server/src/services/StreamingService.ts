@@ -174,17 +174,6 @@ export class StreamingService {
   async broadcastDelta(streamId: string, delta: Operation): Promise<void> {
     const conns = this.connections.get(streamId);
     const hasActiveConnections = conns && conns.size > 0;
-    
-    const msgId = delta.op === 'add' && delta.path === '/messages/-' && delta.value ? (delta.value as { id?: unknown })?.id : null;
-    
-    console.log('[BROADCAST-DELTA] Broadcasting delta:', {
-      streamId,
-      hasActiveConnections,
-      deltaOp: delta.op,
-      deltaPath: delta.path,
-      messageId: msgId,
-      willBuffer: !hasActiveConnections,
-    });
 
     // Buffer logical (pre-normalization) delta once per stream
     this.bufferLogicalEvent(streamId, 'delta', delta);
@@ -198,8 +187,6 @@ export class StreamingService {
           }
         })
       );
-    } else {
-      console.log('[BROADCAST-DELTA] No active connections, delta buffered for replay');
     }
   }
 

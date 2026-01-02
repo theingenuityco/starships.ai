@@ -49,4 +49,6 @@ export interface MessageModel extends Omit<Message, 'content'> {
   id: string;
   createdAt: string;
   updatedAt: string;
+  // Timestamp when message was stopped mid-stream (null if completed normally)
+  stoppedAt?: string | null;
 }

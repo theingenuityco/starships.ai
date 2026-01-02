@@ -25,14 +25,6 @@ export interface UserFilters {
   isNewUser?: boolean
 }
 
-// User registration request
-export interface RegisterUserRequest {
-  email: string
-  password: string
-  displayName?: string
-  name?: string // Legacy support
-}
-
 // User profile update request (includes password change)
 export interface UpdateUserProfileRequest {
   email?: string
@@ -129,44 +121,6 @@ export function useCurrentUser(userId: string | null, enabled: boolean = true) {
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
     retry: 1,
-  })
-}
-
-/**
- * Register a new user
- */
-export function useRegisterUser() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (data: RegisterUserRequest): Promise<UserModel> => {
-      const response: FetchResponse<ApiResponse<UserModel>> = await api.post('/api/v1/users/register', data)
-      return response.data.data
-    },
-    onSuccess: user => {
-      // Add user to cache
-      queryClient.setQueryData(USER_QUERY_KEYS.detail(user.id), user)
-
-      // Invalidate user lists to include new user
-      queryClient.invalidateQueries({
-        queryKey: USER_QUERY_KEYS.lists(),
-      })
-
-      // Invalidate stats
-      queryClient.invalidateQueries({
-        queryKey: USER_QUERY_KEYS.stats(),
-      })
-
-      toast.success('Registration successful!', {
-        description: `Welcome ${user.displayName || user.email?.split('@')[0]}! Your account has been created.`,
-      })
-    },
-    onError: (error: any) => {
-      const errorMessage = error?.response?.data?.error || error?.message || 'Failed to register user'
-      toast.error('Registration failed', {
-        description: errorMessage,
-      })
-    },
   })
 }
 

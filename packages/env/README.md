@@ -6,9 +6,9 @@ A simplified environment configuration package for starships.ai that provides a 
 
 This package replaces the more complex `@starships/env-config` with a lean, single-purpose solution that:
 
-- Reads environment variables from the root `.env` file
+- Reads environment variables from the monorepo root `.env` file (and supports `${VAR}` expansion via `dotenv-expand`)
 - Returns all configuration with proper TypeScript typing
-- Provides sensible defaults for development
+- Provides sensible defaults for non-secret values where safe (ports, Postgres host/user/db)
 - Has minimal complexity and no client/server separation
 
 ## Usage
@@ -36,16 +36,17 @@ The `getEnvConfig()` function returns an `EnvironmentConfig` object with all env
 
 ### URLs
 
-- `PUBLIC_URL` (string) - Public URL, defaults to 'http://localhost:3000'
-- `CLIENT_URL` (string) - Frontend URL, defaults to 'http://localhost:3000'
-- `SERVER_URL` (string) - Backend URL, defaults to 'http://localhost:4000'
+- `PUBLIC_URL` (string) - Canonical public origin (required)
+- `CLIENT_URL` (string) - Client origin (required)
+- `SERVER_URL` (string) - Server origin (required)
+- `DOCS_URL` (string) - Docs origin (required)
 
 ### Database Configuration
 
-- `POSTGRES_HOST` (string) - PostgreSQL host, defaults to `'postgres'` (the in-cluster Service name; override to `'localhost'` for local development)
+- `POSTGRES_HOST` (string) - PostgreSQL host, defaults to `'postgres'` (override to `'localhost'` for local development)
 - `POSTGRES_PORT` (number) - PostgreSQL port, defaults to 5432
 - `POSTGRES_USER` (string) - PostgreSQL username, defaults to 'postgres'
-- `POSTGRES_PASSWORD` (string) - PostgreSQL password (required, no default)
+- `POSTGRES_PASSWORD` (string) - PostgreSQL password (**required**, no default)
 - `POSTGRES_DATABASE` (string) - PostgreSQL database name, defaults to 'starships'
 - `POSTGRES_SSL` (boolean) - PostgreSQL SSL connection, defaults to false
 
@@ -93,3 +94,7 @@ import { getEnvConfig } from '@starships/env';
 ```
 
 The `getEnvConfig()` function now returns the complete configuration object instead of requiring separate client/server configurations.
+
+## Runtime behavior
+
+`getEnvConfig()` validates a small set of critical values and throws if they are missing (for example: `PUBLIC_URL`, `CLIENT_URL`, `SERVER_URL`, `DOCS_URL`, `JWT_SECRET`, `POSTGRES_PASSWORD`). This is intentional: it prevents partially-configured deployments from starting with unsafe defaults.

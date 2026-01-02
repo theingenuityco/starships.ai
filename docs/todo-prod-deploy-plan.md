@@ -125,7 +125,7 @@ A full-stack cloud architecture using:
 ### 🔹 IAM & Security
 | Role | Purpose |
 |------|----------|
-| GitHub Actions Deploy Role | OIDC trust for deploy-dev/prod.yml |
+| GitHub Actions Deploy Role | OIDC trust for deploy-dev.yml / deploy-to-prod.yml |
 | EC2 Postgres Role | Allows AWS Backup service access |
 | EKS Node Role | Pull from GHCR, manage networking |
 | ACM Certificate | TLS termination at ALB |
@@ -137,14 +137,14 @@ A full-stack cloud architecture using:
 ## 🧰 4️⃣ Deployment Pipelines
 
 ### 🏗️ Build pipeline (CI)
-`build-image.yml`
+`build-and-push-image.yml`
 - Semantic versioning
 - Build and push fat container to GHCR
 - Create GitHub release
 - Output image tag
 
 ### 🚀 Deploy pipeline (CD)
-`deploy-dev.yml` / `deploy-prod.yml`
+`deploy-dev.yml` / `deploy-to-prod.yml`
 - Assume AWS OIDC role
 - `aws eks update-kubeconfig`
 - Apply manifests (`k8s/dev` / `k8s/prod`)

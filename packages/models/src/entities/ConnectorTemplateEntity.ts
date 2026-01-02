@@ -58,7 +58,7 @@ export class ConnectorTemplateEntity {
 
   @Expose()
   @IsString()
-  @IsIn(['oauth2', 'api_key', 'platform_jwt', 'none'])
+  @IsIn(['oauth2', 'api_key', 'basic', 'platform_jwt', 'none'])
   authType!: ConnectorAuthTypeV2;
 
   /**
@@ -137,7 +137,9 @@ export class ConnectorTemplateEntity {
       provider: (dataRecord.provider as string) || '',
       name: dataRecord.name || '',
       description: dataRecord.description || '',
-      authType: (dataRecord.authType as ConnectorAuthTypeV2) || 'oauth2',
+      authType:
+        (dataRecord.authType as ConnectorAuthTypeV2) ||
+        (((dataRecord.authJson as { type?: string } | undefined)?.type as ConnectorAuthTypeV2 | undefined) ?? 'oauth2'),
       baseUrl: (dataRecord.baseUrl as string) || '',
       authJson: (dataRecord.authJson as ConnectorAuthV2) || ({ type: 'none' } as ConnectorAuthV2),
       variablesJson: dataRecord.variablesJson as NonNullable<ConnectorTemplateRuntimeFieldsV2['variables']> | undefined,

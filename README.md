@@ -1,108 +1,153 @@
 # starships.ai
 
-Turn goals into shipped work with AI agents. Starships plans the steps, builds a workflow, and executes with live visibility you can control.
+**starships.ai** is a workspace for running AI agents against real systems. You create a **starship** (workspace), deploy **agents** and **tools**, connect external services via **connectors**, and run work through **conversations** (chat) and **schedules** (cron). Under the hood, execution is driven by **Autopilot**: a JSON-defined workflow/DAG engine with streaming events.
 
-This monorepo powers the product UI, API, and the Autopilot workflow engine. It targets product, ops, and engineering teams.
+This monorepo contains the product UI, API, workflow engine, remote runner, and docs.
 
-## How it works (3 steps)
+## Core capabilities
 
-1. Capture your goal in plain language
-2. Starships proposes a plan and builds a DAG workflow (Autopilot)
-3. Agents execute with streaming updates
+- **Starships (workspaces)**: multi-agent, tool-enabled workspaces with entitlements (max agents / concurrent turns).
+- **Agents**: configurable assistants (model, prompt, blueprint) that can call tools and connectors.
+- **Tools + marketplace**:
+  - Tool instances live on a starship and are executable Autopilot blueprints.
+  - Tool templates can be browsed publicly; publishing uses an instance-admin approval flow.
+  - Tool calls can be set to **allow / ask (approval) / deny** per agent.
+- **Connectors**: third‑party integrations executed via the `connector_action` node; auth is injected by the HostRuntime so blueprints never see raw secrets.
+- **Conversations with live streaming**: chat turns stream to the UI over **Server‑Sent Events (SSE)**; the server can stop a turn and resume/replay.
+- **Scheduling**: cron-based scheduled prompts executed by worker processes (BullMQ + Redis).
+- **Billing & credits**: Stripe subscriptions define ship classes/entitlements; wallets/ledger track usage and credits.
+- **Docs for humans + agents**:
+  - A docs site at `/docs` (Next.js + Fumadocs).
+  - A server endpoint (`GET /api/v1/docs`) that indexes `public-docs/` markdown for in-product/agent consumption.
 
-## Quick start
+## Architecture (high level)
 
-- Requirements: Node 20+, pnpm 10+, Docker (optional for DB)
-- Install: `pnpm install`
-- Dev: `pnpm dev` (runs packages via Turborepo)
-
-Common scripts:
-
-```bash
-pnpm dev        # all services in dev
-pnpm build      # build all packages
-pnpm type-check # TypeScript checks
-pnpm lint       # ESLint
+```
+Browser
+  ↓ (same-origin /api + /docs via reverse proxy or ingress)
+@starships/client  (Next.js UI)
+  ↓ REST + SSE (/api/v1/*)
+@starships/server  (Express API)
+  ├─ PostgreSQL: users, starships, agents, tools, connectors, secrets, billing, schedules…
+  ├─ Redis (optional): schedules queue (BullMQ)
+  └─ Autopilot execution
+       ├─ local child-process runner (default when RUNNER_URL is unset)
+       └─ remote runner (@starships/autopilot-runner) when RUNNER_URL is set
 ```
 
-Database (optional local Postgres helpers):
+Related packages:
+- **Engine**: `@starships/autopilot` (blueprints, nodes, eval, events)
+- **Runner**: `@starships/autopilot-runner` (ConnectRPC Execute/ExecuteStream)
+- **Types**: `@starships/protocol`
+- **DB layer**: `@starships/models`
+
+## Setup & installation
+
+### Prerequisites
+
+- Node.js **20+**
+- pnpm **10+** (Corepack is fine)
+- Docker (recommended for local Postgres/Redis)
+
+### Configure environment
 
 ```bash
-pnpm run postgres:install  # start Postgres 18 container
-pnpm run postgres:shell    # psql shell
-pnpm run postgres:reset    # remove container
+cp .env.example .env
 ```
 
-## Key concepts
+Minimum needed for a useful local dev loop:
 
-- Planning UI (Vision Chamber): turns vague goals into a concrete plan (UI concept)
-- Autopilot: executes DAG workflows (LLM/HTTP/conditional/tool nodes)
-- Starship: your workspace for agents, workflows, and conversations
-- Agent: an AI worker with tools and memory
-- Conversation: structured chat and streaming outputs
-- Workflow: a directed graph of steps with state and events
+- **Postgres**: `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DATABASE`
+- **Auth**: `JWT_SECRET` (32+ chars)
+- **Secrets**: `ENCRYPTION_KEY` (Required for platform/connector secrets; must be a 32+ character random string)
+- **LLM** (recommended): `OPENROUTER_API_KEY` (used by agent execution and avatar generation)
+- **Runner** (optional): set `RUNNER_URL` to use the remote runner; unset it to use the local child-process runner.
 
-## Architecture at a glance
-
-- Client: Next.js 15, React 19, shadcn/ui, streaming via SSE
-- Server: Express 5, PostgreSQL 18, JWT auth, SSE channels
-- Engine: `@starships/autopilot` for DAG execution and events
-- Ops: Docker, Kubernetes manifests in `k8s/`, infra IaC in `infra/`
-
-See `docs/architecture/` and `k8s/prod/*` for production layout.
-
-## Common tasks (API)
-
-Base URL: `http://localhost:4000/api/v1` (see SERVER_URL)
-
-Create a starship:
+### Start local dependencies (optional helpers)
 
 ```bash
-curl -X POST $API/starships \
+pnpm postgres:install
+pnpm redis:install
+```
+
+### Run the stack (development)
+
+```bash
+pnpm install
+pnpm dev
+```
+
+Default local URLs (from `.env.example`):
+- App: `http://localhost:8080`
+- API: `http://localhost:8080/api/v1`
+- Docs: `http://localhost:8080/docs`
+
+### Run schedulers/workers (development)
+
+Schedules require Redis and separate processes:
+
+```bash
+pnpm dev:with-schedule
+```
+
+## Usage examples (API)
+
+The UI uses same-origin requests (`/api/v1/*`). For cURL, set an API base:
+
+```bash
+export API="http://localhost:8080/api/v1"
+```
+
+Register + login (password auth):
+
+Note: passwords must be **8+ characters** and include **uppercase + lowercase + number + special character**.
+
+```bash
+curl -s -X POST "$API/auth/register" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"dev@example.com","password":"Password123!","displayName":"Dev"}' | jq .
+
+TOKEN="$(curl -s -X POST "$API/auth/login" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"dev@example.com","password":"Password123!"}' | jq -r '.data.token')"
+```
+
+Create a conversation, send a message, then stream SSE:
+
+```bash
+STARSHIP_ID="<your-starship-id>"
+
+CONV_ID="$(curl -s -X POST "$API/conversations" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"name":"Enterprise"}'
-```
+  -d "{\"starshipId\":\"$STARSHIP_ID\"}" | jq -r '.data.id')"
 
-Create a conversation and send a message:
-
-```bash
-CONV_ID=$(curl -s -X POST $API/conversations \
+curl -s -X POST "$API/conversations/$CONV_ID/messages" \
   -H "Authorization: Bearer $TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{"starshipId":"<starshipId>"}' | jq -r '.data.id')
+  -d '{"content":"Draft a weekly competitive brief."}' | jq .
 
-curl -X POST $API/conversations/$CONV_ID/messages \
+curl -N \
   -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"content":"Run the weekly competitive brief"}'
-```
-
-Stream conversation updates (SSE):
-
-```bash
-curl -N -H "Accept: text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
+  -H "Accept: text/event-stream" \
   "$API/conversations/$CONV_ID/messages?stream=true"
 ```
 
-## Deployment overview
+## Deployment notes
 
-- Kubernetes: manifests in `k8s/prod/`, IAM and cluster config in `infra/prod/`
-
-## Security & observability
-
-- JWT auth, rate limiting, CORS, encrypted API keys
-- Health: `GET /api/v1/health`
-- Metrics and structured logs available; see package READMEs
+- **Docker**: the root `Dockerfile` builds a single image that runs client + server + docs (Postgres is external).
+- **Kubernetes**: manifests in `k8s/` (dev/prod); infra config in `infra/`.
 
 ## Links
 
-- Client: `packages/client/README.md`
-- Server: `packages/server/README.md`
-- Autopilot: `packages/autopilot/README.md`
-- ER diagram: `docs/er-diagram.md`
+- **Client**: `packages/client/README.md`
+- **Server**: `packages/server/README.md`
+- **Autopilot**: `packages/autopilot/README.md`
+- **Runner**: `packages/autopilot-runner/README.md`
+- **Docs site**: `packages/docs/README.md`
+- **Public docs (agent-consumable)**: `public-docs/README.md`
+- **ER diagram**: `docs/er-diagram.md`
 
 ---
 
-Out-of-date? Please open an issue with context and expected behavior.
+If something here doesn’t match behavior, please open an issue with repro steps and expected vs actual output.

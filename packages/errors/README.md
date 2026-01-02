@@ -264,6 +264,10 @@ This package is part of the starships.ai monorepo:
 - [`@starships/server`](../server/) - API server implementation
 - [`@starships/models`](../models/) - Database models and repositories
 
+## Links
+
+- Root overview: `../../README.md`
+
 ## License
 
 Private package - Part of the starships.ai project

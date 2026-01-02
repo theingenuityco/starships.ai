@@ -26,6 +26,7 @@ import OpenAI from 'openai';
 import { Operation } from 'fast-json-patch';
 import type { Runner } from '@starships/autopilot';
 import { BillingService } from '@/services/BillingService';
+import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { parse, Allow } from 'partial-json-parser';
@@ -782,7 +783,7 @@ export class ConversationService {
       imageConfig?: Record<string, unknown>;
     },
     ctx?: { authContext?: { userId: string; agentId?: string; starshipId?: string } },
-    opts?: { preCreatedUserMessage?: MessageModel }
+    opts?: { preCreatedUserMessage?: MessageModel; turnLeaseId?: string }
   ): Promise<void> {
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
@@ -1055,6 +1056,15 @@ export class ConversationService {
     } finally {
       // Always clean up cancellation handle (placeholder or real) to allow new turns
       ConversationService.activeCancellations.delete(data.conversationId);
+      // Always release any starship-level concurrency lease associated with this turn (best-effort).
+      if (opts?.turnLeaseId) {
+        try {
+          const leaseService = new StarshipTurnLeaseService();
+          await leaseService.release(opts.turnLeaseId);
+        } catch {
+          // best-effort; lease also has TTL in DB
+        }
+      }
       // Clear attribution and suppression, emit a single completion
       this.currentAgentForConversation.delete(data.conversationId);
       const wasSuppressed = this.suppressCompleteFor.delete(data.conversationId);
@@ -1087,6 +1097,9 @@ export class ConversationService {
       // placeholder; replaced by actual cancel on workflow start
     });
 
+    let turnLeaseId: string | undefined;
+    const leaseService = new StarshipTurnLeaseService();
+
     try {
       const conversation = await this.getConversationById(conversationId);
       const turnActive =
@@ -1108,6 +1121,13 @@ export class ConversationService {
         ConversationService.activeCancellations.delete(conversationId);
         throw new NotFoundError('Starship', String(conversation.starshipId || ''));
       }
+
+      // Starship-level concurrency gate (Scout=1, Frigate=2)
+      turnLeaseId = await leaseService.acquire({
+        starshipId: starship.id,
+        conversationId,
+        maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 1,
+      });
 
       const agentService = new AgentService();
       const agentModel = await agentService.getAgent(agentId);
@@ -1205,6 +1225,13 @@ export class ConversationService {
       await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
     } finally {
       ConversationService.activeCancellations.delete(conversationId);
+      if (turnLeaseId) {
+        try {
+          await leaseService.release(turnLeaseId);
+        } catch {
+          // best-effort; lease TTL will clean up
+        }
+      }
     }
   }
 

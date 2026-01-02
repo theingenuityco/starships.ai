@@ -8,7 +8,9 @@ import { WalletService } from './WalletService';
 export interface CreateStarshipData {
   ownerId: string;
   name: string;
+  shipClass?: 'scout' | 'frigate';
   maxAgents?: number;
+  maxConcurrentTurns?: number;
   initialCredits?: number;
 }
 
@@ -42,7 +44,9 @@ export class StarshipService {
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
-      maxAgents: data.maxAgents ?? 8,
+      shipClass: data.shipClass ?? 'scout',
+      maxAgents: data.maxAgents ?? 5,
+      maxConcurrentTurns: data.maxConcurrentTurns ?? 1,
       status: 'active',
     });
 
@@ -290,7 +294,9 @@ export class StarshipService {
     const starship = await starshipService.createStarship({
       ownerId: userId,
       name: starshipName,
-      maxAgents: 8,
+      shipClass: 'scout',
+      maxAgents: 5,
+      maxConcurrentTurns: 1,
       initialCredits: 200, // 200 welcome credits for new users
     });
 

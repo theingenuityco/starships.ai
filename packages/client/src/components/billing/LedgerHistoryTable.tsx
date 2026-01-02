@@ -110,6 +110,7 @@ export default function LedgerHistoryTable({
           {rows.map((r: LedgerEntryModel) => {
             const meta = (r.meta as any) || {}
             let details: string = ''
+            let typeLabel: string = r.type
             if (r.type === 'TOPUP') {
               const usd = meta.amountUsd ? `$${Number(meta.amountUsd).toFixed(2)}` : null
               details = meta.stripePaymentIntent
@@ -121,7 +122,11 @@ export default function LedgerHistoryTable({
               details = meta.stripeChargeId ? `Refund for charge ${String(meta.stripeChargeId).slice(-8)}` : 'Refund issued'
             } else if (r.type === 'ADJUSTMENT') {
               if (meta.reason === 'WELCOME_CREDIT' || meta.reason === 'WELCOME_CREDIT_BACKFILL') {
+                typeLabel = 'CREDIT'
                 details = 'Welcome credit'
+              } else if (meta.reason === 'SUBSCRIPTION_CREDIT_GRANT') {
+                typeLabel = 'UPGRADE'
+                details = 'Starship upgrade credit'
               } else {
                 details = meta.promoCode ? `Promo ${meta.promoCode}` : 'Adjustment'
               }
@@ -146,16 +151,14 @@ export default function LedgerHistoryTable({
                           ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
                           : r.type === 'USAGE'
                             ? 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-200'
-                          : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200')
+                            : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200')
                     }
                   >
-                    {r.type}
+                    {typeLabel}
                   </span>
                 </td>
                 <td className="py-2 pr-3 text-slate-600 dark:text-slate-300">{details}</td>
-                <td className={'py-2 pr-3 whitespace-nowrap ' + (amountSigned.isNegative ? 'text-rose-700 dark:text-rose-300' : '')}>
-                  {amountSigned.text}
-                </td>
+                <td className={'py-2 pr-3 whitespace-nowrap ' + (amountSigned.isNegative ? 'text-rose-700 dark:text-rose-300' : '')}>{amountSigned.text}</td>
                 <td className="py-2 pr-3 whitespace-nowrap">{balanceAfter} cr</td>
               </tr>
             )
@@ -170,12 +173,7 @@ export default function LedgerHistoryTable({
         </tbody>
       </table>
       {pagination && (
-        <div
-          className={cn(
-            'mt-4 gap-4',
-            showTitle ? 'flex items-center justify-between' : 'flex flex-col items-end justify-end gap-2',
-          )}
-        >
+        <div className={cn('mt-4 gap-4', showTitle ? 'flex items-center justify-between' : 'flex flex-col items-end justify-end gap-2')}>
           <div className="text-xs text-slate-500 dark:text-slate-400">
             Page {page} of {Math.max(1, Math.ceil((pagination.total ?? 0) / limit))}
           </div>

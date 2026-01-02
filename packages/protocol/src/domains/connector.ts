@@ -125,7 +125,7 @@ export interface ConnectorEndpointV2 {
  * Declarative auth configuration stored on connector_templates.auth_json.
  * Must never contain raw secret values; only SecretRefs.
  */
-export type ConnectorAuthTypeV2 = 'oauth2' | 'api_key' | 'platform_jwt' | 'none';
+export type ConnectorAuthTypeV2 = 'oauth2' | 'api_key' | 'basic' | 'platform_jwt' | 'none';
 
 export interface ConnectorAuthNoneV2 {
   type: 'none';
@@ -146,6 +146,24 @@ export interface ConnectorAuthApiKeyV2 {
     queryParamName?: string; // required when style = query
     tokenPrefix?: string; // default "" (raw key)
   };
+}
+
+/**
+ * ConnectorAuthBasicV2
+ *
+ * HTTP Basic Authentication (RFC 7617):
+ * Authorization: Basic base64("username:password")
+ *
+ * Common API-key-only case:
+ * - usernameRef = API key
+ * - passwordRef omitted (defaults to empty string)
+ * -> base64("API_KEY:")
+ */
+export interface ConnectorAuthBasicV2 {
+  type: 'basic';
+  usernameRef: SecretRef;
+  passwordRef?: SecretRef; // optional (defaults to empty string if omitted)
+  headerName?: string; // default "Authorization"
 }
 
 export interface ConnectorAuthOAuth2V2 {
@@ -180,7 +198,12 @@ export interface ConnectorAuthOAuth2V2 {
   };
 }
 
-export type ConnectorAuthV2 = ConnectorAuthNoneV2 | ConnectorAuthPlatformJwtV2 | ConnectorAuthApiKeyV2 | ConnectorAuthOAuth2V2;
+export type ConnectorAuthV2 =
+  | ConnectorAuthNoneV2
+  | ConnectorAuthPlatformJwtV2
+  | ConnectorAuthApiKeyV2
+  | ConnectorAuthBasicV2
+  | ConnectorAuthOAuth2V2;
 
 export interface ConnectorTemplateRuntimeFieldsV2 {
   baseUrl: string;
@@ -261,7 +284,11 @@ export interface ConnectorTemplateRuntimePublicModel {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
+  /**
+   * Minimal auth descriptor for UI/catalog decisions without exposing full auth config.
+   * Source of truth is connector_templates.auth_json.type.
+   */
+  auth: { type: ConnectorAuthTypeV2 };
   version: string;
   category: string;
 
@@ -278,7 +305,7 @@ export interface ConnectorCatalogItem {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
+  auth: { type: ConnectorAuthTypeV2 };
   /**
    * For OAuth2 connectors whose OAuth URLs contain {{vars}} (e.g. a tenant subdomain),
    * the client should collect these values before initiating OAuth.
@@ -307,7 +334,7 @@ export interface ConnectorTemplateModel {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
+  auth: { type: ConnectorAuthTypeV2 };
   isEnabled: boolean;
   version: string;
   category: string;
@@ -354,7 +381,6 @@ export interface AdminConnectorTemplateImportResponse {
 export interface UpdateConnectorTemplateRequest {
   name?: string;
   description?: string;
-  authType?: ConnectorAuthTypeV2;
   isEnabled?: boolean;
   version?: string;
   category?: string;
@@ -378,7 +404,6 @@ export interface CreateConnectorTemplateRequest {
   provider: ConnectorProvider;
   name: string;
   description: string;
-  authType: ConnectorAuthTypeV2;
   isEnabled?: boolean;
   version?: string;
   category?: string;
@@ -398,6 +423,20 @@ export interface ConnectWithApiKeyRequest {
 }
 
 export interface ConnectWithApiKeyResponse {
+  connector: ConnectorModel;
+}
+
+export interface ConnectWithBasicAuthRequest {
+  username: string;
+  /**
+   * Optional; only required if the connector template auth config includes passwordRef.
+   * When omitted and passwordRef is not configured, the runtime defaults to empty password.
+   */
+  password?: string;
+  extraConfig?: Record<string, unknown>;
+}
+
+export interface ConnectWithBasicAuthResponse {
   connector: ConnectorModel;
 }
 

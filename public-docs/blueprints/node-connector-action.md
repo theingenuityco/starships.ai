@@ -1,12 +1,13 @@
 ## Node: ConnectorAction
 
-What it is: Executes a connector template endpoint (an “action”) via `hostRuntime.connectorAction`. This is how Starships tools call external APIs with server-injected auth (OAuth/API keys/platform JWT) without exposing secrets to the blueprint.
+What it is: Executes a connector template endpoint (an “action”) via `hostRuntime.connectorAction`. This is how Starships tools call external APIs with server-injected auth (OAuth/API keys/basic auth/platform JWT) without exposing secrets to the blueprint.
 
 ## When `connector_action` is necessary (not optional)
 
 Use `connector_action` when **any** of the following are true:
 
 - You need **auth injection** (OAuth tokens, API keys, platform JWT) that must not be visible to the blueprint.
+- You need **Basic auth** (RFC 7617) that must not be visible to the blueprint.
 - You want the host to own **base URL resolution** + **path/query/header/body mapping** via `connector_templates`.
 - You are using the **default `Agent` blueprint in Starships**, which delegates tool authorization/execution to the server.
 
@@ -17,7 +18,7 @@ Specification (authoritative)
 - Handler: `packages/autopilot/src/nodes/ConnectorAction.ts`
 - Runtime implementation (runner): `packages/autopilot-runner/src/hostRuntime/RunnerHostRuntime.ts` (`connectorAction`)
 - Parameters (resolved by Engine before execution; stringEvaluationMode: full-only):
-  - connector: string (required) — connector slug/provider (e.g. `"github"`, `"discord"`, `"google_drive"`, `"linkedin"`, `"starships"`)
+  - connector: string (required) — connector slug/provider (e.g. `"starships"` or any provider configured via `connector_templates`)
   - action: string (required) — endpoint name from the connector template (e.g. `"list-issues"`)
   - args?: Record<string, unknown> (optional)
   - timeout?: number (ms; default 30000)
@@ -97,15 +98,15 @@ Template rules (full-string only)
   - Use a full-string template that returns an object, e.g. `args: "{{ ({ owner: input.owner, repo: input.repo }) }}"`
   - Or use a Code node to construct `{ args }` and pass it as upstream input (then omit `parameters.args`).
 
-Example (GitHub list issues)
+Example (connector_action list issues)
 
 ```ts
 {
-  ref: "github_list_issues",
+  ref: "connector_list_issues",
   type: "connector_action",
-  name: "GitHub: List Issues",
+  name: "Connector: List Issues",
   parameters: {
-    connector: "github",
+    connector: "example",
     action: "list-issues",
     args: { owner: "octo-org", repo: "octo-repo", state: "open" },
     timeout: 15000
@@ -115,6 +116,6 @@ Example (GitHub list issues)
 
 Cross-links
 
-- See `connectors/README.md` and `connectors/configuration.md` for connector templates, auth models, and endpoint mapping.
+- See `../connectors/README.md` and `../connectors/connector_templates.md` for connector templates, auth models, and endpoint mapping.
 - See `node-http-request.md` for raw absolute HTTP calls without connector auth/mapping.
 - See `node-agent.md` for the default hosted Agent behavior (server-side tool authorization/execution).

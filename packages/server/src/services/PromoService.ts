@@ -2,6 +2,9 @@ import Stripe from 'stripe';
 import { LedgerRepository, PromoRedemptionRepository, WalletRepository, getConnection } from '@starships/models';
 import { StarshipService } from '@/services/StarshipService';
 import type { RedeemPromoRequest, RedeemPromoResponse } from '@starships/protocol';
+import { getEnvConfig } from '@starships/env';
+
+const envConfig = getEnvConfig();
 
 export class PromoService {
   private stripe: Stripe;
@@ -11,8 +14,8 @@ export class PromoService {
   private starshipService: StarshipService;
 
   constructor() {
-    this.stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
-      apiVersion: '2025-09-30.clover',
+    this.stripe = new Stripe(envConfig.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-12-15.clover',
     });
     this.walletRepo = new WalletRepository();
     this.ledgerRepo = new LedgerRepository();
@@ -39,7 +42,7 @@ export class PromoService {
       throw new Error('FORBIDDEN');
     }
 
-    // Query Stripe directly, expand via promotion.coupon only (no legacy fields)
+    // Query Stripe directly and expand the coupon (typed on Stripe.PromotionCode.promotion.coupon).
     const codeLower = code.toLowerCase();
     const codeUpper = code.toUpperCase();
     const expandFields: string[] = ['data.promotion', 'data.promotion.coupon'];
@@ -70,9 +73,8 @@ export class PromoService {
     let chosen: Stripe.PromotionCode | null = null;
     let couponObj: Stripe.Coupon | null = null;
     for (const p of activeCandidates) {
-      const promoRel = (p as unknown as { promotion?: { coupon?: Stripe.Coupon | string } }).promotion;
-      const pcoupon = promoRel?.coupon;
-      const coupon = pcoupon && typeof pcoupon !== 'string' ? (pcoupon as Stripe.Coupon) : null;
+      const pcoupon = p.promotion?.coupon ?? null;
+      const coupon = pcoupon && typeof pcoupon !== 'string' ? pcoupon : null;
       const usdAmount = coupon?.amount_off && coupon?.currency?.toLowerCase() === 'usd' ? coupon.amount_off : 0;
       if (usdAmount && usdAmount > 0) {
         chosen = p;
@@ -100,12 +102,7 @@ export class PromoService {
     // Atomic transaction: enforce max_redemptions (if any) -> create redemption (unique per user+code) -> credit wallet -> ledger
     const { balance } = await connection.transaction(async (client) => {
       // If Stripe promotion code has a max_redemptions, enforce it using our own counter.
-      const promoRel = (chosen as unknown as { promotion?: { id?: string; max_redemptions?: number | null } }).promotion;
-      const maxRedeems: number | null =
-        (chosen as Stripe.PromotionCode).max_redemptions ??
-        (promoRel?.max_redemptions as number | null) ??
-        couponObj?.max_redemptions ??
-        null;
+      const maxRedeems: number | null = chosen.max_redemptions ?? null;
       const promoIdForLock = chosen.id || `code:${codeLower}`;
 
       if (maxRedeems && maxRedeems > 0) {

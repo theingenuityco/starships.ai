@@ -150,7 +150,7 @@ Blueprints use simple expressions to pass data between workflow steps:
 
 ## Node Reference Guide
 
-Blueprints are built from 12 specialized node types, each designed for specific workflow functions:
+Blueprints are built from 13 specialized node types, each designed for specific workflow functions:
 
 <div className="overflow-x-auto my-6">
   <table className="w-full border-collapse bg-fd-card rounded-xl shadow-sm">
@@ -217,6 +217,17 @@ Blueprints are built from 12 specialized node types, each designed for specific 
         <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">External API calls</td>
         <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">url, method, headers, auth</td>
         <td className="px-6 py-4 text-fd-muted-foreground">API integrations, data fetching</td>
+      </tr>
+      <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
+        <td className="px-6 py-4 border-r border-fd-border/50">
+          <div className="flex items-center">
+            <ExternalLink className="w-4 h-4 mr-2 text-cyan-600" />
+            <span className="font-semibold">connector_action</span>
+          </div>
+        </td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">Connector-backed API actions</td>
+        <td className="px-6 py-4 text-fd-muted-foreground border-r border-fd-border/50">connector, action, args, timeout</td>
+        <td className="px-6 py-4 text-fd-muted-foreground">Managed integrations, auth-injected requests, schema-validated actions</td>
       </tr>
       <tr className="hover:bg-fd-muted/10 transition-colors duration-150">
         <td className="px-6 py-4 border-r border-fd-border/50">
@@ -298,6 +309,11 @@ Blueprints are built from 12 specialized node types, each designed for specific 
     </tbody>
   </table>
 </div>
+
+### `connector_action` vs `http_request`
+
+- **Use `http_request`** when you need a raw HTTP call to an **absolute** `http(s)://...` URL and you can provide everything needed in the node (method/headers/body), like public APIs, webhooks, or simple integrations.
+- **Use `connector_action`** when calling a **Starships connector** action (defined by connector templates) so the runtime can handle base URLs, auth/credentials injection, argument validation, and standardized request/response mapping—especially for integrations that should not embed secrets directly in blueprints.
 
 ---
 

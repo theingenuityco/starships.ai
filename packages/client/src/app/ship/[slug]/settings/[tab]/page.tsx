@@ -12,24 +12,25 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 import AccountForm from '@/components/profile/AccountForm'
 import { useAuth } from '@/hooks/useAuth'
+import { MyStarshipSettingsSection } from '@/components/settings/MyStarshipSettingsSection'
 
-const ALL_TABS = ['profile', 'usage', 'billing'] as const
+const ALL_TABS = ['my-profile', 'my-starship', 'billing', 'usage'] as const
 type TabValue = (typeof ALL_TABS)[number]
 
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
   const { isInstanceAdmin, isLoading: authLoading } = useAuth()
-  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['profile', 'billing'] as const)
+  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['my-profile', 'my-starship', 'billing'] as const)
   const isValidTab = visibleTabs.includes(tab as TabValue)
-  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'profile'
+  const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'my-profile'
 
   useEffect(() => {
     if (authLoading) return
     if (!isValidTab) router.replace(`/ship/${slug}/settings/${currentTab}`)
   }, [router, slug, currentTab, isValidTab, authLoading])
 
-  const { data: starshipData } = useStarshipBySlug(slug, true)
+  const { data: starshipData, isLoading: starshipLoading } = useStarshipBySlug(slug, true)
 
   return (
     <PageLayout>
@@ -48,33 +49,46 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
             <Tabs value={currentTab} onValueChange={value => router.push(`/ship/${slug}/settings/${value}`)} className="space-y-6">
               <div className="flex justify-center">
                 <TabsList className="mx-auto w-full sm:w-auto flex-wrap justify-center gap-1 rounded-2xl border border-border/40 bg-card p-1 shadow-sm">
-                  <TabsTrigger value="profile" className="gap-2 rounded-xl px-3 py-1">
+                  <TabsTrigger value="my-profile" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="user" className="h-4 w-4" />
-                    <span>Profile</span>
+                    <span>My Profile</span>
                   </TabsTrigger>
-                  {isInstanceAdmin && (
-                    <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1">
-                      <Icon name="activity" className="h-4 w-4" />
-                      <span>Analytics</span>
-                    </TabsTrigger>
-                  )}
+                  <TabsTrigger value="my-starship" className="gap-2 rounded-xl px-3 py-1">
+                    <Icon name="rocket" className="h-4 w-4" />
+                    <span>My starship</span>
+                  </TabsTrigger>
                   <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
                   </TabsTrigger>
+                  {isInstanceAdmin ? (
+                    <TabsTrigger
+                      value="usage"
+                      className="gap-2 rounded-xl px-3 py-1 border border-slate-300/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-100/70 via-background to-transparent text-slate-800 dark:text-slate-100 data-[state=active]:border-slate-300/80 dark:data-[state=active]:border-slate-600/80 data-[state=active]:from-slate-100"
+                    >
+                      <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
+                      <span>Analytics</span>
+                    </TabsTrigger>
+                  ) : null}
                 </TabsList>
               </div>
 
-              <TabsContent value="profile">
-                <section aria-labelledby="profile-section" className="bg-background">
+              <TabsContent value="my-profile">
+                <section aria-labelledby="my-profile-section" className="bg-background">
                   <AccountForm />
+                </section>
+              </TabsContent>
+
+              <TabsContent value="my-starship">
+                <section aria-labelledby="my-starship-section" className="bg-background">
+                  <MyStarshipSettingsSection starship={starshipData} starshipSlug={slug} isLoading={starshipLoading} />
                 </section>
               </TabsContent>
 
               {isInstanceAdmin && (
                 <TabsContent value="usage">
                   <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
-                    {starshipData?.id && <ShipManagement starshipId={starshipData.id} />}
+                    {starshipData?.id ? <ShipManagement starshipId={starshipData.id} /> : null}
                   </section>
                 </TabsContent>
               )}

@@ -43,16 +43,20 @@ const TemplateTextSchema = z
   .max(5000)
   .refine((val) => !/<[^>]*>/.test(val), { message: 'HTML tags are not allowed' });
 
+const AuthTypeSchema = z.enum(['oauth2', 'api_key', 'basic', 'platform_jwt', 'none']);
+
+// Loose-but-validated: require `auth.type`, allow additional keys for forward-compat.
+const AuthObjectSchema = z.object({ type: AuthTypeSchema }).passthrough();
+
 const UpdateConnectorTemplateSchema = z
   .object({
     name: TemplateTextSchema.max(255).optional(),
     description: TemplateTextSchema.max(1024).optional(),
-    authType: z.enum(['oauth2', 'api_key', 'platform_jwt', 'none']).optional(),
     isEnabled: z.boolean().optional(),
     version: z.string().trim().min(1).max(20).optional(),
     category: z.string().trim().min(1).max(100).optional(),
     baseUrl: z.string().trim().min(1).max(2048).optional(),
-    auth: z.record(z.string(), z.unknown()).optional(),
+    auth: AuthObjectSchema.optional(),
     variables: z.array(z.record(z.string(), z.unknown())).optional(),
     endpoints: z.array(z.record(z.string(), z.unknown())).optional(),
     rateLimit: z.record(z.string(), z.unknown()).optional(),
@@ -62,7 +66,6 @@ const UpdateConnectorTemplateSchema = z
     (body) =>
       body.name !== undefined ||
       body.description !== undefined ||
-      body.authType !== undefined ||
       body.isEnabled !== undefined ||
       body.version !== undefined ||
       body.category !== undefined ||
@@ -81,12 +84,11 @@ const CreateConnectorTemplateSchema = z.object({
   provider: z.string().trim().min(1).max(255),
   name: TemplateTextSchema.max(255),
   description: TemplateTextSchema.max(1024),
-  authType: z.enum(['oauth2', 'api_key', 'platform_jwt', 'none']),
   isEnabled: z.boolean().optional(),
   version: z.string().trim().min(1).max(20).optional(),
   category: z.string().trim().min(1).max(100).optional(),
   baseUrl: z.string().trim().min(1).max(2048),
-  auth: z.record(z.string(), z.unknown()),
+  auth: AuthObjectSchema,
   variables: z.array(z.record(z.string(), z.unknown())).optional(),
   endpoints: z.array(z.record(z.string(), z.unknown())),
   rateLimit: z.record(z.string(), z.unknown()).optional(),
@@ -100,7 +102,7 @@ function toTemplateSummary(entity: ConnectorTemplateEntity): ConnectorTemplateMo
     provider: entity.provider,
     name: entity.name,
     description: entity.description,
-    authType: entity.authType,
+    auth: { type: ((entity.authJson as unknown as { type?: string })?.type || 'none') as z.infer<typeof AuthTypeSchema> },
     isEnabled: Boolean(entity.isEnabled),
     version: entity.version,
     category: entity.category,
@@ -166,7 +168,6 @@ router.get('/admin/connector-templates/:id/export', async (req: Request, res: Re
         provider: template.provider,
         name: template.name,
         description: template.description,
-        authType: template.authType,
         isEnabled: Boolean(template.isEnabled),
         version: template.version,
         category: template.category,
@@ -225,12 +226,11 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
           provider: z.string().trim().min(1),
           name: z.string().trim().min(1),
           description: z.string().trim().min(1),
-          authType: z.enum(['oauth2', 'api_key', 'platform_jwt', 'none']),
           isEnabled: z.boolean().optional(),
           version: z.string().trim().min(1).optional(),
           category: z.string().trim().min(1).optional(),
           baseUrl: z.string().trim().min(1),
-          auth: z.record(z.string(), z.unknown()),
+          auth: AuthObjectSchema,
           variables: z.array(z.record(z.string(), z.unknown())).nullable().optional(),
           endpoints: z.array(z.record(z.string(), z.unknown())),
           rateLimit: z.record(z.string(), z.unknown()).nullable().optional(),
@@ -278,7 +278,8 @@ router.post('/admin/connector-templates/import', async (req: Request, res: Respo
         (await repo.update(existing.id, {
           name: ct.name,
           description: ct.description,
-          authType: ct.authType,
+          // Persist a denormalized auth_type column for DB filtering/legacy reasons, derived from auth_json.type.
+          authType: ct.auth.type,
           isEnabled: ct.isEnabled,
           version: ct.version,
           category: ct.category,
@@ -341,7 +342,6 @@ router.post('/admin/connector-templates', async (req: Request, res: Response): P
       provider: body.provider,
       name: body.name,
       description: body.description,
-      authType: body.authType,
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,
@@ -405,7 +405,8 @@ router.put('/admin/connector-templates/:id', async (req: Request, res: Response)
     const updated = await repo.update(existing.id, {
       name: body.name,
       description: body.description,
-      authType: body.authType,
+      // Persist a denormalized auth_type column for DB filtering/legacy reasons, derived from auth_json.type.
+      authType: body.auth ? body.auth.type : undefined,
       isEnabled: body.isEnabled,
       version: body.version,
       category: body.category,

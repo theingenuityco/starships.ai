@@ -97,7 +97,6 @@ try {
 | **MessageRepository**         | Individual message storage and retrieval                  |
 | **ConnectorSecretRepository** | Encrypted connector secrets management (DB-backed)        |
 | **UsageRepository**           | Token usage tracking for analytics                        |
-| **WaitlistRepository**        | Early access user onboarding queue                        |
 
 > **Note:** `WorkflowRepository`, `BlueprintRepository`, `ExecutionRepository`, `NodeRepository`, and `EdgeRepository` have been removed as no implementations exist. Blueprint data is stored as JSONB within agent and tool entities.
 
@@ -108,9 +107,6 @@ try {
 ```bash
 # Run database migrations
 pnpm run migrate
-
-# Seed waitlist data
-pnpm run seed:waitlist
 
 # Seed tool templates
 pnpm run seed:tool-templates

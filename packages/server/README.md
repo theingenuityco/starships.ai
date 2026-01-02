@@ -76,6 +76,8 @@ This is not a complete OpenAPI spec, but these are the endpoints most developers
 - `GET /auth/:provider` and `GET /auth/:provider/callback` (Google/GitHub OAuth)
 - `POST /auth/oauth/exchange` (exchange short-lived auth code for JWT)
 
+> Note: `POST /users/register` is intentionally disabled (deprecated). Use `POST /auth/register` for registration.
+
 ### Starships (workspaces)
 
 - `POST /starships`

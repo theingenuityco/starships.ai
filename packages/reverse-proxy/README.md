@@ -113,17 +113,19 @@ pnpm --filter @starships/reverse-proxy dev
 
 The proxy reads configuration from the root `.env` file:
 
-| Variable     | Default                 | Description               |
-| ------------ | ----------------------- | ------------------------- |
-| `PROXY_PORT` | `8080`                  | Port the proxy listens on |
-| `CLIENT_URL` | `http://localhost:3000` | Next.js frontend URL      |
-| `SERVER_URL` | `http://localhost:4000` | Express backend URL       |
+| Variable     | Default                 | Description                   |
+| ------------ | ----------------------- | ----------------------------- |
+| `PROXY_PORT` | `8080`                  | Port the proxy listens on     |
+| `CLIENT_URL` | `http://localhost:3000` | Next.js frontend URL          |
+| `SERVER_URL` | `http://localhost:4000` | Express backend URL           |
+| `DOCS_URL`   | `http://localhost:3001` | Documentation site (Docs) URL |
 
 Configuration is managed centrally:
 
 - `PROXY_PORT` - The port the proxy listens on
 - `CLIENT_URL` - Frontend routing destination
 - `SERVER_URL` - Backend API routing destination
+- `DOCS_URL` - Docs routing destination
 
 ### Example Configuration
 
@@ -134,6 +136,7 @@ The default configuration uses port 8080. To customize, update your `.env` file:
 PROXY_PORT=8080
 CLIENT_URL=http://localhost:3000
 SERVER_URL=http://localhost:4000
+DOCS_URL=http://localhost:3001
 ```
 
 Then start the proxy:

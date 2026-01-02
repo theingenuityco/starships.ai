@@ -29,7 +29,9 @@ Generated default blueprint (when omitted)
   - `connector: "starships"`
   - `action: "authorize-and-maybe-execute-tool"`
   - The Starships server enforces assignment and allow/ask/deny policies; it may return `TOOL_APPROVAL_REQUIRED`.
-- If the server responds with `TOOL_APPROVAL_REQUIRED`, the default blueprint appends a tool message and ends the workflow turn.
+- If the server responds with `TOOL_APPROVAL_REQUIRED`, the default blueprint **ends the workflow turn immediately** and **does not append any tool message** to `state.messages`.
+  - This means there is **no persisted tool result message** for that tool call at this point (no interim/placeholder tool output is recorded).
+  - The tool `role: "tool"` message (with the final approved result or a denial payload) is only **persisted after** a user approve/deny action resolves the pending approval, at which point the server continues the agent turn.
 
 Execution behavior
 

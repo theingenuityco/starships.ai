@@ -3,6 +3,7 @@ import type { AgentTemplateCategory } from '@starships/protocol'
 
 export const INITIAL_FORM_DATA: AgentFormData = {
   name: '',
+  role: '',
   slug: '',
   description: '',
   // Do not default category; user should explicitly choose one.

@@ -43,6 +43,10 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
       newErrors.name = 'Agent name is required'
     }
 
+    if (!formData.role.trim()) {
+      newErrors.role = 'Role is required'
+    }
+
     if (!formData.slug.trim()) {
       newErrors.slug = 'Agent slug is required'
     } else if (!/^[a-z0-9-]+$/.test(formData.slug)) {

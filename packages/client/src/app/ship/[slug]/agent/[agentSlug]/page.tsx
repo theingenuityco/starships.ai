@@ -681,6 +681,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             })
             if (agent && agentBuilderRef.current) {
               agentBuilderRef.current.updateField('name', agent.name || '')
+              if (agent.role) agentBuilderRef.current.updateField('role', agent.role || '')
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
               agentBuilderRef.current.updateField('description', agent.description || '')
               agentBuilderRef.current.updateField('model', agent.model || '')
@@ -940,6 +941,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     } catch {}
     const currentForm = agentBuilderRef.current.getFormData?.()
     agentBuilderRef.current.updateField('name', existingAgent.name || '')
+    if (!currentForm?.role && existingAgent.role) agentBuilderRef.current.updateField('role', existingAgent.role || '')
     if (existingAgent.slug) agentBuilderRef.current.updateField('slug', existingAgent.slug)
     if (existingAgent.description) agentBuilderRef.current.updateField('description', existingAgent.description)
     if (existingAgent.model) agentBuilderRef.current.updateField('model', existingAgent.model)

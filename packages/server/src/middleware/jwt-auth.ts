@@ -111,11 +111,69 @@ export const optionalJwtAuth = async (req: Request, res: Response, next: NextFun
     return;
   }
 
-  // Token provided, validate it
+  const token = authHeader.replace('Bearer ', '');
+
+  // IMPORTANT: This middleware is intentionally "best effort".
+  // If a token is present but invalid/expired/unresolvable, we treat the request as anonymous.
+  // This is required for public APIs (e.g. agent-templates) to work even when clients send stale tokens.
+  if (!token || token.length < 10) {
+    next();
+    return;
+  }
+
   try {
-    await jwtAuthMiddleware(req, res, next);
-  } catch (error) {
-    // If token validation fails, continue without user instead of rejecting
+    const { payload } = await jwtVerify(token, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+
+    const userId = payload.sub as string | undefined;
+    if (!userId || !userId.trim()) {
+      next();
+      return;
+    }
+
+    let user = null;
+    try {
+      user = await UserService.getUserById(userId);
+    } catch (dbError: any) {
+      // Best-effort: on DB issues, don't block public endpoints.
+      logger.warn('[OPTIONAL-JWT-AUTH] Database error during user lookup (continuing anonymous)', {
+        userId,
+        error: dbError?.message,
+        operation: 'user_lookup',
+      });
+      next();
+      return;
+    }
+
+    if (!user) {
+      next();
+      return;
+    }
+
+    req.user = user;
+
+    // Attach authenticated context (user + optional agent/starship) for downstream attribution
+    try {
+      const agentId = typeof (payload as any).agentId === 'string' ? (payload as any).agentId : undefined;
+      const starshipId = typeof (payload as any).starshipId === 'string' ? (payload as any).starshipId : undefined;
+      (req as any).authContext = {
+        userId: user.id,
+        agentId,
+        starshipId,
+      };
+    } catch {
+      // Non-fatal: if we cannot derive authContext, continue with user-only context.
+    }
+
+    next();
+  } catch (error: any) {
+    // Best-effort: invalid/expired tokens should not cause a 401 here.
+    logger.debug('[OPTIONAL-JWT-AUTH] Token validation failed (continuing anonymous)', {
+      error: error?.message,
+      operation: 'token_validation',
+    });
     next();
   }
 };

@@ -174,10 +174,12 @@ export class ConversationService {
   }
 
   /**
-   * Clear all in-memory, per-conversation streaming/turn state to avoid leaks once
-   * a conversation (or turn) has fully finished. This is safe to call multiple times.
+   * Clear streaming state for a conversation.
+   * @param conversationId - The conversation ID
+   * @param options - Optional configuration for selective clearing
+   * @param options.preserveLastPersistedIndex - If true, keeps lastPersistedIndex (needed when stopping mid-turn to prevent duplicate persistence)
    */
-  private clearStreamingState(conversationId: string): void {
+  private clearStreamingState(conversationId: string, options?: { preserveLastPersistedIndex?: boolean }): void {
     // Per-turn / streaming accumulators
     this.streamingContent.delete(conversationId);
     this.streamingToolCalls.delete(conversationId);
@@ -196,7 +198,11 @@ export class ConversationService {
     this.accumulatedLength.delete(conversationId);
     this.nextChunkPosition.delete(conversationId);
     this.chunkProcessingLock.delete(conversationId);
-    this.lastPersistedIndex.delete(conversationId);
+    
+    // Conditionally clear lastPersistedIndex (preserve when stopping to prevent duplicate persistence)
+    if (!options?.preserveLastPersistedIndex) {
+      this.lastPersistedIndex.delete(conversationId);
+    }
 
     // Balance guards and suppression flags
     this.lowBalanceStopTriggered.delete(conversationId);
@@ -208,6 +214,40 @@ export class ConversationService {
     this.assistantPersistedThisTurn.delete(conversationId);
     this.currentAgentForConversation.delete(conversationId);
     this.lastToolCallsBroadcastHash.delete(conversationId);
+  }
+
+  /**
+   * Determines if an assistant message should be skipped during node_completed persistence.
+   * 
+   * We need to handle two cases:
+   * 1. Message was stopped and persisted via persistActivePartial - skip that specific message
+   * 2. Multiple assistant messages in same turn (tool call + final response) - persist both
+   * 
+   * The original check was too aggressive - it prevented ALL assistant messages from being
+   * persisted after the first one. This broke the case where an assistant makes a tool call
+   * (first message) and then continues with a final response (second message).
+   * 
+   * @param message - The message from execution state
+   * @param index - Current message index in state array
+   * @param lastIndex - Last persisted index for this conversation
+   * @param conversationId - The conversation ID
+   * @returns true if this message should be skipped (already persisted via persistActivePartial)
+   */
+  private shouldSkipAssistantMessage(message: unknown, index: number, lastIndex: number, conversationId: string): boolean {
+    // Type guard: ensure message has expected structure
+    if (!message || typeof message !== 'object') return false;
+    const msg = message as Record<string, unknown>;
+    
+    // Only skip if this is the exact message that was persisted via persistActivePartial during stop
+    // We can identify it because:
+    // - activeStreamPersisted is set (persistActivePartial was called)
+    // - It's the first message after lastIndex (the one that was being streamed)
+    // - It has no tool calls (tool call messages are persisted via node_completed, not persistActivePartial)
+    const wasPartialPersisted = this.activeStreamPersisted.has(conversationId);
+    const isFirstMessageAfterLastIndex = index === lastIndex + 1;
+    const hasToolCalls = Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0;
+    
+    return wasPartialPersisted && isFirstMessageAfterLastIndex && !hasToolCalls;
   }
 
   /**
@@ -1371,30 +1411,7 @@ export class ConversationService {
 
     // Clear streaming accumulators but preserve lastPersistedIndex to prevent duplicate persistence
     // when node_completed fires after stop (execution might still be running)
-    this.streamingContent.delete(conversationId);
-    this.streamingToolCalls.delete(conversationId);
-    this.streamingReasoning.delete(conversationId);
-    this.streamingGeneratedAttachmentIds.delete(conversationId);
-    this.streamingGeneratedImageUrlSeen.delete(conversationId);
-    this.ringBuffer.delete(conversationId);
-    this.latestStreamingUsage.delete(conversationId);
-    this.streamSeq.delete(conversationId);
-    this.snapshotPreferred.delete(conversationId);
-    this.toolCallSeq.delete(conversationId);
-    this.placeholderEmitted.delete(conversationId);
-    this.generationId.delete(conversationId);
-    this.accumulatedLength.delete(conversationId);
-    this.nextChunkPosition.delete(conversationId);
-    this.chunkProcessingLock.delete(conversationId);
-    // DO NOT clear lastPersistedIndex here - it's needed to prevent duplicate persistence
-    // when node_completed fires after stop
-    this.lowBalanceStopTriggered.delete(conversationId);
-    this.lastLowBalanceCheckAt.delete(conversationId);
-    this.suppressCompleteFor.delete(conversationId);
-    this.activeStreamPersisted.delete(conversationId);
-    this.assistantPersistedThisTurn.delete(conversationId);
-    this.currentAgentForConversation.delete(conversationId);
-    this.lastToolCallsBroadcastHash.delete(conversationId);
+    this.clearStreamingState(conversationId, { preserveLastPersistedIndex: true });
   }
 
   /**
@@ -2434,36 +2451,12 @@ export class ConversationService {
                 continue;
               }
 
-              // For assistant messages, we need to handle two cases:
+              // For assistant messages, check if we should skip this message to avoid duplicates
+              // This handles two cases:
               // 1. Message was stopped and persisted via persistActivePartial - skip that specific message
               // 2. Multiple assistant messages in same turn (tool call + final response) - persist both
-              //
-              // The original check was too aggressive - it prevented ALL assistant messages from being
-              // persisted after the first one. This broke the case where an assistant makes a tool call
-              // (first message) and then continues with a final response (second message).
-              //
-              // The fix: Only skip if activeStreamPersisted is set (meaning persistActivePartial was called
-              // during stop) AND this is the first message after lastIndex AND it has no tool calls.
-              // This handles the stop case while allowing multiple assistant messages in normal flow.
-              if (role === 'assistant') {
-                const hasToolCalls = Array.isArray((raw as any).toolCalls) && (raw as any).toolCalls.length > 0;
-                const isFirstMessageAfterLastIndex = i === lastIndex + 1;
-                const wasPartialPersisted = this.activeStreamPersisted.has(conversationId);
-
-                // Only skip if this is the message that was persisted via persistActivePartial during stop
-                // We can identify it because:
-                // - activeStreamPersisted is set (persistActivePartial was called)
-                // - It's the first message after lastIndex (the one that was being streamed)
-                // - It has no tool calls (tool call messages are persisted via node_completed, not persistActivePartial)
-                if (isFirstMessageAfterLastIndex && wasPartialPersisted && !hasToolCalls) {
-                  // This is the message that was already persisted via persistActivePartial during stop
-                  // Skip it to avoid duplicates
-                  continue;
-                }
-                // Otherwise, persist this message:
-                // - It has tool calls (should always be persisted, even if assistantPersistedThisTurn is set)
-                // - It's not the first message after lastIndex (it's a new message in the turn)
-                // - No partial was persisted (normal flow, allow multiple assistant messages)
+              if (role === 'assistant' && this.shouldSkipAssistantMessage(raw, i, lastIndex, conversationId)) {
+                continue;
               }
 
               try {

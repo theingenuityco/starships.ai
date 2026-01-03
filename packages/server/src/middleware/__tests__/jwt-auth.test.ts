@@ -1,5 +1,4 @@
-import type { NextFunction } from 'express';
-import { SignJWT } from 'jose';
+import type { NextFunction, Request, Response } from 'express';
 
 jest.mock('@/services/UserService', () => ({
   UserService: {
@@ -7,20 +6,41 @@ jest.mock('@/services/UserService', () => ({
   },
 }));
 
+jest.mock('@/utils/responseHelpers', () => ({
+  sendError: jest.fn(),
+}));
+
+jest.mock('jose', () => ({
+  jwtVerify: jest.fn(),
+}));
+
+import { jwtVerify } from 'jose';
 import { optionalJwtAuth } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
 import { sendError } from '@/utils/responseHelpers';
 
-const mockSendError = sendError as jest.MockedFunction<typeof sendError>;
+const mockSendError = jest.mocked(sendError);
+const mockJwtVerify = jest.mocked(jwtVerify);
 
-const createMockReq = (authorization?: string): any => ({
-  headers: authorization ? { authorization } : {},
-});
+const createMockReq = (authorization?: string): Request => {
+  const headers: Request['headers'] = authorization ? { authorization } : {};
+  return { headers } as unknown as Request;
+};
 
-const createMockRes = (): any => ({
-  status: jest.fn().mockReturnThis(),
-  json: jest.fn().mockReturnThis(),
-});
+type MockRes = {
+  status: jest.Mock<Response, [number]>;
+  json: jest.Mock<Response, [unknown]>;
+};
+
+const createMockRes = (): MockRes => {
+  const res: MockRes = {
+    status: jest.fn<Response, [number]>(),
+    json: jest.fn<Response, [unknown]>(),
+  };
+  res.status.mockImplementation(() => res as unknown as Response);
+  res.json.mockImplementation(() => res as unknown as Response);
+  return res;
+};
 
 describe('optionalJwtAuth', () => {
   beforeEach(() => {
@@ -32,7 +52,7 @@ describe('optionalJwtAuth', () => {
     const res = createMockRes();
     const next: NextFunction = jest.fn();
 
-    await optionalJwtAuth(req as any, res as any, next);
+    await optionalJwtAuth(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(req.user).toBeUndefined();
@@ -40,30 +60,36 @@ describe('optionalJwtAuth', () => {
   });
 
   it('attaches user when token is valid', async () => {
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'test-jwt-secret-key-for-testing-only');
-    const token = await new SignJWT({ agentId: 'agent-1', starshipId: 'ship-1' })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuer('starships.ai')
-      .setAudience('starships-users')
-      .setSubject('user123')
-      .setIssuedAt()
-      .setExpirationTime('2h')
-      .sign(secret);
+    const token = 'valid-test-token';
 
-    (UserService.getUserById as jest.Mock).mockResolvedValue({ id: 'user123' });
+    mockJwtVerify.mockResolvedValue({
+      payload: {
+        sub: 'user123',
+        agentId: 'agent-1',
+        starshipId: 'ship-1',
+      },
+    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
+
+    const mockedGetUserById = jest.mocked(UserService.getUserById);
+    mockedGetUserById.mockResolvedValue({
+      id: 'user123',
+      createdAt: new Date().toISOString(),
+      hasPassword: false,
+      authMethods: ['password'],
+      primaryAuthMethod: 'password',
+    });
 
     const req = createMockReq(`Bearer ${token}`);
     const res = createMockRes();
     const next: NextFunction = jest.fn();
 
-    await optionalJwtAuth(req as any, res as any, next);
+    await optionalJwtAuth(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledTimes(1);
+    expect(jwtVerify).toHaveBeenCalledTimes(1);
     expect(UserService.getUserById).toHaveBeenCalledWith('user123');
-    expect(req.user).toEqual({ id: 'user123' });
-    expect((req as any).authContext).toEqual({ userId: 'user123', agentId: 'agent-1', starshipId: 'ship-1' });
+    expect(req.user?.id).toBe('user123');
+    expect(req.authContext).toEqual({ userId: 'user123', agentId: 'agent-1', starshipId: 'ship-1' });
     expect(mockSendError).not.toHaveBeenCalled();
   });
 });
-
-

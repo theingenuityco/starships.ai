@@ -2,11 +2,14 @@
  * Slug Generation Utilities
  *
  * Provides utilities for generating unique slugs for agents and other entities.
- * Ensures slugs follow the pattern: {template-slug}-{random-suffix}
+ *
+ * IMPORTANT (slug strategy):
+ * - Instance slugs (agents/tools) use incremental suffixes: {base}, {base}-2, {base}-3, ...
+ *   Uniqueness is enforced within a starship (composite uniqueness: starship_id + slug).
+ * - Template slugs (agent/tool templates) use random suffixes: {base}-{random-suffix}
+ *   Uniqueness is enforced globally (slug unique on the template table).
  */
 
-import { AgentRepository } from '../repositories/AgentRepository';
-import { ToolRepository } from '../repositories/ToolRepository';
 import type { WidgetRepository } from '../repositories/WidgetRepository';
 
 /**
@@ -23,25 +26,73 @@ export function generateRandomSuffix(): string {
 }
 
 /**
- * Generate a unique agent slug
- * Format: {template-slug}-{random-suffix}
+ * Generate a unique slug using incremental suffixes:
+ * - base
+ * - base-2
+ * - base-3
+ * ...
  *
- * @param templateSlug - The slug of the agent template
- * @param agentRepository - Repository instance for checking uniqueness
- * @returns Promise<string> - Unique agent slug
+ * @param baseSlug - The desired base slug (already slugified)
+ * @param isTaken - Async predicate that returns true when the slug is already used
+ * @returns Promise<string> - Unique slug
  */
-export async function generateUniqueAgentSlug(templateSlug: string, agentRepository: AgentRepository): Promise<string> {
-  const baseSlug = templateSlug;
+export async function generateUniqueSlugIncremental(args: {
+  baseSlug: string;
+  isTaken: (candidate: string) => Promise<boolean>;
+  /**
+   * When the base is taken, start counting from this value (default 2).
+   * We intentionally skip "-1" to keep the common human pattern.
+   */
+  startAt?: number;
+  maxAttempts?: number;
+}): Promise<string> {
+  const base = (args.baseSlug || '').trim();
+  const fallbackBase = base.length > 0 ? base : 'item';
+
+  // Fast-path: base slug is free
+  if (!(await args.isTaken(fallbackBase))) {
+    return fallbackBase;
+  }
+
+  // Otherwise suffix with -2, -3, ... until free
+  let counter = typeof args.startAt === 'number' && args.startAt >= 2 ? Math.floor(args.startAt) : 2;
+  const maxAttempts = typeof args.maxAttempts === 'number' && args.maxAttempts > 0 ? Math.floor(args.maxAttempts) : 10_000;
+  while (counter < maxAttempts) {
+    const candidate = `${fallbackBase}-${counter}`;
+    if (!(await args.isTaken(candidate))) return candidate;
+    counter++;
+  }
+
+  // Fallback: timestamp if something is seriously wrong
+  const ts = Date.now().toString(36);
+  return `${fallbackBase}-${ts}`;
+}
+
+/**
+ * Generate a unique slug using a random suffix:
+ * Format: {base}-{random-suffix}
+ *
+ * @param baseSlug - The desired base slug (already slugified)
+ * @param isTaken - Async predicate that returns true when the slug is already used
+ * @returns Promise<string> - Unique slug
+ */
+export async function generateUniqueSlugRandom(args: {
+  baseSlug: string;
+  isTaken: (candidate: string) => Promise<boolean>;
+  maxAttempts?: number;
+}): Promise<string> {
+  const base = (args.baseSlug || '').trim();
+  const fallbackBase = base.length > 0 ? base : 'item';
   let attempts = 0;
-  const maxAttempts = 10;
+  const maxAttempts = typeof args.maxAttempts === 'number' && args.maxAttempts > 0 ? Math.floor(args.maxAttempts) : 10;
 
   while (attempts < maxAttempts) {
     const randomSuffix = generateRandomSuffix();
-    const candidateSlug = `${baseSlug}-${randomSuffix}`;
+    const candidateSlug = `${fallbackBase}-${randomSuffix}`;
 
     // Check if slug is unique
-    const existingAgent = await agentRepository.findBySlug(candidateSlug);
-    if (!existingAgent) {
+    const taken = await args.isTaken(candidateSlug);
+    if (!taken) {
       return candidateSlug;
     }
 
@@ -50,7 +101,7 @@ export async function generateUniqueAgentSlug(templateSlug: string, agentReposit
 
   // Fallback: use timestamp if we can't generate a unique slug
   const timestamp = Date.now().toString(36);
-  return `${baseSlug}-${timestamp}`;
+  return `${fallbackBase}-${timestamp}`;
 }
 
 /**
@@ -80,35 +131,6 @@ export async function generateSimpleAgentSlug(agentRepository: AgentRepository):
   // Fallback: use timestamp if we can't generate a unique slug
   const timestamp = Date.now().toString(36);
   return `agent-${timestamp}`;
-}
-
-/**
- * Generate a unique tool slug
- * Format: {base-slug}-{random-suffix}
- *
- * @param baseSlug - Suggested base slug (often the template slug or provided slug)
- * @param toolRepository - Repository instance for checking uniqueness
- */
-export async function generateUniqueToolSlug(baseSlug: string, toolRepository: ToolRepository): Promise<string> {
-  const base = baseSlug;
-  let attempts = 0;
-  const maxAttempts = 10;
-
-  while (attempts < maxAttempts) {
-    const randomSuffix = generateRandomSuffix();
-    const candidateSlug = `${base}-${randomSuffix}`;
-
-    // Check if slug is unique across all tools
-    const existingTool = await toolRepository.findBySlug(candidateSlug);
-    if (!existingTool) {
-      return candidateSlug;
-    }
-
-    attempts++;
-  }
-
-  const timestamp = Date.now().toString(36);
-  return `${base}-${timestamp}`;
 }
 
 /**

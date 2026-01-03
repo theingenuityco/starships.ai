@@ -17,6 +17,7 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { cn } from '@/lib/utils'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -384,14 +385,14 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                     type="button"
                                     className="w-full text-left hover:text-foreground transition-colors"
                                     onClick={() => router.push(`/ship/${slug}/agent/${agent.slug}`)}
-                                    title={`Open agent: ${agent.name}`}
+                                    title={`Open agent: ${formatAgentDisplayName(agent)}`}
                                   >
                                     <div className="flex items-center gap-2 min-w-0">
                                       <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full shrink-0">
                                         <AgentAvatar seed={agent.name || agent.slug || 'Agent'} imageUrl={agentAvatarUrlById.get((agent as any)?.avatarAttachmentId)} size={32} rounded />
                                       </Avatar>
                                       <div className="min-w-0">
-                                        <div className="truncate text-sm font-semibold text-foreground">{agent.name}</div>
+                                        <div className="truncate text-sm font-semibold text-foreground">{formatAgentDisplayName(agent)}</div>
                                         <div className="truncate text-xs font-mono text-muted-foreground">{agent.slug}</div>
                                       </div>
                                     </div>
@@ -473,8 +474,8 @@ export default function StarshipToolsPage(): React.JSX.Element {
                                                 className={cn('inline-flex items-center justify-start', (isUpdating || !isAssigned) && 'opacity-60')}
                                                 aria-label={
                                                   isAssigned
-                                                    ? `Permission for agent ${agent.name} on tool ${tool.name}. Current: ${permissionLabel(p)}. Click to change to ${permissionLabel(next)}.`
-                                                    : `Tool ${tool.name} is not assigned to agent ${agent.name}`
+                                                    ? `Permission for agent ${formatAgentDisplayName(agent)} on tool ${tool.name}. Current: ${permissionLabel(p)}. Click to change to ${permissionLabel(next)}.`
+                                                    : `Tool ${tool.name} is not assigned to agent ${formatAgentDisplayName(agent)}`
                                                 }
                                               >
                                                 {isAssigned ? (

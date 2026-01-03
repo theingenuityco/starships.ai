@@ -9,6 +9,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { cn } from '@/lib/utils'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import type { AgentModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
@@ -61,7 +62,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
       <PopoverTrigger asChild>
         <Button
           variant="outline"
-          aria-label={selectedAgent ? `Selected agent: ${selectedAgent.name}. Change agent.` : 'Select an agent'}
+          aria-label={selectedAgent ? `Selected agent: ${formatAgentDisplayName(selectedAgent)}. Change agent.` : 'Select an agent'}
           className={cn(
             // Match ConversationMessageInput container styling
             'justify-between bg-card border border-border/60 rounded-2xl shadow-sm transition-all hover:bg-card focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/70',
@@ -83,7 +84,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
             ) : (
               <Icon name="bot" className={compact ? 'h-3 w-3' : 'h-4 w-4'} />
             )}
-            <span className="truncate">{selectedAgent ? selectedAgent.name : compact ? 'Select Agent' : 'Select an agent'}</span>
+            <span className="truncate">{selectedAgent ? formatAgentDisplayName(selectedAgent) : compact ? 'Select Agent' : 'Select an agent'}</span>
           </div>
           {loading ? <LoadingSpinner className={cn(compact ? 'h-3 w-3' : 'h-4 w-4')} /> : <Icon name="chevron-down" className={cn(compact ? 'h-3 w-3' : 'h-4 w-4', isOpen && 'rotate-180')} />}
         </Button>
@@ -124,7 +125,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                       <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={28} rounded />
                     </Avatar>
                     <div className="min-w-0">
-                      <div className="font-medium leading-5">{agent.name}</div>
+                      <div className="font-medium leading-5">{formatAgentDisplayName(agent)}</div>
                       {agent.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div>}
                     </div>
                   </div>

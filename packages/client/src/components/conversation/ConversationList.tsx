@@ -16,6 +16,7 @@ import { Skeleton } from '../ui/skeleton'
 import { Avatar } from '../ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 interface ConversationListProps {
   starshipId: string
@@ -27,6 +28,7 @@ interface ConversationListProps {
 interface ConversationAgent {
   id?: string
   name: string
+  role?: string
   slug?: string
   model?: string
   avatarAttachmentId?: string
@@ -56,7 +58,7 @@ function CompactConversationAgents({ conversationId, starshipId }: { conversatio
           <Avatar className="h-3.5 w-3.5 ring-1 ring-border/40">
             <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={14} />
           </Avatar>
-          <span className="truncate">{agent.name}</span>
+          <span className="truncate">{formatAgentDisplayName(agent)}</span>
         </div>
       ))}
       {remaining > 0 && <span className="text-[10px] text-muted-foreground/70 group-hover:text-foreground/80">+{remaining}</span>}

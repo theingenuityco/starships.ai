@@ -16,6 +16,7 @@ import { useDeleteAgent, useGenerateAgentAvatar, useStarshipAgents } from '@/hoo
 import { useCreateConversation } from '@/hooks/useConversations'
 import type { AgentModel } from '@starships/protocol'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
@@ -387,7 +388,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
       {/* Agent Analytics Dialog */}
       <Dialog open={showAnalytics} onOpenChange={setShowAnalytics}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          {analyticsAgent && <AgentAnalytics agentId={analyticsAgent.id} agentName={analyticsAgent.name} onClose={handleAnalyticsClose} />}
+          {analyticsAgent && <AgentAnalytics agentId={analyticsAgent.id} agentName={formatAgentDisplayName(analyticsAgent)} onClose={handleAnalyticsClose} />}
         </DialogContent>
       </Dialog>
 
@@ -400,7 +401,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
               Delete Agent
             </DialogTitle>
             <DialogDescription className="text-left">
-              Are you sure you want to delete <strong>&ldquo;{agentToDelete?.name}&rdquo;</strong>? This action cannot be undone.
+              Are you sure you want to delete <strong>&ldquo;{agentToDelete ? formatAgentDisplayName(agentToDelete) : ''}&rdquo;</strong>? This action cannot be undone.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="flex gap-2">

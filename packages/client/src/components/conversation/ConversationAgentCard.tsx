@@ -5,6 +5,7 @@ import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { Agent } from '@/lib/api'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { useMemo } from 'react'
 
 interface ConversationAgentCardProps {
@@ -37,7 +38,7 @@ export function ConversationAgentCard({ agent, isSelected, onClick, starshipId }
       </Avatar>
 
       <div className="flex-1 min-w-0 space-y-1">
-        <p className={cn('truncate text-sm font-medium text-foreground', isSelected && 'text-primary', 'group-hover:text-primary')}>{agent.name}</p>
+        <p className={cn('truncate text-sm font-medium text-foreground', isSelected && 'text-primary', 'group-hover:text-primary')}>{formatAgentDisplayName(agent)}</p>
 
         {description && <p className="line-clamp-2 text-xs text-muted-foreground group-hover:text-foreground/80">{description}</p>}
       </div>

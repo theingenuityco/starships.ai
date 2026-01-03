@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 interface AgentCardProps {
   agent: AgentModel
@@ -139,7 +140,7 @@ export function AgentCard({ agent, isSelected, onClick, onEdit, onDelete, onTest
                   group-hover:text-primary transition-colors
                 `}
                   >
-                    {agent.name}
+                    {formatAgentDisplayName(agent)}
                   </h3>
                   {/* Private/Public status removed from AgentModel */}
                 </div>

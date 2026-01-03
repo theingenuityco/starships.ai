@@ -3,6 +3,7 @@ import type { AgentModel, ApiResponse, CreateAgentRequest, UpdateAgentRequest, T
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 // Extended Agent interface for client compatibility with optimistic updates
 export interface ClientAgent extends AgentModel {
@@ -219,7 +220,7 @@ export function useGenerateAgentAvatar() {
       if (agent.starshipId) {
         queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(agent.starshipId) })
       }
-      toast.success('Avatar generated', { description: `Updated avatar for ${agent.name}` })
+      toast.success('Avatar generated', { description: `Updated avatar for ${formatAgentDisplayName(agent)}` })
     },
     onError: (error: any) => {
       const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate avatar'
@@ -250,7 +251,7 @@ export function useCreateAgent() {
       })
 
       toast.success('Agent created successfully!', {
-        description: `${agent.name} has been created and deployed to the starship.`,
+        description: `${formatAgentDisplayName(agent)} has been created and deployed to the starship.`,
       })
     },
     onError: (error: any) => {
@@ -281,7 +282,7 @@ export function useUpdateAgent() {
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.lists() })
 
       toast.success('Agent updated successfully!', {
-        description: `${updatedAgent.name} has been updated.`,
+        description: `${formatAgentDisplayName(updatedAgent)} has been updated.`,
       })
     },
     onError: (error: any) => {
@@ -325,7 +326,7 @@ export function useDeleteAgent() {
 
       if (context?.agent) {
         toast.success('Agent deleted successfully!', {
-          description: `${context.agent.name} has been removed from the starship.`,
+          description: `${formatAgentDisplayName(context.agent)} has been removed from the starship.`,
         })
       } else {
         toast.success('Agent deleted successfully!')
@@ -377,7 +378,7 @@ export function useDeployAgent() {
       })
 
       toast.success('Agent deployed successfully!', {
-        description: `${agent.name} has been deployed to the new starship.`,
+        description: `${formatAgentDisplayName(agent)} has been deployed to the new starship.`,
       })
     },
     onError: (error: any) => {

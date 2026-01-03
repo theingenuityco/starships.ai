@@ -425,18 +425,17 @@ export class AgentTemplateRepository extends BaseRepository {
   async update(id: string, updates: UpdateAgentTemplateRequest): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        // Slugs are never directly editable; ignore if provided.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const cleanedUpdates = { ...(updates as any) };
-        delete cleanedUpdates.slug;
+        const cleanedUpdates: UpdateAgentTemplateRequest = { ...updates };
 
         // Auto-regenerate slug on name updates
+        // Note: public UpdateAgentTemplateRequest forbids `slug`, but the repository may set it internally.
+        const internalUpdates: Partial<AgentTemplateModel> = { ...cleanedUpdates };
         if (cleanedUpdates.name !== undefined && cleanedUpdates.name !== null) {
           const baseSlug = generateSlug(String(cleanedUpdates.name)) || 'agent-template';
-          cleanedUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
         }
 
-        await AgentTemplateEntity.validate(cleanedUpdates, 'update');
+        await AgentTemplateEntity.validate(internalUpdates, 'update');
 
         const connection = this.getConnection();
 
@@ -462,7 +461,7 @@ export class AgentTemplateRepository extends BaseRepository {
         }
 
         const updateProps = {
-          ...cleanedUpdates,
+          ...internalUpdates,
           updatedAt: new Date().toISOString(),
         };
 

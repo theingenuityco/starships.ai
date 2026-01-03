@@ -1,6 +1,12 @@
 import { NotFoundError, ValidationError } from '@starships/errors';
 import { AgentRepository, AgentTemplateRepository, ToolRepository, StarshipRepository } from '@starships/models';
-import { AgentModel, AgentTemplateModel, StarshipModel } from '@starships/protocol';
+import type {
+  AgentModel,
+  AgentTemplateModel,
+  StarshipModel,
+  CreateAgentTemplateRequest,
+  UpdateAgentTemplateRequest,
+} from '@starships/protocol';
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
@@ -54,7 +60,7 @@ export class AgentTemplateService {
   }
 
   async createTemplate(
-    templateData: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>
+    templateData: CreateAgentTemplateRequest
   ): Promise<AgentTemplateModel> {
     // Validate required fields
     if (!templateData.name || !templateData.model) {
@@ -65,12 +71,8 @@ export class AgentTemplateService {
     return this.templateRepository.create(templateData);
   }
 
-  async updateTemplate(id: string, updates: Partial<AgentTemplateModel>): Promise<AgentTemplateModel | null> {
-    // Don't allow updating certain fields
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { id: _id, createdAt: _createdAt, ...allowedUpdates } = updates;
-
-    return this.templateRepository.update(id, allowedUpdates) as Promise<AgentTemplateModel | null>;
+  async updateTemplate(id: string, updates: UpdateAgentTemplateRequest): Promise<AgentTemplateModel | null> {
+    return this.templateRepository.update(id, updates);
   }
 
   async deleteTemplate(id: string): Promise<boolean> {

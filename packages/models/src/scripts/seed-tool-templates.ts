@@ -7,6 +7,7 @@ import { logger } from '@/helpers/logging';
 import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
 import type { CreateToolTemplateRequest } from '@starships/protocol';
 import { ALL_TOOL_TEMPLATES } from '@/seeders/tools';
+import type { UpdateToolTemplateRequest } from '@starships/protocol';
 
 /**
  * Seeds the database with default tool templates
@@ -33,7 +34,7 @@ export async function seedToolTemplates(): Promise<void> {
 
         if (existing) {
           // Update existing template with latest data from seeder
-          const updatePayload: Record<string, unknown> = {
+          const updatePayload: UpdateToolTemplateRequest = {
             description: template.description,
             parameters: template.parameters,
             category: template.category,
@@ -48,10 +49,10 @@ export async function seedToolTemplates(): Promise<void> {
           };
           // Only pass name if it actually changed; otherwise we'd regenerate slug on every seed run.
           if (existing.name !== template.name) {
-            updatePayload['name'] = template.name;
+            updatePayload.name = template.name;
           }
 
-          const updated = await toolTemplateRepo.update(existing.id, updatePayload as any);
+          const updated = await toolTemplateRepo.update(existing.id, updatePayload);
 
           if (updated) {
             logger.info(`✅ Template UPDATED: ${template.name} v${updated.version} (slug: ${updated.slug})`);

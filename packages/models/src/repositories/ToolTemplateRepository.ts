@@ -79,7 +79,9 @@ export class ToolTemplateRepository extends BaseRepository {
       async () => {
         if (!name?.trim()) throw new Error('Name is required for findByName operation');
         const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE LOWER(name) = LOWER($1)', [name.trim()]);
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE LOWER(name) = LOWER($1)', [
+          name.trim(),
+        ]);
         return result ? fromDatabase(ToolTemplateEntity, result) : null;
       },
       'findByName',
@@ -140,10 +142,7 @@ export class ToolTemplateRepository extends BaseRepository {
         const slug = await this.generateUniqueTemplateSlug(baseSlug);
 
         // Validate using entity with slug included
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const cleaned = { ...data } as any;
-        delete cleaned.slug;
-        const dataWithSlug = { ...cleaned, slug };
+        const dataWithSlug = { ...data, slug };
         await ToolTemplateEntity.validate(dataWithSlug, 'create');
 
         const now = new Date().toISOString();
@@ -191,21 +190,21 @@ export class ToolTemplateRepository extends BaseRepository {
           throw new Error('ID is required for update operation');
         }
 
-        // Slugs are never directly editable; ignore if provided.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const cleanedUpdates = { ...(updates as any) };
-        delete cleanedUpdates.slug;
+        const cleanedUpdates: UpdateToolTemplateRequest = { ...updates };
+
+        // Note: public UpdateToolTemplateRequest forbids `slug`, but the repository may set it internally.
+        const internalUpdates: Partial<ToolTemplateModel> = { ...cleanedUpdates };
 
         // Auto-regenerate slug on name updates
         if (cleanedUpdates.name !== undefined && cleanedUpdates.name !== null) {
           const baseSlug = generateSlug(String(cleanedUpdates.name)) || 'tool-template';
-          cleanedUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
         }
 
-        await ToolTemplateEntity.validate(cleanedUpdates, 'update');
+        await ToolTemplateEntity.validate(internalUpdates, 'update');
 
         const updateProps = {
-          ...cleanedUpdates,
+          ...internalUpdates,
           updatedAt: new Date().toISOString(),
         };
 

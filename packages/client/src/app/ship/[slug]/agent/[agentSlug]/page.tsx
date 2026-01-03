@@ -19,7 +19,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import api, { agentAPI } from '@/lib/api'
-import { AGENT_QUERY_KEYS, useAgentBySlugOrId, useStarshipAgents } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, fetchStarshipAgentBySlug, useStarshipAgentBySlug, useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
@@ -59,6 +59,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     isStreaming: isResponding,
     starshipSlug: String(slug),
     conversationId,
+    starshipId: starship?.id || null,
     agents,
     setLeadingMentionAgent: (agent: any, afterText?: string) => {
       try {
@@ -653,12 +654,14 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         // Fetch complete agent data by slug and sync form via TanStack Query
         ;(async () => {
           try {
-            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugArg as string), exact: true })
+            if (!starship?.id) {
+              throw new Error('starship.id missing (cannot resolve agent slug)')
+            }
+            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starship.id, String(slugArg)), exact: true })
             const agent = await queryClient.fetchQuery({
-              queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugArg as string),
+              queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starship.id, String(slugArg)),
               queryFn: async (): Promise<AgentModel> => {
-                const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${encodeURIComponent(slugArg as string)}`)
-                return res.data.data
+                return await fetchStarshipAgentBySlug(starship.id, String(slugArg))
               },
               staleTime: 30 * 1000,
             })
@@ -838,7 +841,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   }, [conversationId, liveMessages, slug, router, agentSlug, isResponding])
 
   // Prefill when editing an existing agent via TanStack Query
-  const { data: existingAgent } = useAgentBySlugOrId(agentSlug || '', !!agentSlug && agentSlug !== 'new')
+  const { data: existingAgent } = useStarshipAgentBySlug(starship?.id || '', agentSlug || '', !!starship?.id && !!agentSlug && agentSlug !== 'new')
   useEffect(() => {
     if (!existingAgent || !agentBuilderRef.current) return
     try {

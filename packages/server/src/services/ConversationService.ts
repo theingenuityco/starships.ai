@@ -1254,8 +1254,43 @@ export class ConversationService {
 
   /**
    * Stop current turn: cancel runner, persist partial content/reasoning (omit tool_calls), finalize SSE.
+   * Also recursively stops all child conversations (delegated conversations).
+   * @param conversationId - The conversation ID to stop
+   * @param visited - Internal set to prevent infinite loops (do not pass manually)
    */
-  async stopConversation(conversationId: string): Promise<void> {
+  async stopConversation(conversationId: string, visited: Set<string> = new Set()): Promise<void> {
+    // Guard against infinite loops (shouldn't happen with valid data, but safety first)
+    if (visited.has(conversationId)) {
+      console.warn('[STOP] Circular reference detected, skipping', { conversationId });
+      return;
+    }
+    visited.add(conversationId);
+
+    // First, recursively stop all child conversations (delegated conversations)
+    // This ensures that when stopping a parent conversation, all child conversations are also stopped
+    try {
+      const childConversations = await this.conversationRepository.findByParentConversationId(conversationId);
+      for (const childConversation of childConversations) {
+        try {
+          // Recursively stop child conversation (which will also stop its children if any)
+          await this.stopConversation(childConversation.id, visited);
+        } catch (err) {
+          console.warn('[STOP] Error stopping child conversation', {
+            parentConversationId: conversationId,
+            childConversationId: childConversation.id,
+            error: err instanceof Error ? err.message : String(err),
+          });
+          // Continue stopping other children even if one fails
+        }
+      }
+    } catch (err) {
+      console.warn('[STOP] Error finding child conversations', {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Continue with stopping this conversation even if finding children fails
+    }
+
     // Cancel active runner if any
     try {
       const cancel = ConversationService.activeCancellations.get(conversationId);

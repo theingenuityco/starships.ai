@@ -54,6 +54,11 @@ interface AgentDocumentEditorProps {
    */
   agentId?: string
   /**
+   * Optional: canonical agent model already fetched by the parent.
+   * When present, the editor must not issue its own /agents/:id fetch.
+   */
+  agent?: AgentModel | null
+  /**
    * When true, renders the editor in read-only/inspection mode:
    * - All form controls are disabled
    * - No mutations or publish/update actions are triggered
@@ -74,6 +79,7 @@ export function AgentDocumentEditor({
   onCancel,
   starshipId,
   agentId: providedAgentId,
+  agent: providedAgent,
   readOnly = false,
   embedded = false,
 }: AgentDocumentEditorProps) {
@@ -316,14 +322,21 @@ export function AgentDocumentEditor({
           return
         }
 
+        // If parent already provided the full agent model, use it and do NOT fetch.
+        if (providedAgent && typeof providedAgent.id === 'string' && providedAgent.id.trim().length > 0) {
+          if (!cancelled) {
+            setAgentId(providedAgent.id)
+            setFullAgent(providedAgent)
+          }
+          return
+        }
+
         // If the parent already provided the canonical id, hydrate directly from /agents/:id.
         if (typeof providedAgentId === 'string' && providedAgentId.trim().length > 0) {
           const id = providedAgentId.trim()
           if (!cancelled) setAgentId(id)
-          const fullResult = await safeGet<AgentModel>(`/api/v1/agents/${id}`)
-          if (!cancelled) {
-            setFullAgent(fullResult.ok && fullResult.data?.id ? fullResult.data : null)
-          }
+          // Do not fetch here. The parent page is responsible for fetching /agents/:id and can pass `agent`.
+          if (!cancelled) setFullAgent(null)
           return
         }
 
@@ -350,10 +363,19 @@ export function AgentDocumentEditor({
             setAgentId(agent.id || null)
           }
           // Fetch full agent details (canonical shape) for publish diff + autosave baseline.
-          const fullResult = await safeGet<AgentModel>(`/api/v1/agents/${agent.id}`)
-          const hydrated = (fullResult.ok && fullResult.data?.id ? fullResult.data : agent) as AgentModel
-          if (!cancelled) {
-            setFullAgent(hydrated)
+          // IMPORTANT: use React Query so concurrent callers share a single request.
+          try {
+            const hydrated = await queryClient.fetchQuery({
+              queryKey: AGENT_QUERY_KEYS.detail(agent.id),
+              queryFn: async (): Promise<AgentModel> => {
+                const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${agent.id}`)
+                return res.data.data
+              },
+              staleTime: 30 * 1000,
+            })
+            if (!cancelled) setFullAgent(hydrated?.id ? hydrated : agent)
+          } catch {
+            if (!cancelled) setFullAgent(agent)
           }
         } else {
           if (!cancelled) {
@@ -372,7 +394,7 @@ export function AgentDocumentEditor({
     return () => {
       cancelled = true
     }
-  }, [starshipId, value?.slug, providedAgentId])
+  }, [starshipId, value?.slug, providedAgentId, providedAgent, queryClient])
 
   // Load the published template (if any) for comparison to gate republish in UI.
   // We bypass the templateAPI cache and fetch fresh data so the diff matches backend behavior.
@@ -564,7 +586,15 @@ export function AgentDocumentEditor({
   useEffect(() => {
     const syncAgent = async () => {
       if (!agentId || hasSyncedAgentRef.current) return
+      // If the parent page provided agentId, it also owns the canonical /agents/:id fetch + prefill.
+      // Avoid an additional /agents/:id request from inside the editor.
+      if ((typeof providedAgentId === 'string' && providedAgentId.trim().length > 0) || (providedAgent && providedAgent.id)) {
+        hasSyncedAgentRef.current = true
+        return
+      }
       try {
+        // If we reached here, we're in a non-page context that didn't provide `agent`.
+        // Fetch once to backfill missing form fields.
         const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${agentId}`)
         const agent = res.data.data
         if (!agent) return
@@ -601,7 +631,7 @@ export function AgentDocumentEditor({
       }
     }
     void syncAgent()
-  }, [agentId, value, onChange])
+  }, [agentId, value, onChange, providedAgentId, providedAgent, onFieldChange])
 
   const publicationStatus = fullAgent?.publicationStatus || 'draft'
   const hasExistingAgent = !!agentId

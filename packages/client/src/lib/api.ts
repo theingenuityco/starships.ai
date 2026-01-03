@@ -453,8 +453,8 @@ export const agentAPI = {
     invalidateAgentCaches(id)
   },
 
-  getBySlug: async (slug: string): Promise<Agent> => {
-    const data = await api.get(`/api/v1/agents/${slug}`).then(res => extractResponseData<Agent>(res))
+  getBySlug: async (starshipId: string, slug: string): Promise<Agent> => {
+    const data = await api.get(`/api/v1/starships/${encodeURIComponent(starshipId)}/agents/${encodeURIComponent(slug)}`).then(res => extractResponseData<Agent>(res))
     return data
   },
 

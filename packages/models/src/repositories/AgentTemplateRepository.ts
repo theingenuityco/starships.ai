@@ -3,6 +3,7 @@ import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import { generateUniqueSlugRandomSuffix } from '@/utils/slugGenerator';
 import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest, ToolTemplateModel } from '@starships/protocol';
 
 export class AgentTemplateRepository extends BaseRepository {
@@ -10,29 +11,57 @@ export class AgentTemplateRepository extends BaseRepository {
     super('AgentTemplateRepository');
   }
 
+  /**
+   * Resolve a tool template id from an assignedToolSlugs entry.
+   *
+   * Why:
+   * - Tool template slugs are now generated with an always-on random suffix (e.g. `list-agents-x7k9`).
+   * - Seeded agent templates (and API clients) commonly reference the "base" slug (e.g. `list-agents`).
+   *
+   * Behavior:
+   * - Prefer exact slug match
+   * - Fall back to "random-suffix" match: `${baseSlug}-<suffix>`
+   *
+   * Important:
+   * A naive prefix match (`${baseSlug}-%`) can accidentally match other base slugs that merely start
+   * with the same prefix (e.g. `list` matching `list-agents-xxxx`). Since template slugs are generated
+   * with a fixed random suffix (`[a-z0-9]{4}`), we can (and should) match that exact shape:
+   * `^${baseSlug}-[a-z0-9]{4}$`.
+   */
+  private async resolveToolTemplateIdForAssignedSlug(assignedSlug: string): Promise<string | null> {
+    const base = generateSlug(String(assignedSlug || ''));
+    if (!base) return null;
+
+    // Escape for use inside a Postgres regex pattern (defensive; base is already slugified).
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+    const baseRegex = `^${escapeRegex(base)}-[a-z0-9]{4}$`;
+
+    const connection = this.getConnection();
+    const result = await connection.queryOne<{ id: string }>(
+      `
+        SELECT id
+        FROM tool_templates
+        WHERE slug = $1 OR slug ~ $2
+        ORDER BY (slug = $1) DESC, created_at DESC
+        LIMIT 1
+      `,
+      [base, baseRegex]
+    );
+
+    return result?.id ?? null;
+  }
+
   private async generateUniqueTemplateSlug(baseSlug: string): Promise<string> {
     const connection = this.getConnection();
-    const base = (baseSlug || '').trim();
-    const fallbackBase = base.length > 0 ? base : 'agent-template';
-
-    // Fast-path: base slug is free
-    const existing = await connection.queryOne<{ id: string }>('SELECT id FROM agent_templates WHERE slug = $1', [fallbackBase]);
-    if (!existing?.id) return fallbackBase;
-
-    // Otherwise suffix with -2, -3, ... until free
-    let counter = 2;
-    // Avoid an infinite loop in pathological cases
-    const maxAttempts = 10_000;
-    while (counter < maxAttempts) {
-      const candidate = `${fallbackBase}-${counter}`;
-      const row = await connection.queryOne<{ id: string }>('SELECT id FROM agent_templates WHERE slug = $1', [candidate]);
-      if (!row?.id) return candidate;
-      counter++;
-    }
-
-    // Fallback: timestamp if something is seriously wrong
-    const ts = Date.now().toString(36);
-    return `${fallbackBase}-${ts}`;
+    const base = generateSlug((baseSlug || '').toString()) || 'agent-template';
+    return await generateUniqueSlugRandomSuffix(
+      base,
+      async (candidate) => {
+        const row = await connection.queryOne<{ id: string }>('SELECT id FROM agent_templates WHERE slug = $1', [candidate]);
+        return !!row?.id;
+      },
+      { fallbackBase: 'agent-template', maxLength: 100, alwaysSuffix: true }
+    );
   }
 
   /**
@@ -349,6 +378,22 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
+  async findByName(name: string): Promise<AgentTemplateModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!name?.trim()) throw new Error('Name is required for findByName operation');
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE LOWER(name) = LOWER($1)', [
+          name.trim(),
+        ]);
+        return result ? fromDatabase(AgentTemplateEntity, result) : null;
+      },
+      'findByName',
+      'AgentTemplate',
+      name
+    );
+  }
+
   async create(data: CreateAgentTemplateRequest): Promise<AgentTemplateModel> {
     return this.executeWithErrorHandling(
       async () => {
@@ -356,7 +401,8 @@ export class AgentTemplateRepository extends BaseRepository {
 
         // Generate a stable template slug from the name (or provided slug), ensuring uniqueness.
         // IMPORTANT: Template slugs should not reuse instance slugs (which contain random suffixes).
-        const baseSlug = generateSlug((data.slug || data.name || '').toString()) || 'agent-template';
+        // Slugs are always generated by the server; ignore any caller-provided slug.
+        const baseSlug = generateSlug((data.name || '').toString()) || 'agent-template';
         const slug = await this.generateUniqueTemplateSlug(baseSlug);
 
         // Build template data for database storage
@@ -396,17 +442,11 @@ export class AgentTemplateRepository extends BaseRepository {
 
         // Create relationships for assigned tool templates
         if (data.assignedToolSlugs && data.assignedToolSlugs.length > 0) {
-          const connection = this.getConnection();
-
           for (const toolSlug of data.assignedToolSlugs) {
-            // Find tool template by slug
-            const toolTemplateResult = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [
-              toolSlug,
-            ]);
-
-            if (toolTemplateResult) {
+            const toolTemplateId = await this.resolveToolTemplateIdForAssignedSlug(toolSlug);
+            if (toolTemplateId) {
               // Create relationship using junction table
-              await this.addToolTemplateRelationship(template.id, toolTemplateResult.id);
+              await this.addToolTemplateRelationship(template.id, toolTemplateId);
             }
           }
         }
@@ -421,33 +461,39 @@ export class AgentTemplateRepository extends BaseRepository {
   async update(id: string, updates: UpdateAgentTemplateRequest): Promise<AgentTemplateModel | null> {
     return this.executeWithErrorHandling(
       async () => {
-        await AgentTemplateEntity.validate(updates, 'update');
+        const cleanedUpdates: UpdateAgentTemplateRequest = { ...updates };
+
+        // Auto-regenerate slug on name updates
+        // Note: public UpdateAgentTemplateRequest forbids `slug`, but the repository may set it internally.
+        const internalUpdates: Partial<AgentTemplateModel> = { ...cleanedUpdates };
+        if (cleanedUpdates.name !== undefined && cleanedUpdates.name !== null) {
+          const baseSlug = generateSlug(String(cleanedUpdates.name)) || 'agent-template';
+          internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+        }
+
+        await AgentTemplateEntity.validate(internalUpdates, 'update');
 
         const connection = this.getConnection();
 
         // Handle tool template relationships if assignedToolSlugs is being updated
-        if (updates.assignedToolSlugs !== undefined) {
+        if (cleanedUpdates.assignedToolSlugs !== undefined) {
           // Remove existing relationships
           await connection.query('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1', [id]);
 
           // Add new relationships
-          if (updates.assignedToolSlugs.length > 0) {
-            for (const toolSlug of updates.assignedToolSlugs) {
-              // Find tool template by slug
-              const toolTemplateResult = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [
-                toolSlug,
-              ]);
-
-              if (toolTemplateResult) {
+          if (cleanedUpdates.assignedToolSlugs.length > 0) {
+            for (const toolSlug of cleanedUpdates.assignedToolSlugs) {
+              const toolTemplateId = await this.resolveToolTemplateIdForAssignedSlug(toolSlug);
+              if (toolTemplateId) {
                 // Create relationship using junction table
-                await this.addToolTemplateRelationship(id, toolTemplateResult.id);
+                await this.addToolTemplateRelationship(id, toolTemplateId);
               }
             }
           }
         }
 
         const updateProps = {
-          ...updates,
+          ...internalUpdates,
           updatedAt: new Date().toISOString(),
         };
 

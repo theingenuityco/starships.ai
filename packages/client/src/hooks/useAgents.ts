@@ -27,8 +27,8 @@ export const AGENT_QUERY_KEYS = {
   list: (filters?: AgentFilters) => [...AGENT_QUERY_KEYS.lists(), { filters }] as const,
   details: () => [...AGENT_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...AGENT_QUERY_KEYS.details(), id] as const,
-  bySlugOrId: (slugOrId: string) => [...AGENT_QUERY_KEYS.all, 'slugOrId', slugOrId] as const,
   byStarship: (starshipId: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId] as const,
+  byStarshipSlug: (starshipId: string, slug: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId, 'slug', slug] as const,
   byAuthor: (authorId: string) => [...AGENT_QUERY_KEYS.all, 'author', authorId] as const,
   byUser: (userId: string) => [...AGENT_QUERY_KEYS.all, 'user', userId] as const,
   public: () => [...AGENT_QUERY_KEYS.all, 'public'] as const,
@@ -53,18 +53,18 @@ export function useAgent(agentId: string, enabled: boolean = true) {
 }
 
 /**
- * Fetcher and hook for agent by slug or ID (single endpoint).
+ * Fetch agent by slug within a specific starship.
  */
-export async function fetchAgentBySlugOrId(slugOrId: string): Promise<AgentModel> {
-  const response: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${encodeURIComponent(slugOrId)}`)
+export async function fetchStarshipAgentBySlug(starshipId: string, slug: string): Promise<AgentModel> {
+  const response: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/starships/${encodeURIComponent(starshipId)}/agents/${encodeURIComponent(slug)}`)
   return response.data.data
 }
 
-export function useAgentBySlugOrId(slugOrId: string, enabled: boolean = true) {
+export function useStarshipAgentBySlug(starshipId: string, slug: string, enabled: boolean = true) {
   return useQuery({
-    queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugOrId),
-    queryFn: () => fetchAgentBySlugOrId(slugOrId),
-    enabled: !!slugOrId && enabled,
+    queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starshipId, slug),
+    queryFn: () => fetchStarshipAgentBySlug(starshipId, slug),
+    enabled: !!starshipId && !!slug && enabled,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
   })

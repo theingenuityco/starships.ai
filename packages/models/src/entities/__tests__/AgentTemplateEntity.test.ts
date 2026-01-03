@@ -78,7 +78,9 @@ describe('AgentTemplateEntity', () => {
       expect(serialized.system_prompt).toBe('You are a coding assistant');
       expect(serialized.icon).toBe('🤖');
       expect(serialized.preview_prompts).toEqual(['Example 1', 'Example 2']);
-      expect(serialized.assigned_tool_slugs).toEqual(['tool-1', 'tool-2']);
+      // assignedToolSlugs is not persisted on agent_templates (it is populated from the junction table),
+      // so it must not be serialized for database writes.
+      expect((serialized as Record<string, unknown>).assigned_tool_slugs).toBeUndefined();
     });
   });
 

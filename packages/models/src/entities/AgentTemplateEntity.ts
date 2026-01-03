@@ -7,7 +7,7 @@
 
 import type { AgentState, Blueprint } from '@starships/autopilot';
 import type { AgentTemplateModel, TemplateCategory } from '@starships/protocol';
-import { Expose, Transform } from 'class-transformer';
+import { Exclude, Expose, Transform } from 'class-transformer';
 import {
   IsArray,
   IsEnum,
@@ -134,6 +134,12 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   blueprint!: Blueprint;
 
   // Tool assignment - reference by slugs instead of embedding
+  // IMPORTANT:
+  // `assignedToolSlugs` is an API-level field populated dynamically from the junction table
+  // `agent_template_tool_templates`. It is NOT persisted on `agent_templates`.
+  // We explicitly exclude it from class->plain serialization so `toDatabase()` never tries
+  // to write a legacy `assigned_tool_slugs` column.
+  @Exclude({ toPlainOnly: true })
   @Expose()
   @IsOptional()
   @IsArray()

@@ -26,7 +26,6 @@ import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository'
 import { ToolRepository } from '@/repositories/ToolRepository';
 import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
 import { ALL_AGENT_TEMPLATES } from '@/seeders/agents';
-import { generateUniqueAgentSlug } from '@/utils/slugGenerator';
 
 type Args = {
   starshipSlug?: string;
@@ -566,19 +565,11 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
           continue;
         }
 
-        // Prefer using the template slug verbatim for the "parent" when available.
-        // If taken, fall back to the normal unique slug pattern ({base}-{suffix}).
-        let agentSlug = template.slug;
-        const slugTaken = await agentRepo.findBySlug(agentSlug);
-        if (slugTaken) {
-          agentSlug = await generateUniqueAgentSlug(template.slug, agentRepo);
-        }
-
         if (args.dryRun) {
           parentsCreated++;
           logger.info(`[DRY-RUN] Would create parent agent for template "${template.slug}" on starship ${target.slug}`, {
             component: 'migrate-seeded-template-parents',
-            metadata: { templateId: template.id, plannedAgentSlug: agentSlug, starshipId: target.id },
+            metadata: { templateId: template.id, starshipId: target.id },
           });
           continue;
         }
@@ -587,7 +578,6 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
           {
             name: template.name,
             role: template.role,
-            slug: agentSlug,
             description: template.description,
             model: template.model,
             category: template.category,

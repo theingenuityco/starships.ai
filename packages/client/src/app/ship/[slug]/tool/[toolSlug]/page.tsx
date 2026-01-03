@@ -59,6 +59,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     isStreaming: isResponding,
     starshipSlug: String(slug),
     conversationId,
+    starshipId: starship?.id || null,
     agents,
     setLeadingMentionAgent: (agent: any, afterText?: string) => {
       try {

@@ -704,6 +704,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       isStreaming: uiStreaming,
       starshipSlug,
       conversationId: currentConversationId || externalConversationId || null,
+      starshipId,
       agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
       setLeadingMentionAgent: (agent: any, afterText?: string) => {
         try {

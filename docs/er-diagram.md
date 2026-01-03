@@ -182,7 +182,6 @@ erDiagram
         int timeout
         jsonb state
         jsonb blueprint
-        string[] assigned_tool_slugs
         string icon
         string[] preview_prompts
         string version

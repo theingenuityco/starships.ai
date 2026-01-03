@@ -66,6 +66,8 @@ export class ConversationService {
   private streamingService!: StreamingService;
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
+  // Track conversations that should be stopped when real cancel is registered
+  private static pendingStops: Set<string> = new Set();
   // Kept for future use (runtime secrets, connector context, etc.)
 
   private connectorSecretService!: ConnectorSecretService;
@@ -376,19 +378,44 @@ export class ConversationService {
 
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
-      if (conversation.parentConversationId && this.streamingService && this.streamingService.isActive(conversation.parentConversationId)) {
-        const payload: any = {
-          __ui_action: 'child_conversation_created',
+      if (conversation.parentConversationId) {
+        const parentHasPendingStop = ConversationService.pendingStops.has(conversation.parentConversationId);
+        const parentHasActiveCancellation = ConversationService.activeCancellations.has(conversation.parentConversationId);
+
+        console.log('[STOP-DEBUG] Child conversation created', {
           parentConversationId: conversation.parentConversationId,
           childConversationId: conversation.id,
-          starshipId: conversation.starshipId,
-        };
-        await this.streamingService.broadcastUIAction(conversation.parentConversationId, payload);
+          parentHasActiveCancellation,
+          parentHasPendingStop,
+          childHasActiveCancellation: ConversationService.activeCancellations.has(conversation.id),
+          allActiveCancellations: Array.from(ConversationService.activeCancellations.keys()),
+        });
+
+        // CRITICAL FIX: If parent has a pending stop, propagate it to the child immediately
+        // This ensures that if the parent is stopped before the child starts executing,
+        // the child will be stopped as soon as it tries to start
+        if (parentHasPendingStop) {
+          console.log('[STOP-DEBUG] Parent has pending stop, propagating to child', {
+            parentConversationId: conversation.parentConversationId,
+            childConversationId: conversation.id,
+          });
+          ConversationService.pendingStops.add(conversation.id);
+        }
+
+        if (this.streamingService && this.streamingService.isActive(conversation.parentConversationId)) {
+          const payload: any = {
+            __ui_action: 'child_conversation_created',
+            parentConversationId: conversation.parentConversationId,
+            childConversationId: conversation.id,
+            starshipId: conversation.starshipId,
+          };
+          await this.streamingService.broadcastUIAction(conversation.parentConversationId, payload);
+        }
       }
     } catch (e) {
       // Non-fatal: failure to emit UI hint must not break conversation creation
       try {
-        console.error('[UI_ACTION] Failed to emit child_conversation_created', {
+        console.error('[STOP-DEBUG] Failed to emit child_conversation_created', {
           error: e instanceof Error ? e.message : String(e),
           parentConversationId: conversation.parentConversationId,
           starshipId: conversation.starshipId,
@@ -809,6 +836,51 @@ export class ConversationService {
     ctx?: { authContext?: { userId: string; agentId?: string; starshipId?: string } },
     opts?: { preCreatedUserMessage?: MessageModel; turnLeaseId?: string }
   ): Promise<void> {
+    // CRITICAL: Check if this conversation was marked for stop BEFORE doing anything
+    // This prevents execution from starting if stop was requested
+    // CRITICAL: Keep pendingStops flag active so any subsequent messages are also aborted
+    // The remote runner service might continue processing and send results back later
+    const hasPendingStop = ConversationService.pendingStops.has(data.conversationId);
+    if (hasPendingStop) {
+      console.log('[STOP-DEBUG] Stop was pending at start of addConversationMessage, aborting', {
+        conversationId: data.conversationId,
+        note: 'Keeping pendingStops flag active to prevent future execution',
+      });
+      // Try to call cancel if available
+      const cancel = ConversationService.activeCancellations.get(data.conversationId);
+      if (typeof cancel === 'function' && !cancel.toString().includes('Placeholder cancel function')) {
+        try {
+          cancel();
+          console.log('[STOP-DEBUG] Called cancel in addConversationMessage abort', { conversationId: data.conversationId });
+        } catch (err) {
+          console.warn('[STOP-DEBUG] Error calling cancel in addConversationMessage abort', {
+            conversationId: data.conversationId,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+      // CRITICAL: Do NOT delete pendingStops - keep it active to prevent future execution
+      // The remote runner might continue processing and trigger new messages
+      // ConversationService.activeCancellations.delete(data.conversationId); // Keep cancellation handle too in case we need to cancel again
+      // Finalize turn state
+      try {
+        const convo = await this.getConversationById(data.conversationId);
+        if (convo) {
+          const prev = (convo.state as any) || {};
+          await this.conversationRepository.update(data.conversationId, {
+            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.warn('[STOP-DEBUG] Failed to update turn state', {
+          conversationId: data.conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+      return; // Exit early - don't process the message
+    }
+
     // SERVER-SIDE GUARD: Prevent duplicate messages when a turn is already active
     // CRITICAL: Check activeCancellations FIRST (synchronous) before any async operations
     // This catches concurrent requests even when conversation doesn't exist yet
@@ -821,9 +893,40 @@ export class ConversationService {
 
     // Add placeholder cancellation handle IMMEDIATELY to block concurrent requests
     // This works even when conversation doesn't exist yet (first message scenario)
+    console.log('[STOP-DEBUG] Setting placeholder cancellation handle', {
+      conversationId: data.conversationId,
+      allActiveCancellations: Array.from(ConversationService.activeCancellations.keys()),
+    });
+
+    // CRITICAL FIX: Check if this is a child conversation and if the parent has a pending stop
+    // If so, mark this child for stop immediately so it stops as soon as execution starts
+    let parentHasPendingStop = false;
+    try {
+      const conversation = await this.getConversationById(data.conversationId).catch(() => null);
+      if (conversation?.parentConversationId) {
+        parentHasPendingStop = ConversationService.pendingStops.has(conversation.parentConversationId);
+        if (parentHasPendingStop) {
+          console.log('[STOP-DEBUG] Parent has pending stop, marking child for stop', {
+            parentConversationId: conversation.parentConversationId,
+            childConversationId: data.conversationId,
+          });
+          ConversationService.pendingStops.add(data.conversationId);
+        }
+      }
+    } catch (e) {
+      // Non-fatal: if we can't check parent status, continue anyway
+      console.warn('[STOP-DEBUG] Failed to check parent stop status', {
+        conversationId: data.conversationId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+
     ConversationService.activeCancellations.set(data.conversationId, () => {
       // Placeholder cancel function - will be replaced by actual runner cancel when workflow starts
       // This should never be called, but if it is, it's a no-op
+      console.log('[STOP-DEBUG] Placeholder cancel function called (unexpected)', {
+        conversationId: data.conversationId,
+      });
     });
 
     // Now check conversation state (async, but we're already protected by activeCancellations)
@@ -961,6 +1064,48 @@ export class ConversationService {
 
       // Orchestrate sequentially without dynamic mention-based handoffs
       while (agentQueue.length > 0 && hops < maxHops) {
+        // CRITICAL: Check for pending stop at the START of each loop iteration
+        // This catches cases where stop was requested while we were processing previous agents
+        if (ConversationService.pendingStops.has(data.conversationId)) {
+          console.log('[STOP-DEBUG] Stop detected at start of agent loop iteration, aborting', {
+            conversationId: data.conversationId,
+            remainingAgents: agentQueue.length,
+            hops,
+          });
+          // Try to call cancel if available
+          const cancel = ConversationService.activeCancellations.get(data.conversationId);
+          if (typeof cancel === 'function' && !cancel.toString().includes('Placeholder cancel function')) {
+            try {
+              cancel();
+              console.log('[STOP-DEBUG] Called cancel in loop check', { conversationId: data.conversationId });
+            } catch (err) {
+              console.warn('[STOP-DEBUG] Error calling cancel in loop check', {
+                conversationId: data.conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+          ConversationService.pendingStops.delete(data.conversationId);
+          ConversationService.activeCancellations.delete(data.conversationId);
+          // Finalize turn state
+          try {
+            const convo = await this.getConversationById(data.conversationId);
+            if (convo) {
+              const prev = (convo.state as any) || {};
+              await this.conversationRepository.update(data.conversationId, {
+                state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.warn('[STOP-DEBUG] Failed to finalize in loop check', {
+              conversationId: data.conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          break; // Exit the while loop
+        }
+
         const agentModel = agentQueue.shift()!;
         if (processedAgents.has(agentModel.id)) {
           continue;
@@ -1028,6 +1173,35 @@ export class ConversationService {
           (agentWithTools.state as any).imageConfig = (data as any).imageConfig;
         }
 
+        // Check if this conversation was marked for stop before execution starts
+        const hasPendingStop = ConversationService.pendingStops.has(data.conversationId);
+        if (hasPendingStop) {
+          console.log('[STOP-DEBUG] Stop was pending before execution, skipping agent execution', {
+            conversationId: data.conversationId,
+          });
+          // Clean up and exit early
+          ConversationService.pendingStops.delete(data.conversationId);
+          ConversationService.activeCancellations.delete(data.conversationId);
+          // Still need to finalize the turn state
+          try {
+            const convo = await this.getConversationById(data.conversationId);
+            if (convo) {
+              const prev = (convo.state as any) || {};
+              await this.conversationRepository.update(data.conversationId, {
+                state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.warn('[STOP-DEBUG] Failed to update turn state for stopped conversation', {
+              conversationId: data.conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          // Skip to next agent or exit
+          continue;
+        }
+
         const agent = new Agent(agentWithTools, {
           eventCallback: (event) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
@@ -1035,22 +1209,178 @@ export class ConversationService {
           runner: this.defaultRunner,
           runnerConfig: engineConfig as unknown as Record<string, unknown>,
           onCancel: (cancel) => {
+            console.log('[STOP-DEBUG] Registering cancellation handle (addConversationMessage)', {
+              conversationId: data.conversationId,
+              cancelType: typeof cancel,
+              allActiveCancellations: Array.from(ConversationService.activeCancellations.keys()),
+              hasPendingStop: ConversationService.pendingStops.has(data.conversationId),
+            });
+
+            // Check if this conversation was marked for stop before the real cancel was registered
+            const shouldStopImmediately = ConversationService.pendingStops.has(data.conversationId);
+
             ConversationService.activeCancellations.set(data.conversationId, cancel);
+            console.log('[STOP-DEBUG] Cancellation handle registered (addConversationMessage)', {
+              conversationId: data.conversationId,
+              activeCancellationsAfter: Array.from(ConversationService.activeCancellations.keys()),
+              shouldStopImmediately,
+            });
+
+            // If stop was requested before real cancel was registered, call it immediately
+            if (shouldStopImmediately) {
+              console.log('[STOP-DEBUG] Stop was pending, calling cancel immediately (addConversationMessage)', {
+                conversationId: data.conversationId,
+              });
+              try {
+                cancel();
+                console.log('[STOP-DEBUG] Pending stop executed successfully (addConversationMessage)', {
+                  conversationId: data.conversationId,
+                });
+              } catch (err) {
+                console.warn('[STOP-DEBUG] Error executing pending stop (addConversationMessage)', {
+                  conversationId: data.conversationId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+              }
+              ConversationService.pendingStops.delete(data.conversationId);
+              ConversationService.activeCancellations.delete(data.conversationId);
+            }
           },
         });
 
         // Execute the agent. Provide the full conversation snapshot as input so Agent.execute can
         // construct the correct ordered message list (systemPrompt -> memory -> conversation).
+        // CRITICAL: Check one final time right before execution (race condition protection)
+        if (ConversationService.pendingStops.has(data.conversationId)) {
+          console.log('[STOP-DEBUG] Stop was requested just before execute, aborting execution', {
+            conversationId: data.conversationId,
+          });
+          // Try to call cancel if real cancel is already registered
+          const cancel = ConversationService.activeCancellations.get(data.conversationId);
+          if (typeof cancel === 'function' && !cancel.toString().includes('Placeholder cancel function')) {
+            try {
+              cancel();
+              console.log('[STOP-DEBUG] Called real cancel before execute', { conversationId: data.conversationId });
+            } catch (err) {
+              console.warn('[STOP-DEBUG] Error calling cancel before execute', {
+                conversationId: data.conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+          ConversationService.pendingStops.delete(data.conversationId);
+          ConversationService.activeCancellations.delete(data.conversationId);
+          // Finalize turn state
+          try {
+            const convo = await this.getConversationById(data.conversationId);
+            if (convo) {
+              const prev = (convo.state as any) || {};
+              await this.conversationRepository.update(data.conversationId, {
+                state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.warn('[STOP-DEBUG] Failed to update turn state before execute', {
+              conversationId: data.conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          continue; // Skip this agent execution
+        }
+
+        // FINAL CHECK: Right before execute, check one more time for pending stop
+        // This is the last chance to abort before execution starts
+        if (ConversationService.pendingStops.has(data.conversationId)) {
+          console.log('[STOP-DEBUG] Final check: Stop pending right before execute, aborting', {
+            conversationId: data.conversationId,
+          });
+          const cancel = ConversationService.activeCancellations.get(data.conversationId);
+          if (typeof cancel === 'function' && !cancel.toString().includes('Placeholder cancel function')) {
+            try {
+              cancel();
+              console.log('[STOP-DEBUG] Called cancel in final check', { conversationId: data.conversationId });
+            } catch (err) {
+              console.warn('[STOP-DEBUG] Error in final check cancel', {
+                conversationId: data.conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+          ConversationService.pendingStops.delete(data.conversationId);
+          ConversationService.activeCancellations.delete(data.conversationId);
+          // Finalize turn state
+          try {
+            const convo = await this.getConversationById(data.conversationId);
+            if (convo) {
+              const prev = (convo.state as any) || {};
+              await this.conversationRepository.update(data.conversationId, {
+                state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.warn('[STOP-DEBUG] Failed to finalize in final check', {
+              conversationId: data.conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          }
+          continue; // Skip execution
+        }
+
+        console.log('[STOP-DEBUG] About to call agent.execute', {
+          conversationId: data.conversationId,
+          hasPendingStop: ConversationService.pendingStops.has(data.conversationId),
+          hasActiveCancellation: ConversationService.activeCancellations.has(data.conversationId),
+          cancellationType: typeof ConversationService.activeCancellations.get(data.conversationId),
+        });
         await agent.execute(ExecutionItemUtils.wrapSingle(llmMessages));
+        console.log('[STOP-DEBUG] agent.execute completed', {
+          conversationId: data.conversationId,
+          hadPendingStop: ConversationService.pendingStops.has(data.conversationId),
+          hasActiveCancellation: ConversationService.activeCancellations.has(data.conversationId),
+        });
 
         // Clear cancellation handle after completion
+        // CRITICAL: If onCancel was never called, we still have a placeholder that needs to be cleaned up
+        const finalCancel = ConversationService.activeCancellations.get(data.conversationId);
+        if (finalCancel && typeof finalCancel === 'function') {
+          const isPlaceholder = finalCancel.toString().includes('Placeholder cancel function');
+          if (isPlaceholder) {
+            console.log('[STOP-DEBUG] Execution completed but placeholder still present (onCancel never called), cleaning up', {
+              conversationId: data.conversationId,
+            });
+          }
+        }
         ConversationService.activeCancellations.delete(data.conversationId);
+        // Also clear pending stop if execution completed successfully
+        ConversationService.pendingStops.delete(data.conversationId);
 
         // Refresh messages after this agent's turn so subsequent agents (if any)
         // see the updated conversation state, but do not perform mention-based handoffs
         messages = await this.getConversationMessages(data.conversationId);
       }
     } catch (error) {
+      // Check if this is a cancellation error - if so, it's expected and we should handle it gracefully
+      const isCancellationError =
+        error instanceof Error &&
+        (error.name === 'AbortError' ||
+          error.message.includes('aborted') ||
+          error.message.includes('cancelled') ||
+          error.message.includes('Remote runner execution cancelled'));
+
+      if (isCancellationError) {
+        console.log('[STOP-DEBUG] Execution was cancelled (expected)', {
+          conversationId: data.conversationId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Clean up cancellation handle - execution was intentionally stopped
+        ConversationService.activeCancellations.delete(data.conversationId);
+        ConversationService.pendingStops.delete(data.conversationId);
+        // Don't throw - cancellation is expected, just stop execution
+        return;
+      }
+
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
         error: error instanceof Error ? error.message : 'Unknown error',
         stack: error instanceof Error ? error.stack : undefined,
@@ -1235,7 +1565,38 @@ export class ConversationService {
         runner: this.defaultRunner,
         runnerConfig: engineConfig as unknown as Record<string, unknown>,
         onCancel: (cancel) => {
+          console.log('[STOP-DEBUG] Registering cancellation handle', {
+            conversationId,
+            cancelType: typeof cancel,
+            allActiveCancellations: Array.from(ConversationService.activeCancellations.keys()),
+            hasPendingStop: ConversationService.pendingStops.has(conversationId),
+          });
+
+          // Check if this conversation was marked for stop before the real cancel was registered
+          const shouldStopImmediately = ConversationService.pendingStops.has(conversationId);
+
           ConversationService.activeCancellations.set(conversationId, cancel);
+          console.log('[STOP-DEBUG] Cancellation handle registered', {
+            conversationId,
+            activeCancellationsAfter: Array.from(ConversationService.activeCancellations.keys()),
+            shouldStopImmediately,
+          });
+
+          // If stop was requested before real cancel was registered, call it immediately
+          if (shouldStopImmediately) {
+            console.log('[STOP-DEBUG] Stop was pending, calling cancel immediately', { conversationId });
+            try {
+              cancel();
+              console.log('[STOP-DEBUG] Pending stop executed successfully', { conversationId });
+            } catch (err) {
+              console.warn('[STOP-DEBUG] Error executing pending stop', {
+                conversationId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+            ConversationService.pendingStops.delete(conversationId);
+            ConversationService.activeCancellations.delete(conversationId);
+          }
         },
       });
 
@@ -1259,9 +1620,16 @@ export class ConversationService {
    * @param visited - Internal set to prevent infinite loops (do not pass manually)
    */
   async stopConversation(conversationId: string, visited: Set<string> = new Set()): Promise<void> {
+    console.log('[STOP-DEBUG] stopConversation called', {
+      conversationId,
+      visitedSize: visited.size,
+      hasActiveCancellation: ConversationService.activeCancellations.has(conversationId),
+      allActiveCancellations: Array.from(ConversationService.activeCancellations.keys()),
+    });
+
     // Guard against infinite loops (shouldn't happen with valid data, but safety first)
     if (visited.has(conversationId)) {
-      console.warn('[STOP] Circular reference detected, skipping', { conversationId });
+      console.warn('[STOP-DEBUG] Circular reference detected, skipping', { conversationId });
       return;
     }
     visited.add(conversationId);
@@ -1269,24 +1637,77 @@ export class ConversationService {
     // First, recursively stop all child conversations (delegated conversations)
     // This ensures that when stopping a parent conversation, all child conversations are also stopped
     try {
+      console.log('[STOP-DEBUG] Finding child conversations for parent', { conversationId });
       const childConversations = await this.conversationRepository.findByParentConversationId(conversationId);
+      console.log('[STOP-DEBUG] Found child conversations', {
+        parentConversationId: conversationId,
+        childCount: childConversations.length,
+        childIds: childConversations.map((c) => c.id),
+      });
+
       for (const childConversation of childConversations) {
         try {
+          const childCancel = ConversationService.activeCancellations.get(childConversation.id);
+          const childCancelString = typeof childCancel === 'function' ? childCancel.toString() : '';
+          const childHasPlaceholder = childCancelString.includes('Placeholder cancel function');
+
+          console.log('[STOP-DEBUG] Stopping child conversation', {
+            parentConversationId: conversationId,
+            childConversationId: childConversation.id,
+            childHasActiveCancellation: ConversationService.activeCancellations.has(childConversation.id),
+            childHasPlaceholder,
+            childHasRealCancel: typeof childCancel === 'function' && !childHasPlaceholder,
+          });
+
+          // CRITICAL: Mark child for stop immediately, even if it's already executing
+          // This ensures the onCancel callback will see the pending stop and call cancel immediately
+          ConversationService.pendingStops.add(childConversation.id);
+
+          // SIMPLE FIX: If we have a real cancel (not placeholder), call it immediately
+          // This handles the case where the child is executing and we have the cancel function
+          if (typeof childCancel === 'function' && !childHasPlaceholder) {
+            console.log('[STOP-DEBUG] Child has real cancel, calling it immediately', {
+              parentConversationId: conversationId,
+              childConversationId: childConversation.id,
+            });
+            try {
+              childCancel();
+              console.log('[STOP-DEBUG] Child real cancel called successfully', {
+                parentConversationId: conversationId,
+                childConversationId: childConversation.id,
+              });
+              ConversationService.activeCancellations.delete(childConversation.id);
+              ConversationService.pendingStops.delete(childConversation.id);
+            } catch (err) {
+              console.warn('[STOP-DEBUG] Error calling child real cancel', {
+                parentConversationId: conversationId,
+                childConversationId: childConversation.id,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
+
           // Recursively stop child conversation (which will also stop its children if any)
           await this.stopConversation(childConversation.id, visited);
+          console.log('[STOP-DEBUG] Successfully stopped child conversation', {
+            parentConversationId: conversationId,
+            childConversationId: childConversation.id,
+          });
         } catch (err) {
-          console.warn('[STOP] Error stopping child conversation', {
+          console.warn('[STOP-DEBUG] Error stopping child conversation', {
             parentConversationId: conversationId,
             childConversationId: childConversation.id,
             error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
           });
           // Continue stopping other children even if one fails
         }
       }
     } catch (err) {
-      console.warn('[STOP] Error finding child conversations', {
+      console.warn('[STOP-DEBUG] Error finding child conversations', {
         conversationId,
         error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       });
       // Continue with stopping this conversation even if finding children fails
     }
@@ -1294,21 +1715,165 @@ export class ConversationService {
     // Cancel active runner if any
     try {
       const cancel = ConversationService.activeCancellations.get(conversationId);
+      const cancelString = typeof cancel === 'function' ? cancel.toString() : '';
+      const isPlaceholder = cancelString.includes('Placeholder cancel function');
+      console.log('[STOP-DEBUG] Checking cancellation handle', {
+        conversationId,
+        hasCancel: typeof cancel === 'function',
+        cancelType: typeof cancel,
+        isPlaceholder,
+        cancelStringPreview: cancelString.substring(0, 200),
+      });
       if (typeof cancel === 'function') {
-        try {
-          cancel();
-        } catch (err) {
-          console.warn('[STOP] Error while cancelling active runner', {
+        // Check if this is a placeholder cancel function (it will log "Placeholder cancel function called")
+        const isPlaceholder = cancel.toString().includes('Placeholder cancel function');
+
+        if (isPlaceholder) {
+          // Real cancel hasn't been registered yet - mark this conversation for stop
+          // The real cancel will check this flag and stop immediately when registered
+          console.log('[STOP-DEBUG] Placeholder cancel found, marking for stop when real cancel is registered', {
             conversationId,
-            error: err instanceof Error ? err.message : String(err),
           });
+          ConversationService.pendingStops.add(conversationId);
+          // Don't delete the placeholder yet - we need to keep it so the real cancel can replace it
+
+          // CRITICAL FIX: Before polling, do an immediate re-check in case the real cancel was just registered
+          // This handles the race condition where execution is in progress and the real cancel gets registered
+          // between when we first checked and now
+          await new Promise((resolve) => setTimeout(resolve, 10)); // Small delay to let any in-flight registrations complete
+          const immediateRecheck = ConversationService.activeCancellations.get(conversationId);
+          if (immediateRecheck && typeof immediateRecheck === 'function') {
+            const isStillPlaceholderAfterRecheck = immediateRecheck.toString().includes('Placeholder cancel function');
+            if (!isStillPlaceholderAfterRecheck) {
+              // Real cancel is now registered! Call it immediately
+              console.log('[STOP-DEBUG] Real cancel found on immediate recheck, calling it', {
+                conversationId,
+              });
+              try {
+                immediateRecheck();
+                console.log('[STOP-DEBUG] Real cancel called successfully on immediate recheck', { conversationId });
+                ConversationService.pendingStops.delete(conversationId);
+                ConversationService.activeCancellations.delete(conversationId);
+                // Skip polling since we already found and called the real cancel
+                return;
+              } catch (err) {
+                console.warn('[STOP-DEBUG] Error calling cancel on immediate recheck', {
+                  conversationId,
+                  error: err instanceof Error ? err.message : String(err),
+                });
+                // Continue to polling as fallback
+              }
+            }
+          }
+
+          // CRITICAL FIX: We found a placeholder, which means execution might be starting or already in progress.
+          // Even if turnActive is false, execution might be in progress (turnActive is set after execution starts).
+          // We should poll for the real cancel to be registered, but with a shorter timeout for cases where
+          // execution truly hasn't started and won't start (due to pending stop).
+          // However, we can't rely on turnActive alone because there's a race condition where execution is
+          // in progress but turnActive hasn't been set yet.
+          console.log('[STOP-DEBUG] Placeholder found, will poll for real cancel (execution may be in progress)', {
+            conversationId,
+          });
+
+          // CRITICAL FIX: Poll for real cancel to be registered (execution might be in progress)
+          // The onCancel callback should handle this, but as a fallback, check a few times
+          // This handles the race condition where execution starts before stop is called
+          // IMPORTANT: For child conversations that are already executing, we need to poll longer
+          // because the real cancel should already be registered, we just need to catch it
+          let pollCount = 0;
+          const maxPolls = 30; // Increased from 10 to 30 to handle executing children (1.5 seconds total)
+          const pollInterval = 50; // 50ms between polls
+
+          const pollForRealCancel = async () => {
+            while (pollCount < maxPolls && ConversationService.pendingStops.has(conversationId)) {
+              await new Promise((resolve) => setTimeout(resolve, pollInterval));
+              pollCount++;
+
+              const currentCancel = ConversationService.activeCancellations.get(conversationId);
+              if (currentCancel && typeof currentCancel === 'function') {
+                const isStillPlaceholder = currentCancel.toString().includes('Placeholder cancel function');
+                if (!isStillPlaceholder) {
+                  // Real cancel is now registered!
+                  console.log('[STOP-DEBUG] Real cancel registered during polling, calling it', {
+                    conversationId,
+                    pollCount,
+                  });
+                  try {
+                    currentCancel();
+                    console.log('[STOP-DEBUG] Real cancel called successfully during polling', { conversationId });
+                  } catch (err) {
+                    console.warn('[STOP-DEBUG] Error calling cancel during polling', {
+                      conversationId,
+                      error: err instanceof Error ? err.message : String(err),
+                    });
+                  }
+                  ConversationService.pendingStops.delete(conversationId);
+                  ConversationService.activeCancellations.delete(conversationId);
+                  return; // Exit polling loop
+                }
+              }
+            }
+
+            if (pollCount >= maxPolls && ConversationService.pendingStops.has(conversationId)) {
+              console.warn('[STOP-DEBUG] Polling timeout - real cancel never registered', {
+                conversationId,
+                pollCount,
+                // Additional debug: check if conversation is actually executing
+                hasActiveCancellation: ConversationService.activeCancellations.has(conversationId),
+                activeCancellationType: typeof ConversationService.activeCancellations.get(conversationId),
+              });
+
+              // CRITICAL: Even though polling timed out, the conversation might still be executing.
+              // The pending stop flag will prevent new execution from starting, but we can't stop
+              // execution that's already in progress without the real cancel. This is a limitation
+              // when onCancel isn't called (e.g., if runner doesn't support runWithController).
+              // The execution will eventually complete or timeout, and the pending stop will prevent
+              // any new execution from starting.
+              console.warn('[STOP-DEBUG] Execution may still be in progress but cannot be stopped without real cancel', {
+                conversationId,
+                note: 'Pending stop flag will prevent new execution, but current execution may continue',
+              });
+            }
+          };
+
+          // Start polling in background (don't await - let it run async)
+          pollForRealCancel().catch((err) => {
+            console.warn('[STOP-DEBUG] Polling error', {
+              conversationId,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        } else {
+          // Real cancel function exists - call it
+          try {
+            console.log('[STOP-DEBUG] Calling real cancel function', { conversationId });
+            cancel();
+            console.log('[STOP-DEBUG] Real cancel function called successfully', { conversationId });
+          } catch (err) {
+            console.warn('[STOP-DEBUG] Error while cancelling active runner', {
+              conversationId,
+              error: err instanceof Error ? err.message : String(err),
+              stack: err instanceof Error ? err.stack : undefined,
+            });
+          }
+          ConversationService.activeCancellations.delete(conversationId);
+          ConversationService.pendingStops.delete(conversationId);
+          console.log('[STOP-DEBUG] Removed cancellation handle and pending stop', { conversationId });
         }
-        ConversationService.activeCancellations.delete(conversationId);
+      } else {
+        // No cancellation handle at all - mark for stop in case it gets registered later
+        console.log('[STOP-DEBUG] No active cancellation handle found, marking for stop', {
+          conversationId,
+          activeCancellationsKeys: Array.from(ConversationService.activeCancellations.keys()),
+        });
+        ConversationService.pendingStops.add(conversationId);
       }
     } catch (err) {
-      console.warn('[STOP] Error accessing active cancellation handle', {
+      console.warn('[STOP-DEBUG] Error accessing active cancellation handle', {
         conversationId,
         error: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack : undefined,
       });
     }
 

@@ -717,19 +717,109 @@ export class Agent implements NodeHandler {
 
       // If the runner supports cancellation controllers, prefer that path so callers can stop a turn.
       type RunnerController = { promise: Promise<ExecutionItem[]>; cancel: () => void };
-      type RunnerWithController = Runner & {
-        runWithController: (bp: Blueprint, exec: Execution, cfg?: EngineConfig) => RunnerController;
+      // CRITICAL: Check if runner has runWithController method (not just type check)
+      // Use type assertion to check for the method at runtime
+      const runnerWithController = runner as Runner & {
+        runWithController?: (bp: Blueprint, exec: Execution, cfg?: EngineConfig) => RunnerController;
       };
-      const ctl = (runner as Runner & Partial<RunnerWithController>).runWithController?.(blueprint, execution, engineConfig);
-      if (ctl && typeof ctl.cancel === 'function') {
+      const hasRunWithController = typeof runnerWithController.runWithController === 'function';
+
+      console.log('[STOP-DEBUG] Agent.execute: Checking runner for cancellation support', {
+        runnerType: runner.constructor.name,
+        hasRunWithController,
+        hasOnCancel: !!this.options?.onCancel,
+      });
+
+      if (hasRunWithController && runnerWithController.runWithController) {
         try {
-          this.options?.onCancel?.(ctl.cancel);
-        } catch {
-          // ignore cancel registration failures
+          const ctl = runnerWithController.runWithController(blueprint, execution, engineConfig);
+          console.log('[STOP-DEBUG] Agent.execute: runWithController called', {
+            ctlExists: !!ctl,
+            ctlHasCancel: ctl && typeof ctl.cancel === 'function',
+            ctlHasPromise: ctl && typeof ctl.promise === 'object',
+          });
+
+          if (ctl && typeof ctl.cancel === 'function') {
+            try {
+              console.log('[STOP-DEBUG] Agent.execute: Calling onCancel with real cancel function', {
+                runnerType: runner.constructor.name,
+              });
+              this.options?.onCancel?.(ctl.cancel);
+              console.log('[STOP-DEBUG] Agent.execute: onCancel called successfully');
+            } catch (err) {
+              console.warn('[STOP-DEBUG] Agent.execute: Error in onCancel callback', {
+                error: err instanceof Error ? err.message : String(err),
+                stack: err instanceof Error ? err.stack : undefined,
+              });
+              // ignore cancel registration failures
+            }
+            try {
+              return await ctl.promise;
+            } catch (err) {
+              // If the error is an AbortError (cancellation), re-throw it
+              // Don't fall back to runner.run() when execution was intentionally cancelled
+              // Check for AbortError, DOMException with aborted message, or any error mentioning abort/cancel
+              const isAbortError =
+                (err instanceof Error &&
+                  (err.name === 'AbortError' || err.message.includes('aborted') || err.message.includes('cancelled'))) ||
+                (err instanceof DOMException && err.name === 'AbortError') ||
+                (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') ||
+                String(err).includes('aborted') ||
+                String(err).includes('cancelled');
+
+              if (isAbortError) {
+                console.log('[STOP-DEBUG] Agent.execute: Execution was cancelled (AbortError), not falling back to runner.run()', {
+                  error: err instanceof Error ? err.message : String(err),
+                  errorName:
+                    err instanceof Error
+                      ? err.name
+                      : typeof err === 'object' && err !== null && 'name' in err
+                        ? String(err.name)
+                        : 'unknown',
+                });
+                throw err;
+              }
+              // For other errors, log and re-throw (don't fall back)
+              throw err;
+            }
+          } else {
+            console.warn('[STOP-DEBUG] Agent.execute: runWithController returned invalid result', {
+              ctlType: typeof ctl,
+              ctlKeys: ctl ? Object.keys(ctl) : [],
+            });
+          }
+        } catch (err) {
+          // If it's an abort error, don't fall back - just re-throw
+          // Check for AbortError, DOMException with aborted message, or any error mentioning abort/cancel
+          const isAbortError =
+            (err instanceof Error && (err.name === 'AbortError' || err.message.includes('aborted') || err.message.includes('cancelled'))) ||
+            (err instanceof DOMException && err.name === 'AbortError') ||
+            (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') ||
+            String(err).includes('aborted') ||
+            String(err).includes('cancelled');
+
+          if (isAbortError) {
+            console.log('[STOP-DEBUG] Agent.execute: Execution was cancelled, not falling back to runner.run()', {
+              error: err instanceof Error ? err.message : String(err),
+              errorName:
+                err instanceof Error ? err.name : typeof err === 'object' && err !== null && 'name' in err ? String(err.name) : 'unknown',
+            });
+            throw err;
+          }
+          console.warn('[STOP-DEBUG] Agent.execute: Error calling runWithController', {
+            error: err instanceof Error ? err.message : String(err),
+            stack: err instanceof Error ? err.stack : undefined,
+          });
+          // Don't fall back for other errors either - let them propagate
+          throw err;
         }
-        return await ctl.promise;
       }
 
+      console.warn('[STOP-DEBUG] Agent.execute: Falling back to runner.run() - onCancel will NOT be called', {
+        runnerType: runner.constructor.name,
+        hasRunWithController,
+        hasOnCancel: !!this.options?.onCancel,
+      });
       return await runner.run(blueprint, execution, engineConfig);
     } catch (error) {
       throw new Error(`Agent execution failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

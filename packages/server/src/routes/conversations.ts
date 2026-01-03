@@ -440,6 +440,10 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
     if (!paramValidation) return;
 
     const { conversationId } = paramValidation;
+    console.log('[STOP-DEBUG] Stop endpoint called', {
+      conversationId,
+      timestamp: new Date().toISOString(),
+    });
 
     const conversationService = new ConversationService();
     const exists = await conversationService.getConversationById(conversationId);
@@ -458,7 +462,15 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
       return;
     }
 
+    console.log('[STOP-DEBUG] About to call stopConversation', {
+      conversationId,
+      timestamp: new Date().toISOString(),
+    });
     await conversationService.stopConversation(conversationId);
+    console.log('[STOP-DEBUG] stopConversation completed', {
+      conversationId,
+      timestamp: new Date().toISOString(),
+    });
     sendSuccess(res, { status: 'stopped', conversationId }, 200);
   } catch (error) {
     handleError(error, res, 'stopping conversation');

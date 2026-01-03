@@ -308,9 +308,6 @@ export class AgentRepository extends BaseRepository {
         // Ensure numeric fields are properly typed (convert strings to numbers if needed)
         // Only convert values that are not null/undefined to avoid NaN or 0 from null
         const typedUpdates: UpdateAgentRequest = { ...updates };
-        // Slugs are never directly editable; ignore if a caller provides it anyway.
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        delete (typedUpdates as any).slug;
 
         if (updates.temperature !== undefined && updates.temperature !== null) {
           typedUpdates.temperature = Number(updates.temperature);

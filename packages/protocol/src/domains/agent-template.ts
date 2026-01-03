@@ -73,6 +73,7 @@ export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
   icon?: string;
   previewPrompts?: string[];
   assignedToolSlugs?: string[]; // Tool templates to assign to this agent template
+  version?: string; // Semantic version (defaults to '1.0.0' if not provided)
 }
 
 /**

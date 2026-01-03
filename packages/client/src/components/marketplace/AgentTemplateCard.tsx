@@ -193,13 +193,6 @@ export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCar
   const category = (template as any)?.category
   return (
     <Card className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer" onClick={() => onClick?.(template)}>
-      {version ? (
-        <div className="absolute top-2 right-2 z-20">
-          <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono bg-background/70 backdrop-blur-sm">
-            v{String(version)}
-          </Badge>
-        </div>
-      ) : null}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
       <CardHeader className="pb-3 relative z-10">
         <div className="mb-1 flex items-center gap-2">
@@ -209,18 +202,24 @@ export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCar
           <CardTitle className="truncate text-base font-semibold">{displayName || template.name}</CardTitle>
         </div>
         {subtitle ? <CardDescription className="-mt-1 line-clamp-1 text-xs">{subtitle}</CardDescription> : null}
-        {template.description && <CardDescription className="line-clamp-2 text-xs">{template.description}</CardDescription>}
+        {template.description && <CardDescription className="line-clamp-5 text-xs">{template.description}</CardDescription>}
       </CardHeader>
       <CardContent className="relative z-10 pt-0">
         <div className="flex items-center justify-between">
-          {typeof category === 'string' && category.trim() ? (
-            <Badge className={`text-[10px] ${getCategoryColor(category as any)} flex items-center gap-1.5 border font-medium w-fit capitalize`}>
-              <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />
-              <span>{category}</span>
-            </Badge>
-          ) : (
-            <span aria-hidden />
-          )}
+          <div className="flex items-center gap-2 min-w-0">
+            {typeof category === 'string' && category.trim() ? (
+              <Badge className={`text-[10px] ${getCategoryColor(category as any)} flex items-center gap-1.5 border font-medium w-fit capitalize`}>
+                <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />
+                <span>{category}</span>
+              </Badge>
+            ) : null}
+            {version ? (
+              <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                v{String(version)}
+              </Badge>
+            ) : null}
+            {!category && !version ? <span aria-hidden /> : null}
+          </div>
           <div className="flex items-center gap-1 text-muted-foreground">
             <Icon name="download" className="h-3.5 w-3.5" />
             <span className="text-[10px]">{template.usageCount ?? 0}</span>

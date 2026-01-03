@@ -117,33 +117,22 @@ export function DeployedAgentCard({
   // Get update info from agent object (populated by API)
   const needsUpdate = isTemplateAgent && agent.updateInfo?.needsUpdate
 
-  const statusBadge = useMemo(() => {
+  const statusMeta = useMemo(() => {
     if (isTemplateAgent) {
       return {
         label: 'From Marketplace',
         iconName: 'store',
-        style: {
-          borderColor: 'rgba(245,158,11,0.35)',
-          backgroundColor: 'rgba(245,158,11,0.10)',
-          color: 'rgba(245,158,11,0.95)',
-        } as React.CSSProperties,
       }
     }
     if (agent.publicationStatus === 'published') {
       return {
         label: 'Published',
         iconName: 'globe',
-        style: {
-          borderColor: 'rgba(59,130,246,0.35)',
-          backgroundColor: 'rgba(59,130,246,0.10)',
-          color: 'rgba(59,130,246,0.95)',
-        } as React.CSSProperties,
       }
     }
     return {
       label: 'Private',
       iconName: 'lock',
-      style: undefined,
     }
   }, [agent.publicationStatus, isTemplateAgent])
 
@@ -193,15 +182,6 @@ export function DeployedAgentCard({
         className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md"
         onClick={onClick}
       >
-        {/* Version badge (top-right) */}
-        {agent.version ? (
-          <div className={`absolute top-3 z-30 ${showActionsDropdown ? 'right-12' : 'right-3'}`}>
-            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono bg-background/70 backdrop-blur-sm">
-              v{agent.version}
-            </Badge>
-          </div>
-        ) : null}
-
         {/* Actions dropdown */}
         {showActionsDropdown && (
           <div className="absolute top-3 right-3 z-30">
@@ -299,6 +279,12 @@ export function DeployedAgentCard({
                   <span>{category}</span>
                 </Badge>
               ) : null}
+              {/* Version (inline, after category) */}
+              {agent.version ? (
+                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                  v{agent.version}
+                </Badge>
+              ) : null}
               {/* Premium update available indicator with subtle animation */}
               {needsUpdate && (
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
@@ -333,7 +319,7 @@ export function DeployedAgentCard({
                 </motion.div>
               )}
             </div>
-            <CardDescription className="line-clamp-2 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
+            <CardDescription className="line-clamp-5 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
               {agent.description || 'No description provided'}
             </CardDescription>
             {belowDescription ? <div className="mt-3">{belowDescription}</div> : null}
@@ -343,10 +329,10 @@ export function DeployedAgentCard({
         <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
           <div className="flex items-center justify-between gap-3">
             {showPublicationBadge ? (
-              <Badge variant="outline" className="text-[10px] px-2 py-1 flex items-center gap-1.5" style={statusBadge.style}>
-                <Icon name={statusBadge.iconName} className="w-3 h-3" />
-                <span className="font-mono">{statusBadge.label}</span>
-              </Badge>
+              <div className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground px-2 py-1 leading-none">
+                <Icon name={statusMeta.iconName} className="w-3 h-3" />
+                <span className="font-mono">{statusMeta.label}</span>
+              </div>
             ) : (
               <span aria-hidden />
             )}

@@ -18,6 +18,7 @@ Apply partial updates to any agent by providing its slug. Supports updating indi
 
 ## Optional Parameters
 - **name**: Update agent name
+- **role**: Update agent role (separate field from systemPrompt). If you change role, consider updating the systemPrompt identity/header to match.
 - **description**: Update agent description
 - **model**: Update LLM model
 - **systemPrompt**: Update system instructions. Must begin with <character name="AGENT_NAME">ROLE</character> as the first line and preserve this header unless explicitly changing name/role.
@@ -46,6 +47,11 @@ Automatically inferred from agent state (do not pass manually):
       name: {
         type: 'string',
         description: 'New agent name',
+      },
+      role: {
+        type: 'string',
+        description:
+          'New agent role (separate field from systemPrompt). If you change role, consider updating the systemPrompt identity/header to match.',
       },
       description: {
         type: 'string',
@@ -103,6 +109,7 @@ Automatically inferred from agent state (do not pass manually):
               // Build partial update body with only provided fields
               const body = {};
               if (input.name !== undefined) body.name = input.name;
+              if (input.role !== undefined) body.role = input.role;
               if (input.description !== undefined) body.description = input.description;
               if (input.model !== undefined) body.model = input.model;
               if (input.systemPrompt !== undefined) body.systemPrompt = input.systemPrompt;
@@ -212,10 +219,10 @@ export const agentEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentEditTool.blueprint,
 
   slug: 'edit-agent',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage:
-    '{ "slug": "support-agent", "systemPrompt": "Updated instructions", "previewPrompts": ["New example 1", "New example 2"] } // partial updates by slug',
+    '{ "slug": "support-agent", "role": "Customer Support Specialist", "systemPrompt": "Updated instructions", "previewPrompts": ["New example 1", "New example 2"] } // partial updates by slug',
   requiresApiKey: false,
   configurationFields: [],
 };

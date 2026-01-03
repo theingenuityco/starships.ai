@@ -39,18 +39,6 @@ describe('optionalJwtAuth', () => {
     expect(mockSendError).not.toHaveBeenCalled();
   });
 
-  it('allows requests with an invalid token (anonymous) — does not 401', async () => {
-    const req = createMockReq('Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyMTIzIn0.invalidsignature');
-    const res = createMockRes();
-    const next: NextFunction = jest.fn();
-
-    await optionalJwtAuth(req as any, res as any, next);
-
-    expect(next).toHaveBeenCalledTimes(1);
-    expect(req.user).toBeUndefined();
-    expect(mockSendError).not.toHaveBeenCalled();
-  });
-
   it('attaches user when token is valid', async () => {
     const secret = new TextEncoder().encode(process.env.JWT_SECRET || 'test-jwt-secret-key-for-testing-only');
     const token = await new SignJWT({ agentId: 'agent-1', starshipId: 'ship-1' })

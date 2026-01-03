@@ -82,6 +82,14 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   publishedTemplateId?: string;
 
   /**
+   * Optional denormalized view of tool assignments for this agent.
+   *
+   * Tools are stored via the agent↔tool junction table, but some endpoints
+   * (e.g. admin review or listing views) include the attached tool slugs for UI convenience.
+   */
+  assignedToolSlugs?: string[];
+
+  /**
    * Optional avatar image for the agent, stored as an Attachment (S3-backed).
    * This is auth-scoped via starship access and served through the attachments endpoints.
    */

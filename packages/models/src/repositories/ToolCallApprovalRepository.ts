@@ -97,6 +97,42 @@ export class ToolCallApprovalRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Atomically mark an approval as approved only if it is still pending.
+   *
+   * This is useful for request handlers that must ensure only ONE request proceeds to
+   * tool execution (avoid double-execution on concurrent retries).
+   */
+  async markApprovedIfPending(id: string): Promise<{ approval: ToolCallApprovalModel; updated: boolean }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const res = await connection.queryWithResult(
+          `
+          UPDATE tool_call_approvals
+          SET status = 'approved', decided_at = NOW()
+          WHERE id = $1 AND status = 'pending'
+          RETURNING *
+          `,
+          [id]
+        );
+
+        if (res.rowCount > 0) {
+          const row = res.rows?.[0] as Record<string, unknown> | undefined;
+          // row should exist if rowCount > 0, but keep it defensive.
+          if (row) return { approval: fromDatabase(ToolCallApprovalEntity, row), updated: true };
+        }
+
+        const existing = await this.findById(id);
+        if (!existing) throw new NotFoundError('ToolCallApproval', id);
+        return { approval: existing, updated: false };
+      },
+      'markApprovedIfPending',
+      'ToolCallApproval',
+      id
+    );
+  }
+
   async markDenied(id: string): Promise<ToolCallApprovalModel> {
     return this.executeWithErrorHandling(
       async () => {

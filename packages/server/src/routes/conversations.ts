@@ -641,9 +641,6 @@ router.post(
         return;
       }
 
-      // Mark approved (idempotent for pending-only)
-      await approvals.markApproved(approvalId);
-
       // Execute tool (server-side) and update the placeholder tool message
       const toolRepo = new ToolRepository();
       const tool = await toolRepo.findById(approval.toolId);
@@ -653,6 +650,16 @@ router.post(
       }
       if (!tool || tool.status === 'draft' || !tool.blueprint) {
         sendError(res, 'VALIDATION_ERROR', 'Tool is not available for execution', 400, { toolId: approval.toolId });
+        return;
+      }
+
+      // Mark approved ONLY after all preflight checks pass, so we can't end up with
+      // status='approved' for a request that never had a chance to execute.
+      // Also ensure only one concurrent request proceeds to execution.
+      const { approval: decided, updated } = await approvals.markApprovedIfPending(approvalId);
+      if (!updated) {
+        // Another request already decided this approval (approved/denied). Do not execute twice.
+        sendSuccess(res, { status: decided.status, approvalId });
         return;
       }
 
@@ -914,7 +921,7 @@ router.post(
         turnLeaseId = await leaseService.acquire({
           starshipId: starship.id,
           conversationId,
-          maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 1,
+          maxConcurrentTurns: starship.maxConcurrentTurns ?? 1,
         });
       } catch (e) {
         handleError(e, res, 'acquiring starship concurrency slot');

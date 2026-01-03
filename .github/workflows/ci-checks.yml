@@ -4,139 +4,18 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  lint:
-    name: Lint Check
-    runs-on: [self-hosted, linux, x64, t3.large]
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js (pnpm cache)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Enable Corepack (pnpm)
-        run: corepack enable
-
-      - name: Get pnpm store path
-        id: pnpm-store
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Configure pnpm
-        run: |
-          pnpm --version
-          pnpm config set registry https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Lint all packages
-        run: pnpm run lint
-
-  type-check:
-    name: Type Check
-    runs-on: [self-hosted, linux, x64, t3.large]
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js (pnpm cache)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Enable Corepack (pnpm)
-        run: corepack enable
-
-      - name: Get pnpm store path
-        id: pnpm-store
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Configure pnpm
-        run: |
-          pnpm --version
-          pnpm config set registry https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Type check all packages
-        run: pnpm run type-check
-
-  test:
-    name: Test Check
-    runs-on: [self-hosted, linux, x64, t3.large]
-    timeout-minutes: 10
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js (pnpm cache)
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Enable Corepack (pnpm)
-        run: corepack enable
-
-      - name: Get pnpm store path
-        id: pnpm-store
-        shell: bash
-        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
-
-      - name: Restore pnpm store cache
-        uses: actions/cache@v4
-        with:
-          path: ${{ steps.pnpm-store.outputs.STORE_PATH }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-      - name: Configure pnpm
-        run: |
-          pnpm --version
-          pnpm config set registry https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run tests
-        run: pnpm run test
-
-  build:
+  build-check:
     name: Build Check
-    runs-on: [self-hosted, linux, x64, t3.large]
-    timeout-minutes: 20
-    needs: [lint, type-check, test]
+    runs-on: [self-hosted, linux, x64, m8a.xlarge]
+    timeout-minutes: 30
     environment: ci
     env:
       # Core Configuration
@@ -176,6 +55,7 @@ jobs:
 
       # Analytics (optional for CI)
       GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -208,6 +88,15 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Lint all packages
+        run: pnpm run lint
+
+      - name: Type check all packages
+        run: pnpm run type-check
+
+      - name: Run tests
+        run: pnpm run test
 
       - name: Build all packages
         run: pnpm run build

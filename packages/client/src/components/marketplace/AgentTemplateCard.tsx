@@ -16,6 +16,7 @@ import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 import { useMemo, useState } from 'react'
 import type { AgentModel, AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { formatAgentNameWithRole } from '@/lib/agentDisplay'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -94,6 +95,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
     // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
     id: template.id,
     name: template.name,
+    role: template.role,
     slug: template.slug,
     description: template.description,
     model: template.model,
@@ -184,6 +186,7 @@ interface AgentTemplateCardCompactProps {
 }
 
 export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCardCompactProps) {
+  const displayName = formatAgentNameWithRole(template.name, template.role)
   return (
     <Card className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer" onClick={() => onClick?.(template)}>
       <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
@@ -192,7 +195,7 @@ export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCar
           <Avatar className="h-6 w-6 ring-1 ring-border/40">
             <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={24} />
           </Avatar>
-          <CardTitle className="truncate text-base font-semibold">{template.name}</CardTitle>
+          <CardTitle className="truncate text-base font-semibold">{displayName || template.name}</CardTitle>
         </div>
         {template.description && <CardDescription className="line-clamp-2 text-xs">{template.description}</CardDescription>}
       </CardHeader>

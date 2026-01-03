@@ -132,7 +132,6 @@ export interface UpdateAgentToolPermissionsRequest {
  * Request to create a new agent
  */
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
-  slug?: string; // Optional: if not provided, will be generated
   /**
    * Human-readable role label for the agent (required).
    */
@@ -152,6 +151,10 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
  * Request to update an agent
  */
 export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetadata, 'reasoning'>> {
+  /**
+   * Slugs are server-generated and not directly editable.
+   */
+  slug?: never;
   /**
    * Optional role update.
    */

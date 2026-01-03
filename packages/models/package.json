@@ -26,6 +26,7 @@
     "monitor": "tsx src/scripts/performance-monitor.ts",
     "db-cli": "tsx src/scripts/db-cli.ts",
     "migrate:seeded-template-parents": "tsx src/scripts/migrate-seeded-template-parents.ts",
+    "migrate:regenerate-slugs": "tsx src/scripts/regenerate-slugs.ts",
     "update:default-agent-blueprints": "tsx src/scripts/update-default-agent-blueprints.ts",
     "pretest": "pnpm --filter @starships/autopilot build",
     "test": "jest",

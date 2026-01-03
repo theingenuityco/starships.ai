@@ -30,7 +30,6 @@ import type {
   CreateAgentRequest,
   UpdateAgentRequest,
 } from '@starships/protocol';
-import { generateUniqueAgentSlug } from '@starships/models';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { ConnectorSecretService } from './ConnectorSecretService';
@@ -137,20 +136,6 @@ export class AgentService {
     // Validate agent limit before creating
     await this.validateAgentLimit(data.starshipId);
 
-    // Ensure unique slug:
-    // - If a slug is provided, use it if unique; otherwise append a random suffix based on the provided slug.
-    // - If no slug is provided, generate a unique slug from the name (kebab-case + suffix).
-    const requestedSlug = (data.slug || '').trim();
-    let slug: string;
-    if (requestedSlug.length > 0) {
-      const base = requestedSlug.toLowerCase();
-      const existing = await this.agentRepository.findBySlug(base);
-      slug = existing ? await generateUniqueAgentSlug(base, this.agentRepository) : base;
-    } else {
-      const baseFromName = (data.name || 'agent').toLowerCase().trim().replace(/\s+/g, '-') || 'agent';
-      slug = await generateUniqueAgentSlug(baseFromName, this.agentRepository);
-    }
-
     // Create agent parameters for the Agent class
     const agentParams: AgentParams = {
       name: data.name,
@@ -174,7 +159,6 @@ export class AgentService {
     const agentData: CreateAgentRequest = {
       name: data.name,
       role: data.role || 'Assistant',
-      slug,
       description: data.description,
       model: data.model,
       temperature: data.temperature,
@@ -199,7 +183,7 @@ export class AgentService {
     if (!current) return null;
     this.assertAgentIsEditable(current, 'edit');
 
-    return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
+    return await this.agentRepository.update(agentId, updates);
   }
 
   /**

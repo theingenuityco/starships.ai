@@ -11,7 +11,7 @@ export interface ToolCallApprovalModel {
   starshipId: string;
   conversationId: string;
   agentId: string;
-  toolSlug: string;
+  toolId: string;
   toolCallId: string;
   argsJson: Record<string, unknown>;
   status: ToolCallApprovalStatus;

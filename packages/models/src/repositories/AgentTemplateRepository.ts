@@ -363,6 +363,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const templateProps = {
           // Explicit primitive fields
           name: data.name,
+          role: data.role,
           slug: slug,
           description: data.description,
           category: data.category,

@@ -35,6 +35,7 @@ describe('AgentTemplateRepository', () => {
     id: 'template-123',
     slug: 'test-template',
     name: 'Test Template',
+    role: 'Assistant',
     description: 'A test agent template',
     category: 'general',
     model: 'gpt-4',
@@ -74,6 +75,7 @@ describe('AgentTemplateRepository', () => {
   const createMockCreateInput = (overrides: Record<string, unknown> = {}) => ({
     name: 'Test Template',
     slug: 'test-template', // Add slug for validation
+    role: 'Assistant',
     description: 'A test agent template',
     category: 'general' as const,
     model: 'gpt-4',
@@ -266,6 +268,7 @@ describe('AgentTemplateRepository', () => {
     it('should handle missing optional fields', async () => {
       const minimalInput = {
         name: 'Minimal Template',
+        role: 'Assistant',
         slug: 'minimal-template', // Add slug for validation
         description: 'Basic template',
         category: 'general' as const,

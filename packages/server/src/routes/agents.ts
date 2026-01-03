@@ -58,6 +58,11 @@ const CreateAgentSchema = z.object({
     .min(1, 'Name is required')
     .max(255, 'Name must be less than 255 characters')
     .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  role: z
+    .string()
+    .min(1, 'Role is required')
+    .max(255, 'Role must be less than 255 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
   description: z
     .string()
     .optional()
@@ -78,6 +83,12 @@ const CreateAgentSchema = z.object({
 
 const UpdateAgentSchema = z.object({
   name: z
+    .string()
+    .min(1)
+    .max(255)
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  role: z
     .string()
     .min(1)
     .max(255)

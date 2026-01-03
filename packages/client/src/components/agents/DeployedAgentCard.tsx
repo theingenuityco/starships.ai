@@ -15,6 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import api from '@/lib/api'
 import type { FetchResponse } from '@/lib/types'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
 
@@ -261,12 +262,12 @@ export function DeployedAgentCard({
             {/* Text content */}
             <div className="min-w-0 flex-1">
               <div className="mb-0.5 min-w-0">
-                <CardTitle className="truncate text-xl font-bold transition-colors duration-200 group-hover:text-foreground">{agent.name}</CardTitle>
+                <CardTitle className="truncate text-xl font-bold transition-colors duration-200 group-hover:text-foreground">{formatAgentDisplayName(agent)}</CardTitle>
               </div>
               {/* Slug row (below title) */}
-              {(agent as any)?.slug && (
+              {agent.slug && (
                 <div className="-mt-1 mb-0 min-w-0">
-                  <span className="font-mono text-sm text-muted-foreground truncate">{(agent as any).slug}</span>
+                  <span className="font-mono text-sm text-muted-foreground truncate">{agent.slug}</span>
                 </div>
               )}
             </div>

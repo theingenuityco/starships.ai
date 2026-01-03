@@ -586,6 +586,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
         const created = await agentRepo.create(
           {
             name: template.name,
+            role: template.role,
             slug: agentSlug,
             description: template.description,
             model: template.model,

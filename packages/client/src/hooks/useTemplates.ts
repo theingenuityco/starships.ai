@@ -3,6 +3,7 @@ import type { AgentTemplateModel, ToolTemplateModel, ApiResponse } from '@starsh
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 // Template filters for search and filtering
 export interface TemplateFilters {
@@ -119,7 +120,7 @@ export function useCreateAgentFromTemplate() {
       })
 
       toast.success('Agent deployed successfully!', {
-        description: `${agent.name} has been created and deployed to your starship.`,
+        description: `${formatAgentDisplayName(agent)} has been created and deployed to your starship.`,
       })
     },
     onError: (error: any) => {

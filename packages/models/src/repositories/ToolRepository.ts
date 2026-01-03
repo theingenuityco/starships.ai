@@ -77,8 +77,8 @@ export class ToolRepository extends BaseRepository {
           ...(publishedTemplateId ? { publishedTemplateId } : {}),
 
           // Versioning fields
-          version: (rest as UpdateToolRequest).version || '1.0.0',
-          ...((rest as UpdateToolRequest).templateSnapshotAt ? { templateSnapshotAt: (rest as UpdateToolRequest).templateSnapshotAt } : {}),
+          version: rest.version || '1.0.0',
+          ...(rest.templateSnapshotAt ? { templateSnapshotAt: rest.templateSnapshotAt } : {}),
 
           // Database-specific fields
           createdAt: now,
@@ -421,8 +421,8 @@ export class ToolRepository extends BaseRepository {
           ...(publishedTemplateId ? { publishedTemplateId } : {}),
 
           // Versioning fields
-          version: (data as UpdateToolRequest).version || '1.0.0',
-          ...((data as UpdateToolRequest).templateSnapshotAt ? { templateSnapshotAt: (data as UpdateToolRequest).templateSnapshotAt } : {}),
+          version: data.version || '1.0.0',
+          ...(data.templateSnapshotAt ? { templateSnapshotAt: data.templateSnapshotAt } : {}),
 
           // Database-specific fields
           createdAt: now,

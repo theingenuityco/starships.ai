@@ -57,6 +57,14 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @Length(1, 255)
   id!: string;
 
+  /**
+   * Human-readable role label for this template (required).
+   */
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  role!: string;
+
   @Expose()
   @IsString()
   @Length(1, 100)
@@ -208,6 +216,7 @@ export class AgentTemplateEntity implements AgentTemplateModel {
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
         name: dataRecord.name || '',
+        role: (dataRecord.role as string) || 'Assistant',
         description: dataRecord.description,
         model: dataRecord.model || '',
         temperature: dataRecord.temperature,

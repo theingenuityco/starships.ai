@@ -501,7 +501,7 @@ export function ConversationMessageList({
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
                     <LoadingSpinner className="w-4 h-4 text-muted-foreground" />
-                    <span>{(agentName || 'Assistant') + ' is typing...'}</span>
+                    <span>{(agentName || 'Agent') + ' is typing...'}</span>
                   </div>
                 </div>
               </div>

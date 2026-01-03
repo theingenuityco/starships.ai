@@ -131,6 +131,7 @@ Tool Usage:
 export const dataAnalystTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Data Analyst',
   slug: 'data-analyst',
+  role: 'Expert Data Analyst',
   version: '1.0.0',
   description:
     'Expert data analyst that transforms raw data into actionable insights through statistical analysis, visualization, and data-driven recommendations. Specializes in creating charts, metrics, and comprehensive reports.',

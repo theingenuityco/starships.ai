@@ -156,6 +156,7 @@ describe('AgentEntity', () => {
       const validData = {
         name: 'Test Agent',
         slug: 'test-agent',
+        role: 'Assistant',
         model: 'gpt-4',
         starshipId: 'starship-123',
         timeout: 30000,
@@ -180,6 +181,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: '',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           starshipId: 'starship-123',
           timeout: 30000,
@@ -192,6 +194,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'a'.repeat(101),
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           starshipId: 'starship-123',
           timeout: 30000,
@@ -204,6 +207,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Valid Name',
           slug: 'valid-name',
+          role: 'Assistant',
           model: 'gpt-4',
           starshipId: 'starship-123',
           timeout: 30000,
@@ -218,6 +222,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           temperature: -0.1,
           starshipId: 'starship-123',
@@ -231,6 +236,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           temperature: 2.1,
           starshipId: 'starship-123',
@@ -244,6 +250,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           temperature: 0.7,
           starshipId: 'starship-123',
@@ -259,6 +266,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           maxTokens: 0,
           starshipId: 'starship-123',
@@ -272,6 +280,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           maxTokens: 100001,
           starshipId: 'starship-123',
@@ -285,6 +294,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           maxTokens: 4000,
           starshipId: 'starship-123',
@@ -300,6 +310,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           timeout: 999,
           starshipId: 'starship-123',
@@ -312,6 +323,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           timeout: 600001,
           starshipId: 'starship-123',
@@ -324,6 +336,7 @@ describe('AgentEntity', () => {
         AgentEntity.validate({
           name: 'Test Agent',
           slug: 'test-agent',
+          role: 'Assistant',
           model: 'gpt-4',
           timeout: 30000,
           starshipId: 'starship-123',

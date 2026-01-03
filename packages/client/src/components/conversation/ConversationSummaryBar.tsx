@@ -4,6 +4,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Avatar } from '@/components/ui/avatar'
 import { useStarshipConversations, useConversationAgents } from '@/hooks/useConversations'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { motion } from 'motion/react'
 import { useMemo } from 'react'
 
@@ -15,6 +16,7 @@ interface ConversationSummaryBarProps {
 interface ConversationAgent {
   id?: string
   name: string
+  role?: string
   slug?: string
   model?: string
   avatarAttachmentId?: string
@@ -80,11 +82,11 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
                 {agents.length > 0 ? (
                   <>
                     {visibleAgents.map(agent => (
-                      <div key={agent.id ?? agent.slug ?? agent.name} className="inline-flex items-center gap-1.5 max-w-[14rem]" title={agent.name}>
+                      <div key={agent.id ?? agent.slug ?? agent.name} className="inline-flex items-center gap-1.5 max-w-[14rem]" title={formatAgentDisplayName(agent)}>
                         <Avatar className="h-4 w-4 ring-1 ring-border/40">
                           <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={16} />
                         </Avatar>
-                        <span className="truncate font-medium leading-none">{agent.name}</span>
+                        <span className="truncate font-medium leading-none">{formatAgentDisplayName(agent)}</span>
                       </div>
                     ))}
                     {remaining > 0 ? <span className="text-muted-foreground/70">+{remaining}</span> : null}

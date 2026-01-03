@@ -10,6 +10,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useToast } from '@/hooks/useToast'
 import { useTypewriter } from '@/hooks/useTypewriter'
 import api, { Agent } from '@/lib/api'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import type { MessageModel } from '@starships/protocol'
 
 import { useEffect, useState } from 'react'
@@ -203,7 +204,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
               <span className="text-white text-sm font-medium">{agent.name.charAt(0).toUpperCase()}</span>
             </div>
             <div>
-              <h2 className="font-semibold text-lg text-white">Testing: {agent.name}</h2>
+              <h2 className="font-semibold text-lg text-white">Testing: {formatAgentDisplayName(agent)}</h2>
               <div className="flex items-center gap-2 mt-1">
                 <Badge className="bg-blue-600 text-white">
                   {agent.name.toLowerCase().includes('support')
@@ -302,7 +303,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
             <div className="px-4 py-2 border-t border-zinc-800 bg-zinc-900">
               <div className="flex items-center gap-2 text-sm text-zinc-400">
                 <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                <span>{agent.name} is responding...</span>
+                <span>{formatAgentDisplayName(agent)} is responding...</span>
                 <Button
                   size="sm"
                   variant="ghost"

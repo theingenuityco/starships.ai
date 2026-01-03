@@ -10,6 +10,7 @@ import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useWallet } from '@/hooks/useWallet'
 import { cn } from '@/lib/utils'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import type { AgentModel } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
 
@@ -340,7 +341,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let createdNewConversation = false
         if (!currentConversationId) {
           const newConversation = await createConversation.mutateAsync({
-            title: `Chat with ${effectiveAgent.name}`,
+            title: `Chat with ${formatAgentDisplayName(effectiveAgent)}`,
             starshipId: starshipId,
             agentSlug: effectiveAgent.slug,
           })
@@ -520,7 +521,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           let currentConversationId = conversationId
           if (!currentConversationId) {
             const newConversation = await createConversation.mutateAsync({
-              title: `Chat with ${selectedAgent.name}`,
+              title: `Chat with ${formatAgentDisplayName(selectedAgent)}`,
               starshipId: starshipId,
               agentSlug: selectedAgent.slug,
             })
@@ -677,7 +678,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 <AgentAvatar seed={agent.name} imageUrl={mentionAvatarUrlById.get((agent as any).avatarAttachmentId)} size={28} />
               </Avatar>
               <div className="min-w-0">
-                <div className="font-medium leading-5">{agent.name}</div>
+                <div className="font-medium leading-5">{formatAgentDisplayName(agent)}</div>
                 {agent.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div>}
               </div>
             </button>
@@ -696,7 +697,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             return !q || a.name.toLowerCase().includes(q) || a.slug.toLowerCase().includes(q)
           })
           .slice(0, 8)
-          .map((a: AgentModel) => ({ id: a.id, label: a.name, agent: a })),
+          .map((a: AgentModel) => ({ id: a.id, label: formatAgentDisplayName(a), agent: a })),
       render: () => {
         let component: ReactRenderer | null = null
         let popup: any = null
@@ -833,7 +834,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   component?.updateProps({ ...component.props, active })
                 },
                 command: (agent: AgentModel) => {
-                  const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: agent.name }
+                  const realItem = (props.items as any[]).find(i => i.id === agent.id) || { id: agent.id, label: formatAgentDisplayName(agent) }
                   // Insert/replace with the mention node
                   props.command(realItem)
                   try {
@@ -1160,7 +1161,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           ),
           role: 'textbox',
           'aria-multiline': 'true',
-          'aria-label': selectedAgent ? `Message ${selectedAgent.name}` : 'Message input',
+          'aria-label': selectedAgent ? `Message ${formatAgentDisplayName(selectedAgent)}` : 'Message input',
         },
         handleKeyDown: (_view, event) => {
           if (isSuggestionActiveRef.current) {

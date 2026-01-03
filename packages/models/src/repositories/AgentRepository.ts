@@ -209,6 +209,7 @@ export class AgentRepository extends BaseRepository {
         const agentProps = {
           // Core AgentParams fields
           name: normalizedData.name,
+          role: normalizedData.role || 'Assistant',
           slug:
             normalizedData.slug ||
             (await generateUniqueAgentSlug((normalizedData.name || 'agent').toLowerCase().replace(/\s+/g, '-'), this)), // Ensure non-empty slug
@@ -398,11 +399,7 @@ export class AgentRepository extends BaseRepository {
    * Get the stored permission for a given agent↔tool (by tool slug within a starship).
    * Returns null when the tool is not assigned to the agent.
    */
-  async getAgentToolPermissionBySlug(
-    agentId: string,
-    starshipId: string,
-    toolSlug: string
-  ): Promise<'allow' | 'ask' | 'deny' | null> {
+  async getAgentToolPermissionBySlug(agentId: string, starshipId: string, toolSlug: string): Promise<'allow' | 'ask' | 'deny' | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
@@ -428,7 +425,9 @@ export class AgentRepository extends BaseRepository {
    * Get agent→tool permissions (join metadata) for a specific starship.
    * Returns only rows present in agent_tools; callers can treat missing pairs as 'deny'.
    */
-  async getStarshipAgentToolPermissions(starshipId: string): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+  async getStarshipAgentToolPermissions(
+    starshipId: string
+  ): Promise<Array<{ agentId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
@@ -464,7 +463,12 @@ export class AgentRepository extends BaseRepository {
    * Upsert a permission for an agent/tool pair by tool slug within a starship.
    * This is intentionally starship-scoped to prevent cross-starship tool slugs.
    */
-  async setAgentToolPermissionBySlug(args: { agentId: string; starshipId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }): Promise<void> {
+  async setAgentToolPermissionBySlug(args: {
+    agentId: string;
+    starshipId: string;
+    toolSlug: string;
+    permission: 'allow' | 'ask' | 'deny';
+  }): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const { agentId, starshipId, toolSlug, permission } = args;
@@ -473,7 +477,10 @@ export class AgentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [toolSlug, starshipId]);
+        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+          toolSlug,
+          starshipId,
+        ]);
         if (!toolResult?.id) {
           throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
         }
@@ -526,6 +533,7 @@ export class AgentRepository extends BaseRepository {
         const now = new Date().toISOString();
         const agentData: CreateAgentRequest = {
           name: customizations?.name || template.name,
+          role: customizations?.role || template.role || 'Assistant',
           slug,
           description: customizations?.description || template.description,
           model: customizations?.model || template.model,

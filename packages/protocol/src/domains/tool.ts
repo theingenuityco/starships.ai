@@ -182,7 +182,12 @@ export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blue
 /**
  * Request to update a tool instance
  */
-export type UpdateToolRequest = Partial<CreateToolRequest> & {
+export type UpdateToolRequest = Partial<Omit<CreateToolRequest, 'slug'>> & {
+  /**
+   * Slugs are immutable after creation.
+   * Disallow providing `slug` in updates at the type level.
+   */
+  slug?: never;
   sourceTemplateId?: string;
   publishedTemplateId?: string;
   version?: string;

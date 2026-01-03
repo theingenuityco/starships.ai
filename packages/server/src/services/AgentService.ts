@@ -173,6 +173,7 @@ export class AgentService {
 
     const agentData: CreateAgentRequest = {
       name: data.name,
+      role: data.role || 'Assistant',
       slug,
       description: data.description,
       model: data.model,
@@ -1012,6 +1013,7 @@ export class AgentService {
         // Instance slugs include random suffixes for uniqueness; template slugs should be
         // stable + human-readable and will be derived from the template name.
         description: agent.description,
+        role: agent.role || 'Assistant',
         // Prefer the agent's category when present; fall back to "general"
         category: agent.category ?? 'general',
         model: agent.model,
@@ -1036,6 +1038,7 @@ export class AgentService {
       await templateRepo.update(targetTemplateId, {
         name: agent.name,
         description: agent.description,
+        role: agent.role || 'Assistant',
         // Only update category if the agent has one explicitly set
         category: agent.category ?? 'general',
         model: agent.model,

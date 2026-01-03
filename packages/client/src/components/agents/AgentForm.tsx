@@ -12,7 +12,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
-import { StarshipSelector } from '@/components/agents/StarshipSelector'
 
 import { cn } from '@/lib/utils'
 
@@ -20,11 +19,16 @@ interface AgentFormProps {
   agent?: AgentModel
   onSave: (agent: AgentModel) => void
   onCancel: () => void
+  starshipId?: string
 }
 
-export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
-  const [formData, setFormData] = useState<CreateAgentRequest>({
+export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProps) {
+  type AgentFormData = Omit<CreateAgentRequest, 'starshipId'>
+
+  const [formData, setFormData] = useState<AgentFormData>({
     name: agent?.name || '',
+    // Don't invent a role in the UI. If missing, require the user to choose one.
+    role: agent?.role || '',
     description: agent?.description || '',
     model: agent?.model || 'gpt-4',
     temperature: agent?.temperature,
@@ -59,7 +63,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
       errors.name = 'Agent name is required'
     }
 
-    // starshipId validation removed
+    if (!formData.role || !String(formData.role).trim()) {
+      errors.role = 'Role is required'
+    }
 
     setFormErrors(errors)
     return Object.keys(errors).length === 0
@@ -82,6 +88,9 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
         // Create data - authorId will be set by server from auth context
         const createData: CreateAgentRequest = {
           ...formData,
+          // Starship context should be derived from the surrounding ship UI, not user input.
+          // If not provided, the server will reject; we keep this out of the "form" itself.
+          ...(starshipId ? { starshipId } : {}),
         }
         savedAgent = await agentAPI.create(createData)
       }
@@ -146,6 +155,21 @@ export function AgentForm({ agent, onSave, onCancel }: AgentFormProps) {
                   required
                 />
                 <p className="text-xs text-muted-foreground">Choose a descriptive name for your agent</p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <Icon name="badge" className="h-4 w-4 text-muted-foreground" />
+                  Role
+                </label>
+                <Input
+                  value={formData.role || ''}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setFormData(prev => ({ ...prev, role: e.target.value }))}
+                  placeholder="e.g. Customer Support Agent"
+                  className="border-muted-foreground/20 focus:border-primary"
+                  required
+                />
+                <p className="text-xs text-muted-foreground">A short role label (shown in UI; used by templates and tooling)</p>
               </div>
 
               <div className="space-y-2">

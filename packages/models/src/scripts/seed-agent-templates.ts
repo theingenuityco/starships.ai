@@ -45,6 +45,7 @@ export async function seedAgentTemplates(): Promise<void> {
             icon: template.icon,
             previewPrompts: template.previewPrompts,
             assignedToolSlugs: template.assignedToolSlugs,
+            role: template.role,
             version: template.version, // Copy version from seeder
           });
 
@@ -69,6 +70,7 @@ export async function seedAgentTemplates(): Promise<void> {
             systemPrompt: template.systemPrompt,
             state: template.state,
             assignedToolSlugs: template.assignedToolSlugs,
+            role: template.role,
             version: template.version, // Include version in creation
           };
           await templateRepo.create(payload);

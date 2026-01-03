@@ -274,7 +274,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           // Use same logic as non-resumeToken path - trust clientBase when provided
           const baselineMessageIds = new Set<string>();
           let messagesToSend: typeof conversationMessages = [];
-          
+
           if (clientBase === 0) {
             messagesToSend = conversationMessages;
           } else if (clientBase < serverCount && serverCount - clientBase <= 2) {
@@ -299,7 +299,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             startIdx = idx >= 0 ? idx + 1 : 0;
           }
           const persistedTail = conversationMessages.slice(startIdx);
-          
+
           // Track message IDs that were sent to avoid replaying them as deltas
           const baselineMessageIds = new Set<string>();
           let replayHasAssistantShell = false;
@@ -332,7 +332,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         const baselineMessageIds = new Set<string>();
         let messagesToSend: typeof conversationMessages = [];
         let baselineHasAssistant = false;
-        
+
         if (clientBase === 0) {
           // Initial connection - send all messages
           messagesToSend = conversationMessages;

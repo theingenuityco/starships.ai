@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DialogTitlePrimitive } from '@/components/ui/dialog'
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
-import { CONNECTOR_LOGOS } from '@/lib/connectorLogos'
 import { motion } from 'motion/react'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
@@ -21,6 +20,20 @@ interface StarshipConnectorsPanelProps {
   starshipId: string
 }
 
+function toSafeConnectorLogoSlug(provider: string): string {
+  // ConnectorProvider is an open string type; keep this conservative.
+  // We currently ship SVG logos in `public/connectors/`.
+  return String(provider)
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+}
+
+function getConnectorLogoSrc(provider: string): string {
+  return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
+}
+
 export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelProps) {
   const { data: catalog = [] } = useConnectorCatalog()
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
@@ -31,6 +44,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
   const [searchQuery, setSearchQuery] = useState('')
   const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
+  const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
   const [apiKeyValue, setApiKeyValue] = useState('')
   const [apiKeyExtraConfigText, setApiKeyExtraConfigText] = useState('')
@@ -264,13 +278,14 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     if (!!isConnected !== connectedFirst) return null
 
     const label = catalogItem.name
-    const logoSrc = CONNECTOR_LOGOS[provider]
+    const logoSrc = getConnectorLogoSrc(provider)
     const authType = catalogItem.auth?.type
     const canDisconnect = isConnected && authType !== 'platform_jwt'
     const isOauthConnectable = authType === 'oauth2'
     const isApiKeyConnectable = authType === 'api_key'
     const isBasicConnectable = authType === 'basic'
     const isManaged = authType === 'platform_jwt'
+    const showLogo = !!provider && !hiddenLogos[provider]
 
     return (
       <motion.div
@@ -285,9 +300,15 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
           <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-3">
-                {logoSrc && (
+                {showLogo && (
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm border border-border/40">
-                    <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
+                    <Image
+                      src={logoSrc}
+                      alt={`${label} logo`}
+                      width={24}
+                      height={24}
+                      onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))}
+                    />
                   </div>
                 )}
                 <div className="flex h-10 flex-col justify-center">

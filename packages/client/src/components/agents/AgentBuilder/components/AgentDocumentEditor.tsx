@@ -108,7 +108,7 @@ export function AgentDocumentEditor({
     return n || 'Untitled agent'
   }
 
-  const avatarAttachmentId = (fullAgent as any)?.avatarAttachmentId as string | undefined
+  const avatarAttachmentId = fullAgent?.avatarAttachmentId
   const avatarIds = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
   const avatarUrl = avatarAttachments?.[0]?.previewUrl
@@ -645,6 +645,7 @@ export function AgentDocumentEditor({
 
     const normalizeCore = (src: {
       name?: string | null
+      role?: string | null
       description?: string | null
       model?: string | null
       category?: string | null
@@ -661,6 +662,7 @@ export function AgentDocumentEditor({
       const normalizedTemperature = typeof src.temperature === 'number' ? src.temperature : 0.7
       return {
         name: src.name ?? '',
+        role: src.role ?? '',
         description: src.description ?? '',
         model: src.model ?? '',
         category: src.category ?? 'general',
@@ -674,13 +676,14 @@ export function AgentDocumentEditor({
       }
     }
 
-    const agentCore = normalizeCore(fullAgent as any)
-    const templateCore = normalizeCore(publishedTemplate as any)
+    const agentCore = normalizeCore(fullAgent)
+    const templateCore = normalizeCore(publishedTemplate)
 
     const sameName = agentCore.name === templateCore.name
+    const sameRole = agentCore.role === templateCore.role
     const sameDescription = agentCore.description === templateCore.description
     const sameModel = agentCore.model === templateCore.model
-    const sameCategory = (agentCore as any).category === (templateCore as any).category
+    const sameCategory = agentCore.category === templateCore.category
     const sameTemperature = agentCore.temperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
@@ -693,9 +696,9 @@ export function AgentDocumentEditor({
     // - Published template avatar is public and tracked via avatarUpdatedAt (cache-busting timestamp).
     // We treat the avatar as "same" if the agent has no avatar and the template has none,
     // or if the agent avatar was created at/before the template's avatarUpdatedAt.
-    const templateAvatarUpdatedAt = (publishedTemplate as any)?.avatarUpdatedAt as string | undefined
+    const templateAvatarUpdatedAt = publishedTemplate.avatarUpdatedAt
     const agentHasAvatar = typeof avatarAttachmentId === 'string' && avatarAttachmentId.trim().length > 0
-    const templateHasAvatar = typeof (publishedTemplate as any)?.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
+    const templateHasAvatar = typeof publishedTemplate.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
     const toMs = (s?: string) => {
       if (!s) return NaN
       const t = new Date(s).getTime()
@@ -730,7 +733,7 @@ export function AgentDocumentEditor({
         })
         .filter((s): s is string => typeof s === 'string' && s.length > 0)
     )
-    const baselineTools = normalizeSlugs(((publishedTemplate as any).assignedToolSlugs as string[] | undefined) || [])
+    const baselineTools = normalizeSlugs(publishedTemplate.assignedToolSlugs || [])
     const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
 
     const agentBlueprintStr = JSON.stringify(agentCore.blueprint)
@@ -739,6 +742,7 @@ export function AgentDocumentEditor({
 
     const changes: string[] = []
     if (!sameName) changes.push('Name')
+    if (!sameRole) changes.push('Role')
     if (!sameDescription) changes.push('Description')
     if (!sameModel) changes.push('Model')
     if (!sameCategory) changes.push('Category')
@@ -757,6 +761,7 @@ export function AgentDocumentEditor({
         agentId: fullAgent.id,
         publishedTemplateId: fullAgent.publishedTemplateId,
         sameName,
+        sameRole,
         sameDescription,
         sameModel,
         sameCategory,
@@ -786,6 +791,7 @@ export function AgentDocumentEditor({
 
     const differs = !(
       sameName &&
+      sameRole &&
       sameDescription &&
       sameModel &&
       sameCategory &&

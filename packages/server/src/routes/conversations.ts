@@ -272,12 +272,14 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         if (!claims || claims.c !== conversationId) {
           // Invalid token; use baseline mode
           // Use same logic as non-resumeToken path - trust clientBase when provided
+          const MAX_BASELINE_GAP = 2; // Allow 1-2 new messages, not duplicates from previous cycles
+          
           const baselineMessageIds = new Set<string>();
           let messagesToSend: typeof conversationMessages = [];
 
           if (clientBase === 0) {
             messagesToSend = conversationMessages;
-          } else if (clientBase < serverCount && serverCount - clientBase <= 2) {
+          } else if (clientBase < serverCount && serverCount - clientBase <= MAX_BASELINE_GAP) {
             const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
             messagesToSend = conversationMessages.slice(startIndexForSend);
           }
@@ -329,6 +331,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // The client knows its own state better than we do, especially after stop/continue cycles.
         // Only send baseline messages if clientBase is 0 (initial connection) or if we detect
         // the client is significantly behind (which shouldn't happen in normal operation).
+        const MAX_BASELINE_GAP = 2; // Allow 1-2 new messages, not duplicates from previous cycles
+        
         const baselineMessageIds = new Set<string>();
         let messagesToSend: typeof conversationMessages = [];
         let baselineHasAssistant = false;
@@ -339,8 +343,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');
         } else if (clientBase < serverCount) {
           // Client is behind - but only send if the gap is reasonable (not duplicates from previous cycles)
-          // Only send if serverCount - clientBase <= 2 (allows for 1-2 new messages, not 4+ duplicates)
-          if (serverCount - clientBase <= 2) {
+          if (serverCount - clientBase <= MAX_BASELINE_GAP) {
             const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
             messagesToSend = conversationMessages.slice(startIndexForSend);
             baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');

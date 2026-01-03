@@ -116,6 +116,7 @@ Never assume which agents, tools, or models exist. Use List Agents / List Tools 
 export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Gaia',
   slug: 'gaia',
+  role: 'Master Agent Creator',
   version: '1.0.5',
   description:
     'Expert agent creator that designs and scaffolds new agents (Agent instances) on the current starship. Creates agents with custom system prompts, tool assignments, and workflows.',

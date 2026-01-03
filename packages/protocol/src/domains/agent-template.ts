@@ -24,6 +24,11 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
   // Core template fields
   id: string;
   slug: string;
+  /**
+   * Human-readable role label for the template (required).
+   * Deployed agents inherit this role.
+   */
+  role: string;
   createdAt: string;
   updatedAt: string;
 
@@ -61,6 +66,10 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
  */
 export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
   slug?: string; // Optional explicit slug (if not provided, will be generated from name)
+  /**
+   * Human-readable role label for the template (required).
+   */
+  role: string;
   category: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];
@@ -71,6 +80,7 @@ export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
  * Request to update agent template information
  */
 export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMetadata> {
+  role?: string;
   category?: AgentTemplateCategory;
   icon?: string;
   previewPrompts?: string[];

@@ -10,7 +10,7 @@ import { getCategoryIcon, getCategoryColor } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
 
 interface CategorySelectorProps {
-  selectedCategory: AgentTemplateCategory
+  selectedCategory: AgentTemplateCategory | ''
   onCategoryChange: (category: AgentTemplateCategory) => void
 }
 

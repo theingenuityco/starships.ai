@@ -104,8 +104,9 @@ export function useApproveAgentPublication() {
         description: `${formatAgentDisplayName(agent)} is now published and available as a template.`,
       })
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error || error?.message || 'Failed to approve agent'
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: string } }; message?: string }
+      const message = err?.response?.data?.error || err?.message || 'Failed to approve agent'
       toast.error('Failed to approve agent', {
         description: message,
       })
@@ -133,8 +134,9 @@ export function useRejectAgentPublication() {
         description: `${formatAgentDisplayName(agent)} has been moved back to draft.`,
       })
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error || error?.message || 'Failed to reject agent'
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: string } }; message?: string }
+      const message = err?.response?.data?.error || err?.message || 'Failed to reject agent'
       toast.error('Failed to reject agent', {
         description: message,
       })

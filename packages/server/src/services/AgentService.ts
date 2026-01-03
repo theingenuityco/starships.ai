@@ -396,7 +396,7 @@ export class AgentService {
           // assignedToolSlugs used in other parts of the app while
           // keeping the underlying storage relationship-based.
           assignedToolSlugs,
-        } as AgentModel,
+        },
         requestedBy,
         requestedByStarship,
       });

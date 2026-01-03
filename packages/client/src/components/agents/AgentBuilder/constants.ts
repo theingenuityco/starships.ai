@@ -3,9 +3,11 @@ import type { AgentTemplateCategory } from '@starships/protocol'
 
 export const INITIAL_FORM_DATA: AgentFormData = {
   name: '',
+  role: '',
   slug: '',
   description: '',
-  category: 'general',
+  // Do not default category; user should explicitly choose one.
+  category: '',
   // IMPORTANT: Do not preselect a default model in the UI.
   // Users must explicitly choose a model when creating a new agent.
   model: '',

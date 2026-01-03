@@ -49,10 +49,10 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
     let user;
     try {
       user = await UserService.getUserById(payload.sub as string);
-    } catch (dbError: any) {
+    } catch (dbError: unknown) {
       logger.error('[JWT-AUTH] Database error during user lookup', {
         userId: payload.sub,
-        error: dbError?.message,
+        error: dbError instanceof Error ? dbError.message : String(dbError),
         operation: 'user_lookup',
       });
       sendError(res, 'DATABASE_ERROR', 'Database error during authentication', 500);
@@ -69,9 +69,9 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
 
     // Attach authenticated context (user + optional agent/starship) for downstream attribution
     try {
-      const agentId = typeof (payload as any).agentId === 'string' ? (payload as any).agentId : undefined;
-      const starshipId = typeof (payload as any).starshipId === 'string' ? (payload as any).starshipId : undefined;
-      (req as any).authContext = {
+      const agentId = typeof payload.agentId === 'string' ? payload.agentId : undefined;
+      const starshipId = typeof payload.starshipId === 'string' ? payload.starshipId : undefined;
+      req.authContext = {
         userId: user.id,
         agentId,
         starshipId,
@@ -81,16 +81,29 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
     }
 
     next();
-  } catch (error: any) {
-    logger.error('[JWT-AUTH] Token validation failed', {
-      error: error?.message,
-      operation: 'token_validation',
-    });
+  } catch (error: unknown) {
+    const name = error instanceof Error ? error.name : undefined;
+    const message = error instanceof Error ? error.message : undefined;
+
+    // JWTExpired/JWTInvalid are common when clients send stale tokens.
+    // Don't log these as server errors; reserve ERROR for unexpected failures.
+    if (name === 'JWTExpired' || name === 'JWTInvalid') {
+      logger.debug('[JWT-AUTH] Token validation failed', {
+        error: message,
+        name,
+        operation: 'token_validation',
+      });
+    } else {
+      logger.error('[JWT-AUTH] Token validation failed', {
+        error: message,
+        operation: 'token_validation',
+      });
+    }
 
     // Provide more specific error messages
-    if (error?.name === 'JWTExpired') {
+    if (name === 'JWTExpired') {
       sendError(res, 'TOKEN_EXPIRED', 'Token expired', 401);
-    } else if (error?.name === 'JWTInvalid') {
+    } else if (name === 'JWTInvalid') {
       sendError(res, 'TOKEN_INVALID', 'Invalid token', 401);
     } else {
       sendError(res, 'AUTHENTICATION_FAILED', 'Authentication failed', 401);
@@ -111,11 +124,69 @@ export const optionalJwtAuth = async (req: Request, res: Response, next: NextFun
     return;
   }
 
-  // Token provided, validate it
+  const token = authHeader.replace('Bearer ', '');
+
+  // IMPORTANT: This middleware is intentionally "best effort".
+  // If a token is present but invalid/expired/unresolvable, we treat the request as anonymous.
+  // This is required for public APIs (e.g. agent-templates) to work even when clients send stale tokens.
+  if (!token || token.length < 10) {
+    next();
+    return;
+  }
+
   try {
-    await jwtAuthMiddleware(req, res, next);
-  } catch (error) {
-    // If token validation fails, continue without user instead of rejecting
+    const { payload } = await jwtVerify(token, JWT_SECRET, {
+      issuer: JWT_ISSUER,
+      audience: JWT_AUDIENCE,
+    });
+
+    const userId = payload.sub as string | undefined;
+    if (!userId || !userId.trim()) {
+      next();
+      return;
+    }
+
+    let user = null;
+    try {
+      user = await UserService.getUserById(userId);
+    } catch (dbError: unknown) {
+      // Best-effort: on DB issues, don't block public endpoints.
+      logger.warn('[OPTIONAL-JWT-AUTH] Database error during user lookup (continuing anonymous)', {
+        userId,
+        error: dbError instanceof Error ? dbError.message : String(dbError),
+        operation: 'user_lookup',
+      });
+      next();
+      return;
+    }
+
+    if (!user) {
+      next();
+      return;
+    }
+
+    req.user = user;
+
+    // Attach authenticated context (user + optional agent/starship) for downstream attribution
+    try {
+      const agentId = typeof payload.agentId === 'string' ? payload.agentId : undefined;
+      const starshipId = typeof payload.starshipId === 'string' ? payload.starshipId : undefined;
+      req.authContext = {
+        userId: user.id,
+        agentId,
+        starshipId,
+      };
+    } catch {
+      // Non-fatal: if we cannot derive authContext, continue with user-only context.
+    }
+
+    next();
+  } catch (error: unknown) {
+    // Best-effort: invalid/expired tokens should not cause a 401 here.
+    logger.debug('[OPTIONAL-JWT-AUTH] Token validation failed (continuing anonymous)', {
+      error: error instanceof Error ? error.message : String(error),
+      operation: 'token_validation',
+    });
     next();
   }
 };

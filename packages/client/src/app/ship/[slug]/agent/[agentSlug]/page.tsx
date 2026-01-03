@@ -681,9 +681,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             })
             if (agent && agentBuilderRef.current) {
               agentBuilderRef.current.updateField('name', agent.name || '')
+              if (agent.role) agentBuilderRef.current.updateField('role', agent.role || '')
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
               agentBuilderRef.current.updateField('description', agent.description || '')
               agentBuilderRef.current.updateField('model', agent.model || '')
+              if (agent.category) agentBuilderRef.current.updateField('category', agent.category as any)
               const effort = (agent as any)?.reasoning?.effort
               if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
                 agentBuilderRef.current.updateField('reasoning', effort)
@@ -695,6 +697,14 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               if (agent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', agent.maxTokens as any)
               if (agent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', agent.timeout as any)
               if (Array.isArray((agent as any).assignedToolSlugs)) agentBuilderRef.current.updateField('assignedToolSlugs', (agent as any).assignedToolSlugs as any)
+              if (Array.isArray(agent.previewPrompts)) {
+                const prompts = (agent.previewPrompts as unknown[])
+                  .filter(p => typeof p === 'string')
+                  .map(p => (p as string).trim())
+                  .filter(Boolean)
+                  .slice(0, 10) as string[]
+                agentBuilderRef.current.updateField('previewPrompts', prompts as any)
+              }
               if (agent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(agent.blueprint, null, 2))
               if ((agent as any).icon) agentBuilderRef.current.updateField('icon', (agent as any).icon)
             }
@@ -909,12 +919,47 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   // Prefill when editing an existing agent via canonical id endpoint.
   const { data: existingAgent, isError: isExistingAgentError } = useAgent(effectiveAgentId || '', !!effectiveAgentId)
+  const lastPrefilledAgentIdRef = useRef<string | null>(null)
   useEffect(() => {
     if (!isEditingExisting) return
     if (!existingAgent?.slug) return
     if (!agentSlug || agentSlug === 'new') return
     const nextSlug = String(existingAgent.slug)
-    if (nextSlug && String(agentSlug) !== nextSlug) {
+    if (nextSlug) {
+      // IMPORTANT:
+      // We update the address bar via history.replaceState (no Next.js navigation) to avoid remounting
+      // the page/form during renames. Because of that, `useParams().agentSlug` can be stale relative to
+      // the address bar. Always compare against the current location slug.
+      let locationSlug: string | null = null
+      try {
+        if (typeof window !== 'undefined') {
+          const parts = window.location.pathname.split('/').filter(Boolean)
+          const last = parts.length > 0 ? parts[parts.length - 1] : null
+          locationSlug = last ? decodeURIComponent(last) : null
+        }
+      } catch {
+        locationSlug = null
+      }
+      if (locationSlug && locationSlug === nextSlug) return
+
+      // Renaming an agent can regenerate its slug on the server. We want the URL to reflect that,
+      // but navigating (router.replace) remounts the whole page and causes the form to lose focus.
+      // Instead, update the address bar without a Next.js navigation.
+      try {
+        if (typeof window !== 'undefined') {
+          const desiredPath = `/ship/${slug}/agent/${encodeURIComponent(nextSlug)}`
+          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+          const desiredUrl = `${desiredPath}${q}`
+          const curUrl = `${window.location.pathname}${window.location.search}`
+          if (curUrl !== desiredUrl) {
+            window.history.replaceState(null, '', desiredUrl)
+          }
+          return
+        }
+      } catch {
+        // ignore
+      }
+      // Fallback (should rarely happen): if history APIs fail, do a normal replace.
       const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
       slugNormalizationTargetRef.current = nextSlug
       router.replace(`/ship/${slug}/agent/${encodeURIComponent(nextSlug)}${q}`)
@@ -923,13 +968,20 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   useEffect(() => {
     if (!existingAgent || !agentBuilderRef.current) return
+    // Only prefill once per agent id to avoid clobbering in-flight edits on background refetches.
+    if (existingAgent.id && lastPrefilledAgentIdRef.current === existingAgent.id) return
     try {
       console.debug('[AgentBuilder] Prefill fetched agent', { id: existingAgent.id, slug: existingAgent.slug })
     } catch {}
+    const currentForm = agentBuilderRef.current.getFormData?.()
     agentBuilderRef.current.updateField('name', existingAgent.name || '')
+    if (!currentForm?.role && existingAgent.role) agentBuilderRef.current.updateField('role', existingAgent.role || '')
     if (existingAgent.slug) agentBuilderRef.current.updateField('slug', existingAgent.slug)
     if (existingAgent.description) agentBuilderRef.current.updateField('description', existingAgent.description)
     if (existingAgent.model) agentBuilderRef.current.updateField('model', existingAgent.model)
+    if (!currentForm?.category && existingAgent.category) {
+      agentBuilderRef.current.updateField('category', existingAgent.category as any)
+    }
     {
       const effort = (existingAgent as any)?.reasoning?.effort
       if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
@@ -943,8 +995,17 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (existingAgent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', existingAgent.maxTokens as any)
     if (existingAgent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', existingAgent.timeout as any)
     if (Array.isArray((existingAgent as any).assignedToolSlugs)) agentBuilderRef.current.updateField('assignedToolSlugs', (existingAgent as any).assignedToolSlugs as any)
+    if ((!Array.isArray(currentForm?.previewPrompts) || (currentForm.previewPrompts || []).length === 0) && Array.isArray(existingAgent.previewPrompts)) {
+      const prompts = (existingAgent.previewPrompts as unknown[])
+        .filter(p => typeof p === 'string')
+        .map(p => (p as string).trim())
+        .filter(Boolean)
+        .slice(0, 10) as string[]
+      agentBuilderRef.current.updateField('previewPrompts', prompts as any)
+    }
     if (existingAgent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(existingAgent.blueprint, null, 2))
     if ((existingAgent as any).icon) agentBuilderRef.current.updateField('icon', (existingAgent as any).icon)
+    if (existingAgent.id) lastPrefilledAgentIdRef.current = existingAgent.id
   }, [existingAgent])
 
   const handleCancel = () => {

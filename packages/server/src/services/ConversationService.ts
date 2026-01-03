@@ -2495,14 +2495,36 @@ export class ConversationService {
                 continue;
               }
 
-              // For assistant messages, check if we've already persisted one this turn
-              // This prevents duplicates when a message was stopped and persisted via persistActivePartial
-              if (
-                role === 'assistant' &&
-                (this.assistantPersistedThisTurn.has(conversationId) || this.activeStreamPersisted.has(conversationId))
-              ) {
-                // Update index to skip this message since it was already persisted
-                continue;
+              // For assistant messages, we need to handle two cases:
+              // 1. Message was stopped and persisted via persistActivePartial - skip that specific message
+              // 2. Multiple assistant messages in same turn (tool call + final response) - persist both
+              //
+              // The original check was too aggressive - it prevented ALL assistant messages from being
+              // persisted after the first one. This broke the case where an assistant makes a tool call
+              // (first message) and then continues with a final response (second message).
+              //
+              // The fix: Only skip if activeStreamPersisted is set (meaning persistActivePartial was called
+              // during stop) AND this is the first message after lastIndex AND it has no tool calls.
+              // This handles the stop case while allowing multiple assistant messages in normal flow.
+              if (role === 'assistant') {
+                const hasToolCalls = Array.isArray((raw as any).toolCalls) && (raw as any).toolCalls.length > 0;
+                const isFirstMessageAfterLastIndex = i === lastIndex + 1;
+                const wasPartialPersisted = this.activeStreamPersisted.has(conversationId);
+
+                // Only skip if this is the message that was persisted via persistActivePartial during stop
+                // We can identify it because:
+                // - activeStreamPersisted is set (persistActivePartial was called)
+                // - It's the first message after lastIndex (the one that was being streamed)
+                // - It has no tool calls (tool call messages are persisted via node_completed, not persistActivePartial)
+                if (isFirstMessageAfterLastIndex && wasPartialPersisted && !hasToolCalls) {
+                  // This is the message that was already persisted via persistActivePartial during stop
+                  // Skip it to avoid duplicates
+                  continue;
+                }
+                // Otherwise, persist this message:
+                // - It has tool calls (should always be persisted, even if assistantPersistedThisTurn is set)
+                // - It's not the first message after lastIndex (it's a new message in the turn)
+                // - No partial was persisted (normal flow, allow multiple assistant messages)
               }
 
               try {

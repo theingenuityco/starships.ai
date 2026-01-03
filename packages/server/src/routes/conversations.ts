@@ -273,7 +273,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
           // Invalid token; use baseline mode
           // Use same logic as non-resumeToken path - trust clientBase when provided
           const MAX_BASELINE_GAP = 2; // Allow 1-2 new messages, not duplicates from previous cycles
-          
+
           const baselineMessageIds = new Set<string>();
           let messagesToSend: typeof conversationMessages = [];
 
@@ -332,7 +332,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // Only send baseline messages if clientBase is 0 (initial connection) or if we detect
         // the client is significantly behind (which shouldn't happen in normal operation).
         const MAX_BASELINE_GAP = 2; // Allow 1-2 new messages, not duplicates from previous cycles
-        
+
         const baselineMessageIds = new Set<string>();
         let messagesToSend: typeof conversationMessages = [];
         let baselineHasAssistant = false;

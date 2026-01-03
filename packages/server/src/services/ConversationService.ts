@@ -198,7 +198,7 @@ export class ConversationService {
     this.accumulatedLength.delete(conversationId);
     this.nextChunkPosition.delete(conversationId);
     this.chunkProcessingLock.delete(conversationId);
-    
+
     // Conditionally clear lastPersistedIndex (preserve when stopping to prevent duplicate persistence)
     if (!options?.preserveLastPersistedIndex) {
       this.lastPersistedIndex.delete(conversationId);
@@ -218,15 +218,15 @@ export class ConversationService {
 
   /**
    * Determines if an assistant message should be skipped during node_completed persistence.
-   * 
+   *
    * We need to handle two cases:
    * 1. Message was stopped and persisted via persistActivePartial - skip that specific message
    * 2. Multiple assistant messages in same turn (tool call + final response) - persist both
-   * 
+   *
    * The original check was too aggressive - it prevented ALL assistant messages from being
    * persisted after the first one. This broke the case where an assistant makes a tool call
    * (first message) and then continues with a final response (second message).
-   * 
+   *
    * @param message - The message from execution state
    * @param index - Current message index in state array
    * @param lastIndex - Last persisted index for this conversation
@@ -237,7 +237,7 @@ export class ConversationService {
     // Type guard: ensure message has expected structure
     if (!message || typeof message !== 'object') return false;
     const msg = message as Record<string, unknown>;
-    
+
     // Only skip if this is the exact message that was persisted via persistActivePartial during stop
     // We can identify it because:
     // - activeStreamPersisted is set (persistActivePartial was called)
@@ -246,7 +246,7 @@ export class ConversationService {
     const wasPartialPersisted = this.activeStreamPersisted.has(conversationId);
     const isFirstMessageAfterLastIndex = index === lastIndex + 1;
     const hasToolCalls = Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0;
-    
+
     return wasPartialPersisted && isFirstMessageAfterLastIndex && !hasToolCalls;
   }
 

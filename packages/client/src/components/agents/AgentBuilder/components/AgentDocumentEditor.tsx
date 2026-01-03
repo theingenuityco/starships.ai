@@ -1338,6 +1338,7 @@ export function AgentDocumentEditor({
             </div>
             <div className="w-full sm:w-[260px]">
               <Input
+                id="agent-name"
                 value={value.name}
                 onChange={e => onFieldChange?.('name', e.target.value)}
                 placeholder="Agent name"

@@ -925,7 +925,41 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (!existingAgent?.slug) return
     if (!agentSlug || agentSlug === 'new') return
     const nextSlug = String(existingAgent.slug)
-    if (nextSlug && String(agentSlug) !== nextSlug) {
+    if (nextSlug) {
+      // IMPORTANT:
+      // We update the address bar via history.replaceState (no Next.js navigation) to avoid remounting
+      // the page/form during renames. Because of that, `useParams().agentSlug` can be stale relative to
+      // the address bar. Always compare against the current location slug.
+      let locationSlug: string | null = null
+      try {
+        if (typeof window !== 'undefined') {
+          const parts = window.location.pathname.split('/').filter(Boolean)
+          const last = parts.length > 0 ? parts[parts.length - 1] : null
+          locationSlug = last ? decodeURIComponent(last) : null
+        }
+      } catch {
+        locationSlug = null
+      }
+      if (locationSlug && locationSlug === nextSlug) return
+
+      // Renaming an agent can regenerate its slug on the server. We want the URL to reflect that,
+      // but navigating (router.replace) remounts the whole page and causes the form to lose focus.
+      // Instead, update the address bar without a Next.js navigation.
+      try {
+        if (typeof window !== 'undefined') {
+          const desiredPath = `/ship/${slug}/agent/${encodeURIComponent(nextSlug)}`
+          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+          const desiredUrl = `${desiredPath}${q}`
+          const curUrl = `${window.location.pathname}${window.location.search}`
+          if (curUrl !== desiredUrl) {
+            window.history.replaceState(null, '', desiredUrl)
+          }
+          return
+        }
+      } catch {
+        // ignore
+      }
+      // Fallback (should rarely happen): if history APIs fail, do a normal replace.
       const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
       slugNormalizationTargetRef.current = nextSlug
       router.replace(`/ship/${slug}/agent/${encodeURIComponent(nextSlug)}${q}`)

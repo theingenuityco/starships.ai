@@ -861,12 +861,37 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     return match?.id || null
   }, [agents, agentSlug])
 
+  // Keep a stable canonical agent id once we have it.
+  // This prevents false "Agent not found" states when the server regenerates the slug
+  // (e.g. user edits agent name) and the URL/list momentarily diverge during refetches.
+  const [canonicalAgentId, setCanonicalAgentId] = useState<string | null>(null)
+  useEffect(() => {
+    if (agentSlug === 'new') {
+      setCanonicalAgentId(null)
+      return
+    }
+    if (resolvedAgentId && resolvedAgentId !== canonicalAgentId) {
+      setCanonicalAgentId(resolvedAgentId)
+    }
+  }, [agentSlug, resolvedAgentId, canonicalAgentId])
+
   const isEditingExisting = agentSlug !== 'new'
-  const isResolvingExistingAgentId = isEditingExisting && !resolvedAgentId && isLoadingAgents
-  const isMissingExistingAgent = isEditingExisting && !resolvedAgentId && !isLoadingAgents
+  const isResolvingExistingAgentId = isEditingExisting && !canonicalAgentId && isLoadingAgents
+  const isMissingExistingAgent = isEditingExisting && !canonicalAgentId && !isLoadingAgents
 
   // Prefill when editing an existing agent via canonical id endpoint.
-  const { data: existingAgent } = useAgent(resolvedAgentId || '', !!resolvedAgentId)
+  const { data: existingAgent, isError: isExistingAgentError } = useAgent(canonicalAgentId || '', !!canonicalAgentId)
+  useEffect(() => {
+    if (!isEditingExisting) return
+    if (!existingAgent?.slug) return
+    if (!agentSlug || agentSlug === 'new') return
+    const nextSlug = String(existingAgent.slug)
+    if (nextSlug && String(agentSlug) !== nextSlug) {
+      const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+      router.replace(`/ship/${slug}/agent/${encodeURIComponent(nextSlug)}${q}`)
+    }
+  }, [isEditingExisting, existingAgent?.slug, agentSlug, conversationId, router, slug])
+
   useEffect(() => {
     if (!existingAgent || !agentBuilderRef.current) return
     try {
@@ -1053,7 +1078,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 <div className="flex items-center justify-center min-h-[600px]">
                   <LoadingSpinner size="lg" />
                 </div>
-              ) : isMissingExistingAgent ? (
+              ) : isExistingAgentError || isMissingExistingAgent ? (
                 <div className="flex flex-col items-center justify-center text-center min-h-[600px] px-6">
                   <div className="text-lg font-semibold">Agent not found</div>
                   <div className="text-sm text-muted-foreground mt-2">This agent slug doesn’t exist in this starship.</div>
@@ -1067,7 +1092,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 <AgentBuilderView
                   ref={agentBuilderRef}
                   starshipId={starship.id}
-                  agentId={resolvedAgentId || undefined}
+                  agentId={canonicalAgentId || undefined}
                   agent={existingAgent || null}
                   onCancel={handleCancel}
                   initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}

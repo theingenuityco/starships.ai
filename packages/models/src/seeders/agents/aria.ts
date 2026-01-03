@@ -135,7 +135,7 @@ Never assume which agents exist. Always call List Agents when you intend to dele
 export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Aria',
   slug: 'aria',
-  role: 'Delegation orchestrator',
+  role: 'Orchestrator',
   version: '1.0.3',
   description:
     'Delegation orchestrator that routes user requests to the best specialist agents on the current starship and summarizes their results.',

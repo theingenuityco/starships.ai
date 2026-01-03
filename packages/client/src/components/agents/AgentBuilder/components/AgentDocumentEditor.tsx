@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
-import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
+import { getCategoryColor, getCategoryDotColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -28,18 +28,6 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentPublishModal } from './AgentPublishModal'
-
-const CATEGORY_DOT_COLORS: Record<string, string> = {
-  general: 'bg-gray-400',
-  automation: 'bg-emerald-400',
-  data: 'bg-purple-400',
-  communication: 'bg-orange-400',
-  coding: 'bg-indigo-400',
-  creative: 'bg-pink-400',
-  analysis: 'bg-cyan-400',
-  support: 'bg-amber-400',
-  utility: 'bg-teal-400',
-}
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -1349,7 +1337,7 @@ export function AgentDocumentEditor({
                   value: cat,
                   label: (
                     <span className="flex items-center gap-2">
-                      <span className={cn('h-2 w-2 rounded-full', CATEGORY_DOT_COLORS[cat] || CATEGORY_DOT_COLORS.general)} />
+                      <span className={cn('h-2 w-2 rounded-full', getCategoryDotColor(cat as any))} />
                       <span className="capitalize">{cat}</span>
                     </span>
                   ),

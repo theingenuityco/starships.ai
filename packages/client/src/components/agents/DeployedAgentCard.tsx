@@ -15,9 +15,9 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DropdownMenuSeparator } from '@/components/ui/dropdown-menu'
 import api from '@/lib/api'
 import type { FetchResponse } from '@/lib/types'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { toast } from 'sonner'
 import { useAuth } from '@/hooks/useAuth'
+import { getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
 
 const CHAT_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -103,6 +103,13 @@ export function DeployedAgentCard({
   const { isInstanceAdmin } = useAuth()
   const [isExporting, setIsExporting] = useState(false)
 
+  const displayName = typeof agent?.name === 'string' ? agent.name.trim() : ''
+  const displayRole = typeof agent?.role === 'string' ? agent.role.trim() : ''
+  const displaySlug = typeof agent?.slug === 'string' ? agent.slug.trim() : ''
+  const subtitle = displayRole || displaySlug
+  const showActionsDropdown = showActions && (onDelete || isInstanceAdmin)
+  const category = (agent as any)?.category as string | undefined
+
   // Check if this is a template-based agent (has sourceTemplateId).
   // Note: template-based agents may be read-only in some editors, but they can still be deleted.
   const isTemplateAgent = !!agent.sourceTemplateId
@@ -186,8 +193,17 @@ export function DeployedAgentCard({
         className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md"
         onClick={onClick}
       >
+        {/* Version badge (top-right) */}
+        {agent.version ? (
+          <div className={`absolute top-3 z-30 ${showActionsDropdown ? 'right-12' : 'right-3'}`}>
+            <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono bg-background/70 backdrop-blur-sm">
+              v{agent.version}
+            </Badge>
+          </div>
+        ) : null}
+
         {/* Actions dropdown */}
-        {showActions && (onDelete || isInstanceAdmin) && (
+        {showActionsDropdown && (
           <div className="absolute top-3 right-3 z-30">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -262,32 +278,27 @@ export function DeployedAgentCard({
             {/* Text content */}
             <div className="min-w-0 flex-1">
               <div className="mb-0.5 min-w-0">
-                <CardTitle className="truncate text-xl font-bold transition-colors duration-200 group-hover:text-foreground">{formatAgentDisplayName(agent)}</CardTitle>
+                <CardTitle className="truncate text-xl font-bold transition-colors duration-200 group-hover:text-foreground">{displayName || 'Unnamed agent'}</CardTitle>
               </div>
-              {/* Slug row (below title) */}
-              {agent.slug && (
+              {/* Role row (below title). Falls back to slug if role isn't set. */}
+              {subtitle ? (
                 <div className="-mt-1 mb-0 min-w-0">
-                  <span className="font-mono text-sm text-muted-foreground truncate">{agent.slug}</span>
+                  <span className="text-sm text-muted-foreground truncate">{subtitle}</span>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
 
           {/* New section: badges + description (below avatar/name/slug) */}
           <div className="mt-0">
             <div className="flex items-center gap-2 flex-wrap mb-2">
-              {/* Version + model badges */}
-              {agent.version && (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
-                  v{agent.version}
+              {/* Category badge */}
+              {typeof category === 'string' && category.trim() ? (
+                <Badge variant="outline" className="text-[10px] px-2 py-1 font-medium capitalize inline-flex items-center gap-1.5">
+                  <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />
+                  <span>{category}</span>
                 </Badge>
-              )}
-              {agent.model && (
-                <Badge variant="outline" className="text-[10px] flex items-center gap-1.5 px-2 py-0.5 transition-all duration-200 min-w-0">
-                  <Icon name="brain" className="w-3.5 h-3.5" />
-                  <span className="font-mono text-[10px] truncate">{agent.model}</span>
-                </Badge>
-              )}
+              ) : null}
               {/* Premium update available indicator with subtle animation */}
               {needsUpdate && (
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>

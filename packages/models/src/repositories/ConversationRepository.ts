@@ -259,4 +259,23 @@ export class ConversationRepository extends BaseRepository {
       'Conversation'
     );
   }
+
+  /**
+   * Find all child conversations for a given parent conversation ID
+   */
+  async findByParentConversationId(parentConversationId: string): Promise<ConversationModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM conversations WHERE parent_conversation_id = $1 ORDER BY created_at ASC',
+          [parentConversationId]
+        );
+        return fromDatabaseArray(ConversationEntity, result);
+      },
+      'findByParentConversationId',
+      'Conversation',
+      parentConversationId
+    );
+  }
 }

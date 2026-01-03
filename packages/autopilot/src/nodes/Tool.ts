@@ -81,8 +81,35 @@ export class Tool extends BaseNode<ToolParams> {
       type RunnerWithController = Runner & {
         runWithController: (bp: Blueprint, exec: Execution, cfg?: EngineConfig) => RunnerController;
       };
-      const ctl = (selectedRunner as Runner & Partial<RunnerWithController>).runWithController?.(params.blueprint, subExec, engineConfig);
-      const items = ctl ? await ctl.promise : await selectedRunner.run(params.blueprint, subExec, engineConfig);
+      const runnerWithController = selectedRunner as Runner & { runWithController?: (bp: Blueprint, exec: Execution, cfg?: EngineConfig) => RunnerController };
+      const hasRunWithController = typeof runnerWithController.runWithController === 'function';
+      
+      let items: ExecutionItem[];
+      if (hasRunWithController && runnerWithController.runWithController) {
+        try {
+          const ctl = runnerWithController.runWithController(params.blueprint, subExec, engineConfig);
+          items = await ctl.promise;
+        } catch (err) {
+          // If the error is an abort/cancellation error, re-throw it to stop tool execution
+          const isAbortError =
+            (err instanceof Error && (err.name === 'AbortError' || err.message.includes('aborted') || err.message.includes('cancelled'))) ||
+            (err instanceof DOMException && err.name === 'AbortError') ||
+            (typeof err === 'object' && err !== null && 'name' in err && err.name === 'AbortError') ||
+            String(err).includes('aborted') ||
+            String(err).includes('cancelled');
+          
+          if (isAbortError) {
+            console.log('[STOP-DEBUG] Tool.execute: Tool execution was cancelled', {
+              toolName: params.name,
+              error: err instanceof Error ? err.message : String(err),
+            });
+            throw err;
+          }
+          throw err;
+        }
+      } else {
+        items = await selectedRunner.run(params.blueprint, subExec, engineConfig);
+      }
       const result = ExecutionItemUtils.unwrapSingle(items);
 
       // Emit tool_complete event
@@ -103,6 +130,25 @@ export class Tool extends BaseNode<ToolParams> {
 
       return ExecutionItemUtils.wrapSingle(result, input?.[0]);
     } catch (error) {
+      // Check if this is a cancellation/abort error - if so, don't emit tool_complete
+      // The conversation was stopped, so we shouldn't process any tool results
+      const isAbortError =
+        (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('cancelled'))) ||
+        (error instanceof DOMException && error.name === 'AbortError') ||
+        (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError') ||
+        String(error).includes('aborted') ||
+        String(error).includes('cancelled') ||
+        String(error).includes('Remote runner execution cancelled');
+      
+      if (isAbortError) {
+        console.log('[STOP-DEBUG] Tool.execute: Tool was cancelled, not emitting tool_complete event', {
+          toolName: params.name,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        // Re-throw the error without emitting tool_complete
+        throw error;
+      }
+      
       // Emit tool_complete event with error and structured result payload for consumers
       const eventCallback = this.getOptions()?.eventCallback;
       const errorMessage = error instanceof Error ? error.message : 'Unknown tool error';

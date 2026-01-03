@@ -6,8 +6,9 @@ import { IdSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/
 import { validateData } from '@/utils/validation';
 import { AgentService } from '../services/AgentService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
-import { AgentModel } from '@starships/protocol';
+import { AgentModel, ConversationModel } from '@starships/protocol';
 import type { AuthUser } from '@starships/protocol';
+import { ConversationService } from '@/services/ConversationService';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { StarshipService } from '@/services/StarshipService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
@@ -461,6 +462,42 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
     }
     const hasAccess = await verifyStarshipAccess(bodyValidation.starshipId, userId, res);
     if (!hasAccess) return;
+
+    // CRITICAL: Check if any active conversations for this starship were recently stopped
+    // This prevents agent creation when a conversation was stopped but the HTTP request
+    // from the remote runner completes after the stop
+    // Note: This is a best-effort check since we can't easily determine which conversation
+    // triggered the agent creation request
+    try {
+      const conversationService = new ConversationService();
+      const conversations = await conversationService.getConversationsByStarship(bodyValidation.starshipId);
+      
+      // Check if any active conversation has turnActive: false (indicating it was stopped)
+      // Only check conversations updated in the last 5 minutes to avoid false positives
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+      const hasRecentlyStoppedConversation = conversations.some((conv: ConversationModel) => {
+        if (conv.status !== 'active') return false;
+        if (!conv.updatedAt || conv.updatedAt < fiveMinutesAgo) return false;
+        
+        const state = conv.state as { turnActive?: boolean } | undefined;
+        return state?.turnActive === false;
+      });
+      
+      if (hasRecentlyStoppedConversation) {
+        console.log('[STOP-DEBUG] Rejecting agent creation - starship has recently stopped conversations', {
+          starshipId: bodyValidation.starshipId,
+          note: 'Agent creation request from stopped conversation is being rejected',
+        });
+        sendError(res, 'RESOURCE_CONFLICT', 'Cannot create agent: conversation was stopped', 409);
+        return;
+      }
+    } catch (err) {
+      // Non-fatal: if we can't check, allow the creation to proceed
+      console.warn('[STOP-DEBUG] Failed to check for stopped conversations before agent creation', {
+        starshipId: bodyValidation.starshipId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     const agentService = new AgentService();
     const agent = await agentService.createAgent(req.body);

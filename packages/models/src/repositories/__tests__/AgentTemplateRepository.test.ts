@@ -268,6 +268,7 @@ describe('AgentTemplateRepository', () => {
     it('should handle missing optional fields', async () => {
       const minimalInput = {
         name: 'Minimal Template',
+        role: 'Assistant',
         slug: 'minimal-template', // Add slug for validation
         description: 'Basic template',
         category: 'general' as const,

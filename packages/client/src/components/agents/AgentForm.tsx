@@ -27,7 +27,8 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
 
   const [formData, setFormData] = useState<AgentFormData>({
     name: agent?.name || '',
-    role: agent?.role || 'Assistant',
+    // Don't invent a role in the UI. If missing, require the user to choose one.
+    role: agent?.role || '',
     description: agent?.description || '',
     model: agent?.model || 'gpt-4',
     temperature: agent?.temperature,

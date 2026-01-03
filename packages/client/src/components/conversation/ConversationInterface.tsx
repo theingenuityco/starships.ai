@@ -29,6 +29,7 @@ import { ConversationContextBar } from '@/components/conversation/ConversationCo
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 
 interface ConversationInterfaceProps {
@@ -361,7 +362,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       }
       // Persist to UI store immediately so other UI reads reflect the change
       if (agent && currentConversationId) {
-        setConversationAgentStore(currentConversationId, agent.id as any, agent.name as any)
+        setConversationAgentStore(currentConversationId, agent.id as any, formatAgentDisplayName(agent) as any)
       }
 
       // Keep the starter URL in sync so the selected agent is shareable/bookmarkable
@@ -481,7 +482,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         lastAutoSelectedAgentIdRef.current = agent.id
         // Also update the UI store so that this agent is remembered for this conversation
         if (currentConversationId) {
-          setConversationAgentStore(currentConversationId, agent.id, agent.name)
+          setConversationAgentStore(currentConversationId, agent.id, formatAgentDisplayName(agent))
         }
       }
     }
@@ -790,7 +791,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             // Mark that an agent has been set - prevent Gaia fallback
             hasEverSetAnyAgentRef.current = true
             // Update the store so it's remembered for this conversation
-            setConversationAgentStore(currentConversationId, messageAgent.id, messageAgent.name)
+            setConversationAgentStore(currentConversationId, messageAgent.id, formatAgentDisplayName(messageAgent))
           }
         }
       }

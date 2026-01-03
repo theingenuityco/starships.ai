@@ -17,6 +17,7 @@ import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 import { cn } from '@/lib/utils'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import Link from 'next/link'
 
 interface RequestedByProfileProps {
@@ -249,7 +250,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                           <div className="space-y-1 min-w-0">
                             <CardTitle className="flex items-center gap-2 text-base">
-                              <span className="truncate">{agent.name}</span>
+                              <span className="truncate">{formatAgentDisplayName(agent)}</span>
                               {(agent.publicationRequestedVersion || agent.version) && (
                                 <Badge variant="outline" className="text-[10px] font-mono">
                                   v{agent.publicationRequestedVersion || agent.version}
@@ -443,7 +444,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
                                 />
                               </div>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-semibold truncate">{selectedAgent.agent.name}</span>
+                                <span className="text-xs font-semibold truncate">{formatAgentDisplayName(selectedAgent.agent)}</span>
                                 <span className="text-[11px] text-muted-foreground font-mono truncate">{selectedAgent.agent.slug || selectedAgent.agent.id}</span>
                               </div>
                             </div>

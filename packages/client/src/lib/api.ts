@@ -1,9 +1,10 @@
 import type { ApiResponse, TemplateCategory, ToolModel as Tool, AgentUpdateCheckResponse } from '@starships/protocol'
+import type { ApiError as ApiErrorLike } from '@/lib/error-utils'
 
 import { apiCache, CACHE_KEYS, invalidateAgentCaches } from './cache'
 
 // Custom fetch response wrapper to match axios-like interface
-interface FetchResponse<T = any> {
+interface FetchResponse<T = unknown> {
   data: T
   status: number
   statusText: string
@@ -12,7 +13,7 @@ interface FetchResponse<T = any> {
 
 // Interceptor types
 type RequestInterceptor = (config: RequestConfig) => Promise<RequestConfig> | RequestConfig
-type ResponseInterceptor = (response: FetchResponse) => FetchResponse
+type ResponseInterceptor = <T>(response: FetchResponse<T>) => FetchResponse<T>
 type ErrorInterceptor = (error: any) => any
 
 interface RequestConfig extends RequestInit {
@@ -282,16 +283,50 @@ api.interceptors.request.use(
 
 // Response interceptor for auth error handling
 api.interceptors.response.use(
-  (response: FetchResponse) => response,
-  (error: any) => {
+  <T>(response: FetchResponse<T>) => response,
+  (rawError: unknown) => {
+    const error = (rawError instanceof Error ? rawError : new Error('Unknown error')) as Error &
+      ApiErrorLike & {
+        code?: string
+        config?: { url?: string; method?: string }
+        response?: {
+          status?: number
+          statusText?: string
+          data?: unknown
+          headers?: Headers
+        } & ApiErrorLike['response']
+        toJSON?: () => unknown
+      }
+    const status = error.response?.status
+    const url = error.config?.url
+
+    // 401s are an expected outcome when a stored token expires.
+    // Treat them as "logged out" instead of spamming console.error.
+    if (status === 401) {
+      try {
+        if (typeof window !== 'undefined') {
+          window.localStorage.removeItem('starships_auth_token')
+        }
+      } catch {
+        // ignore
+      }
+
+      if (process.env.NODE_ENV === 'development') {
+        // Keep a lightweight breadcrumb for debugging without alarming noise.
+        console.debug('[API] 401 Unauthorized (clearing token)', { url, method: error.config?.method })
+      }
+
+      return Promise.reject(error)
+    }
+
     // Enhanced error logging to capture all possible error scenarios
     const errorDetails = {
       message: error.message,
       name: error.name,
       code: error.code,
-      url: error.config?.url,
+      url,
       method: error.config?.method,
-      status: error.response?.status,
+      status,
       statusText: error.response?.statusText,
       data: error.response?.data,
       headers: error.response?.headers,
@@ -304,13 +339,10 @@ api.interceptors.response.use(
 
     console.error('[API] Request failed:', errorDetails)
 
-    if (error.response?.status === 401) {
-      console.error('[API] Authentication failed - token may be invalid or expired:', error.response.data)
-      // TODO: Trigger logout or token refresh
-    } else if (error.response?.status === 500) {
-      console.error('[API] Server error occurred:', error.response.data)
-    } else if (error.response?.status === 409) {
-      console.warn('[API] Conflict error (409):', error.response.data)
+    if (status === 500) {
+      console.error('[API] Server error occurred:', error.response?.data)
+    } else if (status === 409) {
+      console.warn('[API] Conflict error (409):', error.response?.data)
 
       // Handle 409 conflicts gracefully
       if (error.config?.url?.includes('/connectors/')) {
@@ -319,7 +351,7 @@ api.interceptors.response.use(
           status: 200,
           statusText: 'OK',
           data: { message: 'Already connected' },
-          headers: error.response.headers,
+          headers: error.response?.headers ?? new Headers(),
         })
       }
     } else if (!error.response) {

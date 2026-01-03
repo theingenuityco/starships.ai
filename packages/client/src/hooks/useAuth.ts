@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useSimpleError } from './useSimpleError'
 import { isValidRedirectUrl } from '@/lib/utils'
+import type { ApiResponse } from '@starships/protocol'
 
 export type AuthMethod = 'password' | 'google' | 'github'
 
@@ -84,8 +85,13 @@ const validateToken = async (token: string): Promise<AuthUser | null> => {
     })
 
     if (response.ok) {
-      const data = await response.json()
-      return data.data || data // Handle different response formats
+      const json = (await response.json()) as ApiResponse<AuthUser>
+      return json.data
+    }
+
+    // If the token is invalid/expired, clear it so we don't keep calling /auth/me on mount/focus.
+    if (response.status === 401) {
+      setStoredToken(null)
     }
 
     return null

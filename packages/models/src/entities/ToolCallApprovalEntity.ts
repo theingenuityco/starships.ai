@@ -31,8 +31,8 @@ export class ToolCallApprovalEntity implements ToolCallApprovalModel {
 
   @Expose()
   @IsString()
-  @Length(1, 100)
-  toolSlug!: string;
+  @Length(1, 255)
+  toolId!: string;
 
   @Expose()
   @IsString()
@@ -69,7 +69,7 @@ export class ToolCallApprovalEntity implements ToolCallApprovalModel {
         starshipId: rec.starshipId || 'temp-starship-id',
         conversationId: rec.conversationId || 'temp-conversation-id',
         agentId: rec.agentId || 'temp-agent-id',
-        toolSlug: rec.toolSlug,
+        toolId: rec.toolId,
         toolCallId: rec.toolCallId,
         argsJson: (rec.argsJson && typeof rec.argsJson === 'object' ? rec.argsJson : {}) as Record<string, unknown>,
         status: rec.status || 'pending',

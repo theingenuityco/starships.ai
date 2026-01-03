@@ -7,9 +7,7 @@
  * - Templates (agent_templates/tool_templates): slug = slugify(name) + random suffix, unique globally
  *
  * Also updates known stored slug references:
- * - tool_call_approvals.tool_slug (starship-scoped tool instance slug)
  * - agents.state / agents.blueprint (best-effort: replaces exact string matches for old tool slugs)
- * - agent_templates.assigned_tool_slugs (legacy column; best-effort)
  *
  * Usage:
  *   pnpm -C packages/models run migrate:regenerate-slugs -- --dry-run
@@ -175,23 +173,6 @@ export async function regenerateSlugs(args: Args): Promise<void> {
         }
       }
 
-      // Update legacy agent_templates.assigned_tool_slugs (TEXT[]) if present/used.
-      const legacyAssigned = await q<{ id: string; assigned_tool_slugs: string[] | null }>(
-        'SELECT id, assigned_tool_slugs FROM agent_templates'
-      );
-      let legacyAssignedUpdated = 0;
-      for (const row of legacyAssigned) {
-        const arr = Array.isArray(row.assigned_tool_slugs) ? row.assigned_tool_slugs : [];
-        if (arr.length === 0) continue;
-        const next: string[] = arr.map((s: string) => toolTemplateSlugMap.get(s) || s);
-        const changed = next.some((v: string, idx: number) => v !== arr[idx]);
-        if (!changed) continue;
-        legacyAssignedUpdated++;
-        if (!args.dryRun) {
-          await client.query('UPDATE agent_templates SET assigned_tool_slugs = $2, updated_at = NOW() WHERE id = $1', [row.id, next]);
-        }
-      }
-
       // ---------------------------------------------------------------------
       // Instances (per starship)
       // ---------------------------------------------------------------------
@@ -202,7 +183,6 @@ export async function regenerateSlugs(args: Args): Promise<void> {
 
       let toolsUpdated = 0;
       let agentsUpdated = 0;
-      let approvalsUpdated = 0;
       let agentJsonUpdated = 0;
 
       for (const s of starships) {
@@ -228,20 +208,6 @@ export async function regenerateSlugs(args: Args): Promise<void> {
           }
         } else {
           toolsUpdated += tools.filter((t: ToolRow) => toolSlugMap.get(t.slug) !== t.slug).length;
-        }
-
-        // Update tool_call_approvals.tool_slug for this starship
-        const approvals = await q<{ id: string; tool_slug: string }>(
-          'SELECT id, tool_slug FROM tool_call_approvals WHERE starship_id = $1',
-          [s.id]
-        );
-        for (const a of approvals) {
-          const next = toolSlugMap.get(a.tool_slug);
-          if (!next || next === a.tool_slug) continue;
-          approvalsUpdated++;
-          if (!args.dryRun) {
-            await client.query('UPDATE tool_call_approvals SET tool_slug = $2 WHERE id = $1', [a.id, next]);
-          }
         }
 
         // Agents: regenerate agent slugs per starship
@@ -289,10 +255,8 @@ export async function regenerateSlugs(args: Args): Promise<void> {
         metadata: {
           toolTemplates: toolTemplates.length,
           agentTemplates: agentTemplates.length,
-          legacyAssignedToolSlugsUpdated: legacyAssignedUpdated,
           toolsUpdated,
           agentsUpdated,
-          toolCallApprovalsUpdated: approvalsUpdated,
           agentJsonUpdated,
         },
       });

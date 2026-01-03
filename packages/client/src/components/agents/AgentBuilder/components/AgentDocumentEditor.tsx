@@ -597,8 +597,8 @@ export function AgentDocumentEditor({
         if (!value.slug && agent.slug) onFieldChange?.('slug', agent.slug)
         if (!value.description && agent.description) onFieldChange?.('description', agent.description)
         if (!value.model && agent.model) onFieldChange?.('model', agent.model)
-        if ((!value.category || value.category === 'general') && (agent as any).category) {
-          onFieldChange?.('category', (agent as any).category as any)
+        if (!value.category && agent.category) {
+          onFieldChange?.('category', agent.category as any)
         }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
@@ -611,8 +611,8 @@ export function AgentDocumentEditor({
           onFieldChange?.('reasoning', 'none' as any)
         }
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
-        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
-          onFieldChange?.('previewPrompts', ((agent as any).previewPrompts as string[]).filter(Boolean))
+        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray(agent.previewPrompts)) {
+          onFieldChange?.('previewPrompts', (agent.previewPrompts as string[]).filter(Boolean))
         }
         if (value.timeout == null && agent.timeout != null) onFieldChange?.('timeout', agent.timeout as any)
         if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
@@ -886,8 +886,8 @@ export function AgentDocumentEditor({
         updates.model = value.model
       }
 
-      if (value.category && (fullAgent as any).category !== value.category) {
-        ;(updates as any).category = value.category
+      if (value.category && fullAgent?.category !== value.category) {
+        updates.category = value.category as any
       }
 
       // Clamp numeric fields into valid ranges before sending, and compare to base

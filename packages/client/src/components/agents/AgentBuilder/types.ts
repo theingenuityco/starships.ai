@@ -5,7 +5,11 @@ export interface AgentFormData {
   name: string
   slug: string
   description: string
-  category: AgentTemplateCategory
+  /**
+   * Category is optional in the backend and should not be defaulted in the UI.
+   * We keep it as a controlled field by allowing the empty-string sentinel.
+   */
+  category: AgentTemplateCategory | ''
   model: string
   temperature: number
   maxTokens: number

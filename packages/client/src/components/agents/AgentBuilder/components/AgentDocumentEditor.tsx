@@ -981,6 +981,13 @@ export function AgentDocumentEditor({
           setFullAgent(updated)
           // Keep React Query cache in sync for this agent
           queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+          // IMPORTANT:
+          // Editing the agent name regenerates its slug on the server. The agent page route is slug-based
+          // and resolves agentId from the starship agents list. If we don't refresh that list, a later
+          // background refetch (focus/refresh) can cause "Agent not found" due to URL slug mismatch.
+          if (starshipId) {
+            queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starshipId) })
+          }
           // If we successfully persisted a reasoning change, clear the dirty flag
           if (Object.prototype.hasOwnProperty.call(updates as object, 'reasoning')) {
             reasoningDirtyRef.current = false
@@ -1122,169 +1129,169 @@ export function AgentDocumentEditor({
       {/* Primary actions & publication status - compact banner (styled like navbar, sticky with offset) */}
       {!embedded ? (
         <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
-        {agentId && (
-          <div className="flex items-center gap-4 text-sm">
-            {/* Avatar + name/slug on the far left */}
-            {showIdentityInBanner && (
-              <div className="flex items-center gap-3">
-                <AgentAvatar
-                  seed={fullAgent?.name || value.name || value.slug || 'Agent'}
-                  imageUrl={avatarUrl}
-                  size={36}
-                  rounded
-                  className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
-                />
-                <div className="flex flex-col leading-tight min-w-0">
-                  <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
-                  {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
-                </div>
-              </div>
-            )}
-
-            {/* Text stack to the right of avatar/name */}
-            <div className="flex flex-col gap-2">
-              {/* Save indicator */}
-              <div className="flex items-center gap-1 text-xs font-medium">
-                <div className="w-3 h-3 flex items-center justify-center">
-                  <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
-                </div>
-                <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
-              </div>
-
-              {/* Status, Version & Last updated */}
-              <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 font-medium',
-                    publicationStatus === 'published'
-                      ? 'text-emerald-500'
-                      : publicationStatus === 'pending_approval'
-                        ? 'text-amber-500'
-                        : publicationStatus === 'rejected'
-                          ? 'text-red-500'
-                          : 'text-muted-foreground'
-                  )}
-                >
-                  <Icon
-                    name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
-                    className="w-3 h-3"
+          {agentId && (
+            <div className="flex items-center gap-4 text-sm">
+              {/* Avatar + name/slug on the far left */}
+              {showIdentityInBanner && (
+                <div className="flex items-center gap-3">
+                  <AgentAvatar
+                    seed={fullAgent?.name || value.name || value.slug || 'Agent'}
+                    imageUrl={avatarUrl}
+                    size={36}
+                    rounded
+                    className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
                   />
-                  <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
-                </span>
-                {fullAgent?.version && (
-                  <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
-                    <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
+                  <div className="flex flex-col leading-tight min-w-0">
+                    <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
+                    {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Text stack to the right of avatar/name */}
+              <div className="flex flex-col gap-2">
+                {/* Save indicator */}
+                <div className="flex items-center gap-1 text-xs font-medium">
+                  <div className="w-3 h-3 flex items-center justify-center">
+                    <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+                  </div>
+                  <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
+                </div>
+
+                {/* Status, Version & Last updated */}
+                <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 font-medium',
+                      publicationStatus === 'published'
+                        ? 'text-emerald-500'
+                        : publicationStatus === 'pending_approval'
+                          ? 'text-amber-500'
+                          : publicationStatus === 'rejected'
+                            ? 'text-red-500'
+                            : 'text-muted-foreground'
+                    )}
+                  >
+                    <Icon
+                      name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
+                      className="w-3 h-3"
+                    />
+                    <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
                   </span>
-                )}
-                {fullAgent?.updatedAt && (
-                  <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                    <Icon name="clock" className="w-3 h-3" />
-                    <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
+                  {fullAgent?.version && (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
+                      <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
+                    </span>
+                  )}
+                  {fullAgent?.updatedAt && (
+                    <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                      <Icon name="clock" className="w-3 h-3" />
+                      <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {publicationStatus === 'rejected' && (
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>Last request was rejected. Update your agent and request publication again.</span>
                   </div>
                 )}
               </div>
-
-              {publicationStatus === 'rejected' && (
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <span>Last request was rejected. Update your agent and request publication again.</span>
-                </div>
-              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {!readOnly && (
-          <div className="flex flex-col gap-1 items-start sm:items-end">
-            <div className="flex flex-wrap items-center gap-2">
-              {hasExistingAgent && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="primaryOutline"
-                  className="gap-1.5"
-                  disabled={isRequestingPublish || !canRequestPublication}
-                  onClick={() => {
-                    if (!canRequestPublication) return
+          {!readOnly && (
+            <div className="flex flex-col gap-1 items-start sm:items-end">
+              <div className="flex flex-wrap items-center gap-2">
+                {hasExistingAgent && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primaryOutline"
+                    className="gap-1.5"
+                    disabled={isRequestingPublish || !canRequestPublication}
+                    onClick={() => {
+                      if (!canRequestPublication) return
 
-                    // Provide a sensible default changelog if none is set yet
-                    if (!changelog.trim()) {
-                      if (!fullAgent?.publishedTemplateId) {
-                        // First-time publish
-                        setChangelog('Initial publication of this agent to the marketplace.')
-                      } else if (publishedChangeDetails.length > 0) {
-                        // Re-publish with detected changes – summarize the changed fields
-                        const summary = publishedChangeDetails.join(', ').toLowerCase()
-                        setChangelog(`Updated ${summary}.`)
-                      } else {
-                        // Fallback when we can't detect specific fields
-                        setChangelog('Minor updates and fixes.')
-                      }
-                    }
-
-                    // Provide sensible default changelogs for tools as well, if not already set
-                    if (assignedToolsForOverrides.length > 0) {
-                      setToolOverrides(prev => {
-                        const next = { ...prev }
-                        for (const tool of assignedToolsForOverrides) {
-                          const existing = next[tool.id] || {
-                            versionBump: 'patch' as const,
-                            changelog: '',
-                          }
-                          if (existing.changelog && existing.changelog.trim()) continue
-
-                          const isNewTemplate = !tool.publishedTemplateId
-                          const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
-
-                          let defaultLog: string
-                          if (isNewTemplate) {
-                            defaultLog = 'Initial publication of this tool for this agent.'
-                          } else if (hasTemplateUpdate) {
-                            defaultLog = 'Synced latest tool definition changes for this agent.'
-                          } else {
-                            defaultLog = 'Minor updates and fixes for this tool.'
-                          }
-
-                          next[tool.id] = {
-                            versionBump: existing.versionBump || 'patch',
-                            changelog: defaultLog,
-                          }
+                      // Provide a sensible default changelog if none is set yet
+                      if (!changelog.trim()) {
+                        if (!fullAgent?.publishedTemplateId) {
+                          // First-time publish
+                          setChangelog('Initial publication of this agent to the marketplace.')
+                        } else if (publishedChangeDetails.length > 0) {
+                          // Re-publish with detected changes – summarize the changed fields
+                          const summary = publishedChangeDetails.join(', ').toLowerCase()
+                          setChangelog(`Updated ${summary}.`)
+                        } else {
+                          // Fallback when we can't detect specific fields
+                          setChangelog('Minor updates and fixes.')
                         }
-                        return next
-                      })
-                    }
+                      }
 
-                    // Always start the stepped flow at the agent card
-                    setActivePublishStep('agent')
-                    setShowPublishDialog(true)
-                  }}
-                >
-                  <Icon name="rocket-launch" className="w-3.5 h-3.5" />
-                  {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
-                </Button>
+                      // Provide sensible default changelogs for tools as well, if not already set
+                      if (assignedToolsForOverrides.length > 0) {
+                        setToolOverrides(prev => {
+                          const next = { ...prev }
+                          for (const tool of assignedToolsForOverrides) {
+                            const existing = next[tool.id] || {
+                              versionBump: 'patch' as const,
+                              changelog: '',
+                            }
+                            if (existing.changelog && existing.changelog.trim()) continue
+
+                            const isNewTemplate = !tool.publishedTemplateId
+                            const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
+
+                            let defaultLog: string
+                            if (isNewTemplate) {
+                              defaultLog = 'Initial publication of this tool for this agent.'
+                            } else if (hasTemplateUpdate) {
+                              defaultLog = 'Synced latest tool definition changes for this agent.'
+                            } else {
+                              defaultLog = 'Minor updates and fixes for this tool.'
+                            }
+
+                            next[tool.id] = {
+                              versionBump: existing.versionBump || 'patch',
+                              changelog: defaultLog,
+                            }
+                          }
+                          return next
+                        })
+                      }
+
+                      // Always start the stepped flow at the agent card
+                      setActivePublishStep('agent')
+                      setShowPublishDialog(true)
+                    }}
+                  >
+                    <Icon name="rocket-launch" className="w-3.5 h-3.5" />
+                    {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
+                  </Button>
+                )}
+              </div>
+
+              {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
+                      {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
+                    </button>
+                  </TooltipTrigger>
+                  {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
+                    <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
+                      <div className="font-semibold mb-1 text-foreground">Changes since last published version</div>
+                      <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                        {publishedChangeDetails.map(change => (
+                          <li key={change}>{change}</li>
+                        ))}
+                      </ul>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               )}
             </div>
-
-            {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
-                    {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
-                  </button>
-                </TooltipTrigger>
-                {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
-                  <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
-                    <div className="font-semibold mb-1 text-foreground">Changes since last published version</div>
-                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                      {publishedChangeDetails.map(change => (
-                        <li key={change}>{change}</li>
-                      ))}
-                    </ul>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            )}
-          </div>
-        )}
+          )}
         </div>
       ) : null}
 

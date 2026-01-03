@@ -30,3 +30,18 @@ export const getCategoryColor = (category: AgentTemplateCategory) => {
   }
   return colors[category] || colors.general
 }
+
+export const getCategoryDotColor = (category: AgentTemplateCategory) => {
+  const colors: Record<string, string> = {
+    general: 'bg-gray-400',
+    automation: 'bg-emerald-400',
+    data: 'bg-purple-400',
+    communication: 'bg-orange-400',
+    coding: 'bg-indigo-400',
+    creative: 'bg-pink-400',
+    analysis: 'bg-cyan-400',
+    support: 'bg-amber-400',
+    utility: 'bg-teal-400',
+  }
+  return colors[category] || colors.general
+}

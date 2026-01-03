@@ -68,6 +68,8 @@ export class ConversationService {
   private static activeCancellations: Map<string, () => void> = new Map();
   // Track conversations that should be stopped when real cancel is registered
   private static pendingStops: Set<string> = new Set();
+  // Track turn lease IDs per conversation so we can release them on stop
+  private static turnLeases: Map<string, string> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
 
   private connectorSecretService!: ConnectorSecretService;
@@ -1408,6 +1410,7 @@ export class ConversationService {
         try {
           const leaseService = new StarshipTurnLeaseService();
           await leaseService.release(opts.turnLeaseId);
+          ConversationService.turnLeases.delete(data.conversationId);
         } catch {
           // best-effort; lease also has TTL in DB
         }
@@ -1475,6 +1478,11 @@ export class ConversationService {
         conversationId,
         maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 1,
       });
+
+      // Track the turn lease so we can release it on stop
+      if (turnLeaseId) {
+        ConversationService.turnLeases.set(conversationId, turnLeaseId);
+      }
 
       const agentService = new AgentService();
       const agentModel = await agentService.getAgent(agentId);
@@ -1606,6 +1614,7 @@ export class ConversationService {
       if (turnLeaseId) {
         try {
           await leaseService.release(turnLeaseId);
+          ConversationService.turnLeases.delete(conversationId);
         } catch {
           // best-effort; lease TTL will clean up
         }
@@ -1634,6 +1643,25 @@ export class ConversationService {
     }
     visited.add(conversationId);
 
+    // CRITICAL: Release turn lease immediately when stopping
+    // This prevents the concurrency limit from being stuck when conversations are stopped
+    const turnLeaseId = ConversationService.turnLeases.get(conversationId);
+    if (turnLeaseId) {
+      try {
+        const leaseService = new StarshipTurnLeaseService();
+        await leaseService.release(turnLeaseId);
+        ConversationService.turnLeases.delete(conversationId);
+        console.log('[STOP-DEBUG] Released turn lease on stop', { conversationId, turnLeaseId });
+      } catch (err) {
+        console.warn('[STOP-DEBUG] Error releasing turn lease on stop', {
+          conversationId,
+          turnLeaseId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        // Continue with stop even if lease release fails
+      }
+    }
+
     // First, recursively stop all child conversations (delegated conversations)
     // This ensures that when stopping a parent conversation, all child conversations are also stopped
     try {
@@ -1658,6 +1686,28 @@ export class ConversationService {
             childHasPlaceholder,
             childHasRealCancel: typeof childCancel === 'function' && !childHasPlaceholder,
           });
+
+          // CRITICAL: Release child's turn lease immediately when stopping
+          const childTurnLeaseId = ConversationService.turnLeases.get(childConversation.id);
+          if (childTurnLeaseId) {
+            try {
+              const leaseService = new StarshipTurnLeaseService();
+              await leaseService.release(childTurnLeaseId);
+              ConversationService.turnLeases.delete(childConversation.id);
+              console.log('[STOP-DEBUG] Released child turn lease on stop', {
+                parentConversationId: conversationId,
+                childConversationId: childConversation.id,
+                childTurnLeaseId,
+              });
+            } catch (err) {
+              console.warn('[STOP-DEBUG] Error releasing child turn lease on stop', {
+                parentConversationId: conversationId,
+                childConversationId: childConversation.id,
+                childTurnLeaseId,
+                error: err instanceof Error ? err.message : String(err),
+              });
+            }
+          }
 
           // CRITICAL: Mark child for stop immediately, even if it's already executing
           // This ensures the onCancel callback will see the pending stop and call cancel immediately
@@ -2202,6 +2252,15 @@ export class ConversationService {
   }
 
   async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
+    // Log all tool_complete events for debugging stop functionality
+    if (event.type === 'tool_complete') {
+      console.log('[STOP-DEBUG] eventCallback received tool_complete', {
+        conversationId,
+        eventType: event.type,
+        timestamp: event.timestamp,
+        allPendingStops: Array.from(ConversationService.pendingStops),
+      });
+    }
     if (!this.streamingService) {
       return;
     }
@@ -3328,6 +3387,89 @@ export class ConversationService {
       }
 
       case 'tool_complete': {
+        // CRITICAL: Check if conversation was stopped before processing tool results
+        // The remote runner might continue processing tool calls even after we abort the fetch
+        // We need to prevent tool results from being processed if the conversation was stopped
+        const toolEvent = event as { data?: { toolName?: string; result?: unknown } };
+        const toolName = toolEvent.data?.toolName;
+
+        console.log('[STOP-DEBUG] tool_complete event received', {
+          conversationId,
+          toolName,
+          allPendingStops: Array.from(ConversationService.pendingStops),
+          thisConversationInPendingStops: ConversationService.pendingStops.has(conversationId),
+        });
+
+        // Check if this conversation or its parent was stopped
+        // pendingStops is the authoritative indicator that a conversation was stopped
+        const currentConversationStopped = ConversationService.pendingStops.has(conversationId);
+
+        // Also check parent conversation if this is a child conversation
+        // This is critical because tool execution in child conversations should stop if parent was stopped
+        let parentConversationStopped = false;
+        let parentConversationId: string | undefined;
+        try {
+          const convo = await this.getConversationById(conversationId).catch(() => null);
+          if (convo?.parentConversationId) {
+            parentConversationId = convo.parentConversationId;
+            parentConversationStopped = ConversationService.pendingStops.has(parentConversationId);
+          }
+        } catch {
+          // Best-effort: if we can't check parent, continue with current conversation check
+        }
+
+        if (currentConversationStopped || parentConversationStopped) {
+          console.log('[STOP-DEBUG] Ignoring tool_complete event - conversation was stopped', {
+            conversationId,
+            parentConversationId,
+            toolName,
+            currentConversationStopped,
+            parentConversationStopped,
+            allPendingStops: Array.from(ConversationService.pendingStops),
+            note: 'Tool result will not be processed, preventing any side effects',
+          });
+          // Don't process the tool result - the conversation was stopped
+          // This prevents tool results from being added to state and triggering subsequent actions
+          return;
+        }
+
+        // CRITICAL: For ALL tools, verify conversation is still active by checking turnActive state
+        // This catches cases where the conversation was stopped between tool_started and tool_complete
+        try {
+          const convo = await this.getConversationById(conversationId).catch(() => null);
+          if (convo && (convo.state as { turnActive?: boolean })?.turnActive === false) {
+            console.log('[STOP-DEBUG] Ignoring tool_complete event - conversation turn is inactive', {
+              conversationId,
+              toolName,
+              turnActive: (convo.state as { turnActive?: boolean })?.turnActive,
+              note: 'Tool result will not be processed',
+            });
+            return;
+          }
+
+          // Also check parent conversation's turnActive state
+          if (convo?.parentConversationId) {
+            const parentConvo = await this.getConversationById(convo.parentConversationId).catch(() => null);
+            if (parentConvo && (parentConvo.state as { turnActive?: boolean })?.turnActive === false) {
+              console.log('[STOP-DEBUG] Ignoring tool_complete event - parent conversation turn is inactive', {
+                conversationId,
+                parentConversationId: convo.parentConversationId,
+                toolName,
+                parentTurnActive: (parentConvo.state as { turnActive?: boolean })?.turnActive,
+                note: 'Tool result will not be processed',
+              });
+              return;
+            }
+          }
+        } catch (err) {
+          // Non-fatal: if we can't check conversation state, log and continue
+          console.warn('[STOP-DEBUG] Failed to check conversation state in tool_complete', {
+            conversationId,
+            toolName,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+
         // Tool completion is now handled via state-based message persistence in node_completed
         // No persistence needed here - messages are added to state via mutations and persisted automatically
         break;

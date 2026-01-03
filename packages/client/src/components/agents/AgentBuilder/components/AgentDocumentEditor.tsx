@@ -108,7 +108,7 @@ export function AgentDocumentEditor({
     return n || 'Untitled agent'
   }
 
-  const avatarAttachmentId = (fullAgent as any)?.avatarAttachmentId as string | undefined
+  const avatarAttachmentId = fullAgent?.avatarAttachmentId
   const avatarIds = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
   const avatarUrl = avatarAttachments?.[0]?.previewUrl
@@ -308,7 +308,6 @@ export function AgentDocumentEditor({
       }
       try {
         if (!value?.slug || value.slug === 'new') {
-          console.debug('[AgentDocEditor] Skipping agent hydrate', { starshipId, slug: value?.slug, agentId: providedAgentId })
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
@@ -337,7 +336,6 @@ export function AgentDocumentEditor({
 
         // Fallback: resolve id from starship+slug, then hydrate canonical /agents/:id.
         if (!starshipId) {
-          console.debug('[AgentDocEditor] Missing starshipId for slug resolve', { slug: value?.slug })
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
@@ -594,11 +592,12 @@ export function AgentDocumentEditor({
         const agent = res.data.data
         if (!agent) return
         if (!value.name && agent.name) onFieldChange?.('name', agent.name)
+        if (!value.role && agent.role) onFieldChange?.('role', agent.role)
         if (!value.slug && agent.slug) onFieldChange?.('slug', agent.slug)
         if (!value.description && agent.description) onFieldChange?.('description', agent.description)
         if (!value.model && agent.model) onFieldChange?.('model', agent.model)
-        if ((!value.category || value.category === 'general') && (agent as any).category) {
-          onFieldChange?.('category', (agent as any).category as any)
+        if (!value.category && agent.category) {
+          onFieldChange?.('category', agent.category as any)
         }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
@@ -611,8 +610,8 @@ export function AgentDocumentEditor({
           onFieldChange?.('reasoning', 'none' as any)
         }
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
-        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
-          onFieldChange?.('previewPrompts', ((agent as any).previewPrompts as string[]).filter(Boolean))
+        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray(agent.previewPrompts)) {
+          onFieldChange?.('previewPrompts', (agent.previewPrompts as string[]).filter(Boolean))
         }
         if (value.timeout == null && agent.timeout != null) onFieldChange?.('timeout', agent.timeout as any)
         if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
@@ -646,6 +645,7 @@ export function AgentDocumentEditor({
 
     const normalizeCore = (src: {
       name?: string | null
+      role?: string | null
       description?: string | null
       model?: string | null
       category?: string | null
@@ -662,6 +662,7 @@ export function AgentDocumentEditor({
       const normalizedTemperature = typeof src.temperature === 'number' ? src.temperature : 0.7
       return {
         name: src.name ?? '',
+        role: src.role ?? '',
         description: src.description ?? '',
         model: src.model ?? '',
         category: src.category ?? 'general',
@@ -675,13 +676,14 @@ export function AgentDocumentEditor({
       }
     }
 
-    const agentCore = normalizeCore(fullAgent as any)
-    const templateCore = normalizeCore(publishedTemplate as any)
+    const agentCore = normalizeCore(fullAgent)
+    const templateCore = normalizeCore(publishedTemplate)
 
     const sameName = agentCore.name === templateCore.name
+    const sameRole = agentCore.role === templateCore.role
     const sameDescription = agentCore.description === templateCore.description
     const sameModel = agentCore.model === templateCore.model
-    const sameCategory = (agentCore as any).category === (templateCore as any).category
+    const sameCategory = agentCore.category === templateCore.category
     const sameTemperature = agentCore.temperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
@@ -694,9 +696,9 @@ export function AgentDocumentEditor({
     // - Published template avatar is public and tracked via avatarUpdatedAt (cache-busting timestamp).
     // We treat the avatar as "same" if the agent has no avatar and the template has none,
     // or if the agent avatar was created at/before the template's avatarUpdatedAt.
-    const templateAvatarUpdatedAt = (publishedTemplate as any)?.avatarUpdatedAt as string | undefined
+    const templateAvatarUpdatedAt = publishedTemplate.avatarUpdatedAt
     const agentHasAvatar = typeof avatarAttachmentId === 'string' && avatarAttachmentId.trim().length > 0
-    const templateHasAvatar = typeof (publishedTemplate as any)?.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
+    const templateHasAvatar = typeof publishedTemplate.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
     const toMs = (s?: string) => {
       if (!s) return NaN
       const t = new Date(s).getTime()
@@ -731,7 +733,7 @@ export function AgentDocumentEditor({
         })
         .filter((s): s is string => typeof s === 'string' && s.length > 0)
     )
-    const baselineTools = normalizeSlugs(((publishedTemplate as any).assignedToolSlugs as string[] | undefined) || [])
+    const baselineTools = normalizeSlugs(publishedTemplate.assignedToolSlugs || [])
     const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
 
     const agentBlueprintStr = JSON.stringify(agentCore.blueprint)
@@ -740,6 +742,7 @@ export function AgentDocumentEditor({
 
     const changes: string[] = []
     if (!sameName) changes.push('Name')
+    if (!sameRole) changes.push('Role')
     if (!sameDescription) changes.push('Description')
     if (!sameModel) changes.push('Model')
     if (!sameCategory) changes.push('Category')
@@ -758,6 +761,7 @@ export function AgentDocumentEditor({
         agentId: fullAgent.id,
         publishedTemplateId: fullAgent.publishedTemplateId,
         sameName,
+        sameRole,
         sameDescription,
         sameModel,
         sameCategory,
@@ -787,6 +791,7 @@ export function AgentDocumentEditor({
 
     const differs = !(
       sameName &&
+      sameRole &&
       sameDescription &&
       sameModel &&
       sameCategory &&
@@ -806,26 +811,6 @@ export function AgentDocumentEditor({
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
-
-  // Debug logging for publishability pipeline – helps trace why an agent is (re)publishable
-  useEffect(() => {
-    try {
-      console.debug('[AgentDocEditor] publish-debug', {
-        agentId,
-        fullAgentId: fullAgent?.id,
-        publicationStatus,
-        hasExistingAgent,
-        isTemplateAgent,
-        readOnly,
-        hasPublishedTemplateId: !!fullAgent?.publishedTemplateId,
-        differsFromPublishedTemplate,
-        isRepublishable,
-        canRequestPublication,
-      })
-    } catch {
-      // ignore logging errors
-    }
-  }, [agentId, fullAgent?.id, fullAgent?.publishedTemplateId, publicationStatus, hasExistingAgent, isTemplateAgent, readOnly, differsFromPublishedTemplate, isRepublishable, canRequestPublication])
 
   // Autosave agent changes for existing (non-template) agents
   useEffect(() => {
@@ -874,6 +859,14 @@ export function AgentDocumentEditor({
         updates.name = value.name
       }
 
+      if (typeof value.role === 'string') {
+        const nextRole = value.role.trim()
+        const baseRole = typeof base.role === 'string' ? base.role : ''
+        if (nextRole.length > 0 && nextRole !== baseRole) {
+          updates.role = nextRole
+        }
+      }
+
       if (typeof value.description === 'string') {
         const nextDesc = value.description ?? ''
         const baseDesc = base.description ?? ''
@@ -886,8 +879,8 @@ export function AgentDocumentEditor({
         updates.model = value.model
       }
 
-      if (value.category && (fullAgent as any).category !== value.category) {
-        ;(updates as any).category = value.category
+      if (value.category && fullAgent?.category !== value.category) {
+        updates.category = value.category as any
       }
 
       // Clamp numeric fields into valid ranges before sending, and compare to base
@@ -1137,7 +1130,7 @@ export function AgentDocumentEditor({
                     className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
                   />
                   <div className="flex flex-col leading-tight min-w-0">
-                    <span className="text-base font-semibold truncate tracking-tight">{formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role)}</span>
+                    <span className="text-base font-semibold truncate tracking-tight">{formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role || value.role)}</span>
                     {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
                   </div>
                 </div>
@@ -1320,6 +1313,45 @@ export function AgentDocumentEditor({
 
       {/* Quick selectors + core fields */}
       <div className="space-y-2 mb-4">
+        {/* Name */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+              <Icon name="id-card" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Name</span>
+            </div>
+            <div className="w-full sm:w-[260px]">
+              <Input
+                id="agent-name"
+                value={value.name}
+                onChange={e => onFieldChange?.('name', e.target.value)}
+                placeholder="Agent name"
+                disabled={isTemplateAgent || readOnly}
+                className={cn('text-sm h-7', selectLikeFieldClass)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Role */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+              <Icon name="user-cog" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Role</span>
+            </div>
+            <div className="w-full sm:w-[260px]">
+              <Input
+                value={value.role}
+                onChange={e => onFieldChange?.('role', e.target.value)}
+                placeholder='e.g. "Customer Support Agent"'
+                disabled={isTemplateAgent || readOnly}
+                className={cn('text-sm h-7', selectLikeFieldClass)}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">

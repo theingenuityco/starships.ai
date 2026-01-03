@@ -15,15 +15,9 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     updateField: (field, value) => {
-      try {
-        console.debug('[AgentBuilderView] ref.updateField', { field, value })
-      } catch {}
       updateField(field, value)
     },
     getFormData: () => {
-      try {
-        console.debug('[AgentBuilderView] ref.getFormData')
-      } catch {}
       return formData
     },
     resetForm,
@@ -56,8 +50,9 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
             agent={agent}
             readOnly={readOnly}
             embedded={embedded}
-            // If editor mounts with empty slug, pre-seed from props
-            key={`agent-editor-${initialSlug || 'none'}`}
+            // Keep the editor mounted across slug/url changes (renaming an agent updates slug).
+            // Key by stable identity (agentId) so inputs don't lose focus.
+            key={`agent-editor-${agentId || agent?.id || 'new'}`}
           />
         </div>
       </div>

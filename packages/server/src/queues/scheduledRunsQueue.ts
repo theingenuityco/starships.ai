@@ -68,7 +68,7 @@ export async function closeScheduledRunsQueue(): Promise<void> {
     try {
       await queueInstance.close();
     } catch (err) {
-      // eslint-disable-next-line no-console
+       
       console.error('[ScheduledRunsQueue] Failed to close queue', err);
     } finally {
       queueInstance = null;

@@ -350,7 +350,7 @@ export default function BuildCustomAgentDemo() {
       abortController.abort()
       clearAll()
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
   }, [])
 
   // DelegationDemo-style connector path (left chat -> right builder)

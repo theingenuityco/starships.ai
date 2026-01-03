@@ -94,7 +94,7 @@ function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, 
     const MAX_ITERATIONS = 1000
     let iterations = 0
 
-    // eslint-disable-next-line no-constant-condition
+     
     while (true) {
       if (iterations++ >= MAX_ITERATIONS) {
         break

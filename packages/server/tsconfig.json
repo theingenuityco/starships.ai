@@ -3,13 +3,14 @@
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
+    "types": ["node", "jest"],
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]
     }
   },
-  "include": ["src/**/*", "src/types/**/*"],
-  "exclude": ["dist", "tests", "**/__tests__/**/*"],
+  "include": ["src/**/*"],
+  "exclude": ["dist"],
   "references": [
     { "path": "../autopilot" },
     { "path": "../env" },

@@ -40,38 +40,6 @@ function parseArgs(argv: string[]): Args {
   return out;
 }
 
-function deepReplaceStrings(value: unknown, map: Map<string, string>): { value: unknown; changed: boolean } {
-  if (typeof value === 'string') {
-    const next = map.get(value);
-    if (next && next !== value) return { value: next, changed: true };
-    return { value, changed: false };
-  }
-
-  if (Array.isArray(value)) {
-    let changed = false;
-    const nextArr = value.map((v) => {
-      const res = deepReplaceStrings(v, map);
-      if (res.changed) changed = true;
-      return res.value;
-    });
-    return { value: changed ? nextArr : value, changed };
-  }
-
-  if (value && typeof value === 'object') {
-    let changed = false;
-    const obj = value as Record<string, unknown>;
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      const res = deepReplaceStrings(v, map);
-      if (res.changed) changed = true;
-      out[k] = res.value;
-    }
-    return { value: changed ? out : value, changed };
-  }
-
-  return { value, changed: false };
-}
-
 function uniqueTemplateSlug(base: string, used: Set<string>, maxLen = 100): string {
   const safeBase = (generateSlug(base) || 'template').slice(0, maxLen);
   for (let i = 0; i < 1000; i++) {
@@ -162,6 +130,10 @@ export async function regenerateSlugs(args: Args): Promise<void> {
         agentTemplateSlugMap.set(t.slug, next);
       }
 
+      // Track template updates (useful for reruns / dry-run)
+      const toolTemplatesUpdated = toolTemplates.filter((t) => toolTemplateSlugMap.get(t.slug) !== t.slug).length;
+      const agentTemplatesUpdated = agentTemplates.filter((t) => agentTemplateSlugMap.get(t.slug) !== t.slug).length;
+
       if (!args.dryRun) {
         for (const t of toolTemplates) {
           const next = toolTemplateSlugMap.get(t.slug)!;
@@ -183,7 +155,6 @@ export async function regenerateSlugs(args: Args): Promise<void> {
 
       let toolsUpdated = 0;
       let agentsUpdated = 0;
-      let agentJsonUpdated = 0;
 
       for (const s of starships) {
         // Tools first (we need tool slug mapping to update agent JSON and tool_call_approvals)
@@ -233,31 +204,15 @@ export async function regenerateSlugs(args: Args): Promise<void> {
         } else {
           agentsUpdated += agents.filter((a: AgentRow) => agentSlugMap.get(a.slug) !== a.slug).length;
         }
-
-        // Best-effort: update any embedded tool slugs inside agent JSON (state/blueprint)
-        for (const a of agents) {
-          const sRes = deepReplaceStrings(a.state, toolSlugMap);
-          const bRes = deepReplaceStrings(a.blueprint, toolSlugMap);
-          if (!sRes.changed && !bRes.changed) continue;
-          agentJsonUpdated++;
-          if (!args.dryRun) {
-            await client.query('UPDATE agents SET state = $2::jsonb, blueprint = $3::jsonb, updated_at = NOW() WHERE id = $1', [
-              a.id,
-              JSON.stringify(sRes.value ?? {}),
-              JSON.stringify(bRes.value ?? {}),
-            ]);
-          }
-        }
       }
 
       logger.info('Slug regeneration summary', {
         component: 'regenerate-slugs',
         metadata: {
-          toolTemplates: toolTemplates.length,
-          agentTemplates: agentTemplates.length,
+          toolTemplatesUpdated,
+          agentTemplatesUpdated,
           toolsUpdated,
           agentsUpdated,
-          agentJsonUpdated,
         },
       });
     });

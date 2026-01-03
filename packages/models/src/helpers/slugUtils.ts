@@ -9,13 +9,20 @@
  * @returns A URL-safe slug string
  */
 export function generateSlug(text: string): string {
-  return text
+  // IMPORTANT:
+  // Slugs must match the API's SlugSchema: ^[a-z0-9]+(?:-[a-z0-9]+)*$
+  // - lowercase
+  // - alphanumeric only (no underscores)
+  // - hyphen as separator
+  return String(text || '')
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    // Convert any run of non-alphanumerics into a single hyphen
+    .replace(/[^a-z0-9]+/g, '-')
+    // Collapse repeated hyphens
+    .replace(/-+/g, '-')
+    // Remove leading/trailing hyphens
+    .replace(/^-+|-+$/g, '');
 }
 
 /**

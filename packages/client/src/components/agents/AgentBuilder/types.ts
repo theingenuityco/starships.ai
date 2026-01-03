@@ -26,6 +26,11 @@ export interface AgentBuilderViewProps {
   onSave?: (data: AgentFormData) => void
   onCancel?: () => void
   starshipId?: string
+  /**
+   * Optional: when editing an existing agent, pass its immutable id so the editor
+   * can hydrate canonical agent details without doing a slug->id resolve fetch.
+   */
+  agentId?: string
   initialSlug?: string
   errorMessage?: string
   /**

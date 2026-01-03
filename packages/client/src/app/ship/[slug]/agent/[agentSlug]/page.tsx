@@ -19,7 +19,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import api, { agentAPI } from '@/lib/api'
-import { AGENT_QUERY_KEYS, fetchStarshipAgentBySlug, useStarshipAgentBySlug, useStarshipAgents } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
@@ -45,7 +45,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const queryClient = useQueryClient()
   const conversationId = searchParams.get('conversationId') || null
   const [agentOpenError, setAgentOpenError] = useState<string | null>(null)
-  const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
+  const { data: agents = [], isLoading: isLoadingAgents } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
   const selectedAgent = useMemo(() => {
     if (convAgents && convAgents.length > 0) return convAgents[0]
@@ -654,14 +654,28 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         // Fetch complete agent data by slug and sync form via TanStack Query
         ;(async () => {
           try {
-            if (!starship?.id) {
-              throw new Error('starship.id missing (cannot resolve agent slug)')
-            }
-            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starship.id, String(slugArg)), exact: true })
+            if (!starship?.id) throw new Error('starship.id missing (cannot resolve agent)')
+
+            // Avoid the slug lookup endpoint (slug is starship-scoped). Resolve id from the starship agents list,
+            // then hydrate canonical agent details by id.
+            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
+            const list = await queryClient.fetchQuery({
+              queryKey: AGENT_QUERY_KEYS.byStarship(starship.id),
+              queryFn: async (): Promise<AgentModel[]> => {
+                const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starship.id}/agents`)
+                return response.data.data
+              },
+              staleTime: 5 * 1000,
+            })
+            const match = (list || []).find(a => String((a as any)?.slug || '') === String(slugArg))
+            if (!match?.id) throw new Error('Agent not found after tool result')
+
+            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(match.id), exact: true })
             const agent = await queryClient.fetchQuery({
-              queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starship.id, String(slugArg)),
+              queryKey: AGENT_QUERY_KEYS.detail(match.id),
               queryFn: async (): Promise<AgentModel> => {
-                return await fetchStarshipAgentBySlug(starship.id, String(slugArg))
+                const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${match.id}`)
+                return res.data.data
               },
               staleTime: 30 * 1000,
             })
@@ -840,8 +854,19 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages, slug, router, agentSlug, isResponding])
 
-  // Prefill when editing an existing agent via TanStack Query
-  const { data: existingAgent } = useStarshipAgentBySlug(starship?.id || '', agentSlug || '', !!starship?.id && !!agentSlug && agentSlug !== 'new')
+  // Resolve agent id from the already-fetched starship agent list to avoid slug-based lookups.
+  const resolvedAgentId = useMemo(() => {
+    if (!agentSlug || agentSlug === 'new') return null
+    const match = (agents || []).find(a => String((a as any)?.slug || '') === String(agentSlug))
+    return match?.id || null
+  }, [agents, agentSlug])
+
+  const isEditingExisting = agentSlug !== 'new'
+  const isResolvingExistingAgentId = isEditingExisting && !resolvedAgentId && isLoadingAgents
+  const isMissingExistingAgent = isEditingExisting && !resolvedAgentId && !isLoadingAgents
+
+  // Prefill when editing an existing agent via canonical id endpoint.
+  const { data: existingAgent } = useAgent(resolvedAgentId || '', !!resolvedAgentId)
   useEffect(() => {
     if (!existingAgent || !agentBuilderRef.current) return
     try {
@@ -896,7 +921,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       await api.post(`/api/v1/agents/${existingAgent.id}/avatar/generate`, { mode })
       toast.success(mode === 'full_chain' ? 'Avatar reset & regenerated' : headerAvatarUrl ? 'Avatar regenerated' : 'Avatar generated')
       // Refresh agent + attachments
-      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.bySlugOrId(String(agentSlug)), exact: true })
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
       await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(existingAgent.id), exact: true })
     } catch (err: any) {
       const message = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to regenerate avatar'
@@ -1024,13 +1049,30 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             />
 
             <div className="relative h-full w-full">
-              <AgentBuilderView
-                ref={agentBuilderRef}
-                starshipId={starship.id}
-                onCancel={handleCancel}
-                initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
-                errorMessage={agentOpenError || undefined}
-              />
+              {isResolvingExistingAgentId ? (
+                <div className="flex items-center justify-center min-h-[600px]">
+                  <LoadingSpinner size="lg" />
+                </div>
+              ) : isMissingExistingAgent ? (
+                <div className="flex flex-col items-center justify-center text-center min-h-[600px] px-6">
+                  <div className="text-lg font-semibold">Agent not found</div>
+                  <div className="text-sm text-muted-foreground mt-2">This agent slug doesn’t exist in this starship.</div>
+                  <div className="mt-4">
+                    <Button variant="outline" onClick={handleCancel}>
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <AgentBuilderView
+                  ref={agentBuilderRef}
+                  starshipId={starship.id}
+                  agentId={resolvedAgentId || undefined}
+                  onCancel={handleCancel}
+                  initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
+                  errorMessage={agentOpenError || undefined}
+                />
+              )}
 
               {conversationId && (
                 <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">

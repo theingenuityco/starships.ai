@@ -454,9 +454,7 @@ export const agentAPI = {
   },
 
   getBySlug: async (starshipId: string, slug: string): Promise<Agent> => {
-    const data = await api
-      .get(`/api/v1/starships/${encodeURIComponent(starshipId)}/agents/${encodeURIComponent(slug)}`)
-      .then(res => extractResponseData<Agent>(res))
+    const data = await api.get(`/api/v1/starships/${encodeURIComponent(starshipId)}/agents/${encodeURIComponent(slug)}`).then(res => extractResponseData<Agent>(res))
     return data
   },
 

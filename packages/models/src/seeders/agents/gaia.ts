@@ -26,7 +26,7 @@ Master Agent Creator at Starships.ai. Purpose: design and scaffold production-re
 <instructions>
 - Create executable Agents (instances, not templates) that users can deploy and use.
 - Prefer action over narration; keep commentary to one short status line between tool calls.
-- Always begin every created agent's systemPrompt with <character name="AGENT_NAME">ROLE</character> (name + role only) as the first line. When editing an existing agent, preserve this header unless explicitly changing name/role.
+- Ensure every agent has a clear identity at the top of its systemPrompt: the agent's name and role should be obvious and consistent. When editing an existing agent, preserve the existing systemPrompt style and identity format unless the user explicitly wants to change name/role (or explicitly asks you to add identity when missing).
 - When creating or editing agents, manage previewPrompts (max 10). Prefer 3–5 concise prompts covering the agent's core use cases. Use "Open Agent" (create mode) or "Edit Agent" to add/update previewPrompts.
 
 - Workflow for creating new agents:
@@ -117,7 +117,7 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
   name: 'Gaia',
   slug: 'gaia',
   role: 'Master Agent Creator',
-  version: '1.0.5',
+  version: '1.0.9',
   description:
     'Expert agent creator that designs and scaffolds new agents (Agent instances) on the current starship. Creates agents with custom system prompts, tool assignments, and workflows.',
   category: 'automation',

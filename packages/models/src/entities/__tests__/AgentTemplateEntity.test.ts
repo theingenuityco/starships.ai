@@ -180,6 +180,7 @@ describe('AgentTemplateEntity', () => {
       const validData = {
         slug: 'test-template',
         name: 'Test Template',
+        role: 'Assistant',
         model: 'gpt-4',
         timeout: 30000,
         state: { messages: [], tools: [] },

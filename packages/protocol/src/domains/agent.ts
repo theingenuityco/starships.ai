@@ -24,6 +24,11 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   // Core database fields
   id: string;
   slug: string;
+  /**
+   * Human-readable role label for the agent (e.g. "Customer Support Agent").
+   * This is required and is used across UI/marketplace and seeded tooling.
+   */
+  role: string;
   createdAt: string;
   updatedAt: string;
   // Optional categorization (for organizing agents in UI/marketplace)
@@ -128,6 +133,10 @@ export interface UpdateAgentToolPermissionsRequest {
  */
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
   slug?: string; // Optional: if not provided, will be generated
+  /**
+   * Human-readable role label for the agent (required).
+   */
+  role: string;
   // Optional categorization (for organizing agents in UI/marketplace)
   category?: TemplateCategory;
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
@@ -143,6 +152,10 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
  * Request to update an agent
  */
 export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetadata, 'reasoning'>> {
+  /**
+   * Optional role update.
+   */
+  role?: string;
   // Optional categorization (for organizing agents in UI/marketplace)
   category?: TemplateCategory;
   sourceTemplateId?: string;

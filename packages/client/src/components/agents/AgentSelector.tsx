@@ -375,7 +375,7 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
           <DialogHeader>
             <DialogTitle>{editingAgent ? 'Edit Agent' : 'Create New Agent'}</DialogTitle>
           </DialogHeader>
-          <AgentForm agent={editingAgent || undefined} onSave={handleFormSave} onCancel={handleFormCancel} />
+          <AgentForm agent={editingAgent || undefined} onSave={handleFormSave} onCancel={handleFormCancel} starshipId={starshipId} />
         </DialogContent>
       </Dialog>
 

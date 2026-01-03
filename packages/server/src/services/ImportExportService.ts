@@ -39,6 +39,7 @@ export class ImportExportService {
     const payload: AgentExportPayloadV1 = {
       agent: {
         name: agent.name,
+        role: (agent as any).role || 'Assistant',
         description: agent.description,
         model: agent.model,
         temperature: agent.temperature,
@@ -168,6 +169,7 @@ export class ImportExportService {
       const created = await this.agentService.createAgent({
         starshipId,
         name: a.name,
+        role: typeof a.role === 'string' && a.role.trim().length > 0 ? a.role : 'Assistant',
         // IMPORTANT: On import, do not reuse the exported slug.
         // Always let the system generate a new unique slug for the destination starship.
         slug: undefined,

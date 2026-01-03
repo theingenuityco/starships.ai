@@ -52,6 +52,10 @@ Automatically inferred from agent state (do not pass manually):
         type: 'string',
         description: 'Human-readable name (required when creating a new agent)',
       },
+      role: {
+        type: 'string',
+        description: 'Human-readable role label for the agent (required when creating a new agent)',
+      },
       description: {
         type: 'string',
         description: 'Optional description (used only when creating a new agent)',
@@ -102,10 +106,15 @@ Automatically inferred from agent state (do not pass manually):
                 if (!starshipId) {
                   throw new Error('STARSHIP_ID missing');
                 }
+                const role = typeof input.role === 'string' ? input.role.trim() : '';
+                if (!role) {
+                  throw new Error('role is required when creating an agent');
+                }
                 // Create draft
                 const args = {
                   starshipId: String(starshipId),
                   name: input.name,
+                  role: role,
                   description: (input && input.description) || '',
                   model: (input && input.model) || 'openai/gpt-4o-mini',
                   systemPrompt: (input && input.systemPrompt) || '',

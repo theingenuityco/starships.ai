@@ -49,6 +49,11 @@ interface AgentDocumentEditorProps {
   onCancel?: () => void
   starshipId?: string
   /**
+   * Optional: canonical id of the agent being edited. When provided, we skip the
+   * starship-scoped slug lookup and hydrate directly from /api/v1/agents/:id.
+   */
+  agentId?: string
+  /**
    * When true, renders the editor in read-only/inspection mode:
    * - All form controls are disabled
    * - No mutations or publish/update actions are triggered
@@ -61,7 +66,17 @@ interface AgentDocumentEditorProps {
   embedded?: boolean
 }
 
-export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false, embedded = false }: AgentDocumentEditorProps) {
+export function AgentDocumentEditor({
+  value,
+  onChange,
+  onFieldChange,
+  onSave,
+  onCancel,
+  starshipId,
+  agentId: providedAgentId,
+  readOnly = false,
+  embedded = false,
+}: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
   const queryClient = useQueryClient()
   // Track whether the user explicitly changed the Reasoning dropdown.
@@ -291,8 +306,30 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         setIsResolvingAgent(true)
       }
       try {
-        if (!starshipId || !value?.slug || value.slug === 'new') {
-          console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
+        if (!value?.slug || value.slug === 'new') {
+          console.debug('[AgentDocEditor] Skipping agent hydrate', { starshipId, slug: value?.slug, agentId: providedAgentId })
+          if (!cancelled) {
+            setAgentId(null)
+            setFullAgent(null)
+            setPublishedTemplate(null)
+          }
+          return
+        }
+
+        // If the parent already provided the canonical id, hydrate directly from /agents/:id.
+        if (typeof providedAgentId === 'string' && providedAgentId.trim().length > 0) {
+          const id = providedAgentId.trim()
+          if (!cancelled) setAgentId(id)
+          const fullResult = await safeGet<AgentModel>(`/api/v1/agents/${id}`)
+          if (!cancelled) {
+            setFullAgent(fullResult.ok && fullResult.data?.id ? fullResult.data : null)
+          }
+          return
+        }
+
+        // Fallback: resolve id from starship+slug, then hydrate canonical /agents/:id.
+        if (!starshipId) {
+          console.debug('[AgentDocEditor] Missing starshipId for slug resolve', { slug: value?.slug })
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
@@ -335,7 +372,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     return () => {
       cancelled = true
     }
-  }, [starshipId, value?.slug])
+  }, [starshipId, value?.slug, providedAgentId])
 
   // Load the published template (if any) for comparison to gate republish in UI.
   // We bypass the templateAPI cache and fetch fresh data so the diff matches backend behavior.

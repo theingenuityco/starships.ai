@@ -126,21 +126,19 @@ You can use any AWS EC2 instance type available in your region. Common examples:
 
 ### CI Checks (`.github/workflows/ci-checks.yml`)
 
-Currently uses default `t3.medium` for all jobs. Can be optimized:
+Recommended: keep CI as a single job so GitHub reports a single required check, while still running lint/type-check/tests/build sequentially.
 
 ```yaml
 jobs:
-  lint:
-    runs-on: [self-hosted, linux, x64, t3.small]  # Lint is lightweight
-
-  type-check:
-    runs-on: [self-hosted, linux, x64, t3.small]  # Type check is lightweight
-
-  test:
-    runs-on: [self-hosted, linux, x64, t3.medium]  # Tests need moderate resources
-
-  build:
-    runs-on: [self-hosted, linux, x64, t3.large]  # Build is resource-intensive
+  build-check:
+    runs-on: [self-hosted, linux, x64, t3.large]
+    steps:
+      - uses: actions/checkout@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run type-check
+      - run: pnpm run test
+      - run: pnpm run build
 ```
 
 ## Monitoring

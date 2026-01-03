@@ -336,7 +336,6 @@ export function AgentDocumentEditor({
 
         // Fallback: resolve id from starship+slug, then hydrate canonical /agents/:id.
         if (!starshipId) {
-          console.debug('[AgentDocEditor] Missing starshipId for slug resolve', { slug: value?.slug })
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)

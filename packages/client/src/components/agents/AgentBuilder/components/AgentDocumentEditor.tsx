@@ -1149,9 +1149,7 @@ export function AgentDocumentEditor({
                     className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
                   />
                   <div className="flex flex-col leading-tight min-w-0">
-                    <span className="text-base font-semibold truncate tracking-tight">
-                      {formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role)}
-                    </span>
+                    <span className="text-base font-semibold truncate tracking-tight">{formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role)}</span>
                     {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
                   </div>
                 </div>

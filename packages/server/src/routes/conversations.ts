@@ -891,6 +891,26 @@ router.post(
       const { conversationId } = paramValidation;
       const { content, agentId, attachmentIds, sync, modalities, imageConfig } = bodyValidation;
 
+      // Log ALL messages to debug duplicate message issue
+      // Check if this is from a connector action (tool execution) vs direct user input
+      const isFromConnector =
+        req.headers['x-connector-action'] === 'true' ||
+        req.headers['user-agent']?.includes('autopilot') ||
+        req.headers['user-agent']?.includes('node') ||
+        !req.headers['user-agent']?.includes('Mozilla'); // Non-browser requests are likely from tools
+
+      console.log('[MESSAGE-CREATE] Creating message', {
+        conversationId,
+        contentPreview: typeof content === 'string' ? content.substring(0, 150) : String(content).substring(0, 150),
+        contentLength: typeof content === 'string' ? content.length : String(content).length,
+        sync,
+        isFromConnector,
+        userAgent: req.headers['user-agent'],
+        referer: req.headers['referer'],
+        parentConversationId: req.headers['x-parent-conversation-id'],
+        authUserId: req.user?.id,
+      });
+
       const isInternal = isInternalScheduleRequest(req);
 
       // Preflight billing gate: block when wallet credits are insufficient for a user message
@@ -902,6 +922,36 @@ router.post(
         sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, {
           resource: 'conversation',
           id: conversationId,
+        });
+        return;
+      }
+
+      // CRITICAL: Check if conversation was stopped before creating message
+      // This prevents messages from being created via connector actions after stop
+      // Only check pendingStops - this is the authoritative indicator that a conversation was explicitly stopped
+      // turnActive can be false for normally completed turns, so we don't check it here
+      const isInPendingStops = ConversationService.isConversationStopped(conversationId);
+
+      // Also check parent conversation if this is a child conversation
+      let parentStopped = false;
+      if (conversation.parentConversationId) {
+        parentStopped = ConversationService.isConversationStopped(conversation.parentConversationId);
+      }
+
+      if (isInPendingStops || parentStopped) {
+        const conversationState = (conversation.state || {}) as { turnActive?: boolean };
+        console.log('[STOP-DEBUG] Rejecting message creation - conversation was stopped', {
+          conversationId,
+          parentConversationId: conversation.parentConversationId,
+          isInPendingStops,
+          parentStopped,
+          turnActive: conversationState.turnActive,
+          isFromConnector,
+          contentPreview: typeof content === 'string' ? content.substring(0, 100) : String(content).substring(0, 100),
+        });
+        sendError(res, 'RESOURCE_CONFLICT', 'Conversation was stopped. Message creation rejected.', 409, {
+          conversationId,
+          reason: 'conversation_stopped',
         });
         return;
       }
@@ -967,6 +1017,20 @@ router.post(
       } catch (e) {
         handleError(e, res, 'acquiring starship concurrency slot');
         return;
+      }
+
+      // CRITICAL: If this is a user-initiated message (not from connector/tool), clear pendingStops
+      // This allows users to start new turns after stopping, but keeps tool messages blocked
+      if (!isFromConnector) {
+        const wasInPendingStops = ConversationService.isConversationStopped(conversationId);
+        if (wasInPendingStops) {
+          // Clear pendingStops for this conversation to allow new turn
+          ConversationService.clearConversationStop(conversationId);
+          console.log('[STOP-DEBUG] Cleared pendingStops for new user-initiated message', {
+            conversationId,
+            note: 'User is starting a new turn after stop',
+          });
+        }
       }
 
       // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.

@@ -68,6 +68,22 @@ export class ConversationService {
   private static activeCancellations: Map<string, () => void> = new Map();
   // Track conversations that should be stopped when real cancel is registered
   private static pendingStops: Set<string> = new Set();
+
+  /**
+   * Check if a conversation (or its parent) is marked for stop
+   * Public method to allow external checks before creating messages
+   */
+  static isConversationStopped(conversationId: string): boolean {
+    return this.pendingStops.has(conversationId);
+  }
+
+  /**
+   * Clear the stop flag for a conversation
+   * Used when a user starts a new turn after stopping
+   */
+  static clearConversationStop(conversationId: string): void {
+    this.pendingStops.delete(conversationId);
+  }
   // Track turn lease IDs per conversation so we can release them on stop
   private static turnLeases: Map<string, string> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
@@ -1908,8 +1924,11 @@ export class ConversationService {
             });
           }
           ConversationService.activeCancellations.delete(conversationId);
-          ConversationService.pendingStops.delete(conversationId);
-          console.log('[STOP-DEBUG] Removed cancellation handle and pending stop', { conversationId });
+          // CRITICAL: Do NOT delete pendingStops - keep it active to prevent future execution
+          // Tool execution might still be in flight and could create child conversations or send messages
+          // The conversation should remain "stopped" until explicitly resumed or a new turn starts
+          // ConversationService.pendingStops.delete(conversationId); // DO NOT DELETE - keep stop active
+          console.log('[STOP-DEBUG] Removed cancellation handle (keeping pendingStops active)', { conversationId });
         }
       } else {
         // No cancellation handle at all - mark for stop in case it gets registered later

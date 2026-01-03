@@ -11,9 +11,6 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
   const [errors, setErrors] = useState<FormErrors>({})
 
   const handleFieldChange = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
-    try {
-      console.debug('[AgentForm] handleFieldChange', { field, value })
-    } catch {}
     setFormData(prev => {
       const current = prev[field] as unknown
       let nextValue: any = value as any
@@ -96,9 +93,6 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
   }, [])
 
   const updateField = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
-    try {
-      console.debug('[AgentForm] updateField', { field, value })
-    } catch {}
     setFormData(prev => {
       const current = prev[field] as unknown
       let nextValue: any = value as any

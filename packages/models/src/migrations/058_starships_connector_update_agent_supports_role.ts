@@ -2,8 +2,18 @@ import type { Client } from 'pg';
 
 type Endpoint = {
   name: string;
-  parameters?: any;
-  mapping?: any;
+  parameters?: {
+    type?: string;
+    properties?: Record<string, unknown>;
+    required?: unknown;
+    additionalProperties?: unknown;
+    [key: string]: unknown;
+  };
+  mapping?: {
+    path?: Record<string, unknown>;
+    body?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
 };
 
 /**

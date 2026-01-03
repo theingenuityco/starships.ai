@@ -1068,6 +1068,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                   ref={agentBuilderRef}
                   starshipId={starship.id}
                   agentId={resolvedAgentId || undefined}
+                  agent={existingAgent || null}
                   onCancel={handleCancel}
                   initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
                   errorMessage={agentOpenError || undefined}

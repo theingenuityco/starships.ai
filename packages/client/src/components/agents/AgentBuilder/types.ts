@@ -1,4 +1,5 @@
 import type { AgentTemplateCategory } from '@starships/protocol'
+import type { AgentModel } from '@starships/protocol'
 
 export interface AgentFormData {
   name: string
@@ -31,6 +32,11 @@ export interface AgentBuilderViewProps {
    * can hydrate canonical agent details without doing a slug->id resolve fetch.
    */
   agentId?: string
+  /**
+   * Optional: if the parent already fetched the agent (e.g. via useAgent),
+   * pass it down so the editor does not make its own /agents/:id call.
+   */
+  agent?: AgentModel | null
   initialSlug?: string
   errorMessage?: string
   /**

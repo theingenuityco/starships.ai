@@ -15,15 +15,9 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     updateField: (field, value) => {
-      try {
-        console.debug('[AgentBuilderView] ref.updateField', { field, value })
-      } catch {}
       updateField(field, value)
     },
     getFormData: () => {
-      try {
-        console.debug('[AgentBuilderView] ref.getFormData')
-      } catch {}
       return formData
     },
     resetForm,

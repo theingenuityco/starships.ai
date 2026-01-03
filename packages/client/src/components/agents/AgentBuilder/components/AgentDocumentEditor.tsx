@@ -308,7 +308,6 @@ export function AgentDocumentEditor({
       }
       try {
         if (!value?.slug || value.slug === 'new') {
-          console.debug('[AgentDocEditor] Skipping agent hydrate', { starshipId, slug: value?.slug, agentId: providedAgentId })
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
@@ -807,26 +806,6 @@ export function AgentDocumentEditor({
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
-
-  // Debug logging for publishability pipeline – helps trace why an agent is (re)publishable
-  useEffect(() => {
-    try {
-      console.debug('[AgentDocEditor] publish-debug', {
-        agentId,
-        fullAgentId: fullAgent?.id,
-        publicationStatus,
-        hasExistingAgent,
-        isTemplateAgent,
-        readOnly,
-        hasPublishedTemplateId: !!fullAgent?.publishedTemplateId,
-        differsFromPublishedTemplate,
-        isRepublishable,
-        canRequestPublication,
-      })
-    } catch {
-      // ignore logging errors
-    }
-  }, [agentId, fullAgent?.id, fullAgent?.publishedTemplateId, publicationStatus, hasExistingAgent, isTemplateAgent, readOnly, differsFromPublishedTemplate, isRepublishable, canRequestPublication])
 
   // Autosave agent changes for existing (non-template) agents
   useEffect(() => {

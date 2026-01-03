@@ -773,7 +773,6 @@ export class StreamingService {
         }
         
         if (from >= buffer.length) {
-          console.log('[REPLAY] No events to replay after turn end:', { from, bufferLength: buffer.length, lastTurnEndIdx });
           continue;
         }
 
@@ -788,15 +787,6 @@ export class StreamingService {
 
         const lastEvt = buffer[buffer.length - 1];
         let replayedAny = false;
-        
-        console.log('[REPLAY] Replay configuration:', {
-          conversationId: streamId,
-          from,
-          bufferLength: buffer.length,
-          lastTurnEndIdx,
-          turnStartedIdx,
-          willReplayFrom: from < buffer.length,
-        });
 
         for (let i = from; i < buffer.length; i++) {
           const evt = buffer[i];
@@ -817,22 +807,12 @@ export class StreamingService {
             const isMessageAdd = delta.op === 'add' && delta.path === '/messages/-';
             // Skip all deltas from completed turns - chunks, message replacements, and message adds
             if (isChunkDelta || isReplaceWholeMessage || isMessageAdd) {
-              console.log('[REPLAY] Skipping delta from stopped/completed turn (before/at turn end):', {
-                index: i,
-                lastTurnEndIdx,
-                path: delta.path,
-                op: delta.op,
-                isChunkDelta,
-                isReplaceWholeMessage,
-                isMessageAdd,
-              });
               continue;
             }
           }
 
           const skip = evt.type === 'delta' ? this.shouldSkipDelta(evt.payload as Operation, opts) : false;
           if (skip) {
-            console.log('[REPLAY] Skipping delta (shouldSkipDelta):', { type: evt.type, path: (evt.payload as Operation)?.path });
             continue;
           }
           
@@ -842,7 +822,6 @@ export class StreamingService {
             if (delta.op === 'add' && delta.path === '/messages/-' && delta.value) {
               const msg = delta.value as { id?: unknown };
               if (msg?.id && opts?.baselineMessageIds?.has(String(msg.id))) {
-                console.log('[REPLAY] Skipping delta - message already in baseline:', { msgId: msg.id, baselineIds: Array.from(opts.baselineMessageIds || []) });
                 continue; // Skip this delta - message was already sent in baseline
               }
             }

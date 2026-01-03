@@ -265,14 +265,6 @@ export class ConversationService {
       const agent = this.currentAgentForConversation.get(conversationId);
       const starship = await this.getConversationStarship(conversationId);
       const stoppedAt = isStopped ? new Date().toISOString() : undefined;
-      if (isStopped) {
-        console.log('[STOP] 💾 Persisting stopped message:', {
-          conversationId,
-          contentLength: partialContent?.length || 0,
-          hasReasoning: !!partialReasoning,
-          stoppedAt,
-        });
-      }
 
       const persistedMsg = await this.messageService.createMessage({
         conversationId,
@@ -284,14 +276,6 @@ export class ConversationService {
         ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
         ...(stoppedAt ? { stoppedAt } : {}),
       });
-
-      if (isStopped) {
-        console.log('[STOP] ✅ Stopped message persisted:', {
-          messageId: persistedMsg.id,
-          stoppedAt: persistedMsg.stoppedAt,
-          conversationId,
-        });
-      }
 
       // Link generated attachments to the persisted message (best-effort)
       try {
@@ -836,13 +820,6 @@ export class ConversationService {
         path: '/messages/-',
         value: userMessage,
       };
-      console.log('[BROADCAST] Broadcasting user message delta:', {
-        conversationId: data.conversationId,
-        messageId: userMessage.id,
-        messageRole: userMessage.role,
-        messageContent: typeof userMessage.content === 'string' ? userMessage.content.substring(0, 50) : userMessage.content,
-        hasActiveConnection: this.streamingService.isActive(data.conversationId),
-      });
       await this.streamingService.broadcastDelta(data.conversationId, userMessageDelta);
     }
 
@@ -1262,7 +1239,6 @@ export class ConversationService {
 
     // Persist the active streaming partial (if any), regardless of prior assistant messages this turn
     // Mark as stopped since this is called from stopConversation
-    console.log('[STOP] 🛑 stopConversation called:', { conversationId });
     let persistedMsg: MessageModel | null = await this.persistActivePartial(conversationId, true);
 
     // After persisting a stopped message, update lastPersistedIndex to account for the assistant message
@@ -1273,11 +1249,6 @@ export class ConversationService {
       // Increment by 1 to account for the assistant message we just persisted
       // This assumes the next message in execution state would be the assistant message
       this.lastPersistedIndex.set(conversationId, currentIndex + 1);
-      console.log('[STOP] Updated lastPersistedIndex after persist:', {
-        conversationId,
-        previousIndex: currentIndex,
-        newIndex: currentIndex + 1,
-      });
     }
 
     // If we have cached usage from streaming but no content_complete occurred, persist usage now
@@ -1672,24 +1643,6 @@ export class ConversationService {
         if (msgs) {
           const baselineIndex = msgs.length - 1;
           this.lastPersistedIndex.set(conversationId, baselineIndex);
-
-          // DEBUG: Log execution state to understand what messages are in state
-          console.log('[TURN_STARTED] Setting lastPersistedIndex:', {
-            conversationId,
-            executionStateMessagesLength: msgs.length,
-            baselineIndex,
-            lastPersistedIndexBefore: this.lastPersistedIndex.get(conversationId),
-            stateMessageRoles: msgs.slice(-5).map((m: unknown) => {
-              const msg = m as { role?: unknown; content?: unknown };
-              return { role: msg.role, contentPrefix: typeof msg.content === 'string' ? msg.content.substring(0, 30) : 'N/A' };
-            }),
-          });
-        } else {
-          console.log('[TURN_STARTED] No messages in execution state:', {
-            conversationId,
-            hasState: !!state,
-            hasExecution: !!execution,
-          });
         }
 
         // Persist turn_started state and notify clients
@@ -2455,20 +2408,6 @@ export class ConversationService {
             // Get last persisted index for this conversation
             const lastIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
 
-            // DEBUG: Log state and index to understand why duplicates are created
-            console.log('[NODE_COMPLETED] Processing messages from state:', {
-              conversationId,
-              stateMessagesLength: stateMessages.length,
-              lastPersistedIndex: lastIndex,
-              willProcessFrom: lastIndex + 1,
-              willProcessCount: stateMessages.length - (lastIndex + 1),
-              stateMessageRoles: stateMessages.slice(Math.max(0, lastIndex - 2), lastIndex + 5).map((m, idx) => ({
-                index: Math.max(0, lastIndex - 2) + idx,
-                role: m.role,
-                contentPrefix: typeof m.content === 'string' ? m.content.substring(0, 30) : 'N/A',
-              })),
-            });
-
             // Type guard for state messages coming from Autopilot mutations
             const isStateMsg = (m: unknown): m is LlmMessage => {
               if (!m || typeof m !== 'object') return false;
@@ -2551,16 +2490,6 @@ export class ConversationService {
                 // Extract string content (LLM responses are always string, not ContentBlock[])
                 const contentString =
                   typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
-
-                // DEBUG: Log before persisting to understand why duplicates are created
-                console.log('[NODE_COMPLETED] About to persist message:', {
-                  conversationId,
-                  role,
-                  messageIndex: i,
-                  lastPersistedIndex: lastIndex,
-                  contentPrefix: contentString.substring(0, 50),
-                  stateMessagesLength: stateMessages.length,
-                });
 
                 const persistedMsg = await this.messageService.createMessage({
                   conversationId,

@@ -83,7 +83,7 @@ This is not a complete OpenAPI spec, but these are the endpoints most developers
 - `GET /auth/oauth/accounts`: List the current user's linked OAuth accounts (requires JWT).
 - `POST /auth/token/agent`: Issue a user+agent-scoped JWT for acting via a specific agent on a starship. Notes: requires JWT; validates agent ↔ starship and verifies user access.
 
-> Note: `POST /users/register` is intentionally disabled (deprecated). Use `POST /auth/register` for registration.
+> Note: Registration is available at `POST /auth/register`.
 
 ### Starships (workspaces)
 

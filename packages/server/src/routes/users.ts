@@ -191,16 +191,6 @@ router.post('/users', jwtAuthMiddleware, async (req: Request, res: Response): Pr
   }
 });
 
-// POST /users/register - Register user with password (OpenAPI pattern)
-router.post('/users/register', rateLimiters.auth, async (_req: Request, res: Response): Promise<void> => {
-  // SECURITY: This endpoint previously allowed account creation without the same protections
-  // as POST /auth/register (including consistent registration flow and proper defenses).
-  // It is intentionally disabled; use the canonical auth registration endpoint instead.
-  sendError(res, 'ENDPOINT_DEPRECATED', 'Registration is available at POST /auth/register', 410, {
-    replacement: '/auth/register',
-  });
-});
-
 // PUT /users/:id - Update user (OpenAPI pattern)
 router.put('/users/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {

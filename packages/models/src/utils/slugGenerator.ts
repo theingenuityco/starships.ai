@@ -8,6 +8,7 @@
 import { AgentRepository } from '../repositories/AgentRepository';
 import { ToolRepository } from '../repositories/ToolRepository';
 import type { WidgetRepository } from '../repositories/WidgetRepository';
+import { generateSlug } from '../helpers/slugUtils';
 
 /**
  * Generate a random suffix for slugs
@@ -23,8 +24,8 @@ export function generateRandomSuffix(): string {
 }
 
 /**
- * Generate a unique agent slug
- * Format: {template-slug}-{random-suffix}
+ * Generate a unique agent slug (LEGACY)
+ * Format: {base}-{random-suffix}
  *
  * @param templateSlug - The slug of the agent template
  * @param agentRepository - Repository instance for checking uniqueness
@@ -109,6 +110,73 @@ export async function generateUniqueToolSlug(baseSlug: string, toolRepository: T
 
   const timestamp = Date.now().toString(36);
   return `${base}-${timestamp}`;
+}
+
+/**
+ * Generate a unique slug using incremental numeric suffixes: base, base-2, base-3, ...
+ *
+ * This is used for INSTANCE slugs where we prefer human-stable readability and deterministic collision resolution.
+ */
+export async function generateUniqueSlugIncremental(
+  baseSlug: string,
+  exists: (candidate: string) => Promise<boolean>,
+  opts?: { fallbackBase?: string; maxAttempts?: number; maxLength?: number }
+): Promise<string> {
+  const fallbackBase = generateSlug((opts?.fallbackBase || 'item').toString()) || 'item';
+  const maxAttempts = opts?.maxAttempts ?? 10_000;
+  const maxLength = opts?.maxLength ?? 100;
+
+  const base = generateSlug(baseSlug) || fallbackBase;
+  const trimmedBase = base.slice(0, Math.max(1, Math.min(maxLength, base.length)));
+
+  // Try base first
+  if (!(await exists(trimmedBase))) return trimmedBase;
+
+  // Then try base-2, base-3, ...
+  for (let counter = 2; counter < maxAttempts; counter++) {
+    const suffix = `-${counter}`;
+    const candidate = `${trimmedBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
+    if (!(await exists(candidate))) return candidate;
+  }
+
+  const ts = Date.now().toString(36);
+  const suffix = `-${ts}`;
+  return `${trimmedBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
+}
+
+/**
+ * Generate a unique slug using a random suffix: base-r4nd
+ *
+ * This is used for TEMPLATE slugs to make them non-guessable and avoid incremental collisions.
+ * By default we always include a random suffix to avoid stable/guessable template slugs.
+ */
+export async function generateUniqueSlugRandomSuffix(
+  baseSlug: string,
+  exists: (candidate: string) => Promise<boolean>,
+  opts?: { fallbackBase?: string; maxAttempts?: number; maxLength?: number; alwaysSuffix?: boolean }
+): Promise<string> {
+  const fallbackBase = generateSlug((opts?.fallbackBase || 'item').toString()) || 'item';
+  const maxAttempts = opts?.maxAttempts ?? 100;
+  const maxLength = opts?.maxLength ?? 100;
+  const alwaysSuffix = opts?.alwaysSuffix ?? true;
+
+  const base = generateSlug(baseSlug) || fallbackBase;
+  const effectiveBase = base.slice(0, Math.max(1, Math.min(maxLength, base.length)));
+
+  if (!alwaysSuffix) {
+    if (!(await exists(effectiveBase))) return effectiveBase;
+  }
+
+  for (let attempts = 0; attempts < maxAttempts; attempts++) {
+    const rand = generateRandomSuffix();
+    const suffix = `-${rand}`;
+    const candidate = `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
+    if (!(await exists(candidate))) return candidate;
+  }
+
+  const ts = Date.now().toString(36);
+  const suffix = `-${ts}`;
+  return `${effectiveBase.slice(0, Math.max(1, maxLength - suffix.length))}${suffix}`;
 }
 
 /**

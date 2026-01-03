@@ -5,8 +5,17 @@ type Endpoint = {
   description?: string;
   method?: string;
   path?: string;
-  parameters?: any;
-  mapping?: any;
+  parameters?: {
+    type?: string;
+    properties?: Record<string, unknown>;
+    required?: unknown;
+    additionalProperties?: unknown;
+    [key: string]: unknown;
+  };
+  mapping?: {
+    body?: Record<string, unknown>;
+    [key: string]: unknown;
+  };
   requestStyle?: string;
   timeoutMs?: number;
 };
@@ -19,9 +28,7 @@ type Endpoint = {
 export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
   try {
-    const res = await client.query(
-      `SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`
-    );
+    const res = await client.query(`SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`);
 
     if (!res.rows.length) {
       // Nothing to patch on instances that don't have the starships connector template seeded.
@@ -62,10 +69,7 @@ export async function up(client: Client): Promise<void> {
       };
     });
 
-    await client.query(`UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2;`, [
-      JSON.stringify(nextEndpoints),
-      row.id,
-    ]);
+    await client.query(`UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2;`, [JSON.stringify(nextEndpoints), row.id]);
 
     await client.query('COMMIT');
   } catch (error) {
@@ -77,9 +81,7 @@ export async function up(client: Client): Promise<void> {
 export async function down(client: Client): Promise<void> {
   await client.query('BEGIN');
   try {
-    const res = await client.query(
-      `SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`
-    );
+    const res = await client.query(`SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`);
 
     if (!res.rows.length) {
       await client.query('COMMIT');
@@ -116,10 +118,7 @@ export async function down(client: Client): Promise<void> {
       };
     });
 
-    await client.query(`UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2;`, [
-      JSON.stringify(nextEndpoints),
-      row.id,
-    ]);
+    await client.query(`UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2;`, [JSON.stringify(nextEndpoints), row.id]);
 
     await client.query('COMMIT');
   } catch (error) {
@@ -127,5 +126,3 @@ export async function down(client: Client): Promise<void> {
     throw error;
   }
 }
-
-

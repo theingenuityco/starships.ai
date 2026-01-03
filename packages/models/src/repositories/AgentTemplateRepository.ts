@@ -20,22 +20,32 @@ export class AgentTemplateRepository extends BaseRepository {
    *
    * Behavior:
    * - Prefer exact slug match
-   * - Fall back to prefix match: `${baseSlug}-%`
+   * - Fall back to "random-suffix" match: `${baseSlug}-<suffix>`
+   *
+   * Important:
+   * A naive prefix match (`${baseSlug}-%`) can accidentally match other base slugs that merely start
+   * with the same prefix (e.g. `list` matching `list-agents-xxxx`). Since template slugs are generated
+   * with a fixed random suffix (`[a-z0-9]{4}`), we can (and should) match that exact shape:
+   * `^${baseSlug}-[a-z0-9]{4}$`.
    */
   private async resolveToolTemplateIdForAssignedSlug(assignedSlug: string): Promise<string | null> {
     const base = generateSlug(String(assignedSlug || ''));
     if (!base) return null;
+
+    // Escape for use inside a Postgres regex pattern (defensive; base is already slugified).
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+    const baseRegex = `^${escapeRegex(base)}-[a-z0-9]{4}$`;
 
     const connection = this.getConnection();
     const result = await connection.queryOne<{ id: string }>(
       `
         SELECT id
         FROM tool_templates
-        WHERE slug = $1 OR slug LIKE $2
+        WHERE slug = $1 OR slug ~ $2
         ORDER BY (slug = $1) DESC, created_at DESC
         LIMIT 1
       `,
-      [base, `${base}-%`]
+      [base, baseRegex]
     );
 
     return result?.id ?? null;

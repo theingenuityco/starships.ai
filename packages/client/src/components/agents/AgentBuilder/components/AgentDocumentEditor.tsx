@@ -113,6 +113,13 @@ export function AgentDocumentEditor({
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
   const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
 
+  const formatAgentDisplayName = (name: string | undefined | null, role: string | undefined | null): string => {
+    const n = typeof name === 'string' ? name.trim() : ''
+    const r = typeof role === 'string' ? role.trim() : ''
+    if (n && r) return `${n}: ${r}`
+    return n || 'Untitled agent'
+  }
+
   const avatarAttachmentId = (fullAgent as any)?.avatarAttachmentId as string | undefined
   const avatarIds = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
@@ -1142,7 +1149,9 @@ export function AgentDocumentEditor({
                     className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
                   />
                   <div className="flex flex-col leading-tight min-w-0">
-                    <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
+                    <span className="text-base font-semibold truncate tracking-tight">
+                      {formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role)}
+                    </span>
                     {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
                   </div>
                 </div>

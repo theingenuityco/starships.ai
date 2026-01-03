@@ -865,6 +865,30 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   // This prevents false "Agent not found" states when the server regenerates the slug
   // (e.g. user edits agent name) and the URL/list momentarily diverge during refetches.
   const [canonicalAgentId, setCanonicalAgentId] = useState<string | null>(null)
+
+  // When we normalize a slug (router.replace to the canonical slug for an agent id),
+  // we should NOT clear the canonical agent id on the ensuing route change. For any
+  // other agentSlug navigation (e.g. user clicks into a different agent or an invalid
+  // slug), we MUST clear it to avoid stale redirects back to the previously viewed agent.
+  const slugNormalizationTargetRef = useRef<string | null>(null)
+  const prevAgentSlugRef = useRef<string | null>(null)
+  useEffect(() => {
+    const current = agentSlug ? String(agentSlug) : null
+
+    // If this navigation was initiated by our own slug-normalization replace, keep canonical id.
+    if (slugNormalizationTargetRef.current && current === slugNormalizationTargetRef.current) {
+      slugNormalizationTargetRef.current = null
+      prevAgentSlugRef.current = current
+      return
+    }
+
+    // If the user navigated to a different slug, reset canonical id immediately.
+    if (prevAgentSlugRef.current !== null && prevAgentSlugRef.current !== current) {
+      setCanonicalAgentId(null)
+    }
+    prevAgentSlugRef.current = current
+  }, [agentSlug])
+
   useEffect(() => {
     if (agentSlug === 'new') {
       setCanonicalAgentId(null)
@@ -875,12 +899,16 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }, [agentSlug, resolvedAgentId, canonicalAgentId])
 
+  // Use canonical id when available, but fall back to the resolved id for the same render
+  // to avoid transient "not found" flashes before the canonical effect runs.
+  const effectiveAgentId = canonicalAgentId || resolvedAgentId || null
+
   const isEditingExisting = agentSlug !== 'new'
-  const isResolvingExistingAgentId = isEditingExisting && !canonicalAgentId && isLoadingAgents
-  const isMissingExistingAgent = isEditingExisting && !canonicalAgentId && !isLoadingAgents
+  const isResolvingExistingAgentId = isEditingExisting && !effectiveAgentId && isLoadingAgents
+  const isMissingExistingAgent = isEditingExisting && !effectiveAgentId && !isLoadingAgents
 
   // Prefill when editing an existing agent via canonical id endpoint.
-  const { data: existingAgent, isError: isExistingAgentError } = useAgent(canonicalAgentId || '', !!canonicalAgentId)
+  const { data: existingAgent, isError: isExistingAgentError } = useAgent(effectiveAgentId || '', !!effectiveAgentId)
   useEffect(() => {
     if (!isEditingExisting) return
     if (!existingAgent?.slug) return
@@ -888,6 +916,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     const nextSlug = String(existingAgent.slug)
     if (nextSlug && String(agentSlug) !== nextSlug) {
       const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+      slugNormalizationTargetRef.current = nextSlug
       router.replace(`/ship/${slug}/agent/${encodeURIComponent(nextSlug)}${q}`)
     }
   }, [isEditingExisting, existingAgent?.slug, agentSlug, conversationId, router, slug])
@@ -927,6 +956,10 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   }
 
   const headerAgentName = existingAgent?.name || (selectedAgent as any)?.name || (agentSlug === 'new' ? 'New agent' : String(agentSlug))
+
+  // Display convention across the app: "Name: Role"
+  const headerAgentRole = existingAgent?.role || (selectedAgent as any)?.role
+  const headerAgentDisplayName = headerAgentName && headerAgentRole ? `${headerAgentName}: ${headerAgentRole}` : headerAgentName
 
   const headerAgentSubtitle = existingAgent?.slug || (selectedAgent as any)?.slug || (agentSlug !== 'new' ? String(agentSlug) : undefined)
   const headerAvatarAttachmentId = ((existingAgent as any)?.avatarAttachmentId ?? (selectedAgent as any)?.avatarAttachmentId) as string | undefined
@@ -982,7 +1015,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 />
               </button>
               <div className="flex flex-col items-center">
-                <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentName}</h1>
+                <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentDisplayName}</h1>
               </div>
             </div>
             <div className="flex items-center justify-center gap-2 mt-4">
@@ -1092,7 +1125,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 <AgentBuilderView
                   ref={agentBuilderRef}
                   starshipId={starship.id}
-                  agentId={canonicalAgentId || undefined}
+                  agentId={effectiveAgentId || undefined}
                   agent={existingAgent || null}
                   onCancel={handleCancel}
                   initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}

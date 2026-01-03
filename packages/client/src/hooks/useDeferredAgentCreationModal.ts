@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { AGENT_QUERY_KEYS, fetchAgentBySlugOrId } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, fetchAgentBySlugOrId, fetchStarshipAgentBySlug } from '@/hooks/useAgents'
 
 /**
  * Detects agent creations during an active streaming turn and exposes a modal state
@@ -15,6 +15,7 @@ export function useDeferredAgentCreationModal(options: {
   liveMessages: any[] | undefined
   isStreaming: boolean | undefined
   starshipSlug?: string | null
+  starshipId?: string | null
   conversationId?: string | null
   agents?: Array<{ name?: string; slug?: string }>
   setLeadingMentionAgent?: (agent: { id?: string; name?: string; slug?: string }, afterText?: string) => void
@@ -23,6 +24,7 @@ export function useDeferredAgentCreationModal(options: {
   const isStreaming = Boolean(options?.isStreaming)
   const liveMessages = Array.isArray(options?.liveMessages) ? (options!.liveMessages as any[]) : []
   const starshipSlug = typeof options?.starshipSlug === 'string' ? options!.starshipSlug : undefined
+  const starshipId = typeof options?.starshipId === 'string' ? options!.starshipId : undefined
   const conversationId = typeof options?.conversationId === 'string' ? options!.conversationId : undefined
   const agents = Array.isArray(options?.agents) ? options!.agents : undefined
   const setLeadingMentionAgent = typeof options?.setLeadingMentionAgent === 'function' ? options!.setLeadingMentionAgent : undefined
@@ -354,9 +356,10 @@ export function useDeferredAgentCreationModal(options: {
       const fetched: any[] = []
       for (const slug of toFetch) {
         try {
+          // Slugs are starship-scoped, so we must use the scoped endpoint when possible.
           const agent = await queryClient.fetchQuery({
-            queryKey: AGENT_QUERY_KEYS.bySlugOrId(slug),
-            queryFn: () => fetchAgentBySlugOrId(slug),
+            queryKey: starshipId ? AGENT_QUERY_KEYS.byStarshipSlug(starshipId, slug) : AGENT_QUERY_KEYS.bySlugOrId(slug),
+            queryFn: () => (starshipId ? fetchStarshipAgentBySlug(starshipId, slug) : fetchAgentBySlugOrId(slug)),
             staleTime: 30 * 1000,
           })
           if (agent) fetched.push(agent)
@@ -380,7 +383,7 @@ export function useDeferredAgentCreationModal(options: {
         })
       }
     })()
-  }, [isOpen, createdSlugs, createdAgents, queryClient])
+  }, [isOpen, createdSlugs, createdAgents, queryClient, starshipId])
 
   const findAgentSlugByName = useCallback(
     (name: string | undefined): string | undefined => {

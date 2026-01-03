@@ -1,4 +1,12 @@
-import type { Client } from 'pg';
+type DbClient = {
+  query: (text: string, params?: unknown[]) => Promise<unknown>;
+};
+
+function toRows<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  if (res && typeof res === 'object' && Array.isArray((res as { rows?: unknown[] }).rows)) return (res as { rows: T[] }).rows;
+  return [];
+}
 
 type Endpoint = {
   name: string;
@@ -25,18 +33,19 @@ type Endpoint = {
  *
  * We do not modify prior migrations; instead we patch the stored `endpoints_json` for the Starships connector template.
  */
-export async function up(client: Client): Promise<void> {
+export async function up(client: DbClient): Promise<void> {
   await client.query('BEGIN');
   try {
     const res = await client.query(`SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`);
+    const rows = toRows<{ id: string; endpoints_json: unknown }>(res);
 
-    if (!res.rows.length) {
+    if (!rows.length) {
       // Nothing to patch on instances that don't have the starships connector template seeded.
       await client.query('COMMIT');
       return;
     }
 
-    const row = res.rows[0] as { id: string; endpoints_json: unknown };
+    const row = rows[0];
     const endpoints = Array.isArray(row.endpoints_json) ? (row.endpoints_json as Endpoint[]) : [];
 
     const nextEndpoints = endpoints.map((ep) => {
@@ -69,7 +78,10 @@ export async function up(client: Client): Promise<void> {
       };
     });
 
-    await client.query(`UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2;`, [JSON.stringify(nextEndpoints), row.id]);
+    await client.query(`UPDATE connector_templates SET endpoints_json = $1::jsonb WHERE id = $2;`, [
+      JSON.stringify(nextEndpoints),
+      row.id,
+    ]);
 
     await client.query('COMMIT');
   } catch (error) {
@@ -78,17 +90,18 @@ export async function up(client: Client): Promise<void> {
   }
 }
 
-export async function down(client: Client): Promise<void> {
+export async function down(client: DbClient): Promise<void> {
   await client.query('BEGIN');
   try {
     const res = await client.query(`SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`);
+    const rows = toRows<{ id: string; endpoints_json: unknown }>(res);
 
-    if (!res.rows.length) {
+    if (!rows.length) {
       await client.query('COMMIT');
       return;
     }
 
-    const row = res.rows[0] as { id: string; endpoints_json: unknown };
+    const row = rows[0];
     const endpoints = Array.isArray(row.endpoints_json) ? (row.endpoints_json as Endpoint[]) : [];
 
     const nextEndpoints = endpoints.map((ep) => {
@@ -118,7 +131,10 @@ export async function down(client: Client): Promise<void> {
       };
     });
 
-    await client.query(`UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2;`, [JSON.stringify(nextEndpoints), row.id]);
+    await client.query(`UPDATE connector_templates SET endpoints_json = $1::jsonb WHERE id = $2;`, [
+      JSON.stringify(nextEndpoints),
+      row.id,
+    ]);
 
     await client.query('COMMIT');
   } catch (error) {

@@ -14,7 +14,7 @@ export class ToolCallApprovalRepository extends BaseRepository {
     starshipId: string;
     conversationId: string;
     agentId: string;
-    toolSlug: string;
+    toolId: string;
     toolCallId: string;
     argsJson: Record<string, unknown>;
   }): Promise<ToolCallApprovalModel> {
@@ -28,7 +28,7 @@ export class ToolCallApprovalRepository extends BaseRepository {
           starshipId: input.starshipId,
           conversationId: input.conversationId,
           agentId: input.agentId,
-          toolSlug: input.toolSlug,
+          toolId: input.toolId,
           toolCallId: input.toolCallId,
           argsJson: input.argsJson || {},
           status: 'pending',

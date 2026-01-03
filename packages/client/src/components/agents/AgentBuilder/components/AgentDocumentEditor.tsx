@@ -1333,7 +1333,7 @@ export function AgentDocumentEditor({
         <div className="border-b border-border/10 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-              <Icon name="badge" className="w-4 h-4" />
+              <Icon name="id-card" className="w-4 h-4" />
               <span className="text-xs font-semibold">Name</span>
             </div>
             <div className="w-full sm:w-[260px]">
@@ -1352,7 +1352,7 @@ export function AgentDocumentEditor({
         <div className="border-b border-border/10 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
             <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-              <Icon name="user" className="w-4 h-4" />
+              <Icon name="user-cog" className="w-4 h-4" />
               <span className="text-xs font-semibold">Role</span>
             </div>
             <div className="w-full sm:w-[260px]">

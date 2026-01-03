@@ -65,7 +65,6 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
  * Request to create a new agent template
  */
 export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
-  slug?: string; // Optional explicit slug (if not provided, will be generated from name)
   /**
    * Human-readable role label for the template (required).
    */
@@ -80,6 +79,10 @@ export interface CreateAgentTemplateRequest extends AgentParamsWithoutMetadata {
  * Request to update agent template information
  */
 export interface UpdateAgentTemplateRequest extends Partial<AgentParamsWithoutMetadata> {
+  /**
+   * Slugs are server-generated and not directly editable.
+   */
+  slug?: never;
   role?: string;
   category?: AgentTemplateCategory;
   icon?: string;

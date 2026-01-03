@@ -590,7 +590,6 @@ export class AgentRepository extends BaseRepository {
         const agentData: CreateAgentRequest = {
           name: customizations?.name || template.name,
           role: customizations?.role || template.role || 'Assistant',
-          slug,
           description: customizations?.description || template.description,
           model: customizations?.model || template.model,
           temperature: customizations?.temperature ?? template.temperature,
@@ -613,6 +612,7 @@ export class AgentRepository extends BaseRepository {
         // Create agent with source_template_id foreign key
         const agentProps = {
           ...agentData,
+          slug,
           starshipId: starshipId,
           sourceTemplateId: template.id, // Set source_template_id foreign key
           deployedAt: now,

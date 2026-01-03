@@ -279,7 +279,6 @@ describe('ToolRepository', () => {
           {
             name: 'Tool',
             description: 'Tool description',
-            slug: 'tool',
             parameters: { type: 'object' as const, properties: {} },
             blueprint: { nodes: [], edges: [] },
             configuration: {},

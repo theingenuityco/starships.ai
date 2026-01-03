@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { AGENT_QUERY_KEYS, fetchAgentBySlugOrId, fetchStarshipAgentBySlug } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, fetchStarshipAgentBySlug } from '@/hooks/useAgents'
 
 /**
  * Detects agent creations during an active streaming turn and exposes a modal state
@@ -348,7 +348,9 @@ export function useDeferredAgentCreationModal(options: {
 
   // While modal open, hydrate missing agents by slug via TanStack Query
   useEffect(() => {
-    if (!isOpen || createdSlugs.length === 0) return
+    // Agent slugs are starship-scoped and cannot be resolved without a starshipId.
+    // If starshipId is not available yet (e.g. first render), defer hydration until it is.
+    if (!isOpen || createdSlugs.length === 0 || !starshipId) return
     const haveSlugs = new Set<string>((createdAgents || []).map(a => String((a as any)?.slug || ''))) as Set<string>
     const toFetch = createdSlugs.filter(s => s && !haveSlugs.has(s))
     if (toFetch.length === 0) return
@@ -356,10 +358,9 @@ export function useDeferredAgentCreationModal(options: {
       const fetched: any[] = []
       for (const slug of toFetch) {
         try {
-          // Slugs are starship-scoped, so we must use the scoped endpoint when possible.
           const agent = await queryClient.fetchQuery({
-            queryKey: starshipId ? AGENT_QUERY_KEYS.byStarshipSlug(starshipId, slug) : AGENT_QUERY_KEYS.bySlugOrId(slug),
-            queryFn: () => (starshipId ? fetchStarshipAgentBySlug(starshipId, slug) : fetchAgentBySlugOrId(slug)),
+            queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starshipId, slug),
+            queryFn: () => fetchStarshipAgentBySlug(starshipId, slug),
             staleTime: 30 * 1000,
           })
           if (agent) fetched.push(agent)

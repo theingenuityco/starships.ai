@@ -594,6 +594,7 @@ export function AgentDocumentEditor({
         const agent = res.data.data
         if (!agent) return
         if (!value.name && agent.name) onFieldChange?.('name', agent.name)
+        if (!value.role && agent.role) onFieldChange?.('role', agent.role)
         if (!value.slug && agent.slug) onFieldChange?.('slug', agent.slug)
         if (!value.description && agent.description) onFieldChange?.('description', agent.description)
         if (!value.model && agent.model) onFieldChange?.('model', agent.model)
@@ -874,6 +875,14 @@ export function AgentDocumentEditor({
         updates.name = value.name
       }
 
+      if (typeof value.role === 'string') {
+        const nextRole = value.role.trim()
+        const baseRole = typeof base.role === 'string' ? base.role : ''
+        if (nextRole.length > 0 && nextRole !== baseRole) {
+          updates.role = nextRole
+        }
+      }
+
       if (typeof value.description === 'string') {
         const nextDesc = value.description ?? ''
         const baseDesc = base.description ?? ''
@@ -1137,7 +1146,7 @@ export function AgentDocumentEditor({
                     className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
                   />
                   <div className="flex flex-col leading-tight min-w-0">
-                    <span className="text-base font-semibold truncate tracking-tight">{formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role)}</span>
+                    <span className="text-base font-semibold truncate tracking-tight">{formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role || value.role)}</span>
                     {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
                   </div>
                 </div>
@@ -1320,6 +1329,44 @@ export function AgentDocumentEditor({
 
       {/* Quick selectors + core fields */}
       <div className="space-y-2 mb-4">
+        {/* Name */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+              <Icon name="badge" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Name</span>
+            </div>
+            <div className="w-full sm:w-[260px]">
+              <Input
+                value={value.name}
+                onChange={e => onFieldChange?.('name', e.target.value)}
+                placeholder="Agent name"
+                disabled={isTemplateAgent || readOnly}
+                className={cn('text-sm h-7', selectLikeFieldClass)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Role */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+              <Icon name="user" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Role</span>
+            </div>
+            <div className="w-full sm:w-[260px]">
+              <Input
+                value={value.role}
+                onChange={e => onFieldChange?.('role', e.target.value)}
+                placeholder='e.g. "Customer Support Agent"'
+                disabled={isTemplateAgent || readOnly}
+                className={cn('text-sm h-7', selectLikeFieldClass)}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">

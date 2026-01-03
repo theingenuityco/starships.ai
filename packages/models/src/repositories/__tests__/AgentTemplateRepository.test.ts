@@ -316,16 +316,36 @@ describe('AgentTemplateRepository', () => {
 
       await repository.create(createInput);
 
-      // Tool template lookup should use exact OR prefix match.
+      // Tool template lookup should use exact OR strict random-suffix match: ^base-[a-z0-9]{4}$
       expect(mockConnection.queryOne).toHaveBeenCalledWith(
         expect.stringContaining('FROM tool_templates'),
-        expect.arrayContaining(['list-agents', 'list-agents-%'])
+        expect.arrayContaining(['list-agents', '^list\\-agents-[a-z0-9]{4}$'])
       );
 
       // Relationship insert should be attempted.
       expect(mockConnection.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO agent_template_tool_templates'),
         expect.arrayContaining(['template-123', 'tool-template-1', expect.any(String)])
+      );
+    });
+
+    it('should not match overlapping base slugs when resolving assignedToolSlugs (e.g. "list" vs "list-agents-*")', async () => {
+      const createInput = createMockCreateInput({
+        assignedToolSlugs: ['list'],
+      });
+      const mockCreatedRaw = createMockRawTemplate();
+
+      // First queryOne call is from template slug generation uniqueness checks.
+      // Second queryOne call is the tool template lookup.
+      mockConnection.queryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'tool-template-list' });
+      mockConnection.query.mockResolvedValueOnce([mockCreatedRaw]);
+
+      await repository.create(createInput);
+
+      // The lookup must only match random-suffixed slugs for the requested base (prevents `list` matching `list-agents-xxxx`).
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('FROM tool_templates'),
+        expect.arrayContaining(['list', '^list-[a-z0-9]{4}$'])
       );
     });
   });
@@ -384,13 +404,12 @@ describe('AgentTemplateRepository', () => {
 
       await repository.update('template-123', updates);
 
-      expect(mockConnection.query).toHaveBeenCalledWith(
-        'DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1',
-        ['template-123']
-      );
+      expect(mockConnection.query).toHaveBeenCalledWith('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1', [
+        'template-123',
+      ]);
       expect(mockConnection.queryOne).toHaveBeenCalledWith(
         expect.stringContaining('FROM tool_templates'),
-        expect.arrayContaining(['list-agents', 'list-agents-%'])
+        expect.arrayContaining(['list-agents', '^list\\-agents-[a-z0-9]{4}$'])
       );
       expect(mockConnection.query).toHaveBeenCalledWith(
         expect.stringContaining('INSERT INTO agent_template_tool_templates'),

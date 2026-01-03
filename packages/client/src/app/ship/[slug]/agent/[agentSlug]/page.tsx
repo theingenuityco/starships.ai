@@ -955,14 +955,23 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }
 
-  const headerAgentName = existingAgent?.name || (selectedAgent as any)?.name || (agentSlug === 'new' ? 'New agent' : String(agentSlug))
+  // Header should reflect the agent implied by the current route (agentSlug), NOT the "leading mention" agent.
+  // Otherwise, navigating to /agent/new or an unknown slug can incorrectly retain the previous agent's identity.
+  const routeAgentFromList = useMemo(() => {
+    if (!agentSlug || agentSlug === 'new') return null
+    const match = (agents || []).find(a => String((a as any)?.slug || '') === String(agentSlug))
+    return match || null
+  }, [agents, agentSlug])
+
+  const headerAgentModel = existingAgent || routeAgentFromList || null
+  const headerAgentName = agentSlug === 'new' ? 'New agent' : headerAgentModel?.name || String(agentSlug)
 
   // Display convention across the app: "Name: Role"
-  const headerAgentRole = existingAgent?.role || (selectedAgent as any)?.role
+  const headerAgentRole = headerAgentModel?.role
   const headerAgentDisplayName = headerAgentName && headerAgentRole ? `${headerAgentName}: ${headerAgentRole}` : headerAgentName
 
-  const headerAgentSubtitle = existingAgent?.slug || (selectedAgent as any)?.slug || (agentSlug !== 'new' ? String(agentSlug) : undefined)
-  const headerAvatarAttachmentId = ((existingAgent as any)?.avatarAttachmentId ?? (selectedAgent as any)?.avatarAttachmentId) as string | undefined
+  const headerAgentSubtitle = headerAgentModel?.slug || (agentSlug !== 'new' ? String(agentSlug) : undefined)
+  const headerAvatarAttachmentId = (headerAgentModel as any)?.avatarAttachmentId as string | undefined
   const headerAvatarIds = useMemo(() => (headerAvatarAttachmentId ? [headerAvatarAttachmentId] : []), [headerAvatarAttachmentId])
   const { data: headerAvatarAttachments = [] } = useMessageAttachments(headerAvatarIds, starship?.id)
   const headerAvatarUrl = headerAvatarAttachments?.[0]?.previewUrl

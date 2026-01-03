@@ -27,10 +27,11 @@ jobs:
     runs-on: [self-hosted, linux, arm64, t4g.large, docker]
     steps:
       - uses: actions/checkout@v4
-      - run: uname -m   # should print aarch64
+      - run: uname -m # should print aarch64
 ```
 
 Notes:
+
 - The runner controller will download the correct GitHub runner binary (`actions-runner-linux-arm64`) when `arm64` is present.
 - Set `runner_ami_id_arm64` in Terraform to an **ARM64 Ubuntu AMI**.
 - Add the `docker` label if the job needs Docker installed on the ephemeral instance.
@@ -100,17 +101,21 @@ jobs:
 You can use any AWS EC2 instance type available in your region. Common examples:
 
 ### General Purpose (T3/T3a)
+
 - `t3.nano`, `t3.micro`, `t3.small`, `t3.medium`, `t3.large`, `t3.xlarge`, `t3.2xlarge`
 
 ### Compute Optimized (C5/C6i)
+
 - `c5.large`, `c5.xlarge`, `c5.2xlarge`, `c5.4xlarge`
 - `c6i.large`, `c6i.xlarge`, `c6i.2xlarge`
 
 ### Memory Optimized (R5/R6i)
+
 - `r5.large`, `r5.xlarge`, `r5.2xlarge`, `r5.4xlarge`
 - `r6i.large`, `r6i.xlarge`, `r6i.2xlarge`
 
 ### General Purpose (M5/M6i)
+
 - `m5.large`, `m5.xlarge`, `m5.2xlarge`, `m5.4xlarge`
 - `m6i.large`, `m6i.xlarge`, `m6i.2xlarge`
 
@@ -126,21 +131,19 @@ You can use any AWS EC2 instance type available in your region. Common examples:
 
 ### CI Checks (`.github/workflows/ci-checks.yml`)
 
-Currently uses default `t3.medium` for all jobs. Can be optimized:
+Recommended: keep CI as a single job so GitHub reports a single required check, while still running lint/type-check/tests/build sequentially.
 
 ```yaml
 jobs:
-  lint:
-    runs-on: [self-hosted, linux, x64, t3.small]  # Lint is lightweight
-
-  type-check:
-    runs-on: [self-hosted, linux, x64, t3.small]  # Type check is lightweight
-
-  test:
-    runs-on: [self-hosted, linux, x64, t3.medium]  # Tests need moderate resources
-
-  build:
-    runs-on: [self-hosted, linux, x64, t3.large]  # Build is resource-intensive
+  build-check:
+    runs-on: [self-hosted, linux, x64, m8a.xlarge]
+    steps:
+      - uses: actions/checkout@v4
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
+      - run: pnpm run type-check
+      - run: pnpm run test
+      - run: pnpm run build
 ```
 
 ## Monitoring
@@ -164,16 +167,19 @@ aws logs tail /aws/lambda/github-runner-webhook --region us-east-1 --since 10m -
 ## Troubleshooting
 
 ### Job stuck in queued state
+
 - Check Lambda function logs for errors
 - Verify webhook is configured correctly in GitHub
 - Check EC2 instance launch permissions
 
 ### Instance type not working
+
 - Ensure instance type is available in your region
 - Check Spot capacity availability
 - Verify IAM permissions for EC2 instance types
 
 ### Cost concerns
+
 - Monitor instance usage in AWS Cost Explorer
 - Set up billing alerts
 - Review job requirements and downsize where possible

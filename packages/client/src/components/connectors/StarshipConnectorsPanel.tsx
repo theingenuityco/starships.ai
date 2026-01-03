@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DialogTitlePrimitive } from '@/components/ui/dialog'
 import { useMemo, useState } from 'react'
 import Image from 'next/image'
-import { CONNECTOR_LOGOS } from '@/lib/connectorLogos'
 import { motion } from 'motion/react'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
@@ -21,6 +20,20 @@ interface StarshipConnectorsPanelProps {
   starshipId: string
 }
 
+function toSafeConnectorLogoSlug(provider: string): string {
+  // ConnectorProvider is an open string type; keep this conservative.
+  // We currently ship SVG logos in `public/connectors/`.
+  return String(provider)
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+}
+
+function getConnectorLogoSrc(provider: string): string {
+  return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
+}
+
 export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelProps) {
   const { data: catalog = [] } = useConnectorCatalog()
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
@@ -31,6 +44,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
   const [searchQuery, setSearchQuery] = useState('')
   const [pendingDisconnect, setPendingDisconnect] = useState<string | null>(null)
+  const [hiddenLogos, setHiddenLogos] = useState<Record<string, boolean>>({})
   const [apiKeyDialogProvider, setApiKeyDialogProvider] = useState<string | null>(null)
   const [apiKeyValue, setApiKeyValue] = useState('')
   const [apiKeyExtraConfigText, setApiKeyExtraConfigText] = useState('')
@@ -234,7 +248,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   )
 
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
-  const visibleCatalog = useMemo(() => catalog, [catalog])
+  const visibleCatalog = useMemo(() => catalog.filter(item => item.provider !== 'starships'), [catalog])
 
   const getProviderLabel = (provider: string | null | undefined) => {
     if (!provider) return ''
@@ -253,7 +267,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     return matchesQuery({ name: item.name, description: item.description })
   })
 
-  const renderConnectorCard = (provider: string, connectedFirst: boolean) => {
+  const renderConnectorCard = (provider: string) => {
     const catalogItem = visibleCatalog.find((c: { provider: string }) => c.provider === provider)
     if (!catalogItem || !matchesQuery({ name: catalogItem.name, description: catalogItem.description })) {
       return null
@@ -261,33 +275,26 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
     const state = getConnectorState(provider)
     const isConnected = state?.status === 'connected'
-    if (!!isConnected !== connectedFirst) return null
 
     const label = catalogItem.name
-    const logoSrc = CONNECTOR_LOGOS[provider]
+    const logoSrc = getConnectorLogoSrc(provider)
     const authType = catalogItem.auth?.type
     const canDisconnect = isConnected && authType !== 'platform_jwt'
     const isOauthConnectable = authType === 'oauth2'
     const isApiKeyConnectable = authType === 'api_key'
     const isBasicConnectable = authType === 'basic'
     const isManaged = authType === 'platform_jwt'
+    const showLogo = !!provider && !hiddenLogos[provider]
 
     return (
-      <motion.div
-        key={`${provider}-${connectedFirst ? 'connected' : 'disconnected'}`}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        whileHover={{ y: -4 }}
-        transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-        className="h-full"
-      >
+      <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
         <Card className="group relative overflow-hidden h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md">
           <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-3">
-                {logoSrc && (
+                {showLogo && (
                   <div className="flex h-10 w-10 items-center justify-center rounded-md bg-white shadow-sm border border-border/40">
-                    <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} />
+                    <Image src={logoSrc} alt={`${label} logo`} width={24} height={24} onError={() => setHiddenLogos(prev => ({ ...prev, [provider]: true }))} />
                   </div>
                 )}
                 <div className="flex h-10 flex-col justify-center">
@@ -313,13 +320,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                   if (isApiKeyConnectable) return openApiKeyDialog(provider)
                   if (isBasicConnectable) return openBasicDialog(provider)
                 }}
-                disabled={
-                  oauthMutation.isPending ||
-                  apiKeyMutation.isPending ||
-                  basicMutation.isPending ||
-                  isManaged ||
-                  (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)
-                }
+                disabled={oauthMutation.isPending || apiKeyMutation.isPending || basicMutation.isPending || isManaged || (!isOauthConnectable && !isApiKeyConnectable && !isBasicConnectable)}
               >
                 <Icon name={isConnected ? 'repeat' : 'plug'} className={CONNECTOR_CTA_ICON_CLASS} />
                 {isManaged
@@ -336,7 +337,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
                         ? isConnected
                           ? 'Update credentials'
                           : 'Connect with Basic auth'
-                      : 'Not connectable'}
+                        : 'Not connectable'}
               </Button>
               {canDisconnect && (
                 <Button
@@ -374,13 +375,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
 
       {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        {/* Connected first */}
-        {visibleCatalog.map(entry => renderConnectorCard(entry.provider, true))}
-
-        {/* Then not connected */}
-        {visibleCatalog.map(entry => renderConnectorCard(entry.provider, false))}
-      </div>
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
 
       <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>
         <DialogContent className="sm:max-w-md">
@@ -511,33 +506,20 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitlePrimitive>Connect with Basic auth</DialogTitlePrimitive>
-            <DialogDescription>
-              {basicDialogProvider ? `Enter credentials for ${getProviderLabel(basicDialogProvider)}. These will be stored securely for this starship.` : null}
-            </DialogDescription>
+            <DialogDescription>{basicDialogProvider ? `Enter credentials for ${getProviderLabel(basicDialogProvider)}. These will be stored securely for this starship.` : null}</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-username">
                 Username / API key
               </label>
-              <Input
-                id="basic-username"
-                value={basicUsernameValue}
-                onChange={e => setBasicUsernameValue(e.target.value)}
-                placeholder="API key or username"
-              />
+              <Input id="basic-username" value={basicUsernameValue} onChange={e => setBasicUsernameValue(e.target.value)} placeholder="API key or username" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-password">
                 Password (optional)
               </label>
-              <Input
-                id="basic-password"
-                type="password"
-                value={basicPasswordValue}
-                onChange={e => setBasicPasswordValue(e.target.value)}
-                placeholder="Leave empty if not required"
-              />
+              <Input id="basic-password" type="password" value={basicPasswordValue} onChange={e => setBasicPasswordValue(e.target.value)} placeholder="Leave empty if not required" />
             </div>
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground" htmlFor="basic-extra-config">

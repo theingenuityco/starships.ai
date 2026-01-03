@@ -11,6 +11,36 @@ export class AgentTemplateRepository extends BaseRepository {
     super('AgentTemplateRepository');
   }
 
+  /**
+   * Resolve a tool template id from an assignedToolSlugs entry.
+   *
+   * Why:
+   * - Tool template slugs are now generated with an always-on random suffix (e.g. `list-agents-x7k9`).
+   * - Seeded agent templates (and API clients) commonly reference the "base" slug (e.g. `list-agents`).
+   *
+   * Behavior:
+   * - Prefer exact slug match
+   * - Fall back to prefix match: `${baseSlug}-%`
+   */
+  private async resolveToolTemplateIdForAssignedSlug(assignedSlug: string): Promise<string | null> {
+    const base = generateSlug(String(assignedSlug || ''));
+    if (!base) return null;
+
+    const connection = this.getConnection();
+    const result = await connection.queryOne<{ id: string }>(
+      `
+        SELECT id
+        FROM tool_templates
+        WHERE slug = $1 OR slug LIKE $2
+        ORDER BY (slug = $1) DESC, created_at DESC
+        LIMIT 1
+      `,
+      [base, `${base}-%`]
+    );
+
+    return result?.id ?? null;
+  }
+
   private async generateUniqueTemplateSlug(baseSlug: string): Promise<string> {
     const connection = this.getConnection();
     const base = generateSlug((baseSlug || '').toString()) || 'agent-template';
@@ -343,7 +373,9 @@ export class AgentTemplateRepository extends BaseRepository {
       async () => {
         if (!name?.trim()) throw new Error('Name is required for findByName operation');
         const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE LOWER(name) = LOWER($1)', [name.trim()]);
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE LOWER(name) = LOWER($1)', [
+          name.trim(),
+        ]);
         return result ? fromDatabase(AgentTemplateEntity, result) : null;
       },
       'findByName',
@@ -400,17 +432,11 @@ export class AgentTemplateRepository extends BaseRepository {
 
         // Create relationships for assigned tool templates
         if (data.assignedToolSlugs && data.assignedToolSlugs.length > 0) {
-          const connection = this.getConnection();
-
           for (const toolSlug of data.assignedToolSlugs) {
-            // Find tool template by slug
-            const toolTemplateResult = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [
-              toolSlug,
-            ]);
-
-            if (toolTemplateResult) {
+            const toolTemplateId = await this.resolveToolTemplateIdForAssignedSlug(toolSlug);
+            if (toolTemplateId) {
               // Create relationship using junction table
-              await this.addToolTemplateRelationship(template.id, toolTemplateResult.id);
+              await this.addToolTemplateRelationship(template.id, toolTemplateId);
             }
           }
         }
@@ -447,14 +473,10 @@ export class AgentTemplateRepository extends BaseRepository {
           // Add new relationships
           if (cleanedUpdates.assignedToolSlugs.length > 0) {
             for (const toolSlug of cleanedUpdates.assignedToolSlugs) {
-              // Find tool template by slug
-              const toolTemplateResult = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [
-                toolSlug,
-              ]);
-
-              if (toolTemplateResult) {
+              const toolTemplateId = await this.resolveToolTemplateIdForAssignedSlug(toolSlug);
+              if (toolTemplateId) {
                 // Create relationship using junction table
-                await this.addToolTemplateRelationship(id, toolTemplateResult.id);
+                await this.addToolTemplateRelationship(id, toolTemplateId);
               }
             }
           }

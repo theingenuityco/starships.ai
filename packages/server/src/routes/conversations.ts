@@ -926,10 +926,15 @@ router.post(
         return;
       }
 
+      // CRITICAL: If this is a user-initiated message (not from connector), clear pendingStops
+      // This allows users to send new messages after stopping
+      // Also clear stopped children so new child conversations can be created
+      if (!isFromConnector && ConversationService.isConversationStopped(conversationId)) {
+        await conversationService.clearConversationAndChildrenStop(conversationId);
+      }
+
       // CRITICAL: Check if conversation was stopped before creating message
       // This prevents messages from being created via connector actions after stop
-      // Only check pendingStops - this is the authoritative indicator that a conversation was explicitly stopped
-      // turnActive can be false for normally completed turns, so we don't check it here
       const isInPendingStops = ConversationService.isConversationStopped(conversationId);
 
       // Also check parent conversation if this is a child conversation
@@ -1017,20 +1022,6 @@ router.post(
       } catch (e) {
         handleError(e, res, 'acquiring starship concurrency slot');
         return;
-      }
-
-      // CRITICAL: If this is a user-initiated message (not from connector/tool), clear pendingStops
-      // This allows users to start new turns after stopping, but keeps tool messages blocked
-      if (!isFromConnector) {
-        const wasInPendingStops = ConversationService.isConversationStopped(conversationId);
-        if (wasInPendingStops) {
-          // Clear pendingStops for this conversation to allow new turn
-          ConversationService.clearConversationStop(conversationId);
-          console.log('[STOP-DEBUG] Cleared pendingStops for new user-initiated message', {
-            conversationId,
-            note: 'User is starting a new turn after stop',
-          });
-        }
       }
 
       // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.

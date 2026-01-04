@@ -84,6 +84,30 @@ export class ConversationService {
   static clearConversationStop(conversationId: string): void {
     this.pendingStops.delete(conversationId);
   }
+
+  /**
+   * Clear pendingStops for a conversation and all its children
+   * Used when a user sends a new message after stopping
+   */
+  async clearConversationAndChildrenStop(conversationId: string): Promise<void> {
+    ConversationService.pendingStops.delete(conversationId);
+    try {
+      const children = await this.conversationRepository.findByParentConversationId(conversationId);
+      for (const child of children) {
+        ConversationService.pendingStops.delete(child.id);
+      }
+      console.log('[STOP-DEBUG] Cleared pendingStops for conversation and children', {
+        conversationId,
+        clearedChildren: children.length,
+      });
+    } catch (err) {
+      console.warn('[STOP-DEBUG] Error clearing child stops', {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
   // Track turn lease IDs per conversation so we can release them on stop
   private static turnLeases: Map<string, string> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
@@ -425,8 +449,8 @@ export class ConversationService {
   async createConversation(
     data: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'> & { starshipId: string; agentId?: string }
   ): Promise<ConversationModel> {
-    // CRITICAL FIX: Check if parent is stopped BEFORE creating the conversation
-    // This prevents blank child conversations from appearing in the UI
+    // CRITICAL: Check if parent is stopped BEFORE creating the conversation
+    // This prevents new child conversations from being created after a stop
     if (data.parentConversationId) {
       const stoppedAncestorId = await this.checkAncestorStopped(data.parentConversationId);
       if (stoppedAncestorId !== null) {

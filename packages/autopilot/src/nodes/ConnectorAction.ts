@@ -61,13 +61,31 @@ export class ConnectorAction implements NodeHandler {
           ? JSON.stringify(response.body) 
           : String(response.body));
       
-      const isStopError = 
+      // Check for stop-related indicators in the response
+      let isStopError = 
         response.status === 409 || // Conflict (conversation stopped)
         bodyStr.includes('stopped') || 
         bodyStr.includes('aborted') ||
-        bodyStr.includes('conversation_stopped') ||
-        (typeof response.body === 'object' && response.body !== null && 
-         ('reason' in response.body && String(response.body.reason).includes('stopped')));
+        bodyStr.includes('conversation_stopped');
+      
+      // Also check structured error response format: { error: { details: { reason: 'conversation_stopped' } } }
+      if (!isStopError && typeof response.body === 'object' && response.body !== null) {
+        const body = response.body as Record<string, unknown>;
+        // Check response.body.reason (direct)
+        if ('reason' in body && String(body.reason).includes('stopped')) {
+          isStopError = true;
+        }
+        // Check response.body.error.details.reason (structured API error format)
+        if ('error' in body && typeof body.error === 'object' && body.error !== null) {
+          const error = body.error as Record<string, unknown>;
+          if ('details' in error && typeof error.details === 'object' && error.details !== null) {
+            const details = error.details as Record<string, unknown>;
+            if ('reason' in details && String(details.reason).includes('stopped')) {
+              isStopError = true;
+            }
+          }
+        }
+      }
       
       const errorMessage = `Connector action failed: ${connector}/${action} -> ${response.status} ${response.statusText}${
         snippet ? ` | body: ${snippet}` : ''

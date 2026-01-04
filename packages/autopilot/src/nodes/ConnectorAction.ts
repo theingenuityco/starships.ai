@@ -38,6 +38,56 @@ export class ConnectorAction implements NodeHandler {
       timeoutMs,
     });
 
+    // CRITICAL: Throw error for non-2xx responses to stop tool execution
+    // This ensures that when child conversation creation is rejected (e.g., parent stopped),
+    // the tool execution stops immediately instead of continuing and failing later
+    if (response.status < 200 || response.status >= 300) {
+      const snippet =
+        typeof response.body === 'string'
+          ? response.body.slice(0, 300)
+          : (() => {
+              try {
+                return JSON.stringify(response.body).slice(0, 300);
+              } catch {
+                return '';
+              }
+            })();
+      
+      // Check if this is a stop-related error (conversation stopped)
+      // Look for 409 status or error messages containing "stopped" or "aborted"
+      const bodyStr = typeof response.body === 'string' 
+        ? response.body 
+        : (typeof response.body === 'object' && response.body !== null 
+          ? JSON.stringify(response.body) 
+          : String(response.body));
+      
+      const isStopError = 
+        response.status === 409 || // Conflict (conversation stopped)
+        bodyStr.includes('stopped') || 
+        bodyStr.includes('aborted') ||
+        bodyStr.includes('conversation_stopped') ||
+        (typeof response.body === 'object' && response.body !== null && 
+         ('reason' in response.body && String(response.body.reason).includes('stopped')));
+      
+      const errorMessage = `Connector action failed: ${connector}/${action} -> ${response.status} ${response.statusText}${
+        snippet ? ` | body: ${snippet}` : ''
+      }`;
+      
+      const error = new Error(errorMessage);
+      // Mark stop-related errors as AbortError so tool execution stops immediately
+      if (isStopError) {
+        error.name = 'AbortError';
+        console.log('[STOP-DEBUG] ConnectorAction: Detected stop-related error, throwing AbortError', {
+          connector,
+          action,
+          status: response.status,
+          isStopError,
+        });
+      }
+      
+      throw error;
+    }
+
     return ExecutionItemUtils.wrapSingle(
       {
         status: response.status,

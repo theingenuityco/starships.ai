@@ -425,6 +425,20 @@ export class ConversationService {
   async createConversation(
     data: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'> & { starshipId: string; agentId?: string }
   ): Promise<ConversationModel> {
+    // CRITICAL FIX: Check if parent is stopped BEFORE creating the conversation
+    // This prevents blank child conversations from appearing in the UI
+    if (data.parentConversationId) {
+      const stoppedAncestorId = await this.checkAncestorStopped(data.parentConversationId);
+      if (stoppedAncestorId !== null) {
+        console.log('[STOP-DEBUG] Rejecting child conversation creation - parent is stopped', {
+          parentConversationId: data.parentConversationId,
+          stoppedAncestorId,
+          wouldBeChildTitle: data.title || 'New Conversation',
+        });
+        throw new Error(`Cannot create child conversation: parent conversation ${stoppedAncestorId} is stopped`);
+      }
+    }
+
     const conversation = await this.conversationRepository.create({
       title: data.title || 'New Conversation',
       status: data.status || 'active',

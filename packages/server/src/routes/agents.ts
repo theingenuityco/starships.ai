@@ -463,27 +463,27 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
     const hasAccess = await verifyStarshipAccess(bodyValidation.starshipId, userId, res);
     if (!hasAccess) return;
 
-    // CRITICAL: Check if any active conversations for this starship were recently stopped
+    // CRITICAL: Check if any conversations for this starship are in pendingStops
     // This prevents agent creation when a conversation was stopped but the HTTP request
     // from the remote runner completes after the stop
-    // Note: This is a best-effort check since we can't easily determine which conversation
-    // triggered the agent creation request
+    // Use pendingStops (not turnActive) because it's the authoritative indicator of explicit stops
+    // and gets cleared when users start new turns
     try {
       const conversationService = new ConversationService();
       const conversations = await conversationService.getConversationsByStarship(bodyValidation.starshipId);
       
-      // Check if any active conversation has turnActive: false (indicating it was stopped)
+      // Check if any conversation is in pendingStops (indicating it was explicitly stopped)
       // Only check conversations updated in the last 5 minutes to avoid false positives
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const hasRecentlyStoppedConversation = conversations.some((conv: ConversationModel) => {
+      const hasStoppedConversation = conversations.some((conv: ConversationModel) => {
         if (conv.status !== 'active') return false;
         if (!conv.updatedAt || conv.updatedAt < fiveMinutesAgo) return false;
         
-        const state = conv.state as { turnActive?: boolean } | undefined;
-        return state?.turnActive === false;
+        // Use pendingStops instead of turnActive - more accurate for explicit stops
+        return ConversationService.isConversationStopped(conv.id);
       });
       
-      if (hasRecentlyStoppedConversation) {
+      if (hasStoppedConversation) {
         console.log('[STOP-DEBUG] Rejecting agent creation - starship has recently stopped conversations', {
           starshipId: bodyValidation.starshipId,
           note: 'Agent creation request from stopped conversation is being rejected',

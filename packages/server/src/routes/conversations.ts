@@ -940,15 +940,15 @@ router.post(
 
       if (isInPendingStops || parentStopped) {
         const conversationState = (conversation.state || {}) as { turnActive?: boolean };
-        console.log('[STOP-DEBUG] Rejecting message creation - conversation was stopped', {
-          conversationId,
-          parentConversationId: conversation.parentConversationId,
-          isInPendingStops,
-          parentStopped,
-          turnActive: conversationState.turnActive,
-          isFromConnector,
-          contentPreview: typeof content === 'string' ? content.substring(0, 100) : String(content).substring(0, 100),
-        });
+        // Only log if from connector (expected) - user messages shouldn't reach here
+        if (isFromConnector) {
+          console.log('[STOP-DEBUG] Rejecting connector message - conversation was stopped', {
+            conversationId,
+            parentConversationId: conversation.parentConversationId,
+            isInPendingStops,
+            parentStopped,
+          });
+        }
         sendError(res, 'RESOURCE_CONFLICT', 'Conversation was stopped. Message creation rejected.', 409, {
           conversationId,
           reason: 'conversation_stopped',
@@ -1313,9 +1313,21 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
     };
     delete createPayload.agentSlug;
 
-    const conversation = await conversationService.createConversation(createPayload);
-
-    sendSuccess(res, conversation, 201);
+    try {
+      const conversation = await conversationService.createConversation(createPayload);
+      sendSuccess(res, conversation, 201);
+    } catch (error) {
+      // CRITICAL: If error is about parent being stopped, return 409 Conflict
+      // This allows ConnectorAction to detect it as a stop-related error and throw AbortError
+      if (error instanceof Error && error.message.includes('Cannot create child conversation') && error.message.includes('stopped')) {
+        sendError(res, 'RESOURCE_CONFLICT', error.message, 409, {
+          reason: 'conversation_stopped',
+          parentConversationId: createPayload.parentConversationId,
+        });
+        return;
+      }
+      handleError(error, res, 'creating conversation');
+    }
   } catch (error) {
     handleError(error, res, 'creating conversation');
   }

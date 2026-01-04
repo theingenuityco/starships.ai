@@ -90,6 +90,24 @@ export class RemoteRunner implements Runner {
             try {
               await config.eventCallback!(data as AutopilotEvent);
             } catch (e) {
+              // CRITICAL: If eventCallback throws an AbortError, propagate it to stop execution
+              // This happens when tool_started event detects conversation was stopped
+              const isAbortError =
+                (e instanceof Error && (e.name === 'AbortError' || e.message.includes('aborted') || e.message.includes('stopped'))) ||
+                (e instanceof DOMException && e.name === 'AbortError') ||
+                (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError') ||
+                String(e).includes('aborted') ||
+                String(e).includes('stopped');
+              
+              if (isAbortError) {
+                console.log('[STOP-DEBUG] RemoteRunner: eventCallback threw AbortError, stopping execution', {
+                  error: e instanceof Error ? e.message : String(e),
+                  eventType: (data as { type?: string })?.type,
+                });
+                // Propagate the abort error to stop execution
+                throw e;
+              }
+              
               // Non-fatal: don't let a bad consumer callback break execution
               console.error('[RemoteRunner] SSE event dispatch failed', e);
             }
@@ -155,9 +173,23 @@ export class RemoteRunner implements Runner {
                 }
                 await emit(eventName, data);
               } catch (e) {
+                // CRITICAL: AbortError from eventCallback (e.g., tool_started when stopped) should stop execution
+                const isAbortError =
+                  (e instanceof Error && (e.name === 'AbortError' || e.message.includes('aborted') || e.message.includes('stopped'))) ||
+                  (e instanceof DOMException && e.name === 'AbortError') ||
+                  (typeof e === 'object' && e !== null && 'name' in e && e.name === 'AbortError') ||
+                  String(e).includes('aborted') ||
+                  String(e).includes('stopped');
+                
                 // Important: 'error' events are fatal to the caller; do not swallow them.
-                if (eventName === 'error') {
+                // Also treat AbortError from message events (tool_started) as fatal
+                if (eventName === 'error' || isAbortError) {
                   fatalStreamError = e instanceof Error ? e : new Error(String(e));
+                  console.log('[STOP-DEBUG] RemoteRunner: Stopping execution due to fatal error', {
+                    eventName,
+                    isAbortError,
+                    error: e instanceof Error ? e.message : String(e),
+                  });
                   try {
                     await reader.cancel();
                   } catch {

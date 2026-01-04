@@ -493,6 +493,7 @@ export function ConversationMessageList({
                 userAvatarUrlOverride={userAvatarUrlOverride}
                 userAvatarSeedOverride={userAvatarSeedOverride}
                 userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                isAwaitingToolResults={isAwaitingToolResults}
               />
             )
           })}
@@ -551,6 +552,7 @@ interface ConversationMessageBubbleProps {
   userAvatarUrlOverride?: string
   userAvatarSeedOverride?: string
   userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
+  isAwaitingToolResults?: boolean
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -610,6 +612,7 @@ const MemoizedMessageBubble = memo(
     userAvatarUrlOverride,
     userAvatarSeedOverride,
     userAvatarFallbackVariantOverride,
+    isAwaitingToolResults = false,
   }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
@@ -687,6 +690,7 @@ const MemoizedMessageBubble = memo(
                 toolCalls={message.toolCalls}
                 toolResults={message.toolResults}
                 messageType={message.messageType}
+                isAwaitingToolResults={isAwaitingToolResults}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
                 stoppedAt={(message as any).stoppedAt}
@@ -702,6 +706,7 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.id !== nextProps.message.id) return false
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
+    if (prevProps.isAwaitingToolResults !== nextProps.isAwaitingToolResults) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
 

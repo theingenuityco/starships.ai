@@ -50,6 +50,8 @@ interface MessageContentProps {
   starshipId?: string
   // Stop state
   stoppedAt?: string | null
+  // Parent conversation context
+  isAwaitingToolResults?: boolean
 }
 
 // Known widget types from public-docs
@@ -85,6 +87,7 @@ export function ConversationMessageContent({
   attachmentIds,
   starshipId,
   stoppedAt,
+  isAwaitingToolResults = false,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
@@ -194,7 +197,8 @@ export function ConversationMessageContent({
     const agent = agentName || 'Assistant'
 
     // Determine if tool calls are ongoing: pending results AND actively streaming
-    const isOngoing = hasPendingToolCalls && isActivelyStreaming
+    // OR if parent conversation is awaiting tool results (includes active child conversations)
+    const isOngoing = (hasPendingToolCalls && isActivelyStreaming) || isAwaitingToolResults
     const verb = isOngoing ? 'is using' : 'used'
 
     const Chip = ({ children }: any) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
@@ -226,7 +230,7 @@ export function ConversationMessageContent({
         {agent} {verb} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
       </>
     )
-  }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isActivelyStreaming])
+  }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isActivelyStreaming, isAwaitingToolResults])
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
@@ -438,7 +442,7 @@ export function ConversationMessageContent({
           {/* Tools panel: keep collapsed by default and preserve user toggle state */}
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isActivelyStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+              {(isActivelyStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls) || (isAwaitingToolResults && hasAnyToolCalls) ? (
                 <Icon name="loading" className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (
                 <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />

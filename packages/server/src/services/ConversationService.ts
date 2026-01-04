@@ -86,26 +86,19 @@ export class ConversationService {
   }
 
   /**
-   * Clear pendingStops for a conversation and all its children
+   * Clear pendingStops for a conversation (parent only, not children)
    * Used when a user sends a new message after stopping
+   *
+   * IMPORTANT: We do NOT clear children's stop state - stopped child conversations
+   * should remain stopped. Only the parent is cleared so it can start fresh and
+   * create new child conversations if needed.
    */
-  async clearConversationAndChildrenStop(conversationId: string): Promise<void> {
+  async clearConversationStop(conversationId: string): Promise<void> {
     ConversationService.pendingStops.delete(conversationId);
-    try {
-      const children = await this.conversationRepository.findByParentConversationId(conversationId);
-      for (const child of children) {
-        ConversationService.pendingStops.delete(child.id);
-      }
-      console.log('[STOP-DEBUG] Cleared pendingStops for conversation and children', {
-        conversationId,
-        clearedChildren: children.length,
-      });
-    } catch (err) {
-      console.warn('[STOP-DEBUG] Error clearing child stops', {
-        conversationId,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
+    console.log('[STOP-DEBUG] Cleared pendingStops for conversation', {
+      conversationId,
+      note: 'Children remain stopped - they should not continue executing',
+    });
   }
 
   // Track turn lease IDs per conversation so we can release them on stop
@@ -1234,6 +1227,23 @@ export class ConversationService {
           },
         };
 
+        // Check if the previous task was stopped - if so, inject a system message to signal fresh start
+        // Find the last assistant message before the new user message (skipping tool results)
+        let previousTaskWasStopped = false;
+        if (messages.length > 0 && messages[messages.length - 1]?.role === 'user') {
+          // This is the new user message - look backwards for the last assistant message
+          for (let i = messages.length - 2; i >= 0; i--) {
+            const msg = messages[i];
+            if (msg.role === 'assistant') {
+              if (msg.stoppedAt) {
+                previousTaskWasStopped = true;
+              }
+              break; // Found the last assistant message, stop looking
+            }
+            // Skip tool/system messages and continue looking backwards
+          }
+        }
+
         // Prepare input messages snapshot for this agent (with multimodal content support)
         const llmMessages: LlmMessage[] = await Promise.all(
           messages.map(async (msg): Promise<LlmMessage> => {
@@ -1254,6 +1264,18 @@ export class ConversationService {
             return baseMessage;
           })
         );
+
+        // If previous task was stopped, inject a system message right before the new user message
+        // This tells the agent to treat this as a fresh start, not a continuation
+        if (previousTaskWasStopped && llmMessages.length > 0 && llmMessages[llmMessages.length - 1]?.role === 'user') {
+          const systemMessage: LlmMessage = {
+            role: 'system',
+            content:
+              'The user stopped the previous task. This is a new request - treat it as a fresh start and do not continue the previous task.',
+          };
+          // Insert system message right before the last (new) user message
+          llmMessages.splice(llmMessages.length - 1, 0, systemMessage);
+        }
         // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent

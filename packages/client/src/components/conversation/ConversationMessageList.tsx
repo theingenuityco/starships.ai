@@ -241,11 +241,16 @@ export function ConversationMessageList({
     return pruned
   }, [messages])
 
+  // Helper: Check if a message is actively streaming (streaming AND not stopped)
+  const isMessageActivelyStreaming = (message: any): boolean => {
+    return !!(message?.streaming && !message?.stoppedAt)
+  }
+
   // Determine which assistant message should display the streaming caret (latest streaming one)
   const activeStreamingAssistantId = useMemo(() => {
     let lastId: string | null = null
     for (const m of displayMessages) {
-      if (m.role === 'assistant' && (m as any).streaming) {
+      if (m.role === 'assistant' && isMessageActivelyStreaming(m)) {
         lastId = m.id
       }
     }
@@ -673,7 +678,7 @@ const MemoizedMessageBubble = memo(
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive}
                 enableLinkPreview={true}
-                isStreaming={!!isStreamingActive}
+                isStreaming={!!isStreamingActive && !(message as any).stoppedAt}
                 className="text-foreground"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -684,6 +689,7 @@ const MemoizedMessageBubble = memo(
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
+                stoppedAt={(message as any).stoppedAt}
               />
             </div>
           </div>
@@ -727,6 +733,11 @@ const MemoizedMessageBubble = memo(
     const prevCalls = (prevProps.message as any).toolCalls?.length ?? 0
     const nextCalls = (nextProps.message as any).toolCalls?.length ?? 0
     if (prevCalls !== nextCalls) return false
+
+    // Re-render when stoppedAt changes (stop state)
+    const prevStoppedAt = (prevProps.message as any).stoppedAt
+    const nextStoppedAt = (nextProps.message as any).stoppedAt
+    if (prevStoppedAt !== nextStoppedAt) return false
 
     // Re-render when user overrides change (demo/internal chats)
     if ((prevProps.userNameOverride || '') !== (nextProps.userNameOverride || '')) return false

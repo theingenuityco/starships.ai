@@ -48,6 +48,8 @@ interface MessageContentProps {
   // Attachments
   attachmentIds?: string[]
   starshipId?: string
+  // Stop state
+  stoppedAt?: string | null
 }
 
 // Known widget types from public-docs
@@ -82,12 +84,16 @@ export function ConversationMessageContent({
   messageType,
   attachmentIds,
   starshipId,
+  stoppedAt,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
 
   // Fetch attachments metadata
   const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(attachmentIds, starshipId)
+
+  // Helper: Check if message is actively streaming (streaming AND not stopped)
+  const isActivelyStreaming = !!(isStreaming && !stoppedAt)
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
@@ -162,9 +168,9 @@ export function ConversationMessageContent({
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
-  const openReasoning = Boolean(isStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
+  const openReasoning = Boolean(isActivelyStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
   const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Assistant'
-  const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
+  const reasoningHeaderLabel = isActivelyStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
 
   const parsedJson = useMemo(() => {
     try {
@@ -187,7 +193,8 @@ export function ConversationMessageContent({
     const unique = Array.from(new Set(names))
     const agent = agentName || 'Assistant'
 
-    const isOngoing = hasPendingToolCalls || (isStreaming && hasAnyToolCalls && !allToolCallsDone)
+    // Determine if tool calls are ongoing: pending results AND actively streaming
+    const isOngoing = hasPendingToolCalls && isActivelyStreaming
     const verb = isOngoing ? 'is using' : 'used'
 
     const Chip = ({ children }: any) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
@@ -219,7 +226,7 @@ export function ConversationMessageContent({
         {agent} {verb} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
       </>
     )
-  }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
+  }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isActivelyStreaming])
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
@@ -389,7 +396,7 @@ export function ConversationMessageContent({
           {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isStreaming && openReasoning ? <Icon name="loading" className="w-3 h-3 animate-spin" /> : <Icon name="message-circle-more" className="w-3 h-3" />}
+              {isActivelyStreaming && openReasoning ? <Icon name="loading" className="w-3 h-3 animate-spin" /> : <Icon name="message-circle-more" className="w-3 h-3" />}
               <span>{reasoningHeaderLabel}</span>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -431,7 +438,7 @@ export function ConversationMessageContent({
           {/* Tools panel: keep collapsed by default and preserve user toggle state */}
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+              {isActivelyStreaming && hasAnyToolCalls && completedToolResults < totalToolCalls ? (
                 <Icon name="loading" className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (
                 <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />

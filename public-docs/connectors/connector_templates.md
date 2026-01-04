@@ -328,6 +328,7 @@ Mapping is how `args` become a request.
 ```json
 {
   "path": { "id": "{{ String(args.id) }}" },
+  "queryEncoding": "standard",
   "query": { "page": "{{ String(args.page || 1) }}" },
   "headers": { "X-Request-Id": "{{ String(args.requestId) }}" },
   "body": { "title": "{{ String(args.title) }}" },
@@ -344,8 +345,14 @@ Mapping is how `args` become a request.
 
 - **`path?: Record<string, ExprString>`**
   - Values substituted into `{var}` placeholders in `endpoint.path`.
-- **`query?: Record<string, ExprString>`**
+- **`queryEncoding?: "standard" | "none"`**
+  - Default query parameter value encoding strategy.
+  - `"standard"` (default): percent-encode values (URLSearchParams behavior; backwards compatible).
+  - `"none"`: preserve query values exactly (useful for structured query syntaxes like REST.li).
+- **`query?: Record<string, ExprString | { value: ExprString; encoding?: "standard" | "none" }>`**
   - Query string parameters.
+  - Values default to `queryEncoding` (or `"standard"` if omitted).
+  - Use `{ "value": "...", "encoding": "none" }` to override encoding per parameter.
 - **`headers?: Record<string, ExprString>`**
   - Request headers.
   - Current behavior note: mapping headers may overwrite injected auth headers if they collide.
@@ -381,6 +388,29 @@ Mapping is how `args` become a request.
 The canonical expected `file` expression result shape is documented in types as:
 
 - `{ filename?: string; contentType?: string; base64: string }`
+
+#### Example: structured query value (LinkedIn REST.li-style)
+
+REST.li uses delimiters like `(` `)` `:` `,` with semantic meaning inside query parameter values. To avoid breaking that syntax, set `"queryEncoding": "none"` (or use a per-param override):
+
+```json
+{
+  "queryEncoding": "none",
+  "query": {
+    "dateRange": "{{ String(args.dateRange) }}"
+  }
+}
+```
+
+Per-parameter override:
+
+```json
+{
+  "query": {
+    "dateRange": { "value": "{{ String(args.dateRange) }}", "encoding": "none" }
+  }
+}
+```
 
 ---
 

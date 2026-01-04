@@ -51,6 +51,22 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE' | 'HEAD';
 
 export type RequestStyle = 'auto' | 'query' | 'json' | 'form' | 'multipart';
 
+/**
+ * QueryParamEncoding
+ *
+ * Controls how query parameter values are encoded when constructing the final URL.
+ * - standard: URLSearchParams-style percent-encoding (default, backwards compatible)
+ * - none: do not encode the query value (preserve it exactly)
+ */
+export type QueryParamEncoding = 'standard' | 'none';
+
+export type ConnectorQueryParamMapping =
+  | ExprString
+  | {
+      value: ExprString;
+      encoding?: QueryParamEncoding;
+    };
+
 export type MultipartPart =
   | {
       kind: 'field';
@@ -96,7 +112,16 @@ export interface ConnectorEndpointV2 {
    */
   mapping?: {
     path?: Record<string, ExprString>;
-    query?: Record<string, ExprString>;
+    /**
+     * Controls default encoding for all query params in `mapping.query`.
+     * Defaults to 'standard' for backwards compatibility.
+     */
+    queryEncoding?: QueryParamEncoding;
+    /**
+     * Query string parameters. Values default to `queryEncoding` (or 'standard').
+     * You can override encoding per param by using `{ value, encoding }`.
+     */
+    query?: Record<string, ConnectorQueryParamMapping>;
     headers?: Record<string, ExprString>;
 
     // JSON body mapping

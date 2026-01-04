@@ -463,37 +463,32 @@ router.post('/agents', jwtAuthMiddleware, async (req: Request, res: Response): P
     const hasAccess = await verifyStarshipAccess(bodyValidation.starshipId, userId, res);
     if (!hasAccess) return;
 
-    // CRITICAL: Check if any conversations for this starship are in pendingStops
+    // CRITICAL: Check if the parent conversation (if provided) is stopped
     // This prevents agent creation when a conversation was stopped but the HTTP request
     // from the remote runner completes after the stop
     // Use pendingStops (not turnActive) because it's the authoritative indicator of explicit stops
     // and gets cleared when users start new turns
     try {
-      const conversationService = new ConversationService();
-      const conversations = await conversationService.getConversationsByStarship(bodyValidation.starshipId);
+      const parentConversationId = req.headers['x-parent-conversation-id'] as string | undefined;
       
-      // Check if any conversation is in pendingStops (indicating it was explicitly stopped)
-      // Only check conversations updated in the last 5 minutes to avoid false positives
-      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
-      const hasStoppedConversation = conversations.some((conv: ConversationModel) => {
-        if (conv.status !== 'active') return false;
-        if (!conv.updatedAt || conv.updatedAt < fiveMinutesAgo) return false;
+      // Only check if a parent conversation is explicitly provided
+      // This is more precise than checking all conversations on the starship
+      if (parentConversationId) {
+        const isParentStopped = ConversationService.isConversationStopped(parentConversationId);
         
-        // Use pendingStops instead of turnActive - more accurate for explicit stops
-        return ConversationService.isConversationStopped(conv.id);
-      });
-      
-      if (hasStoppedConversation) {
-        console.log('[STOP-DEBUG] Rejecting agent creation - starship has recently stopped conversations', {
-          starshipId: bodyValidation.starshipId,
-          note: 'Agent creation request from stopped conversation is being rejected',
-        });
-        sendError(res, 'RESOURCE_CONFLICT', 'Cannot create agent: conversation was stopped', 409);
-        return;
+        if (isParentStopped) {
+          console.log('[STOP-DEBUG] Rejecting agent creation - parent conversation is stopped', {
+            starshipId: bodyValidation.starshipId,
+            parentConversationId,
+            note: 'Agent creation request from stopped conversation is being rejected',
+          });
+          sendError(res, 'RESOURCE_CONFLICT', 'Cannot create agent: conversation was stopped', 409);
+          return;
+        }
       }
     } catch (err) {
       // Non-fatal: if we can't check, allow the creation to proceed
-      console.warn('[STOP-DEBUG] Failed to check for stopped conversations before agent creation', {
+      console.warn('[STOP-DEBUG] Failed to check for stopped parent conversation before agent creation', {
         starshipId: bodyValidation.starshipId,
         error: err instanceof Error ? err.message : String(err),
       });

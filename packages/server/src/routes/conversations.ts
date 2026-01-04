@@ -926,11 +926,12 @@ router.post(
         return;
       }
 
-      // CRITICAL: If this is a user-initiated message (not from connector), clear pendingStops
+      // CRITICAL: If this is a user-initiated message (not from connector), clear pendingStops for the parent
       // This allows users to send new messages after stopping
-      // Also clear stopped children so new child conversations can be created
+      // IMPORTANT: We only clear the parent's stop state, NOT children - stopped child conversations
+      // should remain stopped and not continue executing. The parent can still create new child conversations.
       if (!isFromConnector && ConversationService.isConversationStopped(conversationId)) {
-        await conversationService.clearConversationAndChildrenStop(conversationId);
+        await conversationService.clearConversationStop(conversationId);
       }
 
       // CRITICAL: Check if conversation was stopped before creating message

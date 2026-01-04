@@ -365,13 +365,16 @@ export function useConversationStop() {
         return
       }
 
-      // Optimistic update: mark streaming as false and add completion markers
+      // Optimistic update: mark streaming as false, set stoppedAt, and add completion markers
       // Server will send the persisted message with stoppedAt set, which reduceMessages will respect
       try {
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
           const chunks = Array.isArray(old) ? old.slice() : []
+          const stoppedAt = new Date().toISOString()
           chunks.push({ type: 'mark_last_assistant_streaming', streaming: false })
-          chunks.push({ type: 'turn_completed', payload: { conversationId, at: new Date().toISOString() } })
+          // Optimistically set stoppedAt on the last assistant message using existing update mechanism
+          chunks.push({ type: 'update_last_assistant', fields: { stoppedAt, streaming: false } as Partial<ClientMessage> })
+          chunks.push({ type: 'turn_completed', payload: { conversationId, at: stoppedAt } })
           return chunks
         })
       } catch {}
@@ -657,6 +660,14 @@ function makeSSEAsyncIterable(conversationId: string, token: string | null, sign
       }
     },
   }
+}
+
+/**
+ * Helper: Determine if a message is actively streaming (streaming AND not stopped)
+ * This is the single source of truth for streaming state checks
+ */
+function isMessageActivelyStreaming(message: any): boolean {
+  return !!(message?.streaming && !message?.stoppedAt)
 }
 
 // Reducer to fold streamed chunks into a message array
@@ -1179,8 +1190,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     for (let i = computedMessages.length - 1; i > lastUserIdx; i--) {
       const m: any = computedMessages[i]
       if (!m || m.role !== 'assistant') continue
-      // If any assistant after the last user is still streaming, we are not done yet.
-      if (m.streaming) return false
+      // If any assistant after the last user is still actively streaming, we are not done yet.
+      if (isMessageActivelyStreaming(m)) return false
       const content = typeof m.content === 'string' ? m.content : ''
       if (content.trim().length > 0) {
         return true
@@ -1193,7 +1204,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Derived streaming flags - ensure we stop streaming when complete event is received
   const isAssistantStreaming = useMemo(() => {
     if (hasCompleteEvent) return false
-    return computedMessages.some(m => (m as any)?.streaming === true)
+    return computedMessages.some(m => isMessageActivelyStreaming(m))
   }, [computedMessages, hasCompleteEvent])
 
   // Local pending-turn signal: we seed a local `turn_started` during the create->route-change gap.
@@ -1242,6 +1253,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Awaiting tool results: detect in-flight tool calls after the last user message that do not yet
   // have corresponding tool_result/tool role messages. This is part of the same turn and should keep
   // the input in a loading state even if the assistant isn't currently streaming text.
+  // IMPORTANT: Exclude stopped messages from awaiting calculation - stopped messages should not show as awaiting.
   const isAwaitingToolResults = useMemo(() => {
     try {
       if (!Array.isArray(computedMessages) || computedMessages.length === 0) return false
@@ -1268,9 +1280,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
 
       // If any assistant tool call after the last user lacks a result, we are awaiting tools.
+      // BUT: Skip messages that are stopped - they should not show as awaiting.
       for (let i = lastUserIdx + 1; i < computedMessages.length; i++) {
         const m: any = computedMessages[i]
         if (!m || m.role !== 'assistant') continue
+        // Skip stopped messages - they are not awaiting anything
+        if (m.stoppedAt) continue
         const calls = Array.isArray(m.toolCalls) ? (m.toolCalls as any[]) : []
         if (calls.length === 0) continue
         for (const tc of calls) {

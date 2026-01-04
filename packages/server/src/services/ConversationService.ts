@@ -381,6 +381,45 @@ export class ConversationService {
   }
 
   /**
+   * Recursively check if any ancestor conversation is stopped
+   * Returns the stopped ancestor ID if found, or null if none are stopped
+   */
+  private async checkAncestorStopped(conversationId: string, visited: Set<string> = new Set()): Promise<string | null> {
+    // Guard against infinite loops
+    if (visited.has(conversationId)) {
+      return null;
+    }
+    visited.add(conversationId);
+
+    // Check if this conversation is stopped
+    const isStopped = ConversationService.pendingStops.has(conversationId);
+    console.log('[STOP-DEBUG] checkAncestorStopped', {
+      conversationId,
+      isStopped,
+      allPendingStops: Array.from(ConversationService.pendingStops),
+    });
+
+    if (isStopped) {
+      return conversationId;
+    }
+
+    // Check parent recursively
+    try {
+      const conversation = await this.conversationRepository.findById(conversationId);
+      if (conversation?.parentConversationId) {
+        return await this.checkAncestorStopped(conversation.parentConversationId, visited);
+      }
+    } catch (err) {
+      console.warn('[STOP-DEBUG] Error checking ancestor stops', {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    return null;
+  }
+
+  /**
    * Create a new conversation
    */
   async createConversation(
@@ -397,7 +436,10 @@ export class ConversationService {
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
       if (conversation.parentConversationId) {
-        const parentHasPendingStop = ConversationService.pendingStops.has(conversation.parentConversationId);
+        // CRITICAL FIX: Recursively check if any ancestor is stopped
+        // This handles cases where a grandparent is stopped but the immediate parent isn't
+        const stoppedAncestorId = await this.checkAncestorStopped(conversation.parentConversationId);
+        const parentHasPendingStop = stoppedAncestorId !== null;
         const parentHasActiveCancellation = ConversationService.activeCancellations.has(conversation.parentConversationId);
 
         console.log('[STOP-DEBUG] Child conversation created', {
@@ -405,17 +447,19 @@ export class ConversationService {
           childConversationId: conversation.id,
           parentHasActiveCancellation,
           parentHasPendingStop,
+          stoppedAncestorId,
           childHasActiveCancellation: ConversationService.activeCancellations.has(conversation.id),
           allActiveCancellations: Array.from(ConversationService.activeCancellations.keys()),
         });
 
-        // CRITICAL FIX: If parent has a pending stop, propagate it to the child immediately
-        // This ensures that if the parent is stopped before the child starts executing,
+        // CRITICAL FIX: If any ancestor has a pending stop, propagate it to the child immediately
+        // This ensures that if any ancestor is stopped before the child starts executing,
         // the child will be stopped as soon as it tries to start
         if (parentHasPendingStop) {
-          console.log('[STOP-DEBUG] Parent has pending stop, propagating to child', {
+          console.log('[STOP-DEBUG] Ancestor has pending stop, propagating to child', {
             parentConversationId: conversation.parentConversationId,
             childConversationId: conversation.id,
+            stoppedAncestorId,
           });
           ConversationService.pendingStops.add(conversation.id);
         }
@@ -1260,8 +1304,10 @@ export class ConversationService {
                   error: err instanceof Error ? err.message : String(err),
                 });
               }
-              ConversationService.pendingStops.delete(data.conversationId);
               ConversationService.activeCancellations.delete(data.conversationId);
+              // CRITICAL: Do NOT delete from pendingStops - keep stop active to prevent future execution
+              // The conversation should remain "stopped" until a new user message starts a new turn
+              // ConversationService.pendingStops.delete(data.conversationId);
             }
           },
         });
@@ -1394,7 +1440,10 @@ export class ConversationService {
         });
         // Clean up cancellation handle - execution was intentionally stopped
         ConversationService.activeCancellations.delete(data.conversationId);
-        ConversationService.pendingStops.delete(data.conversationId);
+        // CRITICAL: Do NOT delete from pendingStops - keep stop active to prevent future execution
+        // The conversation should remain "stopped" until a new user message starts a new turn
+        // This prevents tools/connectors from creating child conversations or sending messages after stop
+        // ConversationService.pendingStops.delete(data.conversationId);
         // Don't throw - cancellation is expected, just stop execution
         return;
       }
@@ -1618,8 +1667,10 @@ export class ConversationService {
                 error: err instanceof Error ? err.message : String(err),
               });
             }
-            ConversationService.pendingStops.delete(conversationId);
             ConversationService.activeCancellations.delete(conversationId);
+            // CRITICAL: Do NOT delete from pendingStops - keep stop active to prevent future execution
+            // The conversation should remain "stopped" until explicitly resumed or a new turn starts
+            // ConversationService.pendingStops.delete(conversationId);
           }
         },
       });
@@ -1743,7 +1794,9 @@ export class ConversationService {
                 childConversationId: childConversation.id,
               });
               ConversationService.activeCancellations.delete(childConversation.id);
-              ConversationService.pendingStops.delete(childConversation.id);
+              // CRITICAL: Ensure child stays in pendingStops - keep stop active to prevent future execution
+              // The child should remain "stopped" until explicitly resumed or a new turn starts
+              ConversationService.pendingStops.add(childConversation.id);
             } catch (err) {
               console.warn('[STOP-DEBUG] Error calling child real cancel', {
                 parentConversationId: conversationId,
@@ -1818,8 +1871,10 @@ export class ConversationService {
               try {
                 immediateRecheck();
                 console.log('[STOP-DEBUG] Real cancel called successfully on immediate recheck', { conversationId });
-                ConversationService.pendingStops.delete(conversationId);
                 ConversationService.activeCancellations.delete(conversationId);
+                // CRITICAL: Do NOT delete from pendingStops - keep stop active to prevent future execution
+                // The conversation should remain "stopped" until explicitly resumed or a new turn starts
+                // ConversationService.pendingStops.delete(conversationId);
                 // Skip polling since we already found and called the real cancel
                 return;
               } catch (err) {
@@ -1874,8 +1929,10 @@ export class ConversationService {
                       error: err instanceof Error ? err.message : String(err),
                     });
                   }
-                  ConversationService.pendingStops.delete(conversationId);
                   ConversationService.activeCancellations.delete(conversationId);
+                  // CRITICAL: Do NOT delete from pendingStops - keep stop active to prevent future execution
+                  // The conversation should remain "stopped" until explicitly resumed or a new turn starts
+                  // ConversationService.pendingStops.delete(conversationId);
                   return; // Exit polling loop
                 }
               }
@@ -1924,10 +1981,10 @@ export class ConversationService {
             });
           }
           ConversationService.activeCancellations.delete(conversationId);
-          // CRITICAL: Do NOT delete pendingStops - keep it active to prevent future execution
+          // CRITICAL: Ensure conversation is in pendingStops - keep it active to prevent future execution
           // Tool execution might still be in flight and could create child conversations or send messages
           // The conversation should remain "stopped" until explicitly resumed or a new turn starts
-          // ConversationService.pendingStops.delete(conversationId); // DO NOT DELETE - keep stop active
+          ConversationService.pendingStops.add(conversationId);
           console.log('[STOP-DEBUG] Removed cancellation handle (keeping pendingStops active)', { conversationId });
         }
       } else {
@@ -2271,13 +2328,14 @@ export class ConversationService {
   }
 
   async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
-    // Log all tool_complete events for debugging stop functionality
-    if (event.type === 'tool_complete') {
-      console.log('[STOP-DEBUG] eventCallback received tool_complete', {
+    // Log all tool events for debugging stop functionality
+    if (event.type === 'tool_started' || event.type === 'tool_complete') {
+      console.log(`[STOP-DEBUG] eventCallback received ${event.type}`, {
         conversationId,
         eventType: event.type,
         timestamp: event.timestamp,
         allPendingStops: Array.from(ConversationService.pendingStops),
+        thisConversationInPendingStops: ConversationService.pendingStops.has(conversationId),
       });
     }
     if (!this.streamingService) {
@@ -3393,6 +3451,48 @@ export class ConversationService {
       }
 
       case 'tool_started': {
+        // CRITICAL: Hard stop - check if conversation was stopped BEFORE tool execution
+        // This prevents tools from executing at all when conversation is stopped
+        const isStopped = ConversationService.pendingStops.has(conversationId);
+
+        // Also check parent conversation if this is a child conversation
+        let parentStopped = false;
+        try {
+          const convo = await this.getConversationById(conversationId).catch(() => null);
+          if (convo?.parentConversationId) {
+            parentStopped = ConversationService.pendingStops.has(convo.parentConversationId);
+            // Also check parent's turnActive state
+            if (!parentStopped) {
+              const parentConvo = await this.getConversationById(convo.parentConversationId).catch(() => null);
+              if (parentConvo) {
+                const parentConvoState = (parentConvo.state || {}) as { turnActive?: boolean };
+                parentStopped = parentConvoState.turnActive === false;
+              }
+            }
+          }
+        } catch {
+          // Best-effort check
+        }
+
+        if (isStopped || parentStopped) {
+          const toolEvent = event as { data?: { toolName?: string } };
+          const toolName = toolEvent.data?.toolName;
+          console.log('[STOP-DEBUG] HARD STOP: Throwing error to prevent tool execution', {
+            conversationId,
+            parentStopped,
+            toolName,
+            isStopped,
+            allPendingStops: Array.from(ConversationService.pendingStops),
+            note: 'Tool execution will be aborted immediately',
+          });
+          // Throw an error that the Tool node will catch - this prevents tool execution entirely
+          // Use "aborted" in the message so Tool node recognizes it as an abort error
+          const abortError = new Error(`Tool execution aborted: conversation was stopped`);
+          abortError.name = 'AbortError';
+          // CRITICAL: Re-throw immediately to ensure Tool node catches it
+          throw abortError;
+        }
+
         // Enforce balance at the moment tool execution starts
         try {
           const stoppedToolStart = await this.maybeAutoStopForLowBalance(conversationId);

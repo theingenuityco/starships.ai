@@ -133,11 +133,12 @@ export class Tool extends BaseNode<ToolParams> {
       // Check if this is a cancellation/abort error - if so, don't emit tool_complete
       // The conversation was stopped, so we shouldn't process any tool results
       const isAbortError =
-        (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('cancelled'))) ||
+        (error instanceof Error && (error.name === 'AbortError' || error.message.includes('aborted') || error.message.includes('cancelled') || error.message.includes('stopped'))) ||
         (error instanceof DOMException && error.name === 'AbortError') ||
         (typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError') ||
         String(error).includes('aborted') ||
         String(error).includes('cancelled') ||
+        String(error).includes('stopped') ||
         String(error).includes('Remote runner execution cancelled');
       
       if (isAbortError) {

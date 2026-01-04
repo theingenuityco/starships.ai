@@ -13,19 +13,21 @@ import type { Client } from 'pg';
 export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
   try {
-    // Add stopped_at column (IF NOT EXISTS is not supported for columns, so we check first)
-    const columnExists = await client.query(`
-      SELECT column_name 
-      FROM information_schema.columns 
-      WHERE table_name = 'messages' AND column_name = 'stopped_at'
+    // Add stopped_at column (IF NOT EXISTS is not supported for columns, so we use DO block)
+    await client.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1
+          FROM information_schema.columns
+          WHERE table_name = 'messages' AND column_name = 'stopped_at'
+        ) THEN
+          ALTER TABLE messages 
+          ADD COLUMN stopped_at TIMESTAMP WITH TIME ZONE NULL;
+        END IF;
+      END
+      $$;
     `);
-
-    if (columnExists.rows.length === 0) {
-      await client.query(`
-        ALTER TABLE messages 
-        ADD COLUMN stopped_at TIMESTAMP WITH TIME ZONE NULL;
-      `);
-    }
 
     // Create index for queries filtering by stopped messages
     // Using partial index since most messages won't be stopped

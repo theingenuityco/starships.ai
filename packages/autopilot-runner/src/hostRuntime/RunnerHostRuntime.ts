@@ -1,5 +1,12 @@
 import type { HostRuntime, LlmHostRequest } from '@starships/autopilot';
-import type { ConnectorEndpointV2, ConnectorTemplateRuntimeFieldsV2, ExprString, HttpMethod } from '@starships/protocol';
+import type {
+  ConnectorEndpointV2,
+  ConnectorTemplateRuntimeFieldsV2,
+  ConnectorQueryParamMapping,
+  ExprString,
+  HttpMethod,
+  QueryParamEncoding,
+} from '@starships/protocol';
 import OpenAI from 'openai';
 
 type OpenAIChatCompletionCreateParamsNonStreaming = Omit<OpenAI.Chat.ChatCompletionCreateParamsStreaming, 'stream' | 'stream_options'> & {
@@ -278,13 +285,38 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
     const mapping = endpoint.mapping;
     if (mapping?.query) {
-      const qs = new URLSearchParams();
-      for (const [k, v] of Object.entries(mapping.query)) {
-        const out = evalTemplate(v, ctx);
+      const defaultEncoding: QueryParamEncoding = mapping.queryEncoding ?? 'standard';
+      const parts: string[] = [];
+
+      for (const [k, v] of Object.entries(mapping.query as Record<string, ConnectorQueryParamMapping>)) {
+        let expr: unknown = v;
+        let encoding: QueryParamEncoding = defaultEncoding;
+
+        if (typeof v === 'object' && v !== null && 'value' in v) {
+          const vv = v as { value: unknown; encoding?: unknown };
+          expr = vv.value;
+          if (vv.encoding === 'none' || vv.encoding === 'standard') {
+            encoding = vv.encoding;
+          }
+        }
+
+        const out = evalTemplate(expr, ctx);
         if (out === undefined || out === null) continue;
-        qs.set(k, String(out));
+        const valueStr = String(out);
+
+        if (encoding === 'none') {
+          // Preserve value exactly; still encode the key for safety.
+          parts.push(`${encodeURIComponent(k)}=${valueStr}`);
+        } else {
+          // Backwards-compatible encoding behavior.
+          const qs = new URLSearchParams();
+          qs.set(k, valueStr);
+          const s = qs.toString();
+          if (s) parts.push(s);
+        }
       }
-      const q = qs.toString();
+
+      const q = parts.filter(Boolean).join('&');
       if (q) finalUrl = `${finalUrl}${finalUrl.includes('?') ? '&' : '?'}${q}`;
     }
 

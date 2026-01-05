@@ -42,7 +42,7 @@ const mockConnection = {
   ownerId: 'user-123',
   shipClass: 'scout',
   maxAgents: 5,
-  maxConcurrentTurns: 1,
+  maxConcurrentTurns: 3,
   status: 'active',
   createdAt: '2024-01-01T00:00:00.000Z',
   updatedAt: '2024-01-01T00:00:00.000Z',

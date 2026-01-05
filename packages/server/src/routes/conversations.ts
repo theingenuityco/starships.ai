@@ -921,7 +921,7 @@ router.post(
         turnLeaseId = await leaseService.acquire({
           starshipId: starship.id,
           conversationId,
-          maxConcurrentTurns: starship.maxConcurrentTurns ?? 1,
+          maxConcurrentTurns: starship.maxConcurrentTurns ?? 3,
         });
       } catch (e) {
         handleError(e, res, 'acquiring starship concurrency slot');

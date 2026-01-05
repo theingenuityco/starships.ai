@@ -77,8 +77,6 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       name: name.trim(),
       // New starships are created as Scout class by default
       shipClass: 'scout',
-      maxAgents: 5,
-      maxConcurrentTurns: 1,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 

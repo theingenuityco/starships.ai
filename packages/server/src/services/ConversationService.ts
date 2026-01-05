@@ -1100,7 +1100,7 @@ export class ConversationService {
       turnLeaseId = await leaseService.acquire({
         starshipId: starship.id,
         conversationId,
-        maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 1,
+        maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 3,
       });
 
       const agentService = new AgentService();

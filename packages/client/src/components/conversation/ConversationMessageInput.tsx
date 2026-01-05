@@ -33,7 +33,6 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useFileUpload, useMessageAttachments, type PendingFile } from '@/hooks/useFileUpload'
 import { generateId } from '@/lib/utils'
 import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
-import { Switch } from '@/components/ui/switch'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -1311,39 +1310,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     return (
       <div className="relative opacity-100">
         <PlaceholderStyles />
-        {/* Web Browsing Toggle - Only visible for existing conversations */}
-        {conversationId && (
-          <div className="mb-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/40">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Icon name="globe" className="h-4 w-4 text-muted-foreground" />
-                <div className="flex-1">
-                  <label className="text-xs font-medium cursor-pointer" htmlFor="web-browsing-toggle">
-                    Web Browsing
-                  </label>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    $4 per 1,000 results (max $0.02 per request)
-                  </p>
-                </div>
-              </div>
-              <Switch
-                id="web-browsing-toggle"
-                checked={hasWebBrowsing}
-                onCheckedChange={(checked) => {
-                  if (!conversationId) return
-                  updateConversationState.mutate({
-                    conversationId,
-                    state: {
-                      plugins: checked ? [{ id: 'web', max_results: 3 }] : [], // Empty array = explicitly disabled
-                    },
-                  })
-                }}
-                disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
-                className="data-[state=checked]:bg-primary"
-              />
-            </div>
-          </div>
-        )}
         {/* Context Limit Progress Indicator - Show when context limit is active and usage > 50% */}
         {hardLimitActive && contextUsagePercent > 50 && !minimal && (
           <div className="mb-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/40">
@@ -1487,7 +1453,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn('flex-1 min-w-0 pr-12 relative z-10')}
+              className={cn('flex-1 min-w-0 pr-40 relative z-10')}
               onPaste={handlePaste}
               style={{
                 paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
@@ -1499,7 +1465,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-15">
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-40">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
                       <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
@@ -1509,24 +1475,61 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               )}
             </div>
 
-            {/* Attachment Button - Bottom-right, next to send button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || fileUploading}
-              className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-14 z-20 p-1.5' : 'absolute bottom-2.5 right-14 z-20 p-1.5',
-                'rounded-lg transition-colors',
-                'hover:bg-muted text-muted-foreground hover:text-foreground',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-              aria-label="Attach file"
-              title="Attach file (images, PDFs)"
-            >
-              <Icon name="paperclip" className="h-5 w-5" />
-            </button>
+            {/* Right-side Action Buttons Container */}
+            <div className={cn('absolute z-20 flex items-center gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-2.5 right-2')}>
+              {/* Attachment Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || fileUploading}
+                className={cn(
+                  'p-1.5 rounded-lg transition-colors',
+                  'hover:bg-muted text-muted-foreground hover:text-foreground',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+                aria-label="Attach file"
+                title="Attach file (images, PDFs)"
+              >
+                <Icon name="paperclip" className="h-5 w-5" />
+              </button>
 
-            {/* Right-side Actions: Stop (when streaming) or Send */}
-            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-3' : 'bottom-2.5 right-3')}>
+              {/* Web Browsing Toggle Button - Only visible for existing conversations */}
+              {conversationId && (
+                <button
+                  onClick={() => {
+                    if (!conversationId) return
+                    updateConversationState.mutate({
+                      conversationId,
+                      state: {
+                        plugins: hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }], // Toggle: if enabled, disable; if disabled, enable
+                      },
+                    })
+                  }}
+                  disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                  className={cn(
+                    'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
+                    hasWebBrowsing
+                      ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                      : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                    'disabled:opacity-50 disabled:cursor-not-allowed'
+                  )}
+                  aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                  title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+                >
+                  {hasWebBrowsing ? (
+                    <>
+                      <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                        <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                        <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </div>
+                      <span className="text-xs font-medium whitespace-nowrap">Search</span>
+                    </>
+                  ) : (
+                    <Icon name="globe" className="h-5 w-5" />
+                  )}
+                </button>
+              )}
+
+              {/* Stop (when streaming) or Send Button */}
               {shouldShowStop ? (
                 <div className="relative h-8 w-8">
                   <Button

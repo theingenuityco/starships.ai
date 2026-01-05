@@ -187,11 +187,26 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Conversation state for web browsing toggle
     const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
     const updateConversationState = useUpdateConversationState()
+    
+    // Local state for web browsing preference before conversation exists
+    const [pendingWebBrowsing, setPendingWebBrowsing] = useState(false)
+    
     const hasWebBrowsing = useMemo(() => {
-      if (!conversation?.state?.plugins) return false
-      const plugins = conversation.state.plugins
-      return Array.isArray(plugins) && plugins.some((p: any) => p?.id === 'web')
-    }, [conversation?.state?.plugins])
+      // If conversation exists, use its state
+      if (conversation?.state?.plugins) {
+        const plugins = conversation.state.plugins
+        return Array.isArray(plugins) && plugins.some((p: any) => p?.id === 'web')
+      }
+      // Otherwise use pending preference
+      return pendingWebBrowsing
+    }, [conversation?.state?.plugins, pendingWebBrowsing])
+    
+    // Reset pending state when conversation is created
+    useEffect(() => {
+      if (conversationId && pendingWebBrowsing) {
+        setPendingWebBrowsing(false)
+      }
+    }, [conversationId, pendingWebBrowsing])
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
@@ -357,6 +372,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           currentConversationId = newConversation.id
           sendConversationId = currentConversationId
           createdNewConversation = true
+          
+          // Apply pending web browsing preference if enabled
+          if (pendingWebBrowsing) {
+            try {
+              await updateConversationState.mutateAsync({
+                conversationId: currentConversationId,
+                state: {
+                  plugins: [{ id: 'web', max_results: 3 }],
+                },
+              })
+            } catch (error) {
+              console.warn('Failed to apply web browsing preference to new conversation:', error)
+            }
+          }
         }
         sendConversationId = currentConversationId!
         // Ensure local ref is updated immediately for stop button usability
@@ -484,6 +513,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       onAgentChange,
       starshipAgents,
       queryClient,
+      pendingWebBrowsing,
+      updateConversationState,
     ])
 
     // Handle suggestion clicks
@@ -537,6 +568,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             currentConversationId = newConversation.id
             sendConversationId = currentConversationId
             createdNewConversation = true
+            
+            // Apply pending web browsing preference if enabled
+            if (pendingWebBrowsing) {
+              try {
+                await updateConversationState.mutateAsync({
+                  conversationId: currentConversationId,
+                  state: {
+                    plugins: [{ id: 'web', max_results: 3 }],
+                  },
+                })
+              } catch (error) {
+                console.warn('Failed to apply web browsing preference to new conversation:', error)
+              }
+            }
           }
           sendConversationId = currentConversationId!
           // Ensure local ref is updated immediately for stop button usability
@@ -580,7 +625,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           streamingRef.current = false
         }
       },
-      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
+      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, pendingWebBrowsing, updateConversationState]
     )
 
     // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
@@ -1492,19 +1537,23 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 <Icon name="paperclip" className="h-5 w-5" />
               </button>
 
-              {/* Web Browsing Toggle Button - Only visible for existing conversations */}
-              {conversationId && (
-                <button
-                  onClick={() => {
-                    if (!conversationId) return
+              {/* Web Browsing Toggle Button - Available from the start */}
+              <button
+                onClick={() => {
+                  if (conversationId) {
+                    // Update existing conversation
                     updateConversationState.mutate({
                       conversationId,
                       state: {
-                        plugins: hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }], // Toggle: if enabled, disable; if disabled, enable
+                        plugins: hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }],
                       },
                     })
-                  }}
-                  disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                  } else {
+                    // Store preference for when conversation is created
+                    setPendingWebBrowsing(!pendingWebBrowsing)
+                  }
+                }}
+                disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
                   className={cn(
                     'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
                     hasWebBrowsing
@@ -1527,7 +1576,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                     <Icon name="globe" className="h-5 w-5" />
                   )}
                 </button>
-              )}
 
               {/* Stop (when streaming) or Send Button */}
               {shouldShowStop ? (

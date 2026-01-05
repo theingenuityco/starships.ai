@@ -1,7 +1,7 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, getConnection, StarshipRepository, ToolRepository, UserRepository } from '@starships/models';
-import { StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
+import { AgentRepository, StarshipRepository, ToolRepository, UserRepository } from '@starships/models';
+import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
 import { SubscriptionPlanCatalogService } from './SubscriptionPlanCatalogService';
@@ -16,7 +16,7 @@ export interface CreateStarshipData {
 }
 
 export interface StarshipWithDetails extends StarshipModel {
-  agents: any[];
+  agents: AgentModel[];
   availableSlots: number;
   deployedCount: number;
 }
@@ -156,7 +156,7 @@ export class StarshipService {
   /**
    * Get deployed agents for starship
    */
-  async getDeployedAgents(starshipId: string): Promise<any[]> {
+  async getDeployedAgents(starshipId: string): Promise<AgentModel[]> {
     return this.starshipRepository.getDeployedAgents(starshipId);
   }
 
@@ -191,7 +191,7 @@ export class StarshipService {
   /**
    * Get starship memories (placeholder - feature not implemented yet)
    */
-  async getStarshipMemories(starshipId: string): Promise<any[]> {
+  async getStarshipMemories(starshipId: string): Promise<unknown[]> {
     // TODO: Implement memory management when the feature is needed
     console.warn(`Memory management not yet implemented for starship ${starshipId}`);
     return [];
@@ -218,7 +218,7 @@ export class StarshipService {
   /**
    * Get starship conversations
    */
-  async getStarshipConversations(starshipId: string): Promise<any[]> {
+  async getStarshipConversations(starshipId: string): Promise<Record<string, unknown>[]> {
     return this.starshipRepository.getConversations(starshipId);
   }
 
@@ -232,7 +232,7 @@ export class StarshipService {
   /**
    * Get active conversations for starship
    */
-  async getActiveConversations(starshipId: string): Promise<any[]> {
+  async getActiveConversations(starshipId: string): Promise<Record<string, unknown>[]> {
     return this.starshipRepository.getActiveConversations(starshipId);
   }
 
@@ -255,7 +255,7 @@ export class StarshipService {
       }
 
       // Check if user is the owner or instance admin
-      if (starship.ownerId === userId || (user as any).isInstanceAdmin) {
+      if (starship.ownerId === userId || (user as AuthUser).isInstanceAdmin) {
         return true;
       }
 
@@ -344,9 +344,8 @@ export class StarshipService {
   /**
    * Create the default Daedalus agent from template for a new user's starship
    */
-  static async createDefaultAgent(userId: string, starshipId: string): Promise<any | null> {
+  static async createDefaultAgent(userId: string, starshipId: string): Promise<AgentModel | null> {
     try {
-      const connection = getConnection();
       const templateService = new AgentTemplateService();
 
       // Find the "Daedalus" template to use as the default toolwright
@@ -380,8 +379,8 @@ export class StarshipService {
    * - Creates Aria if available
    * Returns a map of created agents by name when created
    */
-  static async createInitialAgents(userId: string, starshipId: string): Promise<Record<string, any>> {
-    const created: Record<string, any> = {};
+  static async createInitialAgents(userId: string, starshipId: string): Promise<Record<string, AgentModel>> {
+    const created: Record<string, AgentModel> = {};
     try {
       const templateService = new AgentTemplateService();
       const agentRepo = new AgentRepository();
@@ -405,7 +404,7 @@ export class StarshipService {
           if (daedalus?.id) {
             await agentRepo.setAllAssignedToolPermissionsForAgent(daedalus.id, 'allow');
           }
-          created['Daedalus'] = daedalus;
+          if (daedalus) created['Daedalus'] = daedalus;
         } catch (err) {
           console.error('[STARSHIP-SERVICE] Failed to create Daedalus agent:', err);
         }
@@ -420,7 +419,7 @@ export class StarshipService {
           if (gaia?.id) {
             await agentRepo.setAllAssignedToolPermissionsForAgent(gaia.id, 'allow');
           }
-          created['Gaia'] = gaia;
+          if (gaia) created['Gaia'] = gaia;
         } catch (err) {
           console.error('[STARSHIP-SERVICE] Failed to create Gaia agent:', err);
         }
@@ -435,7 +434,7 @@ export class StarshipService {
           if (aria?.id) {
             await agentRepo.setAllAssignedToolPermissionsForAgent(aria.id, 'allow');
           }
-          created['Aria'] = aria;
+          if (aria) created['Aria'] = aria;
         } catch (err) {
           console.error('[STARSHIP-SERVICE] Failed to create Aria agent:', err);
         }

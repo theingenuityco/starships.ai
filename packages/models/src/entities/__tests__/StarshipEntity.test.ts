@@ -59,7 +59,7 @@ describe('StarshipEntity', () => {
         name: 'Test Starship',
         shipClass: 'scout',
         maxAgents: 3,
-        maxConcurrentTurns: 1,
+        maxConcurrentTurns: 3,
         status: 'active',
         createdAt: '2024-01-01T00:00:00.000Z',
         updatedAt: '2024-01-02T12:00:00.000Z',
@@ -74,7 +74,7 @@ describe('StarshipEntity', () => {
       expect(entity.status).toBe('active');
       expect(entity.shipClass).toBe('scout');
       expect(entity.maxAgents).toBe(3);
-      expect(entity.maxConcurrentTurns).toBe(1);
+      expect(entity.maxConcurrentTurns).toBe(3);
     });
 
     it('should deserialize array of database records', async () => {
@@ -87,7 +87,7 @@ describe('StarshipEntity', () => {
           name: 'Starship 1',
           shipClass: 'scout',
           maxAgents: 3,
-          maxConcurrentTurns: 1,
+          maxConcurrentTurns: 3,
           status: 'active',
           createdAt: '2024-01-01T00:00:00.000Z',
           updatedAt: '2024-01-01T12:00:00.000Z',
@@ -100,7 +100,7 @@ describe('StarshipEntity', () => {
           name: 'Starship 2',
           shipClass: 'scout',
           maxAgents: 5,
-          maxConcurrentTurns: 1,
+          maxConcurrentTurns: 3,
           status: 'inactive',
           createdAt: '2024-01-02T00:00:00.000Z',
           updatedAt: '2024-01-02T12:00:00.000Z',

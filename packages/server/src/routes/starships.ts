@@ -27,6 +27,15 @@ const router: Router = Router();
 const envConfig = getEnvConfig();
 const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
 
+function requireAuthUser(req: Request, res: Response): AuthUser | null {
+  const user = req.user as AuthUser | null | undefined;
+  if (!user?.id) {
+    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+    return null;
+  }
+  return user;
+}
+
 function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextFunction): void {
   if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
     sendError(res, 'FORBIDDEN', 'Only instance admins can import/export agents and tools', 403);
@@ -35,20 +44,12 @@ function requireInstanceAdminMiddleware(req: Request, res: Response, next: NextF
   next();
 }
 
-// Helper function for authentication check
-const checkAuth = (req: Request, res: Response): boolean => {
-  const user = (req as any).user;
-  if (!user?.id) {
-    sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-    return false;
-  }
-  return true;
-};
-
 // POST /starships - Create new starship (OpenAPI pattern)
 router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).user!.id;
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    const userId = user.id;
     const { name } = req.body;
 
     console.log('[STARSHIP-CREATE] Starting starship creation for user:', userId);
@@ -77,8 +78,6 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       name: name.trim(),
       // New starships are created as Scout class by default
       shipClass: 'scout',
-      maxAgents: 5,
-      maxConcurrentTurns: 1,
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
 
@@ -105,7 +104,9 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
 router.post('/starships/:id/subscribe', rateLimiters.financial, jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
-    const userId = (req as any).user!.id as string;
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    const userId = user.id;
 
     const bodyValidation = validateData(
       z.object({
@@ -146,7 +147,9 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const starshipId = req.params.id;
-      const userId = (req as any).user!.id as string;
+      const user = requireAuthUser(req, res);
+      if (!user) return;
+      const userId = user.id;
 
       const bodyValidation = validateData(
         z.object({
@@ -186,7 +189,9 @@ router.post(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const starshipId = req.params.id;
-      const userId = (req as any).user!.id as string;
+      const user = requireAuthUser(req, res);
+      if (!user) return;
+      const userId = user.id;
 
       const paramValidation = validateData(z.object({ id: IdSchema }), { id: starshipId }, res, 'cancel downgrade');
       if (!paramValidation) return;
@@ -215,7 +220,7 @@ router.post(
       }
 
       const subscription = await stripe.subscriptions.retrieve(row.stripe_subscription_id, { expand: ['items.data'] });
-      const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : subscription.schedule?.id ?? null;
+      const scheduleId = typeof subscription.schedule === 'string' ? subscription.schedule : (subscription.schedule?.id ?? null);
 
       if (scheduleId) {
         // Detach schedule so we can update cancellation behavior on the subscription.
@@ -259,7 +264,9 @@ router.get(
   async (req: Request, res: Response): Promise<void> => {
     try {
       const starshipId = req.params.id;
-      const userId = (req as any).user!.id as string;
+      const user = requireAuthUser(req, res);
+      if (!user) return;
+      const userId = user.id;
 
       const paramValidation = validateData(z.object({ id: IdSchema }), { id: starshipId }, res, 'subscription status');
       if (!paramValidation) return;
@@ -335,7 +342,9 @@ router.get(
 router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { idOrSlug } = req.params;
-    const userId = (req as any).user!.id;
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    const userId = user.id;
 
     const starshipService = new StarshipService();
     // Try to find by ID first, then by slug
@@ -392,7 +401,9 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
       return;
     }
 
-    if (starship.ownerId !== (req as any).user!.id) {
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (starship.ownerId !== user.id) {
       sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
@@ -411,7 +422,7 @@ router.post('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: Req
 
     // If agent is already assigned to a starship, verify user owns that starship
     if (agent.starshipId) {
-      if (!(await verifyResourceAccess(agent.starshipId, (req as any).user!.id, 'agent', agentId, res))) {
+      if (!(await verifyResourceAccess(agent.starshipId, user.id, 'agent', agentId, res))) {
         return;
       }
     }
@@ -467,7 +478,9 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
       return;
     }
 
-    if (starship.ownerId !== (req as any).user!.id) {
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    if (starship.ownerId !== user.id) {
       sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }
@@ -494,7 +507,9 @@ router.delete('/starships/:id/agents/:agentId', jwtAuthMiddleware, async (req: R
 router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
-    const userId = (req as any).user!.id;
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    const userId = user.id;
     const { name, status, maxAgents } = req.body;
 
     // Validate starship ID
@@ -589,7 +604,9 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
 router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
-    const userId = (req as any).user!.id;
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    const userId = user.id;
 
     console.log(`[STARSHIPS] Delete request for starship ${starshipId} by user ${userId}`);
 
@@ -639,7 +656,9 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
 router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
-    const userId = (req as any).user!.id;
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+    const userId = user.id;
 
     // Validate starship ID
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');

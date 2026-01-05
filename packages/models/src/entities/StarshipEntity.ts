@@ -100,7 +100,7 @@ export class StarshipEntity implements StarshipModel {
         name: dataRecord.name || '',
         shipClass: (dataRecord.shipClass as ShipClass) ?? 'scout',
         maxAgents: dataRecord.maxAgents ?? 5,
-        maxConcurrentTurns: dataRecord.maxConcurrentTurns ?? 1,
+        maxConcurrentTurns: dataRecord.maxConcurrentTurns ?? 3,
         status: dataRecord.status || 'active',
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),

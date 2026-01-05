@@ -1334,7 +1334,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   updateConversationState.mutate({
                     conversationId,
                     state: {
-                      plugins: checked ? [{ id: 'web', max_results: 3 }] : null,
+                      plugins: checked ? [{ id: 'web', max_results: 3 }] : [], // Empty array = explicitly disabled
                     },
                   })
                 }}

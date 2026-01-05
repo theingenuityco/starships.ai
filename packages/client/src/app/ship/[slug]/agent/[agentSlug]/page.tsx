@@ -352,6 +352,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       assignedToolSlugs: undefined as undefined | string[],
       icon: undefined as undefined | string,
       timeout: undefined as undefined | number,
+      state: undefined as undefined | Record<string, unknown>,
       blueprintChanged: false,
     }
 
@@ -410,6 +411,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (Array.isArray(src?.previewPrompts)) compose.previewPrompts = (src.previewPrompts as unknown[]).filter(p => typeof p === 'string' && (p as string).trim()).slice(0, 10) as string[]
         if (typeof src?.icon === 'string') compose.icon = src.icon
         if (typeof src?.timeout === 'number') compose.timeout = src.timeout
+        // Extract state (including plugins for web browsing)
+        if (src?.state && typeof src.state === 'object' && !Array.isArray(src.state)) {
+          console.log('[AgentBuilderStream] Extracting state from edit-agent:', { state: src.state, hasPlugins: 'plugins' in src.state });
+          compose.state = src.state as Record<string, unknown>;
+        }
 
         // If slug not provided in args, derive from function name suffix: open-agent-<slug> / edit-agent-<slug>
         if (!compose.slug) {
@@ -517,6 +523,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         temperature: compose.temperature,
         maxTokens: compose.maxTokens,
         timeout: compose.timeout,
+        hasState: compose.state !== undefined,
+        statePlugins: (compose.state as { plugins?: unknown })?.plugins,
         blueprintChanged: compose.blueprintChanged,
       })
     } catch {}
@@ -533,6 +541,10 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (compose.timeout !== undefined) agentBuilderRef.current?.updateField('timeout', compose.timeout as any)
     if (compose.assignedToolSlugs !== undefined) agentBuilderRef.current?.updateField('assignedToolSlugs', compose.assignedToolSlugs as any)
     if (compose.previewPrompts !== undefined) agentBuilderRef.current?.updateField('previewPrompts', compose.previewPrompts as any)
+    if (compose.state !== undefined) {
+      console.log('[AgentBuilderStream] Applying state update:', { state: compose.state, hasPlugins: 'plugins' in compose.state });
+      agentBuilderRef.current?.updateField('state', compose.state)
+    }
     if (compose.blueprintChanged) {
       const bpStr = JSON.stringify(bp, null, 2)
       agentBuilderRef.current?.updateField('blueprint', bpStr)
@@ -707,6 +719,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               }
               if (agent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(agent.blueprint, null, 2))
               if ((agent as any).icon) agentBuilderRef.current.updateField('icon', (agent as any).icon)
+              // Load state (including plugins for web browsing)
+              if (agent.state && typeof agent.state === 'object') {
+                console.log('[AgentBuilder] Loading agent state:', { state: agent.state, hasPlugins: 'plugins' in agent.state });
+                agentBuilderRef.current.updateField('state', agent.state as any)
+              }
             }
             // If we are currently at /agent/new, replace URL with real slug
             if (!routeUpdatedRef.current && agentSlug === 'new' && typeof slugArg === 'string' && slugArg) {
@@ -1005,6 +1022,15 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
     if (existingAgent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(existingAgent.blueprint, null, 2))
     if ((existingAgent as any).icon) agentBuilderRef.current.updateField('icon', (existingAgent as any).icon)
+    // Load state (including plugins for web browsing) - CRITICAL: must preserve state
+    if (existingAgent.state && typeof existingAgent.state === 'object') {
+      console.log('[AgentBuilder] Prefill loading state:', { 
+        state: existingAgent.state, 
+        hasPlugins: 'plugins' in existingAgent.state,
+        plugins: (existingAgent.state as { plugins?: unknown })?.plugins
+      });
+      agentBuilderRef.current.updateField('state', existingAgent.state as any)
+    }
     if (existingAgent.id) lastPrefilledAgentIdRef.current = existingAgent.id
   }, [existingAgent])
 

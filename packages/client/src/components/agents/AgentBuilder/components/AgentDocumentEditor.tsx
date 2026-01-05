@@ -27,6 +27,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Switch } from '@/components/ui/switch'
 import { AgentPublishModal } from './AgentPublishModal'
 
 interface AgentDocumentEditorProps {
@@ -948,6 +949,61 @@ export function AgentDocumentEditor({
         }
       }
 
+      // State (including plugins for web browsing)
+      // CRITICAL: Only update state if form has state AND it differs from base
+      // If form state is missing plugins but base has plugins, don't remove them
+      if (value.state && typeof value.state === 'object') {
+        const baseState = (base.state && typeof base.state === 'object' ? base.state : {}) as Record<string, unknown>
+        const nextState = value.state as Record<string, unknown>
+        
+        // Normalize both states for comparison (handle undefined vs missing plugins)
+        const normalizeState = (s: Record<string, unknown>): Record<string, unknown> => {
+          const normalized = { ...s }
+          // Remove plugins key if it's undefined (treat undefined as missing)
+          if ('plugins' in normalized && normalized.plugins === undefined) {
+            delete normalized.plugins
+          }
+          // Ensure messages and tools arrays exist for comparison
+          if (!('messages' in normalized)) normalized.messages = []
+          if (!('tools' in normalized)) normalized.tools = []
+          return normalized
+        }
+        
+        const normalizedNext = normalizeState(nextState)
+        const normalizedBase = normalizeState(baseState)
+        const nextStateStr = stableStringify(normalizedNext)
+        const baseStateStr = stableStringify(normalizedBase)
+        
+        // CRITICAL CHECK: If base has plugins but next doesn't, don't remove them
+        // This prevents autosave from removing plugins when form state is incomplete
+        const baseHasPlugins = 'plugins' in normalizedBase && Array.isArray(normalizedBase.plugins) && normalizedBase.plugins.length > 0
+        const nextHasPlugins = 'plugins' in normalizedNext && Array.isArray(normalizedNext.plugins) && normalizedNext.plugins.length > 0
+        
+        if (baseHasPlugins && !nextHasPlugins) {
+          console.log('[Autosave] Base has plugins but form state missing them - preserving base state, skipping update');
+          // Don't update - preserve base state with plugins
+        } else if (nextStateStr !== baseStateStr) {
+          console.log('[Autosave] State changed, including in update:', { 
+            nextState: normalizedNext, 
+            baseState: normalizedBase, 
+            hasPlugins: 'plugins' in normalizedNext,
+            plugins: (normalizedNext.plugins as unknown[])
+          });
+          updates.state = nextState
+        } else {
+          console.log('[Autosave] State unchanged, skipping update');
+        }
+      } else if (base.state && typeof base.state === 'object') {
+        // If form has no state but base has state, preserve base state
+        // This ensures plugins aren't lost when form state is reset
+        const baseState = base.state as Record<string, unknown>
+        const hasPlugins = 'plugins' in baseState && Array.isArray(baseState.plugins) && baseState.plugins.length > 0
+        if (hasPlugins) {
+          console.log('[Autosave] Form missing state but base has plugins - preserving base state');
+          // Don't update - let base state persist
+        }
+      }
+
       return updates
     }
 
@@ -962,10 +1018,31 @@ export function AgentDocumentEditor({
           return
         }
         setIsAutosaving(true)
+        console.log('[Autosave] Sending update request:', { 
+          updates, 
+          hasState: 'state' in updates,
+          statePlugins: (updates.state as { plugins?: unknown })?.plugins
+        });
         const res: FetchResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
         const updated = res.data.data
 
         if (!cancelled && updated) {
+          console.log('[Autosave] Received updated agent:', { 
+            hasState: 'state' in updated,
+            state: updated.state,
+            statePlugins: (updated.state as { plugins?: unknown })?.plugins,
+            sentState: updates.state,
+            sentHasPlugins: updates.state && 'plugins' in (updates.state as Record<string, unknown>)
+          });
+          // ALWAYS preserve state from updates if we sent it, regardless of API response
+          // This ensures state (like plugins) is never lost
+          if (updates.state && typeof updates.state === 'object') {
+            console.log('[Autosave] Preserving sent state in updated agent:', {
+              sentState: updates.state,
+              apiState: updated.state
+            });
+            (updated as any).state = updates.state;
+          }
           setFullAgent(updated)
           // Keep React Query cache in sync for this agent
           queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
@@ -1737,6 +1814,55 @@ export function AgentDocumentEditor({
                     disabled={isTemplateAgent || readOnly}
                     className={cn('text-sm h-7', selectLikeFieldClass)}
                   />
+                </div>
+              </div>
+
+              {/* Web Browsing */}
+              <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
+                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
+                  <Icon name="globe" className="w-4 h-4" />
+                  <span className="text-xs font-semibold">Web Browsing</span>
+                </div>
+                <div className="flex-1">
+                  <div className="flex items-center justify-between w-full sm:w-[260px] p-2 border rounded-lg border-border/70 bg-background/80">
+                    <div className="flex-1">
+                      <p className="text-xs font-medium">Enable web search</p>
+                      <p className="text-[10px] text-muted-foreground mt-0.5">
+                        Allow agent to search the web for current information
+                      </p>
+                    </div>
+                    <Switch
+                      checked={
+                        (() => {
+                          const state = value.state as { plugins?: Array<{ id: string }> } | undefined;
+                          return Array.isArray(state?.plugins) && state.plugins.some(p => p.id === 'web');
+                        })()
+                      }
+                      onCheckedChange={(checked) => {
+                        if (isTemplateAgent || readOnly) return;
+                        console.log('[WebBrowsing] Toggle changed:', { checked, currentState: value.state });
+                        const currentState = (value.state || {}) as Record<string, unknown>;
+                        const updatedState = {
+                          ...currentState,
+                          plugins: checked ? [{ id: 'web', max_results: 3 }] : undefined,
+                        };
+                        // Remove plugins key if disabled
+                        if (!checked && updatedState.plugins === undefined) {
+                          delete updatedState.plugins;
+                        }
+                        console.log('[WebBrowsing] Updated state:', { updatedState, hasPlugins: 'plugins' in updatedState });
+                        onChange({
+                          ...value,
+                          state: updatedState as any,
+                        });
+                      }}
+                      disabled={isTemplateAgent || readOnly}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  </div>
+                  <p className="text-[10px] text-muted-foreground mt-1">
+                    Costs $4 per 1,000 results (max $0.02 per request with default settings)
+                  </p>
                 </div>
               </div>
             </div>

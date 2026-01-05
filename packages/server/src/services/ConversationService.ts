@@ -934,6 +934,9 @@ export class ConversationService {
         // Get deployed tools for this agent (always redacted; server executes tools)
         const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
+        // Preserve plugins from agent state (for web browsing, etc.)
+        const plugins = (baseState as { plugins?: unknown }).plugins;
+
         const agentWithTools: AgentParams = {
           ...agentModel,
           // Always use the server-tools blueprint (no legacy tool-node execution).
@@ -943,6 +946,8 @@ export class ConversationService {
             ...conversationState,
             tools: resolvedTools,
             starshipId: starship.id,
+            // Preserve plugins from agent state if present
+            ...(plugins !== undefined ? { plugins } : {}),
           },
         };
 
@@ -1156,6 +1161,9 @@ export class ConversationService {
           ? (agentModel.state as Record<string, unknown>)
           : ({ messages: [], tools: [] } as any);
 
+      // Preserve plugins from agent state (for web browsing, etc.)
+      const plugins = baseState.plugins;
+
       const agentWithTools: AgentParams = {
         ...(agentModel as any),
         // Always use the server-tools blueprint (no legacy tool-node execution).
@@ -1165,6 +1173,8 @@ export class ConversationService {
           ...conversationState,
           tools: resolvedTools,
           starshipId: starship.id,
+          // Preserve plugins from agent state if present
+          ...(plugins !== undefined ? { plugins } : {}),
         },
       } as unknown as AgentParams;
 

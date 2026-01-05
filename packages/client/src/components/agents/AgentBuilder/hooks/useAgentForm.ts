@@ -83,6 +83,11 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
 
   const handleSave = useCallback(() => {
     if (validateForm()) {
+      console.log('[useAgentForm] Saving agent with formData:', { 
+        hasState: 'state' in formData, 
+        statePlugins: (formData.state as { plugins?: unknown })?.plugins,
+        formDataKeys: Object.keys(formData)
+      });
       onSave?.(formData)
     }
   }, [validateForm, onSave, formData])
@@ -92,8 +97,16 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
     setErrors({})
   }, [])
 
-  const updateField = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[]) => {
+  const updateField = useCallback((field: keyof AgentFormData, value: string | boolean | number | string[] | Record<string, unknown>) => {
     setFormData(prev => {
+      // Special handling for state (nested object)
+      if (field === 'state' && typeof value === 'object' && value !== null && !Array.isArray(value)) {
+        console.log('[useAgentForm] Updating state field:', { value, hasPlugins: 'plugins' in value });
+        return {
+          ...prev,
+          state: value as Record<string, unknown>,
+        }
+      }
       const current = prev[field] as unknown
       let nextValue: any = value as any
       if (nextValue == null) {
@@ -122,5 +135,6 @@ export const useAgentForm = ({ onSave }: UseAgentFormProps) => {
     handleSave,
     resetForm,
     updateField,
+    setFormData,
   }
 }

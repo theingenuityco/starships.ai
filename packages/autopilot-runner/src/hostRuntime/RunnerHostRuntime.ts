@@ -391,6 +391,16 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       // Non-fatal: ignore unsupported fields
     }
 
+    // OpenRouter plugins (e.g., web browsing):
+    // - plugins: [{ id: 'web', max_results: 3 }]
+    try {
+      if (Array.isArray(request.plugins) && request.plugins.length > 0) {
+        baseRequest.plugins = request.plugins;
+      }
+    } catch {
+      // Non-fatal: ignore unsupported fields
+    }
+
     if (typeof request.temperature === 'number') {
       baseRequest.temperature = request.temperature;
     }

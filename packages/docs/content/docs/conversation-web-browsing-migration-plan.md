@@ -22,12 +22,12 @@ This migration moves web browsing control from agent configuration to conversati
 
 ## Phase 1: Backend - State Merging Logic
 
-**Status:** 🔴 Not Started  
+**Status:** 🟡 In Progress  
 **Estimated Time:** 2-3 hours
 
 ### Task 1.1: Fix State Merge in `streamConversation`
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/server/src/services/ConversationService.ts`  
 **Lines:** ~937-950
 
@@ -90,7 +90,7 @@ state: {
 
 ### Task 1.2: Fix State Merge in `continueAfterToolApproval`
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/server/src/services/ConversationService.ts`  
 **Lines:** ~1164-1177
 
@@ -127,7 +127,7 @@ const plugins = conversationPlugins !== undefined ? conversationPlugins : agentP
 
 ### Task 1.3: Create Helper Function for Plugin Precedence
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/server/src/services/ConversationService.ts`
 
 **Description:**
@@ -178,7 +178,7 @@ const plugins = this.resolvePlugins(conversationState, baseState);
 
 ### Task 1.4: Search for All State Merge Locations
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/server/src/services/ConversationService.ts`
 
 **Description:**
@@ -236,12 +236,12 @@ Create comprehensive unit tests to verify the state merging logic works correctl
 
 ## Phase 2: Backend - API Layer
 
-**Status:** 🔴 Not Started  
+**Status:** 🟡 In Progress  
 **Estimated Time:** 3-4 hours
 
 ### Task 2.1: Extend Conversation Update Schema
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/server/src/routes/conversations.ts`  
 **Lines:** ~1337-1344
 
@@ -298,7 +298,7 @@ z.object({
 
 ### Task 2.2: Update ConversationService.updateConversation Method
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/server/src/services/ConversationService.ts`  
 **Lines:** ~514-535
 
@@ -373,7 +373,7 @@ async updateConversation(
 
 ### Task 2.3: Verify ConversationRepository Supports State Updates
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/models/src/repositories/ConversationRepository.ts`  
 **Lines:** ~72-104
 
@@ -397,7 +397,7 @@ Verify that `ConversationRepository.update()` already supports state field updat
 
 ### Task 2.4: Verify/Create GET Conversation Endpoint (if needed)
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/server/src/routes/conversations.ts`
 
 **Description:**
@@ -459,12 +459,12 @@ Create integration tests for the conversation update endpoint with state updates
 
 ## Phase 3: Frontend - Remove Agent-Level Toggles
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Estimated Time:** 1-2 hours
 
 ### Task 3.1: Remove Web Browsing Toggle from AgentDocumentEditor
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/client/src/components/agents/AgentBuilder/components/AgentDocumentEditor.tsx`  
 **Lines:** ~1820-1867
 
@@ -489,7 +489,7 @@ Remove the entire web browsing toggle section from the agent document editor com
 
 ### Task 3.2: Remove Web Browsing Toggle from AgentForm
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/client/src/components/agents/AgentForm.tsx`  
 **Lines:** ~335-369
 
@@ -514,7 +514,7 @@ Remove the web browsing toggle from the agent form component.
 
 ### Task 3.3: Verify Agent State Still Supports Plugins (Backend Compatibility)
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** Multiple files
 
 **Description:**
@@ -537,12 +537,12 @@ Ensure that agent state can still contain plugins when set programmatically (via
 
 ## Phase 4: Frontend - Add Conversation-Level Toggle
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **Estimated Time:** 4-5 hours
 
 ### Task 4.1: Verify/Create Conversation Detail Query Hook
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/client/src/hooks/useConversations.ts`
 
 **Description:**
@@ -586,7 +586,7 @@ export function useConversationDetail(conversationId: string | null) {
 
 ### Task 4.2: Create Conversation State Update Hook
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/client/src/hooks/useConversations.ts`  
 **Lines:** ~295-336 (near existing `useUpdateConversation`)
 
@@ -654,7 +654,7 @@ export function useUpdateConversationState() {
 
 ### Task 4.3: Add Web Browsing Toggle to ConversationMessageInput
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/client/src/components/conversation/ConversationMessageInput.tsx`  
 **Lines:** Add after line ~1520 (near send button area)
 
@@ -704,7 +704,7 @@ Add a compact web browsing toggle to the conversation message input component, v
 
 ### Task 4.4: Load Conversation State for Toggle Initialization
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/client/src/components/conversation/ConversationMessageInput.tsx`
 
 **Description:**
@@ -740,7 +740,7 @@ const hasWebBrowsing = useMemo(() => {
 
 ### Task 4.5: Add Visual Feedback and Error Handling
 
-**Status:** 🔴 Not Started  
+**Status:** 🟢 Completed  
 **File:** `packages/client/src/components/conversation/ConversationMessageInput.tsx`
 
 **Description:**

@@ -413,8 +413,8 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         if (typeof src?.timeout === 'number') compose.timeout = src.timeout
         // Extract state (including plugins for web browsing)
         if (src?.state && typeof src.state === 'object' && !Array.isArray(src.state)) {
-          console.log('[AgentBuilderStream] Extracting state from edit-agent:', { state: src.state, hasPlugins: 'plugins' in src.state });
-          compose.state = src.state as Record<string, unknown>;
+          console.log('[AgentBuilderStream] Extracting state from edit-agent:', { state: src.state, hasPlugins: 'plugins' in src.state })
+          compose.state = src.state as Record<string, unknown>
         }
 
         // If slug not provided in args, derive from function name suffix: open-agent-<slug> / edit-agent-<slug>
@@ -542,7 +542,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (compose.assignedToolSlugs !== undefined) agentBuilderRef.current?.updateField('assignedToolSlugs', compose.assignedToolSlugs as any)
     if (compose.previewPrompts !== undefined) agentBuilderRef.current?.updateField('previewPrompts', compose.previewPrompts as any)
     if (compose.state !== undefined) {
-      console.log('[AgentBuilderStream] Applying state update:', { state: compose.state, hasPlugins: 'plugins' in compose.state });
+      console.log('[AgentBuilderStream] Applying state update:', { state: compose.state, hasPlugins: 'plugins' in compose.state })
       agentBuilderRef.current?.updateField('state', compose.state)
     }
     if (compose.blueprintChanged) {
@@ -721,7 +721,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               if ((agent as any).icon) agentBuilderRef.current.updateField('icon', (agent as any).icon)
               // Load state (including plugins for web browsing)
               if (agent.state && typeof agent.state === 'object') {
-                console.log('[AgentBuilder] Loading agent state:', { state: agent.state, hasPlugins: 'plugins' in agent.state });
+                console.log('[AgentBuilder] Loading agent state:', { state: agent.state, hasPlugins: 'plugins' in agent.state })
                 agentBuilderRef.current.updateField('state', agent.state as any)
               }
             }
@@ -1024,11 +1024,11 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if ((existingAgent as any).icon) agentBuilderRef.current.updateField('icon', (existingAgent as any).icon)
     // Load state (including plugins for web browsing) - CRITICAL: must preserve state
     if (existingAgent.state && typeof existingAgent.state === 'object') {
-      console.log('[AgentBuilder] Prefill loading state:', { 
-        state: existingAgent.state, 
+      console.log('[AgentBuilder] Prefill loading state:', {
+        state: existingAgent.state,
         hasPlugins: 'plugins' in existingAgent.state,
-        plugins: (existingAgent.state as { plugins?: unknown })?.plugins
-      });
+        plugins: (existingAgent.state as { plugins?: unknown })?.plugins,
+      })
       agentBuilderRef.current.updateField('state', existingAgent.state as any)
     }
     if (existingAgent.id) lastPrefilledAgentIdRef.current = existingAgent.id

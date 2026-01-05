@@ -4,7 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation, useConversationStop } from '@/hooks/useConversations'
+import { useCreateConversation, useConversationStop, useConversationDetail, useUpdateConversationState } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
@@ -33,6 +33,7 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useFileUpload, useMessageAttachments, type PendingFile } from '@/hooks/useFileUpload'
 import { generateId } from '@/lib/utils'
 import { FileAttachmentPreview } from '@/components/conversation/FileAttachmentPreview'
+import { Switch } from '@/components/ui/switch'
 
 interface ConversationMessageInputProps {
   selectedAgent?: AgentModel | null
@@ -183,6 +184,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const tokensUsed = Number(totalsData?.totalTokens ?? 0)
     const contextLimit = Number(agentContextLength ?? 0)
     const hardLimitActive = !!conversationId && contextLimit > 0
+
+    // Conversation state for web browsing toggle
+    const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
+    const updateConversationState = useUpdateConversationState()
+    const hasWebBrowsing = useMemo(() => {
+      if (!conversation?.state?.plugins) return false
+      const plugins = conversation.state.plugins
+      return Array.isArray(plugins) && plugins.some((p: any) => p?.id === 'web')
+    }, [conversation?.state?.plugins])
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
@@ -1301,6 +1311,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     return (
       <div className="relative opacity-100">
         <PlaceholderStyles />
+        {/* Web Browsing Toggle - Only visible for existing conversations */}
+        {conversationId && (
+          <div className="mb-2 px-3 py-2 rounded-lg bg-muted/30 border border-border/40">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Icon name="globe" className="h-4 w-4 text-muted-foreground" />
+                <div className="flex-1">
+                  <label className="text-xs font-medium cursor-pointer" htmlFor="web-browsing-toggle">
+                    Web Browsing
+                  </label>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    $4 per 1,000 results (max $0.02 per request)
+                  </p>
+                </div>
+              </div>
+              <Switch
+                id="web-browsing-toggle"
+                checked={hasWebBrowsing}
+                onCheckedChange={(checked) => {
+                  if (!conversationId) return
+                  updateConversationState.mutate({
+                    conversationId,
+                    state: {
+                      plugins: checked ? [{ id: 'web', max_results: 3 }] : null,
+                    },
+                  })
+                }}
+                disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                className="data-[state=checked]:bg-primary"
+              />
+            </div>
+          </div>
+        )}
         {/* Context Limit Progress Indicator - Show when context limit is active and usage > 50% */}
         {hardLimitActive && contextUsagePercent > 50 && !minimal && (
           <div className="mb-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/40">

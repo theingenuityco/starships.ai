@@ -332,43 +332,6 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
                   <Separator className="flex-1" />
                 </div>
 
-                {/* Web Browsing Toggle */}
-                <div className="flex items-center justify-between p-4 border rounded-md border-muted-foreground/20 bg-muted/5">
-                  <div className="flex items-start gap-3">
-                    <Icon name="globe" className="h-5 w-5 text-primary mt-0.5" />
-                    <div>
-                      <label className="text-sm font-medium">Enable Web Browsing</label>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Allow the agent to search the web for current information (costs $4 per 1,000 results)
-                      </p>
-                    </div>
-                  </div>
-                  <Switch
-                    checked={Array.isArray((formData.state as { plugins?: unknown[] })?.plugins) && 
-                            (formData.state as { plugins?: Array<{ id: string }> })?.plugins?.some(p => p.id === 'web')}
-                    onCheckedChange={(checked) => {
-                      setFormData(prev => {
-                        const currentState = (prev.state || {}) as Record<string, unknown>;
-                        const updatedState = {
-                          ...currentState,
-                          plugins: checked 
-                            ? [{ id: 'web', max_results: 3 }]
-                            : undefined,
-                        };
-                        // Remove plugins key if disabled
-                        if (!checked && updatedState.plugins === undefined) {
-                          delete updatedState.plugins;
-                        }
-                        return {
-                          ...prev,
-                          state: updatedState,
-                        };
-                      });
-                    }}
-                    className="data-[state=checked]:bg-primary"
-                  />
-                </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
                     <label className="flex items-center gap-2 text-sm font-medium">

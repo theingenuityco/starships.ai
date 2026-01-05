@@ -509,11 +509,32 @@ export class ConversationService {
   }
 
   /**
-   * Update conversation details (title, etc.)
+   * Update conversation details (title, state, etc.)
    */
-  async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
+  async updateConversation(
+    conversationId: string,
+    updates: { title?: string; state?: Record<string, unknown> }
+  ): Promise<ConversationModel | null> {
     try {
       console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
+
+      // If state is being updated, merge with existing state
+      if (updates.state !== undefined) {
+        const existing = await this.getConversationById(conversationId);
+        const existingState = existing?.state || {};
+
+        // Shallow merge: spread existing state, then spread updates
+        // Special handling for plugins: null means remove, undefined means preserve
+        const mergedState = { ...existingState, ...updates.state };
+
+        // Handle explicit null: remove plugins from state (cleaner than delete after merge)
+        if (updates.state.plugins === null) {
+          const { plugins: _, ...rest } = mergedState;
+          updates.state = rest;
+        } else {
+          updates.state = mergedState;
+        }
+      }
 
       // Use the repository's update method
       const updatedConversation = await this.conversationRepository.update(conversationId, {
@@ -678,6 +699,29 @@ export class ConversationService {
       console.error(`[CONVERSATION-SERVICE] Error getting agent tools via relationships:`, error);
       return [];
     }
+  }
+
+  /**
+   * Resolve plugins with proper precedence: conversation > agent
+   * @param conversationState - Conversation-level state
+   * @param agentState - Agent-level state
+   * @returns Resolved plugins (conversation if defined, otherwise agent, or undefined)
+   */
+  private resolvePlugins(
+    conversationState: Record<string, unknown> | undefined,
+    agentState: Record<string, unknown> | undefined
+  ): unknown[] | undefined {
+    const conversationPlugins = (conversationState as { plugins?: unknown })?.plugins;
+    const agentPlugins = (agentState as { plugins?: unknown })?.plugins;
+    // Explicit undefined check (not nullish coalescing) to handle empty arrays correctly
+    // Treat null as undefined for consistency
+    const resolved =
+      conversationPlugins !== undefined && conversationPlugins !== null
+        ? conversationPlugins
+        : agentPlugins !== undefined && agentPlugins !== null
+          ? agentPlugins
+          : undefined;
+    return resolved as unknown[] | undefined;
   }
 
   /**
@@ -934,8 +978,11 @@ export class ConversationService {
         // Get deployed tools for this agent (always redacted; server executes tools)
         const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
-        // Preserve plugins from agent state (for web browsing, etc.)
-        const plugins = (baseState as { plugins?: unknown }).plugins;
+        // Resolve plugins with proper precedence: conversation > agent
+        const plugins = this.resolvePlugins(
+          conversationState as Record<string, unknown> | undefined,
+          baseState as Record<string, unknown> | undefined
+        );
 
         const agentWithTools: AgentParams = {
           ...agentModel,
@@ -946,7 +993,7 @@ export class ConversationService {
             ...conversationState,
             tools: resolvedTools,
             starshipId: starship.id,
-            // Preserve plugins from agent state if present
+            // Apply plugins with proper precedence (conversation > agent)
             ...(plugins !== undefined ? { plugins } : {}),
           },
         };
@@ -1161,8 +1208,8 @@ export class ConversationService {
           ? (agentModel.state as Record<string, unknown>)
           : ({ messages: [], tools: [] } as any);
 
-      // Preserve plugins from agent state (for web browsing, etc.)
-      const plugins = baseState.plugins;
+      // Resolve plugins with proper precedence: conversation > agent
+      const plugins = this.resolvePlugins(conversationState, baseState);
 
       const agentWithTools: AgentParams = {
         ...(agentModel as any),
@@ -1173,7 +1220,7 @@ export class ConversationService {
           ...conversationState,
           tools: resolvedTools,
           starshipId: starship.id,
-          // Preserve plugins from agent state if present
+          // Apply plugins with proper precedence (conversation > agent)
           ...(plugins !== undefined ? { plugins } : {}),
         },
       } as unknown as AgentParams;

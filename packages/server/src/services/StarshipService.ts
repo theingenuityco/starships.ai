@@ -4,6 +4,7 @@ import { AgentRepository, getConnection, StarshipRepository, ToolRepository, Use
 import { StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
+import { SubscriptionPlanCatalogService } from './SubscriptionPlanCatalogService';
 
 export interface CreateStarshipData {
   ownerId: string;
@@ -41,12 +42,20 @@ export class StarshipService {
    * Create a new starship
    */
   async createStarship(data: CreateStarshipData): Promise<StarshipModel> {
+    const shipClass = data.shipClass ?? 'scout';
+
+    // Default entitlements should come from the Scout plan when available (Stripe metadata),
+    // falling back to hard-coded Scout defaults if the plan catalog is unavailable/missing.
+    const scoutEntitlements = shipClass === 'scout' ? await SubscriptionPlanCatalogService.getEntitlementsForShipClass('scout') : null;
+    const fallbackScout = { maxAgents: 5, maxConcurrentTurns: 3 };
+    const defaultEntitlements = scoutEntitlements ?? fallbackScout;
+
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
-      shipClass: data.shipClass ?? 'scout',
-      maxAgents: data.maxAgents ?? 5,
-      maxConcurrentTurns: data.maxConcurrentTurns ?? 1,
+      shipClass,
+      maxAgents: data.maxAgents ?? defaultEntitlements.maxAgents,
+      maxConcurrentTurns: data.maxConcurrentTurns ?? defaultEntitlements.maxConcurrentTurns,
       status: 'active',
     });
 
@@ -295,8 +304,6 @@ export class StarshipService {
       ownerId: userId,
       name: starshipName,
       shipClass: 'scout',
-      maxAgents: 5,
-      maxConcurrentTurns: 1,
       initialCredits: 200, // 200 welcome credits for new users
     });
 

@@ -2514,6 +2514,20 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // Persist any streamed assistant content (content/reasoning/attachments) if the normal
+        // state-based persistence path did not produce an assistant message.
+        try {
+          const persisted = await this.persistActivePartial(conversationId);
+          if (persisted) {
+            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
+          }
+        } catch (e) {
+          console.warn('[STREAM] Failed to persist/publish final streamed assistant message on workflow_completed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
         // Mark turn completed (best-effort)
         try {
           const turnId = this.currentTurnId.get(conversationId);
@@ -2556,6 +2570,19 @@ export class ConversationService {
         const execEvent = event as ExecutionEvent;
         const execution: Execution | undefined = execEvent.data?.execution;
         console.error('[STREAMING] Workflow failed:', execution?.results);
+
+        // Persist any streamed assistant content even on failure (helps explain partial progress on reload).
+        try {
+          const persisted = await this.persistActivePartial(conversationId);
+          if (persisted) {
+            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
+          }
+        } catch (e) {
+          console.warn('[STREAM] Failed to persist/publish streamed assistant message on workflow_failed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
 
         // Create error message
         const errorMessage = await this.messageService.createMessage({

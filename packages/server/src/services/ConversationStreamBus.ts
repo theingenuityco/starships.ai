@@ -1,4 +1,4 @@
-import Redis from 'ioredis';
+import Redis, { type Redis as RedisClient } from 'ioredis';
 import { getEnvConfig } from '@starships/env';
 import type { ConversationStreamEvent } from '@starships/protocol';
 
@@ -14,9 +14,9 @@ type PublishResult = { streamId: string };
  */
 export class ConversationStreamBus {
   private static instance: ConversationStreamBus | null = null;
-  private readonly redis: Redis;
+  private readonly redis: RedisClient;
 
-  private constructor(redis: Redis) {
+  private constructor(redis: RedisClient) {
     this.redis = redis;
   }
 
@@ -43,46 +43,142 @@ export class ConversationStreamBus {
     return `starships:stream:conversation:${conversationId}`;
   }
 
+  private static toStringSafe(v: unknown): string {
+    if (typeof v === 'string') return v;
+    if (typeof v === 'number') return String(v);
+    if (v && typeof v === 'object') {
+      // JSON-serialized Buffer shape: { type: 'Buffer', data: number[] }
+      const rec = v as Record<string, unknown>;
+      if (rec.type === 'Buffer' && Array.isArray(rec.data) && rec.data.every((n) => typeof n === 'number')) {
+        try {
+          return Buffer.from(rec.data as number[]).toString('utf8');
+        } catch {
+          return '';
+        }
+      }
+    }
+    try {
+      // Node Buffer
+      if (typeof Buffer !== 'undefined' && Buffer.isBuffer(v)) return v.toString('utf8');
+    } catch {
+      /* ignore */
+    }
+    return v == null ? '' : String(v);
+  }
+
+  private logWarn(message: string, meta?: Record<string, unknown>): void {
+    try {
+      console.warn(message, meta || {});
+    } catch {
+      /* ignore logging failures */
+    }
+  }
+
   async publish(conversationId: string, evt: ConversationStreamEvent, opts?: { maxLenApprox?: number }): Promise<PublishResult> {
     const key = this.streamKey(conversationId);
     const maxLen = typeof opts?.maxLenApprox === 'number' && opts.maxLenApprox > 0 ? Math.floor(opts.maxLenApprox) : 20_000;
     const payload = JSON.stringify(evt);
-    const streamId = await (this.redis as any).xadd(key, 'MAXLEN', '~', String(maxLen), '*', 'evt', payload);
+    const raw = await this.redis.call('XADD', key, 'MAXLEN', '~', String(maxLen), '*', 'evt', payload);
+    const streamId = ConversationStreamBus.toStringSafe(raw);
+    if (!streamId) throw new Error('[ConversationStreamBus] XADD returned empty stream id');
     return { streamId };
+  }
+
+  // Debug helpers (safe to call; used only when explicitly requested by the route)
+  async getLastId(conversationId: string): Promise<string | null> {
+    const key = this.streamKey(conversationId);
+    try {
+      const raw = await this.redis.call('XREVRANGE', key, '+', '-', 'COUNT', '1');
+      if (!Array.isArray(raw) || raw.length === 0) return null;
+      const first = raw[0];
+      if (!Array.isArray(first) || first.length < 1) return null;
+      const id = ConversationStreamBus.toStringSafe(first[0]);
+      return id || null;
+    } catch (e) {
+      this.logWarn('[ConversationStreamBus] getLastId failed', {
+        conversationId,
+        key,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      return null;
+    }
+  }
+
+  async getLen(conversationId: string): Promise<number> {
+    const key = this.streamKey(conversationId);
+    try {
+      const n = await this.redis.call('XLEN', key);
+      const num = typeof n === 'number' ? n : Number(ConversationStreamBus.toStringSafe(n));
+      return Number.isFinite(num) ? num : 0;
+    } catch (e) {
+      this.logWarn('[ConversationStreamBus] getLen failed', {
+        conversationId,
+        key,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      return 0;
+    }
   }
 
   /**
    * Read events after a cursor (exclusive).
    * If cursor is '$', blocks for new events only.
    */
-  async read(conversationId: string, cursor: string, opts?: { blockMs?: number; count?: number }): Promise<Array<{ id: string; evt: ConversationStreamEvent }>> {
+  async read(
+    conversationId: string,
+    cursor: string,
+    opts?: { blockMs?: number; count?: number }
+  ): Promise<Array<{ id: string; evt: ConversationStreamEvent }>> {
     const key = this.streamKey(conversationId);
     const blockMs = typeof opts?.blockMs === 'number' && opts.blockMs >= 0 ? opts.blockMs : 25_000;
     const count = typeof opts?.count === 'number' && opts.count > 0 ? Math.floor(opts.count) : 200;
 
-    const res = await (this.redis as any).xread('BLOCK', String(blockMs), 'COUNT', String(count), 'STREAMS', key, cursor);
-    if (!res || res.length === 0) return [];
-    const [, entries] = res[0] as any;
-    if (!Array.isArray(entries) || entries.length === 0) return [];
+    let raw: unknown;
+    try {
+      raw = await this.redis.call('XREAD', 'BLOCK', String(blockMs), 'COUNT', String(count), 'STREAMS', key, cursor);
+    } catch (e) {
+      this.logWarn('[ConversationStreamBus] read failed', {
+        conversationId,
+        key,
+        cursor,
+        blockMs,
+        count,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      return [];
+    }
+    if (!Array.isArray(raw) || raw.length === 0) return [];
 
     const out: Array<{ id: string; evt: ConversationStreamEvent }> = [];
-    for (const entry of entries) {
-      const id = String(entry?.[0] ?? '');
-      const kv = entry?.[1];
-      if (!id || !Array.isArray(kv)) continue;
-      const idx = kv.findIndex((x: any) => String(x) === 'evt');
-      const raw = idx >= 0 ? kv[idx + 1] : null;
-      if (!raw) continue;
-      try {
-        const evt = JSON.parse(String(raw)) as ConversationStreamEvent;
-        if (!evt || typeof (evt as any).type !== 'string') continue;
-        out.push({ id, evt });
-      } catch {
-        continue;
+    for (const streamItem of raw) {
+      if (!Array.isArray(streamItem) || streamItem.length < 2) continue;
+      const entries = streamItem[1];
+      if (!Array.isArray(entries) || entries.length === 0) continue;
+
+      for (const entry of entries) {
+        if (!Array.isArray(entry) || entry.length < 2) continue;
+        const id = ConversationStreamBus.toStringSafe(entry[0]);
+        const kvAny = entry[1];
+        if (!id || !Array.isArray(kvAny)) continue;
+
+        const kv = kvAny.map((v: unknown) => ConversationStreamBus.toStringSafe(v));
+        const idx = kv.findIndex((x) => x === 'evt');
+        const payload = idx >= 0 ? kv[idx + 1] : '';
+        if (!payload) continue;
+
+        try {
+          const evt = JSON.parse(payload) as ConversationStreamEvent;
+          if (!evt || typeof (evt as { type?: unknown }).type !== 'string') continue;
+          out.push({ id, evt });
+        } catch (e) {
+          // Avoid log spam in the hot path; this indicates a bad payload in the stream.
+          // If you need to debug malformed events, temporarily add logging here.
+          void e;
+          continue;
+        }
       }
     }
+
     return out;
   }
 }
-
-

@@ -22,7 +22,7 @@ import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
-import type { ToolModel } from '@starships/protocol';
+import type { ToolModel, ConversationStreamSnapshot, TurnStatus as StreamTurnStatus } from '@starships/protocol';
 import { buildAutopilotExecutionBundle, buildAutopilotRuntimeEnv } from '@/services/autopilot-execution-bundle';
 
 const router: Router = Router();
@@ -221,13 +221,19 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       try {
         const maybe = res as unknown as { flushHeaders?: () => void };
         if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.warn('[stream] flushHeaders failed', {
+          conversationId,
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
       try {
         res.write(':ok\n\n');
-      } catch {
-        /* ignore */
+      } catch (e) {
+        console.warn('[stream] initial :ok write failed', {
+          conversationId,
+          error: e instanceof Error ? e.message : String(e),
+        });
       }
 
       const bus = ConversationStreamBus.getInstance();
@@ -237,11 +243,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
       const conversationMessages = await conversationService.getConversationMessages(conversationId);
       const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
-      const turn =
+      const turn: ConversationStreamSnapshot['turn'] =
         latestTurn && typeof latestTurn.id === 'string'
           ? {
               turnId: latestTurn.id,
-              status: latestTurn.status === 'active' ? 'active' : latestTurn.status,
+              status: (latestTurn.status as StreamTurnStatus) || 'completed',
               startedAt: latestTurn.startedAt,
               completedAt: latestTurn.completedAt,
             }
@@ -252,32 +258,76 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       res.write(`data: ${JSON.stringify(snapshotEvt.data)}\n\n`);
 
       // 2) Stream live events from Redis from the provided cursor (or only new events if none)
-      let cursor: string = '$';
+      // IMPORTANT: default cursor must not be '$'. Using '$' can miss events published between
+      // sending snapshot and the first XREAD call. Instead use a time-based cursor captured
+      // immediately after connect so we never miss "post-connect" events.
+      let cursor: string = `${Date.now()}-0`;
       const qpCursor = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
       const lastEventIdHeader = typeof req.headers['last-event-id'] === 'string' ? req.headers['last-event-id'] : undefined;
       if (qpCursor) cursor = qpCursor;
       else if (lastEventIdHeader) cursor = lastEventIdHeader;
+
+      // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
+      // (and what cursor this connection is using) without needing extra flags.
+      try {
+        const [len, lastId] = await Promise.all([bus.getLen(conversationId), bus.getLastId(conversationId)]);
+        res.write(`event: stream_debug\n`);
+        type StreamDebugPayload = { conversationId: string; cursor: string; len: number; lastId: string | null };
+        const payload: StreamDebugPayload = { conversationId, cursor, len, lastId };
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch (e) {
+        console.warn('[stream] stream_debug emission failed', {
+          conversationId,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
 
       let closed = false;
       res.on('close', () => {
         closed = true;
       });
 
-      while (!closed && !res.writableEnded && !res.destroyed) {
-        const batch = await bus.read(conversationId, cursor, { blockMs: 25_000, count: 200 });
-        if (!batch || batch.length === 0) continue;
-        for (const item of batch) {
-          const id = item.id;
-          const evt = item.evt;
-          cursor = id;
-          try {
-            res.write(`id: ${id}\n`);
-            res.write(`event: ${evt.type}\n`);
-            res.write(`data: ${JSON.stringify(evt.data)}\n\n`);
-          } catch {
-            closed = true;
-            break;
+      try {
+        while (!closed && !res.writableEnded && !res.destroyed) {
+          const batch = await bus.read(conversationId, cursor, { blockMs: 25_000, count: 200 });
+          if (!batch || batch.length === 0) continue;
+          for (const item of batch) {
+            const id = item.id;
+            const evt = item.evt;
+            cursor = id;
+            try {
+              res.write(`id: ${id}\n`);
+              res.write(`event: ${evt.type}\n`);
+              res.write(`data: ${JSON.stringify(evt.data)}\n\n`);
+            } catch {
+              closed = true;
+              break;
+            }
           }
+        }
+      } catch (e) {
+        try {
+          res.write(`event: error\n`);
+          res.write(
+            `data: ${JSON.stringify({
+              code: 'STREAM_READ_FAILED',
+              message: 'Streaming backend read failed',
+              detail: e instanceof Error ? e.message : String(e),
+            })}\n\n`
+          );
+        } catch (e2) {
+          console.warn('[stream] failed to write STREAM_READ_FAILED event', {
+            conversationId,
+            error: e2 instanceof Error ? e2.message : String(e2),
+          });
+        }
+        try {
+          res.end();
+        } catch (e3) {
+          console.warn('[stream] failed to end response after stream read error', {
+            conversationId,
+            error: e3 instanceof Error ? e3.message : String(e3),
+          });
         }
       }
       return;

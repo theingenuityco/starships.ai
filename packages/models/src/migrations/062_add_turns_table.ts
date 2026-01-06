@@ -5,9 +5,9 @@ import type { Client } from 'pg';
  *
  * - Adds `turns` table (1 conversation -> many turns)
  * - Adds `messages.turn_id` + `messages.turn_seq`
- * - Enforces idempotency for new writes via unique indexes:
- *   - UNIQUE(turn_id, turn_seq) (partial: only when both are non-null)
- *   - UNIQUE(conversation_id, tool_call_id) (partial: only when tool_call_id is non-null)
+ * - Enforces idempotency for new writes via:
+ *   - UNIQUE constraint on (turn_id, turn_seq) (NULLs allowed and do not conflict)
+ *   - UNIQUE(conversation_id, tool_call_id) for tool messages (partial index)
  */
 export async function up(client: Client): Promise<void> {
   const sql = `
@@ -40,22 +40,77 @@ export async function up(client: Client): Promise<void> {
 
     CREATE INDEX IF NOT EXISTS idx_messages_turn_id ON messages(turn_id, created_at DESC);
 
-    -- Prevent duplicate tool result messages by tool_call_id within a conversation
+    -- ------------------------------------------------------------------------
+    -- Data cleanup: existing installations may already have duplicate tool result rows
+    -- for the same (conversation_id, tool_call_id). We must dedupe before adding uniqueness.
+    -- Keep the newest row and delete older duplicates.
+    -- ------------------------------------------------------------------------
+    WITH ranked AS (
+      SELECT
+        id,
+        ROW_NUMBER() OVER (
+          PARTITION BY conversation_id, tool_call_id
+          ORDER BY created_at DESC, id DESC
+        ) AS rn
+      FROM messages
+      WHERE tool_call_id IS NOT NULL
+        AND role = 'tool'
+    )
+    DELETE FROM messages m
+    USING ranked r
+    WHERE m.id = r.id
+      AND r.rn > 1;
+
+    -- Prevent duplicate tool result messages by tool_call_id within a conversation (tool messages only)
     CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_conversation_tool_call_id_unique
       ON messages(conversation_id, tool_call_id)
-      WHERE tool_call_id IS NOT NULL;
+      WHERE tool_call_id IS NOT NULL AND role = 'tool';
 
+    -- ------------------------------------------------------------------------
     -- Turn-scoped idempotency: one message per (turn_id, turn_seq)
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_messages_turn_id_turn_seq_unique
-      ON messages(turn_id, turn_seq)
-      WHERE turn_id IS NOT NULL AND turn_seq IS NOT NULL;
+    --
+    -- Postgres cannot always infer partial unique indexes for ON CONFLICT(column_list).
+    -- Use a real UNIQUE constraint so callers can reliably use:
+    --   ON CONFLICT ON CONSTRAINT uq_messages_turn_id_turn_seq
+    -- ------------------------------------------------------------------------
+
+    -- Defensive dedupe (should be a no-op on fresh installs)
+    WITH ranked_turn AS (
+      SELECT
+        id,
+        ROW_NUMBER() OVER (
+          PARTITION BY turn_id, turn_seq
+          ORDER BY created_at DESC, id DESC
+        ) AS rn
+      FROM messages
+      WHERE turn_id IS NOT NULL AND turn_seq IS NOT NULL
+    )
+    DELETE FROM messages m
+    USING ranked_turn r
+    WHERE m.id = r.id
+      AND r.rn > 1;
+
+    -- Drop any prior partial index (if present) before adding the constraint
+    DROP INDEX IF EXISTS idx_messages_turn_id_turn_seq_unique;
+
+    DO $$
+    BEGIN
+      IF NOT EXISTS (
+        SELECT 1
+        FROM pg_constraint
+        WHERE conname = 'uq_messages_turn_id_turn_seq'
+      ) THEN
+        ALTER TABLE messages
+          ADD CONSTRAINT uq_messages_turn_id_turn_seq UNIQUE (turn_id, turn_seq);
+      END IF;
+    END $$;
   `;
   await client.query(sql);
 }
 
 export async function down(client: Client): Promise<void> {
   const sql = `
-    DROP INDEX IF EXISTS idx_messages_turn_id_turn_seq_unique;
+    ALTER TABLE messages DROP CONSTRAINT IF EXISTS uq_messages_turn_id_turn_seq;
     DROP INDEX IF EXISTS idx_messages_conversation_tool_call_id_unique;
     DROP INDEX IF EXISTS idx_messages_turn_id;
 
@@ -68,5 +123,3 @@ export async function down(client: Client): Promise<void> {
   `;
   await client.query(sql);
 }
-
-

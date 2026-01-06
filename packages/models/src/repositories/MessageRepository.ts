@@ -181,7 +181,7 @@ export class MessageRepository extends BaseRepository {
         const insertSql = `
           INSERT INTO messages (${columns.join(', ')})
           VALUES (${placeholders.join(', ')})
-          ON CONFLICT (turn_id, turn_seq)
+          ON CONFLICT ON CONSTRAINT uq_messages_turn_id_turn_seq
           DO UPDATE SET
             updated_at = NOW(),
             role = EXCLUDED.role,

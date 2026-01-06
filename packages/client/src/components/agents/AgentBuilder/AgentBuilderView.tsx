@@ -8,21 +8,16 @@ import { Button } from '@/components/ui/button'
 import { AgentDocumentEditor } from './components/AgentDocumentEditor'
 import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 
-export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(({ onSave, onCancel, starshipId, initialSlug, errorMessage, readOnly = false, embedded = false }, ref) => {
+export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(
+  ({ onSave, onCancel, starshipId, agentId, agent, initialSlug, errorMessage, readOnly = false, embedded = false }, ref) => {
   const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave })
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
     updateField: (field, value) => {
-      try {
-        console.debug('[AgentBuilderView] ref.updateField', { field, value })
-      } catch {}
       updateField(field, value)
     },
     getFormData: () => {
-      try {
-        console.debug('[AgentBuilderView] ref.getFormData')
-      } catch {}
       return formData
     },
     resetForm,
@@ -51,15 +46,19 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
             onSave={handleSave}
             onCancel={onCancel}
             starshipId={starshipId}
+            agentId={agentId}
+            agent={agent}
             readOnly={readOnly}
             embedded={embedded}
-            // If editor mounts with empty slug, pre-seed from props
-            key={`agent-editor-${initialSlug || 'none'}`}
+            // Keep the editor mounted across slug/url changes (renaming an agent updates slug).
+            // Key by stable identity (agentId) so inputs don't lose focus.
+            key={`agent-editor-${agentId || agent?.id || 'new'}`}
           />
         </div>
       </div>
     </div>
   )
-})
+  }
+)
 
 AgentBuilderView.displayName = 'AgentBuilderView'

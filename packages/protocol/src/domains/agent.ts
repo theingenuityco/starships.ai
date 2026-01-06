@@ -24,6 +24,11 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   // Core database fields
   id: string;
   slug: string;
+  /**
+   * Human-readable role label for the agent (e.g. "Customer Support Agent").
+   * This is required and is used across UI/marketplace and seeded tooling.
+   */
+  role: string;
   createdAt: string;
   updatedAt: string;
   // Optional categorization (for organizing agents in UI/marketplace)
@@ -77,6 +82,14 @@ export interface AgentModel extends AgentParamsWithoutMetadata {
   publishedTemplateId?: string;
 
   /**
+   * Optional denormalized view of tool assignments for this agent.
+   *
+   * Tools are stored via the agent↔tool junction table, but some endpoints
+   * (e.g. admin review or listing views) include the attached tool slugs for UI convenience.
+   */
+  assignedToolSlugs?: string[];
+
+  /**
    * Optional avatar image for the agent, stored as an Attachment (S3-backed).
    * This is auth-scoped via starship access and served through the attachments endpoints.
    */
@@ -127,7 +140,10 @@ export interface UpdateAgentToolPermissionsRequest {
  * Request to create a new agent
  */
 export type CreateAgentRequest = AgentParamsWithoutMetadata & {
-  slug?: string; // Optional: if not provided, will be generated
+  /**
+   * Human-readable role label for the agent (required).
+   */
+  role: string;
   // Optional categorization (for organizing agents in UI/marketplace)
   category?: TemplateCategory;
   assignedToolSlugs?: string[]; // Temporary: used during creation to establish relationships
@@ -143,6 +159,14 @@ export type CreateAgentRequest = AgentParamsWithoutMetadata & {
  * Request to update an agent
  */
 export interface UpdateAgentRequest extends Partial<Omit<AgentParamsWithoutMetadata, 'reasoning'>> {
+  /**
+   * Slugs are server-generated and not directly editable.
+   */
+  slug?: never;
+  /**
+   * Optional role update.
+   */
+  role?: string;
   // Optional categorization (for organizing agents in UI/marketplace)
   category?: TemplateCategory;
   sourceTemplateId?: string;

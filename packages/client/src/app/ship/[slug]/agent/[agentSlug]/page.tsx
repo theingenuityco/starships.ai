@@ -19,7 +19,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import api, { agentAPI } from '@/lib/api'
-import { AGENT_QUERY_KEYS, useAgentBySlugOrId, useStarshipAgents } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
@@ -45,7 +45,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const queryClient = useQueryClient()
   const conversationId = searchParams.get('conversationId') || null
   const [agentOpenError, setAgentOpenError] = useState<string | null>(null)
-  const { data: agents = [] } = useStarshipAgents(starship?.id || '', !!starship?.id)
+  const { data: agents = [], isLoading: isLoadingAgents } = useStarshipAgents(starship?.id || '', !!starship?.id)
   const { data: convAgents = [] } = useConversationAgents(conversationId)
   const selectedAgent = useMemo(() => {
     if (convAgents && convAgents.length > 0) return convAgents[0]
@@ -59,6 +59,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     isStreaming: isResponding,
     starshipSlug: String(slug),
     conversationId,
+    starshipId: starship?.id || null,
     agents,
     setLeadingMentionAgent: (agent: any, afterText?: string) => {
       try {
@@ -653,20 +654,38 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
         // Fetch complete agent data by slug and sync form via TanStack Query
         ;(async () => {
           try {
-            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugArg as string), exact: true })
+            if (!starship?.id) throw new Error('starship.id missing (cannot resolve agent)')
+
+            // Avoid the slug lookup endpoint (slug is starship-scoped). Resolve id from the starship agents list,
+            // then hydrate canonical agent details by id.
+            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
+            const list = await queryClient.fetchQuery({
+              queryKey: AGENT_QUERY_KEYS.byStarship(starship.id),
+              queryFn: async (): Promise<AgentModel[]> => {
+                const response: FetchResponse<ApiResponse<AgentModel[]>> = await api.get(`/api/v1/starships/${starship.id}/agents`)
+                return response.data.data
+              },
+              staleTime: 5 * 1000,
+            })
+            const match = (list || []).find(a => String((a as any)?.slug || '') === String(slugArg))
+            if (!match?.id) throw new Error('Agent not found after tool result')
+
+            await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(match.id), exact: true })
             const agent = await queryClient.fetchQuery({
-              queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugArg as string),
+              queryKey: AGENT_QUERY_KEYS.detail(match.id),
               queryFn: async (): Promise<AgentModel> => {
-                const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${encodeURIComponent(slugArg as string)}`)
+                const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${match.id}`)
                 return res.data.data
               },
               staleTime: 30 * 1000,
             })
             if (agent && agentBuilderRef.current) {
               agentBuilderRef.current.updateField('name', agent.name || '')
+              if (agent.role) agentBuilderRef.current.updateField('role', agent.role || '')
               if (agent.slug) agentBuilderRef.current.updateField('slug', agent.slug)
               agentBuilderRef.current.updateField('description', agent.description || '')
               agentBuilderRef.current.updateField('model', agent.model || '')
+              if (agent.category) agentBuilderRef.current.updateField('category', agent.category as any)
               const effort = (agent as any)?.reasoning?.effort
               if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
                 agentBuilderRef.current.updateField('reasoning', effort)
@@ -678,6 +697,14 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
               if (agent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', agent.maxTokens as any)
               if (agent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', agent.timeout as any)
               if (Array.isArray((agent as any).assignedToolSlugs)) agentBuilderRef.current.updateField('assignedToolSlugs', (agent as any).assignedToolSlugs as any)
+              if (Array.isArray(agent.previewPrompts)) {
+                const prompts = (agent.previewPrompts as unknown[])
+                  .filter(p => typeof p === 'string')
+                  .map(p => (p as string).trim())
+                  .filter(Boolean)
+                  .slice(0, 10) as string[]
+                agentBuilderRef.current.updateField('previewPrompts', prompts as any)
+              }
               if (agent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(agent.blueprint, null, 2))
               if ((agent as any).icon) agentBuilderRef.current.updateField('icon', (agent as any).icon)
             }
@@ -837,17 +864,124 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages, slug, router, agentSlug, isResponding])
 
-  // Prefill when editing an existing agent via TanStack Query
-  const { data: existingAgent } = useAgentBySlugOrId(agentSlug || '', !!agentSlug && agentSlug !== 'new')
+  // Resolve agent id from the already-fetched starship agent list to avoid slug-based lookups.
+  const resolvedAgentId = useMemo(() => {
+    if (!agentSlug || agentSlug === 'new') return null
+    const match = (agents || []).find(a => String((a as any)?.slug || '') === String(agentSlug))
+    return match?.id || null
+  }, [agents, agentSlug])
+
+  // Keep a stable canonical agent id once we have it.
+  // This prevents false "Agent not found" states when the server regenerates the slug
+  // (e.g. user edits agent name) and the URL/list momentarily diverge during refetches.
+  const [canonicalAgentId, setCanonicalAgentId] = useState<string | null>(null)
+
+  // When we normalize a slug (router.replace to the canonical slug for an agent id),
+  // we should NOT clear the canonical agent id on the ensuing route change. For any
+  // other agentSlug navigation (e.g. user clicks into a different agent or an invalid
+  // slug), we MUST clear it to avoid stale redirects back to the previously viewed agent.
+  const slugNormalizationTargetRef = useRef<string | null>(null)
+  const prevAgentSlugRef = useRef<string | null>(null)
+  useEffect(() => {
+    const current = agentSlug ? String(agentSlug) : null
+
+    // If this navigation was initiated by our own slug-normalization replace, keep canonical id.
+    if (slugNormalizationTargetRef.current && current === slugNormalizationTargetRef.current) {
+      slugNormalizationTargetRef.current = null
+      prevAgentSlugRef.current = current
+      return
+    }
+
+    // If the user navigated to a different slug, reset canonical id immediately.
+    if (prevAgentSlugRef.current !== null && prevAgentSlugRef.current !== current) {
+      setCanonicalAgentId(null)
+    }
+    prevAgentSlugRef.current = current
+  }, [agentSlug])
+
+  useEffect(() => {
+    if (agentSlug === 'new') {
+      setCanonicalAgentId(null)
+      return
+    }
+    if (resolvedAgentId && resolvedAgentId !== canonicalAgentId) {
+      setCanonicalAgentId(resolvedAgentId)
+    }
+  }, [agentSlug, resolvedAgentId, canonicalAgentId])
+
+  // Use canonical id when available, but fall back to the resolved id for the same render
+  // to avoid transient "not found" flashes before the canonical effect runs.
+  const effectiveAgentId = canonicalAgentId || resolvedAgentId || null
+
+  const isEditingExisting = agentSlug !== 'new'
+  const isResolvingExistingAgentId = isEditingExisting && !effectiveAgentId && isLoadingAgents
+  const isMissingExistingAgent = isEditingExisting && !effectiveAgentId && !isLoadingAgents
+
+  // Prefill when editing an existing agent via canonical id endpoint.
+  const { data: existingAgent, isError: isExistingAgentError } = useAgent(effectiveAgentId || '', !!effectiveAgentId)
+  const lastPrefilledAgentIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!isEditingExisting) return
+    if (!existingAgent?.slug) return
+    if (!agentSlug || agentSlug === 'new') return
+    const nextSlug = String(existingAgent.slug)
+    if (nextSlug) {
+      // IMPORTANT:
+      // We update the address bar via history.replaceState (no Next.js navigation) to avoid remounting
+      // the page/form during renames. Because of that, `useParams().agentSlug` can be stale relative to
+      // the address bar. Always compare against the current location slug.
+      let locationSlug: string | null = null
+      try {
+        if (typeof window !== 'undefined') {
+          const parts = window.location.pathname.split('/').filter(Boolean)
+          const last = parts.length > 0 ? parts[parts.length - 1] : null
+          locationSlug = last ? decodeURIComponent(last) : null
+        }
+      } catch {
+        locationSlug = null
+      }
+      if (locationSlug && locationSlug === nextSlug) return
+
+      // Renaming an agent can regenerate its slug on the server. We want the URL to reflect that,
+      // but navigating (router.replace) remounts the whole page and causes the form to lose focus.
+      // Instead, update the address bar without a Next.js navigation.
+      try {
+        if (typeof window !== 'undefined') {
+          const desiredPath = `/ship/${slug}/agent/${encodeURIComponent(nextSlug)}`
+          const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+          const desiredUrl = `${desiredPath}${q}`
+          const curUrl = `${window.location.pathname}${window.location.search}`
+          if (curUrl !== desiredUrl) {
+            window.history.replaceState(null, '', desiredUrl)
+          }
+          return
+        }
+      } catch {
+        // ignore
+      }
+      // Fallback (should rarely happen): if history APIs fail, do a normal replace.
+      const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
+      slugNormalizationTargetRef.current = nextSlug
+      router.replace(`/ship/${slug}/agent/${encodeURIComponent(nextSlug)}${q}`)
+    }
+  }, [isEditingExisting, existingAgent?.slug, agentSlug, conversationId, router, slug])
+
   useEffect(() => {
     if (!existingAgent || !agentBuilderRef.current) return
+    // Only prefill once per agent id to avoid clobbering in-flight edits on background refetches.
+    if (existingAgent.id && lastPrefilledAgentIdRef.current === existingAgent.id) return
     try {
       console.debug('[AgentBuilder] Prefill fetched agent', { id: existingAgent.id, slug: existingAgent.slug })
     } catch {}
+    const currentForm = agentBuilderRef.current.getFormData?.()
     agentBuilderRef.current.updateField('name', existingAgent.name || '')
+    if (!currentForm?.role && existingAgent.role) agentBuilderRef.current.updateField('role', existingAgent.role || '')
     if (existingAgent.slug) agentBuilderRef.current.updateField('slug', existingAgent.slug)
     if (existingAgent.description) agentBuilderRef.current.updateField('description', existingAgent.description)
     if (existingAgent.model) agentBuilderRef.current.updateField('model', existingAgent.model)
+    if (!currentForm?.category && existingAgent.category) {
+      agentBuilderRef.current.updateField('category', existingAgent.category as any)
+    }
     {
       const effort = (existingAgent as any)?.reasoning?.effort
       if (typeof effort === 'string' && (effort === 'low' || effort === 'medium' || effort === 'high')) {
@@ -861,8 +995,17 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     if (existingAgent.maxTokens !== undefined) agentBuilderRef.current.updateField('maxTokens', existingAgent.maxTokens as any)
     if (existingAgent.timeout !== undefined) agentBuilderRef.current.updateField('timeout', existingAgent.timeout as any)
     if (Array.isArray((existingAgent as any).assignedToolSlugs)) agentBuilderRef.current.updateField('assignedToolSlugs', (existingAgent as any).assignedToolSlugs as any)
+    if ((!Array.isArray(currentForm?.previewPrompts) || (currentForm.previewPrompts || []).length === 0) && Array.isArray(existingAgent.previewPrompts)) {
+      const prompts = (existingAgent.previewPrompts as unknown[])
+        .filter(p => typeof p === 'string')
+        .map(p => (p as string).trim())
+        .filter(Boolean)
+        .slice(0, 10) as string[]
+      agentBuilderRef.current.updateField('previewPrompts', prompts as any)
+    }
     if (existingAgent.blueprint) agentBuilderRef.current.updateField('blueprint', JSON.stringify(existingAgent.blueprint, null, 2))
     if ((existingAgent as any).icon) agentBuilderRef.current.updateField('icon', (existingAgent as any).icon)
+    if (existingAgent.id) lastPrefilledAgentIdRef.current = existingAgent.id
   }, [existingAgent])
 
   const handleCancel = () => {
@@ -873,10 +1016,23 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     }
   }
 
-  const headerAgentName = existingAgent?.name || (selectedAgent as any)?.name || (agentSlug === 'new' ? 'New agent' : String(agentSlug))
+  // Header should reflect the agent implied by the current route (agentSlug), NOT the "leading mention" agent.
+  // Otherwise, navigating to /agent/new or an unknown slug can incorrectly retain the previous agent's identity.
+  const routeAgentFromList = useMemo(() => {
+    if (!agentSlug || agentSlug === 'new') return null
+    const match = (agents || []).find(a => String((a as any)?.slug || '') === String(agentSlug))
+    return match || null
+  }, [agents, agentSlug])
 
-  const headerAgentSubtitle = existingAgent?.slug || (selectedAgent as any)?.slug || (agentSlug !== 'new' ? String(agentSlug) : undefined)
-  const headerAvatarAttachmentId = ((existingAgent as any)?.avatarAttachmentId ?? (selectedAgent as any)?.avatarAttachmentId) as string | undefined
+  const headerAgentModel = existingAgent || routeAgentFromList || null
+  const headerAgentName = agentSlug === 'new' ? 'New agent' : headerAgentModel?.name || String(agentSlug)
+
+  // Display convention across the app: "Name: Role"
+  const headerAgentRole = headerAgentModel?.role
+  const headerAgentDisplayName = headerAgentName && headerAgentRole ? `${headerAgentName}: ${headerAgentRole}` : headerAgentName
+
+  const headerAgentSubtitle = headerAgentModel?.slug || (agentSlug !== 'new' ? String(agentSlug) : undefined)
+  const headerAvatarAttachmentId = (headerAgentModel as any)?.avatarAttachmentId as string | undefined
   const headerAvatarIds = useMemo(() => (headerAvatarAttachmentId ? [headerAvatarAttachmentId] : []), [headerAvatarAttachmentId])
   const { data: headerAvatarAttachments = [] } = useMessageAttachments(headerAvatarIds, starship?.id)
   const headerAvatarUrl = headerAvatarAttachments?.[0]?.previewUrl
@@ -893,7 +1049,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       await api.post(`/api/v1/agents/${existingAgent.id}/avatar/generate`, { mode })
       toast.success(mode === 'full_chain' ? 'Avatar reset & regenerated' : headerAvatarUrl ? 'Avatar regenerated' : 'Avatar generated')
       // Refresh agent + attachments
-      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.bySlugOrId(String(agentSlug)), exact: true })
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
       await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(existingAgent.id), exact: true })
     } catch (err: any) {
       const message = err?.response?.data?.error || err?.response?.data?.message || err?.message || 'Failed to regenerate avatar'
@@ -929,7 +1085,7 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 />
               </button>
               <div className="flex flex-col items-center">
-                <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentName}</h1>
+                <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentDisplayName}</h1>
               </div>
             </div>
             <div className="flex items-center justify-center gap-2 mt-4">
@@ -1021,13 +1177,31 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
             />
 
             <div className="relative h-full w-full">
-              <AgentBuilderView
-                ref={agentBuilderRef}
-                starshipId={starship.id}
-                onCancel={handleCancel}
-                initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
-                errorMessage={agentOpenError || undefined}
-              />
+              {isResolvingExistingAgentId ? (
+                <div className="flex items-center justify-center min-h-[600px]">
+                  <LoadingSpinner size="lg" />
+                </div>
+              ) : isExistingAgentError || isMissingExistingAgent ? (
+                <div className="flex flex-col items-center justify-center text-center min-h-[600px] px-6">
+                  <div className="text-lg font-semibold">Agent not found</div>
+                  <div className="text-sm text-muted-foreground mt-2">This agent slug doesn’t exist in this starship.</div>
+                  <div className="mt-4">
+                    <Button variant="outline" onClick={handleCancel}>
+                      Back
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <AgentBuilderView
+                  ref={agentBuilderRef}
+                  starshipId={starship.id}
+                  agentId={effectiveAgentId || undefined}
+                  agent={existingAgent || null}
+                  onCancel={handleCancel}
+                  initialSlug={agentSlug !== 'new' ? String(agentSlug) : undefined}
+                  errorMessage={agentOpenError || undefined}
+                />
+              )}
 
               {conversationId && (
                 <div className="absolute left-0 right-0 bottom-[22px] px-6 z-30 pointer-events-none">

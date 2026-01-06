@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
 import { AGENT_QUERY_KEYS } from './useAgents'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 export interface PaginationMeta {
   page: number
@@ -100,11 +101,12 @@ export function useApproveAgentPublication() {
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(agent.id) })
 
       toast.success('Agent publication approved', {
-        description: `${agent.name} is now published and available as a template.`,
+        description: `${formatAgentDisplayName(agent)} is now published and available as a template.`,
       })
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error || error?.message || 'Failed to approve agent'
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: string } }; message?: string }
+      const message = err?.response?.data?.error || err?.message || 'Failed to approve agent'
       toast.error('Failed to approve agent', {
         description: message,
       })
@@ -129,11 +131,12 @@ export function useRejectAgentPublication() {
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(agent.id) })
 
       toast.success('Agent publication rejected', {
-        description: `${agent.name} has been moved back to draft.`,
+        description: `${formatAgentDisplayName(agent)} has been moved back to draft.`,
       })
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.error || error?.message || 'Failed to reject agent'
+    onError: (error: unknown) => {
+      const err = error as { response?: { data?: { error?: string } }; message?: string }
+      const message = err?.response?.data?.error || err?.message || 'Failed to reject agent'
       toast.error('Failed to reject agent', {
         description: message,
       })

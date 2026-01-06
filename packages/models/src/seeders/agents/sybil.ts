@@ -52,6 +52,7 @@ Safety:
 export const sybilTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Sybil',
   slug: 'sybil',
+  role: 'Starship navigator',
   version: '1.0.0',
   description:
     'Your expert starship navigator and first officer who helps new captains get started, configure their crew, and begin their journey.',

@@ -11,6 +11,7 @@ import type { Agent } from '@/lib/api'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 interface ScheduleConversationModalProps {
   open: boolean
@@ -295,7 +296,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                       <AgentAvatar seed={selectedAgent.name} imageUrl={avatarUrlById.get((selectedAgent as any).avatarAttachmentId)} size={32} rounded />
                     </Avatar>
                     <div className="flex flex-col min-w-0 flex-1 items-start text-left">
-                      <span className="text-sm font-medium truncate leading-tight">{selectedAgent.name}</span>
+                      <span className="text-sm font-medium truncate leading-tight">{formatAgentDisplayName(selectedAgent)}</span>
                       {selectedAgent.description && <span className="text-[11px] text-muted-foreground truncate max-w-[36ch] leading-tight">{selectedAgent.description}</span>}
                     </div>
                   </div>
@@ -311,7 +312,7 @@ export function ScheduleConversationModal({ open, onOpenChange, starshipId, agen
                         <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={32} rounded />
                       </Avatar>
                       <div className="flex flex-col min-w-0 flex-1 items-start text-left">
-                        <span className="text-sm font-medium truncate leading-tight">{agent.name}</span>
+                        <span className="text-sm font-medium truncate leading-tight">{formatAgentDisplayName(agent)}</span>
                         {agent.description && <span className="text-[11px] text-muted-foreground leading-tight line-clamp-2 break-words">{agent.description}</span>}
                       </div>
                     </div>

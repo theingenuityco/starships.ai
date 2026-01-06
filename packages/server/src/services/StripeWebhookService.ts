@@ -646,7 +646,7 @@ export class StripeWebhookService {
           `UPDATE starships
               SET ship_class = 'scout',
                   max_agents = LEAST(max_agents, 5),
-                  max_concurrent_turns = 1,
+                  max_concurrent_turns = 3,
                   updated_at = NOW()
             WHERE id = $1`,
           [starshipId]

@@ -138,7 +138,6 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
  * Request to create a new tool template
  */
 export interface CreateToolTemplateRequest extends Omit<ToolParams, 'slug'> {
-  slug?: string; // Optional explicit slug (if not provided, will be generated from name)
   category: ToolTemplateCategory;
   version?: string; // Semantic version (defaults to '1.0.0' if not provided)
   exampleUsage?: string;
@@ -155,6 +154,10 @@ export interface CreateToolTemplateRequest extends Omit<ToolParams, 'slug'> {
  * Request to update a tool template
  */
 export type UpdateToolTemplateRequest = Partial<CreateToolTemplateRequest> & {
+  /**
+   * Slugs are server-generated and not directly editable.
+   */
+  slug?: never;
   version?: string;
 };
 
@@ -166,7 +169,7 @@ export type UpdateToolTemplateRequest = Partial<CreateToolTemplateRequest> & {
  * Request to create a new tool instance
  * For draft tools (status='draft'), only name and slug are required
  */
-export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blueprint'> {
+export interface CreateToolRequest extends Omit<ToolParams, 'slug' | 'parameters' | 'blueprint'> {
   parameters?: ToolParams['parameters']; // Optional for draft tools
   blueprint?: ToolParams['blueprint']; // Optional for draft tools
   configuration?: Record<string, unknown>;
@@ -182,7 +185,12 @@ export interface CreateToolRequest extends Omit<ToolParams, 'parameters' | 'blue
 /**
  * Request to update a tool instance
  */
-export type UpdateToolRequest = Partial<CreateToolRequest> & {
+export type UpdateToolRequest = Partial<Omit<CreateToolRequest, 'slug'>> & {
+  /**
+   * Slugs are immutable after creation.
+   * Disallow providing `slug` in updates at the type level.
+   */
+  slug?: never;
   sourceTemplateId?: string;
   publishedTemplateId?: string;
   version?: string;

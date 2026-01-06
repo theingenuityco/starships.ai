@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo } from 'react'
 import { toast } from 'sonner'
 import { useSimpleError } from './useSimpleError'
 import { isValidRedirectUrl } from '@/lib/utils'
+import type { ApiResponse } from '@starships/protocol'
 
 export type AuthMethod = 'password' | 'google' | 'github'
 
@@ -61,7 +62,12 @@ export const AUTH_QUERY_KEYS = {
 // Token storage utilities
 const getStoredToken = (): string | null => {
   if (typeof window === 'undefined') return null
-  return localStorage.getItem('starships_auth_token')
+  const token = localStorage.getItem('starships_auth_token')
+
+  // Defensive cleanup: avoid treating common placeholder values as real tokens.
+  if (!token || token === 'null' || token === 'undefined') return null
+
+  return token
 }
 
 const setStoredToken = (token: string | null) => {
@@ -76,6 +82,13 @@ const setStoredToken = (token: string | null) => {
 // Validate token and get user info
 const validateToken = async (token: string): Promise<AuthUser | null> => {
   try {
+    // Avoid hitting the network for obviously invalid tokens.
+    const looksLikeJwt = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/.test(token)
+    if (!token || !looksLikeJwt) {
+      setStoredToken(null)
+      return null
+    }
+
     const response = await fetch('/api/v1/auth/me', {
       headers: {
         Authorization: `Bearer ${token}`,
@@ -84,8 +97,13 @@ const validateToken = async (token: string): Promise<AuthUser | null> => {
     })
 
     if (response.ok) {
-      const data = await response.json()
-      return data.data || data // Handle different response formats
+      const json = (await response.json()) as ApiResponse<AuthUser>
+      return json.data
+    }
+
+    // If the token is invalid/expired, clear it so we don't keep calling /auth/me on mount/focus.
+    if (response.status === 401 || response.status === 403) {
+      setStoredToken(null)
     }
 
     return null
@@ -122,15 +140,13 @@ export function useAuthUser() {
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
-    retry: (failureCount, error: any) => {
-      // Don't retry on 401 (unauthorized) - token is invalid
-      if (error?.response?.status === 401) {
-        return false
-      }
-      return failureCount < 2
-    },
-    refetchOnWindowFocus: true,
-    refetchOnMount: 'always',
+    // `/auth/me` is a cheap "am I logged in?" check and should not spam on public pages.
+    // With multiple `useAuth()` consumers (landing) and React StrictMode (dev), `refetchOnMount: 'always'`
+    // can cause repeated requests. Prefer refetching only when the cache is stale.
+    retry: false,
+    refetchOnWindowFocus: false,
+    refetchOnMount: true,
+    refetchOnReconnect: false,
   })
 }
 

@@ -3,10 +3,14 @@ import type { AgentTemplateCategory } from '@starships/protocol'
 
 export const INITIAL_FORM_DATA: AgentFormData = {
   name: '',
+  role: '',
   slug: '',
   description: '',
-  category: 'general',
-  model: 'openai/gpt-4o-mini',
+  // Do not default category; user should explicitly choose one.
+  category: '',
+  // IMPORTANT: Do not preselect a default model in the UI.
+  // Users must explicitly choose a model when creating a new agent.
+  model: '',
   temperature: 0.7,
   maxTokens: 2048,
   reasoning: 'none',

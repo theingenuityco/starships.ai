@@ -271,9 +271,19 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       isInstanceAdmin: user.isInstanceAdmin || false,
     });
   } catch (error) {
-    logger.error('[AUTH] Me endpoint error', {
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    // Token expiration/invalidity is expected when a client holds a stale token.
+    // Avoid logging these as server errors; the 401 response is the signal.
+    if (error instanceof Error && (error.name === 'JWTExpired' || error.name === 'JWTInvalid')) {
+      logger.debug('[AUTH] Me endpoint auth failed', {
+        error: error.message,
+        name: error.name,
+        operation: 'token_validation',
+      });
+    } else {
+      logger.error('[AUTH] Me endpoint error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
 
     if (error instanceof Error && error.name === 'JWTExpired') {
       sendError(res, 'TOKEN_EXPIRED', 'Token expired', 401);
@@ -368,7 +378,20 @@ async function getAuthenticatedUserFromRequest(req: Request): Promise<UserModel 
     // This is expected - return null for unauthenticated users
     return null;
   } catch (error) {
-    // Silently fail - user is not authenticated
+    // Token expiration/invalidity is expected when a client holds a stale token.
+    // Avoid logging these as server errors; the 401 response is the signal.
+    if (error instanceof Error && (error.name === 'JWTExpired' || error.name === 'JWTInvalid')) {
+      logger.debug('[AUTH] Me endpoint auth failed', {
+        error: error.message,
+        name: error.name,
+        operation: 'token_validation',
+      });
+    } else {
+      logger.error('[AUTH] Me endpoint error', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
     return null;
   }
 }
@@ -477,7 +500,6 @@ router.get('/auth/email/change/verify', async (req: Request, res: Response) => {
     // Check if user is authenticated using helper function
     const authenticatedUser = await getAuthenticatedUserFromRequest(req);
     const profilePath = await userService.getProfileRedirectPath(result.userId);
-    const expectedEmailParam = encodeURIComponent(result.newEmail);
 
     // Determine redirect based on authentication status
     let redirectPath: string;

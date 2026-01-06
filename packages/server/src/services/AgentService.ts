@@ -30,7 +30,6 @@ import type {
   CreateAgentRequest,
   UpdateAgentRequest,
 } from '@starships/protocol';
-import { generateUniqueAgentSlug } from '@starships/models';
 import { MessageService } from './MessageService';
 import type { StreamingService } from './StreamingService';
 import { ConnectorSecretService } from './ConnectorSecretService';
@@ -137,20 +136,6 @@ export class AgentService {
     // Validate agent limit before creating
     await this.validateAgentLimit(data.starshipId);
 
-    // Ensure unique slug:
-    // - If a slug is provided, use it if unique; otherwise append a random suffix based on the provided slug.
-    // - If no slug is provided, generate a unique slug from the name (kebab-case + suffix).
-    const requestedSlug = (data.slug || '').trim();
-    let slug: string;
-    if (requestedSlug.length > 0) {
-      const base = requestedSlug.toLowerCase();
-      const existing = await this.agentRepository.findBySlug(base);
-      slug = existing ? await generateUniqueAgentSlug(base, this.agentRepository) : base;
-    } else {
-      const baseFromName = (data.name || 'agent').toLowerCase().trim().replace(/\s+/g, '-') || 'agent';
-      slug = await generateUniqueAgentSlug(baseFromName, this.agentRepository);
-    }
-
     // Create agent parameters for the Agent class
     const agentParams: AgentParams = {
       name: data.name,
@@ -173,7 +158,7 @@ export class AgentService {
 
     const agentData: CreateAgentRequest = {
       name: data.name,
-      slug,
+      role: data.role || 'Assistant',
       description: data.description,
       model: data.model,
       temperature: data.temperature,
@@ -198,7 +183,7 @@ export class AgentService {
     if (!current) return null;
     this.assertAgentIsEditable(current, 'edit');
 
-    return await this.agentRepository.update(agentId, updates as Partial<AgentModel>);
+    return await this.agentRepository.update(agentId, updates);
   }
 
   /**
@@ -411,7 +396,7 @@ export class AgentService {
           // assignedToolSlugs used in other parts of the app while
           // keeping the underlying storage relationship-based.
           assignedToolSlugs,
-        } as AgentModel,
+        },
         requestedBy,
         requestedByStarship,
       });
@@ -1012,6 +997,7 @@ export class AgentService {
         // Instance slugs include random suffixes for uniqueness; template slugs should be
         // stable + human-readable and will be derived from the template name.
         description: agent.description,
+        role: agent.role || 'Assistant',
         // Prefer the agent's category when present; fall back to "general"
         category: agent.category ?? 'general',
         model: agent.model,
@@ -1036,6 +1022,7 @@ export class AgentService {
       await templateRepo.update(targetTemplateId, {
         name: agent.name,
         description: agent.description,
+        role: agent.role || 'Assistant',
         // Only update category if the agent has one explicitly set
         category: agent.category ?? 'general',
         model: agent.model,

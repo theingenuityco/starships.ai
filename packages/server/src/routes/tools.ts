@@ -103,7 +103,6 @@ const UpdateToolSchema = z.object({
     .optional()
     .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
   description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional(),
-  slug: z.string().min(1, 'Slug is required').max(100, 'Slug must be less than 100 characters').optional(),
   parameters: z
     .object({
       type: z.literal('object'),
@@ -792,7 +791,6 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
       // Create a new template from this tool
       const createdTemplate = await templateRepository.create({
         name: tool.name,
-        slug: tool.slug,
         description: tool.description,
         category: 'utility',
         parameters: tool.parameters!,

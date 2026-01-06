@@ -172,7 +172,7 @@ export function ConversationMessageContent({
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
   const openReasoning = Boolean(isActivelyStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
-  const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Assistant'
+  const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Agent'
   const reasoningHeaderLabel = isActivelyStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
 
   const parsedJson = useMemo(() => {
@@ -194,7 +194,7 @@ export function ConversationMessageContent({
     if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return null
     const names = normalizedToolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
     const unique = Array.from(new Set(names))
-    const agent = agentName || 'Assistant'
+    const agent = agentName || 'Agent'
 
     // Determine if tool calls are ongoing: pending results AND actively streaming
     // OR if parent conversation is awaiting tool results (includes active child conversations)

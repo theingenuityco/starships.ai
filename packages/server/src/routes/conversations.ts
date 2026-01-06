@@ -578,6 +578,14 @@ router.post(
       }
 
       if (permission === 'ask') {
+        // Resolve toolId once at authorization time so approvals are stable across slug changes.
+        const toolRepo = new ToolRepository();
+        const resolvedTool = await toolRepo.findBySlugAndStarship(toolSlug, conversation.starshipId);
+        if (!resolvedTool) {
+          sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 200, { toolSlug, toolCallId });
+          return;
+        }
+
         const approvals = new ToolCallApprovalRepository();
         let approvalId: string;
         try {
@@ -585,7 +593,7 @@ router.post(
             starshipId: conversation.starshipId,
             conversationId,
             agentId,
-            toolSlug,
+            toolId: resolvedTool.id,
             toolCallId,
             argsJson: args || {},
           });
@@ -605,6 +613,7 @@ router.post(
           starshipId: conversation.starshipId,
           agentId,
           agentName: agent.name,
+          toolId: resolvedTool.id,
           toolSlug,
           toolCallId,
           args: args || {},
@@ -693,14 +702,25 @@ router.post(
         return;
       }
 
-      // Mark approved (idempotent for pending-only)
-      await approvals.markApproved(approvalId);
-
       // Execute tool (server-side) and update the placeholder tool message
       const toolRepo = new ToolRepository();
-      const tool = await toolRepo.findBySlugAndStarship(approval.toolSlug, conversation.starshipId);
+      const tool = await toolRepo.findById(approval.toolId);
+      if (tool && tool.starshipId !== conversation.starshipId) {
+        sendError(res, 'FORBIDDEN', 'Tool approval tool does not belong to this starship', 403, { toolId: approval.toolId });
+        return;
+      }
       if (!tool || tool.status === 'draft' || !tool.blueprint) {
-        sendError(res, 'VALIDATION_ERROR', 'Tool is not available for execution', 400, { toolSlug: approval.toolSlug });
+        sendError(res, 'VALIDATION_ERROR', 'Tool is not available for execution', 400, { toolId: approval.toolId });
+        return;
+      }
+
+      // Mark approved ONLY after all preflight checks pass, so we can't end up with
+      // status='approved' for a request that never had a chance to execute.
+      // Also ensure only one concurrent request proceeds to execution.
+      const { approval: decided, updated } = await approvals.markApprovedIfPending(approvalId);
+      if (!updated) {
+        // Another request already decided this approval (approved/denied). Do not execute twice.
+        sendSuccess(res, { status: decided.status, approvalId });
         return;
       }
 
@@ -721,7 +741,7 @@ router.post(
       const messageService = new MessageService();
       const content = JSON.stringify({
         success: true,
-        data: { result, approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId },
+        data: { result, approvalId, toolId: approval.toolId, toolCallId: approval.toolCallId },
       });
 
       // Do NOT persist any interim tool result before approval; this message is the first persisted tool result for this call.
@@ -814,7 +834,7 @@ router.post(
         error: {
           code: 'TOOL_APPROVAL_DENIED',
           message: 'Tool approval denied',
-          details: { approvalId, toolSlug: approval.toolSlug, toolCallId: approval.toolCallId },
+          details: { approvalId, toolId: approval.toolId, toolCallId: approval.toolCallId },
         },
       });
 
@@ -1018,7 +1038,7 @@ router.post(
         turnLeaseId = await leaseService.acquire({
           starshipId: starship.id,
           conversationId,
-          maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 1,
+          maxConcurrentTurns: starship.maxConcurrentTurns ?? 3,
         });
       } catch (e) {
         handleError(e, res, 'acquiring starship concurrency slot');

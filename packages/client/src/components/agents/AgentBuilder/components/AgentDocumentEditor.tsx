@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import Icon from '@/components/primitives/Icon'
 import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
-import { getCategoryColor, getCategoryIcon } from '../utils/categoryHelpers'
+import { getCategoryColor, getCategoryDotColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
 import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -29,18 +29,6 @@ import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentPublishModal } from './AgentPublishModal'
 
-const CATEGORY_DOT_COLORS: Record<string, string> = {
-  general: 'bg-gray-400',
-  automation: 'bg-emerald-400',
-  data: 'bg-purple-400',
-  communication: 'bg-orange-400',
-  coding: 'bg-indigo-400',
-  creative: 'bg-pink-400',
-  analysis: 'bg-cyan-400',
-  support: 'bg-amber-400',
-  utility: 'bg-teal-400',
-}
-
 interface AgentDocumentEditorProps {
   value: AgentFormData
   onChange: (next: AgentFormData) => void
@@ -48,6 +36,16 @@ interface AgentDocumentEditorProps {
   onSave?: () => void
   onCancel?: () => void
   starshipId?: string
+  /**
+   * Optional: canonical id of the agent being edited. When provided, we skip the
+   * starship-scoped slug lookup and hydrate directly from /api/v1/agents/:id.
+   */
+  agentId?: string
+  /**
+   * Optional: canonical agent model already fetched by the parent.
+   * When present, the editor must not issue its own /agents/:id fetch.
+   */
+  agent?: AgentModel | null
   /**
    * When true, renders the editor in read-only/inspection mode:
    * - All form controls are disabled
@@ -61,7 +59,18 @@ interface AgentDocumentEditorProps {
   embedded?: boolean
 }
 
-export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, onCancel, starshipId, readOnly = false, embedded = false }: AgentDocumentEditorProps) {
+export function AgentDocumentEditor({
+  value,
+  onChange,
+  onFieldChange,
+  onSave,
+  onCancel,
+  starshipId,
+  agentId: providedAgentId,
+  agent: providedAgent,
+  readOnly = false,
+  embedded = false,
+}: AgentDocumentEditorProps) {
   const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
   const queryClient = useQueryClient()
   // Track whether the user explicitly changed the Reasoning dropdown.
@@ -92,7 +101,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   const [fullAgent, setFullAgent] = useState<AgentModel | null>(null)
   const [publishedTemplate, setPublishedTemplate] = useState<AgentTemplateModel | null>(null)
 
-  const avatarAttachmentId = (fullAgent as any)?.avatarAttachmentId as string | undefined
+  const formatAgentDisplayName = (name: string | undefined | null, role: string | undefined | null): string => {
+    const n = typeof name === 'string' ? name.trim() : ''
+    const r = typeof role === 'string' ? role.trim() : ''
+    if (n && r) return `${n}: ${r}`
+    return n || 'Untitled agent'
+  }
+
+  const avatarAttachmentId = fullAgent?.avatarAttachmentId
   const avatarIds = useMemo(() => (avatarAttachmentId ? [avatarAttachmentId] : []), [avatarAttachmentId])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
   const avatarUrl = avatarAttachments?.[0]?.previewUrl
@@ -291,8 +307,35 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         setIsResolvingAgent(true)
       }
       try {
-        if (!starshipId || !value?.slug || value.slug === 'new') {
-          console.debug('[AgentDocEditor] Skipping agentId resolve', { starshipId, slug: value?.slug })
+        if (!value?.slug || value.slug === 'new') {
+          if (!cancelled) {
+            setAgentId(null)
+            setFullAgent(null)
+            setPublishedTemplate(null)
+          }
+          return
+        }
+
+        // If parent already provided the full agent model, use it and do NOT fetch.
+        if (providedAgent && typeof providedAgent.id === 'string' && providedAgent.id.trim().length > 0) {
+          if (!cancelled) {
+            setAgentId(providedAgent.id)
+            setFullAgent(providedAgent)
+          }
+          return
+        }
+
+        // If the parent already provided the canonical id, hydrate directly from /agents/:id.
+        if (typeof providedAgentId === 'string' && providedAgentId.trim().length > 0) {
+          const id = providedAgentId.trim()
+          if (!cancelled) setAgentId(id)
+          // Do not fetch here. The parent page is responsible for fetching /agents/:id and can pass `agent`.
+          if (!cancelled) setFullAgent(null)
+          return
+        }
+
+        // Fallback: resolve id from starship+slug, then hydrate canonical /agents/:id.
+        if (!starshipId) {
           if (!cancelled) {
             setAgentId(null)
             setFullAgent(null)
@@ -313,10 +356,19 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
             setAgentId(agent.id || null)
           }
           // Fetch full agent details (canonical shape) for publish diff + autosave baseline.
-          const fullResult = await safeGet<AgentModel>(`/api/v1/agents/${agent.id}`)
-          const hydrated = (fullResult.ok && fullResult.data?.id ? fullResult.data : agent) as AgentModel
-          if (!cancelled) {
-            setFullAgent(hydrated)
+          // IMPORTANT: use React Query so concurrent callers share a single request.
+          try {
+            const hydrated = await queryClient.fetchQuery({
+              queryKey: AGENT_QUERY_KEYS.detail(agent.id),
+              queryFn: async (): Promise<AgentModel> => {
+                const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${agent.id}`)
+                return res.data.data
+              },
+              staleTime: 30 * 1000,
+            })
+            if (!cancelled) setFullAgent(hydrated?.id ? hydrated : agent)
+          } catch {
+            if (!cancelled) setFullAgent(agent)
           }
         } else {
           if (!cancelled) {
@@ -335,7 +387,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     return () => {
       cancelled = true
     }
-  }, [starshipId, value?.slug])
+  }, [starshipId, value?.slug, providedAgentId, providedAgent, queryClient])
 
   // Load the published template (if any) for comparison to gate republish in UI.
   // We bypass the templateAPI cache and fetch fresh data so the diff matches backend behavior.
@@ -527,16 +579,25 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
   useEffect(() => {
     const syncAgent = async () => {
       if (!agentId || hasSyncedAgentRef.current) return
+      // If the parent page provided agentId, it also owns the canonical /agents/:id fetch + prefill.
+      // Avoid an additional /agents/:id request from inside the editor.
+      if ((typeof providedAgentId === 'string' && providedAgentId.trim().length > 0) || (providedAgent && providedAgent.id)) {
+        hasSyncedAgentRef.current = true
+        return
+      }
       try {
+        // If we reached here, we're in a non-page context that didn't provide `agent`.
+        // Fetch once to backfill missing form fields.
         const res: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${agentId}`)
         const agent = res.data.data
         if (!agent) return
         if (!value.name && agent.name) onFieldChange?.('name', agent.name)
+        if (!value.role && agent.role) onFieldChange?.('role', agent.role)
         if (!value.slug && agent.slug) onFieldChange?.('slug', agent.slug)
         if (!value.description && agent.description) onFieldChange?.('description', agent.description)
         if (!value.model && agent.model) onFieldChange?.('model', agent.model)
-        if ((!value.category || value.category === 'general') && (agent as any).category) {
-          onFieldChange?.('category', (agent as any).category as any)
+        if (!value.category && agent.category) {
+          onFieldChange?.('category', agent.category as any)
         }
         if (value.temperature == null && agent.temperature != null) onFieldChange?.('temperature', agent.temperature as any)
         if (value.maxTokens == null && agent.maxTokens != null) onFieldChange?.('maxTokens', agent.maxTokens as any)
@@ -549,8 +610,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           onFieldChange?.('reasoning', 'none' as any)
         }
         if (!value.systemPrompt && agent.systemPrompt) onFieldChange?.('systemPrompt', agent.systemPrompt)
-        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray((agent as any).previewPrompts)) {
-          onFieldChange?.('previewPrompts', ((agent as any).previewPrompts as string[]).filter(Boolean))
+        if ((!Array.isArray(value.previewPrompts) || value.previewPrompts.length === 0) && Array.isArray(agent.previewPrompts)) {
+          onFieldChange?.('previewPrompts', (agent.previewPrompts as string[]).filter(Boolean))
         }
         if (value.timeout == null && agent.timeout != null) onFieldChange?.('timeout', agent.timeout as any)
         if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
@@ -564,7 +625,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       }
     }
     void syncAgent()
-  }, [agentId, value, onChange])
+  }, [agentId, value, onChange, providedAgentId, providedAgent, onFieldChange])
 
   const publicationStatus = fullAgent?.publicationStatus || 'draft'
   const hasExistingAgent = !!agentId
@@ -584,6 +645,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     const normalizeCore = (src: {
       name?: string | null
+      role?: string | null
       description?: string | null
       model?: string | null
       category?: string | null
@@ -600,6 +662,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       const normalizedTemperature = typeof src.temperature === 'number' ? src.temperature : 0.7
       return {
         name: src.name ?? '',
+        role: src.role ?? '',
         description: src.description ?? '',
         model: src.model ?? '',
         category: src.category ?? 'general',
@@ -613,13 +676,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       }
     }
 
-    const agentCore = normalizeCore(fullAgent as any)
-    const templateCore = normalizeCore(publishedTemplate as any)
+    const agentCore = normalizeCore(fullAgent)
+    const templateCore = normalizeCore(publishedTemplate)
 
     const sameName = agentCore.name === templateCore.name
+    const sameRole = agentCore.role === templateCore.role
     const sameDescription = agentCore.description === templateCore.description
     const sameModel = agentCore.model === templateCore.model
-    const sameCategory = (agentCore as any).category === (templateCore as any).category
+    const sameCategory = agentCore.category === templateCore.category
     const sameTemperature = agentCore.temperature === templateCore.temperature
     const sameMaxTokens = agentCore.maxTokens === templateCore.maxTokens
     const sameTimeout = agentCore.timeout === templateCore.timeout
@@ -632,9 +696,9 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
     // - Published template avatar is public and tracked via avatarUpdatedAt (cache-busting timestamp).
     // We treat the avatar as "same" if the agent has no avatar and the template has none,
     // or if the agent avatar was created at/before the template's avatarUpdatedAt.
-    const templateAvatarUpdatedAt = (publishedTemplate as any)?.avatarUpdatedAt as string | undefined
+    const templateAvatarUpdatedAt = publishedTemplate.avatarUpdatedAt
     const agentHasAvatar = typeof avatarAttachmentId === 'string' && avatarAttachmentId.trim().length > 0
-    const templateHasAvatar = typeof (publishedTemplate as any)?.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
+    const templateHasAvatar = typeof publishedTemplate.avatarUrl === 'string' || typeof templateAvatarUpdatedAt === 'string'
     const toMs = (s?: string) => {
       if (!s) return NaN
       const t = new Date(s).getTime()
@@ -669,7 +733,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         })
         .filter((s): s is string => typeof s === 'string' && s.length > 0)
     )
-    const baselineTools = normalizeSlugs(((publishedTemplate as any).assignedToolSlugs as string[] | undefined) || [])
+    const baselineTools = normalizeSlugs(publishedTemplate.assignedToolSlugs || [])
     const sameTools = currentTools.length === baselineTools.length && currentTools.every((slug, i) => slug === baselineTools[i])
 
     const agentBlueprintStr = JSON.stringify(agentCore.blueprint)
@@ -678,6 +742,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     const changes: string[] = []
     if (!sameName) changes.push('Name')
+    if (!sameRole) changes.push('Role')
     if (!sameDescription) changes.push('Description')
     if (!sameModel) changes.push('Model')
     if (!sameCategory) changes.push('Category')
@@ -696,6 +761,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         agentId: fullAgent.id,
         publishedTemplateId: fullAgent.publishedTemplateId,
         sameName,
+        sameRole,
         sameDescription,
         sameModel,
         sameCategory,
@@ -725,6 +791,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
     const differs = !(
       sameName &&
+      sameRole &&
       sameDescription &&
       sameModel &&
       sameCategory &&
@@ -744,26 +811,6 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
   const isRepublishable = publicationStatus === 'published' && !!fullAgent?.publishedTemplateId && differsFromPublishedTemplate
   const canRequestPublication = hasExistingAgent && !!fullAgent && !isTemplateAgent && !readOnly && (publicationStatus === 'draft' || publicationStatus === 'rejected' || isRepublishable)
-
-  // Debug logging for publishability pipeline – helps trace why an agent is (re)publishable
-  useEffect(() => {
-    try {
-      console.debug('[AgentDocEditor] publish-debug', {
-        agentId,
-        fullAgentId: fullAgent?.id,
-        publicationStatus,
-        hasExistingAgent,
-        isTemplateAgent,
-        readOnly,
-        hasPublishedTemplateId: !!fullAgent?.publishedTemplateId,
-        differsFromPublishedTemplate,
-        isRepublishable,
-        canRequestPublication,
-      })
-    } catch {
-      // ignore logging errors
-    }
-  }, [agentId, fullAgent?.id, fullAgent?.publishedTemplateId, publicationStatus, hasExistingAgent, isTemplateAgent, readOnly, differsFromPublishedTemplate, isRepublishable, canRequestPublication])
 
   // Autosave agent changes for existing (non-template) agents
   useEffect(() => {
@@ -812,6 +859,14 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         updates.name = value.name
       }
 
+      if (typeof value.role === 'string') {
+        const nextRole = value.role.trim()
+        const baseRole = typeof base.role === 'string' ? base.role : ''
+        if (nextRole.length > 0 && nextRole !== baseRole) {
+          updates.role = nextRole
+        }
+      }
+
       if (typeof value.description === 'string') {
         const nextDesc = value.description ?? ''
         const baseDesc = base.description ?? ''
@@ -824,8 +879,8 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
         updates.model = value.model
       }
 
-      if (value.category && (fullAgent as any).category !== value.category) {
-        ;(updates as any).category = value.category
+      if (value.category && fullAgent?.category !== value.category) {
+        updates.category = value.category as any
       }
 
       // Clamp numeric fields into valid ranges before sending, and compare to base
@@ -914,6 +969,13 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
           setFullAgent(updated)
           // Keep React Query cache in sync for this agent
           queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)
+          // IMPORTANT:
+          // Editing the agent name regenerates its slug on the server. The agent page route is slug-based
+          // and resolves agentId from the starship agents list. If we don't refresh that list, a later
+          // background refetch (focus/refresh) can cause "Agent not found" due to URL slug mismatch.
+          if (starshipId) {
+            queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starshipId) })
+          }
           // If we successfully persisted a reasoning change, clear the dirty flag
           if (Object.prototype.hasOwnProperty.call(updates as object, 'reasoning')) {
             reasoningDirtyRef.current = false
@@ -1055,169 +1117,169 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
       {/* Primary actions & publication status - compact banner (styled like navbar, sticky with offset) */}
       {!embedded ? (
         <div className="sticky top-4 z-20 flex flex-col sm:flex-row items-center justify-between gap-3 rounded-xl border border-border/40 bg-card px-3 py-2 shadow-sm mb-10">
-        {agentId && (
-          <div className="flex items-center gap-4 text-sm">
-            {/* Avatar + name/slug on the far left */}
-            {showIdentityInBanner && (
-              <div className="flex items-center gap-3">
-                <AgentAvatar
-                  seed={fullAgent?.name || value.name || value.slug || 'Agent'}
-                  imageUrl={avatarUrl}
-                  size={36}
-                  rounded
-                  className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
-                />
-                <div className="flex flex-col leading-tight min-w-0">
-                  <span className="text-base font-semibold truncate tracking-tight">{fullAgent?.name || value.name || 'Untitled agent'}</span>
-                  {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
-                </div>
-              </div>
-            )}
-
-            {/* Text stack to the right of avatar/name */}
-            <div className="flex flex-col gap-2">
-              {/* Save indicator */}
-              <div className="flex items-center gap-1 text-xs font-medium">
-                <div className="w-3 h-3 flex items-center justify-center">
-                  <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
-                </div>
-                <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
-              </div>
-
-              {/* Status, Version & Last updated */}
-              <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                <span
-                  className={cn(
-                    'inline-flex items-center gap-1 font-medium',
-                    publicationStatus === 'published'
-                      ? 'text-emerald-500'
-                      : publicationStatus === 'pending_approval'
-                        ? 'text-amber-500'
-                        : publicationStatus === 'rejected'
-                          ? 'text-red-500'
-                          : 'text-muted-foreground'
-                  )}
-                >
-                  <Icon
-                    name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
-                    className="w-3 h-3"
+          {agentId && (
+            <div className="flex items-center gap-4 text-sm">
+              {/* Avatar + name/slug on the far left */}
+              {showIdentityInBanner && (
+                <div className="flex items-center gap-3">
+                  <AgentAvatar
+                    seed={fullAgent?.name || value.name || value.slug || 'Agent'}
+                    imageUrl={avatarUrl}
+                    size={36}
+                    rounded
+                    className="h-9 w-9 rounded-xl overflow-hidden ring-1 ring-primary/40 bg-background"
                   />
-                  <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
-                </span>
-                {fullAgent?.version && (
-                  <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
-                    <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
+                  <div className="flex flex-col leading-tight min-w-0">
+                    <span className="text-base font-semibold truncate tracking-tight">{formatAgentDisplayName(fullAgent?.name || value.name, fullAgent?.role || value.role)}</span>
+                    {(fullAgent?.slug || value.slug) && <span className="text-xs text-muted-foreground truncate font-mono">{fullAgent?.slug || value.slug}</span>}
+                  </div>
+                </div>
+              )}
+
+              {/* Text stack to the right of avatar/name */}
+              <div className="flex flex-col gap-2">
+                {/* Save indicator */}
+                <div className="flex items-center gap-1 text-xs font-medium">
+                  <div className="w-3 h-3 flex items-center justify-center">
+                    <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+                  </div>
+                  <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
+                </div>
+
+                {/* Status, Version & Last updated */}
+                <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 font-medium',
+                      publicationStatus === 'published'
+                        ? 'text-emerald-500'
+                        : publicationStatus === 'pending_approval'
+                          ? 'text-amber-500'
+                          : publicationStatus === 'rejected'
+                            ? 'text-red-500'
+                            : 'text-muted-foreground'
+                    )}
+                  >
+                    <Icon
+                      name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
+                      className="w-3 h-3"
+                    />
+                    <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
                   </span>
-                )}
-                {fullAgent?.updatedAt && (
-                  <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
-                    <Icon name="clock" className="w-3 h-3" />
-                    <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
+                  {fullAgent?.version && (
+                    <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
+                      <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
+                    </span>
+                  )}
+                  {fullAgent?.updatedAt && (
+                    <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
+                      <Icon name="clock" className="w-3 h-3" />
+                      <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
+                    </div>
+                  )}
+                </div>
+
+                {publicationStatus === 'rejected' && (
+                  <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+                    <span>Last request was rejected. Update your agent and request publication again.</span>
                   </div>
                 )}
               </div>
-
-              {publicationStatus === 'rejected' && (
-                <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                  <span>Last request was rejected. Update your agent and request publication again.</span>
-                </div>
-              )}
             </div>
-          </div>
-        )}
+          )}
 
-        {!readOnly && (
-          <div className="flex flex-col gap-1 items-start sm:items-end">
-            <div className="flex flex-wrap items-center gap-2">
-              {hasExistingAgent && (
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="primaryOutline"
-                  className="gap-1.5"
-                  disabled={isRequestingPublish || !canRequestPublication}
-                  onClick={() => {
-                    if (!canRequestPublication) return
+          {!readOnly && (
+            <div className="flex flex-col gap-1 items-start sm:items-end">
+              <div className="flex flex-wrap items-center gap-2">
+                {hasExistingAgent && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="primaryOutline"
+                    className="gap-1.5"
+                    disabled={isRequestingPublish || !canRequestPublication}
+                    onClick={() => {
+                      if (!canRequestPublication) return
 
-                    // Provide a sensible default changelog if none is set yet
-                    if (!changelog.trim()) {
-                      if (!fullAgent?.publishedTemplateId) {
-                        // First-time publish
-                        setChangelog('Initial publication of this agent to the marketplace.')
-                      } else if (publishedChangeDetails.length > 0) {
-                        // Re-publish with detected changes – summarize the changed fields
-                        const summary = publishedChangeDetails.join(', ').toLowerCase()
-                        setChangelog(`Updated ${summary}.`)
-                      } else {
-                        // Fallback when we can't detect specific fields
-                        setChangelog('Minor updates and fixes.')
-                      }
-                    }
-
-                    // Provide sensible default changelogs for tools as well, if not already set
-                    if (assignedToolsForOverrides.length > 0) {
-                      setToolOverrides(prev => {
-                        const next = { ...prev }
-                        for (const tool of assignedToolsForOverrides) {
-                          const existing = next[tool.id] || {
-                            versionBump: 'patch' as const,
-                            changelog: '',
-                          }
-                          if (existing.changelog && existing.changelog.trim()) continue
-
-                          const isNewTemplate = !tool.publishedTemplateId
-                          const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
-
-                          let defaultLog: string
-                          if (isNewTemplate) {
-                            defaultLog = 'Initial publication of this tool for this agent.'
-                          } else if (hasTemplateUpdate) {
-                            defaultLog = 'Synced latest tool definition changes for this agent.'
-                          } else {
-                            defaultLog = 'Minor updates and fixes for this tool.'
-                          }
-
-                          next[tool.id] = {
-                            versionBump: existing.versionBump || 'patch',
-                            changelog: defaultLog,
-                          }
+                      // Provide a sensible default changelog if none is set yet
+                      if (!changelog.trim()) {
+                        if (!fullAgent?.publishedTemplateId) {
+                          // First-time publish
+                          setChangelog('Initial publication of this agent to the marketplace.')
+                        } else if (publishedChangeDetails.length > 0) {
+                          // Re-publish with detected changes – summarize the changed fields
+                          const summary = publishedChangeDetails.join(', ').toLowerCase()
+                          setChangelog(`Updated ${summary}.`)
+                        } else {
+                          // Fallback when we can't detect specific fields
+                          setChangelog('Minor updates and fixes.')
                         }
-                        return next
-                      })
-                    }
+                      }
 
-                    // Always start the stepped flow at the agent card
-                    setActivePublishStep('agent')
-                    setShowPublishDialog(true)
-                  }}
-                >
-                  <Icon name="rocket-launch" className="w-3.5 h-3.5" />
-                  {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
-                </Button>
+                      // Provide sensible default changelogs for tools as well, if not already set
+                      if (assignedToolsForOverrides.length > 0) {
+                        setToolOverrides(prev => {
+                          const next = { ...prev }
+                          for (const tool of assignedToolsForOverrides) {
+                            const existing = next[tool.id] || {
+                              versionBump: 'patch' as const,
+                              changelog: '',
+                            }
+                            if (existing.changelog && existing.changelog.trim()) continue
+
+                            const isNewTemplate = !tool.publishedTemplateId
+                            const hasTemplateUpdate = !!tool.updateInfo?.needsUpdate
+
+                            let defaultLog: string
+                            if (isNewTemplate) {
+                              defaultLog = 'Initial publication of this tool for this agent.'
+                            } else if (hasTemplateUpdate) {
+                              defaultLog = 'Synced latest tool definition changes for this agent.'
+                            } else {
+                              defaultLog = 'Minor updates and fixes for this tool.'
+                            }
+
+                            next[tool.id] = {
+                              versionBump: existing.versionBump || 'patch',
+                              changelog: defaultLog,
+                            }
+                          }
+                          return next
+                        })
+                      }
+
+                      // Always start the stepped flow at the agent card
+                      setActivePublishStep('agent')
+                      setShowPublishDialog(true)
+                    }}
+                  >
+                    <Icon name="rocket-launch" className="w-3.5 h-3.5" />
+                    {isRequestingPublish ? 'Publishing…' : publicationStatus === 'pending_approval' ? 'Pending approval' : isRepublishable ? 'Publish update' : 'Publish'}
+                  </Button>
+                )}
+              </div>
+
+              {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
+                      {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
+                    </button>
+                  </TooltipTrigger>
+                  {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
+                    <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
+                      <div className="font-semibold mb-1 text-foreground">Changes since last published version</div>
+                      <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
+                        {publishedChangeDetails.map(change => (
+                          <li key={change}>{change}</li>
+                        ))}
+                      </ul>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               )}
             </div>
-
-            {hasExistingAgent && publicationStatus === 'published' && fullAgent?.publishedTemplateId && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <button type="button" className="text-[11px] text-muted-foreground cursor-pointer underline underline-offset-2 decoration-dotted px-0 py-0.5">
-                    {differsFromPublishedTemplate && publishedChangeDetails.length > 0 ? `${publishedChangeDetails.length} changes to publish` : 'No new changes to publish'}
-                  </button>
-                </TooltipTrigger>
-                {differsFromPublishedTemplate && publishedChangeDetails.length > 0 && (
-                  <TooltipContent side="bottom" align="end" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
-                    <div className="font-semibold mb-1 text-foreground">Changes since last published version</div>
-                    <ul className="list-disc list-inside space-y-0.5 text-muted-foreground">
-                      {publishedChangeDetails.map(change => (
-                        <li key={change}>{change}</li>
-                      ))}
-                    </ul>
-                  </TooltipContent>
-                )}
-              </Tooltip>
-            )}
-          </div>
-        )}
+          )}
         </div>
       ) : null}
 
@@ -1251,6 +1313,45 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
 
       {/* Quick selectors + core fields */}
       <div className="space-y-2 mb-4">
+        {/* Name */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+              <Icon name="id-card" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Name</span>
+            </div>
+            <div className="w-full sm:w-[260px]">
+              <Input
+                id="agent-name"
+                value={value.name}
+                onChange={e => onFieldChange?.('name', e.target.value)}
+                placeholder="Agent name"
+                disabled={isTemplateAgent || readOnly}
+                className={cn('text-sm h-7', selectLikeFieldClass)}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Role */}
+        <div className="border-b border-border/10 pb-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
+            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+              <Icon name="user-cog" className="w-4 h-4" />
+              <span className="text-xs font-semibold">Role</span>
+            </div>
+            <div className="w-full sm:w-[260px]">
+              <Input
+                value={value.role}
+                onChange={e => onFieldChange?.('role', e.target.value)}
+                placeholder='e.g. "Customer Support Agent"'
+                disabled={isTemplateAgent || readOnly}
+                className={cn('text-sm h-7', selectLikeFieldClass)}
+              />
+            </div>
+          </div>
+        </div>
+
         {/* Category section */}
         <div className="border-b border-border/10 pb-2">
           <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
@@ -1268,7 +1369,7 @@ export function AgentDocumentEditor({ value, onChange, onFieldChange, onSave, on
                   value: cat,
                   label: (
                     <span className="flex items-center gap-2">
-                      <span className={cn('h-2 w-2 rounded-full', CATEGORY_DOT_COLORS[cat] || CATEGORY_DOT_COLORS.general)} />
+                      <span className={cn('h-2 w-2 rounded-full', getCategoryDotColor(cat as any))} />
                       <span className="capitalize">{cat}</span>
                     </span>
                   ),

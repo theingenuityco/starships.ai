@@ -3,6 +3,8 @@ import { StarshipService } from '@/services/StarshipService';
 import { AgentRepository, StarshipRepository, ToolRepository } from '@starships/models';
 import type {
   AgentExportPayloadV1,
+  CreateAgentRequest,
+  CreateToolRequest,
   ImportExportContainerV1,
   ImportExportKind,
   StarshipImportResponse,
@@ -39,19 +41,21 @@ export class ImportExportService {
     const payload: AgentExportPayloadV1 = {
       agent: {
         name: agent.name,
+        role: agent.role || 'Assistant',
         description: agent.description,
         model: agent.model,
         temperature: agent.temperature,
         maxTokens: agent.maxTokens,
         timeout: agent.timeout,
-        reasoning: (agent as any).reasoning,
+        reasoning: agent.reasoning,
         systemPrompt: agent.systemPrompt,
         state: agent.state,
         blueprint: agent.blueprint,
         category: agent.category,
         previewPrompts: agent.previewPrompts,
-        avatarPrompt: agent.avatarPrompt,
-      } as any,
+        // NOTE: avatarPrompt is not part of CreateAgentRequest (and createAgent currently ignores it),
+        // so we intentionally do not export it as part of the create-compatible payload.
+      },
       assignedToolSlugs,
     };
 
@@ -85,13 +89,13 @@ export class ImportExportService {
         description: tool.description,
         parameters: tool.parameters,
         blueprint: tool.blueprint,
-        transforms: (tool as any).transforms,
-        mutations: (tool as any).mutations,
-        condition: (tool as any).condition,
+        transforms: tool.transforms,
+        mutations: tool.mutations,
+        condition: tool.condition,
         isEnabled: tool.isEnabled,
         status: tool.status,
         // Intentionally do not export versioning fields. Import should behave like a fresh copy.
-      } as any,
+      },
     };
 
     return {
@@ -116,43 +120,48 @@ export class ImportExportService {
       throw new Error('Starship not found');
     }
 
-    const kind: ImportExportKind = container.kind as ImportExportKind;
     const warnings: string[] = [];
 
-    if (kind === 'tool') {
-      const toolPayload = (container as ImportExportContainerV1<'tool'>).payload;
-      const t = toolPayload.tool as any;
+    const isKind = <K extends ImportExportKind>(c: ImportExportContainerV1, expected: K): c is ImportExportContainerV1<K> =>
+      c.kind === expected;
+
+    if (isKind(container, 'tool')) {
+      const toolPayload = container.payload;
+      const t = toolPayload.tool;
 
       // IMPORTANT: On import, do not reuse the exported slug (even debug metadata).
       // Always let the system generate a new unique slug for the destination starship.
-      const fromSlug = (container as any)?.metadata?.fromSlug;
+      const fromSlug = container.metadata?.fromSlug;
       if (typeof fromSlug === 'string' && fromSlug.trim().length > 0) {
         warnings.push(`Tool slug will be regenerated on import (source slug: ${fromSlug}).`);
       }
 
-      const created = await this.toolRepo.create(
-        {
-          name: t.name,
-          // Keep description defaulting consistent with other flows
-          description: typeof t.description === 'string' ? t.description : '',
-          parameters: t.parameters,
-          blueprint: t.blueprint,
-          transforms: t.transforms,
-          mutations: t.mutations,
-          condition: t.condition,
-          isEnabled: t.isEnabled,
-          status: t.status,
-          // Intentionally ignore versioning fields (version/templateSnapshotAt) on import.
-        } as any,
-        starshipId
-      );
+      if (typeof t?.name !== 'string' || t.name.trim().length === 0) {
+        throw new Error('Invalid import payload: tool.name is required');
+      }
+
+      const createToolData: CreateToolRequest = {
+        name: t.name,
+        // Keep description defaulting consistent with other flows
+        description: typeof t.description === 'string' ? t.description : '',
+        parameters: t.parameters,
+        blueprint: t.blueprint,
+        transforms: t.transforms,
+        mutations: t.mutations,
+        condition: t.condition,
+        isEnabled: t.isEnabled,
+        status: t.status,
+        // Intentionally ignore versioning fields (version/templateSnapshotAt) on import.
+      };
+
+      const created = await this.toolRepo.create(createToolData, starshipId);
 
       return { kind: 'tool', tool: created, warnings: warnings.length ? warnings : undefined };
     }
 
-    if (kind === 'agent') {
-      const agentPayload = (container as ImportExportContainerV1<'agent'>).payload;
-      const a = agentPayload.agent as any;
+    if (isKind(container, 'agent')) {
+      const agentPayload = container.payload;
+      const a = agentPayload.agent;
       const requestedToolSlugs = Array.isArray(agentPayload.assignedToolSlugs) ? agentPayload.assignedToolSlugs : [];
 
       // Build warnings for missing tools (we still import agent and silently skip missing relations).
@@ -165,12 +174,17 @@ export class ImportExportService {
         }
       }
 
-      const created = await this.agentService.createAgent({
+      if (typeof a?.name !== 'string' || a.name.trim().length === 0) {
+        throw new Error('Invalid import payload: agent.name is required');
+      }
+      if (typeof a?.model !== 'string' || a.model.trim().length === 0) {
+        throw new Error('Invalid import payload: agent.model is required');
+      }
+
+      const createAgentData: CreateAgentRequest & { starshipId: string } = {
         starshipId,
         name: a.name,
-        // IMPORTANT: On import, do not reuse the exported slug.
-        // Always let the system generate a new unique slug for the destination starship.
-        slug: undefined,
+        role: typeof a.role === 'string' && a.role.trim().length > 0 ? a.role : 'Assistant',
         description: a.description,
         model: a.model,
         temperature: a.temperature,
@@ -182,13 +196,14 @@ export class ImportExportService {
         blueprint: a.blueprint,
         category: a.category,
         previewPrompts: a.previewPrompts,
-        avatarPrompt: a.avatarPrompt,
         assignedToolSlugs: requestedToolSlugs,
-      } as any);
+      };
+
+      const created = await this.agentService.createAgent(createAgentData);
 
       return { kind: 'agent', agent: created, warnings: warnings.length ? warnings : undefined };
     }
 
-    throw new Error(`Unsupported import kind: ${String((container as any)?.kind)}`);
+    throw new Error(`Unsupported import kind: ${String(container.kind)}`);
   }
 }

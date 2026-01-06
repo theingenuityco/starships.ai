@@ -603,7 +603,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     if (chunk.type === 'snapshot') {
       const msgs = Array.isArray(chunk.data.messages) ? (chunk.data.messages as ClientMessage[]) : []
-      return msgs.map(m => withStreaming(m, false))
+      // Preserve streaming state for assistant messages in active turns - they may have been
+      // derived from Redis stream replay and should continue accumulating deltas.
+      const turn = chunk.data.turn
+      const isActiveTurn = turn && (turn.status === 'active' || turn.status === 'waiting_for_tools')
+      return msgs.map(m => {
+        // If this is an assistant message for an active turn, keep it as streaming so deltas can accumulate
+        const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && typeof m.turnId === 'string' && m.turnId === turn?.turnId)
+        return withStreaming(m, shouldStream)
+      })
     }
 
     if (chunk.type === 'append') {
@@ -738,44 +746,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return response.data
     },
     onMutate: async variables => {
-      // Optimistically append user message + local turn_started in the query cache (no local component state).
-      try {
-        const convId = (variables as any)?.conversationId as string | undefined
-        if (!convId) return
-        const content = String((variables as any)?.content ?? '')
-
-        // Avoid double-inject if ConversationMessageInput already pre-seeded
-        try {
-          const existing = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(convId)) as any[] | undefined
-          const existingArr = Array.isArray(existing) ? existing : []
-          const last = existingArr.length > 0 ? existingArr[existingArr.length - 1] : null
-          const prev = existingArr.length > 1 ? existingArr[existingArr.length - 2] : null
-          const hasLocalTurnStarted = last?.type === 'turn_started' && last?.payload?.local === true
-          const prevIsUserAppend = prev?.type === 'append' && prev?.message?.role === 'user'
-          const sameContent = prevIsUserAppend && String(prev?.message?.content ?? '') === content
-          const prevIsTemp = prevIsUserAppend && typeof prev?.message?.id === 'string' && String(prev.message.id).startsWith('temp-user-')
-          if (hasLocalTurnStarted && prevIsTemp && sameContent) {
-            return
-          }
-        } catch {}
-
-        const now = new Date().toISOString()
-        const tempUser: ClientMessage = {
-          id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-          role: 'user',
-          content,
-          createdAt: now,
-          updatedAt: now,
-          messageType: 'user_input',
-        }
-
-        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any[] | undefined) => {
-          const next = Array.isArray(old) ? old.slice() : []
-          next.push({ type: 'append', message: tempUser })
-          next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
-          return next
-        })
-      } catch {}
+      // No optimistic updates - wait for server to send message.append and turn.started events
+      // This avoids duplicate messages and keeps the UI in sync with server state
     },
     onError: (error: any) => {
       const errorMessage = getSafeErrorMessage(error)

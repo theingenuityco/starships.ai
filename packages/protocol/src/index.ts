@@ -48,5 +48,4 @@ export * from './domains/widget';
 export * from './contracts/api-response';
 export * from './contracts/errors';
 export * from './contracts/conversation-stream';
-export * from './contracts/streaming';
 export * from './contracts/import-export';

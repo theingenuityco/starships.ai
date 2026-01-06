@@ -1,9 +1,9 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, MessageModel, ConversationState } from '@starships/protocol'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
+import type { ApiResponse, ConversationModel, ConversationState, ConversationStreamEvent, ConversationStreamSnapshot, TurnStatus as StreamTurnStatus, MessageModel } from '@starships/protocol'
+import { experimental_streamedQuery as streamedQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
-import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
@@ -399,9 +399,25 @@ export function useUpdateConversation() {
 
 // Stop an in-flight streamed conversation turn across layers
 export function useConversationStop() {
+  const queryClient = useQueryClient()
+
   return useCallback(
     async (conversationId: string) => {
       if (!conversationId) return
+      try {
+        // Abort SSE locally
+        await queryClient.cancelQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } catch {}
+
+      // Optimistically finalize UI immediately (query-cache only; no local component state)
+      try {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
+          const chunks = Array.isArray(old) ? old.slice() : []
+          chunks.push({ type: 'turn.status', payload: { local: true, status: 'cancelled', at: new Date().toISOString() } })
+          return chunks
+        })
+      } catch {}
+
       try {
         // Signal server to persist partials and cancel autopilot
         await api.post(`/api/v1/conversations/${conversationId}/stop`)
@@ -410,178 +426,272 @@ export function useConversationStop() {
         toast.error('Failed to stop response', { description: msg })
         return
       }
+
+      // Force next attach to start from snapshot (safe, cross-pod)
+      try {
+        if (typeof window !== 'undefined') window.localStorage.removeItem(`conv:${conversationId}:cursor`)
+      } catch {}
     },
-    []
+    [queryClient]
   )
 }
 
 export function useConversationStreamed(conversationId: string | null, starshipId?: string | null, options?: { enabled?: boolean }) {
+  const queryClient = useQueryClient()
   const enabledFlag = options?.enabled !== false
-  const [messages, setMessages] = useState<ClientMessage[]>([])
-  const [lastUIAction, setLastUIAction] = useState<any>(null)
-  const [turn, setTurn] = useState<{ turnId: string; status: 'active' | 'waiting_for_tools' | 'completed' | 'failed' | 'cancelled' } | null>(null)
 
-  // Load initial snapshot (server REST)
-  useEffect(() => {
-    if (!conversationId || !enabledFlag) return
-    let cancelled = false
-    ;(async () => {
-      try {
-        const resp: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${conversationId}/messages`)
-        if (cancelled) return
-        const list = Array.isArray((resp as any)?.data?.data?.messages) ? ((resp as any).data.data.messages as any[]) : []
-        setMessages(list as ClientMessage[])
-      } catch {
-        /* ignore */
-      }
-    })()
-    return () => {
-      cancelled = true
-    }
-  }, [conversationId, enabledFlag])
+  type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
 
-  // Live SSE (Redis Streams-backed)
-  useEffect(() => {
-    if (!conversationId || !enabledFlag) return
-    let closed = false
-  const controller = new AbortController()
+  type LegacyChunk = { type: 'append'; message: ClientMessage } | { type: 'turn_started'; payload?: { local?: boolean } }
+  type StreamErrorChunk = { type: 'error'; error: unknown }
+  type StreamedChunk = ConversationStreamEvent | LegacyChunk | StreamErrorChunk
 
-    const cursorKey = `conv:${conversationId}:cursor`
+  // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events.
+  // IMPORTANT: This function does not use React local state; the entire event log lives in TanStack Query cache.
+  function makeSSEAsyncIterable(convId: string, token: string | null, signal?: AbortSignal): AsyncIterable<StreamedChunk> {
+    const cursorKey = `conv:${convId}:cursor`
     const cursor = typeof window !== 'undefined' ? window.localStorage.getItem(cursorKey) : null
-    const url = `/api/v1/conversations/${conversationId}/messages?stream=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
+    const url = `/api/v1/conversations/${convId}/messages?stream=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
 
-    ;(async () => {
-      const token = await getCurrentToken()
-  fetchEventSource(url, {
-    method: 'GET',
-    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        signal: controller.signal,
-    openWhenHidden: true,
-        onmessage(ev: any) {
-          if (closed) return
-          try {
-            if (typeof ev?.id === 'string' && ev.id) {
-              try {
-                if (typeof window !== 'undefined') window.localStorage.setItem(cursorKey, ev.id)
-              } catch {}
-            }
-            const type = String(ev?.event || '')
-            const data = ev?.data ? JSON.parse(ev.data) : null
-            if (!type || data == null) return
+    let closed = false
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
+    const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
 
-            if (type === 'snapshot') {
-              const nextMsgs = Array.isArray(data?.messages) ? (data.messages as ClientMessage[]) : []
-              setMessages(nextMsgs)
-              const t = data?.turn
-              if (t && typeof t.turnId === 'string' && typeof t.status === 'string') {
-                setTurn({ turnId: t.turnId, status: t.status })
-              } else {
-                setTurn(null)
-              }
-              return
-            }
+    type Resolver = (value: IteratorResult<StreamedChunk>) => void
+    const queue: StreamedChunk[] = []
+    const resolvers: Resolver[] = []
 
-            if (type === 'ui_action') {
-              setLastUIAction(data)
-              return
-            }
-
-            if (type === 'turn.started') {
-              if (typeof data?.turnId === 'string') {
-                setTurn({ turnId: data.turnId, status: 'active' })
-              }
-              return
-            }
-
-            if (type === 'turn.status') {
-              if (typeof data?.turnId === 'string' && typeof data?.status === 'string') {
-                setTurn({ turnId: data.turnId, status: data.status })
-                // Terminal statuses should stop any streaming messages
-                if (data.status === 'completed' || data.status === 'failed' || data.status === 'cancelled') {
-                  setMessages(prev =>
-                    prev.map(m => ((m as any).streaming ? ({ ...(m as any), streaming: false } as any) : m))
-                  )
-                }
-              }
-              return
-            }
-
-            if (type === 'message.append') {
-              const msg = data?.message as ClientMessage
-              if (!msg || typeof msg.id !== 'string') return
-              setMessages(prev => {
-                // If this is the persisted assistant for the active turn, replace the streaming placeholder message (stream-<turnId>)
-                const msgTurnId = (msg as any).turnId
-                if (msg.role === 'assistant' && typeof msgTurnId === 'string') {
-                  const streamId = `stream-${msgTurnId}`
-                  const idx = prev.findIndex(m => m.id === streamId)
-                  if (idx !== -1) {
-                    const next = prev.slice()
-                    next[idx] = { ...msg, streaming: false } as any
-                    return next
-                  }
-                }
-                if (prev.some(m => m.id === msg.id)) return prev
-                return [...prev, msg]
-              })
-              return
-            }
-
-            if (type === 'assistant.delta' || type === 'assistant.reasoning_delta') {
-              const messageId = String(data?.messageId || '')
-              const delta = String(data?.delta || '')
-              if (!messageId || !delta) return
-              setMessages(prev => {
-                const idx = prev.findIndex(m => m.id === messageId)
-                const now = new Date().toISOString()
-      if (idx === -1) {
-                  const m: any = {
-                    id: messageId,
-          role: 'assistant',
-                    content: type === 'assistant.delta' ? delta : '',
-                    reasoning: type === 'assistant.reasoning_delta' ? delta : undefined,
-          messageType: 'agent_response',
-                    createdAt: now,
-                    updatedAt: now,
-          streaming: true,
-                  }
-                  return [...prev, m]
-                }
-                const next = prev.slice()
-                const cur: any = { ...(prev[idx] as any) }
-                cur.updatedAt = now
-                cur.streaming = true
-                if (type === 'assistant.delta') {
-                  cur.content = String(cur.content || '') + delta
+    const push = (item: StreamedChunk) => {
+      if (closed) return
+      if (resolvers.length > 0) {
+        const resolve = resolvers.shift()!
+        resolve({ value: item, done: false })
       } else {
-                  cur.reasoning = String(cur.reasoning || '') + delta
-                }
-                next[idx] = cur
-                return next
-              })
-      return
+        queue.push(item)
+      }
     }
-    } catch {
-            // ignore parse errors
-          }
-        },
-        onerror() {
-          // Fail closed: keep existing state; client will retry on next mount
-          controller.abort()
-        },
-      })
-    })()
 
-    return () => {
+    const cleanup = () => {
+      if (closed) return
       closed = true
+      clearTimeout(timeoutId)
       controller.abort()
+      while (resolvers.length > 0) {
+        const resolve = resolvers.shift()!
+        resolve({ value: undefined as any, done: true })
+      }
+      queue.length = 0
     }
-  }, [conversationId, enabledFlag])
 
-  const isResponding = turn?.status === 'active' || turn?.status === 'waiting_for_tools'
-  const isAwaitingToolResults = turn?.status === 'waiting_for_tools'
-  const isAssistantStreaming = useMemo(() => messages.some(m => (m as any)?.streaming === true), [messages])
+    fetchEventSource(url, {
+      method: 'GET',
+      headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+      openWhenHidden: true,
+      signal: combinedSignal,
+      async onopen(response) {
+        if (!response.ok) {
+          push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
+          cleanup()
+        }
+      },
+      onmessage(ev: EventSourceMessage) {
+        try {
+          if (typeof ev.id === 'string' && ev.id) {
+            try {
+              if (typeof window !== 'undefined') window.localStorage.setItem(cursorKey, ev.id)
+            } catch {}
+          }
+
+          const eventType = String(ev.event || '')
+          const data = ev.data ? JSON.parse(ev.data) : null
+          if (!eventType || data == null) return
+
+          if (eventType === 'snapshot') {
+            push({ type: 'snapshot', data: data as ConversationStreamSnapshot })
+            return
+          }
+
+          // All other stream events are typed by the shared protocol contract:
+          // event name == ConversationStreamEvent['type'], data == ConversationStreamEvent['data']
+          if (
+            eventType === 'turn.started' ||
+            eventType === 'turn.status' ||
+            eventType === 'assistant.delta' ||
+            eventType === 'assistant.reasoning_delta' ||
+            eventType === 'message.append' ||
+            eventType === 'ui_action'
+          ) {
+            push({ type: eventType as ConversationStreamEvent['type'], data } as ConversationStreamEvent)
+            return
+          }
+        } catch (e) {
+          push({ type: 'error', error: e })
+        }
+      },
+      onclose() {
+        cleanup()
+      },
+      onerror(err) {
+        push({ type: 'error', error: err })
+        cleanup()
+      },
+    })
+
+    return {
+      [Symbol.asyncIterator]() {
+        return {
+          next: () => {
+            if (queue.length > 0) return Promise.resolve({ value: queue.shift()!, done: false })
+            if (closed) return Promise.resolve({ value: undefined as any, done: true })
+            return new Promise<IteratorResult<StreamedChunk>>(resolve => resolvers.push(resolve))
+          },
+          return: () => {
+            cleanup()
+            return Promise.resolve({ value: undefined as any, done: true })
+          },
+          throw: e => {
+            cleanup()
+            return Promise.reject(e)
+          },
+        }
+      },
+    }
+  }
+
+  const withStreaming = (m: ClientMessage, streaming: boolean): ClientMessage => ({ ...m, streaming })
+
+  function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessage[] {
+    const clone = (arr: ClientMessage[]) => arr.map(m => ({ ...m }) as ClientMessage)
+
+    // Terminal turn states should stop any in-progress streaming message.
+    if (chunk.type === 'turn.status') {
+      if (chunk.data.status === 'completed' || chunk.data.status === 'failed' || chunk.data.status === 'cancelled') {
+        return acc.map(m => (m.streaming ? withStreaming(m, false) : m))
+      }
+      return acc
+    }
+
+    if (chunk.type === 'snapshot') {
+      const msgs = Array.isArray(chunk.data.messages) ? (chunk.data.messages as ClientMessage[]) : []
+      return msgs.map(m => withStreaming(m, false))
+    }
+
+    if (chunk.type === 'append') {
+      return reduceMessages(acc, {
+        type: 'message.append',
+        data: { conversationId: conversationId || '', message: chunk.message },
+      } as ConversationStreamEvent)
+    }
+
+    if (chunk.type === 'message.append') {
+      const msg = chunk.data.message as ClientMessage
+      const messages = clone(acc)
+      if (!msg || !msg.id) return messages
+      if (messages.some(m => m.id === msg.id)) return messages
+
+      // Replace the streaming placeholder message for this turn (stream-<turnId>) if present.
+      const msgTurnId = msg.turnId
+      if (msg.role === 'assistant' && typeof msgTurnId === 'string') {
+        const streamId = `stream-${msgTurnId}`
+        const idx = messages.findIndex(m => m.id === streamId)
+        if (idx !== -1) {
+          messages[idx] = withStreaming(msg, false)
+          return messages
+        }
+      }
+      return [...messages, { ...msg }]
+    }
+
+    if (chunk.type === 'assistant.delta' || chunk.type === 'assistant.reasoning_delta') {
+      const messages = clone(acc)
+      const messageId = chunk.data.messageId
+      const delta = chunk.data.delta
+      if (!messageId || !delta) return messages
+
+      const idx = messages.findIndex(m => m.id === messageId)
+      const now = new Date().toISOString()
+      if (idx === -1) {
+        const shell: ClientMessage = {
+          id: messageId,
+          role: 'assistant',
+          content: chunk.type === 'assistant.delta' ? delta : '',
+          reasoning: chunk.type === 'assistant.reasoning_delta' ? delta : undefined,
+          messageType: 'agent_response',
+          createdAt: now,
+          updatedAt: now,
+          streaming: true,
+        } as ClientMessage
+        return [...messages, shell]
+      }
+      const cur: ClientMessage = { ...(messages[idx] as ClientMessage) }
+      cur.updatedAt = now
+      cur.streaming = true
+      if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
+      else cur.reasoning = String(cur.reasoning || '') + delta
+      messages[idx] = cur
+      return messages
+    }
+
+    return acc
+  }
+
+  function reduceTurn(acc: TurnState, chunk: StreamedChunk): TurnState {
+    if (chunk.type === 'snapshot') {
+      if (chunk.data.turn) return { turnId: chunk.data.turn.turnId, status: chunk.data.turn.status }
+      return acc
+    }
+    if (chunk.type === 'turn.started') {
+      return { turnId: chunk.data.turnId, status: 'active' }
+    }
+    if (chunk.type === 'turn.status') {
+      return { turnId: chunk.data.turnId ?? acc.turnId, status: chunk.data.status }
+    }
+    // Back-compat for local pre-seed
+    if (chunk.type === 'turn_started' && chunk.payload?.local === true) {
+      return { turnId: acc.turnId ?? 'pending', status: 'active' }
+    }
+    return acc
+  }
+
+  const messagesQuery = useQuery({
+    queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
+    queryFn: streamedQuery({
+      queryFn: async (_ctx: any) => {
+        const token = await getCurrentToken()
+        return makeSSEAsyncIterable(conversationId!, token, _ctx?.signal)
+      },
+      refetchMode: 'append',
+    }),
+    enabled: !!conversationId && enabledFlag,
+    refetchOnWindowFocus: false,
+    staleTime: 0,
+    gcTime: 2 * 60 * 1000,
+  })
+
+  const chunks = (messagesQuery.data as StreamedChunk[]) || []
+  const chunksLen = Array.isArray(chunks) ? chunks.length : 0
+  const lastChunkAny: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
+  const lastChunkSig = lastChunkAny?.type ? String(lastChunkAny.type) : 'none'
+  const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
+
+  const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunksRevisionKey])
+  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
+
+  const isAwaitingToolResults = turnState.status === 'waiting_for_tools'
+  const isAssistantStreaming = useMemo(() => computedMessages.some(m => m.streaming === true), [computedMessages])
+  const turnActive = turnState.status === 'active' || turnState.status === 'waiting_for_tools'
+  const isResponding = Boolean(turnActive || isAssistantStreaming)
   const isAwaitingAssistant = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+
+  const lastUIAction = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) return null
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i]
+      if (c?.type === 'ui_action') return c.data ?? null
+    }
+    return null
+  }, [chunksRevisionKey])
 
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {
@@ -595,21 +705,43 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return response.data
     },
     onMutate: async variables => {
-      // Optimistically append user message and flip turn to active immediately for UI responsiveness.
+      // Optimistically append user message + local turn_started in the query cache (no local component state).
       try {
         const convId = (variables as any)?.conversationId as string | undefined
         if (!convId) return
+        const content = String((variables as any)?.content ?? '')
+
+        // Avoid double-inject if ConversationMessageInput already pre-seeded
+        try {
+          const existing = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.messages(convId)) as any[] | undefined
+          const existingArr = Array.isArray(existing) ? existing : []
+          const last = existingArr.length > 0 ? existingArr[existingArr.length - 1] : null
+          const prev = existingArr.length > 1 ? existingArr[existingArr.length - 2] : null
+          const hasLocalTurnStarted = last?.type === 'turn_started' && last?.payload?.local === true
+          const prevIsUserAppend = prev?.type === 'append' && prev?.message?.role === 'user'
+          const sameContent = prevIsUserAppend && String(prev?.message?.content ?? '') === content
+          const prevIsTemp = prevIsUserAppend && typeof prev?.message?.id === 'string' && String(prev.message.id).startsWith('temp-user-')
+          if (hasLocalTurnStarted && prevIsTemp && sameContent) {
+            return
+          }
+        } catch {}
+
         const now = new Date().toISOString()
         const tempUser: ClientMessage = {
           id: `temp-user-${Date.now()}-${Math.random().toString(36).slice(2)}`,
           role: 'user',
-          content: String((variables as any)?.content ?? ''),
+          content,
           createdAt: now,
           updatedAt: now,
           messageType: 'user_input',
         }
-        setMessages(prev => [...prev, tempUser])
-        setTurn(prev => prev ?? { turnId: 'pending', status: 'active' })
+
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any[] | undefined) => {
+          const next = Array.isArray(old) ? old.slice() : []
+          next.push({ type: 'append', message: tempUser })
+          next.push({ type: 'turn_started', payload: { local: true, at: Date.now() } })
+          return next
+        })
       } catch {}
     },
     onError: (error: any) => {
@@ -619,20 +751,23 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   })
 
   return {
-    messages,
-    isLoading: false,
-    error: null,
+    messages: computedMessages,
+    isLoading: messagesQuery.isLoading,
+    error: messagesQuery.error,
     isStreaming: isResponding,
     isResponding,
     isAssistantStreaming,
     isAwaitingAssistant,
     isAwaitingToolResults,
-    hasCompleteEvent: turn?.status === 'completed' || turn?.status === 'failed' || turn?.status === 'cancelled',
+    hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
     lastUIAction,
-    isFetching: false,
+    isFetching: messagesQuery.fetchStatus === 'fetching',
     sendMessage: (data: CreateMessageRequest & { conversationId: string }) => sendMessageMutation.mutateAsync(data),
     isSending: sendMessageMutation.isPending,
-    refetch: () => Promise.resolve(),
-    invalidate: () => Promise.resolve(),
+    refetch: messagesQuery.refetch,
+    invalidate: () => {
+      if (!conversationId) return Promise.resolve()
+      return queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+    },
   }
 }

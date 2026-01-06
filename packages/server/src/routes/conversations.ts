@@ -1,7 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
 import { ConversationService } from '@/services/ConversationService';
-import { StreamingService } from '@/services/StreamingService';
+import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
@@ -9,14 +9,13 @@ import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { WalletService } from '@/services/WalletService';
-import { ResumeTokenService } from '@/services/ResumeTokenService';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { AgentService } from '@/services/AgentService';
 import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
-import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
+import { AgentRepository, ToolCallApprovalRepository, ToolRepository, TurnRepository } from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { AppError } from '@starships/errors';
@@ -212,114 +211,75 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
 
     if (wantsStreaming) {
-      // Add connection to streaming service - it will handle SSE headers and setup
-      const streamingService = new StreamingService();
-
-      // Server-driven resume via query param (avoid custom headers)
-      const resumeToken = typeof req.query.resumeToken === 'string' ? req.query.resumeToken : '';
-
-      // Determine a reliable baseline:
-      // - client hint (query.baselineLength) if provided
-      // - server truth (current messages count)
-      const clientBase = Number(req.query.baselineLength ?? 0) || 0;
-
-      // Fetch existing messages first to compute server-side count
-      const conversationService = new ConversationService();
-      const conversationMessages = await conversationService.getConversationMessages(conversationId);
-      const serverCount = conversationMessages.length;
-
-      // Use the larger of client hint and server truth to avoid undercounting
-      const baseLength = Math.max(clientBase, serverCount);
-
-      // Establish SSE connection with normalized baseline
-      streamingService.addConnection(conversationId, res, { baseLength });
-
-      // Send initial turn state snapshot so clients know if a turn is active after refresh
-      let turnActiveFlag = false;
+      // SSE streaming (Redis Streams)
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
       try {
-        const conversationService = new ConversationService();
-        const conversation = await conversationService.getConversationById(conversationId);
-        const convState = conversation?.state || {};
-        const lastCompleteAtRaw = (convState as { lastCompleteAt?: unknown })?.lastCompleteAt;
-        const lastCompleteAt = typeof lastCompleteAtRaw === 'string' ? lastCompleteAtRaw : null;
-        const bufferedState = streamingService.getBufferedTurnActive(conversationId);
-        turnActiveFlag = typeof bufferedState === 'boolean' ? bufferedState : !!convState.turnActive;
-        await streamingService.broadcastTurnState(conversationId, {
-          conversationId,
-          turnActive: turnActiveFlag,
-          lastCompleteAt,
-        });
-      } catch (err) {
-        // Swallow initial snapshot failure; SSE will continue without initial turn_state event
-        console.error('[CONVERSATIONS] Failed to send initial turn_state snapshot:', {
-          conversationId,
-          error: err instanceof Error ? err.message : String(err),
-        });
+        const maybe = res as unknown as { flushHeaders?: () => void };
+        if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
+      } catch {
+        /* ignore */
+      }
+      try {
+        res.write(':ok\n\n');
+      } catch {
+        /* ignore */
       }
 
-      // If this is a reconnection with Last-Event-ID, prefer event replay from buffer
-      // to avoid duplicating already-processed baseline messages. Otherwise send
-      // initial baseline snapshot messages.
-      if (resumeToken) {
-        // Verify token; fall back to baseline on failure
-        const svc = ResumeTokenService.getInstance();
-        const claims = svc.verify(resumeToken);
+      const bus = ConversationStreamBus.getInstance();
+      const conversationService = new ConversationService();
+      const turnRepo = new TurnRepository();
 
-        if (!claims || claims.c !== conversationId) {
-          // Invalid token; use baseline mode
-          const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
-          const messagesToSend = conversationMessages.slice(startIndexForSend);
-
-          if (messagesToSend.length > 0) {
-            for (const message of messagesToSend) {
-              await streamingService.broadcastMessage(conversationId, message);
+      // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
+      const conversationMessages = await conversationService.getConversationMessages(conversationId);
+      const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
+      const turn =
+        latestTurn && typeof latestTurn.id === 'string'
+          ? {
+              turnId: latestTurn.id,
+              status: latestTurn.status === 'active' ? 'active' : latestTurn.status,
+              startedAt: latestTurn.startedAt,
+              completedAt: latestTurn.completedAt,
             }
-          }
-        } else {
-          // 1) Replay persisted messages beyond last persisted id in token (claims.m)
-          let startIdx = 0;
-          if (claims.m && claims.m !== '0') {
-            const idx = conversationMessages.findIndex((m) => String(m.id) === String(claims.m));
-            startIdx = idx >= 0 ? idx + 1 : 0;
-          }
-          const persistedTail = conversationMessages.slice(startIdx);
-          let replayHasAssistantShell = false;
-          if (persistedTail.length > 0) {
-            for (const message of persistedTail) {
-              await streamingService.broadcastMessage(conversationId, message);
-            }
-            const lastAssistant = [...persistedTail].reverse().find((msg) => (msg as { role?: string })?.role === 'assistant');
-            replayHasAssistantShell = !!lastAssistant;
-          }
+          : null;
 
-          // 2) Replay current-turn buffered events (skip 'message' to avoid duplicate persisted messages)
-          const minContentPosition = typeof claims.p === 'number' ? claims.p : undefined;
-          await streamingService.replayCurrentTurn(conversationId, {
-            minContentPosition,
-            skipAssistantShell: !turnActiveFlag || replayHasAssistantShell,
-            turnIsActive: turnActiveFlag,
-          });
-        }
-      } else {
-        // Send only messages the client may be missing based on their baselineLength hint
-        const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
-        const messagesToSend = conversationMessages.slice(startIndexForSend);
+      const snapshotEvt = { type: 'snapshot', data: { conversationId, messages: conversationMessages, turn } };
+      res.write(`event: snapshot\n`);
+      res.write(`data: ${JSON.stringify(snapshotEvt.data)}\n\n`);
 
-        if (messagesToSend.length > 0) {
-          for (const message of messagesToSend) {
-            await streamingService.broadcastMessage(conversationId, message);
+      // 2) Stream live events from Redis from the provided cursor (or only new events if none)
+      let cursor: string = '$';
+      const qpCursor = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
+      const lastEventIdHeader = typeof req.headers['last-event-id'] === 'string' ? req.headers['last-event-id'] : undefined;
+      if (qpCursor) cursor = qpCursor;
+      else if (lastEventIdHeader) cursor = lastEventIdHeader;
+
+      let closed = false;
+      res.on('close', () => {
+        closed = true;
+      });
+
+      while (!closed && !res.writableEnded && !res.destroyed) {
+        const batch = await bus.read(conversationId, cursor, { blockMs: 25_000, count: 200 });
+        if (!batch || batch.length === 0) continue;
+        for (const item of batch) {
+          const id = item.id;
+          const evt = item.evt;
+          cursor = id;
+          try {
+            res.write(`id: ${id}\n`);
+            res.write(`event: ${evt.type}\n`);
+            res.write(`data: ${JSON.stringify(evt.data)}\n\n`);
+          } catch {
+            closed = true;
+            break;
           }
         }
-
-        // Also replay current turn events to cover race where streaming started just before connect
-        const baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');
-        await streamingService.replayCurrentTurn(conversationId, {
-          skipAssistantShell: !turnActiveFlag || baselineHasAssistant,
-          turnIsActive: turnActiveFlag,
-        });
       }
-
-      // Connection stays open for live updates via StreamingService
       return;
     } else {
       // Regular JSON response mode
@@ -544,18 +504,21 @@ router.post(
         }
 
         // Emit out-of-band UI action so the client can show an Approve/Deny prompt.
-        const streaming = new StreamingService();
-        await streaming.broadcastUIAction(conversationId, {
-          __ui_action: 'tool_approval_required',
-          approvalId,
-          conversationId,
-          starshipId: conversation.starshipId,
-          agentId,
-          agentName: agent.name,
-          toolId: resolvedTool.id,
-          toolSlug,
-          toolCallId,
-          args: args || {},
+        const bus = ConversationStreamBus.getInstance();
+        await bus.publish(conversationId, {
+          type: 'ui_action',
+          data: {
+            __ui_action: 'tool_approval_required',
+            approvalId,
+            conversationId,
+            starshipId: conversation.starshipId,
+            agentId,
+            agentName: agent.name,
+            toolId: resolvedTool.id,
+            toolSlug,
+            toolCallId,
+            args: args || {},
+          },
         });
 
         sendError(res, 'TOOL_APPROVAL_REQUIRED', 'Tool requires approval', 200, { approvalId, agentId, toolSlug, toolCallId });
@@ -694,14 +657,16 @@ router.post(
 
       // Best-effort broadcast: update last message (after client supports replace for non-assistant)
       try {
-        const streaming = new StreamingService();
-        // Broadcast as a normal message append (safe; client de-dupes by id)
-        await streaming.broadcastMessage(conversationId, created);
-        await streaming.broadcastUIAction(conversationId, {
-          __ui_action: 'tool_approval_resolved',
-          approvalId,
-          conversationId,
-          status: 'approved',
+        const bus = ConversationStreamBus.getInstance();
+        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: created } });
+        await bus.publish(conversationId, {
+          type: 'ui_action',
+          data: {
+            __ui_action: 'tool_approval_resolved',
+            approvalId,
+            conversationId,
+            status: 'approved',
+          },
         });
       } catch {
         // ignore broadcast failures
@@ -786,13 +751,16 @@ router.post(
       });
 
       try {
-        const streaming = new StreamingService();
-        await streaming.broadcastMessage(conversationId, created);
-        await streaming.broadcastUIAction(conversationId, {
-          __ui_action: 'tool_approval_resolved',
-          approvalId,
-          conversationId,
-          status: 'denied',
+        const bus = ConversationStreamBus.getInstance();
+        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: created } });
+        await bus.publish(conversationId, {
+          type: 'ui_action',
+          data: {
+            __ui_action: 'tool_approval_resolved',
+            approvalId,
+            conversationId,
+            status: 'denied',
+          },
         });
       } catch {
         /* ignore broadcast failures */

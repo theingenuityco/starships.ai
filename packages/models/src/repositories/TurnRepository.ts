@@ -114,4 +114,20 @@ export class TurnRepository extends BaseRepository {
       id
     );
   }
+
+  async findLatestByConversationId(conversationId: string): Promise<TurnModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          'SELECT * FROM turns WHERE conversation_id = $1 ORDER BY started_at DESC, created_at DESC LIMIT 1',
+          [conversationId]
+        );
+        return row ? TurnRepository.mapRow(row) : null;
+      },
+      'findLatestByConversationId',
+      'Turn',
+      conversationId
+    );
+  }
 }

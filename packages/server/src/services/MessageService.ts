@@ -44,9 +44,7 @@ export class MessageService {
 
     // Link attachments to message if provided
     if (request.attachmentIds && request.attachmentIds.length > 0) {
-      await Promise.all(
-        request.attachmentIds.map((attachmentId) => this.attachmentRepository.linkToMessage(attachmentId, message.id))
-      );
+      await Promise.all(request.attachmentIds.map((attachmentId) => this.attachmentRepository.linkToMessage(attachmentId, message.id)));
     }
 
     return message;

@@ -187,29 +187,52 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     // Conversation state for web browsing toggle
     const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
     const updateConversationState = useUpdateConversationState()
-    
+
     // Local state for web browsing preference before conversation exists
     const [pendingWebBrowsing, setPendingWebBrowsing] = useState(false)
-    
+
     const hasWebBrowsing = useMemo(() => {
       // If conversation exists, use its state
       if (conversation?.state) {
-        const state = conversation.state as ConversationState;
-        const plugins = state.plugins;
+        const state = conversation.state as ConversationState
+        const plugins = state.plugins
         if (Array.isArray(plugins)) {
-          return plugins.some((p: ConversationPlugin) => p?.id === 'web');
+          return plugins.some((p: ConversationPlugin) => p?.id === 'web')
         }
       }
       // Otherwise use pending preference
       return pendingWebBrowsing
     }, [conversation?.state, pendingWebBrowsing])
-    
+
     // Reset pending state when conversation is created
     useEffect(() => {
       if (conversationId && pendingWebBrowsing) {
         setPendingWebBrowsing(false)
       }
     }, [conversationId, pendingWebBrowsing])
+
+    // Helper to apply pending web browsing preference to a newly created conversation
+    // This is non-blocking - errors are handled by the mutation's onError handler
+    const applyPendingWebBrowsing = useCallback(
+      async (newConversationId: string): Promise<void> => {
+        if (!pendingWebBrowsing) return
+
+        try {
+          // Apply the preference - mutation handles errors and shows toast internally
+          await updateConversationState.mutateAsync({
+            conversationId: newConversationId,
+            state: {
+              plugins: [{ id: 'web', max_results: 3 }],
+            } as ConversationState,
+          })
+        } catch {
+          // Error already handled by mutation's onError handler (shows toast)
+          // Silently continue to avoid blocking message sending
+        }
+      },
+      [pendingWebBrowsing, updateConversationState]
+    )
+
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
@@ -375,24 +398,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           currentConversationId = newConversation.id
           sendConversationId = currentConversationId
           createdNewConversation = true
-          
+
           // Apply pending web browsing preference if enabled
-          if (pendingWebBrowsing) {
-            try {
-              await updateConversationState.mutateAsync({
-                conversationId: currentConversationId,
-                state: {
-                  plugins: [{ id: 'web', max_results: 3 }],
-                } as ConversationState,
-              });
-            } catch (error) {
-              const errorMessage = error instanceof Error ? error.message : 'Failed to apply web browsing preference';
-              console.warn('Failed to apply web browsing preference to new conversation:', error);
-              toast.error('Failed to enable web browsing', {
-                description: errorMessage,
-              });
-            }
-          }
+          await applyPendingWebBrowsing(currentConversationId)
         }
         sendConversationId = currentConversationId!
         // Ensure local ref is updated immediately for stop button usability
@@ -520,8 +528,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       onAgentChange,
       starshipAgents,
       queryClient,
-      pendingWebBrowsing,
-      updateConversationState,
+      applyPendingWebBrowsing,
     ])
 
     // Handle suggestion clicks
@@ -575,24 +582,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             currentConversationId = newConversation.id
             sendConversationId = currentConversationId
             createdNewConversation = true
-            
+
             // Apply pending web browsing preference if enabled
-            if (pendingWebBrowsing) {
-              try {
-                await updateConversationState.mutateAsync({
-                  conversationId: currentConversationId,
-                  state: {
-                    plugins: [{ id: 'web', max_results: 3 }],
-                  } as ConversationState,
-                });
-              } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Failed to apply web browsing preference';
-                console.warn('Failed to apply web browsing preference to new conversation:', error);
-                toast.error('Failed to enable web browsing', {
-                  description: errorMessage,
-                });
-              }
-            }
+            await applyPendingWebBrowsing(currentConversationId)
           }
           sendConversationId = currentConversationId!
           // Ensure local ref is updated immediately for stop button usability
@@ -636,7 +628,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           streamingRef.current = false
         }
       },
-      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, pendingWebBrowsing, updateConversationState]
+      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, applyPendingWebBrowsing]
     )
 
     // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
@@ -1537,11 +1529,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               <button
                 onClick={() => fileInputRef.current?.click()}
                 disabled={disabled || fileUploading}
-                className={cn(
-                  'p-1.5 rounded-lg transition-colors',
-                  'hover:bg-muted text-muted-foreground hover:text-foreground',
-                  'disabled:opacity-50 disabled:cursor-not-allowed'
-                )}
+                className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
                 aria-label="Attach file"
                 title="Attach file (images, PDFs)"
               >
@@ -1553,48 +1541,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 onClick={() => {
                   if (conversationId) {
                     // Update existing conversation
-                    const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }];
+                    const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
                     updateConversationState.mutate({
                       conversationId,
                       state: {
                         plugins: newPlugins,
                       } as ConversationState,
-                    }, {
-                      onError: (error) => {
-                        const errorMessage = error instanceof Error ? error.message : 'Failed to update web browsing setting';
-                        toast.error('Failed to update web browsing', {
-                          description: errorMessage,
-                        });
-                      },
-                    });
+                    })
                   } else {
                     // Store preference for when conversation is created
                     setPendingWebBrowsing(!pendingWebBrowsing)
                   }
                 }}
                 disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
-                  className={cn(
-                    'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
-                    hasWebBrowsing
-                      ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                      : 'hover:bg-muted text-muted-foreground hover:text-foreground',
-                    'disabled:opacity-50 disabled:cursor-not-allowed'
-                  )}
-                  aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
-                  title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
-                >
-                  {hasWebBrowsing ? (
-                    <>
-                      <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
-                        <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
-                        <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                      <span className="text-xs font-medium whitespace-nowrap">Search</span>
-                    </>
-                  ) : (
-                    <Icon name="globe" className="h-5 w-5" />
-                  )}
-                </button>
+                className={cn(
+                  'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
+                  hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+                aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+              >
+                {hasWebBrowsing ? (
+                  <>
+                    <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                      <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                      <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <span className="text-xs font-medium whitespace-nowrap">Search</span>
+                  </>
+                ) : (
+                  <Icon name="globe" className="h-5 w-5" />
+                )}
+              </button>
 
               {/* Stop (when streaming) or Send Button */}
               {shouldShowStop ? (

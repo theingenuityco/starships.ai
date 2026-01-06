@@ -1,5 +1,5 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, MessageModel, ConversationState } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -309,7 +309,7 @@ export function useUpdateConversationState() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ conversationId, state }: { conversationId: string; state: Record<string, unknown> }) => {
+    mutationFn: async ({ conversationId, state }: { conversationId: string; state: Partial<ConversationState> | Record<string, unknown> }) => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${conversationId}`, { state })
       return response.data.data
     },

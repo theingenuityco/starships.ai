@@ -25,6 +25,7 @@ export * from './domains/agent-template';
 export * from './domains/attachment';
 export * from './domains/auth';
 export * from './domains/conversation';
+export * from './domains/conversation-state';
 export * from './domains/message';
 export * from './domains/starship';
 export * from './domains/connector-secrets';

@@ -34,6 +34,13 @@ import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
+import {
+  resolvePlugins,
+  mergeConversationState,
+  extractPersistableState as extractPersistableStateUtil,
+  hasPlugins,
+} from '@/utils/conversation-state';
+import type { ConversationState, AgentState } from '@starships/protocol';
 
 /**
  * Autopilot child process configuration
@@ -335,32 +342,28 @@ export class ConversationService {
     if (conversation.parentConversationId) {
       try {
         const parentConversation = await this.getConversationById(conversation.parentConversationId);
-        if (parentConversation?.state && typeof parentConversation.state === 'object') {
-          const parentState = parentConversation.state as Record<string, unknown>;
-          // Inherit plugins from parent (could be undefined, [], or [{ id: 'web', ... }])
-          if ('plugins' in parentState) {
-            const updated = await this.updateConversation(conversation.id, {
-              state: {
-                plugins: parentState.plugins,
-              },
-            });
-            if (updated) {
-              conversation = updated; // Use the updated conversation with inherited state
-            }
-            console.log('[createConversation] Inherited plugins from parent conversation:', {
-              childConversationId: conversation.id,
-              parentConversationId: conversation.parentConversationId,
-              inheritedPlugins: parentState.plugins,
-            });
+        const parentState = (parentConversation?.state || {}) as ConversationState;
+
+        // Inherit plugins from parent (could be undefined, [], or [{ id: 'web', ... }])
+        if (hasPlugins(parentState) || parentState.plugins === null || Array.isArray(parentState.plugins)) {
+          const updated = await this.updateConversation(conversation.id, {
+            state: {
+              plugins: parentState.plugins,
+            },
+          });
+          if (updated) {
+            conversation = updated; // Use the updated conversation with inherited state
           }
         }
       } catch (e) {
         // Non-fatal: failure to inherit state should not break conversation creation
+        const errorMessage = e instanceof Error ? e.message : String(e);
         console.warn('[createConversation] Failed to inherit plugin state from parent:', {
-          error: e instanceof Error ? e.message : String(e),
+          error: errorMessage,
           parentConversationId: conversation.parentConversationId,
           childConversationId: conversation.id,
         });
+        // Log to error tracking if available, but don't throw
       }
     }
 
@@ -546,61 +549,26 @@ export class ConversationService {
    */
   async updateConversation(
     conversationId: string,
-    updates: { title?: string; state?: Record<string, unknown> }
+    updates: { title?: string; state?: Partial<ConversationState> | Record<string, unknown> }
   ): Promise<ConversationModel | null> {
     try {
-      console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
-
       // If state is being updated, merge with existing state
       if (updates.state !== undefined) {
         const existing = await this.getConversationById(conversationId);
-        const existingState = existing?.state || {};
+        const existingState = (existing?.state || {}) as ConversationState;
 
-        console.log('[updateConversation] State update:', {
-          conversationId,
-          existingState,
-          updatesState: updates.state,
-          pluginsValue: updates.state.plugins,
-          pluginsType: typeof updates.state.plugins,
-          pluginsIsArray: Array.isArray(updates.state.plugins),
-        });
-
-        // Shallow merge: spread existing state, then spread updates
-        // Empty array [] means "explicitly no plugins" (keep it in state)
-        // undefined means "preserve existing" (don't change)
-        // null means "remove" (but we now use [] for disable, so this is legacy)
-        const mergedState = { ...existingState, ...updates.state };
-
-        // Handle explicit null: remove plugins from state (legacy behavior)
-        // Note: Frontend now uses [] for disable instead of null
-        if (updates.state.plugins === null) {
-          const { plugins: _, ...rest } = mergedState;
-          updates.state = rest;
-          console.log('[updateConversation] Removed plugins key (null)');
-        } else {
-          updates.state = mergedState;
-          console.log('[updateConversation] Merged state:', updates.state);
-        }
+        // Use centralized merge utility
+        const mergedState = mergeConversationState(existingState, updates.state);
+        updates.state = mergedState;
       }
 
       // Use the repository's update method
-      console.log('[updateConversation] About to update repository with:', {
-        conversationId,
-        updatesState: updates.state,
-        pluginsInUpdates: updates.state?.plugins,
-      });
-
       const updatedConversation = await this.conversationRepository.update(conversationId, {
         ...updates,
         updatedAt: new Date().toISOString(),
       });
 
-      if (updatedConversation) {
-        console.log(`[ConversationService] Successfully updated conversation ${conversationId}`, {
-          updatedState: updatedConversation.state,
-          pluginsInUpdatedState: (updatedConversation.state as Record<string, unknown>)?.plugins,
-        });
-      } else {
+      if (!updatedConversation) {
         console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
       }
 
@@ -615,25 +583,7 @@ export class ConversationService {
    * Extract persistable state fields from execution state
    */
   private extractPersistableState(executionState: Record<string, unknown> | undefined): Record<string, unknown> | null {
-    if (!executionState || typeof executionState !== 'object') {
-      return null;
-    }
-
-    const persistable: Record<string, unknown> = {};
-    // Persist most execution state to conversation.state, but keep certain keys ephemeral
-    // (per-turn/per-request) so they don't "stick" across turns.
-    // Plugins are conversation-level only (controlled by UI toggle) and should NEVER be persisted from execution state
-    const blacklist = new Set(['messages', 'tools', 'modalities', 'imageConfig', 'plugins']);
-
-    // Blacklist: Store everything except messages, tools, and plugins
-    // Plugins are managed exclusively via conversation state updates (UI toggle), not from execution state
-    for (const [key, value] of Object.entries(executionState)) {
-      if (!blacklist.has(key)) {
-        persistable[key] = value;
-      }
-    }
-
-    return Object.keys(persistable).length > 0 ? persistable : null;
+    return extractPersistableStateUtil(executionState);
   }
 
   /**
@@ -766,28 +716,10 @@ export class ConversationService {
    * @returns Resolved plugins (conversation plugins if defined, otherwise undefined = no plugins)
    */
   private resolvePlugins(
-    conversationState: Record<string, unknown> | undefined,
-    _agentState: Record<string, unknown> | undefined // Ignored - kept for backwards compatibility
+    conversationState: ConversationState | Record<string, unknown> | undefined,
+    agentState: AgentState | Record<string, unknown> | undefined
   ): unknown[] | undefined {
-    const conversationPlugins = (conversationState as { plugins?: unknown })?.plugins;
-
-    // Debug logging (agentPlugins logged for debugging but not used)
-    console.log('[resolvePlugins] Resolving plugins (conversation-only):', {
-      conversationPlugins,
-      conversationPluginsType: typeof conversationPlugins,
-      conversationPluginsIsArray: Array.isArray(conversationPlugins),
-      note: 'Agent plugins are ignored - conversation-level plugins are the only source of truth',
-    });
-
-    // Conversation-level plugins are the ONLY source of truth
-    // Empty array [] means "explicitly no plugins" (disabled)
-    // undefined means "not set" (default = no plugins)
-    // null is treated as undefined for consistency
-    // Agent plugins are completely ignored (no fallback)
-    const resolved = conversationPlugins !== undefined && conversationPlugins !== null ? conversationPlugins : undefined;
-
-    console.log('[resolvePlugins] Resolved plugins:', resolved);
-    return resolved as unknown[] | undefined;
+    return resolvePlugins(conversationState, agentState);
   }
 
   /**
@@ -1000,13 +932,6 @@ export class ConversationService {
     const latestConversation = await this.getConversationById(data.conversationId);
     const conversationState = (latestConversation?.state || {}) as Record<string, unknown>;
 
-    console.log('[streamConversation] Loading conversation state:', {
-      conversationId: data.conversationId,
-      conversationState,
-      hasPlugins: 'plugins' in conversationState,
-      plugins: conversationState.plugins,
-    });
-
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
     this.suppressCompleteFor.add(data.conversationId);
 
@@ -1057,14 +982,6 @@ export class ConversationService {
           conversationState as Record<string, unknown> | undefined,
           baseState as Record<string, unknown> | undefined
         );
-
-        console.log('[streamConversation] Plugin resolution result:', {
-          conversationId: data.conversationId,
-          agentId: agentModel.id,
-          resolvedPlugins: plugins,
-          pluginsType: typeof plugins,
-          pluginsIsArray: Array.isArray(plugins),
-        });
 
         // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
         const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
@@ -1296,7 +1213,7 @@ export class ConversationService {
           : ({ messages: [], tools: [] } as any);
 
       // Resolve plugins from conversation state only (agent plugins ignored)
-      const plugins = this.resolvePlugins(conversationState, baseState);
+      const plugins = this.resolvePlugins(conversationState as ConversationState | undefined, baseState as AgentState | undefined);
 
       // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
       const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
@@ -2662,18 +2579,16 @@ export class ConversationService {
             if (evolvedState) {
               // Get existing conversation state to preserve plugins
               const existingConversation = await this.getConversationById(conversationId);
-              const existingState = (
-                existingConversation?.state && typeof existingConversation.state === 'object' ? existingConversation.state : {}
-              ) as Record<string, unknown>;
+              const existingState = (existingConversation?.state || {}) as ConversationState;
 
               // Merge: preserve plugins from existing state, update other fields from evolved state
               // Plugins are conversation-level only (controlled by UI toggle) and should NEVER be overwritten by execution state
-              const mergedState = {
-                ...existingState,
-                ...evolvedState,
-                // Explicitly preserve plugins from existing state (plugins are never in evolvedState due to blacklist)
-                ...(existingState.plugins !== undefined ? { plugins: existingState.plugins } : {}),
-              };
+              const mergedState = mergeConversationState(existingState, evolvedState);
+
+              // Explicitly preserve plugins from existing state (plugins are never in evolvedState due to blacklist)
+              if (hasPlugins(existingState)) {
+                mergedState.plugins = existingState.plugins;
+              }
 
               await this.conversationRepository.update(conversationId, {
                 state: mergedState,

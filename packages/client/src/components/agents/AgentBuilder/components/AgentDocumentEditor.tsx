@@ -28,6 +28,12 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentPublishModal } from './AgentPublishModal'
+import {
+  areStatesEqual,
+  shouldSkipStateUpdateToPreservePlugins,
+  baseStateHasPlugins,
+} from '@/utils/agent-state'
+import type { ConversationState } from '@starships/protocol'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -949,55 +955,31 @@ export function AgentDocumentEditor({
       }
 
       // State (including plugins for web browsing)
-      // CRITICAL: Only update state if form has state AND it differs from base
+      // Only update state if form has state AND it differs from base
       // If form state is missing plugins but base has plugins, don't remove them
       if (value.state && typeof value.state === 'object') {
-        const baseState = (base.state && typeof base.state === 'object' ? base.state : {}) as Record<string, unknown>
-        const nextState = value.state as Record<string, unknown>
-        
-        // Normalize both states for comparison (handle undefined vs missing plugins)
-        const normalizeState = (s: Record<string, unknown>): Record<string, unknown> => {
-          const normalized = { ...s }
-          // Remove plugins key if it's undefined (treat undefined as missing)
-          if ('plugins' in normalized && normalized.plugins === undefined) {
-            delete normalized.plugins
-          }
-          // Ensure messages and tools arrays exist for comparison
-          if (!('messages' in normalized)) normalized.messages = []
-          if (!('tools' in normalized)) normalized.tools = []
-          return normalized
-        }
-        
-        const normalizedNext = normalizeState(nextState)
-        const normalizedBase = normalizeState(baseState)
-        const nextStateStr = stableStringify(normalizedNext)
-        const baseStateStr = stableStringify(normalizedBase)
-        
-        // CRITICAL CHECK: If base has plugins but next doesn't, don't remove them
-        // This prevents autosave from removing plugins when form state is incomplete
-        const baseHasPlugins = 'plugins' in normalizedBase && Array.isArray(normalizedBase.plugins) && normalizedBase.plugins.length > 0
-        const nextHasPlugins = 'plugins' in normalizedNext && Array.isArray(normalizedNext.plugins) && normalizedNext.plugins.length > 0
-        
-        if (baseHasPlugins && !nextHasPlugins) {
+        const baseState = (base.state && typeof base.state === 'object' ? base.state : {}) as ConversationState;
+        const nextState = value.state as ConversationState;
+
+        // Check if we should skip update to preserve plugins
+        if (shouldSkipStateUpdateToPreservePlugins(baseState, nextState)) {
           console.log('[Autosave] Base has plugins but form state missing them - preserving base state, skipping update');
           // Don't update - preserve base state with plugins
-        } else if (nextStateStr !== baseStateStr) {
-          console.log('[Autosave] State changed, including in update:', { 
-            nextState: normalizedNext, 
-            baseState: normalizedBase, 
-            hasPlugins: 'plugins' in normalizedNext,
-            plugins: (normalizedNext.plugins as unknown[])
+        } else if (!areStatesEqual(baseState, nextState)) {
+          console.log('[Autosave] State changed, including in update:', {
+            nextState,
+            baseState,
+            hasPlugins: 'plugins' in nextState,
+            plugins: nextState.plugins,
           });
-          updates.state = nextState
+          updates.state = nextState;
         } else {
           console.log('[Autosave] State unchanged, skipping update');
         }
       } else if (base.state && typeof base.state === 'object') {
         // If form has no state but base has state, preserve base state
         // This ensures plugins aren't lost when form state is reset
-        const baseState = base.state as Record<string, unknown>
-        const hasPlugins = 'plugins' in baseState && Array.isArray(baseState.plugins) && baseState.plugins.length > 0
-        if (hasPlugins) {
+        if (baseStateHasPlugins(base.state as ConversationState)) {
           console.log('[Autosave] Form missing state but base has plugins - preserving base state');
           // Don't update - let base state persist
         }

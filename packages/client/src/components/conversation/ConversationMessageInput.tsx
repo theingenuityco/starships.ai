@@ -11,7 +11,7 @@ import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useWallet } from '@/hooks/useWallet'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import type { AgentModel } from '@starships/protocol'
+import type { AgentModel, ConversationState, ConversationPlugin } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -193,13 +193,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     
     const hasWebBrowsing = useMemo(() => {
       // If conversation exists, use its state
-      if (conversation?.state?.plugins) {
-        const plugins = conversation.state.plugins
-        return Array.isArray(plugins) && plugins.some((p: any) => p?.id === 'web')
+      if (conversation?.state) {
+        const state = conversation.state as ConversationState;
+        const plugins = state.plugins;
+        if (Array.isArray(plugins)) {
+          return plugins.some((p: ConversationPlugin) => p?.id === 'web');
+        }
       }
       // Otherwise use pending preference
       return pendingWebBrowsing
-    }, [conversation?.state?.plugins, pendingWebBrowsing])
+    }, [conversation?.state, pendingWebBrowsing])
     
     // Reset pending state when conversation is created
     useEffect(() => {
@@ -380,10 +383,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 conversationId: currentConversationId,
                 state: {
                   plugins: [{ id: 'web', max_results: 3 }],
-                },
-              })
+                } as ConversationState,
+              });
             } catch (error) {
-              console.warn('Failed to apply web browsing preference to new conversation:', error)
+              const errorMessage = error instanceof Error ? error.message : 'Failed to apply web browsing preference';
+              console.warn('Failed to apply web browsing preference to new conversation:', error);
+              toast.error('Failed to enable web browsing', {
+                description: errorMessage,
+              });
             }
           }
         }
@@ -576,10 +583,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   conversationId: currentConversationId,
                   state: {
                     plugins: [{ id: 'web', max_results: 3 }],
-                  },
-                })
+                  } as ConversationState,
+                });
               } catch (error) {
-                console.warn('Failed to apply web browsing preference to new conversation:', error)
+                const errorMessage = error instanceof Error ? error.message : 'Failed to apply web browsing preference';
+                console.warn('Failed to apply web browsing preference to new conversation:', error);
+                toast.error('Failed to enable web browsing', {
+                  description: errorMessage,
+                });
               }
             }
           }
@@ -1542,12 +1553,20 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                 onClick={() => {
                   if (conversationId) {
                     // Update existing conversation
+                    const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }];
                     updateConversationState.mutate({
                       conversationId,
                       state: {
-                        plugins: hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }],
+                        plugins: newPlugins,
+                      } as ConversationState,
+                    }, {
+                      onError: (error) => {
+                        const errorMessage = error instanceof Error ? error.message : 'Failed to update web browsing setting';
+                        toast.error('Failed to update web browsing', {
+                          description: errorMessage,
+                        });
                       },
-                    })
+                    });
                   } else {
                     // Store preference for when conversation is created
                     setPendingWebBrowsing(!pendingWebBrowsing)

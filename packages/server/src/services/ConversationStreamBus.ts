@@ -200,4 +200,67 @@ export class ConversationStreamBus {
 
     return out;
   }
+
+  /**
+   * Read events in reverse chronological order (newest -> oldest) up to a start ID (inclusive).
+   *
+   * Useful for building a "best-effort" snapshot of in-progress streaming state without replaying
+   * the entire stream.
+   */
+  async readReverse(
+    conversationId: string,
+    startId: string,
+    opts?: { endId?: string; count?: number },
+    redisOverride?: RedisClient
+  ): Promise<Array<{ id: string; evt: ConversationStreamEvent }>> {
+    const key = this.streamKey(conversationId);
+    const endId = typeof opts?.endId === 'string' && opts.endId ? opts.endId : '-';
+    const count = typeof opts?.count === 'number' && opts.count > 0 ? Math.floor(opts.count) : 2_000;
+
+    let raw: unknown;
+    try {
+      const client = redisOverride ?? this.redis;
+      raw = await client.call('XREVRANGE', key, startId, endId, 'COUNT', String(count));
+    } catch (e) {
+      if (redisOverride && e instanceof Error && /connection is closed/i.test(e.message)) {
+        return [];
+      }
+      this.logWarn('[ConversationStreamBus] readReverse failed', {
+        conversationId,
+        key,
+        startId,
+        endId,
+        count,
+        override: !!redisOverride,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      return [];
+    }
+
+    if (!Array.isArray(raw) || raw.length === 0) return [];
+
+    const out: Array<{ id: string; evt: ConversationStreamEvent }> = [];
+    for (const entry of raw) {
+      if (!Array.isArray(entry) || entry.length < 2) continue;
+      const id = ConversationStreamBus.toStringSafe(entry[0]);
+      const kvAny = entry[1];
+      if (!id || !Array.isArray(kvAny)) continue;
+
+      const kv = kvAny.map((v: unknown) => ConversationStreamBus.toStringSafe(v));
+      const idx = kv.findIndex((x) => x === 'evt');
+      const payload = idx >= 0 ? kv[idx + 1] : '';
+      if (!payload) continue;
+
+      try {
+        const evt = JSON.parse(payload) as ConversationStreamEvent;
+        if (!evt || typeof (evt as { type?: unknown }).type !== 'string') continue;
+        out.push({ id, evt });
+      } catch (e) {
+        void e;
+        continue;
+      }
+    }
+
+    return out;
+  }
 }

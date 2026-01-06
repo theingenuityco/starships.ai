@@ -279,10 +279,13 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         /* best-effort */
       }
 
-      let cursor: string = '';
-      if (qpCursor) cursor = qpCursor;
-      else if (lastEventIdHeader) cursor = lastEventIdHeader;
-      else cursor = lastId ?? '0-0';
+      // Snapshot cursor:
+      // - Always align snapshot to the current tail (if available) so refresh/reconnect can
+      //   immediately render the in-progress state, then continue streaming from that point.
+      // - We still accept client cursors, but we don't *depend* on them for reconstructing UI state
+      //   (a full page refresh loses in-memory deltas).
+      const snapshotCursor: string = lastId ?? qpCursor ?? lastEventIdHeader ?? '0-0';
+      let cursor: string = snapshotCursor;
 
       // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
       const conversationMessages = await conversationService.getConversationMessages(conversationId);
@@ -297,7 +300,90 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             }
           : null;
 
-      const snapshotEvt = { type: 'snapshot', data: { conversationId, messages: conversationMessages, turn } };
+      // Best-effort: augment the snapshot with any in-progress streamed assistant content by
+      // replaying recent Redis stream entries for the active turn.
+      //
+      // This fixes a UX bug where refreshing the page mid-stream would lose previously streamed
+      // deltas (not yet persisted to DB), and the UI would only show new deltas after reconnect.
+      let snapshotMessages = conversationMessages;
+      const activeTurnId =
+        latestTurn && typeof latestTurn.id === 'string' && (latestTurn.status === 'active' || latestTurn.status === 'waiting_for_tools')
+          ? latestTurn.id
+          : null;
+
+      if (activeTurnId) {
+        try {
+          const recentDesc = await bus.readReverse(conversationId, snapshotCursor, { count: 2_000 }, redisReader);
+          if (Array.isArray(recentDesc) && recentDesc.length > 0) {
+            const recent = recentDesc.slice().reverse(); // chronological
+
+            type Buffer = { content: string; reasoning: string; firstAt?: string; lastAt?: string };
+            const buffers = new Map<string, Buffer>();
+
+            for (const item of recent) {
+              const evt = item.evt;
+              if (!evt || typeof evt.type !== 'string') continue;
+
+              if (evt.type === 'assistant.delta' || evt.type === 'assistant.reasoning_delta') {
+                const data: any = (evt as any).data;
+                if (!data || data.turnId !== activeTurnId) continue;
+                const messageId = typeof data.messageId === 'string' ? data.messageId : '';
+                const delta = typeof data.delta === 'string' ? data.delta : '';
+                const at = typeof data.at === 'string' ? data.at : undefined;
+                if (!messageId || !delta) continue;
+
+                const cur = buffers.get(messageId) || { content: '', reasoning: '' };
+                if (!cur.firstAt && at) cur.firstAt = at;
+                if (at) cur.lastAt = at;
+                if (evt.type === 'assistant.delta') cur.content += delta;
+                else cur.reasoning += delta;
+                buffers.set(messageId, cur);
+              }
+            }
+
+            // Pick the messageId with the most accumulated data.
+            let bestId: string | null = null;
+            let bestScore = 0;
+            for (const [id, buf] of buffers.entries()) {
+              const score = (buf.content?.length || 0) + (buf.reasoning?.length || 0);
+              if (score > bestScore) {
+                bestScore = score;
+                bestId = id;
+              }
+            }
+
+            if (bestId && bestScore > 0) {
+              const buf = buffers.get(bestId)!;
+              const alreadyPersisted = Array.isArray(snapshotMessages) && snapshotMessages.some((m) => (m as any)?.id === bestId);
+              if (!alreadyPersisted) {
+                const now = new Date().toISOString();
+                const at = buf.lastAt || buf.firstAt || now;
+                const derivedAssistantMsg: any = {
+                  id: bestId,
+                  role: 'assistant',
+                  content: buf.content || '',
+                  messageType: 'agent_response',
+                  createdAt: buf.firstAt || at,
+                  updatedAt: at,
+                  turnId: activeTurnId,
+                };
+                if (buf.reasoning) derivedAssistantMsg.reasoning = buf.reasoning;
+                snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('[stream] failed to augment snapshot from redis', {
+            conversationId,
+            snapshotCursor,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+      }
+
+      const snapshotEvt = { type: 'snapshot', data: { conversationId, messages: snapshotMessages, turn } };
+      // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
+      res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
       res.write(`data: ${JSON.stringify(snapshotEvt.data)}\n\n`);
 

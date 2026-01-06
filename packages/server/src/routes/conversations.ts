@@ -310,7 +310,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // deltas (not yet persisted to DB), and the UI would only show new deltas after reconnect.
       let snapshotMessages = conversationMessages;
       const activeTurnId =
-        latestTurn && typeof latestTurn.id === 'string' && ((latestTurn.status as StreamTurnStatus) === 'active' || (latestTurn.status as StreamTurnStatus) === 'waiting_for_tools')
+        latestTurn &&
+        typeof latestTurn.id === 'string' &&
+        ((latestTurn.status as StreamTurnStatus) === 'active' || (latestTurn.status as StreamTurnStatus) === 'waiting_for_tools')
           ? latestTurn.id
           : null;
 

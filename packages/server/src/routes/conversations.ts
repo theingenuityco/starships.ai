@@ -268,8 +268,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Compute initial cursor from client-provided cursor / Last-Event-ID; otherwise derive
       // from Redis so we avoid clock-skew issues from time-based cursors.
-      const qpCursor = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
-      const lastEventIdHeader = typeof req.headers['last-event-id'] === 'string' ? req.headers['last-event-id'] : undefined;
+      const qpCursorRaw = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
+      const qpCursor = qpCursorRaw && qpCursorRaw.trim() ? qpCursorRaw.trim() : '';
+      const lastEventIdHeaderRaw = typeof req.headers['last-event-id'] === 'string' ? req.headers['last-event-id'] : undefined;
+      const lastEventIdHeader = lastEventIdHeaderRaw && lastEventIdHeaderRaw.trim() ? lastEventIdHeaderRaw.trim() : undefined;
 
       let len = 0;
       let lastId: string | null = null;
@@ -284,7 +286,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       //   immediately render the in-progress state, then continue streaming from that point.
       // - We still accept client cursors, but we don't *depend* on them for reconstructing UI state
       //   (a full page refresh loses in-memory deltas).
-      const snapshotCursor: string = lastId ?? qpCursor ?? lastEventIdHeader ?? '0-0';
+      // IMPORTANT: treat empty string as "unset" (Redis rejects '' as an invalid stream id).
+      const snapshotCursor: string = lastId || qpCursor || lastEventIdHeader || '0-0';
       let cursor: string = snapshotCursor;
 
       // 1) Always send a baseline snapshot from DB (messages + latest known turn status)

@@ -1,5 +1,5 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, MessageModel } from '@starships/protocol'
+import type { ApiResponse, ConversationModel, MessageModel, ConversationState } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -286,6 +286,68 @@ export function useUpdateConversationStatus() {
       const errorMessage = getSafeErrorMessage(error)
       toast.error('Failed to update status', {
         description: errorMessage,
+      })
+    },
+  })
+}
+
+// Get conversation detail (including state)
+export function useConversationDetail(conversationId: string | null) {
+  return useQuery({
+    queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId!),
+    queryFn: async (): Promise<ConversationModel> => {
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.get(`/api/v1/conversations/${conversationId}`)
+      return response.data.data
+    },
+    enabled: !!conversationId,
+    staleTime: 30 * 1000, // 30 seconds
+  })
+}
+
+// Update conversation state (plugins, etc.)
+export function useUpdateConversationState() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async ({ conversationId, state }: { conversationId: string; state: Partial<ConversationState> | Record<string, unknown> }) => {
+      const response: FetchResponse<ApiResponse<ConversationModel>> = await api.patch(`/api/v1/conversations/${conversationId}`, { state })
+      return response.data.data
+    },
+    // Optimistic update
+    onMutate: async ({ conversationId, state }) => {
+      await queryClient.cancelQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.detail(conversationId),
+      })
+
+      const previousConversation = queryClient.getQueryData<ConversationModel>(CONVERSATION_QUERY_KEYS.detail(conversationId))
+
+      // Optimistically update
+      if (previousConversation) {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.detail(conversationId), {
+          ...previousConversation,
+          state: {
+            ...previousConversation.state,
+            ...state,
+          },
+        })
+      }
+
+      return { previousConversation }
+    },
+    // Rollback on error
+    onError: (error, variables, context) => {
+      if (context?.previousConversation) {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.detail(variables.conversationId), context.previousConversation)
+      }
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to update conversation state', {
+        description: errorMessage,
+      })
+    },
+    // Invalidate to refetch from server
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({
+        queryKey: CONVERSATION_QUERY_KEYS.detail(variables.conversationId),
       })
     },
   })

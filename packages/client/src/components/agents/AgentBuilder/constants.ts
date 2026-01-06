@@ -27,6 +27,10 @@ export const INITIAL_FORM_DATA: AgentFormData = {
   ),
   timeout: 60000,
   icon: '🤖',
+  state: {
+    messages: [],
+    tools: [],
+  },
 }
 
 export const AGENT_CATEGORIES: AgentTemplateCategory[] = ['general', 'automation', 'data', 'communication', 'coding', 'creative', 'analysis', 'support', 'utility']

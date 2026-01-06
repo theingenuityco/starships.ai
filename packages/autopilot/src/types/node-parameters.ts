@@ -232,6 +232,13 @@ export interface LlmParams extends BaseParams {
    * Supports template expressions via string (e.g. '{{ state.imageConfig }}').
    */
   imageConfig?: Record<string, unknown> | string;
+  /**
+   * Optional OpenRouter plugins configuration (e.g., web browsing).
+   * Example: [{ id: 'web', max_results: 3 }]
+   *
+   * Supports template expressions via string (e.g. '{{ state.plugins }}').
+   */
+  plugins?: Array<{ id: string; max_results?: number }> | string;
 }
 
 /**

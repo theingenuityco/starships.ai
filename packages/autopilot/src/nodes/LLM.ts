@@ -188,6 +188,7 @@ export class LLM extends BaseNode<LlmParams> {
       // the host returns an AsyncIterable of provider-native chunks.
       const modalities = this.coerceMaybeJson<Array<'text' | 'image'>>(params.modalities);
       const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
+      const plugins = this.coerceMaybeJson<Array<{ id: string; max_results?: number }>>(params.plugins);
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
       const stream = await hostRuntime.llm({
         model: params.model,
@@ -202,6 +203,7 @@ export class LLM extends BaseNode<LlmParams> {
         ...(typeof streamFlag === 'boolean' ? { stream: streamFlag } : {}),
         ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
         ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),
+        ...(Array.isArray(plugins) && plugins.length > 0 ? { plugins } : {}),
       });
 
       const llmResponse = await this.processOpenAIStream(stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>);

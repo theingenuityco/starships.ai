@@ -59,6 +59,11 @@ export interface LlmHostRequest {
    * and the host runtime will map it.
    */
   imageConfig?: Record<string, unknown>;
+  /**
+   * Optional OpenRouter plugins configuration (e.g., web browsing).
+   * Example: [{ id: 'web', max_results: 3 }]
+   */
+  plugins?: Array<{ id: string; max_results?: number }>;
 }
 
 /**

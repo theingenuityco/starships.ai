@@ -38,6 +38,9 @@ export function AgentForm({ agent, onSave, onCancel, starshipId }: AgentFormProp
     state: agent?.state || {
       messages: [],
       tools: [],
+      ...(agent?.state && typeof agent.state === 'object' && 'plugins' in agent.state 
+        ? { plugins: (agent.state as { plugins?: unknown }).plugins }
+        : {}),
     },
     blueprint: agent?.blueprint || {
       nodes: [],

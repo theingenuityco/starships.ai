@@ -109,6 +109,7 @@ const UpdateAgentSchema = z.object({
   sourceTemplateId: z.string().min(1).optional(),
   previewPrompts: PreviewPromptsSchema.optional(),
   starshipId: z.string().min(1, 'Starship ID is required').optional(),
+  state: z.record(z.string(), z.unknown()).optional(), // Allow state updates (e.g., for plugins)
 });
 
 const StarshipAssignmentSchema = z.object({

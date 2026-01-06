@@ -10,7 +10,7 @@ import { Alert, AlertTitle, AlertDescription } from '@/components/ui/alert'
 
 export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderViewProps>(
   ({ onSave, onCancel, starshipId, agentId, agent, initialSlug, errorMessage, readOnly = false, embedded = false }, ref) => {
-  const { formData, errors, handleFieldChange, handleSave, resetForm, updateField } = useAgentForm({ onSave })
+  const { formData, errors, handleFieldChange, handleSave, resetForm, updateField, setFormData } = useAgentForm({ onSave })
 
   // Expose methods to parent via ref
   useImperativeHandle(ref, () => ({
@@ -36,7 +36,18 @@ export const AgentBuilderView = forwardRef<AgentBuilderViewRef, AgentBuilderView
           <AgentDocumentEditor
             value={formData}
             onChange={next => {
+              console.log('[AgentBuilder] onChange called with:', { 
+                hasState: 'state' in next, 
+                statePlugins: (next.state as { plugins?: unknown })?.plugins,
+                allKeys: Object.keys(next)
+              });
+              // Handle state separately since it's a nested object
+              if ('state' in next && next.state !== undefined) {
+                setFormData(prev => ({ ...prev, state: next.state }))
+              }
+              // Handle other fields
               ;(Object.keys(next) as Array<keyof typeof next>).forEach(key => {
+                if (key === 'state') return // Already handled above
                 const value = next[key]
                 if (value === undefined) return
                 handleFieldChange(key as keyof typeof formData, value)

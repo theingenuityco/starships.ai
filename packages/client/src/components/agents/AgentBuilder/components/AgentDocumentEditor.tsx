@@ -28,6 +28,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentPublishModal } from './AgentPublishModal'
+import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlugins } from '@/utils/agent-state'
+import type { ConversationState } from '@starships/protocol'
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -351,7 +353,6 @@ export function AgentDocumentEditor({
         const result = await safeGet<AgentModel>(starshipUrl)
         if (result.ok && result.data?.id) {
           const agent = result.data
-          console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
           if (!cancelled) {
             setAgentId(agent.id || null)
           }
@@ -562,12 +563,10 @@ export function AgentDocumentEditor({
         // Only update if form has no assignments yet to avoid clobbering in-flight edits
         const cur = value.assignedToolSlugs || []
         if (cur.length === 0 && slugs.length > 0) {
-          console.debug('[AgentDocEditor] Sync assigned tools', { slugs })
           onFieldChange?.('assignedToolSlugs', slugs)
         }
         hasSyncedAssignedRef.current = true
       } catch {
-        console.warn('[AgentDocEditor] Failed to load assigned tools', { agentId })
         // ignore
       }
     }
@@ -617,10 +616,8 @@ export function AgentDocumentEditor({
         if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
           onFieldChange?.('blueprint', JSON.stringify(agent.blueprint, null, 2))
         }
-        console.debug('[AgentDocEditor] Sync agent fields', { id: agentId })
         hasSyncedAgentRef.current = true
       } catch {
-        console.warn('[AgentDocEditor] Failed to load agent fields', { agentId })
         // ignore
       }
     }
@@ -756,38 +753,6 @@ export function AgentDocumentEditor({
     if (!sameTools) changes.push('Tools')
     if (!sameBlueprint) changes.push('Blueprint')
 
-    try {
-      console.debug('[AgentDocEditor] template-diff-debug', {
-        agentId: fullAgent.id,
-        publishedTemplateId: fullAgent.publishedTemplateId,
-        sameName,
-        sameRole,
-        sameDescription,
-        sameModel,
-        sameCategory,
-        sameTemperature,
-        sameMaxTokens,
-        sameTimeout,
-        sameReasoning,
-        sameSystemPrompt,
-        samePreviewPrompts,
-        sameAvatar,
-        sameTools,
-        sameBlueprint,
-        avatarAttachmentId,
-        avatarCreatedAt,
-        templateAvatarUpdatedAt,
-        agentPreviewPrompts: agentCore.previewPrompts,
-        templatePreviewPrompts: templateCore.previewPrompts,
-        agentBlueprintLen: agentBlueprintStr.length,
-        templateBlueprintLen: templateBlueprintStr.length,
-        allCurrentTools,
-        currentTools,
-        baselineTools,
-      })
-    } catch {
-      // ignore logging errors
-    }
 
     const differs = !(
       sameName &&
@@ -948,6 +913,28 @@ export function AgentDocumentEditor({
         }
       }
 
+      // State (including plugins for web browsing)
+      // Only update state if form has state AND it differs from base
+      // If form state is missing plugins but base has plugins, don't remove them
+      if (value.state && typeof value.state === 'object') {
+        const baseState = (base.state && typeof base.state === 'object' ? base.state : {}) as ConversationState
+        const nextState = value.state as ConversationState
+
+        // Check if we should skip update to preserve plugins
+        if (shouldSkipStateUpdateToPreservePlugins(baseState, nextState)) {
+          // Don't update - preserve base state with plugins
+        } else if (!areStatesEqual(baseState, nextState)) {
+          updates.state = nextState
+        } else {
+        }
+      } else if (base.state && typeof base.state === 'object') {
+        // If form has no state but base has state, preserve base state
+        // This ensures plugins aren't lost when form state is reset
+        if (baseStateHasPlugins(base.state as ConversationState)) {
+          // Don't update - let base state persist
+        }
+      }
+
       return updates
     }
 
@@ -966,6 +953,11 @@ export function AgentDocumentEditor({
         const updated = res.data.data
 
         if (!cancelled && updated) {
+          // ALWAYS preserve state from updates if we sent it, regardless of API response
+          // This ensures state (like plugins) is never lost
+          if (updates.state && typeof updates.state === 'object') {
+            ;(updated as any).state = updates.state
+          }
           setFullAgent(updated)
           // Keep React Query cache in sync for this agent
           queryClient.setQueryData(AGENT_QUERY_KEYS.detail(updated.id), updated)

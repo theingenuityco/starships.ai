@@ -220,6 +220,28 @@ export class ConversationService {
   }
 
   /**
+   * Final cleanup for a conversation's *turn lifecycle* state.
+   * Use this ONLY when we are confident no further runner events should be applied
+   * for the current turn (e.g. workflow_completed / workflow_failed).
+   */
+  private finalizeTurnState(conversationId: string): void {
+    // Clear bulky streaming state first
+    this.clearStreamingState(conversationId);
+
+    // Turn identity + sequencing (safe to clear only once turn is definitively finished)
+    this.currentTurnId.delete(conversationId);
+    this.currentTurnBaseIndex.delete(conversationId);
+    this.lastPersistedIndex.delete(conversationId);
+
+    // Per-turn persistence guards (no longer needed once the turn is complete/failed)
+    this.assistantPersistedThisTurn.delete(conversationId);
+    this.activeStreamPersisted.delete(conversationId);
+
+    // Also ensure we don't keep any outstanding cancellation handles around
+    ConversationService.activeCancellations.delete(conversationId);
+  }
+
+  /**
    * Extract completed properties from a JSON-like string buffer using partial-json-parser only.
    */
   private static extractCompletedTopLevelProperties(jsonLike: string): Record<string, unknown> {
@@ -2694,8 +2716,8 @@ export class ConversationService {
           console.warn('[STREAMING] Failed to broadcast turn_completed', err);
         }
 
-        // Clear streaming trackers now that the workflow turn has fully completed
-        this.clearStreamingState(conversationId);
+        // Final cleanup now that the workflow turn has fully completed
+        this.finalizeTurnState(conversationId);
         break;
       }
 
@@ -2719,8 +2741,8 @@ export class ConversationService {
           value: errorMessage,
         };
         await this.streamingService.broadcastDelta(conversationId, delta);
-        // Best-effort: clear any per-conversation streaming state after a failed workflow
-        this.clearStreamingState(conversationId);
+        // Final cleanup after a failed workflow
+        this.finalizeTurnState(conversationId);
         break;
       }
 

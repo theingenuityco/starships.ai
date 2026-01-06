@@ -134,11 +134,29 @@ export class MessageRepository extends BaseRepository {
       async () => {
         const now = new Date().toISOString();
         const conversationId = entity.conversationId;
+        const turnId = String(entity.turnId || '');
+        const turnSeq = Number(entity.turnSeq);
+
+        if (!turnId) {
+          throw new Error('turnId is required');
+        }
+        if (!Number.isFinite(turnSeq) || turnSeq < 0) {
+          throw new Error('turnSeq must be a non-negative integer');
+        }
+
+        // Validate turnId belongs to the same conversationId (prevents cross-conversation message attachment).
+        const connection = this.getConnection();
+        const turnRow = await connection.queryOne<{ conversation_id: string }>('SELECT conversation_id FROM turns WHERE id = $1', [turnId]);
+        if (!turnRow) {
+          throw new Error(`Turn ${turnId} not found`);
+        }
+        if (String(turnRow.conversation_id) !== conversationId) {
+          throw new Error(`Turn ${turnId} does not belong to conversation ${conversationId}`);
+        }
 
         // Get starshipId from conversation if not provided
         let starshipId = entity.starshipId;
         if (!starshipId) {
-          const connection = this.getConnection();
           const conversation = await connection.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [
             conversationId,
           ]);
@@ -158,8 +176,8 @@ export class MessageRepository extends BaseRepository {
           role: entity.role,
           content: entity.content,
           messageType: entity.messageType || 'user_input',
-          turnId: entity.turnId,
-          turnSeq: entity.turnSeq,
+          turnId,
+          turnSeq,
           ...(entity.reasoning ? { reasoning: entity.reasoning } : {}),
           ...(entity.toolCalls ? { toolCalls: entity.toolCalls } : {}),
           ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),

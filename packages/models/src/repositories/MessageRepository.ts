@@ -140,8 +140,8 @@ export class MessageRepository extends BaseRepository {
         if (!turnId) {
           throw new Error('turnId is required');
         }
-        if (!Number.isFinite(turnSeq) || turnSeq < 0) {
-          throw new Error('turnSeq must be a non-negative integer');
+        if (!Number.isFinite(turnSeq) || !Number.isInteger(turnSeq) || turnSeq < 0 || turnSeq > 1_000_000) {
+          throw new Error('turnSeq must be a non-negative integer <= 1,000,000');
         }
 
         // Validate turnId belongs to the same conversationId (prevents cross-conversation message attachment).

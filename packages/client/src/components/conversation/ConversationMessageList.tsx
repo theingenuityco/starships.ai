@@ -252,112 +252,11 @@ export function ConversationMessageList({
     return lastId
   }, [displayMessages])
 
-  // Determine if any assistant textual progress has occurred after the latest user turn.
-  // Progress means: content tokens (chunks), reasoning tokens (reasoningChunks), final reasoning, or finalized content text.
-  // Tool calls alone do NOT count as progress.
-  const hasAssistantTextProgressAfterUser = useMemo(() => {
-    // Find most recent user message index
-    let lastUserIdx = -1
-    for (let i = displayMessages.length - 1; i >= 0; i--) {
-      const mm: any = displayMessages[i]
-      if (mm?.role === 'user') {
-        lastUserIdx = i
-        break
-      }
-    }
-    // Scan messages after the last user for any assistant textual progress
-    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
-      const m: any = displayMessages[i]
-      if (m?.role !== 'assistant') continue
-      const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
-      const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
-      const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
-      const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
-      if (hasChunks || hasRChunks || hasReasoning || hasContent) {
-        return true
-      }
-    }
-    return false
-  }, [displayMessages])
-
-  // When tools are executed mid-turn, show the GAP loader again until LLM resumes streaming text/reasoning.
-  // We detect a "gap" if we see a tool_result after the last user message, but no assistant chunks/reasoning chunks
-  // have arrived AFTER that tool_result.
-  const awaitingResumeAfterTools = useMemo(() => {
-    // Find most recent user message index
-    let lastUserIdx = -1
-    for (let i = displayMessages.length - 1; i >= 0; i--) {
-      const mm: any = displayMessages[i]
-      if (mm?.role === 'user') {
-        lastUserIdx = i
-        break
-      }
-    }
-
-    // Most recent tool result timestamp after the user
-    let lastToolTs = -1
-    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
-      const m: any = displayMessages[i]
-      // Standalone tool_result messages
-      if (m?.messageType === 'tool_result') {
-        const t = Date.parse(String(m?.createdAt || m?.updatedAt || ''))
-        if (!Number.isNaN(t)) lastToolTs = Math.max(lastToolTs, t)
-      }
-      // Grouped tool results attached to assistant messages
-      if (m?.role === 'assistant' && Array.isArray(m?.toolResults) && m.toolResults.length > 0) {
-        for (const tr of m.toolResults as any[]) {
-          const t = Date.parse(String(tr?.createdAt || tr?.updatedAt || ''))
-          if (!Number.isNaN(t)) lastToolTs = Math.max(lastToolTs, t)
-        }
-      }
-    }
-    if (lastToolTs < 0) return false
-
-    // Most recent assistant textual progress timestamp after the user.
-    // Consider chunk timestamps when present; otherwise fall back to the finalized message timestamp
-    // if the assistant has content or reasoning (common after refresh/baseline load).
-    let lastAssistantProgressTs = -1
-    for (let i = lastUserIdx + 1; i < displayMessages.length; i++) {
-      const m: any = displayMessages[i]
-      if (m?.role !== 'assistant') continue
-
-      const hasChunks = Array.isArray(m?.chunks) && m.chunks.length > 0
-      const hasRChunks = Array.isArray(m?.reasoningChunks) && m.reasoningChunks.length > 0
-      const hasReasoning = typeof m?.reasoning === 'string' && m.reasoning.trim().length > 0
-      const hasContent = typeof m?.content === 'string' && m.content.trim().length > 0
-
-      const lastC = hasChunks ? Number(m.chunks[m.chunks.length - 1]?.timestamp) : -1
-      const lastR = hasRChunks ? Number(m.reasoningChunks[m.reasoningChunks.length - 1]?.timestamp) : -1
-
-      // Fallback to message updatedAt/createdAt when finalized text/reasoning exists but no chunks are present (e.g., after refresh)
-      let finalTs = -1
-      if ((hasContent || hasReasoning) && !(hasChunks || hasRChunks)) {
-        const t = Date.parse(String(m?.updatedAt || m?.createdAt || ''))
-        if (!Number.isNaN(t)) finalTs = t
-      }
-
-      lastAssistantProgressTs = Math.max(lastAssistantProgressTs, lastC, lastR, finalTs)
-    }
-
-    // Gap exists if no assistant textual progress has arrived AFTER the last tool result
-    return lastAssistantProgressTs < 0 || lastAssistantProgressTs <= lastToolTs
-  }, [displayMessages])
-
-  // Final GAP loader decision: show if we're responding AND either:
-  //  - no assistant text progress yet after the user (first response is pending), or
-  //  - we are waiting for the assistant to resume after tool results.
-  const shouldShowGapLoader = useMemo(() => {
-    // We want the gap loader whenever the turn is active but we are not currently streaming text.
-    // - Show before first tokens
-    // - Show between assistant messages (assistant finished one message but turn is still active)
-    // - Show for “resume after tools” gaps
-    // - Do NOT show while awaiting tool results (tool UI shows its own spinner)
-    const betweenMessages = isResponding && !isAssistantStreaming && !awaitingResumeAfterTools
-    const responding = !isAwaitingToolResults && isResponding && (!hasAssistantTextProgressAfterUser || awaitingResumeAfterTools || betweenMessages)
-    // IMPORTANT: never show the gap loader while tools are still pending; the tools UI has its own spinner.
-    const toolGapFetching = !isAwaitingToolResults && awaitingResumeAfterTools && isResponding
-    return responding || toolGapFetching
-  }, [isAwaitingToolResults, isResponding, isAssistantStreaming, hasAssistantTextProgressAfterUser, awaitingResumeAfterTools])
+  // New loading logic:
+  // - turn is active (isResponding)
+  // - assistant hasn't started streaming tokens yet (isAssistantStreaming=false)
+  // - if tools are actively running, tool UI should show its own state
+  const shouldShowGapLoader = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {

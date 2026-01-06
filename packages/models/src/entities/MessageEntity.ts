@@ -12,6 +12,7 @@ import {
   IsArray,
   IsEnum,
   IsISO8601,
+  IsInt,
   IsString,
   Length,
   MinLength,
@@ -45,6 +46,18 @@ export class MessageEntity implements MessageModel {
   @IsString()
   @Length(1, 255)
   conversationId!: string;
+
+  // Optional turn linkage (idempotency + lifecycle)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  turnId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsInt()
+  turnSeq?: number;
 
   @Expose()
   @IsEnum(['system', 'user', 'assistant', 'tool'])

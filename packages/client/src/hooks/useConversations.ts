@@ -637,6 +637,33 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           return messages
         }
       }
+
+      // Replace temp user message (temp-user-*) with the persisted message when it arrives.
+      // ConversationMessageInput pre-seeds temp user messages for optimistic UI updates.
+      if (msg.role === 'user') {
+        const msgContent = String(msg.content || '')
+        const msgCreatedAt = typeof msg.createdAt === 'string' ? msg.createdAt : ''
+        // Find temp user message with same content and similar timestamp (within 10 seconds)
+        for (let i = messages.length - 1; i >= 0; i--) {
+          const m = messages[i]
+          if (m.role !== 'user') continue
+          const mId = typeof m.id === 'string' ? String(m.id) : ''
+          if (!mId.startsWith('temp-user-')) continue
+          if (String(m.content || '') !== msgContent) continue
+
+          // Check timestamp similarity (allow 10 second window for DB vs stream timing)
+          const mCreatedAt = typeof m.createdAt === 'string' ? m.createdAt : ''
+          if (msgCreatedAt && mCreatedAt) {
+            const diff = Math.abs(Date.parse(msgCreatedAt) - Date.parse(mCreatedAt))
+            if (diff > 10000) continue
+          }
+
+          // Replace temp message with persisted message
+          messages[i] = withStreaming(msg, false)
+          return messages
+        }
+      }
+
       return [...messages, { ...msg }]
     }
 

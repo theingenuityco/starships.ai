@@ -196,7 +196,11 @@ export class ConversationService {
     this.accumulatedLength.delete(conversationId);
     this.nextChunkPosition.delete(conversationId);
     this.chunkProcessingLock.delete(conversationId);
-    this.lastPersistedIndex.delete(conversationId);
+    // IMPORTANT:
+    // Do NOT clear lastPersistedIndex / persisted guards here.
+    // After stop/cancel, late runner events (node_completed/workflow_completed) can still arrive.
+    // If we clear lastPersistedIndex, the node_completed persistence pass can start from -1 and
+    // re-persist the entire execution.state.messages history, duplicating all conversation messages.
 
     // Balance guards and suppression flags
     this.lowBalanceStopTriggered.delete(conversationId);
@@ -204,8 +208,8 @@ export class ConversationService {
     this.suppressCompleteFor.delete(conversationId);
 
     // Misc per-conversation flags / attribution
-    this.activeStreamPersisted.delete(conversationId);
-    this.assistantPersistedThisTurn.delete(conversationId);
+    // Leave these guards intact until the next workflow_started resets them.
+    // This prevents stop/pause + late events from persisting multiple times.
     this.currentAgentForConversation.delete(conversationId);
     this.lastToolCallsBroadcastHash.delete(conversationId);
   }
@@ -227,6 +231,13 @@ export class ConversationService {
   private async persistActivePartial(conversationId: string): Promise<MessageModel | null> {
     // If we've already persisted the active stream for this conversation, skip
     if (this.activeStreamPersisted.has(conversationId)) {
+      return null;
+    }
+
+    // If an assistant message was already persisted for this turn (via state message persistence),
+    // do NOT persist again on stop/pause. This prevents duplicate saved messages when stop triggers
+    // while the normal persistence path is also running.
+    if (this.assistantPersistedThisTurn.has(conversationId)) {
       return null;
     }
 

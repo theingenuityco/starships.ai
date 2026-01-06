@@ -147,6 +147,28 @@ spec:
                   name: starships-secrets
                   key: OPENROUTER_API_KEY
 
+            # Redis (required for conversation streaming via Redis Streams)
+            - name: REDIS_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_HOST
+            - name: REDIS_PORT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_PORT
+            - name: REDIS_DB
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_DB
+            - name: REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REDIS_PASSWORD
+
             # Stripe
             - name: STRIPE_SECRET_KEY
               valueFrom:

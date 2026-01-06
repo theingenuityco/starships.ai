@@ -1,7 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
 import { ConversationService } from '@/services/ConversationService';
-import { StreamingService } from '@/services/StreamingService';
+import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response, NextFunction } from 'express';
 import { Router } from 'express';
@@ -9,21 +9,26 @@ import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema } from '@/schemas/common';
 import { WalletService } from '@/services/WalletService';
-import { ResumeTokenService } from '@/services/ResumeTokenService';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { AgentService } from '@/services/AgentService';
 import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
-import { AgentRepository, ToolCallApprovalRepository, ToolRepository } from '@starships/models';
+import { AgentRepository, ToolCallApprovalRepository, ToolRepository, TurnRepository } from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
-import type { ToolModel } from '@starships/protocol';
+import type {
+  ToolModel,
+  ConversationStreamSnapshot,
+  ConversationStreamEvent,
+  TurnStatus as StreamTurnStatus,
+  MessageModel,
+} from '@starships/protocol';
 import { buildAutopilotExecutionBundle, buildAutopilotRuntimeEnv } from '@/services/autopilot-execution-bundle';
 
 const router: Router = Router();
@@ -212,114 +217,254 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
 
     if (wantsStreaming) {
-      // Add connection to streaming service - it will handle SSE headers and setup
-      const streamingService = new StreamingService();
-
-      // Server-driven resume via query param (avoid custom headers)
-      const resumeToken = typeof req.query.resumeToken === 'string' ? req.query.resumeToken : '';
-
-      // Determine a reliable baseline:
-      // - client hint (query.baselineLength) if provided
-      // - server truth (current messages count)
-      const clientBase = Number(req.query.baselineLength ?? 0) || 0;
-
-      // Fetch existing messages first to compute server-side count
-      const conversationService = new ConversationService();
-      const conversationMessages = await conversationService.getConversationMessages(conversationId);
-      const serverCount = conversationMessages.length;
-
-      // Use the larger of client hint and server truth to avoid undercounting
-      const baseLength = Math.max(clientBase, serverCount);
-
-      // Establish SSE connection with normalized baseline
-      streamingService.addConnection(conversationId, res, { baseLength });
-
-      // Send initial turn state snapshot so clients know if a turn is active after refresh
-      let turnActiveFlag = false;
+      // SSE streaming (Redis Streams)
+      res.writeHead(200, {
+        'Content-Type': 'text/event-stream; charset=utf-8',
+        'Cache-Control': 'no-cache, no-transform',
+        Connection: 'keep-alive',
+        'X-Accel-Buffering': 'no',
+      });
       try {
-        const conversationService = new ConversationService();
-        const conversation = await conversationService.getConversationById(conversationId);
-        const convState = conversation?.state || {};
-        const lastCompleteAtRaw = (convState as { lastCompleteAt?: unknown })?.lastCompleteAt;
-        const lastCompleteAt = typeof lastCompleteAtRaw === 'string' ? lastCompleteAtRaw : null;
-        const bufferedState = streamingService.getBufferedTurnActive(conversationId);
-        turnActiveFlag = typeof bufferedState === 'boolean' ? bufferedState : !!convState.turnActive;
-        await streamingService.broadcastTurnState(conversationId, {
+        // Reduce latency for small SSE frames (avoid Nagle delaying writes)
+        res.socket?.setNoDelay(true);
+      } catch {
+        /* best-effort */
+      }
+      try {
+        const maybe = res as unknown as { flushHeaders?: () => void };
+        if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
+      } catch (e) {
+        console.warn('[stream] flushHeaders failed', {
           conversationId,
-          turnActive: turnActiveFlag,
-          lastCompleteAt,
+          error: e instanceof Error ? e.message : String(e),
         });
-      } catch (err) {
-        // Swallow initial snapshot failure; SSE will continue without initial turn_state event
-        console.error('[CONVERSATIONS] Failed to send initial turn_state snapshot:', {
+      }
+      try {
+        res.write(':ok\n\n');
+      } catch (e) {
+        console.warn('[stream] initial :ok write failed', {
           conversationId,
-          error: err instanceof Error ? err.message : String(err),
+          error: e instanceof Error ? e.message : String(e),
         });
       }
 
-      // If this is a reconnection with Last-Event-ID, prefer event replay from buffer
-      // to avoid duplicating already-processed baseline messages. Otherwise send
-      // initial baseline snapshot messages.
-      if (resumeToken) {
-        // Verify token; fall back to baseline on failure
-        const svc = ResumeTokenService.getInstance();
-        const claims = svc.verify(resumeToken);
+      const bus = ConversationStreamBus.getInstance();
+      // IMPORTANT: Use a dedicated Redis connection for blocking reads (XREAD BLOCK).
+      // Never share the publish connection with a blocking reader, or publishes can stall.
+      const redisReader = bus.createReaderClient();
+      const conversationService = new ConversationService();
+      const turnRepo = new TurnRepository();
 
-        if (!claims || claims.c !== conversationId) {
-          // Invalid token; use baseline mode
-          const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
-          const messagesToSend = conversationMessages.slice(startIndexForSend);
+      // Ensure reader is connected early (best-effort); disconnect on close to avoid leaks.
+      try {
+        await redisReader.connect();
+      } catch {
+        /* best-effort */
+      }
 
-          if (messagesToSend.length > 0) {
-            for (const message of messagesToSend) {
-              await streamingService.broadcastMessage(conversationId, message);
+      let closed = false;
+      res.on('close', () => {
+        closed = true;
+        try {
+          redisReader.disconnect();
+        } catch {
+          /* ignore */
+        }
+      });
+
+      // Compute initial cursor from client-provided cursor / Last-Event-ID; otherwise derive
+      // from Redis so we avoid clock-skew issues from time-based cursors.
+      const qpCursorRaw = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
+      const qpCursor = qpCursorRaw && qpCursorRaw.trim() ? qpCursorRaw.trim() : '';
+      const lastEventIdHeaderRaw = typeof req.headers['last-event-id'] === 'string' ? req.headers['last-event-id'] : undefined;
+      const lastEventIdHeader = lastEventIdHeaderRaw && lastEventIdHeaderRaw.trim() ? lastEventIdHeaderRaw.trim() : undefined;
+
+      let len = 0;
+      let lastId: string | null = null;
+      try {
+        [len, lastId] = await Promise.all([bus.getLen(conversationId), bus.getLastId(conversationId)]);
+      } catch {
+        /* best-effort */
+      }
+
+      // Snapshot cursor:
+      // - Always align snapshot to the current tail (if available) so refresh/reconnect can
+      //   immediately render the in-progress state, then continue streaming from that point.
+      // - We still accept client cursors, but we don't *depend* on them for reconstructing UI state
+      //   (a full page refresh loses in-memory deltas).
+      // IMPORTANT: treat empty string as "unset" (Redis rejects '' as an invalid stream id).
+      const snapshotCursor: string = lastId || qpCursor || lastEventIdHeader || '0-0';
+      let cursor: string = snapshotCursor;
+
+      // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
+      const conversationMessages = await conversationService.getConversationMessages(conversationId);
+      const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
+      const turn: ConversationStreamSnapshot['turn'] =
+        latestTurn && typeof latestTurn.id === 'string'
+          ? {
+              turnId: latestTurn.id,
+              status: (latestTurn.status as StreamTurnStatus) || 'completed',
+              startedAt: latestTurn.startedAt,
+              completedAt: latestTurn.completedAt,
+            }
+          : null;
+
+      // Best-effort: augment the snapshot with any in-progress streamed assistant content by
+      // replaying recent Redis stream entries for the active turn.
+      //
+      // This fixes a UX bug where refreshing the page mid-stream would lose previously streamed
+      // deltas (not yet persisted to DB), and the UI would only show new deltas after reconnect.
+      let snapshotMessages = conversationMessages;
+      const activeTurnId =
+        latestTurn &&
+        typeof latestTurn.id === 'string' &&
+        ((latestTurn.status as StreamTurnStatus) === 'active' || (latestTurn.status as StreamTurnStatus) === 'waiting_for_tools')
+          ? latestTurn.id
+          : null;
+
+      if (activeTurnId) {
+        try {
+          const recentDesc = await bus.readReverse(conversationId, snapshotCursor, { count: 2_000 }, redisReader);
+          if (Array.isArray(recentDesc) && recentDesc.length > 0) {
+            const recent = recentDesc.slice().reverse(); // chronological
+
+            type Buffer = { content: string; reasoning: string; firstAt?: string; lastAt?: string };
+            const buffers = new Map<string, Buffer>();
+
+            for (const item of recent) {
+              const evt = item.evt;
+              if (!evt || typeof evt.type !== 'string') continue;
+
+              if (evt.type === 'assistant.delta' || evt.type === 'assistant.reasoning_delta') {
+                const data =
+                  evt.type === 'assistant.delta'
+                    ? (evt as Extract<ConversationStreamEvent, { type: 'assistant.delta' }>).data
+                    : (evt as Extract<ConversationStreamEvent, { type: 'assistant.reasoning_delta' }>).data;
+                if (!data || data.turnId !== activeTurnId) continue;
+                const messageId = typeof data.messageId === 'string' ? data.messageId : '';
+                const delta = typeof data.delta === 'string' ? data.delta : '';
+                const at = typeof data.at === 'string' ? data.at : undefined;
+                if (!messageId || !delta) continue;
+
+                const cur = buffers.get(messageId) || { content: '', reasoning: '' };
+                if (!cur.firstAt && at) cur.firstAt = at;
+                if (at) cur.lastAt = at;
+                if (evt.type === 'assistant.delta') cur.content += delta;
+                else cur.reasoning += delta;
+                buffers.set(messageId, cur);
+              }
+            }
+
+            // Pick the messageId with the most accumulated data.
+            let bestId: string | null = null;
+            let bestScore = 0;
+            for (const [id, buf] of buffers.entries()) {
+              const score = (buf.content?.length || 0) + (buf.reasoning?.length || 0);
+              if (score > bestScore) {
+                bestScore = score;
+                bestId = id;
+              }
+            }
+
+            if (bestId && bestScore > 0) {
+              const buf = buffers.get(bestId)!;
+              const alreadyPersisted = Array.isArray(snapshotMessages) && snapshotMessages.some((m: MessageModel) => m.id === bestId);
+              if (!alreadyPersisted) {
+                const now = new Date().toISOString();
+                const at = buf.lastAt || buf.firstAt || now;
+                const derivedAssistantMsg: MessageModel = {
+                  id: bestId,
+                  role: 'assistant',
+                  content: buf.content || '',
+                  messageType: 'agent_response',
+                  createdAt: buf.firstAt || at,
+                  updatedAt: at,
+                  turnId: activeTurnId,
+                  ...(buf.reasoning && { reasoning: buf.reasoning }),
+                };
+                snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
+              }
             }
           }
-        } else {
-          // 1) Replay persisted messages beyond last persisted id in token (claims.m)
-          let startIdx = 0;
-          if (claims.m && claims.m !== '0') {
-            const idx = conversationMessages.findIndex((m) => String(m.id) === String(claims.m));
-            startIdx = idx >= 0 ? idx + 1 : 0;
-          }
-          const persistedTail = conversationMessages.slice(startIdx);
-          let replayHasAssistantShell = false;
-          if (persistedTail.length > 0) {
-            for (const message of persistedTail) {
-              await streamingService.broadcastMessage(conversationId, message);
-            }
-            const lastAssistant = [...persistedTail].reverse().find((msg) => (msg as { role?: string })?.role === 'assistant');
-            replayHasAssistantShell = !!lastAssistant;
-          }
-
-          // 2) Replay current-turn buffered events (skip 'message' to avoid duplicate persisted messages)
-          const minContentPosition = typeof claims.p === 'number' ? claims.p : undefined;
-          await streamingService.replayCurrentTurn(conversationId, {
-            minContentPosition,
-            skipAssistantShell: !turnActiveFlag || replayHasAssistantShell,
-            turnIsActive: turnActiveFlag,
+        } catch (e) {
+          console.warn('[stream] failed to augment snapshot from redis', {
+            conversationId,
+            snapshotCursor,
+            error: e instanceof Error ? e.message : String(e),
           });
         }
-      } else {
-        // Send only messages the client may be missing based on their baselineLength hint
-        const startIndexForSend = Math.min(Math.max(clientBase, 0), serverCount);
-        const messagesToSend = conversationMessages.slice(startIndexForSend);
+      }
 
-        if (messagesToSend.length > 0) {
-          for (const message of messagesToSend) {
-            await streamingService.broadcastMessage(conversationId, message);
-          }
-        }
+      const snapshotEvt = { type: 'snapshot', data: { conversationId, messages: snapshotMessages, turn } };
+      // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
+      res.write(`id: ${snapshotCursor}\n`);
+      res.write(`event: snapshot\n`);
+      res.write(`data: ${JSON.stringify(snapshotEvt.data)}\n\n`);
 
-        // Also replay current turn events to cover race where streaming started just before connect
-        const baselineHasAssistant = messagesToSend.some((msg) => (msg as { role?: string })?.role === 'assistant');
-        await streamingService.replayCurrentTurn(conversationId, {
-          skipAssistantShell: !turnActiveFlag || baselineHasAssistant,
-          turnIsActive: turnActiveFlag,
+      // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
+      // (and what cursor this connection is using) without needing extra flags.
+      try {
+        res.write(`event: stream_debug\n`);
+        type StreamDebugPayload = { conversationId: string; cursor: string; len: number; lastId: string | null };
+        const payload: StreamDebugPayload = { conversationId, cursor, len, lastId };
+        res.write(`data: ${JSON.stringify(payload)}\n\n`);
+      } catch (e) {
+        console.warn('[stream] stream_debug emission failed', {
+          conversationId,
+          error: e instanceof Error ? e.message : String(e),
         });
       }
 
-      // Connection stays open for live updates via StreamingService
+      try {
+        while (!closed && !res.writableEnded && !res.destroyed) {
+          const batch = await bus.read(conversationId, cursor, { blockMs: 25_000, count: 200 }, redisReader);
+          if (!batch || batch.length === 0) continue;
+          for (const item of batch) {
+            const id = item.id;
+            const evt = item.evt;
+            cursor = id;
+            try {
+              res.write(`id: ${id}\n`);
+              res.write(`event: ${evt.type}\n`);
+              res.write(`data: ${JSON.stringify(evt.data)}\n\n`);
+              // Best-effort flush for environments with compression middleware / proxy buffering.
+              try {
+                const maybe = res as unknown as { flush?: () => void };
+                if (typeof maybe.flush === 'function') maybe.flush();
+              } catch {
+                /* ignore */
+              }
+            } catch {
+              closed = true;
+              break;
+            }
+          }
+        }
+      } catch (e) {
+        try {
+          res.write(`event: error\n`);
+          res.write(
+            `data: ${JSON.stringify({
+              code: 'STREAM_READ_FAILED',
+              message: 'Streaming backend read failed',
+              detail: e instanceof Error ? e.message : String(e),
+            })}\n\n`
+          );
+        } catch (e2) {
+          console.warn('[stream] failed to write STREAM_READ_FAILED event', {
+            conversationId,
+            error: e2 instanceof Error ? e2.message : String(e2),
+          });
+        }
+        try {
+          res.end();
+        } catch (e3) {
+          console.warn('[stream] failed to end response after stream read error', {
+            conversationId,
+            error: e3 instanceof Error ? e3.message : String(e3),
+          });
+        }
+      }
       return;
     } else {
       // Regular JSON response mode
@@ -544,18 +689,21 @@ router.post(
         }
 
         // Emit out-of-band UI action so the client can show an Approve/Deny prompt.
-        const streaming = new StreamingService();
-        await streaming.broadcastUIAction(conversationId, {
-          __ui_action: 'tool_approval_required',
-          approvalId,
-          conversationId,
-          starshipId: conversation.starshipId,
-          agentId,
-          agentName: agent.name,
-          toolId: resolvedTool.id,
-          toolSlug,
-          toolCallId,
-          args: args || {},
+        const bus = ConversationStreamBus.getInstance();
+        await bus.publish(conversationId, {
+          type: 'ui_action',
+          data: {
+            __ui_action: 'tool_approval_required',
+            approvalId,
+            conversationId,
+            starshipId: conversation.starshipId,
+            agentId,
+            agentName: agent.name,
+            toolId: resolvedTool.id,
+            toolSlug,
+            toolCallId,
+            args: args || {},
+          },
         });
 
         sendError(res, 'TOOL_APPROVAL_REQUIRED', 'Tool requires approval', 200, { approvalId, agentId, toolSlug, toolCallId });
@@ -694,14 +842,16 @@ router.post(
 
       // Best-effort broadcast: update last message (after client supports replace for non-assistant)
       try {
-        const streaming = new StreamingService();
-        // Broadcast as a normal message append (safe; client de-dupes by id)
-        await streaming.broadcastMessage(conversationId, created);
-        await streaming.broadcastUIAction(conversationId, {
-          __ui_action: 'tool_approval_resolved',
-          approvalId,
-          conversationId,
-          status: 'approved',
+        const bus = ConversationStreamBus.getInstance();
+        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: created } });
+        await bus.publish(conversationId, {
+          type: 'ui_action',
+          data: {
+            __ui_action: 'tool_approval_resolved',
+            approvalId,
+            conversationId,
+            status: 'approved',
+          },
         });
       } catch {
         // ignore broadcast failures
@@ -786,13 +936,16 @@ router.post(
       });
 
       try {
-        const streaming = new StreamingService();
-        await streaming.broadcastMessage(conversationId, created);
-        await streaming.broadcastUIAction(conversationId, {
-          __ui_action: 'tool_approval_resolved',
-          approvalId,
-          conversationId,
-          status: 'denied',
+        const bus = ConversationStreamBus.getInstance();
+        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: created } });
+        await bus.publish(conversationId, {
+          type: 'ui_action',
+          data: {
+            __ui_action: 'tool_approval_resolved',
+            approvalId,
+            conversationId,
+            status: 'denied',
+          },
         });
       } catch {
         /* ignore broadcast failures */

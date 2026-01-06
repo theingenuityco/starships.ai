@@ -31,7 +31,6 @@ import type {
   UpdateAgentRequest,
 } from '@starships/protocol';
 import { MessageService } from './MessageService';
-import type { StreamingService } from './StreamingService';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { AttachmentService } from './AttachmentService';
@@ -51,11 +50,6 @@ export interface ConversationResponse {
     promptTokens: number;
     completionTokens: number;
   };
-}
-
-export interface ConversationStreamingRequest extends ConversationRequest {
-  streamId: string;
-  streamingService: StreamingService;
 }
 
 /**

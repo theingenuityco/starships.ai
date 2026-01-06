@@ -2499,6 +2499,19 @@ export class ConversationService {
 
                 // Mark that an assistant message has been persisted for this turn
                 if (role === 'assistant') {
+                  // ROOT CAUSE FIX:
+                  // We buffer deltas (timer-based) to avoid XADD per token. Without forcing a flush here,
+                  // the last buffered assistant.delta can land AFTER this message.append (which already
+                  // includes the final content), causing the UI to render the last chunk twice.
+                  try {
+                    await this.flushPendingDeltas(conversationId);
+                  } catch (e) {
+                    console.warn('[STREAM] Failed to flush pending deltas before message.append (node_completed)', {
+                      conversationId,
+                      error: e instanceof Error ? e.message : String(e),
+                    });
+                  }
+
                   this.assistantPersistedThisTurn.add(conversationId);
                   // Reset streaming accumulators so subsequent assistant responses in the same turn
                   // get their own placeholder and can be persisted independently

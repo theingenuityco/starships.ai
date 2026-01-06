@@ -81,8 +81,8 @@ export class ConversationService {
   // Streaming assistant message id per conversation (per current turn)
   private streamingAssistantMessageId: Map<string, string> = new Map();
   // Buffer deltas so we don't XADD per token (which slows streaming dramatically).
-  private pendingContentDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null }> = new Map();
-  private pendingReasoningDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null }> = new Map();
+  private pendingContentDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null; flushing: boolean }> = new Map();
+  private pendingReasoningDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null; flushing: boolean }> = new Map();
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
@@ -197,84 +197,86 @@ export class ConversationService {
     return this;
   }
 
-  private enqueueDelta(
-    kind: 'content' | 'reasoning',
-    conversationId: string,
-    delta: string
-  ): void {
+  private enqueueDelta(kind: 'content' | 'reasoning', conversationId: string, delta: string): void {
     const map = kind === 'content' ? this.pendingContentDelta : this.pendingReasoningDelta;
-    const entry = map.get(conversationId) ?? { buf: '', timer: null };
+    const entry = map.get(conversationId) ?? { buf: '', timer: null, flushing: false };
     entry.buf += delta;
     map.set(conversationId, entry);
-
-    const flush = async () => {
-      const cur = map.get(conversationId);
-      if (!cur) return;
-      const payload = cur.buf;
-      cur.buf = '';
-      cur.timer = null;
-      map.set(conversationId, cur);
-      if (!payload) return;
-
-      try {
-        const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-        const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
-        this.streamingAssistantMessageId.set(conversationId, messageId);
-        await this.streamBus.publish(conversationId, {
-          type: kind === 'content' ? 'assistant.delta' : 'assistant.reasoning_delta',
-          data: {
-            conversationId,
-            turnId,
-            messageId,
-            delta: payload,
-            at: new Date().toISOString(),
-          } as any,
-        } as any);
-      } catch (err) {
-        console.warn('[STREAM] Failed to publish buffered delta', {
-          conversationId,
-          kind,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      }
-    };
 
     // Flush quickly for responsiveness, but avoid Redis roundtrip per-token.
     // - if buffer is large, flush immediately
     // - otherwise flush on a short timer
     if (entry.buf.length >= 1024) {
-      void flush();
+      void this.flushDelta(kind, conversationId);
       return;
     }
     if (!entry.timer) {
-      entry.timer = setTimeout(() => void flush(), 50);
+      entry.timer = setTimeout(() => void this.flushDelta(kind, conversationId), 50);
       map.set(conversationId, entry);
     }
   }
 
-  private async flushPendingDeltas(conversationId: string): Promise<void> {
-    const flushMap = async (kind: 'content' | 'reasoning') => {
-      const map = kind === 'content' ? this.pendingContentDelta : this.pendingReasoningDelta;
-      const entry = map.get(conversationId);
-      if (!entry) return;
-      if (entry.timer) {
-        clearTimeout(entry.timer);
-        entry.timer = null;
-      }
-      const payload = entry.buf;
-      entry.buf = '';
-      map.set(conversationId, entry);
+  /**
+   * Flush buffered deltas for a conversation exactly-once per buffer snapshot.
+   *
+   * This prevents a race where:
+   * - the timer-based flush from enqueueDelta()
+   * - and the final flushPendingDeltas() at turn completion
+   * both publish the same last buffer.
+   */
+  private async flushDelta(kind: 'content' | 'reasoning', conversationId: string): Promise<void> {
+    const map = kind === 'content' ? this.pendingContentDelta : this.pendingReasoningDelta;
+    const entry = map.get(conversationId);
+    if (!entry) return;
+    if (entry.flushing) return;
+
+    entry.flushing = true;
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+    const payload = entry.buf;
+    entry.buf = '';
+    map.set(conversationId, entry);
+
+    try {
       if (!payload) return;
       const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
       const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
       this.streamingAssistantMessageId.set(conversationId, messageId);
       await this.streamBus.publish(conversationId, {
         type: kind === 'content' ? 'assistant.delta' : 'assistant.reasoning_delta',
-        data: { conversationId, turnId, messageId, delta: payload, at: new Date().toISOString() } as any,
+        data: {
+          conversationId,
+          turnId,
+          messageId,
+          delta: payload,
+          at: new Date().toISOString(),
+        } as any,
       } as any);
-    };
-    await flushMap('content');
-    await flushMap('reasoning');
+    } catch (err) {
+      console.warn('[STREAM] Failed to publish buffered delta', {
+        conversationId,
+        kind,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      const cur = map.get(conversationId);
+      if (cur) {
+        cur.flushing = false;
+
+        // If new deltas arrived while we were publishing, schedule another flush.
+        if (cur.buf && cur.buf.length > 0 && !cur.timer) {
+          cur.timer = setTimeout(() => void this.flushDelta(kind, conversationId), 10);
+        }
+        map.set(conversationId, cur);
+      }
+    }
+  }
+
+  private async flushPendingDeltas(conversationId: string): Promise<void> {
+    await this.flushDelta('content', conversationId);
+    await this.flushDelta('reasoning', conversationId);
   }
 
   /**
@@ -1011,12 +1013,18 @@ export class ConversationService {
     // Publish turn start + user message (server-authoritative) to the shared stream.
     try {
       const at = new Date().toISOString();
-      await this.streamBus.publish(data.conversationId, { type: 'turn.started', data: { conversationId: data.conversationId, turnId: turn.id, at } });
+      await this.streamBus.publish(data.conversationId, {
+        type: 'turn.started',
+        data: { conversationId: data.conversationId, turnId: turn.id, at },
+      });
       await this.streamBus.publish(data.conversationId, {
         type: 'turn.status',
         data: { conversationId: data.conversationId, turnId: turn.id, status: 'active', at },
       });
-      await this.streamBus.publish(data.conversationId, { type: 'message.append', data: { conversationId: data.conversationId, message: userMessage } });
+      await this.streamBus.publish(data.conversationId, {
+        type: 'message.append',
+        data: { conversationId: data.conversationId, message: userMessage },
+      });
     } catch (e) {
       console.warn('[STREAM] Failed to publish initial turn/message events', e);
     }
@@ -1499,29 +1507,29 @@ export class ConversationService {
     }
 
     // Publish terminal turn state + any persisted partial message
-        try {
+    try {
       const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
       const at = new Date().toISOString();
-          if (persistedMsg) {
+      if (persistedMsg) {
         await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
-          }
+      }
       await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'cancelled', at } });
-        } catch (err) {
+    } catch (err) {
       console.warn('[STOP] Failed to publish cancelled turn status', {
-            conversationId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
 
     // Persist server-authoritative end-of-turn state (best-effort, for administrative visibility)
-        try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (err) {
+    try {
+      const convo = await this.getConversationById(conversationId);
+      const prev = (convo?.state as any) || {};
+      await this.conversationRepository.update(conversationId, {
+        state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
       console.warn('[STOP] Failed to persist turnActive=false on stop', err);
     }
 
@@ -1987,12 +1995,12 @@ export class ConversationService {
             // We no longer broadcast JSON-Patch placeholders; the client constructs the streaming assistant message
             // from typed delta events.
             if ((hasContent || hasToolCalls || hasReasoning || hasImages) && !this.streamingContent.has(conversationId)) {
-                this.streamingContent.set(conversationId, '');
-                this.placeholderEmitted.set(conversationId, true);
-                this.streamingToolCalls.delete(conversationId);
-                this.streamingGeneratedAttachmentIds.set(conversationId, []);
-                this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
-                if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
+              this.streamingContent.set(conversationId, '');
+              this.placeholderEmitted.set(conversationId, true);
+              this.streamingToolCalls.delete(conversationId);
+              this.streamingGeneratedAttachmentIds.set(conversationId, []);
+              this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
+              if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
               // Streaming assistant message id is deterministic per turn for client-side reconciliation.
               const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
               this.streamingAssistantMessageId.set(conversationId, `stream-${turnId}`);
@@ -2597,8 +2605,8 @@ export class ConversationService {
           await this.streamBus.publish(conversationId, {
             type: 'turn.status',
             data: { conversationId, turnId, status: 'completed', at: new Date().toISOString() },
-            });
-          } catch (err) {
+          });
+        } catch (err) {
           console.warn('[STREAM] Failed to publish completed turn status', err);
         }
 
@@ -2669,7 +2677,10 @@ export class ConversationService {
           const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
           const at = new Date().toISOString();
           await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: errorMessage } });
-          await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'failed', at, error: { message: 'Workflow failed' } } });
+          await this.streamBus.publish(conversationId, {
+            type: 'turn.status',
+            data: { conversationId, turnId, status: 'failed', at, error: { message: 'Workflow failed' } },
+          });
         } catch {
           /* ignore */
         }

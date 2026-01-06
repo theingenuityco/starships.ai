@@ -2,6 +2,7 @@ import { MessageEntity } from '@/entities/MessageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { Message, MessageModel } from '@starships/protocol';
+import { nanoid } from 'nanoid';
 
 /**
  * PostgreSQL-based message repository following layered architecture
@@ -77,6 +78,8 @@ export class MessageRepository extends BaseRepository {
 
         // Build message data with all required fields including foreign keys
         const messageData = {
+          // messages.id is a NOT NULL primary key with no DB default; provide one for the insert path.
+          id: nanoid(),
           createdAt: now,
           updatedAt: now,
           conversationId,
@@ -146,6 +149,8 @@ export class MessageRepository extends BaseRepository {
         }
 
         const messageData = {
+          // messages.id is a NOT NULL primary key with no DB default; provide one for the insert path.
+          id: nanoid(),
           createdAt: now,
           updatedAt: now,
           conversationId,

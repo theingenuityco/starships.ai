@@ -8,6 +8,7 @@ import type {
   QueryParamEncoding,
 } from '@starships/protocol';
 import OpenAI from 'openai';
+import { CancelledError } from '@starships/autopilot';
 
 type OpenAIChatCompletionCreateParamsNonStreaming = Omit<OpenAI.Chat.ChatCompletionCreateParamsStreaming, 'stream' | 'stream_options'> & {
   stream: false;
@@ -64,6 +65,12 @@ export interface RunnerHostRuntimeOptions {
    * use this instead of reading from process.env.
    */
   llm?: LlmRuntimeConfig;
+
+  /**
+   * Execution-wide abort signal. When aborted, all in-flight host runtime operations
+   * (HTTP + LLM) should be cancelled promptly.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -85,9 +92,9 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   const runtimeEnv = options.runtimeEnv ?? {};
 
   const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
-    const controller = new AbortController();
+    const timeoutController = new AbortController();
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
-    const timeoutId = setTimeout(() => controller.abort(), timeout);
+    const timeoutId = setTimeout(() => timeoutController.abort(), timeout);
 
     try {
       const finalMethod = method.toUpperCase();
@@ -96,10 +103,12 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const finalUrl = url;
       const finalHeaders: Record<string, unknown> = { ...(headers as Record<string, unknown>) };
 
+      const combinedSignal = options.signal ? AbortSignal.any([options.signal, timeoutController.signal]) : timeoutController.signal;
+
       const init: RequestInit = {
         method: finalMethod,
         headers: finalHeaders as RequestInit['headers'],
-        signal: controller.signal,
+        signal: combinedSignal,
       };
 
       if (body !== undefined && finalMethod !== 'GET' && finalMethod !== 'HEAD') {
@@ -126,7 +135,15 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         init.body = bodyInit;
       }
 
-      const resp: Response = await fetch(finalUrl, init);
+      let resp: Response;
+      try {
+        resp = await fetch(finalUrl, init);
+      } catch (e: unknown) {
+        if (options.signal?.aborted) {
+          throw new CancelledError('cancelled');
+        }
+        throw e;
+      }
       const contentType = resp.headers.get('content-type') || '';
       let responseBody: unknown;
 
@@ -486,10 +503,21 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     // - Always force non-stream for image requests
     // - Respect explicit stream=false for text requests
     if (isImageRequest || !wantsStream) {
-      const completion = await client.chat.completions.create({
-        ...(baseRequest as Record<string, unknown>),
-        stream: false,
-      } as unknown as OpenAIChatCompletionCreateParamsNonStreaming);
+      let completion: unknown;
+      try {
+        completion = await client.chat.completions.create(
+          {
+            ...(baseRequest as Record<string, unknown>),
+            stream: false,
+          } as unknown as OpenAIChatCompletionCreateParamsNonStreaming,
+          options.signal ? ({ signal: options.signal } as any) : undefined
+        );
+      } catch (e: unknown) {
+        if (options.signal?.aborted) {
+          throw new CancelledError('cancelled');
+        }
+        throw e;
+      }
       return wrapNonStreamAsOneChunk(completion);
     }
 
@@ -498,7 +526,15 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       stream: true,
       stream_options: { include_usage: true },
     };
-    const stream = await client.chat.completions.create(openaiRequest);
+    let stream: unknown;
+    try {
+      stream = await client.chat.completions.create(openaiRequest, options.signal ? ({ signal: options.signal } as any) : undefined);
+    } catch (e: unknown) {
+      if (options.signal?.aborted) {
+        throw new CancelledError('cancelled');
+      }
+      throw e;
+    }
     return stream as AsyncIterable<unknown>;
   };
 

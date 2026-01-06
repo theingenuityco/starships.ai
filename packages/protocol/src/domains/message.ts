@@ -26,6 +26,16 @@ export interface Message extends Omit<LlmMessage, 'content'> {
   // ContentBlock[] is only built when calling LLM
   content: string;
   messageType: MessageType;
+  /**
+   * Turn linkage for idempotent persistence.
+   * When present, identifies which turn/run produced the message.
+   */
+  turnId?: string;
+  /**
+   * Per-turn stable ordering slot.
+   * Used with (turnId) to provide DB-enforced idempotency.
+   */
+  turnSeq?: number;
   // Optional model-provided reasoning/thinking text
   reasoning?: string;
   // Agent tracking fields (assistant messages only)

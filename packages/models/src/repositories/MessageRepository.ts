@@ -2,6 +2,7 @@ import { MessageEntity } from '@/entities/MessageEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import type { Message, MessageModel } from '@starships/protocol';
+import { nanoid } from 'nanoid';
 
 /**
  * PostgreSQL-based message repository following layered architecture
@@ -77,6 +78,8 @@ export class MessageRepository extends BaseRepository {
 
         // Build message data with all required fields including foreign keys
         const messageData = {
+          // messages.id is a NOT NULL primary key with no DB default; provide one for the insert path.
+          id: nanoid(),
           createdAt: now,
           updatedAt: now,
           conversationId,
@@ -84,6 +87,8 @@ export class MessageRepository extends BaseRepository {
           role: entity.role,
           content: entity.content,
           messageType: entity.messageType || 'user_input',
+          ...(typeof entity.turnId === 'string' ? { turnId: entity.turnId } : {}),
+          ...(typeof entity.turnSeq === 'number' ? { turnSeq: entity.turnSeq } : {}),
           ...(entity.reasoning ? { reasoning: entity.reasoning } : {}),
           ...(entity.toolCalls ? { toolCalls: entity.toolCalls } : {}),
           ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),
@@ -110,6 +115,117 @@ export class MessageRepository extends BaseRepository {
         return fromDatabase(MessageEntity, result);
       },
       'create',
+      'Message'
+    );
+  }
+
+  /**
+   * Upsert a message into a stable turn slot (turn_id, turn_seq).
+   * This is the core primitive for idempotent chat persistence under retries/races.
+   *
+   * Requires:
+   * - messages.turn_id + messages.turn_seq columns
+   * - unique index on (turn_id, turn_seq)
+   */
+  async upsertByTurnSlot(
+    entity: Message & { conversationId: string; turnId: string; turnSeq: number; starshipId?: string; attachmentIds?: string[] }
+  ): Promise<MessageModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const now = new Date().toISOString();
+        const conversationId = entity.conversationId;
+        const turnId = String(entity.turnId || '');
+        const turnSeq = Number(entity.turnSeq);
+
+        if (!turnId) {
+          throw new Error('turnId is required');
+        }
+        if (!Number.isFinite(turnSeq) || !Number.isInteger(turnSeq) || turnSeq < 0 || turnSeq > 1_000_000) {
+          throw new Error('turnSeq must be a non-negative integer <= 1,000,000');
+        }
+
+        // Validate turnId belongs to the same conversationId (prevents cross-conversation message attachment).
+        const connection = this.getConnection();
+        const turnRow = await connection.queryOne<{ conversation_id: string }>('SELECT conversation_id FROM turns WHERE id = $1', [turnId]);
+        if (!turnRow) {
+          throw new Error(`Turn ${turnId} not found`);
+        }
+        if (String(turnRow.conversation_id) !== conversationId) {
+          throw new Error(`Turn ${turnId} does not belong to conversation ${conversationId}`);
+        }
+
+        // Get starshipId from conversation if not provided
+        let starshipId = entity.starshipId;
+        if (!starshipId) {
+          const conversation = await connection.queryOne<{ starship_id: string }>('SELECT starship_id FROM conversations WHERE id = $1', [
+            conversationId,
+          ]);
+          if (!conversation) {
+            throw new Error(`Conversation ${conversationId} not found`);
+          }
+          starshipId = conversation.starship_id;
+        }
+
+        const messageData = {
+          // messages.id is a NOT NULL primary key with no DB default; provide one for the insert path.
+          id: nanoid(),
+          createdAt: now,
+          updatedAt: now,
+          conversationId,
+          starshipId,
+          role: entity.role,
+          content: entity.content,
+          messageType: entity.messageType || 'user_input',
+          turnId,
+          turnSeq,
+          ...(entity.reasoning ? { reasoning: entity.reasoning } : {}),
+          ...(entity.toolCalls ? { toolCalls: entity.toolCalls } : {}),
+          ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),
+          ...(entity.agentId ? { agentId: entity.agentId } : {}),
+          ...(entity.agentName ? { agentName: entity.agentName } : {}),
+          ...(entity.attachmentIds ? { attachmentIds: entity.attachmentIds } : {}),
+        };
+
+        await MessageEntity.validate(messageData, 'create');
+        const messageEntity = toEntityInstance(MessageEntity, messageData);
+        const serializedData = toDatabase(messageEntity);
+
+        // JSONB tool_calls must be stringified if an array
+        if (serializedData.tool_calls && Array.isArray(serializedData.tool_calls)) {
+          serializedData.tool_calls = JSON.stringify(serializedData.tool_calls);
+        }
+
+        const conn = this.getConnection();
+        const columns = Object.keys(serializedData);
+        const values = Object.values(serializedData);
+        const placeholders = columns.map((_, i) => `$${i + 1}`);
+
+        // Create a stable id on first insert; on conflict we keep existing id/created_at.
+        const insertSql = `
+          INSERT INTO messages (${columns.join(', ')})
+          VALUES (${placeholders.join(', ')})
+          ON CONFLICT ON CONSTRAINT uq_messages_turn_id_turn_seq
+          DO UPDATE SET
+            updated_at = NOW(),
+            role = EXCLUDED.role,
+            content = EXCLUDED.content,
+            message_type = EXCLUDED.message_type,
+            reasoning = EXCLUDED.reasoning,
+            tool_calls = EXCLUDED.tool_calls,
+            tool_call_id = EXCLUDED.tool_call_id,
+            agent_id = EXCLUDED.agent_id,
+            agent_name = EXCLUDED.agent_name,
+            attachment_ids = EXCLUDED.attachment_ids
+          RETURNING *;
+        `;
+
+        const row = await conn.queryOne<Record<string, unknown>>(insertSql, values);
+        if (!row) {
+          throw new Error('Failed to upsert message');
+        }
+        return fromDatabase(MessageEntity, row);
+      },
+      'upsertByTurnSlot',
       'Message'
     );
   }

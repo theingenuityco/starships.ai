@@ -28,11 +28,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { AGENT_QUERY_KEYS } from '@/hooks/useAgents'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { AgentPublishModal } from './AgentPublishModal'
-import {
-  areStatesEqual,
-  shouldSkipStateUpdateToPreservePlugins,
-  baseStateHasPlugins,
-} from '@/utils/agent-state'
+import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlugins } from '@/utils/agent-state'
 import type { ConversationState } from '@starships/protocol'
 
 interface AgentDocumentEditorProps {
@@ -357,7 +353,6 @@ export function AgentDocumentEditor({
         const result = await safeGet<AgentModel>(starshipUrl)
         if (result.ok && result.data?.id) {
           const agent = result.data
-          console.debug('[AgentDocEditor] Resolved agentId', { slug: value.slug, id: agent?.id })
           if (!cancelled) {
             setAgentId(agent.id || null)
           }
@@ -568,12 +563,10 @@ export function AgentDocumentEditor({
         // Only update if form has no assignments yet to avoid clobbering in-flight edits
         const cur = value.assignedToolSlugs || []
         if (cur.length === 0 && slugs.length > 0) {
-          console.debug('[AgentDocEditor] Sync assigned tools', { slugs })
           onFieldChange?.('assignedToolSlugs', slugs)
         }
         hasSyncedAssignedRef.current = true
       } catch {
-        console.warn('[AgentDocEditor] Failed to load assigned tools', { agentId })
         // ignore
       }
     }
@@ -623,10 +616,8 @@ export function AgentDocumentEditor({
         if (agent.blueprint && (!value.blueprint || value.blueprint.trim() === '' || value.blueprint.trim() === '{\n  "nodes": [],\n  "edges": []\n}')) {
           onFieldChange?.('blueprint', JSON.stringify(agent.blueprint, null, 2))
         }
-        console.debug('[AgentDocEditor] Sync agent fields', { id: agentId })
         hasSyncedAgentRef.current = true
       } catch {
-        console.warn('[AgentDocEditor] Failed to load agent fields', { agentId })
         // ignore
       }
     }
@@ -762,38 +753,6 @@ export function AgentDocumentEditor({
     if (!sameTools) changes.push('Tools')
     if (!sameBlueprint) changes.push('Blueprint')
 
-    try {
-      console.debug('[AgentDocEditor] template-diff-debug', {
-        agentId: fullAgent.id,
-        publishedTemplateId: fullAgent.publishedTemplateId,
-        sameName,
-        sameRole,
-        sameDescription,
-        sameModel,
-        sameCategory,
-        sameTemperature,
-        sameMaxTokens,
-        sameTimeout,
-        sameReasoning,
-        sameSystemPrompt,
-        samePreviewPrompts,
-        sameAvatar,
-        sameTools,
-        sameBlueprint,
-        avatarAttachmentId,
-        avatarCreatedAt,
-        templateAvatarUpdatedAt,
-        agentPreviewPrompts: agentCore.previewPrompts,
-        templatePreviewPrompts: templateCore.previewPrompts,
-        agentBlueprintLen: agentBlueprintStr.length,
-        templateBlueprintLen: templateBlueprintStr.length,
-        allCurrentTools,
-        currentTools,
-        baselineTools,
-      })
-    } catch {
-      // ignore logging errors
-    }
 
     const differs = !(
       sameName &&
@@ -958,29 +917,20 @@ export function AgentDocumentEditor({
       // Only update state if form has state AND it differs from base
       // If form state is missing plugins but base has plugins, don't remove them
       if (value.state && typeof value.state === 'object') {
-        const baseState = (base.state && typeof base.state === 'object' ? base.state : {}) as ConversationState;
-        const nextState = value.state as ConversationState;
+        const baseState = (base.state && typeof base.state === 'object' ? base.state : {}) as ConversationState
+        const nextState = value.state as ConversationState
 
         // Check if we should skip update to preserve plugins
         if (shouldSkipStateUpdateToPreservePlugins(baseState, nextState)) {
-          console.log('[Autosave] Base has plugins but form state missing them - preserving base state, skipping update');
           // Don't update - preserve base state with plugins
         } else if (!areStatesEqual(baseState, nextState)) {
-          console.log('[Autosave] State changed, including in update:', {
-            nextState,
-            baseState,
-            hasPlugins: 'plugins' in nextState,
-            plugins: nextState.plugins,
-          });
-          updates.state = nextState;
+          updates.state = nextState
         } else {
-          console.log('[Autosave] State unchanged, skipping update');
         }
       } else if (base.state && typeof base.state === 'object') {
         // If form has no state but base has state, preserve base state
         // This ensures plugins aren't lost when form state is reset
         if (baseStateHasPlugins(base.state as ConversationState)) {
-          console.log('[Autosave] Form missing state but base has plugins - preserving base state');
           // Don't update - let base state persist
         }
       }
@@ -999,30 +949,14 @@ export function AgentDocumentEditor({
           return
         }
         setIsAutosaving(true)
-        console.log('[Autosave] Sending update request:', { 
-          updates, 
-          hasState: 'state' in updates,
-          statePlugins: (updates.state as { plugins?: unknown })?.plugins
-        });
         const res: FetchResponse<ApiResponse<AgentModel>> = await api.put(`/api/v1/agents/${agentId}`, updates)
         const updated = res.data.data
 
         if (!cancelled && updated) {
-          console.log('[Autosave] Received updated agent:', { 
-            hasState: 'state' in updated,
-            state: updated.state,
-            statePlugins: (updated.state as { plugins?: unknown })?.plugins,
-            sentState: updates.state,
-            sentHasPlugins: updates.state && 'plugins' in (updates.state as Record<string, unknown>)
-          });
           // ALWAYS preserve state from updates if we sent it, regardless of API response
           // This ensures state (like plugins) is never lost
           if (updates.state && typeof updates.state === 'object') {
-            console.log('[Autosave] Preserving sent state in updated agent:', {
-              sentState: updates.state,
-              apiState: updated.state
-            });
-            (updated as any).state = updates.state;
+            ;(updated as any).state = updates.state
           }
           setFullAgent(updated)
           // Keep React Query cache in sync for this agent

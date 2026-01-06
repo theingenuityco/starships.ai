@@ -22,7 +22,13 @@ import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
-import type { ToolModel, ConversationStreamSnapshot, TurnStatus as StreamTurnStatus } from '@starships/protocol';
+import type {
+  ToolModel,
+  ConversationStreamSnapshot,
+  ConversationStreamEvent,
+  TurnStatus as StreamTurnStatus,
+  MessageModel,
+} from '@starships/protocol';
 import { buildAutopilotExecutionBundle, buildAutopilotRuntimeEnv } from '@/services/autopilot-execution-bundle';
 
 const router: Router = Router();
@@ -330,7 +336,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
               if (!evt || typeof evt.type !== 'string') continue;
 
               if (evt.type === 'assistant.delta' || evt.type === 'assistant.reasoning_delta') {
-                const data: any = (evt as any).data;
+                const data =
+                  evt.type === 'assistant.delta'
+                    ? (evt as Extract<ConversationStreamEvent, { type: 'assistant.delta' }>).data
+                    : (evt as Extract<ConversationStreamEvent, { type: 'assistant.reasoning_delta' }>).data;
                 if (!data || data.turnId !== activeTurnId) continue;
                 const messageId = typeof data.messageId === 'string' ? data.messageId : '';
                 const delta = typeof data.delta === 'string' ? data.delta : '';
@@ -359,11 +368,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
             if (bestId && bestScore > 0) {
               const buf = buffers.get(bestId)!;
-              const alreadyPersisted = Array.isArray(snapshotMessages) && snapshotMessages.some((m) => (m as any)?.id === bestId);
+              const alreadyPersisted = Array.isArray(snapshotMessages) && snapshotMessages.some((m: MessageModel) => m.id === bestId);
               if (!alreadyPersisted) {
                 const now = new Date().toISOString();
                 const at = buf.lastAt || buf.firstAt || now;
-                const derivedAssistantMsg: any = {
+                const derivedAssistantMsg: MessageModel = {
                   id: bestId,
                   role: 'assistant',
                   content: buf.content || '',
@@ -371,8 +380,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                   createdAt: buf.firstAt || at,
                   updatedAt: at,
                   turnId: activeTurnId,
+                  ...(buf.reasoning && { reasoning: buf.reasoning }),
                 };
-                if (buf.reasoning) derivedAssistantMsg.reasoning = buf.reasoning;
                 snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
               }
             }

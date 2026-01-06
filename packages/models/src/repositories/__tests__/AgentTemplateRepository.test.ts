@@ -35,6 +35,7 @@ describe('AgentTemplateRepository', () => {
     id: 'template-123',
     slug: 'test-template',
     name: 'Test Template',
+    role: 'Assistant',
     description: 'A test agent template',
     category: 'general',
     model: 'gpt-4',
@@ -74,6 +75,7 @@ describe('AgentTemplateRepository', () => {
   const createMockCreateInput = (overrides: Record<string, unknown> = {}) => ({
     name: 'Test Template',
     slug: 'test-template', // Add slug for validation
+    role: 'Assistant',
     description: 'A test agent template',
     category: 'general' as const,
     model: 'gpt-4',
@@ -266,6 +268,7 @@ describe('AgentTemplateRepository', () => {
     it('should handle missing optional fields', async () => {
       const minimalInput = {
         name: 'Minimal Template',
+        role: 'Assistant',
         slug: 'minimal-template', // Add slug for validation
         description: 'Basic template',
         category: 'general' as const,
@@ -298,6 +301,52 @@ describe('AgentTemplateRepository', () => {
       mockConnection.query.mockRejectedValue(new Error('Database error'));
 
       await expect(repository.create(createInput)).rejects.toThrow(DatabaseError);
+    });
+
+    it('should assign tool templates using base slug when tool template slugs are random-suffixed', async () => {
+      const createInput = createMockCreateInput({
+        assignedToolSlugs: ['list-agents'],
+      });
+      const mockCreatedRaw = createMockRawTemplate();
+
+      // First queryOne call is from template slug generation uniqueness checks.
+      // Second queryOne call is the tool template lookup.
+      mockConnection.queryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'tool-template-1' });
+      mockConnection.query.mockResolvedValueOnce([mockCreatedRaw]);
+
+      await repository.create(createInput);
+
+      // Tool template lookup should use exact OR strict random-suffix match: ^base-[a-z0-9]{4}$
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('FROM tool_templates'),
+        expect.arrayContaining(['list-agents', '^list\\-agents-[a-z0-9]{4}$'])
+      );
+
+      // Relationship insert should be attempted.
+      expect(mockConnection.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO agent_template_tool_templates'),
+        expect.arrayContaining(['template-123', 'tool-template-1', expect.any(String)])
+      );
+    });
+
+    it('should not match overlapping base slugs when resolving assignedToolSlugs (e.g. "list" vs "list-agents-*")', async () => {
+      const createInput = createMockCreateInput({
+        assignedToolSlugs: ['list'],
+      });
+      const mockCreatedRaw = createMockRawTemplate();
+
+      // First queryOne call is from template slug generation uniqueness checks.
+      // Second queryOne call is the tool template lookup.
+      mockConnection.queryOne.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 'tool-template-list' });
+      mockConnection.query.mockResolvedValueOnce([mockCreatedRaw]);
+
+      await repository.create(createInput);
+
+      // The lookup must only match random-suffixed slugs for the requested base (prevents `list` matching `list-agents-xxxx`).
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('FROM tool_templates'),
+        expect.arrayContaining(['list', '^list-[a-z0-9]{4}$'])
+      );
     });
   });
 
@@ -340,6 +389,32 @@ describe('AgentTemplateRepository', () => {
         id: 'template-123',
       });
       expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE agent_templates'), expect.any(Array));
+    });
+
+    it('should re-create tool template relationships using base slug fallback on update', async () => {
+      const updates = { assignedToolSlugs: ['list-agents'] };
+      const mockUpdatedRaw = createMockRawTemplate();
+
+      // Tool template lookup (exact OR prefix)
+      mockConnection.queryOne.mockResolvedValueOnce({ id: 'tool-template-1' });
+
+      // Multiple queries happen: DELETE relationships, INSERT relationship, UPDATE agent_templates.
+      // We only need the UPDATE to return the updated row.
+      mockConnection.query.mockResolvedValue([mockUpdatedRaw]);
+
+      await repository.update('template-123', updates);
+
+      expect(mockConnection.query).toHaveBeenCalledWith('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1', [
+        'template-123',
+      ]);
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('FROM tool_templates'),
+        expect.arrayContaining(['list-agents', '^list\\-agents-[a-z0-9]{4}$'])
+      );
+      expect(mockConnection.query).toHaveBeenCalledWith(
+        expect.stringContaining('INSERT INTO agent_template_tool_templates'),
+        expect.arrayContaining(['template-123', 'tool-template-1', expect.any(String)])
+      );
     });
   });
 

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { useQueryClient } from '@tanstack/react-query'
-import { AGENT_QUERY_KEYS, fetchAgentBySlugOrId } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, fetchStarshipAgentBySlug } from '@/hooks/useAgents'
 
 /**
  * Detects agent creations during an active streaming turn and exposes a modal state
@@ -15,6 +15,7 @@ export function useDeferredAgentCreationModal(options: {
   liveMessages: any[] | undefined
   isStreaming: boolean | undefined
   starshipSlug?: string | null
+  starshipId?: string | null
   conversationId?: string | null
   agents?: Array<{ name?: string; slug?: string }>
   setLeadingMentionAgent?: (agent: { id?: string; name?: string; slug?: string }, afterText?: string) => void
@@ -23,6 +24,7 @@ export function useDeferredAgentCreationModal(options: {
   const isStreaming = Boolean(options?.isStreaming)
   const liveMessages = Array.isArray(options?.liveMessages) ? (options!.liveMessages as any[]) : []
   const starshipSlug = typeof options?.starshipSlug === 'string' ? options!.starshipSlug : undefined
+  const starshipId = typeof options?.starshipId === 'string' ? options!.starshipId : undefined
   const conversationId = typeof options?.conversationId === 'string' ? options!.conversationId : undefined
   const agents = Array.isArray(options?.agents) ? options!.agents : undefined
   const setLeadingMentionAgent = typeof options?.setLeadingMentionAgent === 'function' ? options!.setLeadingMentionAgent : undefined
@@ -346,7 +348,9 @@ export function useDeferredAgentCreationModal(options: {
 
   // While modal open, hydrate missing agents by slug via TanStack Query
   useEffect(() => {
-    if (!isOpen || createdSlugs.length === 0) return
+    // Agent slugs are starship-scoped and cannot be resolved without a starshipId.
+    // If starshipId is not available yet (e.g. first render), defer hydration until it is.
+    if (!isOpen || createdSlugs.length === 0 || !starshipId) return
     const haveSlugs = new Set<string>((createdAgents || []).map(a => String((a as any)?.slug || ''))) as Set<string>
     const toFetch = createdSlugs.filter(s => s && !haveSlugs.has(s))
     if (toFetch.length === 0) return
@@ -355,8 +359,8 @@ export function useDeferredAgentCreationModal(options: {
       for (const slug of toFetch) {
         try {
           const agent = await queryClient.fetchQuery({
-            queryKey: AGENT_QUERY_KEYS.bySlugOrId(slug),
-            queryFn: () => fetchAgentBySlugOrId(slug),
+            queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starshipId, slug),
+            queryFn: () => fetchStarshipAgentBySlug(starshipId, slug),
             staleTime: 30 * 1000,
           })
           if (agent) fetched.push(agent)
@@ -380,7 +384,7 @@ export function useDeferredAgentCreationModal(options: {
         })
       }
     })()
-  }, [isOpen, createdSlugs, createdAgents, queryClient])
+  }, [isOpen, createdSlugs, createdAgents, queryClient, starshipId])
 
   const findAgentSlugByName = useCallback(
     (name: string | undefined): string | undefined => {

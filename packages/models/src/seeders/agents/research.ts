@@ -96,6 +96,7 @@ Remember: You have two complementary tools - use them wisely to provide the best
 export const researchTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: 'Research Assistant',
   slug: 'research-assistant',
+  role: 'Research Assistant',
   version: '1.0.0',
   description:
     'Expert research agent that combines Wikipedia depth with DuckDuckGo instant answers for comprehensive, accurate information on any topic.',

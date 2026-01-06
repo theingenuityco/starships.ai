@@ -9,13 +9,19 @@
  * @returns A URL-safe slug string
  */
 export function generateSlug(text: string): string {
-  return text
+  // Strict slug generation:
+  // - lower-case
+  // - strip special chars (keep only a-z0-9)
+  // - collapse separators to single hyphen
+  // - trim leading/trailing hyphens
+  //
+  // This intentionally does NOT allow underscores or other word chars.
+  return String(text || '')
     .toLowerCase()
     .trim()
-    .replace(/[^\w\s-]/g, '') // Remove special characters except spaces and hyphens
-    .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/-+/g, '-') // Replace multiple hyphens with single hyphen
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+    .replace(/[^a-z0-9]+/g, '-') // Replace any non-alphanumeric runs with hyphens
+    .replace(/^-+|-+$/g, '') // Trim hyphens
+    .replace(/-+/g, '-'); // Collapse multiple hyphens
 }
 
 /**

@@ -1601,7 +1601,7 @@ export class ConversationService {
       turnLeaseId = await leaseService.acquire({
         starshipId: starship.id,
         conversationId,
-        maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 1,
+        maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 3,
       });
 
       // Track the turn lease so we can release it on stop

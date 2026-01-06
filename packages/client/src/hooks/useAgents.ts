@@ -3,6 +3,7 @@ import type { AgentModel, ApiResponse, CreateAgentRequest, UpdateAgentRequest, T
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 
 // Extended Agent interface for client compatibility with optimistic updates
 export interface ClientAgent extends AgentModel {
@@ -26,8 +27,8 @@ export const AGENT_QUERY_KEYS = {
   list: (filters?: AgentFilters) => [...AGENT_QUERY_KEYS.lists(), { filters }] as const,
   details: () => [...AGENT_QUERY_KEYS.all, 'detail'] as const,
   detail: (id: string) => [...AGENT_QUERY_KEYS.details(), id] as const,
-  bySlugOrId: (slugOrId: string) => [...AGENT_QUERY_KEYS.all, 'slugOrId', slugOrId] as const,
   byStarship: (starshipId: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId] as const,
+  byStarshipSlug: (starshipId: string, slug: string) => [...AGENT_QUERY_KEYS.all, 'starship', starshipId, 'slug', slug] as const,
   byAuthor: (authorId: string) => [...AGENT_QUERY_KEYS.all, 'author', authorId] as const,
   byUser: (userId: string) => [...AGENT_QUERY_KEYS.all, 'user', userId] as const,
   public: () => [...AGENT_QUERY_KEYS.all, 'public'] as const,
@@ -52,18 +53,18 @@ export function useAgent(agentId: string, enabled: boolean = true) {
 }
 
 /**
- * Fetcher and hook for agent by slug or ID (single endpoint).
+ * Fetch agent by slug within a specific starship.
  */
-export async function fetchAgentBySlugOrId(slugOrId: string): Promise<AgentModel> {
-  const response: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/agents/${encodeURIComponent(slugOrId)}`)
+export async function fetchStarshipAgentBySlug(starshipId: string, slug: string): Promise<AgentModel> {
+  const response: FetchResponse<ApiResponse<AgentModel>> = await api.get(`/api/v1/starships/${encodeURIComponent(starshipId)}/agents/${encodeURIComponent(slug)}`)
   return response.data.data
 }
 
-export function useAgentBySlugOrId(slugOrId: string, enabled: boolean = true) {
+export function useStarshipAgentBySlug(starshipId: string, slug: string, enabled: boolean = true) {
   return useQuery({
-    queryKey: AGENT_QUERY_KEYS.bySlugOrId(slugOrId),
-    queryFn: () => fetchAgentBySlugOrId(slugOrId),
-    enabled: !!slugOrId && enabled,
+    queryKey: AGENT_QUERY_KEYS.byStarshipSlug(starshipId, slug),
+    queryFn: () => fetchStarshipAgentBySlug(starshipId, slug),
+    enabled: !!starshipId && !!slug && enabled,
     staleTime: 30 * 1000,
     gcTime: 5 * 60 * 1000,
   })
@@ -219,7 +220,7 @@ export function useGenerateAgentAvatar() {
       if (agent.starshipId) {
         queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(agent.starshipId) })
       }
-      toast.success('Avatar generated', { description: `Updated avatar for ${agent.name}` })
+      toast.success('Avatar generated', { description: `Updated avatar for ${formatAgentDisplayName(agent)}` })
     },
     onError: (error: any) => {
       const message = error?.response?.data?.error?.message || error?.message || 'Failed to generate avatar'
@@ -250,7 +251,7 @@ export function useCreateAgent() {
       })
 
       toast.success('Agent created successfully!', {
-        description: `${agent.name} has been created and deployed to the starship.`,
+        description: `${formatAgentDisplayName(agent)} has been created and deployed to the starship.`,
       })
     },
     onError: (error: any) => {
@@ -281,7 +282,7 @@ export function useUpdateAgent() {
       queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.lists() })
 
       toast.success('Agent updated successfully!', {
-        description: `${updatedAgent.name} has been updated.`,
+        description: `${formatAgentDisplayName(updatedAgent)} has been updated.`,
       })
     },
     onError: (error: any) => {
@@ -325,7 +326,7 @@ export function useDeleteAgent() {
 
       if (context?.agent) {
         toast.success('Agent deleted successfully!', {
-          description: `${context.agent.name} has been removed from the starship.`,
+          description: `${formatAgentDisplayName(context.agent)} has been removed from the starship.`,
         })
       } else {
         toast.success('Agent deleted successfully!')
@@ -377,7 +378,7 @@ export function useDeployAgent() {
       })
 
       toast.success('Agent deployed successfully!', {
-        description: `${agent.name} has been deployed to the new starship.`,
+        description: `${formatAgentDisplayName(agent)} has been deployed to the new starship.`,
       })
     },
     onError: (error: any) => {

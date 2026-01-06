@@ -17,6 +17,7 @@ import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 import { cn } from '@/lib/utils'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import Link from 'next/link'
 
 interface RequestedByProfileProps {
@@ -70,8 +71,8 @@ export default function PendingAgentsPage(): React.JSX.Element {
   const [selectedAgent, setSelectedAgent] = useState<PendingAgentSummary | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
 
-  const selectedAgentAvatarAttachmentId = (selectedAgent as any)?.agent?.avatarAttachmentId as string | undefined
-  const selectedAgentStarshipId = (selectedAgent as any)?.agent?.starshipId as string | undefined
+  const selectedAgentAvatarAttachmentId = selectedAgent?.agent.avatarAttachmentId
+  const selectedAgentStarshipId = selectedAgent?.agent.starshipId
   const selectedAgentAvatarIds = useMemo(() => (selectedAgentAvatarAttachmentId ? [selectedAgentAvatarAttachmentId] : []), [selectedAgentAvatarAttachmentId])
   const { data: selectedAgentAvatarAttachments = [] } = useMessageAttachments(selectedAgentAvatarIds, selectedAgentStarshipId)
   const selectedAgentAvatarUrl = selectedAgentAvatarAttachments?.[0]?.previewUrl
@@ -148,24 +149,28 @@ export default function PendingAgentsPage(): React.JSX.Element {
   const selectedAgentFormData: AgentFormData | null = selectedAgent
     ? {
         name: selectedAgent.agent.name,
+        role: selectedAgent.agent.role,
         slug: selectedAgent.agent.slug,
         description: selectedAgent.agent.description || '',
-        category: (selectedAgent.agent as any).category || 'general',
+        category: selectedAgent.agent.category || 'general',
         model: selectedAgent.agent.model,
-        temperature: (selectedAgent.agent as any).temperature ?? 0.7,
-        maxTokens: (selectedAgent.agent as any).maxTokens ?? 4000,
-        reasoning: ((selectedAgent.agent as any)?.reasoning?.effort as any) || 'none',
+        temperature: selectedAgent.agent.temperature ?? 0.7,
+        maxTokens: selectedAgent.agent.maxTokens ?? 4000,
+        reasoning:
+          selectedAgent.agent.reasoning?.effort === 'low' || selectedAgent.agent.reasoning?.effort === 'medium' || selectedAgent.agent.reasoning?.effort === 'high'
+            ? selectedAgent.agent.reasoning.effort
+            : 'none',
         systemPrompt: selectedAgent.agent.systemPrompt || '',
-        previewPrompts: (selectedAgent.agent as any).previewPrompts || [],
+        previewPrompts: selectedAgent.agent.previewPrompts || [],
         // Use the denormalized assignedToolSlugs populated by the admin
         // pending agents API so the preview matches the agent's current
         // tool assignments. The aside "Tools in this publish" panel
         // separately shows only the subset of tools that will create or
         // update templates in this publish.
-        assignedToolSlugs: (selectedAgent.agent as any).assignedToolSlugs || [],
+        assignedToolSlugs: selectedAgent.agent.assignedToolSlugs || [],
         blueprint: selectedAgent.agent.blueprint ? JSON.stringify(selectedAgent.agent.blueprint, null, 2) : '{\n  "nodes": [],\n  "edges": []\n}',
-        timeout: (selectedAgent.agent as any).timeout ?? 30000,
-        icon: (selectedAgent.agent as any).icon || '',
+        timeout: selectedAgent.agent.timeout ?? 30000,
+        icon: '',
       }
     : null
 
@@ -225,7 +230,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
                 <div className="flex items-center justify-center py-16">
                   <div className="max-w-md text-center space-y-2">
                     <p className="font-medium">Unable to load pending agents</p>
-                    <p className="text-sm text-muted-foreground">{(error as any)?.message || 'Something went wrong while loading data.'}</p>
+                    <p className="text-sm text-muted-foreground">{error instanceof Error ? error.message : 'Something went wrong while loading data.'}</p>
                   </div>
                 </div>
               )}
@@ -249,7 +254,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
                         <CardHeader className="flex flex-row items-center justify-between gap-4">
                           <div className="space-y-1 min-w-0">
                             <CardTitle className="flex items-center gap-2 text-base">
-                              <span className="truncate">{agent.name}</span>
+                              <span className="truncate">{formatAgentDisplayName(agent)}</span>
                               {(agent.publicationRequestedVersion || agent.version) && (
                                 <Badge variant="outline" className="text-[10px] font-mono">
                                   v{agent.publicationRequestedVersion || agent.version}
@@ -443,7 +448,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
                                 />
                               </div>
                               <div className="flex flex-col min-w-0">
-                                <span className="text-xs font-semibold truncate">{selectedAgent.agent.name}</span>
+                                <span className="text-xs font-semibold truncate">{formatAgentDisplayName(selectedAgent.agent)}</span>
                                 <span className="text-[11px] text-muted-foreground font-mono truncate">{selectedAgent.agent.slug || selectedAgent.agent.id}</span>
                               </div>
                             </div>

@@ -32,6 +32,14 @@ export class AgentEntity implements AgentModel {
   @Length(1, 255)
   id!: string;
 
+  /**
+   * Human-readable role label for this agent (required).
+   */
+  @Expose()
+  @IsString()
+  @Length(1, 255)
+  role!: string;
+
   @Expose()
   @IsISO8601()
   createdAt!: string;
@@ -231,6 +239,7 @@ export class AgentEntity implements AgentModel {
         starshipId: (dataRecord.starshipId as string) || '',
         sourceTemplateId: dataRecord.sourceTemplateId,
         name: dataRecord.name || '',
+        role: (dataRecord.role as string) || 'Assistant',
         description: dataRecord.description,
         model: dataRecord.model || '',
         temperature: dataRecord.temperature,

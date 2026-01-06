@@ -53,11 +53,15 @@ const ReasoningConfigSchema = z
   .strict();
 
 const CreateAgentSchema = z.object({
-  slug: z.string().min(1).max(100).optional(),
   name: z
     .string()
     .min(1, 'Name is required')
     .max(255, 'Name must be less than 255 characters')
+    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  role: z
+    .string()
+    .min(1, 'Role is required')
+    .max(255, 'Role must be less than 255 characters')
     .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
   description: z
     .string()
@@ -79,6 +83,12 @@ const CreateAgentSchema = z.object({
 
 const UpdateAgentSchema = z.object({
   name: z
+    .string()
+    .min(1)
+    .max(255)
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  role: z
     .string()
     .min(1)
     .max(255)
@@ -316,13 +326,9 @@ router.get('/agents/:slugOrId', jwtAuthMiddleware, async (req: Request, res: Res
 
     const agentService = new AgentService();
 
-    // Always try slug first
-    let agent: AgentModel | null = await agentService.getAgentBySlug(paramValidation.slugOrId);
-
-    // If not found by slug, try to find by ID
-    if (!agent) {
-      agent = await agentService.getAgent(paramValidation.slugOrId);
-    }
+    // NOTE: Agent slugs are only unique within a starship (starship_id + slug).
+    // This endpoint is therefore ID-only to avoid ambiguous cross-starship slug resolution.
+    const agent: AgentModel | null = await agentService.getAgent(paramValidation.slugOrId);
 
     // If still not found, return 404
     if (!agent) {

@@ -1,10 +1,20 @@
 import type { AgentTemplateCategory } from '@starships/protocol'
+import type { AgentModel } from '@starships/protocol'
 
 export interface AgentFormData {
   name: string
+  /**
+   * Human-readable role label for the agent (e.g. "Customer Support Agent").
+   * Required by the backend.
+   */
+  role: string
   slug: string
   description: string
-  category: AgentTemplateCategory
+  /**
+   * Category is optional in the backend and should not be defaulted in the UI.
+   * We keep it as a controlled field by allowing the empty-string sentinel.
+   */
+  category: AgentTemplateCategory | ''
   model: string
   temperature: number
   maxTokens: number
@@ -26,6 +36,16 @@ export interface AgentBuilderViewProps {
   onSave?: (data: AgentFormData) => void
   onCancel?: () => void
   starshipId?: string
+  /**
+   * Optional: when editing an existing agent, pass its immutable id so the editor
+   * can hydrate canonical agent details without doing a slug->id resolve fetch.
+   */
+  agentId?: string
+  /**
+   * Optional: if the parent already fetched the agent (e.g. via useAgent),
+   * pass it down so the editor does not make its own /agents/:id call.
+   */
+  agent?: AgentModel | null
   initialSlug?: string
   errorMessage?: string
   /**

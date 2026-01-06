@@ -19,6 +19,10 @@ module.exports = {
   coverageReporters: ['text', 'lcov', 'html'],
   setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
   moduleNameMapper: {
+    // Some workspace packages use local "@/..." aliases internally.
+    // Map these packages to their built dist so tsconfig path aliases are already rewritten.
+    '^@starships/env$': '<rootDir>/../env/dist',
+    '^@starships/env/(.*)$': '<rootDir>/../env/dist/$1',
     '^@starships/(.*)$': '<rootDir>/../$1/src',
     '^@/(.*)$': '<rootDir>/src/$1',
   },

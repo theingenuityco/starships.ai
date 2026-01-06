@@ -12,25 +12,39 @@ type ActiveHandle = {
  */
 class ExecutionRegistry {
   private active = new Map<string, ActiveHandle>();
-  private cancelled = new Set<string>();
+  // Keep cancellations for a short TTL to avoid register/unregister races and allow queued/starting runs to be cancelled.
+  private cancelledUntil = new Map<string, number>();
+  private static readonly CANCEL_TTL_MS = 5 * 60 * 1000;
+
+  private prune(now: number = Date.now()): void {
+    for (const [requestId, until] of this.cancelledUntil.entries()) {
+      if (until <= now) this.cancelledUntil.delete(requestId);
+    }
+  }
 
   register(handle: ActiveHandle): void {
     this.active.set(handle.requestId, handle);
     // Handle the "cancel-before-register" race:
     // cancel(requestId) can be called before the executor registers the handle.
     // In that case, immediately cancel this handle as soon as it registers.
-    if (this.cancelled.has(handle.requestId)) {
+    if (this.isCancelled(handle.requestId)) {
       this.cancel(handle.requestId);
     }
   }
 
   unregister(requestId: string): void {
     this.active.delete(requestId);
-    this.cancelled.delete(requestId);
+    // Do NOT clear cancellation state here; cancel() can race with unregister().
+    // TTL pruning keeps this bounded.
+    this.prune();
   }
 
   isCancelled(requestId: string): boolean {
-    return this.cancelled.has(requestId);
+    if (!requestId) return false;
+    const now = Date.now();
+    this.prune(now);
+    const until = this.cancelledUntil.get(requestId);
+    return typeof until === 'number' && until > now;
   }
 
   /**
@@ -42,7 +56,9 @@ class ExecutionRegistry {
    */
   cancel(requestId: string): boolean {
     if (!requestId) return false;
-    this.cancelled.add(requestId);
+    const now = Date.now();
+    this.cancelledUntil.set(requestId, now + ExecutionRegistry.CANCEL_TTL_MS);
+    this.prune(now);
     const handle = this.active.get(requestId);
     if (!handle) return true;
     try {

@@ -46,23 +46,29 @@ export class GrpcServer {
         const url = req.url || '';
         const method = req.method || 'GET';
 
+        const requireAuth = (): boolean => {
+          try {
+            this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
+            return true;
+          } catch (authErr) {
+            const message = authErr instanceof Error ? authErr.message : String(authErr);
+            res.statusCode = 401;
+            res.setHeader('Content-Type', 'application/json');
+            // Security: do not echo request_id or other body-derived fields to unauthorized callers.
+            res.end(JSON.stringify({ error: { message: `unauthorized: ${message}` } }));
+            return false;
+          }
+        };
+
         if (method === 'POST' && url.endsWith('/runner.Runner/Cancel')) {
           try {
+            if (!requireAuth()) return;
+
             const chunks: Buffer[] = [];
             for await (const chunk of req) chunks.push(Buffer.from(chunk));
             const bodyStr = Buffer.concat(chunks).toString('utf-8');
             const body = (bodyStr ? JSON.parse(bodyStr) : {}) as { request_id?: string };
             const requestId = String(body?.request_id || '');
-
-            try {
-              this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
-            } catch (authErr) {
-              const message = authErr instanceof Error ? authErr.message : String(authErr);
-              res.statusCode = 401;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(JSON.stringify({ error: { message: `unauthorized: ${message}` }, request_id: requestId }));
-              return;
-            }
 
             if (!requestId) {
               res.statusCode = 400;
@@ -88,6 +94,8 @@ export class GrpcServer {
         if (method === 'POST' && url.endsWith('/runner.Runner/ExecuteStream')) {
           // Server-Sent Events streaming endpoint
           try {
+            if (!requireAuth()) return;
+
             const chunks: Buffer[] = [];
             for await (const chunk of req) chunks.push(Buffer.from(chunk));
             const bodyStr = Buffer.concat(chunks).toString('utf-8');
@@ -97,20 +105,6 @@ export class GrpcServer {
               res.statusCode = 400;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ error: { message: 'request_id is required' } }));
-              return;
-            }
-            try {
-              this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
-            } catch (authErr) {
-              const message = authErr instanceof Error ? authErr.message : String(authErr);
-              res.statusCode = 401;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(
-                JSON.stringify({
-                  error: { message: `unauthorized: ${message}` },
-                  request_id: currentRequestId,
-                })
-              );
               return;
             }
 
@@ -194,6 +188,8 @@ export class GrpcServer {
 
         if (method === 'POST' && url.endsWith('/runner.Runner/Execute')) {
           try {
+            if (!requireAuth()) return;
+
             const chunks: Buffer[] = [];
             for await (const chunk of req) chunks.push(Buffer.from(chunk));
             const bodyStr = Buffer.concat(chunks).toString('utf-8');
@@ -203,20 +199,6 @@ export class GrpcServer {
               res.statusCode = 400;
               res.setHeader('Content-Type', 'application/json');
               res.end(JSON.stringify({ error: { message: 'request_id is required' } }));
-              return;
-            }
-            try {
-              this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
-            } catch (authErr) {
-              const message = authErr instanceof Error ? authErr.message : String(authErr);
-              res.statusCode = 401;
-              res.setHeader('Content-Type', 'application/json');
-              res.end(
-                JSON.stringify({
-                  error: { message: `unauthorized: ${message}` },
-                  request_id: currentRequestId,
-                })
-              );
               return;
             }
             const started = Date.now();

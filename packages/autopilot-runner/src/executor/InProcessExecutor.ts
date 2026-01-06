@@ -1,5 +1,5 @@
 import { Executor, ExecuteInput } from './Executor';
-import { CancelledError, Engine } from '@starships/autopilot';
+import { CancelledError, Engine, type Execution } from '@starships/autopilot';
 import { createRunnerHostRuntime, type ConnectorSession, type LlmRuntimeConfig } from '../hostRuntime/RunnerHostRuntime';
 import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
 import { executionRegistry } from '@/execution/ExecutionRegistry';
@@ -16,7 +16,7 @@ export class InProcessExecutor implements Executor {
     }
 
     const blueprint = JSON.parse(input.blueprintJson || '{}');
-    const execution = JSON.parse(input.executionJson || '{}');
+    const execution = JSON.parse(input.executionJson || '{}') as Execution;
     const rawConfig = JSON.parse(input.configJson || '{}') as {
       failOnNodeError?: boolean;
       runtimeEnv?: Record<string, unknown>;
@@ -83,7 +83,7 @@ export class InProcessExecutor implements Executor {
     } catch (err) {
       // If this request was cancelled, treat as graceful termination (not error).
       if (executionRegistry.isCancelled(requestId) || err instanceof CancelledError) {
-        return (execution as any)?.results ?? null;
+        return execution?.results ?? null;
       }
       throw err;
     } finally {

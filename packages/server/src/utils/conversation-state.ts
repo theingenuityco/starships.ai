@@ -40,12 +40,18 @@ export function resolvePlugins(
     return undefined;
   }
 
+  // Empty array means explicitly no plugins (disabled)
+  if (conversationPlugins.length === 0) {
+    return [];
+  }
+
   // Validate plugin structure
   const validPlugins = conversationPlugins.filter(
     (p): p is ConversationPlugin =>
       typeof p === 'object' &&
       p !== null &&
       typeof (p as ConversationPlugin).id === 'string' &&
+      (p as ConversationPlugin).id.length > 0 && // Require non-empty id
       ((p as ConversationPlugin).max_results === undefined ||
         (typeof (p as ConversationPlugin).max_results === 'number' &&
           Number.isInteger((p as ConversationPlugin).max_results) &&
@@ -151,11 +157,11 @@ export function normalizeStateForComparison(
   }
 
   // Ensure messages and tools arrays exist for comparison (if they're in the state)
-  if (!('messages' in normalized) && 'messages' in state) {
-    normalized.messages = [];
+  if ('messages' in state) {
+    normalized.messages = normalized.messages === undefined ? [] : normalized.messages;
   }
-  if (!('tools' in normalized) && 'tools' in state) {
-    normalized.tools = [];
+  if ('tools' in state) {
+    normalized.tools = normalized.tools === undefined ? [] : normalized.tools;
   }
 
   return normalized;

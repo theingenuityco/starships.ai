@@ -43,6 +43,17 @@ export class ConversationStreamBus {
     return `starships:stream:conversation:${conversationId}`;
   }
 
+  /**
+   * Create a dedicated Redis connection for BLOCKing reads (XREAD BLOCK).
+   *
+   * IMPORTANT:
+   * Never run blocking commands (e.g. XREAD BLOCK) on the same connection used
+   * for publishing (XADD), or publishes can be stalled behind the block.
+   */
+  createReaderClient(): RedisClient {
+    return this.redis.duplicate();
+  }
+
   private static toStringSafe(v: unknown): string {
     if (typeof v === 'string') return v;
     if (typeof v === 'number') return String(v);
@@ -127,7 +138,8 @@ export class ConversationStreamBus {
   async read(
     conversationId: string,
     cursor: string,
-    opts?: { blockMs?: number; count?: number }
+    opts?: { blockMs?: number; count?: number },
+    redisOverride?: RedisClient
   ): Promise<Array<{ id: string; evt: ConversationStreamEvent }>> {
     const key = this.streamKey(conversationId);
     const blockMs = typeof opts?.blockMs === 'number' && opts.blockMs >= 0 ? opts.blockMs : 25_000;
@@ -135,14 +147,21 @@ export class ConversationStreamBus {
 
     let raw: unknown;
     try {
-      raw = await this.redis.call('XREAD', 'BLOCK', String(blockMs), 'COUNT', String(count), 'STREAMS', key, cursor);
+      const client = redisOverride ?? this.redis;
+      raw = await client.call('XREAD', 'BLOCK', String(blockMs), 'COUNT', String(count), 'STREAMS', key, cursor);
     } catch (e) {
+      // Expected during SSE disconnects: we deliberately close the dedicated reader connection
+      // to break out of XREAD BLOCK. Avoid log spam for this benign shutdown path.
+      if (redisOverride && e instanceof Error && /connection is closed/i.test(e.message)) {
+        return [];
+      }
       this.logWarn('[ConversationStreamBus] read failed', {
         conversationId,
         key,
         cursor,
         blockMs,
         count,
+        override: !!redisOverride,
         error: e instanceof Error ? e.message : String(e),
       });
       return [];

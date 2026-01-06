@@ -219,6 +219,12 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         'X-Accel-Buffering': 'no',
       });
       try {
+        // Reduce latency for small SSE frames (avoid Nagle delaying writes)
+        res.socket?.setNoDelay(true);
+      } catch {
+        /* best-effort */
+      }
+      try {
         const maybe = res as unknown as { flushHeaders?: () => void };
         if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
       } catch (e) {
@@ -237,8 +243,46 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       }
 
       const bus = ConversationStreamBus.getInstance();
+      // IMPORTANT: Use a dedicated Redis connection for blocking reads (XREAD BLOCK).
+      // Never share the publish connection with a blocking reader, or publishes can stall.
+      const redisReader = bus.createReaderClient();
       const conversationService = new ConversationService();
       const turnRepo = new TurnRepository();
+
+      // Ensure reader is connected early (best-effort); disconnect on close to avoid leaks.
+      try {
+        await redisReader.connect();
+      } catch {
+        /* best-effort */
+      }
+
+      let closed = false;
+      res.on('close', () => {
+        closed = true;
+        try {
+          redisReader.disconnect();
+        } catch {
+          /* ignore */
+        }
+      });
+
+      // Compute initial cursor from client-provided cursor / Last-Event-ID; otherwise derive
+      // from Redis so we avoid clock-skew issues from time-based cursors.
+      const qpCursor = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
+      const lastEventIdHeader = typeof req.headers['last-event-id'] === 'string' ? req.headers['last-event-id'] : undefined;
+
+      let len = 0;
+      let lastId: string | null = null;
+      try {
+        [len, lastId] = await Promise.all([bus.getLen(conversationId), bus.getLastId(conversationId)]);
+      } catch {
+        /* best-effort */
+      }
+
+      let cursor: string = '';
+      if (qpCursor) cursor = qpCursor;
+      else if (lastEventIdHeader) cursor = lastEventIdHeader;
+      else cursor = lastId ?? '0-0';
 
       // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
       const conversationMessages = await conversationService.getConversationMessages(conversationId);
@@ -257,20 +301,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       res.write(`event: snapshot\n`);
       res.write(`data: ${JSON.stringify(snapshotEvt.data)}\n\n`);
 
-      // 2) Stream live events from Redis from the provided cursor (or only new events if none)
-      // IMPORTANT: default cursor must not be '$'. Using '$' can miss events published between
-      // sending snapshot and the first XREAD call. Instead use a time-based cursor captured
-      // immediately after connect so we never miss "post-connect" events.
-      let cursor: string = `${Date.now()}-0`;
-      const qpCursor = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
-      const lastEventIdHeader = typeof req.headers['last-event-id'] === 'string' ? req.headers['last-event-id'] : undefined;
-      if (qpCursor) cursor = qpCursor;
-      else if (lastEventIdHeader) cursor = lastEventIdHeader;
-
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.
       try {
-        const [len, lastId] = await Promise.all([bus.getLen(conversationId), bus.getLastId(conversationId)]);
         res.write(`event: stream_debug\n`);
         type StreamDebugPayload = { conversationId: string; cursor: string; len: number; lastId: string | null };
         const payload: StreamDebugPayload = { conversationId, cursor, len, lastId };
@@ -282,14 +315,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         });
       }
 
-      let closed = false;
-      res.on('close', () => {
-        closed = true;
-      });
-
       try {
         while (!closed && !res.writableEnded && !res.destroyed) {
-          const batch = await bus.read(conversationId, cursor, { blockMs: 25_000, count: 200 });
+          const batch = await bus.read(conversationId, cursor, { blockMs: 25_000, count: 200 }, redisReader);
           if (!batch || batch.length === 0) continue;
           for (const item of batch) {
             const id = item.id;
@@ -299,6 +327,13 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
               res.write(`id: ${id}\n`);
               res.write(`event: ${evt.type}\n`);
               res.write(`data: ${JSON.stringify(evt.data)}\n\n`);
+              // Best-effort flush for environments with compression middleware / proxy buffering.
+              try {
+                const maybe = res as unknown as { flush?: () => void };
+                if (typeof maybe.flush === 'function') maybe.flush();
+              } catch {
+                /* ignore */
+              }
             } catch {
               closed = true;
               break;

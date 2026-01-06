@@ -80,6 +80,9 @@ export class ConversationService {
   private streamBus!: ConversationStreamBus;
   // Streaming assistant message id per conversation (per current turn)
   private streamingAssistantMessageId: Map<string, string> = new Map();
+  // Buffer deltas so we don't XADD per token (which slows streaming dramatically).
+  private pendingContentDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null }> = new Map();
+  private pendingReasoningDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null }> = new Map();
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
@@ -192,6 +195,86 @@ export class ConversationService {
 
     ConversationService.instance = this;
     return this;
+  }
+
+  private enqueueDelta(
+    kind: 'content' | 'reasoning',
+    conversationId: string,
+    delta: string
+  ): void {
+    const map = kind === 'content' ? this.pendingContentDelta : this.pendingReasoningDelta;
+    const entry = map.get(conversationId) ?? { buf: '', timer: null };
+    entry.buf += delta;
+    map.set(conversationId, entry);
+
+    const flush = async () => {
+      const cur = map.get(conversationId);
+      if (!cur) return;
+      const payload = cur.buf;
+      cur.buf = '';
+      cur.timer = null;
+      map.set(conversationId, cur);
+      if (!payload) return;
+
+      try {
+        const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+        const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
+        this.streamingAssistantMessageId.set(conversationId, messageId);
+        await this.streamBus.publish(conversationId, {
+          type: kind === 'content' ? 'assistant.delta' : 'assistant.reasoning_delta',
+          data: {
+            conversationId,
+            turnId,
+            messageId,
+            delta: payload,
+            at: new Date().toISOString(),
+          } as any,
+        } as any);
+      } catch (err) {
+        console.warn('[STREAM] Failed to publish buffered delta', {
+          conversationId,
+          kind,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+
+    // Flush quickly for responsiveness, but avoid Redis roundtrip per-token.
+    // - if buffer is large, flush immediately
+    // - otherwise flush on a short timer
+    if (entry.buf.length >= 1024) {
+      void flush();
+      return;
+    }
+    if (!entry.timer) {
+      entry.timer = setTimeout(() => void flush(), 50);
+      map.set(conversationId, entry);
+    }
+  }
+
+  private async flushPendingDeltas(conversationId: string): Promise<void> {
+    const flushMap = async (kind: 'content' | 'reasoning') => {
+      const map = kind === 'content' ? this.pendingContentDelta : this.pendingReasoningDelta;
+      const entry = map.get(conversationId);
+      if (!entry) return;
+      if (entry.timer) {
+        clearTimeout(entry.timer);
+        entry.timer = null;
+      }
+      const payload = entry.buf;
+      entry.buf = '';
+      map.set(conversationId, entry);
+      if (!payload) return;
+      const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+      const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
+      this.streamingAssistantMessageId.set(conversationId, messageId);
+      await this.streamBus.publish(conversationId, {
+        type: kind === 'content' ? 'assistant.delta' : 'assistant.reasoning_delta',
+        data: { conversationId, turnId, messageId, delta: payload, at: new Date().toISOString() } as any,
+      } as any);
+    };
+    await flushMap('content');
+    await flushMap('reasoning');
   }
 
   /**
@@ -2029,27 +2112,7 @@ export class ConversationService {
                   this.ringBuffer.set(conversationId, rb);
 
                   // Publish typed assistant delta (Redis Streams)
-                  try {
-                    const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-                    const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
-                    this.streamingAssistantMessageId.set(conversationId, messageId);
-                    await this.streamBus.publish(conversationId, {
-                      type: 'assistant.delta',
-                      data: {
-                        conversationId,
-                        turnId,
-                        messageId,
-                        delta: normalized,
-                      position: chunkPosition,
-                        at: new Date().toISOString(),
-                      },
-                    });
-                  } catch (err) {
-                    console.warn('[STREAM] Failed to publish assistant.delta', {
-                      conversationId,
-                      error: err instanceof Error ? err.message : String(err),
-                    });
-                  }
+                  this.enqueueDelta('content', conversationId, normalized);
                 }
               }
             }
@@ -2076,27 +2139,7 @@ export class ConversationService {
                   this.streamingReasoning.set(conversationId, newR);
 
                   // Publish typed reasoning delta (Redis Streams)
-                  try {
-                    const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
-                    const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
-                    this.streamingAssistantMessageId.set(conversationId, messageId);
-                    await this.streamBus.publish(conversationId, {
-                      type: 'assistant.reasoning_delta',
-                      data: {
-                        conversationId,
-                        turnId,
-                        messageId,
-                        delta: normalizedR,
-                      position: currentRLength,
-                        at: new Date().toISOString(),
-                      },
-                    });
-                  } catch (err) {
-                    console.warn('[STREAM] Failed to publish assistant.reasoning_delta', {
-                      conversationId,
-                      error: err instanceof Error ? err.message : String(err),
-                    });
-                  }
+                  this.enqueueDelta('reasoning', conversationId, normalizedR);
                 }
               }
             }
@@ -2514,6 +2557,16 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // Flush buffered deltas so clients see the final output immediately.
+        try {
+          await this.flushPendingDeltas(conversationId);
+        } catch (e) {
+          console.warn('[STREAM] Failed to flush pending deltas on workflow_completed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
         // Persist any streamed assistant content (content/reasoning/attachments) if the normal
         // state-based persistence path did not produce an assistant message.
         try {
@@ -2570,6 +2623,15 @@ export class ConversationService {
         const execEvent = event as ExecutionEvent;
         const execution: Execution | undefined = execEvent.data?.execution;
         console.error('[STREAMING] Workflow failed:', execution?.results);
+
+        try {
+          await this.flushPendingDeltas(conversationId);
+        } catch (e) {
+          console.warn('[STREAM] Failed to flush pending deltas on workflow_failed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
 
         // Persist any streamed assistant content even on failure (helps explain partial progress on reload).
         try {

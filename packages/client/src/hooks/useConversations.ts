@@ -413,7 +413,34 @@ export function useConversationStop() {
       try {
         queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any[] | undefined) => {
           const chunks = Array.isArray(old) ? old.slice() : []
-          chunks.push({ type: 'turn.status', payload: { local: true, status: 'cancelled', at: new Date().toISOString() } })
+          // Conform to the stream contract: `turn.status` MUST use `data`, not `payload`.
+          // We best-effort infer the latest known turnId from existing chunks.
+          let inferredTurnId: string | undefined
+          for (let i = chunks.length - 1; i >= 0; i--) {
+            const c: any = chunks[i]
+            if (c?.type === 'turn.status' && c?.data?.turnId) {
+              inferredTurnId = String(c.data.turnId)
+              break
+            }
+            if (c?.type === 'turn.started' && c?.data?.turnId) {
+              inferredTurnId = String(c.data.turnId)
+              break
+            }
+            if (c?.type === 'snapshot' && c?.data?.turn?.turnId) {
+              inferredTurnId = String(c.data.turn.turnId)
+              break
+            }
+          }
+
+          chunks.push({
+            type: 'turn.status',
+            data: {
+              conversationId,
+              turnId: inferredTurnId ?? 'local',
+              status: 'cancelled',
+              at: new Date().toISOString(),
+            },
+          })
           return chunks
         })
       } catch {}
@@ -566,7 +593,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     // Terminal turn states should stop any in-progress streaming message.
     if (chunk.type === 'turn.status') {
-      if (chunk.data.status === 'completed' || chunk.data.status === 'failed' || chunk.data.status === 'cancelled') {
+      // NOTE: Some local/legacy chunks used `payload` instead of `data`.
+      const status: any = (chunk as any)?.data?.status ?? (chunk as any)?.payload?.status
+      if (status === 'completed' || status === 'failed' || status === 'cancelled') {
         return acc.map(m => (m.streaming ? withStreaming(m, false) : m))
       }
       return acc
@@ -645,7 +674,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return { turnId: chunk.data.turnId, status: 'active' }
     }
     if (chunk.type === 'turn.status') {
-      return { turnId: chunk.data.turnId ?? acc.turnId, status: chunk.data.status }
+      // NOTE: Some local/legacy chunks used `payload` instead of `data`.
+      const data: any = (chunk as any)?.data ?? (chunk as any)?.payload
+      const status: any = data?.status
+      if (!status) return acc
+      return { turnId: data?.turnId ?? acc.turnId, status }
     }
     // Back-compat for local pre-seed
     if (chunk.type === 'turn_started' && chunk.payload?.local === true) {

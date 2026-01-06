@@ -9,14 +9,13 @@ import type {
   AgentParams,
   ExecutionEvent,
   LLMEvent,
-  ToolEvent,
   Execution,
   LlmToolCall,
   LlmMessage,
   EngineConfig,
 } from '@starships/autopilot';
 import { NotFoundError, ConflictError } from '@starships/errors';
-import { ConversationRepository, AgentRepository } from '@starships/models';
+import { ConversationRepository, AgentRepository, TurnRepository } from '@starships/models';
 import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
@@ -71,6 +70,7 @@ export class ConversationService {
   private agentRepository!: AgentRepository;
   private messageService!: MessageService;
   private streamingService!: StreamingService;
+  private turnRepository!: TurnRepository;
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
@@ -86,6 +86,10 @@ export class ConversationService {
   private streamingContent: Map<string, string> = new Map();
   // Resume state per conversation generation
   private generationId: Map<string, string> = new Map();
+  // DB-backed turn id (one conversation -> many turns)
+  private currentTurnId: Map<string, string> = new Map();
+  // Baseline index for execution.state.messages at turn start (used to compute per-turn seq)
+  private currentTurnBaseIndex: Map<string, number> = new Map();
   private accumulatedLength: Map<string, number> = new Map();
   // CRITICAL FIX: Track next chunk position atomically to prevent race conditions
   private nextChunkPosition: Map<string, number> = new Map();
@@ -161,6 +165,7 @@ export class ConversationService {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
     this.streamingService = new StreamingService();
+    this.turnRepository = new TurnRepository();
     this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
     this.billingService = new BillingService();
@@ -203,7 +208,11 @@ export class ConversationService {
     this.accumulatedLength.delete(conversationId);
     this.nextChunkPosition.delete(conversationId);
     this.chunkProcessingLock.delete(conversationId);
-    this.lastPersistedIndex.delete(conversationId);
+    // IMPORTANT:
+    // Do NOT clear lastPersistedIndex / persisted guards here.
+    // After stop/cancel, late runner events (node_completed/workflow_completed) can still arrive.
+    // If we clear lastPersistedIndex, the node_completed persistence pass can start from -1 and
+    // re-persist the entire execution.state.messages history, duplicating all conversation messages.
 
     // Balance guards and suppression flags
     this.lowBalanceStopTriggered.delete(conversationId);
@@ -211,10 +220,32 @@ export class ConversationService {
     this.suppressCompleteFor.delete(conversationId);
 
     // Misc per-conversation flags / attribution
-    this.activeStreamPersisted.delete(conversationId);
-    this.assistantPersistedThisTurn.delete(conversationId);
+    // Leave these guards intact until the next workflow_started resets them.
+    // This prevents stop/pause + late events from persisting multiple times.
     this.currentAgentForConversation.delete(conversationId);
     this.lastToolCallsBroadcastHash.delete(conversationId);
+  }
+
+  /**
+   * Final cleanup for a conversation's *turn lifecycle* state.
+   * Use this ONLY when we are confident no further runner events should be applied
+   * for the current turn (e.g. workflow_completed / workflow_failed).
+   */
+  private finalizeTurnState(conversationId: string): void {
+    // Clear bulky streaming state first
+    this.clearStreamingState(conversationId);
+
+    // Turn identity + sequencing (safe to clear only once turn is definitively finished)
+    this.currentTurnId.delete(conversationId);
+    this.currentTurnBaseIndex.delete(conversationId);
+    this.lastPersistedIndex.delete(conversationId);
+
+    // Per-turn persistence guards (no longer needed once the turn is complete/failed)
+    this.assistantPersistedThisTurn.delete(conversationId);
+    this.activeStreamPersisted.delete(conversationId);
+
+    // Also ensure we don't keep any outstanding cancellation handles around
+    ConversationService.activeCancellations.delete(conversationId);
   }
 
   /**
@@ -234,6 +265,13 @@ export class ConversationService {
   private async persistActivePartial(conversationId: string): Promise<MessageModel | null> {
     // If we've already persisted the active stream for this conversation, skip
     if (this.activeStreamPersisted.has(conversationId)) {
+      return null;
+    }
+
+    // If an assistant message was already persisted for this turn (via state message persistence),
+    // do NOT persist again on stop/pause. This prevents duplicate saved messages when stop triggers
+    // while the normal persistence path is also running.
+    if (this.assistantPersistedThisTurn.has(conversationId)) {
       return null;
     }
 
@@ -269,42 +307,60 @@ export class ConversationService {
       (partialReasoning && partialReasoning.trim().length > 0) ||
       pendingAttachmentIds.length > 0
     ) {
-      const agent = this.currentAgentForConversation.get(conversationId);
-      const starship = await this.getConversationStarship(conversationId);
-      const persistedMsg = await this.messageService.createMessage({
-        conversationId,
-        role: 'assistant',
-        content: partialContent || '',
-        messageType: 'agent_response',
-        ...(partialReasoning ? { reasoning: partialReasoning } : {}),
-        ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
-        ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
-      });
-
-      // Link generated attachments to the persisted message (best-effort)
-      try {
-        if (starship && pendingAttachmentIds.length > 0) {
-          const attachmentService = new AttachmentService();
-          await Promise.all(
-            pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
-          );
-        }
-      } catch {
-        // Non-fatal
-      }
-      // Mark both per-turn and active-stream persisted flags
-      this.assistantPersistedThisTurn.add(conversationId);
+      // IMPORTANT:
+      // This function can be invoked from multiple concurrent pathways (e.g. user stop + lifecycle events).
+      // Add the persisted guard *before* any awaits so it acts as an atomic "in-flight" lock and prevents
+      // double inserts when two calls race past the initial checks.
       this.activeStreamPersisted.add(conversationId);
+      const agent = this.currentAgentForConversation.get(conversationId);
+      try {
+        const starship = await this.getConversationStarship(conversationId);
+        const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || 'turn';
+        // Partial assistant is always the first assistant slot after the baseline user message.
+        // We intentionally avoid relying on mutable lastPersistedIndex here.
+        const turnSeq = 1;
 
-      // Clear accumulators for the active stream so a future stream can start cleanly
-      this.streamingContent.delete(conversationId);
-      this.streamingToolCalls.delete(conversationId);
-      this.streamingReasoning.delete(conversationId);
-      this.ringBuffer.delete(conversationId);
-      this.streamingGeneratedAttachmentIds.delete(conversationId);
-      this.streamingGeneratedImageUrlSeen.delete(conversationId);
+        const persistedMsg = await this.messageService.upsertMessageByTurnSlot({
+          conversationId,
+          turnId,
+          turnSeq,
+          role: 'assistant',
+          content: partialContent || '',
+          messageType: 'agent_response',
+          ...(partialReasoning ? { reasoning: partialReasoning } : {}),
+          ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
+          ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
+        });
 
-      return persistedMsg;
+        // Link generated attachments to the persisted message (best-effort)
+        try {
+          if (starship && pendingAttachmentIds.length > 0) {
+            const attachmentService = new AttachmentService();
+            await Promise.all(
+              pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
+            );
+          }
+        } catch {
+          // Non-fatal
+        }
+
+        // Mark per-turn persisted flag (active-stream guard already set above)
+        this.assistantPersistedThisTurn.add(conversationId);
+
+        // Clear accumulators for the active stream so a future stream can start cleanly
+        this.streamingContent.delete(conversationId);
+        this.streamingToolCalls.delete(conversationId);
+        this.streamingReasoning.delete(conversationId);
+        this.ringBuffer.delete(conversationId);
+        this.streamingGeneratedAttachmentIds.delete(conversationId);
+        this.streamingGeneratedImageUrlSeen.delete(conversationId);
+
+        return persistedMsg;
+      } catch (err) {
+        // Roll back the in-flight guard so the caller can retry if needed.
+        this.activeStreamPersisted.delete(conversationId);
+        throw err;
+      }
     }
     return null;
   }
@@ -840,7 +896,12 @@ export class ConversationService {
       );
     }
 
-    // Persist user message unless pre-created by the route (needed to charge credits before returning 202)
+    // Create a DB-backed turn record first. This is the idempotency boundary for this run.
+    const turn = await this.turnRepository.createTurn({ conversationId: data.conversationId, status: 'active' });
+    this.currentTurnId.set(data.conversationId, turn.id);
+
+    // Persist user message unless pre-created by the route (needed to charge credits before returning 202).
+    // Ensure the user message is linked to the turn with turnSeq=0.
     const userMessage =
       opts?.preCreatedUserMessage ??
       (await this.messageService.createMessage({
@@ -851,6 +912,16 @@ export class ConversationService {
         ...(data.agentId && { agentId: data.agentId }),
         ...(data.attachmentIds && { attachmentIds: data.attachmentIds }),
       }));
+    try {
+      await this.messageService.updateMessage(userMessage.id, { turnId: turn.id, turnSeq: 0 });
+    } catch {
+      // best-effort; idempotency relies on assistant/tool slot upserts, not the user message row
+    }
+    try {
+      await this.turnRepository.updateTurn(turn.id, { createdByMessageId: userMessage.id });
+    } catch {
+      // best-effort
+    }
 
     // Broadcast user message immediately via streaming if available
     if (this.streamingService) {
@@ -1303,13 +1374,27 @@ export class ConversationService {
     // Persist the active streaming partial (if any), regardless of prior assistant messages this turn
     let persistedMsg: MessageModel | null = await this.persistActivePartial(conversationId);
 
+    // Mark turn cancelled (best-effort)
+    try {
+      const turnId = this.currentTurnId.get(conversationId);
+      if (turnId) {
+        await this.turnRepository.updateTurn(turnId, {
+          status: 'cancelled',
+          completedAt: new Date().toISOString(),
+          stopReason: 'user_stop',
+        });
+      }
+    } catch {
+      // best-effort
+    }
+
     // If we have cached usage from streaming but no content_complete occurred, persist usage now
     try {
       const latest = this.latestStreamingUsage.get(conversationId);
       if (latest) {
         const starship = await this.getConversationStarship(conversationId);
         if (starship) {
-          const usageRow = await this.usageService.createUsageForTurn({
+          await this.usageService.createUsageForTurn({
             starshipId: starship.id,
             conversationId,
             promptTokens: Number(latest.promptTokens || 0),
@@ -1640,9 +1725,9 @@ export class ConversationService {
         // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
         // streamingContent accumulator will be initialized on first chunk if needed.
         this.streamingContent.delete(conversationId);
-        // Start a new generation for resume
-        const genId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-        this.generationId.set(conversationId, genId);
+        // Use the DB-backed turn id as the stable generation id for resume/idempotency.
+        const turnId = this.currentTurnId.get(conversationId) || `turn_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+        this.generationId.set(conversationId, turnId);
         this.accumulatedLength.set(conversationId, 0);
         this.placeholderEmitted.set(conversationId, false);
         this.ringBuffer.set(conversationId, []);
@@ -1670,6 +1755,7 @@ export class ConversationService {
 
         if (msgs) {
           const baselineIndex = msgs.length - 1;
+          this.currentTurnBaseIndex.set(conversationId, baselineIndex);
           this.lastPersistedIndex.set(conversationId, baselineIndex);
         }
 
@@ -2338,7 +2424,7 @@ export class ConversationService {
           try {
             const starship = await this.getConversationStarship(conversationId);
             if (starship) {
-              const usageRow = await this.usageService.createUsageForTurn({
+              await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,
                 promptTokens: usagePayload.promptTokens,
@@ -2487,8 +2573,14 @@ export class ConversationService {
                 const contentString =
                   typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
 
-                const persistedMsg = await this.messageService.createMessage({
+                const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || 'turn';
+                const baseIdx = this.currentTurnBaseIndex.get(conversationId) ?? this.lastPersistedIndex.get(conversationId) ?? -1;
+                const turnSeq = Math.max(0, i - baseIdx);
+
+                const persistedMsg = await this.messageService.upsertMessageByTurnSlot({
                   conversationId,
+                  turnId,
+                  turnSeq,
                   role,
                   content: contentString,
                   messageType,
@@ -2605,6 +2697,16 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // Mark turn completed (best-effort)
+        try {
+          const turnId = this.currentTurnId.get(conversationId);
+          if (turnId) {
+            await this.turnRepository.updateTurn(turnId, { status: 'completed', completedAt: new Date().toISOString() });
+          }
+        } catch {
+          // best-effort
+        }
+
         // Ensure the active assistant streaming shell is finalized before emitting 'complete'
         if (this.streamingService && this.streamingService.isActive(conversationId)) {
           try {
@@ -2694,8 +2796,8 @@ export class ConversationService {
           console.warn('[STREAMING] Failed to broadcast turn_completed', err);
         }
 
-        // Clear streaming trackers now that the workflow turn has fully completed
-        this.clearStreamingState(conversationId);
+        // Final cleanup now that the workflow turn has fully completed
+        this.finalizeTurnState(conversationId);
         break;
       }
 
@@ -2719,8 +2821,8 @@ export class ConversationService {
           value: errorMessage,
         };
         await this.streamingService.broadcastDelta(conversationId, delta);
-        // Best-effort: clear any per-conversation streaming state after a failed workflow
-        this.clearStreamingState(conversationId);
+        // Final cleanup after a failed workflow
+        this.finalizeTurnState(conversationId);
         break;
       }
 

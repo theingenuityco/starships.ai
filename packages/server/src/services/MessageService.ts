@@ -44,9 +44,36 @@ export class MessageService {
 
     // Link attachments to message if provided
     if (request.attachmentIds && request.attachmentIds.length > 0) {
-      await Promise.all(
-        request.attachmentIds.map((attachmentId) => this.attachmentRepository.linkToMessage(attachmentId, message.id))
-      );
+      await Promise.all(request.attachmentIds.map((attachmentId) => this.attachmentRepository.linkToMessage(attachmentId, message.id)));
+    }
+
+    return message;
+  }
+
+  /**
+   * Upsert a message into a stable turn slot (turnId, turnSeq).
+   * This is the primary primitive for idempotent persistence under retries/races.
+   */
+  async upsertMessageByTurnSlot(
+    request: Message & { conversationId: string; turnId: string; turnSeq: number; attachmentIds?: string[] }
+  ): Promise<MessageModel> {
+    const message = await this.messageRepository.upsertByTurnSlot({
+      role: request.role,
+      content: request.content,
+      messageType: request.messageType,
+      conversationId: request.conversationId,
+      turnId: request.turnId,
+      turnSeq: request.turnSeq,
+      ...(request.reasoning && { reasoning: request.reasoning }),
+      ...(request.toolCalls && { toolCalls: request.toolCalls }),
+      ...(request.toolCallId && { toolCallId: request.toolCallId }),
+      ...(request.agentId && { agentId: request.agentId }),
+      ...(request.agentName && { agentName: request.agentName }),
+      ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
+    });
+
+    if (request.attachmentIds && request.attachmentIds.length > 0) {
+      await Promise.all(request.attachmentIds.map((attachmentId) => this.attachmentRepository.linkToMessage(attachmentId, message.id)));
     }
 
     return message;

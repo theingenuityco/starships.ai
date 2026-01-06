@@ -411,6 +411,7 @@ export class Agent implements NodeHandler {
         tools: '{{ state.tools }}',
         modalities: '{{ state.modalities }}',
         imageConfig: '{{ state.imageConfig }}',
+        plugins: '{{ state.plugins }}',
         temperature: '{{ state.temperature }}',
         maxTokens: '{{ state.maxTokens }}',
         timeout: '{{ state.timeout }}',

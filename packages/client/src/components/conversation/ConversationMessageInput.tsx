@@ -4,14 +4,14 @@ import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { useCreateConversation, useConversationStop } from '@/hooks/useConversations'
+import { useCreateConversation, useConversationStop, useConversationDetail, useUpdateConversationState } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useOpenRouterModels'
 import { useWallet } from '@/hooks/useWallet'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import type { AgentModel } from '@starships/protocol'
+import type { AgentModel, ConversationState, ConversationPlugin } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
@@ -183,6 +183,56 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const tokensUsed = Number(totalsData?.totalTokens ?? 0)
     const contextLimit = Number(agentContextLength ?? 0)
     const hardLimitActive = !!conversationId && contextLimit > 0
+
+    // Conversation state for web browsing toggle
+    const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
+    const updateConversationState = useUpdateConversationState()
+
+    // Local state for web browsing preference before conversation exists
+    const [pendingWebBrowsing, setPendingWebBrowsing] = useState(false)
+
+    const hasWebBrowsing = useMemo(() => {
+      // If conversation exists, use its state
+      if (conversation?.state) {
+        const state = conversation.state as ConversationState
+        const plugins = state.plugins
+        if (Array.isArray(plugins)) {
+          return plugins.some((p: ConversationPlugin) => p?.id === 'web')
+        }
+      }
+      // Otherwise use pending preference
+      return pendingWebBrowsing
+    }, [conversation?.state, pendingWebBrowsing])
+
+    // Reset pending state when conversation is created
+    useEffect(() => {
+      if (conversationId && pendingWebBrowsing) {
+        setPendingWebBrowsing(false)
+      }
+    }, [conversationId, pendingWebBrowsing])
+
+    // Helper to apply pending web browsing preference to a newly created conversation
+    // This is non-blocking - errors are handled by the mutation's onError handler
+    const applyPendingWebBrowsing = useCallback(
+      async (newConversationId: string): Promise<void> => {
+        if (!pendingWebBrowsing) return
+
+        try {
+          // Apply the preference - mutation handles errors and shows toast internally
+          await updateConversationState.mutateAsync({
+            conversationId: newConversationId,
+            state: {
+              plugins: [{ id: 'web', max_results: 3 }],
+            } as ConversationState,
+          })
+        } catch {
+          // Error already handled by mutation's onError handler (shows toast)
+          // Silently continue to avoid blocking message sending
+        }
+      },
+      [pendingWebBrowsing, updateConversationState]
+    )
+
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
 
@@ -348,6 +398,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           currentConversationId = newConversation.id
           sendConversationId = currentConversationId
           createdNewConversation = true
+
+          // Apply pending web browsing preference if enabled
+          await applyPendingWebBrowsing(currentConversationId)
         }
         sendConversationId = currentConversationId!
         // Ensure local ref is updated immediately for stop button usability
@@ -475,6 +528,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       onAgentChange,
       starshipAgents,
       queryClient,
+      applyPendingWebBrowsing,
     ])
 
     // Handle suggestion clicks
@@ -528,6 +582,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             currentConversationId = newConversation.id
             sendConversationId = currentConversationId
             createdNewConversation = true
+
+            // Apply pending web browsing preference if enabled
+            await applyPendingWebBrowsing(currentConversationId)
           }
           sendConversationId = currentConversationId!
           // Ensure local ref is updated immediately for stop button usability
@@ -571,7 +628,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           streamingRef.current = false
         }
       },
-      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId]
+      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, applyPendingWebBrowsing]
     )
 
     // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
@@ -1444,7 +1501,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
             {/* Text Input (TipTap) with attachments */}
             <div
-              className={cn('flex-1 min-w-0 pr-12 relative z-10')}
+              className={cn('flex-1 min-w-0 pr-40 relative z-10')}
               onPaste={handlePaste}
               style={{
                 paddingBottom: !minimal && attachmentHeight > 0 ? `${attachmentHeight}px` : undefined,
@@ -1456,7 +1513,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
               {/* File Attachments Preview - Absolutely positioned at bottom in normal mode */}
               {!minimal && pendingFiles.length > 0 && (
-                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-15">
+                <div ref={attachmentContainerRef} className="absolute bottom-0 left-0 right-0 pr-40">
                   <div className="flex flex-wrap gap-2">
                     {pendingFiles.map(file => (
                       <FileAttachmentPreview key={file.id} file={file} onRemove={() => handleRemoveFile(file.id)} uploading={file.uploading} />
@@ -1466,24 +1523,59 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               )}
             </div>
 
-            {/* Attachment Button - Bottom-right, next to send button */}
-            <button
-              onClick={() => fileInputRef.current?.click()}
-              disabled={disabled || fileUploading}
-              className={cn(
-                minimal ? 'absolute top-1/2 -translate-y-1/2 right-14 z-20 p-1.5' : 'absolute bottom-2.5 right-14 z-20 p-1.5',
-                'rounded-lg transition-colors',
-                'hover:bg-muted text-muted-foreground hover:text-foreground',
-                'disabled:opacity-50 disabled:cursor-not-allowed'
-              )}
-              aria-label="Attach file"
-              title="Attach file (images, PDFs)"
-            >
-              <Icon name="paperclip" className="h-5 w-5" />
-            </button>
+            {/* Right-side Action Buttons Container */}
+            <div className={cn('absolute z-20 flex items-center gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-2' : 'bottom-2.5 right-2')}>
+              {/* Attachment Button */}
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={disabled || fileUploading}
+                className={cn('p-1.5 rounded-lg transition-colors', 'hover:bg-muted text-muted-foreground hover:text-foreground', 'disabled:opacity-50 disabled:cursor-not-allowed')}
+                aria-label="Attach file"
+                title="Attach file (images, PDFs)"
+              >
+                <Icon name="paperclip" className="h-5 w-5" />
+              </button>
 
-            {/* Right-side Actions: Stop (when streaming) or Send */}
-            <div className={cn('absolute z-20 flex gap-2', minimal ? 'top-1/2 -translate-y-1/2 right-3' : 'bottom-2.5 right-3')}>
+              {/* Web Browsing Toggle Button - Available from the start */}
+              <button
+                onClick={() => {
+                  if (conversationId) {
+                    // Update existing conversation
+                    const newPlugins: ConversationPlugin[] = hasWebBrowsing ? [] : [{ id: 'web', max_results: 3 }]
+                    updateConversationState.mutate({
+                      conversationId,
+                      state: {
+                        plugins: newPlugins,
+                      } as ConversationState,
+                    })
+                  } else {
+                    // Store preference for when conversation is created
+                    setPendingWebBrowsing(!pendingWebBrowsing)
+                  }
+                }}
+                disabled={updateConversationState.isPending || isLoadingConversation || isStreamingEffective}
+                className={cn(
+                  'group flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-colors',
+                  hasWebBrowsing ? 'bg-primary/10 text-primary hover:bg-primary/20' : 'hover:bg-muted text-muted-foreground hover:text-foreground',
+                  'disabled:opacity-50 disabled:cursor-not-allowed'
+                )}
+                aria-label={hasWebBrowsing ? 'Disable web browsing' : 'Enable web browsing'}
+                title={hasWebBrowsing ? 'Web browsing enabled - Click to disable' : 'Web browsing disabled - Click to enable ($4 per 1,000 results)'}
+              >
+                {hasWebBrowsing ? (
+                  <>
+                    <div className="relative h-5 w-5 flex items-center justify-center flex-shrink-0">
+                      <Icon name="globe" className="h-5 w-5 absolute transition-opacity group-hover:opacity-0" />
+                      <Icon name="x" className="h-5 w-5 absolute opacity-0 group-hover:opacity-100 transition-opacity" />
+                    </div>
+                    <span className="text-xs font-medium whitespace-nowrap">Search</span>
+                  </>
+                ) : (
+                  <Icon name="globe" className="h-5 w-5" />
+                )}
+              </button>
+
+              {/* Stop (when streaming) or Send Button */}
               {shouldShowStop ? (
                 <div className="relative h-8 w-8">
                   <Button

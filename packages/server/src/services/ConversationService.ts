@@ -34,6 +34,13 @@ import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
+import {
+  resolvePlugins,
+  mergeConversationState,
+  extractPersistableState as extractPersistableStateUtil,
+  hasPlugins,
+} from '@/utils/conversation-state';
+import type { ConversationState, AgentState } from '@starships/protocol';
 
 /**
  * Autopilot child process configuration
@@ -323,13 +330,42 @@ export class ConversationService {
   async createConversation(
     data: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'> & { starshipId: string; agentId?: string }
   ): Promise<ConversationModel> {
-    const conversation = await this.conversationRepository.create({
+    let conversation = await this.conversationRepository.create({
       title: data.title || 'New Conversation',
       status: data.status || 'active',
       starshipId: data.starshipId,
       agentId: data.agentId,
       parentConversationId: data.parentConversationId,
     });
+
+    // If this is a child conversation, inherit plugin state from parent
+    if (conversation.parentConversationId) {
+      try {
+        const parentConversation = await this.getConversationById(conversation.parentConversationId);
+        const parentState = (parentConversation?.state || {}) as ConversationState;
+
+        // Inherit plugins from parent (could be undefined, [], or [{ id: 'web', ... }])
+        if (hasPlugins(parentState) || parentState.plugins === null || Array.isArray(parentState.plugins)) {
+          const updated = await this.updateConversation(conversation.id, {
+            state: {
+              plugins: parentState.plugins,
+            },
+          });
+          if (updated) {
+            conversation = updated; // Use the updated conversation with inherited state
+          }
+        }
+      } catch (e) {
+        // Non-fatal: failure to inherit state should not break conversation creation
+        const errorMessage = e instanceof Error ? e.message : String(e);
+        console.warn('[createConversation] Failed to inherit plugin state from parent:', {
+          error: errorMessage,
+          parentConversationId: conversation.parentConversationId,
+          childConversationId: conversation.id,
+        });
+        // Log to error tracking if available, but don't throw
+      }
+    }
 
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
@@ -509,11 +545,22 @@ export class ConversationService {
   }
 
   /**
-   * Update conversation details (title, etc.)
+   * Update conversation details (title, state, etc.)
    */
-  async updateConversation(conversationId: string, updates: { title?: string }): Promise<ConversationModel | null> {
+  async updateConversation(
+    conversationId: string,
+    updates: { title?: string; state?: Partial<ConversationState> | Record<string, unknown> }
+  ): Promise<ConversationModel | null> {
     try {
-      console.log(`[ConversationService] Updating conversation ${conversationId}`, updates);
+      // If state is being updated, merge with existing state
+      if (updates.state !== undefined) {
+        const existing = await this.getConversationById(conversationId);
+        const existingState = (existing?.state || {}) as ConversationState;
+
+        // Use centralized merge utility
+        const mergedState = mergeConversationState(existingState, updates.state);
+        updates.state = mergedState;
+      }
 
       // Use the repository's update method
       const updatedConversation = await this.conversationRepository.update(conversationId, {
@@ -521,9 +568,7 @@ export class ConversationService {
         updatedAt: new Date().toISOString(),
       });
 
-      if (updatedConversation) {
-        console.log(`[ConversationService] Successfully updated conversation ${conversationId}`);
-      } else {
+      if (!updatedConversation) {
         console.error(`[ConversationService] Failed to update conversation ${conversationId} - not found`);
       }
 
@@ -538,23 +583,7 @@ export class ConversationService {
    * Extract persistable state fields from execution state
    */
   private extractPersistableState(executionState: Record<string, unknown> | undefined): Record<string, unknown> | null {
-    if (!executionState || typeof executionState !== 'object') {
-      return null;
-    }
-
-    const persistable: Record<string, unknown> = {};
-    // Persist most execution state to conversation.state, but keep certain keys ephemeral
-    // (per-turn/per-request) so they don't "stick" across turns.
-    const blacklist = new Set(['messages', 'tools', 'modalities', 'imageConfig']);
-
-    // Blacklist: Store everything except messages and tools
-    for (const [key, value] of Object.entries(executionState)) {
-      if (!blacklist.has(key)) {
-        persistable[key] = value;
-      }
-    }
-
-    return Object.keys(persistable).length > 0 ? persistable : null;
+    return extractPersistableStateUtil(executionState);
   }
 
   /**
@@ -678,6 +707,19 @@ export class ConversationService {
       console.error(`[CONVERSATION-SERVICE] Error getting agent tools via relationships:`, error);
       return [];
     }
+  }
+
+  /**
+   * Resolve plugins from conversation state only (agent plugins are ignored)
+   * @param conversationState - Conversation-level state
+   * @param agentState - Agent-level state (ignored, kept for backwards compatibility)
+   * @returns Resolved plugins (conversation plugins if defined, otherwise undefined = no plugins)
+   */
+  private resolvePlugins(
+    conversationState: ConversationState | Record<string, unknown> | undefined,
+    agentState: AgentState | Record<string, unknown> | undefined
+  ): unknown[] | undefined {
+    return resolvePlugins(conversationState, agentState);
   }
 
   /**
@@ -886,8 +928,9 @@ export class ConversationService {
     // Get conversation messages from database
     let messages = await this.getConversationMessages(data.conversationId);
 
-    // Load conversation state for context
-    const conversationState = conversation.state || {};
+    // Load conversation state for context - reload conversation to get latest state
+    const latestConversation = await this.getConversationById(data.conversationId);
+    const conversationState = (latestConversation?.state || {}) as Record<string, unknown>;
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
     this.suppressCompleteFor.add(data.conversationId);
@@ -934,15 +977,28 @@ export class ConversationService {
         // Get deployed tools for this agent (always redacted; server executes tools)
         const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
+        // Resolve plugins from conversation state only (agent plugins ignored)
+        const plugins = this.resolvePlugins(
+          conversationState as Record<string, unknown> | undefined,
+          baseState as Record<string, unknown> | undefined
+        );
+
+        // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+        const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
+        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
+
         const agentWithTools: AgentParams = {
           ...agentModel,
           // Always use the server-tools blueprint (no legacy tool-node execution).
           blueprint: Agent.defaultAgentBlueprintServerTools(),
           state: {
-            ...baseState,
-            ...conversationState,
+            ...baseStateWithoutPlugins,
+            ...conversationStateWithoutPlugins,
             tools: resolvedTools,
             starshipId: starship.id,
+            // Explicitly set plugins from resolvePlugins (conversation-level only)
+            // If plugins is undefined, omit it (no plugins enabled)
+            ...(plugins !== undefined ? { plugins } : {}),
           },
         };
 
@@ -1156,15 +1212,25 @@ export class ConversationService {
           ? (agentModel.state as Record<string, unknown>)
           : ({ messages: [], tools: [] } as any);
 
+      // Resolve plugins from conversation state only (agent plugins ignored)
+      const plugins = this.resolvePlugins(conversationState as ConversationState | undefined, baseState as AgentState | undefined);
+
+      // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+      const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
+      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState;
+
       const agentWithTools: AgentParams = {
         ...(agentModel as any),
         // Always use the server-tools blueprint (no legacy tool-node execution).
         blueprint: Agent.defaultAgentBlueprintServerTools(),
         state: {
-          ...baseState,
-          ...conversationState,
+          ...baseStateWithoutPlugins,
+          ...conversationStateWithoutPlugins,
           tools: resolvedTools,
           starshipId: starship.id,
+          // Explicitly set plugins from resolvePlugins (conversation-level only)
+          // If plugins is undefined, omit it (no plugins enabled)
+          ...(plugins !== undefined ? { plugins } : {}),
         },
       } as unknown as AgentParams;
 
@@ -2504,14 +2570,28 @@ export class ConversationService {
         }
 
         // Persist evolved state back to conversation when node completes
+        // IMPORTANT: Merge with existing state to preserve plugins (plugins are conversation-level only, not from execution state)
         try {
           const execEvent = event as ExecutionEvent;
           const execution: Execution | undefined = execEvent?.data?.execution;
           if (execution?.state) {
             const evolvedState = this.extractPersistableState(execution.state);
             if (evolvedState) {
+              // Get existing conversation state to preserve plugins
+              const existingConversation = await this.getConversationById(conversationId);
+              const existingState = (existingConversation?.state || {}) as ConversationState;
+
+              // Merge: preserve plugins from existing state, update other fields from evolved state
+              // Plugins are conversation-level only (controlled by UI toggle) and should NEVER be overwritten by execution state
+              const mergedState = mergeConversationState(existingState, evolvedState);
+
+              // Explicitly preserve plugins from existing state (plugins are never in evolvedState due to blacklist)
+              if (hasPlugins(existingState)) {
+                mergedState.plugins = existingState.plugins;
+              }
+
               await this.conversationRepository.update(conversationId, {
-                state: evolvedState,
+                state: mergedState,
                 updatedAt: new Date().toISOString(),
               });
             }

@@ -30,6 +30,7 @@ export interface AgentFormData {
   blueprint: string // JSON string for the blueprint
   timeout: number
   icon: string
+  state?: Record<string, unknown> // Agent runtime state (e.g., plugins for web browsing)
 }
 
 export interface AgentBuilderViewProps {
@@ -60,7 +61,7 @@ export interface AgentBuilderViewProps {
 }
 
 export interface AgentBuilderViewRef {
-  updateField: (field: keyof AgentFormData, value: string | boolean | number | string[]) => void
+  updateField: (field: keyof AgentFormData, value: string | boolean | number | string[] | Record<string, unknown>) => void
   getFormData: () => AgentFormData
   resetForm: () => void
 }

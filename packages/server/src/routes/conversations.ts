@@ -1337,6 +1337,20 @@ router.patch('/conversations/:conversationId', jwtAuthMiddleware, async (req: Re
     const bodyValidation = validateData(
       z.object({
         title: z.string().min(1).max(100).optional(),
+        state: z
+          .object({
+            plugins: z
+              .array(
+                z.object({
+                  id: z.string().min(1), // Require non-empty id
+                  max_results: z.number().int().positive().optional(), // Must be positive integer if provided
+                })
+              )
+              .optional()
+              .nullable(), // Allow null for explicit clearing
+          })
+          .passthrough()
+          .optional(), // passthrough allows other state fields
       }),
       req.body,
       res,

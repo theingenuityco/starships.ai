@@ -23,7 +23,8 @@ import {
   Message,
   MessageModel,
   StarshipModel,
-  TurnStatus as StreamTurnStatus,
+  ConversationStreamEvent,
+  ConversationStreamUIAction,
 } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
@@ -244,16 +245,29 @@ export class ConversationService {
       const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
       const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
       this.streamingAssistantMessageId.set(conversationId, messageId);
-      await this.streamBus.publish(conversationId, {
-        type: kind === 'content' ? 'assistant.delta' : 'assistant.reasoning_delta',
-        data: {
-          conversationId,
-          turnId,
-          messageId,
-          delta: payload,
-          at: new Date().toISOString(),
-        } as any,
-      } as any);
+      const event: ConversationStreamEvent =
+        kind === 'content'
+          ? {
+              type: 'assistant.delta',
+              data: {
+                conversationId,
+                turnId,
+                messageId,
+                delta: payload,
+                at: new Date().toISOString(),
+              },
+            }
+          : {
+              type: 'assistant.reasoning_delta',
+              data: {
+                conversationId,
+                turnId,
+                messageId,
+                delta: payload,
+                at: new Date().toISOString(),
+              },
+            };
+      await this.streamBus.publish(conversationId, event);
     } catch (err) {
       console.warn('[STREAM] Failed to publish buffered delta', {
         conversationId,
@@ -350,7 +364,11 @@ export class ConversationService {
     try {
       const v = parse(jsonLike, Allow.ALL as number) as unknown;
       return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-    } catch {
+    } catch (err) {
+      console.error('[ConversationService] Failed to parse partial JSON', {
+        error: err instanceof Error ? err.message : String(err),
+        jsonLike: jsonLike?.substring(0, 100),
+      });
       return {};
     }
   }
@@ -434,8 +452,11 @@ export class ConversationService {
               pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
             );
           }
-        } catch {
-          // Non-fatal
+        } catch (err) {
+          console.error('[ConversationService] Failed to emit UI action for child conversation', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
 
         // Mark per-turn persisted flag (active-stream guard already set above)
@@ -469,7 +490,11 @@ export class ConversationService {
       const buffer = Buffer.from(b64, 'base64');
       if (!buffer || buffer.length === 0) return null;
       return { mimeType, buffer };
-    } catch {
+    } catch (err) {
+      console.error('[ConversationService] Failed to parse base64 image data URL', {
+        error: err instanceof Error ? err.message : String(err),
+        dataUrlLength: dataUrl?.length,
+      });
       return null;
     }
   }
@@ -520,13 +545,16 @@ export class ConversationService {
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
       if (conversation.parentConversationId) {
-        const payload: any = {
+        const payload: ConversationStreamUIAction['data'] = {
           __ui_action: 'child_conversation_created',
           parentConversationId: conversation.parentConversationId,
           childConversationId: conversation.id,
           starshipId: conversation.starshipId,
         };
-        await this.streamBus.publish(conversation.parentConversationId, { type: 'ui_action', data: payload });
+        await this.streamBus.publish(conversation.parentConversationId, {
+          type: 'ui_action',
+          data: payload,
+        } as ConversationStreamEvent);
       }
     } catch (e) {
       // Non-fatal: failure to emit UI hint must not break conversation creation
@@ -536,8 +564,11 @@ export class ConversationService {
           parentConversationId: conversation.parentConversationId,
           starshipId: conversation.starshipId,
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error('[ConversationService] Failed to publish UI action for child conversation', {
+          error: err instanceof Error ? err.message : String(err),
+          conversationId: conversation.parentConversationId,
+        });
       }
     }
 
@@ -684,8 +715,8 @@ export class ConversationService {
           message: error.message,
           name: error.name,
           stack: error.stack,
-          ...((error as any).code && { code: (error as any).code }),
-          ...((error as any).constraint && { constraint: (error as any).constraint }),
+          ...('code' in error && typeof error.code === 'string' && { code: error.code }),
+          ...('constraint' in error && typeof error.constraint === 'string' && { constraint: error.constraint }),
         });
       } else {
         console.error(`[ConversationService] Unknown error deleting conversation ${conversationId}:`, error);
@@ -782,11 +813,17 @@ export class ConversationService {
           try {
             await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: sys } });
             await this.streamBus.publish(conversationId, { type: 'ui_action', data: { __ui_action: 'insufficient_balance' } });
-          } catch {
-            /* non-fatal */
+          } catch (err) {
+            console.error('[ConversationService] Failed to publish insufficient balance messages', {
+              error: err instanceof Error ? err.message : String(err),
+              conversationId,
+            });
           }
-        } catch {
-          /* non-fatal: system message emission failure */
+        } catch (err) {
+          console.error('[ConversationService] Failed to emit system message', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
 
         // Trigger stop pipeline (cancel runner, persist partials, finalize SSE)
@@ -842,7 +879,7 @@ export class ConversationService {
           parameters: tool.parameters!,
           // IMPORTANT: Tools are executed server-side; do not embed tool blueprints/transforms/mutations/condition in agent state.
           // Provide a minimal placeholder blueprint for ToolParams compatibility.
-          blueprint: redactedBlueprint as any,
+          blueprint: redactedBlueprint as ToolParams['blueprint'],
         }));
 
       return toolParams;
@@ -1001,13 +1038,21 @@ export class ConversationService {
       }));
     try {
       await this.messageService.updateMessage(userMessage.id, { turnId: turn.id, turnSeq: 0 });
-    } catch {
-      // best-effort; idempotency relies on assistant/tool slot upserts, not the user message row
+    } catch (err) {
+      console.error('[ConversationService] Failed to update user message with turnId', {
+        error: err instanceof Error ? err.message : String(err),
+        messageId: userMessage.id,
+        turnId: turn.id,
+      });
     }
     try {
       await this.turnRepository.updateTurn(turn.id, { createdByMessageId: userMessage.id });
-    } catch {
-      // best-effort
+    } catch (err) {
+      console.error('[ConversationService] Failed to update turn with createdByMessageId', {
+        error: err instanceof Error ? err.message : String(err),
+        turnId: turn.id,
+        messageId: userMessage.id,
+      });
     }
 
     // Publish turn start + user message (server-authoritative) to the shared stream.
@@ -1047,8 +1092,11 @@ export class ConversationService {
                   type: 'ui_action',
                   data: { __ui_action: 'conversation_title_updated', conversationId: convo.id, title: gen.trim() },
                 });
-              } catch {
-                /* ignore */
+              } catch (err) {
+                console.error('[ConversationService] Failed to publish conversation title update', {
+                  error: err instanceof Error ? err.message : String(err),
+                  conversationId: convo.id,
+                });
               }
             } else {
               console.warn('[TITLE] Generation returned empty title');
@@ -1136,7 +1184,7 @@ export class ConversationService {
         hops += 1;
 
         // Expose current agent id to the blueprint via env("AGENT_ID")
-        (runtimeEnv as any).AGENT_ID = agentModel.id;
+        (runtimeEnv as EngineConfig & { AGENT_ID?: string }).AGENT_ID = agentModel.id;
 
         // Guard against NULL/undefined persisted JSONB state
         const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
@@ -1151,7 +1199,9 @@ export class ConversationService {
         );
 
         // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
 
         const agentWithTools: AgentParams = {
@@ -1201,11 +1251,11 @@ export class ConversationService {
 
         // Optional per-turn multimodal output configuration (OpenRouter image generation):
         // Agent.execute merges params.state into execution.state, so attach to agent params.state BEFORE construction.
-        if (Array.isArray((data as any).modalities) && (data as any).modalities.length > 0) {
-          (agentWithTools.state as any).modalities = (data as any).modalities;
+        if (Array.isArray(data.modalities) && data.modalities.length > 0) {
+          (agentWithTools.state as AgentState & { modalities?: unknown[] }).modalities = data.modalities;
         }
-        if ((data as any).imageConfig && typeof (data as any).imageConfig === 'object') {
-          (agentWithTools.state as any).imageConfig = (data as any).imageConfig;
+        if (data.imageConfig && typeof data.imageConfig === 'object') {
+          (agentWithTools.state as AgentState & { imageConfig?: Record<string, unknown> }).imageConfig = data.imageConfig;
         }
 
         const agent = new Agent(agentWithTools, {
@@ -1251,8 +1301,13 @@ export class ConversationService {
             error: { code: 'AGENT_EXECUTION_FAILED', message: error instanceof Error ? error.message : 'Unknown agent execution error' },
           },
         });
-      } catch {
-        /* ignore */
+      } catch (err) {
+        const turnId = this.currentTurnId.get(data.conversationId) || this.generationId.get(data.conversationId) || data.conversationId;
+        console.error('[ConversationService] Failed to publish turn status failed event', {
+          error: err instanceof Error ? err.message : String(err),
+          conversationId: data.conversationId,
+          turnId,
+        });
       }
 
       throw error;
@@ -1320,7 +1375,7 @@ export class ConversationService {
       turnLeaseId = await leaseService.acquire({
         starshipId: starship.id,
         conversationId,
-        maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 3,
+        maxConcurrentTurns: (starship as StarshipModel & { maxConcurrentTurns?: number }).maxConcurrentTurns ?? 3,
       });
 
       const agentService = new AgentService();
@@ -1374,17 +1429,19 @@ export class ConversationService {
       const baseState =
         agentModel.state && typeof agentModel.state === 'object'
           ? (agentModel.state as Record<string, unknown>)
-          : ({ messages: [], tools: [] } as any);
+          : ({ messages: [], tools: [] } as AgentState);
 
       // Resolve plugins from conversation state only (agent plugins ignored)
       const plugins = this.resolvePlugins(conversationState as ConversationState | undefined, baseState as AgentState | undefined);
 
       // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState;
 
       const agentWithTools: AgentParams = {
-        ...(agentModel as any),
+        ...(agentModel as Partial<AgentParams>),
         // Always use the server-tools blueprint (no legacy tool-node execution).
         blueprint: Agent.defaultAgentBlueprintServerTools(),
         state: {
@@ -1432,8 +1489,12 @@ export class ConversationService {
       if (turnLeaseId) {
         try {
           await leaseService.release(turnLeaseId);
-        } catch {
-          // best-effort; lease TTL will clean up
+        } catch (err) {
+          console.error('[ConversationService] Failed to release turn lease', {
+            error: err instanceof Error ? err.message : String(err),
+            turnLeaseId,
+            conversationId,
+          });
         }
       }
     }
@@ -1477,8 +1538,11 @@ export class ConversationService {
           stopReason: 'user_stop',
         });
       }
-    } catch {
-      // best-effort
+    } catch (err) {
+      console.error('[ConversationService] Failed to update conversation state after turn completion', {
+        error: err instanceof Error ? err.message : String(err),
+        conversationId,
+      });
     }
 
     // If we have cached usage from streaming but no content_complete occurred, persist usage now
@@ -1524,7 +1588,7 @@ export class ConversationService {
     // Persist server-authoritative end-of-turn state (best-effort, for administrative visibility)
     try {
       const convo = await this.getConversationById(conversationId);
-      const prev = (convo?.state as any) || {};
+      const prev = (convo?.state as ConversationState | undefined) || {};
       await this.conversationRepository.update(conversationId, {
         state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
         updatedAt: new Date().toISOString(),
@@ -1598,10 +1662,10 @@ export class ConversationService {
               promptTokens: Number(usage.prompt_tokens ?? 0),
               completionTokens: Number(usage.completion_tokens ?? 0),
               totalTokens: Number(usage.total_tokens ?? 0),
-              cost: Number((usage as any).cost ?? 0),
+              cost: Number((usage as { cost?: unknown }).cost ?? 0),
               model: String(model),
             })
-            .then(async (_row) => {
+            .then(async () => {
               // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
             });
         }
@@ -1719,7 +1783,10 @@ export class ConversationService {
       }
 
       return out;
-    } catch {
+    } catch (err) {
+      console.error('[ConversationService] Failed to resolve agents from conversation mentions', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return [];
     }
   }
@@ -1788,7 +1855,7 @@ export class ConversationService {
         // Persist turn_started state (best-effort). Stream events are published when the turn is created.
         try {
           const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
+          const prev = (convo?.state as ConversationState | undefined) || {};
           await this.conversationRepository.update(conversationId, {
             state: { ...prev, turnActive: true },
             updatedAt: new Date().toISOString(),
@@ -1805,8 +1872,11 @@ export class ConversationService {
           if (stoppedAtStart) {
             break;
           }
-        } catch {
-          /* non-fatal: balance auto-stop check at workflow start */
+        } catch (err) {
+          console.error('[ConversationService] Failed to check balance auto-stop at workflow start', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
 
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
@@ -1847,8 +1917,11 @@ export class ConversationService {
             if (stopped) {
               return;
             }
-          } catch (e) {
-            /* non-fatal: balance auto-stop check failure */
+          } catch (err) {
+            console.error('[ConversationService] Failed to check balance auto-stop', {
+              error: err instanceof Error ? err.message : String(err),
+              conversationId,
+            });
           }
 
           // Stream content chunks in real-time (supports both delta.* and message.* providers)
@@ -1918,10 +1991,10 @@ export class ConversationService {
 
             // OpenRouter image generation output: delta.images / message.images
             const imagesFromDelta: unknown[] = Array.isArray((delta as { images?: unknown[] }).images)
-              ? ((delta as any).images as unknown[])
+              ? (delta as { images: unknown[] }).images
               : [];
             const imagesFromMessage: unknown[] = Array.isArray((messageNode as { images?: unknown[] }).images)
-              ? ((messageNode as any).images as unknown[])
+              ? (messageNode as { images: unknown[] }).images
               : [];
             const hasImages = imagesFromDelta.length > 0 || imagesFromMessage.length > 0;
 
@@ -1982,7 +2055,11 @@ export class ConversationService {
                 if (typeof raw === 'string') return raw;
 
                 return '';
-              } catch {
+              } catch (err) {
+                console.error('[ConversationService] Failed to process image URL', {
+                  error: err instanceof Error ? err.message : String(err),
+                  conversationId,
+                });
                 return '';
               }
             };
@@ -2131,7 +2208,6 @@ export class ConversationService {
               const snapshotR = reasoningFromMessage || '';
 
               const currentR = this.streamingReasoning.get(conversationId) || '';
-              const currentRLength = currentR.length;
 
               let appendR = '';
               if (incrementalR) {
@@ -2183,32 +2259,9 @@ export class ConversationService {
 
                   this.streamingToolCalls.set(conversationId, acc);
 
-                  // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
-                  const toolCallsValue = acc
-                    .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
-                    .map((tc) => {
-                      let argsObj: unknown = {};
-                      const argsStr = tc.function?.arguments;
-                      if (typeof argsStr === 'string' && argsStr) {
-                        try {
-                          // Lenient parse for partial/incomplete JSON object
-                          argsObj = parsePartialJSONObject(argsStr);
-                        } catch {
-                          argsObj = {};
-                        }
-                      }
-                      return {
-                        id: tc.id,
-                        type: tc.type,
-                        function: {
-                          name: tc.function.name,
-                          arguments: argsObj, // Parsed object (may be partial)
-                        },
-                      };
-                    });
-
                   // Tool calls are persisted via state/message persistence (node_completed) and published as message.append.
                   // We intentionally do not stream toolCalls as incremental UI deltas in the new protocol.
+                  // Note: We parse tool call arguments here but don't use them for streaming (they're persisted on completion).
                 } else if (toolCallsFromMessage.length > 0) {
                   // Snapshot toolCalls from message node (no incremental indices)
                   // Parse arguments using partial-json for robustness
@@ -2219,7 +2272,12 @@ export class ConversationService {
                     if (argsStr) {
                       try {
                         argsObj = parsePartialJSONObject(argsStr);
-                      } catch {
+                      } catch (err) {
+                        console.error('[ConversationService] Failed to parse partial JSON for tool call arguments', {
+                          error: err instanceof Error ? err.message : String(err),
+                          conversationId,
+                          argsStr: argsStr?.substring(0, 100),
+                        });
                         argsObj = {};
                       }
                     }
@@ -2230,7 +2288,7 @@ export class ConversationService {
                         name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
                         arguments: argsObj, // Store as parsed object for UI
                       },
-                    } as any;
+                    } as LlmToolCall;
                   });
 
                   // Maintain streaming accumulator with string arguments form
@@ -2242,7 +2300,11 @@ export class ConversationService {
                       arguments: (() => {
                         try {
                           return JSON.stringify(tc.function.arguments ?? {});
-                        } catch {
+                        } catch (err) {
+                          console.error('[ConversationService] Failed to stringify tool call arguments', {
+                            error: err instanceof Error ? err.message : String(err),
+                            conversationId,
+                          });
                           return '{}';
                         }
                       })(),
@@ -2252,8 +2314,11 @@ export class ConversationService {
 
                   // Tool calls are persisted and will be delivered via message.append; no incremental streaming here.
                 }
-              } catch {
-                // ignore toolCall parse errors to avoid breaking streaming
+              } catch (err) {
+                console.error('[ConversationService] Failed to parse tool calls', {
+                  error: err instanceof Error ? err.message : String(err),
+                  conversationId,
+                });
               }
             }
           }
@@ -2396,8 +2461,11 @@ export class ConversationService {
             // and no longer rely on back-compat assistant messages that duplicate tool_result JSON.
             try {
               await this.streamBus.publish(conversationId, { type: 'ui_action', data: uiPayload });
-            } catch {
-              /* ignore */
+            } catch (err) {
+              console.error('[ConversationService] Failed to publish UI action', {
+                error: err instanceof Error ? err.message : String(err),
+                conversationId,
+              });
             }
           }
         } catch (e) {
@@ -2492,8 +2560,12 @@ export class ConversationService {
                     await Promise.all(
                       pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
                     );
-                  } catch {
-                    // Non-fatal
+                  } catch (err) {
+                    console.error('[ConversationService] Failed to link attachments to message', {
+                      error: err instanceof Error ? err.message : String(err),
+                      conversationId,
+                      messageId: persistedMsg.id,
+                    });
                   }
                 }
 
@@ -2608,8 +2680,13 @@ export class ConversationService {
           if (turnId) {
             await this.turnRepository.updateTurn(turnId, { status: 'completed', completedAt: new Date().toISOString() });
           }
-        } catch {
-          // best-effort
+        } catch (err) {
+          const turnId = this.currentTurnId.get(conversationId);
+          console.error('[ConversationService] Failed to update turn status to completed', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+            turnId: turnId || 'unknown',
+          });
         }
 
         // Publish terminal turn status (Redis Streams)
@@ -2626,7 +2703,7 @@ export class ConversationService {
         // Persist turn_completed state and notify clients
         try {
           const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
+          const prev = (convo?.state as ConversationState | undefined) || {};
           await this.conversationRepository.update(conversationId, {
             state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
             updatedAt: new Date().toISOString(),
@@ -2681,8 +2758,13 @@ export class ConversationService {
           if (turnId) {
             await this.turnRepository.updateTurn(turnId, { status: 'failed', completedAt: new Date().toISOString() });
           }
-        } catch {
-          /* best-effort */
+        } catch (err) {
+          const turnId = this.currentTurnId.get(conversationId);
+          console.error('[ConversationService] Failed to update turn status to failed', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+            turnId: turnId || 'unknown',
+          });
         }
 
         // Publish error message + terminal turn status
@@ -2701,7 +2783,7 @@ export class ConversationService {
         // Persist server-authoritative end-of-turn state (best-effort)
         try {
           const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
+          const prev = (convo?.state as ConversationState | undefined) || {};
           await this.conversationRepository.update(conversationId, {
             state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
             updatedAt: new Date().toISOString(),
@@ -2729,8 +2811,11 @@ export class ConversationService {
           if (stoppedToolStart) {
             break;
           }
-        } catch {
-          /* non-fatal: balance auto-stop during tool_started */
+        } catch (err) {
+          console.error('[ConversationService] Failed to check balance auto-stop during tool_started', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
         break;
       }

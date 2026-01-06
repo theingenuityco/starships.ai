@@ -35,6 +35,7 @@ export class WorkerPool {
       const startedAt = Date.now();
       try {
         const result = await this.executor.execute({
+          requestId: task.requestId,
           blueprintJson: task.blueprintJson,
           executionJson: task.executionJson,
           configJson: task.configJson,

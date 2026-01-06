@@ -13,6 +13,7 @@ import type { Runner } from '@/runner/Runner';
 import { Eval } from './Eval';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import { config } from '@/constants';
+import { CancelledError } from '@/errors/CancelledError';
 
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   start: () => import('@/nodes/Start').then((m) => m.Start as NodeHandlerConstructor),
@@ -307,6 +308,12 @@ export class Engine {
 
         currentNode = nextNode;
       } catch (error) {
+        // Cancellation is a host-driven, graceful termination signal.
+        // Do NOT record a node_failed error or mark the workflow as failed.
+        if (error instanceof CancelledError) {
+          execution.status = 'cancelled';
+          break;
+        }
         await this.handleNodeError(error, currentNode, execution);
 
         // If failOnNodeError is true, stop execution by throwing the error

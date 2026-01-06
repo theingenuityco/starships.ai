@@ -51,11 +51,10 @@ export class GrpcServer {
             this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
             return true;
           } catch (authErr) {
-            const message = authErr instanceof Error ? authErr.message : String(authErr);
             res.statusCode = 401;
             res.setHeader('Content-Type', 'application/json');
             // Security: do not echo request_id or other body-derived fields to unauthorized callers.
-            res.end(JSON.stringify({ error: { message: `unauthorized: ${message}` } }));
+            res.end(JSON.stringify({ error: { message: 'unauthorized' } }));
             return false;
           }
         };

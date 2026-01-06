@@ -1,5 +1,5 @@
 import { MessageService } from '@/services/MessageService';
-import { StreamingService } from '@/services/StreamingService';
+import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { ConnectorSecretService } from '@/services/ConnectorSecretService';
 import { UsageService } from '@/services/UsageService';
 import { AttachmentService } from '@/services/AttachmentService';
@@ -16,13 +16,21 @@ import type {
 } from '@starships/autopilot';
 import { NotFoundError, ConflictError } from '@starships/errors';
 import { ConversationRepository, AgentRepository, TurnRepository } from '@starships/models';
-import { AgentModel, ConversationModel, ConversationStatus, Message, MessageModel, StarshipModel } from '@starships/protocol';
+import {
+  AgentModel,
+  ConversationModel,
+  ConversationStatus,
+  Message,
+  MessageModel,
+  StarshipModel,
+  ConversationStreamEvent,
+  ConversationStreamUIAction,
+} from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
 import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 import OpenAI from 'openai';
-import { Operation } from 'fast-json-patch';
 import type { Runner } from '@starships/autopilot';
 import { BillingService } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
@@ -69,8 +77,13 @@ export class ConversationService {
   private conversationRepository!: ConversationRepository;
   private agentRepository!: AgentRepository;
   private messageService!: MessageService;
-  private streamingService!: StreamingService;
   private turnRepository!: TurnRepository;
+  private streamBus!: ConversationStreamBus;
+  // Streaming assistant message id per conversation (per current turn)
+  private streamingAssistantMessageId: Map<string, string> = new Map();
+  // Buffer deltas so we don't XADD per token (which slows streaming dramatically).
+  private pendingContentDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null; flushing: boolean }> = new Map();
+  private pendingReasoningDelta: Map<string, { buf: string; timer: NodeJS.Timeout | null; flushing: boolean }> = new Map();
   // Track active runner cancellation handles per conversation
   private static activeCancellations: Map<string, () => void> = new Map();
   // Kept for future use (runtime secrets, connector context, etc.)
@@ -164,8 +177,8 @@ export class ConversationService {
     this.conversationRepository = new ConversationRepository();
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
-    this.streamingService = new StreamingService();
     this.turnRepository = new TurnRepository();
+    this.streamBus = ConversationStreamBus.getInstance();
     this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
     this.billingService = new BillingService();
@@ -183,6 +196,101 @@ export class ConversationService {
 
     ConversationService.instance = this;
     return this;
+  }
+
+  private enqueueDelta(kind: 'content' | 'reasoning', conversationId: string, delta: string): void {
+    const map = kind === 'content' ? this.pendingContentDelta : this.pendingReasoningDelta;
+    const entry = map.get(conversationId) ?? { buf: '', timer: null, flushing: false };
+    entry.buf += delta;
+    map.set(conversationId, entry);
+
+    // Flush quickly for responsiveness, but avoid Redis roundtrip per-token.
+    // - if buffer is large, flush immediately
+    // - otherwise flush on a short timer
+    if (entry.buf.length >= 1024) {
+      void this.flushDelta(kind, conversationId);
+      return;
+    }
+    if (!entry.timer) {
+      entry.timer = setTimeout(() => void this.flushDelta(kind, conversationId), 50);
+      map.set(conversationId, entry);
+    }
+  }
+
+  /**
+   * Flush buffered deltas for a conversation exactly-once per buffer snapshot.
+   *
+   * This prevents a race where:
+   * - the timer-based flush from enqueueDelta()
+   * - and the final flushPendingDeltas() at turn completion
+   * both publish the same last buffer.
+   */
+  private async flushDelta(kind: 'content' | 'reasoning', conversationId: string): Promise<void> {
+    const map = kind === 'content' ? this.pendingContentDelta : this.pendingReasoningDelta;
+    const entry = map.get(conversationId);
+    if (!entry) return;
+    if (entry.flushing) return;
+
+    entry.flushing = true;
+    if (entry.timer) {
+      clearTimeout(entry.timer);
+      entry.timer = null;
+    }
+    const payload = entry.buf;
+    entry.buf = '';
+    map.set(conversationId, entry);
+
+    try {
+      if (!payload) return;
+      const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+      const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
+      this.streamingAssistantMessageId.set(conversationId, messageId);
+      const event: ConversationStreamEvent =
+        kind === 'content'
+          ? {
+              type: 'assistant.delta',
+              data: {
+                conversationId,
+                turnId,
+                messageId,
+                delta: payload,
+                at: new Date().toISOString(),
+              },
+            }
+          : {
+              type: 'assistant.reasoning_delta',
+              data: {
+                conversationId,
+                turnId,
+                messageId,
+                delta: payload,
+                at: new Date().toISOString(),
+              },
+            };
+      await this.streamBus.publish(conversationId, event);
+    } catch (err) {
+      console.warn('[STREAM] Failed to publish buffered delta', {
+        conversationId,
+        kind,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    } finally {
+      const cur = map.get(conversationId);
+      if (cur) {
+        cur.flushing = false;
+
+        // If new deltas arrived while we were publishing, schedule another flush.
+        if (cur.buf && cur.buf.length > 0 && !cur.timer) {
+          cur.timer = setTimeout(() => void this.flushDelta(kind, conversationId), 10);
+        }
+        map.set(conversationId, cur);
+      }
+    }
+  }
+
+  private async flushPendingDeltas(conversationId: string): Promise<void> {
+    await this.flushDelta('content', conversationId);
+    await this.flushDelta('reasoning', conversationId);
   }
 
   /**
@@ -256,7 +364,11 @@ export class ConversationService {
     try {
       const v = parse(jsonLike, Allow.ALL as number) as unknown;
       return v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {};
-    } catch {
+    } catch (err) {
+      console.error('[ConversationService] Failed to parse partial JSON', {
+        error: err instanceof Error ? err.message : String(err),
+        jsonLike: jsonLike?.substring(0, 100),
+      });
       return {};
     }
   }
@@ -340,8 +452,11 @@ export class ConversationService {
               pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
             );
           }
-        } catch {
-          // Non-fatal
+        } catch (err) {
+          console.error('[ConversationService] Failed to emit UI action for child conversation', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
 
         // Mark per-turn persisted flag (active-stream guard already set above)
@@ -375,7 +490,11 @@ export class ConversationService {
       const buffer = Buffer.from(b64, 'base64');
       if (!buffer || buffer.length === 0) return null;
       return { mimeType, buffer };
-    } catch {
+    } catch (err) {
+      console.error('[ConversationService] Failed to parse base64 image data URL', {
+        error: err instanceof Error ? err.message : String(err),
+        dataUrlLength: dataUrl?.length,
+      });
       return null;
     }
   }
@@ -425,14 +544,17 @@ export class ConversationService {
 
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
-      if (conversation.parentConversationId && this.streamingService && this.streamingService.isActive(conversation.parentConversationId)) {
-        const payload: any = {
+      if (conversation.parentConversationId) {
+        const payload: ConversationStreamUIAction['data'] = {
           __ui_action: 'child_conversation_created',
           parentConversationId: conversation.parentConversationId,
           childConversationId: conversation.id,
           starshipId: conversation.starshipId,
         };
-        await this.streamingService.broadcastUIAction(conversation.parentConversationId, payload);
+        await this.streamBus.publish(conversation.parentConversationId, {
+          type: 'ui_action',
+          data: payload,
+        } as ConversationStreamEvent);
       }
     } catch (e) {
       // Non-fatal: failure to emit UI hint must not break conversation creation
@@ -442,8 +564,11 @@ export class ConversationService {
           parentConversationId: conversation.parentConversationId,
           starshipId: conversation.starshipId,
         });
-      } catch {
-        // ignore
+      } catch (err) {
+        console.error('[ConversationService] Failed to publish UI action for child conversation', {
+          error: err instanceof Error ? err.message : String(err),
+          conversationId: conversation.parentConversationId,
+        });
       }
     }
 
@@ -590,8 +715,8 @@ export class ConversationService {
           message: error.message,
           name: error.name,
           stack: error.stack,
-          ...((error as any).code && { code: (error as any).code }),
-          ...((error as any).constraint && { constraint: (error as any).constraint }),
+          ...('code' in error && typeof error.code === 'string' && { code: error.code }),
+          ...('constraint' in error && typeof error.constraint === 'string' && { constraint: error.constraint }),
         });
       } else {
         console.error(`[ConversationService] Unknown error deleting conversation ${conversationId}:`, error);
@@ -685,21 +810,20 @@ export class ConversationService {
             content: 'Insufficient balance. Add credits from Billing to continue.',
             messageType: 'error',
           });
-          if (this.streamingService && this.streamingService.isActive(conversationId)) {
-            await this.streamingService.broadcastDelta(conversationId, {
-              op: 'add',
-              path: '/messages/-',
-              value: sys,
+          try {
+            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: sys } });
+            await this.streamBus.publish(conversationId, { type: 'ui_action', data: { __ui_action: 'insufficient_balance' } });
+          } catch (err) {
+            console.error('[ConversationService] Failed to publish insufficient balance messages', {
+              error: err instanceof Error ? err.message : String(err),
+              conversationId,
             });
           }
-          // Optional: UI action for future clients to react immediately
-          try {
-            await this.streamingService.broadcastUIAction(conversationId, { __ui_action: 'insufficient_balance' });
-          } catch {
-            /* non-fatal: ui_action is best-effort */
-          }
-        } catch {
-          /* non-fatal: system message emission failure */
+        } catch (err) {
+          console.error('[ConversationService] Failed to emit system message', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
 
         // Trigger stop pipeline (cancel runner, persist partials, finalize SSE)
@@ -755,7 +879,7 @@ export class ConversationService {
           parameters: tool.parameters!,
           // IMPORTANT: Tools are executed server-side; do not embed tool blueprints/transforms/mutations/condition in agent state.
           // Provide a minimal placeholder blueprint for ToolParams compatibility.
-          blueprint: redactedBlueprint as any,
+          blueprint: redactedBlueprint as ToolParams['blueprint'],
         }));
 
       return toolParams;
@@ -914,23 +1038,40 @@ export class ConversationService {
       }));
     try {
       await this.messageService.updateMessage(userMessage.id, { turnId: turn.id, turnSeq: 0 });
-    } catch {
-      // best-effort; idempotency relies on assistant/tool slot upserts, not the user message row
+    } catch (err) {
+      console.error('[ConversationService] Failed to update user message with turnId', {
+        error: err instanceof Error ? err.message : String(err),
+        messageId: userMessage.id,
+        turnId: turn.id,
+      });
     }
     try {
       await this.turnRepository.updateTurn(turn.id, { createdByMessageId: userMessage.id });
-    } catch {
-      // best-effort
+    } catch (err) {
+      console.error('[ConversationService] Failed to update turn with createdByMessageId', {
+        error: err instanceof Error ? err.message : String(err),
+        turnId: turn.id,
+        messageId: userMessage.id,
+      });
     }
 
-    // Broadcast user message immediately via streaming if available
-    if (this.streamingService) {
-      const userMessageDelta: Operation = {
-        op: 'add',
-        path: '/messages/-',
-        value: userMessage,
-      };
-      await this.streamingService.broadcastDelta(data.conversationId, userMessageDelta);
+    // Publish turn start + user message (server-authoritative) to the shared stream.
+    try {
+      const at = new Date().toISOString();
+      await this.streamBus.publish(data.conversationId, {
+        type: 'turn.started',
+        data: { conversationId: data.conversationId, turnId: turn.id, at },
+      });
+      await this.streamBus.publish(data.conversationId, {
+        type: 'turn.status',
+        data: { conversationId: data.conversationId, turnId: turn.id, status: 'active', at },
+      });
+      await this.streamBus.publish(data.conversationId, {
+        type: 'message.append',
+        data: { conversationId: data.conversationId, message: userMessage },
+      });
+    } catch (e) {
+      console.warn('[STREAM] Failed to publish initial turn/message events', e);
     }
 
     // Attempt early title generation before agent gating (so missing agent link doesn't block title updates)
@@ -946,12 +1087,15 @@ export class ConversationService {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
             if (gen && gen.trim()) {
               await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
-
-              if (this.streamingService && this.streamingService.isActive(convo.id)) {
-                await this.streamingService.broadcastUIAction(convo.id, {
-                  __ui_action: 'conversation_title_updated',
+              try {
+                await this.streamBus.publish(convo.id, {
+                  type: 'ui_action',
+                  data: { __ui_action: 'conversation_title_updated', conversationId: convo.id, title: gen.trim() },
+                });
+              } catch (err) {
+                console.error('[ConversationService] Failed to publish conversation title update', {
+                  error: err instanceof Error ? err.message : String(err),
                   conversationId: convo.id,
-                  title: gen.trim(),
                 });
               }
             } else {
@@ -1040,7 +1184,7 @@ export class ConversationService {
         hops += 1;
 
         // Expose current agent id to the blueprint via env("AGENT_ID")
-        (runtimeEnv as any).AGENT_ID = agentModel.id;
+        (runtimeEnv as EngineConfig & { AGENT_ID?: string }).AGENT_ID = agentModel.id;
 
         // Guard against NULL/undefined persisted JSONB state
         const baseState = agentModel.state && typeof agentModel.state === 'object' ? agentModel.state : { messages: [], tools: [] };
@@ -1055,7 +1199,9 @@ export class ConversationService {
         );
 
         // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
 
         const agentWithTools: AgentParams = {
@@ -1105,11 +1251,11 @@ export class ConversationService {
 
         // Optional per-turn multimodal output configuration (OpenRouter image generation):
         // Agent.execute merges params.state into execution.state, so attach to agent params.state BEFORE construction.
-        if (Array.isArray((data as any).modalities) && (data as any).modalities.length > 0) {
-          (agentWithTools.state as any).modalities = (data as any).modalities;
+        if (Array.isArray(data.modalities) && data.modalities.length > 0) {
+          (agentWithTools.state as AgentState & { modalities?: unknown[] }).modalities = data.modalities;
         }
-        if ((data as any).imageConfig && typeof (data as any).imageConfig === 'object') {
-          (agentWithTools.state as any).imageConfig = (data as any).imageConfig;
+        if (data.imageConfig && typeof data.imageConfig === 'object') {
+          (agentWithTools.state as AgentState & { imageConfig?: Record<string, unknown> }).imageConfig = data.imageConfig;
         }
 
         const agent = new Agent(agentWithTools, {
@@ -1143,13 +1289,24 @@ export class ConversationService {
       // Clean up placeholder cancellation handle on error
       ConversationService.activeCancellations.delete(data.conversationId);
 
-      if (this.streamingService) {
-        await this.streamingService.broadcastError(data.conversationId, {
-          streamId: data.conversationId,
-          errorCode: 'AGENT_EXECUTION_FAILED',
-          message: error instanceof Error ? error.message : 'Unknown agent execution error',
-          timestamp: new Date().toISOString(),
-          recoverable: false,
+      try {
+        const turnId = this.currentTurnId.get(data.conversationId) || this.generationId.get(data.conversationId) || data.conversationId;
+        await this.streamBus.publish(data.conversationId, {
+          type: 'turn.status',
+          data: {
+            conversationId: data.conversationId,
+            turnId,
+            status: 'failed',
+            at: new Date().toISOString(),
+            error: { code: 'AGENT_EXECUTION_FAILED', message: error instanceof Error ? error.message : 'Unknown agent execution error' },
+          },
+        });
+      } catch (err) {
+        const turnId = this.currentTurnId.get(data.conversationId) || this.generationId.get(data.conversationId) || data.conversationId;
+        console.error('[ConversationService] Failed to publish turn status failed event', {
+          error: err instanceof Error ? err.message : String(err),
+          conversationId: data.conversationId,
+          turnId,
         });
       }
 
@@ -1168,16 +1325,7 @@ export class ConversationService {
       }
       // Clear attribution and suppression, emit a single completion
       this.currentAgentForConversation.delete(data.conversationId);
-      const wasSuppressed = this.suppressCompleteFor.delete(data.conversationId);
-      if (wasSuppressed && this.streamingService && this.streamingService.isActive(data.conversationId)) {
-        await this.streamingService.broadcastComplete(data.conversationId, {
-          source: 'agent',
-          content: 'Turn completed',
-          agentId: 'multi',
-          scope: 'workflow',
-          conversationId: data.conversationId,
-        });
-      }
+      this.suppressCompleteFor.delete(data.conversationId);
     }
   }
 
@@ -1227,7 +1375,7 @@ export class ConversationService {
       turnLeaseId = await leaseService.acquire({
         starshipId: starship.id,
         conversationId,
-        maxConcurrentTurns: (starship as any).maxConcurrentTurns ?? 3,
+        maxConcurrentTurns: (starship as StarshipModel & { maxConcurrentTurns?: number }).maxConcurrentTurns ?? 3,
       });
 
       const agentService = new AgentService();
@@ -1281,17 +1429,19 @@ export class ConversationService {
       const baseState =
         agentModel.state && typeof agentModel.state === 'object'
           ? (agentModel.state as Record<string, unknown>)
-          : ({ messages: [], tools: [] } as any);
+          : ({ messages: [], tools: [] } as AgentState);
 
       // Resolve plugins from conversation state only (agent plugins ignored)
       const plugins = this.resolvePlugins(conversationState as ConversationState | undefined, baseState as AgentState | undefined);
 
       // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState;
 
       const agentWithTools: AgentParams = {
-        ...(agentModel as any),
+        ...(agentModel as Partial<AgentParams>),
         // Always use the server-tools blueprint (no legacy tool-node execution).
         blueprint: Agent.defaultAgentBlueprintServerTools(),
         state: {
@@ -1339,8 +1489,12 @@ export class ConversationService {
       if (turnLeaseId) {
         try {
           await leaseService.release(turnLeaseId);
-        } catch {
-          // best-effort; lease TTL will clean up
+        } catch (err) {
+          console.error('[ConversationService] Failed to release turn lease', {
+            error: err instanceof Error ? err.message : String(err),
+            turnLeaseId,
+            conversationId,
+          });
         }
       }
     }
@@ -1384,8 +1538,11 @@ export class ConversationService {
           stopReason: 'user_stop',
         });
       }
-    } catch {
-      // best-effort
+    } catch (err) {
+      console.error('[ConversationService] Failed to update conversation state after turn completion', {
+        error: err instanceof Error ? err.message : String(err),
+        conversationId,
+      });
     }
 
     // If we have cached usage from streaming but no content_complete occurred, persist usage now
@@ -1413,97 +1570,31 @@ export class ConversationService {
       this.latestStreamingUsage.delete(conversationId);
     }
 
-    // Finalize stream on SSE
-    if (this.streamingService) {
-      if (this.streamingService.isActive(conversationId)) {
-        try {
-          if (persistedMsg) {
-            await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persistedMsg });
-          }
-          await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
-        } catch (err) {
-          console.warn('[STOP] Failed to finalize streaming state via delta', {
-            conversationId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-        try {
-          await this.streamingService.broadcastComplete(conversationId, {
-            source: 'agent',
-            content: 'Turn stopped by user',
-            agentId: 'agent',
-            scope: 'workflow',
-            conversationId,
-          });
-        } catch (err) {
-          console.warn('[STOP] Failed to broadcast complete on stop', {
-            conversationId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-        // Persist server-authoritative end-of-turn state and notify listeners before closing SSE
-        try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STOP] Failed to persist turn_completed state on stop', err);
-        }
-        try {
-          await this.streamingService.broadcastTurnCompleted(conversationId, {
-            conversationId,
-            at: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STOP] Failed to broadcast turn_completed on stop', err);
-        }
-        try {
-          this.streamingService.closeConnection(conversationId);
-        } catch (err) {
-          console.warn('[STOP] Failed to close streaming connection', {
-            conversationId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      } else {
-        // No active connection: still buffer a logical 'complete' to bound future replays
-        try {
-          await this.streamingService.broadcastComplete(conversationId, {
-            source: 'agent',
-            content: 'Turn stopped by user',
-            agentId: 'agent',
-            scope: 'workflow',
-            conversationId,
-          });
-        } catch (err) {
-          console.warn('[STOP] Failed to buffer complete event on stop', {
-            conversationId,
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-        // Persist server-authoritative end-of-turn state even without active SSE connections
-        try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-            updatedAt: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STOP] Failed to persist turn_completed state on stop (no active conn)', err);
-        }
-        try {
-          await this.streamingService.broadcastTurnCompleted(conversationId, {
-            conversationId,
-            at: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STOP] Failed to broadcast turn_completed on stop (no active conn)', err);
-        }
+    // Publish terminal turn state + any persisted partial message
+    try {
+      const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+      const at = new Date().toISOString();
+      if (persistedMsg) {
+        await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
       }
+      await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'cancelled', at } });
+    } catch (err) {
+      console.warn('[STOP] Failed to publish cancelled turn status', {
+        conversationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Persist server-authoritative end-of-turn state (best-effort, for administrative visibility)
+    try {
+      const convo = await this.getConversationById(conversationId);
+      const prev = (convo?.state as ConversationState | undefined) || {};
+      await this.conversationRepository.update(conversationId, {
+        state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+        updatedAt: new Date().toISOString(),
+      });
+    } catch (err) {
+      console.warn('[STOP] Failed to persist turnActive=false on stop', err);
     }
 
     // Clear all in-memory state for this conversation's turn now that it has stopped
@@ -1571,10 +1662,10 @@ export class ConversationService {
               promptTokens: Number(usage.prompt_tokens ?? 0),
               completionTokens: Number(usage.completion_tokens ?? 0),
               totalTokens: Number(usage.total_tokens ?? 0),
-              cost: Number((usage as any).cost ?? 0),
+              cost: Number((usage as { cost?: unknown }).cost ?? 0),
               model: String(model),
             })
-            .then(async (_row) => {
+            .then(async () => {
               // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
             });
         }
@@ -1692,16 +1783,15 @@ export class ConversationService {
       }
 
       return out;
-    } catch {
+    } catch (err) {
+      console.error('[ConversationService] Failed to resolve agents from conversation mentions', {
+        error: err instanceof Error ? err.message : String(err),
+      });
       return [];
     }
   }
 
   async eventCallback(conversationId: string, event: AutopilotEvent): Promise<void> {
-    if (!this.streamingService) {
-      return;
-    }
-
     // Skip workflow/node control events from nested executions (depth>0) to avoid duplicates
     if (
       event.type === 'workflow_started' ||
@@ -1759,24 +1849,19 @@ export class ConversationService {
           this.lastPersistedIndex.set(conversationId, baselineIndex);
         }
 
-        // Persist turn_started state and notify clients
+        // Reset streaming assistant message id for the new turn
+        this.streamingAssistantMessageId.delete(conversationId);
+
+        // Persist turn_started state (best-effort). Stream events are published when the turn is created.
         try {
           const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
+          const prev = (convo?.state as ConversationState | undefined) || {};
           await this.conversationRepository.update(conversationId, {
             state: { ...prev, turnActive: true },
             updatedAt: new Date().toISOString(),
           });
         } catch (err) {
           console.warn('[STREAMING] Failed to persist turn_started state', err);
-        }
-        try {
-          await this.streamingService.broadcastTurnStarted(conversationId, {
-            conversationId,
-            at: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STREAMING] Failed to broadcast turn_started', err);
         }
 
         // Reset per-turn balance enforcement guards and enforce immediately
@@ -1787,8 +1872,11 @@ export class ConversationService {
           if (stoppedAtStart) {
             break;
           }
-        } catch {
-          /* non-fatal: balance auto-stop check at workflow start */
+        } catch (err) {
+          console.error('[ConversationService] Failed to check balance auto-stop at workflow start', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
 
         // Do not clear pending finalization here; previous turn must finish to preserve event ordering
@@ -1799,23 +1887,14 @@ export class ConversationService {
         // Persist the current partial assistant message so that reloads include it while paused
         try {
           const persisted = await this.persistActivePartial(conversationId);
-          if (persisted && this.streamingService && this.streamingService.isActive(conversationId)) {
-            try {
-              await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1', value: persisted });
-            } catch (err) {
-              console.warn('[STREAMING] Failed to broadcast persisted partial on workflow_paused', {
-                conversationId,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }
-            try {
-              await this.streamingService.broadcastDelta(conversationId, { op: 'replace', path: '/messages/-1/streaming', value: false });
-            } catch (err) {
-              console.warn('[STREAMING] Failed to mark streaming=false on workflow_paused', {
-                conversationId,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }
+          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+          const at = new Date().toISOString();
+          await this.streamBus.publish(conversationId, {
+            type: 'turn.status',
+            data: { conversationId, turnId, status: 'waiting_for_tools', at },
+          });
+          if (persisted) {
+            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
           }
         } catch (e) {
           console.warn('[STREAMING] Failed to persist partial on workflow_paused:', e);
@@ -1838,8 +1917,11 @@ export class ConversationService {
             if (stopped) {
               return;
             }
-          } catch (e) {
-            /* non-fatal: balance auto-stop check failure */
+          } catch (err) {
+            console.error('[ConversationService] Failed to check balance auto-stop', {
+              error: err instanceof Error ? err.message : String(err),
+              conversationId,
+            });
           }
 
           // Stream content chunks in real-time (supports both delta.* and message.* providers)
@@ -1909,10 +1991,10 @@ export class ConversationService {
 
             // OpenRouter image generation output: delta.images / message.images
             const imagesFromDelta: unknown[] = Array.isArray((delta as { images?: unknown[] }).images)
-              ? ((delta as any).images as unknown[])
+              ? (delta as { images: unknown[] }).images
               : [];
             const imagesFromMessage: unknown[] = Array.isArray((messageNode as { images?: unknown[] }).images)
-              ? ((messageNode as any).images as unknown[])
+              ? (messageNode as { images: unknown[] }).images
               : [];
             const hasImages = imagesFromDelta.length > 0 || imagesFromMessage.length > 0;
 
@@ -1973,7 +2055,11 @@ export class ConversationService {
                 if (typeof raw === 'string') return raw;
 
                 return '';
-              } catch {
+              } catch (err) {
+                console.error('[ConversationService] Failed to process image URL', {
+                  error: err instanceof Error ? err.message : String(err),
+                  conversationId,
+                });
                 return '';
               }
             };
@@ -1982,75 +2068,19 @@ export class ConversationService {
             const hasReasoning =
               (reasoningFromDelta && reasoningFromDelta.length > 0) || (reasoningFromMessage && reasoningFromMessage.length > 0);
 
-            // Guard: if no active accumulator and we have content OR toolCalls OR reasoning, start a new placeholder stream.
-            // Acquire the placeholder "lock" BEFORE any awaits to prevent duplicate shells from concurrent chunks.
+            // Initialize per-turn streaming accumulators on first observed content/tool/reasoning/images.
+            // We no longer broadcast JSON-Patch placeholders; the client constructs the streaming assistant message
+            // from typed delta events.
             if ((hasContent || hasToolCalls || hasReasoning || hasImages) && !this.streamingContent.has(conversationId)) {
-              if (this.streamingService.isActive(conversationId)) {
-                // Acquire lock upfront to avoid race between parallel content_chunk events
-                this.streamingContent.set(conversationId, '');
-                this.placeholderEmitted.set(conversationId, true);
-                // Clear toolCalls accumulator for this new stream to prevent reuse from previous LLM calls
-                this.streamingToolCalls.delete(conversationId);
-                // Reset generated image attachment tracking for this new stream
-                this.streamingGeneratedAttachmentIds.set(conversationId, []);
-                this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
-                // Initialize per-stream sequence counter
-                this.streamSeq.set(conversationId, 0);
-                this.snapshotPreferred.delete(conversationId);
-                this.toolCallSeq.set(conversationId, 0);
-
-                const assistantMessage: MessageModel = {
-                  id: `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-                  role: 'assistant',
-                  content: '',
-                  messageType: 'agent_response',
-                  createdAt: event.timestamp,
-                  updatedAt: event.timestamp,
-                };
-
-                const agent = this.currentAgentForConversation.get(conversationId);
-                const shell: Operation = {
-                  op: 'add',
-                  path: '/messages/-',
-                  value: {
-                    ...assistantMessage,
-                    ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
-                    streaming: true,
-                    chunks: [], // Initialize array so JSON Patch add to /chunks/- is valid
-                    reasoningChunks: [], // Initialize array so JSON Patch add to /reasoningChunks/- is valid
-                    toolCalls: [], // Initialize empty toolCalls array for replace operations
-                    attachmentIds: [], // Generated images (and other attachments) can be added during streaming
-                  },
-                };
-                await this.streamingService.broadcastDelta(conversationId, shell);
-                // Emit initial resume token
-                try {
-                  const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                  const svc = ResumeTokenService.getInstance();
-                  const token = svc.sign({
-                    c: conversationId,
-                    g: this.generationId.get(conversationId) || 'g',
-                    p: 0,
-                    m: '0',
-                    exp: Math.floor(Date.now() / 1000) + 600,
-                  });
-                  this.streamingService.sendResumeToken(conversationId, token);
-                } catch (err) {
-                  console.warn('[STREAMING] Failed to emit initial resume token', {
-                    conversationId,
-                    error: err instanceof Error ? err.message : String(err),
-                  });
-                }
-              } else {
-                // No active SSE client: still initialize accumulators so stop can persist partials.
-                this.streamingContent.set(conversationId, '');
-                this.placeholderEmitted.set(conversationId, true);
-                this.streamingToolCalls.delete(conversationId);
-                this.streamingGeneratedAttachmentIds.set(conversationId, []);
-                this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
-                if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
-                // Skip shell broadcast; continue accumulating for persistence
-              }
+              this.streamingContent.set(conversationId, '');
+              this.placeholderEmitted.set(conversationId, true);
+              this.streamingToolCalls.delete(conversationId);
+              this.streamingGeneratedAttachmentIds.set(conversationId, []);
+              this.streamingGeneratedImageUrlSeen.set(conversationId, new Set());
+              if (!this.ringBuffer.has(conversationId)) this.ringBuffer.set(conversationId, []);
+              // Streaming assistant message id is deterministic per turn for client-side reconciliation.
+              const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+              this.streamingAssistantMessageId.set(conversationId, `stream-${turnId}`);
             }
 
             // Process generated images (OpenRouter: images[].image_url.url is a data URL)
@@ -2113,21 +2143,7 @@ export class ConversationService {
 
                       acc.push(attachment.id);
                       this.streamingGeneratedAttachmentIds.set(conversationId, acc);
-
-                      if (this.streamingService && this.streamingService.isActive(conversationId)) {
-                        try {
-                          await this.streamingService.broadcastDelta(conversationId, {
-                            op: 'add',
-                            path: '/messages/-1/attachmentIds/-',
-                            value: attachment.id,
-                          });
-                        } catch (err) {
-                          console.warn('[STREAMING] Failed to broadcast generated image attachment id', {
-                            conversationId,
-                            error: err instanceof Error ? err.message : String(err),
-                          });
-                        }
-                      }
+                      // Attachment IDs will be included on the persisted assistant message and delivered via message.append.
                     } catch (err) {
                       console.warn('[STREAMING] Failed to persist generated image attachment', {
                         conversationId,
@@ -2180,40 +2196,8 @@ export class ConversationService {
                   if (rb.length > 200) rb.splice(0, rb.length - 200);
                   this.ringBuffer.set(conversationId, rb);
 
-                  // Build delta object synchronously
-                  const chunkDelta: Operation = {
-                    op: 'add',
-                    path: '/messages/-1/chunks/-',
-                    value: {
-                      content: normalized,
-                      position: chunkPosition,
-                      timestamp: Date.now(),
-                    },
-                  };
-
-                  // Broadcast
-                  await this.streamingService.broadcastDelta(conversationId, chunkDelta);
-
-                  // Periodically emit resume token (every ~2s)
-                  try {
-                    if (Math.random() < 0.15) {
-                      const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                      const svc = ResumeTokenService.getInstance();
-                      const token = svc.sign({
-                        c: conversationId,
-                        g: this.generationId.get(conversationId) || 'g',
-                        p: newLen,
-                        m: '0',
-                        exp: Math.floor(Date.now() / 1000) + 600,
-                      });
-                      this.streamingService.sendResumeToken(conversationId, token);
-                    }
-                  } catch (err) {
-                    console.warn('[STREAMING] Failed to emit periodic resume token', {
-                      conversationId,
-                      error: err instanceof Error ? err.message : String(err),
-                    });
-                  }
+                  // Publish typed assistant delta (Redis Streams)
+                  this.enqueueDelta('content', conversationId, normalized);
                 }
               }
             }
@@ -2224,7 +2208,6 @@ export class ConversationService {
               const snapshotR = reasoningFromMessage || '';
 
               const currentR = this.streamingReasoning.get(conversationId) || '';
-              const currentRLength = currentR.length;
 
               let appendR = '';
               if (incrementalR) {
@@ -2239,17 +2222,8 @@ export class ConversationService {
                   const newR = currentR + normalizedR;
                   this.streamingReasoning.set(conversationId, newR);
 
-                  // Stream delta chunk for reasoning
-                  const rChunkDelta: Operation = {
-                    op: 'add',
-                    path: '/messages/-1/reasoningChunks/-',
-                    value: {
-                      content: normalizedR,
-                      position: currentRLength,
-                      timestamp: Date.now(),
-                    },
-                  };
-                  await this.streamingService.broadcastDelta(conversationId, rChunkDelta);
+                  // Publish typed reasoning delta (Redis Streams)
+                  this.enqueueDelta('reasoning', conversationId, normalizedR);
                 }
               }
             }
@@ -2285,35 +2259,9 @@ export class ConversationService {
 
                   this.streamingToolCalls.set(conversationId, acc);
 
-                  // Parse accumulated arguments using partial-json to handle incomplete JSON gracefully
-                  const toolCallsValue = acc
-                    .filter((tc) => !!tc && typeof tc.function?.name === 'string' && tc.function.name.length > 0)
-                    .map((tc) => {
-                      let argsObj: unknown = {};
-                      const argsStr = tc.function?.arguments;
-                      if (typeof argsStr === 'string' && argsStr) {
-                        try {
-                          // Lenient parse for partial/incomplete JSON object
-                          argsObj = parsePartialJSONObject(argsStr);
-                        } catch {
-                          argsObj = {};
-                        }
-                      }
-                      return {
-                        id: tc.id,
-                        type: tc.type,
-                        function: {
-                          name: tc.function.name,
-                          arguments: argsObj, // Parsed object (may be partial)
-                        },
-                      };
-                    });
-
-                  await this.streamingService.broadcastDelta(conversationId, {
-                    op: 'replace',
-                    path: '/messages/-1/toolCalls',
-                    value: toolCallsValue,
-                  });
+                  // Tool calls are persisted via state/message persistence (node_completed) and published as message.append.
+                  // We intentionally do not stream toolCalls as incremental UI deltas in the new protocol.
+                  // Note: We parse tool call arguments here but don't use them for streaming (they're persisted on completion).
                 } else if (toolCallsFromMessage.length > 0) {
                   // Snapshot toolCalls from message node (no incremental indices)
                   // Parse arguments using partial-json for robustness
@@ -2324,7 +2272,12 @@ export class ConversationService {
                     if (argsStr) {
                       try {
                         argsObj = parsePartialJSONObject(argsStr);
-                      } catch {
+                      } catch (err) {
+                        console.error('[ConversationService] Failed to parse partial JSON for tool call arguments', {
+                          error: err instanceof Error ? err.message : String(err),
+                          conversationId,
+                          argsStr: argsStr?.substring(0, 100),
+                        });
                         argsObj = {};
                       }
                     }
@@ -2335,7 +2288,7 @@ export class ConversationService {
                         name: typeof tc?.function?.name === 'string' ? (tc.function!.name as string) : '',
                         arguments: argsObj, // Store as parsed object for UI
                       },
-                    } as any;
+                    } as LlmToolCall;
                   });
 
                   // Maintain streaming accumulator with string arguments form
@@ -2347,7 +2300,11 @@ export class ConversationService {
                       arguments: (() => {
                         try {
                           return JSON.stringify(tc.function.arguments ?? {});
-                        } catch {
+                        } catch (err) {
+                          console.error('[ConversationService] Failed to stringify tool call arguments', {
+                            error: err instanceof Error ? err.message : String(err),
+                            conversationId,
+                          });
                           return '{}';
                         }
                       })(),
@@ -2355,15 +2312,13 @@ export class ConversationService {
                   }));
                   this.streamingToolCalls.set(conversationId, accumFromSnapshot);
 
-                  // Broadcast only valid entries (non-empty function name)
-                  await this.streamingService.broadcastDelta(conversationId, {
-                    op: 'replace',
-                    path: '/messages/-1/toolCalls',
-                    value: normalized.filter((tc) => typeof tc.function?.name === 'string' && tc.function.name.length > 0),
-                  });
+                  // Tool calls are persisted and will be delivered via message.append; no incremental streaming here.
                 }
-              } catch {
-                // ignore toolCall parse errors to avoid breaking streaming
+              } catch (err) {
+                console.error('[ConversationService] Failed to parse tool calls', {
+                  error: err instanceof Error ? err.message : String(err),
+                  conversationId,
+                });
               }
             }
           }
@@ -2504,7 +2459,14 @@ export class ConversationService {
           if (uiPayload && typeof uiPayload.__ui_action === 'string') {
             // Emit structured UI event over SSE; modern clients should listen to 'ui_action'
             // and no longer rely on back-compat assistant messages that duplicate tool_result JSON.
-            await this.streamingService.broadcastUIAction(conversationId, uiPayload);
+            try {
+              await this.streamBus.publish(conversationId, { type: 'ui_action', data: uiPayload });
+            } catch (err) {
+              console.error('[ConversationService] Failed to publish UI action', {
+                error: err instanceof Error ? err.message : String(err),
+                conversationId,
+              });
+            }
           }
         } catch (e) {
           console.warn('[STREAMING] UI action detection failed on node_completed:', e);
@@ -2598,13 +2560,30 @@ export class ConversationService {
                     await Promise.all(
                       pendingAttachmentIds.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
                     );
-                  } catch {
-                    // Non-fatal
+                  } catch (err) {
+                    console.error('[ConversationService] Failed to link attachments to message', {
+                      error: err instanceof Error ? err.message : String(err),
+                      conversationId,
+                      messageId: persistedMsg.id,
+                    });
                   }
                 }
 
                 // Mark that an assistant message has been persisted for this turn
                 if (role === 'assistant') {
+                  // ROOT CAUSE FIX:
+                  // We buffer deltas (timer-based) to avoid XADD per token. Without forcing a flush here,
+                  // the last buffered assistant.delta can land AFTER this message.append (which already
+                  // includes the final content), causing the UI to render the last chunk twice.
+                  try {
+                    await this.flushPendingDeltas(conversationId);
+                  } catch (e) {
+                    console.warn('[STREAM] Failed to flush pending deltas before message.append (node_completed)', {
+                      conversationId,
+                      error: e instanceof Error ? e.message : String(e),
+                    });
+                  }
+
                   this.assistantPersistedThisTurn.add(conversationId);
                   // Reset streaming accumulators so subsequent assistant responses in the same turn
                   // get their own placeholder and can be persisted independently
@@ -2616,41 +2595,15 @@ export class ConversationService {
                   this.activeStreamPersisted.delete(conversationId);
                   this.streamingGeneratedAttachmentIds.delete(conversationId);
                   this.streamingGeneratedImageUrlSeen.delete(conversationId);
+                  // Clear streaming message id so future deltas start a new stream message for subsequent assistant outputs
+                  this.streamingAssistantMessageId.delete(conversationId);
                 }
 
-                // Broadcast via SSE if streaming is active
-                if (this.streamingService && this.streamingService.isActive(conversationId)) {
-                  if (role === 'assistant') {
-                    // Replace the streaming placeholder with the persisted assistant message
-                    await this.streamingService.broadcastDelta(conversationId, {
-                      op: 'replace',
-                      path: '/messages/-1',
-                      value: persistedMsg,
-                    });
-                  } else {
-                    await this.streamingService.broadcastDelta(conversationId, {
-                      op: 'add',
-                      path: '/messages/-',
-                      value: persistedMsg,
-                    });
-                  }
-
-                  // Emit resume token checkpoint including last persisted message id
-                  try {
-                    const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-                    const svc = ResumeTokenService.getInstance();
-                    const persistedId = (persistedMsg as { id?: unknown }).id;
-                    const token = svc.sign({
-                      c: conversationId,
-                      g: this.generationId.get(conversationId) || 'g',
-                      p: this.accumulatedLength.get(conversationId) || 0,
-                      m: String(typeof persistedId === 'string' || typeof persistedId === 'number' ? persistedId : '0'),
-                      exp: Math.floor(Date.now() / 1000) + 600,
-                    });
-                    this.streamingService.sendResumeToken(conversationId, token);
-                  } catch {
-                    /* non-fatal: resume token emission after persistence failed */
-                  }
+                // Publish persisted messages to the shared stream.
+                try {
+                  await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
+                } catch (e) {
+                  console.warn('[STREAM] Failed to publish message.append', e);
                 }
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);
@@ -2697,103 +2650,66 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // Flush buffered deltas so clients see the final output immediately.
+        try {
+          await this.flushPendingDeltas(conversationId);
+        } catch (e) {
+          console.warn('[STREAM] Failed to flush pending deltas on workflow_completed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
+        // Persist any streamed assistant content (content/reasoning/attachments) if the normal
+        // state-based persistence path did not produce an assistant message.
+        try {
+          const persisted = await this.persistActivePartial(conversationId);
+          if (persisted) {
+            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
+          }
+        } catch (e) {
+          console.warn('[STREAM] Failed to persist/publish final streamed assistant message on workflow_completed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
         // Mark turn completed (best-effort)
         try {
           const turnId = this.currentTurnId.get(conversationId);
           if (turnId) {
             await this.turnRepository.updateTurn(turnId, { status: 'completed', completedAt: new Date().toISOString() });
           }
-        } catch {
-          // best-effort
+        } catch (err) {
+          const turnId = this.currentTurnId.get(conversationId);
+          console.error('[ConversationService] Failed to update turn status to completed', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+            turnId: turnId || 'unknown',
+          });
         }
 
-        // Ensure the active assistant streaming shell is finalized before emitting 'complete'
-        if (this.streamingService && this.streamingService.isActive(conversationId)) {
-          try {
-            await this.streamingService.broadcastDelta(conversationId, {
-              op: 'replace',
-              path: '/messages/-1/streaming',
-              value: false,
-            });
-            await new Promise<void>((resolve) => {
-              if (typeof setImmediate !== 'undefined') {
-                setImmediate(resolve);
-              } else {
-                setTimeout(resolve, 0);
-              }
-            });
-          } catch (err) {
-            console.warn('[STREAMING] Failed to finalize streaming shell on workflow_completed', {
-              conversationId,
-              error: err instanceof Error ? err.message : String(err),
-            });
-          }
-
-          // If this conversation is under multi-agent suppression, skip broadcasting 'complete' here
-          if (!this.suppressCompleteFor.has(conversationId)) {
-            await this.streamingService.broadcastComplete(conversationId, {
-              source: 'agent',
-              content: 'Workflow completed',
-              agentId: 'agent',
-              scope: 'workflow',
-              conversationId,
-            });
-            try {
-              const ResumeTokenService = (await import('./ResumeTokenService')).ResumeTokenService;
-              const svc = ResumeTokenService.getInstance();
-              const token = svc.sign({
-                c: conversationId,
-                g: this.generationId.get(conversationId) || 'g',
-                p: this.accumulatedLength.get(conversationId) || 0,
-                m: '0',
-                exp: Math.floor(Date.now() / 1000) + 600,
-              });
-              this.streamingService.sendResumeToken(conversationId, token);
-            } catch (err) {
-              console.warn('[STREAMING] Failed to emit final resume token on workflow_completed', {
-                conversationId,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }
-          }
-        } else if (this.streamingService) {
-          // No active connection: still buffer a logical 'complete' to bound future replays
-          if (!this.suppressCompleteFor.has(conversationId)) {
-            try {
-              await this.streamingService.broadcastComplete(conversationId, {
-                source: 'agent',
-                content: 'Workflow completed',
-                agentId: 'agent',
-                scope: 'workflow',
-                conversationId,
-              });
-            } catch (err) {
-              console.warn('[STREAMING] Failed to buffer logical complete on workflow_completed (no active conn)', {
-                conversationId,
-                error: err instanceof Error ? err.message : String(err),
-              });
-            }
-          }
+        // Publish terminal turn status (Redis Streams)
+        try {
+          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+          await this.streamBus.publish(conversationId, {
+            type: 'turn.status',
+            data: { conversationId, turnId, status: 'completed', at: new Date().toISOString() },
+          });
+        } catch (err) {
+          console.warn('[STREAM] Failed to publish completed turn status', err);
         }
 
         // Persist turn_completed state and notify clients
         try {
           const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as any) || {};
+          const prev = (convo?.state as ConversationState | undefined) || {};
           await this.conversationRepository.update(conversationId, {
             state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
             updatedAt: new Date().toISOString(),
           });
         } catch (err) {
           console.warn('[STREAMING] Failed to persist turn_completed state', err);
-        }
-        try {
-          await this.streamingService.broadcastTurnCompleted(conversationId, {
-            conversationId,
-            at: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('[STREAMING] Failed to broadcast turn_completed', err);
         }
 
         // Final cleanup now that the workflow turn has fully completed
@@ -2806,6 +2722,28 @@ export class ConversationService {
         const execution: Execution | undefined = execEvent.data?.execution;
         console.error('[STREAMING] Workflow failed:', execution?.results);
 
+        try {
+          await this.flushPendingDeltas(conversationId);
+        } catch (e) {
+          console.warn('[STREAM] Failed to flush pending deltas on workflow_failed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
+        // Persist any streamed assistant content even on failure (helps explain partial progress on reload).
+        try {
+          const persisted = await this.persistActivePartial(conversationId);
+          if (persisted) {
+            await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
+          }
+        } catch (e) {
+          console.warn('[STREAM] Failed to persist/publish streamed assistant message on workflow_failed', {
+            conversationId,
+            error: e instanceof Error ? e.message : String(e),
+          });
+        }
+
         // Create error message
         const errorMessage = await this.messageService.createMessage({
           conversationId,
@@ -2814,13 +2752,46 @@ export class ConversationService {
           messageType: 'error',
         });
 
-        // Broadcast error message
-        const delta: Operation = {
-          op: 'add',
-          path: '/messages/-',
-          value: errorMessage,
-        };
-        await this.streamingService.broadcastDelta(conversationId, delta);
+        // Persist turn failed (best-effort)
+        try {
+          const turnId = this.currentTurnId.get(conversationId);
+          if (turnId) {
+            await this.turnRepository.updateTurn(turnId, { status: 'failed', completedAt: new Date().toISOString() });
+          }
+        } catch (err) {
+          const turnId = this.currentTurnId.get(conversationId);
+          console.error('[ConversationService] Failed to update turn status to failed', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+            turnId: turnId || 'unknown',
+          });
+        }
+
+        // Publish error message + terminal turn status
+        try {
+          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+          const at = new Date().toISOString();
+          await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: errorMessage } });
+          await this.streamBus.publish(conversationId, {
+            type: 'turn.status',
+            data: { conversationId, turnId, status: 'failed', at, error: { message: 'Workflow failed' } },
+          });
+        } catch {
+          /* ignore */
+        }
+
+        // Persist server-authoritative end-of-turn state (best-effort)
+        try {
+          const convo = await this.getConversationById(conversationId);
+          const prev = (convo?.state as ConversationState | undefined) || {};
+          await this.conversationRepository.update(conversationId, {
+            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
+            updatedAt: new Date().toISOString(),
+          });
+        } catch {
+          /* ignore */
+        }
+
         // Final cleanup after a failed workflow
         this.finalizeTurnState(conversationId);
         break;
@@ -2840,8 +2811,11 @@ export class ConversationService {
           if (stoppedToolStart) {
             break;
           }
-        } catch {
-          /* non-fatal: balance auto-stop during tool_started */
+        } catch (err) {
+          console.error('[ConversationService] Failed to check balance auto-stop during tool_started', {
+            error: err instanceof Error ? err.message : String(err),
+            conversationId,
+          });
         }
         break;
       }

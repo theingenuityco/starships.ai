@@ -193,15 +193,4 @@ export const rateLimiters = {
   // Global adaptive limiter
   adaptive: adaptiveApiLimiter,
 } as const;
-
-/**
- * Rate limiter for SSE/WebSocket connections
- */
-export const streamingRateLimiter = createRateLimiter('MESSAGING', {
-  skipSuccessfulRequests: true, // Only count failed connection attempts
-  max: 50, // 50 connection attempts per minute (was 20)
-  message: 'Too many connection attempts, please try again later',
-});
-
-// Export types for TypeScript support
 export type RateLimiterTier = keyof typeof RATE_LIMIT_TIERS;

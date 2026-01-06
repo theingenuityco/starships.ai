@@ -31,6 +31,9 @@ export type { ConditionalResult } from './nodes/Conditional';
 // Utils
 export { ExecutionItemUtils } from './utils/ExecutionItemUtils';
 
+// Errors
+export { CancelledError } from './errors/CancelledError';
+
 // Types
 export * from './types';
 export type { Execution, ExecutionState, ExecutionStatus, ExecutionItem, ExecutionError, ExecutionErrorCode } from './types/execution';

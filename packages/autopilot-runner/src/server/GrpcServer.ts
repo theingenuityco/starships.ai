@@ -2,6 +2,7 @@ import * as http from 'http';
 import { Queue, RunnerTask } from '@/queue/Queue';
 import { Executor } from '@/executor/Executor';
 import { WorkerPool } from '@/queue/Worker';
+import { executionRegistry } from '@/execution/ExecutionRegistry';
 
 interface GrpcServerOptions {
   port: number;
@@ -44,6 +45,45 @@ export class GrpcServer {
       const server = http.createServer(async (req, res) => {
         const url = req.url || '';
         const method = req.method || 'GET';
+
+        if (method === 'POST' && url.endsWith('/runner.Runner/Cancel')) {
+          try {
+            const chunks: Buffer[] = [];
+            for await (const chunk of req) chunks.push(Buffer.from(chunk));
+            const bodyStr = Buffer.concat(chunks).toString('utf-8');
+            const body = (bodyStr ? JSON.parse(bodyStr) : {}) as { request_id?: string };
+            const requestId = String(body?.request_id || '');
+
+            try {
+              this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
+            } catch (authErr) {
+              const message = authErr instanceof Error ? authErr.message : String(authErr);
+              res.statusCode = 401;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: { message: `unauthorized: ${message}` }, request_id: requestId }));
+              return;
+            }
+
+            if (!requestId) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: { message: 'request_id is required' } }));
+              return;
+            }
+
+            const cancelledActive = executionRegistry.cancel(requestId);
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ ok: true, request_id: requestId, cancelled: true, had_active: cancelledActive }));
+          } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            res.statusCode = 500;
+            res.setHeader('Content-Type', 'application/json');
+            res.end(JSON.stringify({ error: { message } }));
+          }
+          return;
+        }
+
         // Unary execute compatible with RemoteRunner's HTTP call
         if (method === 'POST' && url.endsWith('/runner.Runner/ExecuteStream')) {
           // Server-Sent Events streaming endpoint
@@ -53,6 +93,12 @@ export class GrpcServer {
             const bodyStr = Buffer.concat(chunks).toString('utf-8');
             const body = (bodyStr ? JSON.parse(bodyStr) : {}) as ExecuteRequest;
             const currentRequestId = String(body?.request_id || '');
+            if (!currentRequestId) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: { message: 'request_id is required' } }));
+              return;
+            }
             try {
               this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
             } catch (authErr) {
@@ -153,6 +199,12 @@ export class GrpcServer {
             const bodyStr = Buffer.concat(chunks).toString('utf-8');
             const body = (bodyStr ? JSON.parse(bodyStr) : {}) as ExecuteRequest;
             const currentRequestId = String(body?.request_id || '');
+            if (!currentRequestId) {
+              res.statusCode = 400;
+              res.setHeader('Content-Type', 'application/json');
+              res.end(JSON.stringify({ error: { message: 'request_id is required' } }));
+              return;
+            }
             try {
               this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
             } catch (authErr) {
@@ -213,6 +265,7 @@ export class GrpcServer {
     const fastPath = this.opts.fastPathEnabled && this.opts.workers !== undefined;
     if (fastPath) {
       return await this.opts.executor.execute({
+        requestId: String(req?.request_id || ''),
         blueprintJson: String(req?.blueprint_json || '{}'),
         executionJson: String(req?.execution_json || '{}'),
         configJson: String(req?.config_json || '{}'),

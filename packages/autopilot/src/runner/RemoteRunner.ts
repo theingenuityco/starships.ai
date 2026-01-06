@@ -19,7 +19,11 @@ export class RemoteRunner implements Runner {
     this.authToken = cfg.remoteRunnerToken;
   }
 
-  async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {
+  runWithController(
+    blueprint: Blueprint,
+    execution: Execution,
+    config?: EngineConfig
+  ): { promise: Promise<ExecutionItem[]>; cancel: () => void } {
     const requestId = nanoid();
     const payload: Record<string, unknown> = {
       blueprint_json: JSON.stringify(blueprint),
@@ -31,8 +35,23 @@ export class RemoteRunner implements Runner {
     const headers: Record<string, string> = { 'Content-Type': 'application/json' };
     if (this.authToken) headers['Authorization'] = `Bearer ${this.authToken}`;
 
-    // If the caller provided an eventCallback, prefer SSE streaming endpoint
-    if (config?.eventCallback) {
+    const cancel = () => {
+      // Fire-and-forget: tell the runner to cancel the request by id.
+      // IMPORTANT: do NOT abort the ExecuteStream connection here; we want the runner to
+      // complete the stream gracefully with a 'completed' payload so the caller does not
+      // treat cancellation as a failure.
+      try {
+        void fetch(`${this.baseUrl}/runner.Runner/Cancel`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({ request_id: requestId }),
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+    };
+
+    const promise = (async (): Promise<ExecutionItem[]> => {
       const streamUrl = `${this.baseUrl}/runner.Runner/ExecuteStream`;
       const streamRes = await fetch(streamUrl, {
         method: 'POST',
@@ -47,17 +66,16 @@ export class RemoteRunner implements Runner {
       const decoder = new TextDecoder();
       let buffer = '';
       let finalResult: ExecutionItem[] | undefined = undefined;
-      let fatalStreamError: Error | undefined = undefined;
 
       type CompletedPayload = { duration_ms?: number; result_json?: string };
       type ErrorPayload = { error?: { message?: string } };
 
       const emit = async (name: 'message' | 'completed' | 'error', data: unknown) => {
         if (name === 'message') {
+          if (!config?.eventCallback) return;
           try {
-            await config.eventCallback!(data as AutopilotEvent);
+            await config.eventCallback(data as AutopilotEvent);
           } catch (e) {
-            // Non-fatal: don't let a bad consumer callback break execution
             console.error('[RemoteRunner] SSE event dispatch failed', e);
           }
           return;
@@ -70,13 +88,11 @@ export class RemoteRunner implements Runner {
           return;
         }
 
-        // name === 'error' must be fatal to the caller; do NOT swallow.
         const env = data as ErrorPayload;
         throw new Error(String(env?.error?.message || 'stream error'));
       };
 
       // Minimal SSE parser
-
       while (true) {
         const { value, done } = await reader.read();
         if (done) break;
@@ -87,7 +103,6 @@ export class RemoteRunner implements Runner {
           const raw = buffer.slice(0, idx);
           buffer = buffer.slice(idx + 2);
 
-          // parse single event block
           const lines = raw.split('\n');
           let eventName: 'message' | 'completed' | 'error' = 'message';
           let dataStr = '';
@@ -99,66 +114,35 @@ export class RemoteRunner implements Runner {
               } else {
                 eventName = 'message';
               }
-            } else if (line.startsWith('data:')) dataStr += line.slice(5).trim();
-          }
-          if (dataStr) {
-            let data: unknown;
-            try {
-              data = JSON.parse(dataStr);
-            } catch (e) {
-              // Non-fatal: malformed JSON in stream; log and keep parsing.
-              console.error('[RemoteRunner] SSE parse error', e);
-              continue;
-            }
-
-            try {
-              await emit(eventName, data);
-            } catch (e) {
-              // Important: 'error' events are fatal to the caller; do not swallow them.
-              if (eventName === 'error') {
-                fatalStreamError = e instanceof Error ? e : new Error(String(e));
-                try {
-                  await reader.cancel();
-                } catch {
-                  // ignore
-                }
-                break;
-              }
-              console.error('[RemoteRunner] SSE event handler error', e);
+            } else if (line.startsWith('data:')) {
+              dataStr += line.slice(5).trim();
             }
           }
+          if (!dataStr) continue;
 
-          if (fatalStreamError) break;
+          let data: unknown;
+          try {
+            data = JSON.parse(dataStr);
+          } catch (e) {
+            console.error('[RemoteRunner] SSE parse error', e);
+            continue;
+          }
+
+          await emit(eventName, data);
         }
-
-        if (fatalStreamError) break;
       }
 
-      if (fatalStreamError) {
-        throw fatalStreamError;
-      }
-
-      // If the stream ended without a completed payload, treat as an error.
-      // This prevents silent "success" with [] when the runner dies mid-stream.
       if (!Array.isArray(finalResult)) {
         throw new Error('Remote runner stream ended without a completed result');
       }
       return finalResult;
-    }
+    })();
 
-    // Non-streaming fallback
-    const execUrl = `${this.baseUrl}/runner.Runner/Execute`;
-    const res = await fetch(execUrl, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) {
-      const text = await res.text().catch(() => '');
-      throw new Error(`Remote runner error: ${res.status} ${res.statusText}${text ? ` - ${text}` : ''}`);
-    }
-    const body = (await res.json()) as { result_json?: string };
-    const result = body?.result_json ? JSON.parse(body.result_json) : undefined;
-    return Array.isArray(result) ? (result as ExecutionItem[]) : [];
+    return { promise, cancel };
+  }
+
+  async run(blueprint: Blueprint, execution: Execution, config?: EngineConfig): Promise<ExecutionItem[]> {
+    const ctl = this.runWithController(blueprint, execution, config);
+    return await ctl.promise;
   }
 }

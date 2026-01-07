@@ -376,18 +376,53 @@ export function ConversationMessageList({
       // Skip if already marked complete
       if (completedTurnIdsRef.current.has(messageId)) return
 
+      // Only process assistant messages (not tool_result messages)
+      if (message.role !== 'assistant' || message.messageType === 'tool_result') return
+
       // Check if this turn should be complete
       const isNotStreaming = !(message as any).streaming
       const isTurnBoundary = next?.role === 'user' || next === null
       const animationDone = isAnimationComplete(messageId)
       const hasChunks = Array.isArray(message.chunks) && message.chunks.length > 0
 
-      // A turn is complete if: assistant message, not streaming, at turn boundary, and (animation done OR never streamed)
-      if (message.role === 'assistant' && isNotStreaming && isTurnBoundary && (animationDone || !hasChunks)) {
+      // Check if all tool calls have completed
+      const toolCalls = (message as any).toolCalls || []
+      const toolResults = (message as any).toolResults || []
+      const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
+      const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
+      const allToolCallsDone = totalToolCalls === 0 || (totalToolCalls > 0 && completedToolResults >= totalToolCalls)
+
+      // Don't mark as complete if we're still awaiting tool results (for the last message)
+      const isLastMessage = idx === renderMessages.length - 1
+      const shouldWaitForToolResults = isLastMessage && isAwaitingToolResults
+
+      // Check if there are any more assistant messages in this turn after this one
+      // Look ahead to find the next user message, and check if there are any assistant messages between now and then
+      let hasMoreAssistantMessagesInTurn = false
+      if (!isTurnBoundary) {
+        // Look ahead through messages until we hit a user message or end
+        for (let i = idx + 1; i < renderMessages.length; i++) {
+          const futureMsg = renderMessages[i] as any
+          if (futureMsg.role === 'user') {
+            // Found the next turn, stop looking
+            break
+          }
+          if (futureMsg.role === 'assistant' && futureMsg.messageType !== 'tool_result') {
+            // Found another assistant message in this turn
+            hasMoreAssistantMessagesInTurn = true
+            break
+          }
+        }
+      }
+
+      // A turn is complete if: assistant message (not tool_result), not streaming, at turn boundary,
+      // (animation done OR never streamed), all tool calls are done, not awaiting tool results,
+      // and there are no more assistant messages in this turn
+      if (isNotStreaming && isTurnBoundary && (animationDone || !hasChunks) && allToolCallsDone && !shouldWaitForToolResults && !hasMoreAssistantMessagesInTurn) {
         completedTurnIdsRef.current.add(messageId)
       }
     })
-  }, [renderMessages])
+  }, [renderMessages, isAwaitingToolResults])
 
   // Component to render action buttons after a complete turn
   function TurnActionButtons({ turnMessages, turnId }: { turnMessages: MessageModel[]; turnId: string }) {
@@ -532,8 +567,14 @@ export function ConversationMessageList({
                   userAvatarUrlOverride={userAvatarUrlOverride}
                   userAvatarSeedOverride={userAvatarSeedOverride}
                   userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                  isAwaitingToolResults={isAwaitingToolResults}
+                  isLastMessage={idx === renderMessages.length - 1}
                 />
-                {isTurnEnd && turnMessages.length > 0 && <TurnActionButtons turnMessages={turnMessages} turnId={message.id} />}
+                {/* Only show buttons after the final assistant message of a complete turn (not tool_result messages or intermediate messages) */}
+                {/* Must be: marked as turn end, assistant message, not tool_result, at turn boundary (next is user or null), and have turn messages */}
+                {isTurnEnd && message.role === 'assistant' && message.messageType !== 'tool_result' && (next?.role === 'user' || next === null) && turnMessages.length > 0 && (
+                  <TurnActionButtons turnMessages={turnMessages} turnId={message.id} />
+                )}
               </Fragment>
             )
           })}
@@ -592,6 +633,8 @@ interface ConversationMessageBubbleProps {
   userAvatarUrlOverride?: string
   userAvatarSeedOverride?: string
   userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
+  isAwaitingToolResults?: boolean
+  isLastMessage?: boolean
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -651,6 +694,8 @@ const MemoizedMessageBubble = memo(
     userAvatarUrlOverride,
     userAvatarSeedOverride,
     userAvatarFallbackVariantOverride,
+    isAwaitingToolResults = false,
+    isLastMessage = false,
   }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
@@ -730,6 +775,8 @@ const MemoizedMessageBubble = memo(
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
+                isAwaitingToolResults={isAwaitingToolResults}
+                isLastMessage={isLastMessage}
               />
             </div>
           </div>

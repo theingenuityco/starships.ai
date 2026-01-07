@@ -49,6 +49,10 @@ interface MessageContentProps {
   // Attachments
   attachmentIds?: string[]
   starshipId?: string
+  // Whether we're awaiting tool results (for showing loading state)
+  isAwaitingToolResults?: boolean
+  // Whether this is the last message in the conversation
+  isLastMessage?: boolean
 }
 
 // Known widget types from public-docs
@@ -83,6 +87,8 @@ export function ConversationMessageContent({
   messageType,
   attachmentIds,
   starshipId,
+  isAwaitingToolResults = false,
+  isLastMessage = false,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
@@ -92,13 +98,31 @@ export function ConversationMessageContent({
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
-  const normalizedToolCalls = useMemo<LlmToolCall[]>(() => (Array.isArray(toolCalls) ? (toolCalls as unknown as LlmToolCall[]).filter(tc => typeof tc === 'object' && tc !== null) : []), [toolCalls])
+  // Also require function object to exist for meaningful rendering
+  const normalizedToolCalls = useMemo<LlmToolCall[]>(() => {
+    if (!Array.isArray(toolCalls)) return []
+    return (toolCalls as unknown as LlmToolCall[]).filter(tc => {
+      if (typeof tc !== 'object' || tc === null) return false
+      const tcAny = tc as any
+      // Require function object to exist for meaningful rendering
+      if (!tcAny?.function || typeof tcAny.function !== 'object') return false
+      // Keep if function.name exists OR id exists OR function.arguments exists
+      const hasFunctionName = tcAny.function?.name != null && String(tcAny.function.name).trim().length > 0
+      const hasId = tcAny?.id != null && String(tcAny.id).trim().length > 0
+      const hasArguments =
+        tcAny.function?.arguments != null &&
+        ((typeof tcAny.function.arguments === 'string' && tcAny.function.arguments.trim().length > 0) ||
+          (typeof tcAny.function.arguments === 'object' && Object.keys(tcAny.function.arguments).length > 0))
+      return hasFunctionName || hasId || hasArguments
+    })
+  }, [toolCalls])
 
   // Tool call header icon state handling
   const totalToolCalls = normalizedToolCalls.length
   const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
   const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
-  const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
+  // Show loading if: we have tool calls but not all results yet, OR we're awaiting tool results for this message
+  const hasPendingToolCalls = totalToolCalls > 0 && (completedToolResults < totalToolCalls || (isLastMessage && isAwaitingToolResults))
   const hasAnyToolCalls = totalToolCalls > 0
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)
@@ -629,7 +653,7 @@ export function ConversationMessageContent({
           {/* Tools panel: keep collapsed by default and preserve user toggle state */}
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+              {hasAnyToolCalls && hasPendingToolCalls ? (
                 <Icon name="loading" className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (
                 <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />

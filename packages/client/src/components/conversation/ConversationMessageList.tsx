@@ -89,7 +89,7 @@ export function ConversationMessageList({
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
-  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
+  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
   const agentName = agentNameOverride ?? agentObj?.name
   const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
@@ -120,7 +120,7 @@ export function ConversationMessageList({
     const seenIds = new Set<string>()
     const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
     for (const m of sortedMessages) {
-      const key = (m as any)?.id != null ? String((m as any).id) : null
+      const key = m.id != null ? String(m.id) : null
       if (key) {
         if (seenIds.has(key)) continue
         seenIds.add(key)
@@ -131,21 +131,45 @@ export function ConversationMessageList({
     // Collapse temp assistant shell followed by concrete assistant from server (UI-level safety if merging missed)
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
     for (let i = 0; i < uniqueMessages.length; i++) {
-      const cur: any = uniqueMessages[i]
+      const cur = uniqueMessages[i] as ExtendedMessage
 
       // 1) Collapse local temp assistant shell into the next concrete assistant
       if (cur?.role === 'assistant' && typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-')) {
-        const next: any = uniqueMessages[i + 1]
+        const next = uniqueMessages[i + 1] as ExtendedMessage | undefined
         if (next && next.role === 'assistant' && !(typeof next.id === 'string' && next.id.startsWith('temp-assistant-'))) {
-          const merged: any = { ...next }
+          const merged: ExtendedMessage = { ...next }
           if (Array.isArray(cur.chunks) && (!Array.isArray(merged.chunks) || merged.chunks.length === 0)) {
             merged.chunks = cur.chunks
           }
           if (Array.isArray(cur.reasoningChunks) && (!Array.isArray(merged.reasoningChunks) || merged.reasoningChunks.length === 0)) {
             merged.reasoningChunks = cur.reasoningChunks
           }
-          if ((merged as any).toolCalls == null || (merged as any).toolCalls.length === 0) {
-            ;(merged as any).toolCalls = cur.toolCalls
+          // Merge tool calls: combine arrays to preserve all tool calls from both messages
+          const curToolCalls = Array.isArray(cur.toolCalls) ? cur.toolCalls : []
+          const mergedToolCalls = Array.isArray(merged.toolCalls) ? merged.toolCalls : []
+          if (curToolCalls.length > 0 || mergedToolCalls.length > 0) {
+            // Combine tool calls, avoiding duplicates by ID
+            const toolCallMap = new Map<string, LlmToolCall>()
+            // First add merged tool calls
+            mergedToolCalls.forEach(tc => {
+              const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+              const id = tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+              if (id != null) {
+                toolCallMap.set(String(id), tc)
+              }
+            })
+            // Then add current tool calls (will overwrite if duplicate ID, but that's fine)
+            curToolCalls.forEach(tc => {
+              const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+              const id = tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+              if (id != null) {
+                toolCallMap.set(String(id), tc)
+              } else {
+                // If no ID, add it anyway (might be a partial tool call)
+                toolCallMap.set(`no-id-${toolCallMap.size}`, tc)
+              }
+            })
+            merged.toolCalls = Array.from(toolCallMap.values())
           }
           merged.streaming = cur.streaming || merged.streaming
           collapsedMessages.push(merged)
@@ -156,22 +180,29 @@ export function ConversationMessageList({
 
       // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or toolCalls).
       // Preserve if it's actively streaming (so caret can show) and only drop if non-streaming.
+      // IMPORTANT: Always preserve assistant messages with tool calls, even if they have no content
       if (cur?.role === 'assistant' && !(typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-'))) {
-        const streaming = Boolean((cur as any)?.streaming)
-        const hasContent = typeof cur?.content === 'string' && cur.content.trim().length > 0
-        const hasChunks = Array.isArray(cur?.chunks) && cur.chunks.length > 0
-        const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
-        const hasReasoning = typeof cur?.reasoning === 'string' && cur.reasoning.trim().length > 0
-        const hasToolCalls = Array.isArray(cur?.toolCalls) && cur.toolCalls.length > 0
-        const hasAttachments = Array.isArray((cur as any)?.attachmentIds) && (cur as any).attachmentIds.length > 0
+        const streaming = Boolean(cur.streaming)
+        const hasContent = typeof cur.content === 'string' && cur.content.trim().length > 0
+        const hasChunks = Array.isArray(cur.chunks) && cur.chunks.length > 0
+        const hasRChunks = Array.isArray(cur.reasoningChunks) && cur.reasoningChunks.length > 0
+        const hasReasoning = typeof cur.reasoning === 'string' && cur.reasoning.trim().length > 0
+        const hasToolCalls = Array.isArray(cur.toolCalls) && cur.toolCalls.length > 0
+        const hasAttachments = Array.isArray(cur.attachmentIds) && cur.attachmentIds.length > 0
 
-        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments)) {
+        // Always preserve assistant messages with tool calls, even if they have no other content
+        if (hasToolCalls) {
+          collapsedMessages.push(cur)
+          continue
+        }
+
+        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasAttachments)) {
           // Keep actively streaming assistant shells visible
           if (streaming) {
             collapsedMessages.push(cur)
             continue
           }
-          const next: any = uniqueMessages[i + 1]
+          const next = uniqueMessages[i + 1] as ExtendedMessage | undefined
           if (next && next.role === 'assistant') {
             // skip current blank shell; next will be processed/pushed in subsequent iterations
             continue
@@ -193,7 +224,8 @@ export function ConversationMessageList({
 
     baseMessages.forEach(msg => {
       if (msg.messageType === 'tool_result') {
-        const rid = (msg as any).toolCallId ?? (msg as any).call_id ?? (msg as any).id
+        const toolResultMsg = msg as ExtendedMessage & { toolCallId?: string; call_id?: string }
+        const rid = toolResultMsg.toolCallId ?? toolResultMsg.call_id ?? msg.id
         if (rid != null) {
           toolResultsMap.set(String(rid), msg)
         }
@@ -201,29 +233,39 @@ export function ConversationMessageList({
     })
 
     // Second pass: group messages and attach matching tool results
-    const groupedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }> = []
+    const groupedMessages: ExtendedMessage[] = []
 
     for (const message of baseMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
-      if (message.role === 'assistant' && (message as any).toolCalls?.length > 0) {
-        const toolCallIds = ((message as any).toolCalls || [])
-          .map((tc: any) => (tc as any).id ?? (tc as any).call_id ?? (tc as any).toolCallId ?? (tc as any).function?.id)
-          .filter(Boolean)
-          .map((id: any) => String(id))
-        const toolResults: any[] = []
+      const assistantMsg = message as ExtendedMessage
+      if (assistantMsg.role === 'assistant' && Array.isArray(assistantMsg.toolCalls) && assistantMsg.toolCalls.length > 0) {
+        const toolCallIds = assistantMsg.toolCalls
+          .map(tc => {
+            const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+            return tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+          })
+          .filter((id): id is string => id != null)
+          .map(id => String(id))
+        const toolResults: ExtendedMessage[] = []
 
-        // Collect all matching tool results
+        // Collect all matching tool results that haven't been processed yet
         for (const toolCallId of toolCallIds) {
           if (toolResultsMap.has(toolCallId)) {
             const result = toolResultsMap.get(toolCallId)
-            toolResults.push(result)
-            processedResultIds.add(result.id) // Mark as processed
+            if (result) {
+              // Only attach if this result hasn't been processed yet (to avoid attaching same result to multiple messages)
+              if (!processedResultIds.has(result.id)) {
+                toolResults.push(result)
+                processedResultIds.add(result.id) // Mark as processed
+              }
+            }
           }
         }
 
-        // Add the grouped message with tool results
+        // Always add assistant messages with tool calls, even if no results are attached yet
+        // This ensures tool calls are visible even when results haven't arrived
         groupedMessages.push({
-          ...message,
+          ...assistantMsg,
           toolResults,
         })
       }
@@ -241,13 +283,13 @@ export function ConversationMessageList({
     // NOTE: Do NOT treat toolResults alone as renderable; without toolCalls the tool panel won't show.
     const pruned = groupedMessages.filter(msg => {
       if (msg.role !== 'assistant' || msg.messageType === 'tool_result') return true
-      const a: any = msg as any
+      const extendedMsg = msg as ExtendedMessage
       const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
-      const hasChunks = Array.isArray(a?.chunks) && a.chunks.length > 0
-      const hasRChunks = Array.isArray(a?.reasoningChunks) && a.reasoningChunks.length > 0
-      const hasReasoning = typeof a?.reasoning === 'string' && a.reasoning.trim().length > 0
-      const hasToolCalls = Array.isArray(a?.toolCalls) && a.toolCalls.length > 0
-      const hasAttachments = Array.isArray(a?.attachmentIds) && a.attachmentIds.length > 0
+      const hasChunks = Array.isArray(extendedMsg.chunks) && extendedMsg.chunks.length > 0
+      const hasRChunks = Array.isArray(extendedMsg.reasoningChunks) && extendedMsg.reasoningChunks.length > 0
+      const hasReasoning = typeof extendedMsg.reasoning === 'string' && extendedMsg.reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray(extendedMsg.toolCalls) && extendedMsg.toolCalls.length > 0
+      const hasAttachments = Array.isArray(extendedMsg.attachmentIds) && extendedMsg.attachmentIds.length > 0
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments
     })
 
@@ -258,7 +300,8 @@ export function ConversationMessageList({
   const activeStreamingAssistantId = useMemo(() => {
     let lastId: string | null = null
     for (const m of displayMessages) {
-      if (m.role === 'assistant' && (m as any).streaming) {
+      const extendedMsg = m as ExtendedMessage
+      if (m.role === 'assistant' && extendedMsg.streaming) {
         lastId = m.id
       }
     }
@@ -273,16 +316,16 @@ export function ConversationMessageList({
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {
-    const canRenderAssistant = (msg: any) => {
+    const canRenderAssistant = (msg: ExtendedMessage) => {
       if (msg.role !== 'assistant') return true
       if (msg.messageType === 'tool_result') return true
       const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
       const hasChunks = Array.isArray(msg.chunks) && msg.chunks.length > 0
-      const hasRChunks = Array.isArray((msg as any)?.reasoningChunks) && (msg as any).reasoningChunks.length > 0
-      const hasReasoning = typeof (msg as any)?.reasoning === 'string' && (msg as any).reasoning.trim().length > 0
-      const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0
-      const hasToolResults = Array.isArray((msg as any)?.toolResults) && (msg as any).toolResults.length > 0
-      const hasAttachments = Array.isArray((msg as any)?.attachmentIds) && (msg as any).attachmentIds.length > 0
+      const hasRChunks = Array.isArray(msg.reasoningChunks) && msg.reasoningChunks.length > 0
+      const hasReasoning = typeof msg.reasoning === 'string' && msg.reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0
+      const hasToolResults = Array.isArray(msg.toolResults) && msg.toolResults.length > 0
+      const hasAttachments = Array.isArray(msg.attachmentIds) && msg.attachmentIds.length > 0
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments
     }
     return displayMessages.filter(canRenderAssistant)
@@ -292,7 +335,8 @@ export function ConversationMessageList({
   const activeRenderedStreamingAssistantId = useMemo(() => {
     let lastId: string | null = null
     for (const m of renderMessages) {
-      if (m.role === 'assistant' && (m as any).streaming) {
+      const extendedM = m as ExtendedMessage
+      if (m.role === 'assistant' && extendedM.streaming) {
         lastId = m.id
       }
     }
@@ -300,7 +344,7 @@ export function ConversationMessageList({
   }, [renderMessages])
 
   // "Progress key" for streaming: changes when chunks/tool results advance even if message count doesn't.
-  const lastRenderedMessage: any = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as any) : null
+  const lastRenderedMessage: ExtendedMessage | null = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as ExtendedMessage) : null
   const lastRenderedChunkTs = useMemo(() => {
     const chunks = lastRenderedMessage?.chunks
     if (Array.isArray(chunks) && chunks.length > 0) {
@@ -370,7 +414,7 @@ export function ConversationMessageList({
   // This runs after renderMessages is computed to avoid using it before declaration
   useEffect(() => {
     renderMessages.forEach((message, idx) => {
-      const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as any) : null
+      const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
       const messageId = message.id
 
       // Skip if already marked complete
@@ -380,14 +424,15 @@ export function ConversationMessageList({
       if (message.role !== 'assistant' || message.messageType === 'tool_result') return
 
       // Check if this turn should be complete
-      const isNotStreaming = !(message as any).streaming
+      const extendedMsg = message as ExtendedMessage
+      const isNotStreaming = !extendedMsg.streaming
       const isTurnBoundary = next?.role === 'user' || next === null
       const animationDone = isAnimationComplete(messageId)
-      const hasChunks = Array.isArray(message.chunks) && message.chunks.length > 0
+      const hasChunks = Array.isArray(extendedMsg.chunks) && extendedMsg.chunks.length > 0
 
       // Check if all tool calls have completed
-      const toolCalls = (message as any).toolCalls || []
-      const toolResults = (message as any).toolResults || []
+      const toolCalls = extendedMsg.toolCalls || []
+      const toolResults = extendedMsg.toolResults || []
       const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
       const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
       const allToolCallsDone = totalToolCalls === 0 || (totalToolCalls > 0 && completedToolResults >= totalToolCalls)
@@ -402,7 +447,7 @@ export function ConversationMessageList({
       if (!isTurnBoundary) {
         // Look ahead through messages until we hit a user message or end
         for (let i = idx + 1; i < renderMessages.length; i++) {
-          const futureMsg = renderMessages[i] as any
+          const futureMsg = renderMessages[i] as ExtendedMessage
           if (futureMsg.role === 'user') {
             // Found the next turn, stop looking
             break
@@ -445,7 +490,7 @@ export function ConversationMessageList({
           parts.push(`**User:**\n${msg.content || ''}`)
         } else if (msg.role === 'assistant') {
           const content = msg.content || ''
-          const reasoning = (msg as any).reasoning
+          const reasoning = (msg as ExtendedMessage).reasoning
           if (reasoning && typeof reasoning === 'string' && reasoning.trim()) {
             parts.push(`**Assistant (thinking):**\n${reasoning}`)
           }
@@ -529,8 +574,8 @@ export function ConversationMessageList({
       >
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
-            const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null
-            const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as any) : null
+            const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
+            const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
 
             // Check if this is the end of a complete turn
@@ -802,13 +847,13 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.content !== nextProps.message.content) return false
 
     // Re-render when reasoning text changes (server may replace aggregated with finalized)
-    const prevReasoning = (prevProps.message as any).reasoning
-    const nextReasoning = (nextProps.message as any).reasoning
+    const prevReasoning = (prevProps.message as ExtendedMessage).reasoning
+    const nextReasoning = (nextProps.message as ExtendedMessage).reasoning
     if (prevReasoning !== nextReasoning) return false
 
     // Re-render when reasoningChunks count changes (reasoning-first streaming)
-    const prevRChunks = (prevProps.message as any).reasoningChunks?.length ?? 0
-    const nextRChunks = (nextProps.message as any).reasoningChunks?.length ?? 0
+    const prevRChunks = (prevProps.message as ExtendedMessage).reasoningChunks?.length ?? 0
+    const nextRChunks = (nextProps.message as ExtendedMessage).reasoningChunks?.length ?? 0
     if (prevRChunks !== nextRChunks) return false
 
     // Re-render when content chunks count changes
@@ -817,8 +862,8 @@ const MemoizedMessageBubble = memo(
     if (prevChunks !== nextChunks) return false
 
     // Re-render when tool calls count changes
-    const prevCalls = (prevProps.message as any).toolCalls?.length ?? 0
-    const nextCalls = (nextProps.message as any).toolCalls?.length ?? 0
+    const prevCalls = (prevProps.message as ExtendedMessage).toolCalls?.length ?? 0
+    const nextCalls = (nextProps.message as ExtendedMessage).toolCalls?.length ?? 0
     if (prevCalls !== nextCalls) return false
 
     // Re-render when user overrides change (demo/internal chats)
@@ -829,8 +874,8 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
-    const prevToolResults = (prevProps.message as any).toolResults?.length ?? 0
-    const nextToolResults = (nextProps.message as any).toolResults?.length ?? 0
+    const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0
+    const nextToolResults = (nextProps.message as ExtendedMessage).toolResults?.length ?? 0
     if (prevToolResults !== nextToolResults) return false
 
     return true

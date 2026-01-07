@@ -240,11 +240,40 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // - Existing conversations (loaded directly via route) should show immediately.
   // - Newly created conversations should NOT abruptly flip layouts on the null->id handoff;
   //   wait until we have at least one message or the turn is responding.
+  // - When switching between existing conversations, keep messages area visible to avoid flashing starter screen.
   const initialHadConversationRef = useRef<boolean>(externalConversationId != null)
+  const hasEverShownMessagesRef = useRef<boolean>(externalConversationId != null)
   const stream = useConversationStreamContextOptional()
   const streamMessagesLen = Array.isArray((stream as any)?.messages) ? Number(((stream as any).messages as any[]).length) : 0
   const streamIsResponding = Boolean((stream as any)?.isResponding)
-  const showMessagesArea = Boolean(currentConversationId && (initialHadConversationRef.current || streamMessagesLen > 0 || streamIsResponding))
+  
+  // Check if current conversation exists in the conversations list (existing conversation, not newly created)
+  const isExistingConversation = useMemo(() => {
+    if (!currentConversationId || !starshipConversationsData?.conversations) return false
+    return starshipConversationsData.conversations.some(c => c.id === currentConversationId)
+  }, [currentConversationId, starshipConversationsData])
+  
+  // Show messages area if:
+  // 1. We have a conversation ID AND
+  // 2. (We initially had a conversation OR we've ever shown messages OR it's an existing conversation OR we have stream messages OR stream is responding)
+  const shouldShowMessages = Boolean(
+    currentConversationId && (
+      initialHadConversationRef.current || 
+      hasEverShownMessagesRef.current || 
+      isExistingConversation || 
+      streamMessagesLen > 0 || 
+      streamIsResponding
+    )
+  )
+  
+  // Track that we've shown messages area at least once
+  useEffect(() => {
+    if (shouldShowMessages) {
+      hasEverShownMessagesRef.current = true
+    }
+  }, [shouldShowMessages])
+  
+  const showMessagesArea = shouldShowMessages
 
   // Start docking immediately when messages area appears; allow welcome to fade concurrently
   useEffect(() => {

@@ -23,6 +23,8 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
+import { motion } from 'motion/react'
+import { staggerContainer, staggerItem } from '@/lib/animations'
 
 interface StreamChunk {
   content: string
@@ -370,6 +372,40 @@ export function ConversationMessageContent({
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
+  const extractMessageText = (): string => {
+    const container = messageContainerRef.current
+    if (!container) {
+      return displayContent
+    }
+
+    const textClone = container.cloneNode(true) as HTMLElement
+
+    // Remove UI elements
+    textClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
+
+    // Build plain text by traversing DOM and converting tables to markdown
+    const extractPlainText = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent || ''
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return ''
+      }
+      const element = node as HTMLElement
+
+      // Convert table wrapper to markdown (same as individual table copy)
+      if (element.classList?.contains('table-wrapper')) {
+        const table = element.querySelector('table')
+        return table ? '\n' + tableToMarkdown(table as HTMLTableElement) + '\n\n' : ''
+      }
+
+      // Recursively process child nodes
+      return Array.from(node.childNodes).map(extractPlainText).join('')
+    }
+
+    return extractPlainText(textClone).trim()
+  }
+
   const handleCopyContent = async () => {
     try {
       const container = messageContainerRef.current
@@ -423,6 +459,28 @@ export function ConversationMessageContent({
       toast.success('Message copied to clipboard')
     } catch (error) {
       toast.error('Failed to copy message')
+    }
+  }
+
+  const handleExportContent = () => {
+    try {
+      const messageText = extractMessageText()
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5) // Remove milliseconds and timezone
+      const filename = `message-${messageId.slice(0, 8)}-${timestamp}.md`
+
+      const blob = new Blob([messageText], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+
+      toast.success('Message exported successfully')
+    } catch (error) {
+      toast.error('Failed to export message')
     }
   }
 
@@ -519,9 +577,18 @@ export function ConversationMessageContent({
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
         {enableCopy && !isStreaming && (
-          <Button variant="ghost" size="icon" className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
-            <Icon name="copy" className="w-3 h-3" />
-          </Button>
+          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex justify-start items-center gap-1 mt-2 -mb-1">
+            <motion.div variants={staggerItem}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyContent} title="Copy message">
+                <Icon name="copy" className="w-3 h-3" />
+              </Button>
+            </motion.div>
+            <motion.div variants={staggerItem}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportContent} title="Export message">
+                <Icon name="download" className="w-3 h-3" />
+              </Button>
+            </motion.div>
+          </motion.div>
         )}
       </div>
     )
@@ -565,7 +632,7 @@ export function ConversationMessageContent({
 
       {/* Unified markdown rendering - message content at normal size */}
       {messageType !== 'tool_result' && (
-        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content', enableCopy && !isStreaming && 'pr-6')}>
+        <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {displayContent}
           </ReactMarkdown>
@@ -830,11 +897,20 @@ export function ConversationMessageContent({
         </Card>
       )}
 
-      {/* Copy button for entire message */}
+      {/* Action buttons for entire message - positioned at bottom left of message turn */}
       {enableCopy && !isStreaming && (
-        <Button variant="ghost" size="icon" className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
-          <Icon name="copy" className="w-3 h-3" />
-        </Button>
+        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex justify-start items-center gap-1 mt-2 -mb-1">
+          <motion.div variants={staggerItem}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyContent} title="Copy message">
+              <Icon name="copy" className="w-3 h-3" />
+            </Button>
+          </motion.div>
+          <motion.div variants={staggerItem}>
+            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportContent} title="Export message">
+              <Icon name="download" className="w-3 h-3" />
+            </Button>
+          </motion.div>
+        </motion.div>
       )}
     </div>
   )

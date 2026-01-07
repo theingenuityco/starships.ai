@@ -6,7 +6,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo } from 'react'
+import { useEffect, useMemo, useRef, memo, useState } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -16,6 +16,11 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { motion } from 'motion/react'
+import { staggerContainer, staggerItem } from '@/lib/animations'
+import { toast } from 'sonner'
+import { tableToMarkdown } from '@/components/markdown/markdownComponents'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -353,6 +358,105 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
+  // Component to render action buttons after a complete turn
+  function TurnActionButtons({ turnMessages, turnId }: { turnMessages: MessageModel[]; turnId: string }) {
+    const [shouldAnimateButtons, setShouldAnimateButtons] = useState<boolean>(true)
+    const hasRenderedButtonsRef = useRef<boolean>(false)
+
+    useEffect(() => {
+      setShouldAnimateButtons(true)
+      hasRenderedButtonsRef.current = false
+    }, [turnId])
+
+    useEffect(() => {
+      if (shouldAnimateButtons && !hasRenderedButtonsRef.current) {
+        const timer = setTimeout(() => {
+          hasRenderedButtonsRef.current = true
+          setShouldAnimateButtons(false)
+        }, 50)
+        return () => clearTimeout(timer)
+      }
+    }, [shouldAnimateButtons])
+
+    const extractTurnText = (): string => {
+      const parts: string[] = []
+      for (const msg of turnMessages) {
+        if (msg.role === 'user') {
+          parts.push(`**User:**\n${msg.content || ''}`)
+        } else if (msg.role === 'assistant') {
+          const content = msg.content || ''
+          const reasoning = (msg as any).reasoning
+          if (reasoning && typeof reasoning === 'string' && reasoning.trim()) {
+            parts.push(`**Assistant (thinking):**\n${reasoning}`)
+          }
+          if (content.trim()) {
+            parts.push(`**Assistant:**\n${content}`)
+          }
+        }
+      }
+      return parts.join('\n\n')
+    }
+
+    const handleCopyTurn = async () => {
+      try {
+        const turnText = extractTurnText()
+        await navigator.clipboard.writeText(turnText)
+        toast.success('Turn copied to clipboard')
+      } catch (error) {
+        toast.error('Failed to copy turn')
+      }
+    }
+
+    const handleExportTurn = () => {
+      try {
+        const turnText = extractTurnText()
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+        const filename = `turn-${turnId.slice(0, 8)}-${timestamp}.md`
+
+        const blob = new Blob([turnText], { type: 'text/markdown' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+
+        toast.success('Turn exported successfully')
+      } catch (error) {
+        toast.error('Failed to export turn')
+      }
+    }
+
+    return (
+      <div className="flex justify-start">
+        <div className="flex items-start gap-3 w-full">
+          {/* Spacer to match avatar width */}
+          <div className="flex-shrink-0 w-8 h-8" aria-hidden="true" />
+          <motion.div
+            key={`turn-buttons-${turnId}`}
+            variants={staggerContainer}
+            initial={shouldAnimateButtons ? 'hidden' : 'visible'}
+            animate="visible"
+            className="flex items-center gap-1 mt-2 mb-4"
+          >
+        <motion.div variants={staggerItem}>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTurn} title="Copy turn">
+            <Icon name="copy" className="w-3 h-3" />
+          </Button>
+        </motion.div>
+        <motion.div variants={staggerItem}>
+          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportTurn} title="Export turn">
+            <Icon name="download" className="w-3 h-3" />
+          </Button>
+        </motion.div>
+      </motion.div>
+        </div>
+      </div>
+    )
+  }
+
   if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
@@ -372,22 +476,51 @@ export function ConversationMessageList({
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null
+            const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as any) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+            
+            // Detect if this is the end of a complete turn
+            // A turn ends when: current message is assistant AND (next is user OR this is the last message) AND not streaming
+            const isTurnEnd = 
+              message.role === 'assistant' && 
+              !(message as any).streaming &&
+              (next?.role === 'user' || next === null) &&
+              !isResponding &&
+              !isAssistantStreaming
+            
+            // Find the start of this turn (the user message before this assistant message)
+            const turnStartIdx = message.role === 'assistant' 
+              ? renderMessages.slice(0, idx + 1).findLastIndex((m: any) => m.role === 'user')
+              : -1
+            
+            const turnMessages = turnStartIdx >= 0 
+              ? renderMessages.slice(turnStartIdx, idx + 1)
+              : []
+            
             return (
-              <MemoizedMessageBubble
-                key={message.id}
-                message={message}
-                agentName={message.agentName || agentName}
-                agentAvatarUrl={agentAvatarUrl}
-                isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                starshipId={starshipId}
-                showAssistantAvatar={showAssistantAvatar}
-                userNameOverride={userNameOverride}
-                userEmailOverride={userEmailOverride}
-                userAvatarUrlOverride={userAvatarUrlOverride}
-                userAvatarSeedOverride={userAvatarSeedOverride}
-                userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
-              />
+              <>
+                <MemoizedMessageBubble
+                  key={message.id}
+                  message={message}
+                  agentName={message.agentName || agentName}
+                  agentAvatarUrl={agentAvatarUrl}
+                  isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                  starshipId={starshipId}
+                  showAssistantAvatar={showAssistantAvatar}
+                  userNameOverride={userNameOverride}
+                  userEmailOverride={userEmailOverride}
+                  userAvatarUrlOverride={userAvatarUrlOverride}
+                  userAvatarSeedOverride={userAvatarSeedOverride}
+                  userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                />
+                {isTurnEnd && turnMessages.length > 0 && (
+                  <TurnActionButtons
+                    key={`turn-buttons-${message.id}`}
+                    turnMessages={turnMessages}
+                    turnId={message.id}
+                  />
+                )}
+              </>
             )
           })}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}

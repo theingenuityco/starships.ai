@@ -23,8 +23,6 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
-import { motion } from 'motion/react'
-import { staggerContainer, staggerItem } from '@/lib/animations'
 
 interface StreamChunk {
   content: string
@@ -576,20 +574,6 @@ export function ConversationMessageContent({
           {displayContent}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
-        {enableCopy && !isStreaming && (
-          <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex justify-start items-center gap-1 mt-2 -mb-1">
-            <motion.div variants={staggerItem}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyContent} title="Copy message">
-                <Icon name="copy" className="w-3 h-3" />
-              </Button>
-            </motion.div>
-            <motion.div variants={staggerItem}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportContent} title="Export message">
-                <Icon name="download" className="w-3 h-3" />
-              </Button>
-            </motion.div>
-          </motion.div>
-        )}
       </div>
     )
   }
@@ -895,22 +879,6 @@ export function ConversationMessageContent({
             <code>{JSON.stringify(parsedJson, null, 2)}</code>
           </pre>
         </Card>
-      )}
-
-      {/* Action buttons for entire message - positioned at bottom left of message turn */}
-      {enableCopy && !isStreaming && (
-        <motion.div variants={staggerContainer} initial="hidden" animate="visible" className="flex justify-start items-center gap-1 mt-2 -mb-1">
-          <motion.div variants={staggerItem}>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyContent} title="Copy message">
-              <Icon name="copy" className="w-3 h-3" />
-            </Button>
-          </motion.div>
-          <motion.div variants={staggerItem}>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportContent} title="Export message">
-              <Icon name="download" className="w-3 h-3" />
-            </Button>
-          </motion.div>
-        </motion.div>
       )}
     </div>
   )

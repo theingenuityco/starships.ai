@@ -57,13 +57,31 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   // Reserve space even when loading to prevent layout shift
   if (!conversationId || !currentConversation) {
     return (
-      <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md" style={{ minHeight: '72px' }}>
+      <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
         <div className="px-4 py-3.5">
           <div className="max-w-4xl mx-auto">
             <div className="flex items-center justify-between gap-4">
+              {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
-                <div className="h-6 w-48 bg-muted/30 rounded animate-pulse" />
-                <div className="h-4 w-32 bg-muted/20 rounded" />
+                {/* Title - exact match */}
+                <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">
+                  <span className="opacity-50">Loading...</span>
+                </h3>
+                {/* Agents + updated row - exact structural match with same classes */}
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                  {/* Agent placeholder - matches exact structure */}
+                  <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                    <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                      <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                    </Avatar>
+                    <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                  </div>
+                  {/* Separator and updated text - exact match */}
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                    <span className="font-medium leading-none opacity-50">Updated just now</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -6,7 +6,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState } from 'react'
+import { useEffect, useMemo, useRef, memo, useState, Fragment } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -21,6 +21,7 @@ import { motion } from 'motion/react'
 import { staggerContainer, staggerItem } from '@/lib/animations'
 import { toast } from 'sonner'
 import { tableToMarkdown } from '@/components/markdown/markdownComponents'
+import { isAnimationComplete } from '@/hooks/useMessageAnimationState'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -102,6 +103,13 @@ export function ConversationMessageList({
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
   const SCROLL_THRESHOLD_PX = 120
+
+  // Track which turns have been marked as complete (to prevent flickering)
+  // Once a turn is complete, its buttons should always be shown
+  const completedTurnIdsRef = useRef<Set<string>>(new Set())
+
+  // Track which turns have already animated their buttons (to prevent re-animation)
+  const animatedTurnIdsRef = useRef<Set<string>>(new Set())
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
@@ -358,25 +366,42 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
+  // Effect to mark turns as complete when they meet the criteria
+  // This runs after renderMessages is computed to avoid using it before declaration
+  useEffect(() => {
+    renderMessages.forEach((message, idx) => {
+      const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as any) : null
+      const messageId = message.id
+
+      // Skip if already marked complete
+      if (completedTurnIdsRef.current.has(messageId)) return
+
+      // Check if this turn should be complete
+      const isNotStreaming = !(message as any).streaming
+      const isTurnBoundary = next?.role === 'user' || next === null
+      const animationDone = isAnimationComplete(messageId)
+      const hasChunks = Array.isArray(message.chunks) && message.chunks.length > 0
+
+      // A turn is complete if: assistant message, not streaming, at turn boundary, and (animation done OR never streamed)
+      if (message.role === 'assistant' && isNotStreaming && isTurnBoundary && (animationDone || !hasChunks)) {
+        completedTurnIdsRef.current.add(messageId)
+      }
+    })
+  }, [renderMessages])
+
   // Component to render action buttons after a complete turn
   function TurnActionButtons({ turnMessages, turnId }: { turnMessages: MessageModel[]; turnId: string }) {
-    const [shouldAnimateButtons, setShouldAnimateButtons] = useState<boolean>(true)
-    const hasRenderedButtonsRef = useRef<boolean>(false)
-
-    useEffect(() => {
-      setShouldAnimateButtons(true)
-      hasRenderedButtonsRef.current = false
-    }, [turnId])
-
-    useEffect(() => {
-      if (shouldAnimateButtons && !hasRenderedButtonsRef.current) {
-        const timer = setTimeout(() => {
-          hasRenderedButtonsRef.current = true
-          setShouldAnimateButtons(false)
-        }, 50)
-        return () => clearTimeout(timer)
+    // Initialize state based on whether this turn has already been animated
+    // Once a turn is marked as animated, it will never animate again (even on re-renders)
+    const [shouldAnimateButtons] = useState<boolean>(() => {
+      const alreadyAnimated = animatedTurnIdsRef.current.has(turnId)
+      if (!alreadyAnimated) {
+        // Mark as animated immediately to prevent re-animation on future renders
+        animatedTurnIdsRef.current.add(turnId)
+        return true
       }
-    }, [shouldAnimateButtons])
+      return false
+    })
 
     const extractTurnText = (): string => {
       const parts: string[] = []
@@ -434,24 +459,18 @@ export function ConversationMessageList({
         <div className="flex items-start gap-3 w-full">
           {/* Spacer to match avatar width */}
           <div className="flex-shrink-0 w-8 h-8" aria-hidden="true" />
-          <motion.div
-            key={`turn-buttons-${turnId}`}
-            variants={staggerContainer}
-            initial={shouldAnimateButtons ? 'hidden' : 'visible'}
-            animate="visible"
-            className="flex items-center gap-1 mt-2 mb-4"
-          >
-        <motion.div variants={staggerItem}>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTurn} title="Copy turn">
-            <Icon name="copy" className="w-3 h-3" />
-          </Button>
-        </motion.div>
-        <motion.div variants={staggerItem}>
-          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportTurn} title="Export turn">
-            <Icon name="download" className="w-3 h-3" />
-          </Button>
-        </motion.div>
-      </motion.div>
+          <motion.div key={`turn-buttons-${turnId}`} variants={staggerContainer} initial={shouldAnimateButtons ? 'hidden' : 'visible'} animate="visible" className="flex items-center gap-2 mt-4 mb-4">
+            <motion.div variants={staggerItem}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTurn} title="Copy turn">
+                <Icon name="copy" className="w-3 h-3" />
+              </Button>
+            </motion.div>
+            <motion.div variants={staggerItem}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportTurn} title="Export turn">
+                <Icon name="download" className="w-3 h-3" />
+              </Button>
+            </motion.div>
+          </motion.div>
         </div>
       </div>
     )
@@ -478,29 +497,30 @@ export function ConversationMessageList({
             const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null
             const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as any) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
-            
-            // Detect if this is the end of a complete turn
-            // A turn ends when: current message is assistant AND (next is user OR this is the last message) AND not streaming
-            const isTurnEnd = 
-              message.role === 'assistant' && 
-              !(message as any).streaming &&
-              (next?.role === 'user' || next === null) &&
-              !isResponding &&
-              !isAssistantStreaming
-            
+
+            // Check if this is the end of a complete turn
+            // Once a turn is marked as complete (via useEffect), always show its buttons (prevents flickering)
+            const messageId = message.id
+            const isTurnEnd = completedTurnIdsRef.current.has(messageId)
+
             // Find the start of this turn (the user message before this assistant message)
-            const turnStartIdx = message.role === 'assistant' 
-              ? renderMessages.slice(0, idx + 1).findLastIndex((m: any) => m.role === 'user')
-              : -1
-            
-            const turnMessages = turnStartIdx >= 0 
-              ? renderMessages.slice(turnStartIdx, idx + 1)
-              : []
-            
+            // Use a reverse loop since findLastIndex is not available in older TypeScript targets
+            const turnStartIdx =
+              message.role === 'assistant'
+                ? (() => {
+                    const slice = renderMessages.slice(0, idx + 1)
+                    for (let i = slice.length - 1; i >= 0; i--) {
+                      if (slice[i].role === 'user') return i
+                    }
+                    return -1
+                  })()
+                : -1
+
+            const turnMessages = turnStartIdx >= 0 ? renderMessages.slice(turnStartIdx, idx + 1) : []
+
             return (
-              <>
+              <Fragment key={message.id}>
                 <MemoizedMessageBubble
-                  key={message.id}
                   message={message}
                   agentName={message.agentName || agentName}
                   agentAvatarUrl={agentAvatarUrl}
@@ -513,14 +533,8 @@ export function ConversationMessageList({
                   userAvatarSeedOverride={userAvatarSeedOverride}
                   userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
                 />
-                {isTurnEnd && turnMessages.length > 0 && (
-                  <TurnActionButtons
-                    key={`turn-buttons-${message.id}`}
-                    turnMessages={turnMessages}
-                    turnId={message.id}
-                  />
-                )}
-              </>
+                {isTurnEnd && turnMessages.length > 0 && <TurnActionButtons turnMessages={turnMessages} turnId={message.id} />}
+              </Fragment>
             )
           })}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}

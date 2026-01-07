@@ -743,7 +743,88 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastChunkSig = lastChunkAny?.type ? String(lastChunkAny.type) : 'none'
   const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
 
-  const computedMessages = useMemo(() => chunks.reduce(reduceMessages, [] as ClientMessage[]), [chunksRevisionKey])
+  // Queue for message.append chunks that are delayed due to animation
+  const queuedAppendChunksRef = useRef<StreamedChunk[]>([])
+  const processedChunksRef = useRef<StreamedChunk[]>([])
+
+  // Filter chunks to delay message.append until animation completes
+  const filteredChunks = useMemo(() => {
+    const processed: StreamedChunk[] = []
+    const queued: StreamedChunk[] = []
+    
+    for (const chunk of chunks) {
+      if (chunk.type === 'message.append') {
+        const msg = (chunk as any).data?.message
+        if (msg?.role === 'assistant') {
+          // Check if previous assistant message animation is complete
+          const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
+          const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
+          const lastAssistantId = getLastAssistantMessageId(currentMessages)
+          if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
+            // Queue this chunk for later processing
+            queued.push(chunk)
+            continue
+          }
+        }
+      }
+      processed.push(chunk)
+    }
+    
+    // Store queued chunks
+    queuedAppendChunksRef.current = [...queuedAppendChunksRef.current, ...queued]
+    processedChunksRef.current = processed
+    
+    return processed
+  }, [chunksRevisionKey])
+
+  // Process queued chunks when animation completes
+  useEffect(() => {
+    if (queuedAppendChunksRef.current.length === 0) return
+    
+    const processQueued = () => {
+      const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
+      const currentMessages = processedChunksRef.current.reduce(reduceMessages, [] as ClientMessage[])
+      const lastAssistantId = getLastAssistantMessageId(currentMessages)
+      
+      if (!lastAssistantId || isAnimationComplete(lastAssistantId)) {
+        // Animation complete, add queued chunks to the query data
+        const queued = queuedAppendChunksRef.current.splice(0)
+        if (queued.length > 0 && conversationId) {
+          queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
+            if (!Array.isArray(old)) return old
+            return [...old, ...queued]
+          })
+        }
+        return true
+      }
+      return false
+    }
+    
+    // Try processing immediately
+    if (!processQueued()) {
+      // If not ready, set up callback for when animation completes
+      const { addPendingAppendCallback, removePendingAppendCallback } = require('./useMessageAnimationState')
+      const callback = () => {
+        processQueued()
+      }
+      addPendingAppendCallback(callback)
+      
+      // Also poll periodically as fallback
+      const intervalId = setInterval(() => {
+        if (processQueued()) {
+          clearInterval(intervalId)
+          removePendingAppendCallback(callback)
+        }
+      }, 100) // Check every 100ms
+      
+      return () => {
+        clearInterval(intervalId)
+        removePendingAppendCallback(callback)
+      }
+    }
+  }, [filteredChunks, conversationId, queryClient])
+
+  const computedMessages = useMemo(() => filteredChunks.reduce(reduceMessages, [] as ClientMessage[]), [filteredChunks])
   const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
   const isAwaitingToolResults = turnState.status === 'waiting_for_tools'

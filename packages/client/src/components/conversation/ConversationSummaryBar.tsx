@@ -6,7 +6,7 @@ import { useStarshipConversations, useConversationAgents } from '@/hooks/useConv
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { motion } from 'motion/react'
-import { useMemo } from 'react'
+import { useMemo, useEffect, useRef } from 'react'
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
@@ -44,8 +44,32 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   // This helps coordinate the animation when transitioning from starter page
   const animationKey = useMemo(() => conversationId || 'none', [conversationId])
 
+  // Track if this is the initial mount to prevent animation on page reload
+  const isInitialMountRef = useRef(true)
+  useEffect(() => {
+    // Mark initial mount as complete after a short delay
+    const timer = setTimeout(() => {
+      isInitialMountRef.current = false
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Reserve space even when loading to prevent layout shift
   if (!conversationId || !currentConversation) {
-    return null
+    return (
+      <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md" style={{ minHeight: '72px' }}>
+        <div className="px-4 py-3.5">
+          <div className="max-w-4xl mx-auto">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+                <div className="h-6 w-48 bg-muted/30 rounded animate-pulse" />
+                <div className="h-4 w-32 bg-muted/20 rounded" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const title = currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`
@@ -69,13 +93,17 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   return (
     <motion.div
       key={animationKey}
-      initial={{ opacity: 0, y: -20 }}
+      initial={isInitialMountRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{
-        duration: 0.5,
-        delay: 0.1,
-        ease: [0.25, 0.46, 0.45, 0.94],
-      }}
+      transition={
+        isInitialMountRef.current
+          ? { duration: 0 }
+          : {
+              duration: 0.5,
+              delay: 0.1,
+              ease: [0.25, 0.46, 0.45, 0.94],
+            }
+      }
       className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
     >
       <div className="px-4 py-3.5">

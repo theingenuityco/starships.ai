@@ -24,11 +24,11 @@ interface ConversationAgent {
 
 export function ConversationSummaryBar({ conversationId, starshipId }: ConversationSummaryBarProps) {
   // Fetch all conversations to get the current one's details
-  const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
+  const { data: starshipConversationsData, isLoading: isLoadingConversations } = useStarshipConversations(starshipId || '', true)
   const currentConversation = starshipConversationsData?.conversations?.find(c => c.id === conversationId)
 
   // Derive agents for this conversation (same source as the left navigation list)
-  const { data: convAgents = [] } = useConversationAgents(conversationId)
+  const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
   const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
   const maxToShow = 4
   const visibleAgents = agents.slice(0, maxToShow)
@@ -37,8 +37,13 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   const avatarAttachmentIds = useMemo(() => {
     return visibleAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
   }, [visibleAgents])
-  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const hasAvatarIds = avatarAttachmentIds.length > 0
+  const { data: avatarAttachments = [], isLoading: isLoadingAvatars } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  // Only render actual header when all data is ready to prevent layout shifts
+  // If there are no avatars to load, don't wait for avatar loading
+  const isDataReady = !isLoadingConversations && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
 
   // Use a key based on conversationId to ensure smooth remount animations
   // This helps coordinate the animation when transitioning from starter page
@@ -55,14 +60,15 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   }, [])
 
   // Reserve space even when loading to prevent layout shift
-  if (!conversationId || !currentConversation) {
+  // Show placeholder if: no conversationId, no currentConversation, or data is still loading
+  if (!conversationId || !isDataReady) {
     return (
       <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
-        <div className="px-4 py-3.5">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-between gap-4">
-              {/* Title and metadata (stacked) - exact structural match */}
-              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+      <div className="px-4 py-3.5">
+        <div className="max-w-4xl">
+          <div className="flex items-center justify-between gap-4">
+            {/* Title and metadata (stacked) - exact structural match */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 {/* Title - exact match */}
                 <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">
                   <span className="opacity-50">Loading...</span>
@@ -125,7 +131,7 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
       className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
     >
       <div className="px-4 py-3.5">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">

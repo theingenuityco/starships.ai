@@ -40,6 +40,10 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
+  // Use a key based on conversationId to ensure smooth remount animations
+  // This helps coordinate the animation when transitioning from starter page
+  const animationKey = useMemo(() => conversationId || 'none', [conversationId])
+
   if (!conversationId || !currentConversation) {
     return null
   }
@@ -64,9 +68,14 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10 }}
+      key={animationKey}
+      initial={{ opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
+      transition={{
+        duration: 0.5,
+        delay: 0.1,
+        ease: [0.25, 0.46, 0.45, 0.94],
+      }}
       className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
     >
       <div className="px-4 py-3.5">

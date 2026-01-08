@@ -836,6 +836,13 @@ const MemoizedMessageBubble = memo(
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     if (isUser) {
+      // When the "user" is being overridden to represent an agent (e.g. Aria in landing demos),
+      // prefer an explicitly-provided avatar URL (if any). Otherwise fall back to the seeded agent avatar.
+      // Never fall back to the signed-in user's avatar when a seed override is present.
+      const explicitUserAvatarUrl = userAvatarUrlOverride
+      const shouldUseExplicitUserAvatar = isImageUrl(explicitUserAvatarUrl)
+      const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
+
       // User message: Neutral bubble on the right
       return (
         <div className="flex justify-end">
@@ -854,9 +861,17 @@ const MemoizedMessageBubble = memo(
               </div>
             </div>
             <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
-              {userAvatarSeedOverride ? (
+              {shouldUseExplicitUserAvatar ? (
+                <AvatarImage
+                  src={explicitUserAvatarUrl!}
+                  alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                  referrerPolicy="no-referrer"
+                  crossOrigin="anonymous"
+                  className="rounded-full object-cover"
+                />
+              ) : userAvatarSeedOverride ? (
                 <AgentAvatar seed={userAvatarSeedOverride} size={32} />
-              ) : isImageUrl(effectiveUserAvatar) ? (
+              ) : shouldUseAuthedUserAvatar ? (
                 <AvatarImage
                   src={effectiveUserAvatar!}
                   alt={effectiveUserName || effectiveUserEmail || 'User avatar'}

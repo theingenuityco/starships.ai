@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import { useAgentTemplates } from '@/hooks/useTemplates'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
 type DemoMessage = {
@@ -78,7 +79,7 @@ const DEMO_CONVERSATIONS: Record<
     userIsAgent: boolean
   }
 > = {
-  main: { id: 'main', label: 'Aria ↔ You', leftAgentName: 'Aria', leftAgentSeed: 'Aria', rightUserLabel: 'You', rightUserSeed: 'You', userIsAgent: false },
+  main: { id: 'main', label: 'You ↔ Aria', leftAgentName: 'Aria', leftAgentSeed: 'Aria', rightUserLabel: 'You', rightUserSeed: 'You', userIsAgent: false },
   gaia: { id: 'gaia', label: 'Aria ↔ Gaia', leftAgentName: 'Gaia', leftAgentSeed: 'Gaia', rightUserLabel: 'Aria', rightUserSeed: 'Aria', userIsAgent: true },
   daedalus: {
     id: 'daedalus',
@@ -366,11 +367,17 @@ const DEMO_TIMELINE: DemoStep[] = [
     agentName: 'Aria',
     noStream: true,
     content:
-      "✅ Scheduled **every Friday**\n✅ Posts **features + fixes** to **#announcements**\n✅ **Approval required** before publishing\n\nNext step: connect GitHub + Discord, then click **Deploy**.",
+      "- ✅ Scheduled **every Friday**\n- ✅ Posts **features + fixes** to **#announcements**\n- ✅ **Approval required** before publishing\n\nNext step: connect GitHub + Discord, then click **Deploy**.",
   },
 ]
 
 export default function DelegationDemo() {
+  const { data: ariaTemplates = [] } = useAgentTemplates({ search: 'aria' })
+  const ariaAvatarUrl = useMemo(() => {
+    const aria = ariaTemplates.find(t => t.slug === 'aria' || t.name === 'Aria')
+    return aria?.avatarUrl
+  }, [ariaTemplates])
+
   const [activeDemoConvoId, setActiveDemoConvoId] = useState<DemoConvoId>('main')
   const [demoByConvo, setDemoByConvo] = useState<Record<DemoConvoId, DemoMessage[]>>({ main: [], gaia: [], daedalus: [] })
   const [respondingByConvo, setRespondingByConvo] = useState<Record<DemoConvoId, boolean>>({ main: false, gaia: false, daedalus: false })
@@ -511,8 +518,10 @@ export default function DelegationDemo() {
 
             for (const part of parts) {
               if (cancelled || abortController.signal.aborted) return
+              // IMPORTANT: `ConversationMessageContent.aggregateStreamChunks` treats `position` as a
+              // cumulative character position (not a chunk index).
+              position += part.length
               chunks = [...chunks, { content: part, position, timestamp: Date.now() }]
-              position += 1
               updateMessage(step.convoId, id, { chunks, streaming: true })
               await sleep(70)
             }
@@ -662,7 +671,7 @@ export default function DelegationDemo() {
                       <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.main.label}</div>
                       <div className="mt-1 flex items-center gap-2 min-w-0">
                         <div className="text-xs text-muted-foreground truncate">
-                          {DEMO_CONVERSATIONS.main.leftAgentName}, {DEMO_CONVERSATIONS.main.rightUserLabel} · Delegator conversation
+                          {DEMO_CONVERSATIONS.main.rightUserLabel}, {DEMO_CONVERSATIONS.main.leftAgentName} · Delegator conversation
                         </div>
                       </div>
                     </div>
@@ -677,6 +686,7 @@ export default function DelegationDemo() {
                       conversationId={null}
                       messagesOverride={(demoByConvo.main || []) as any}
                       agentNameOverride={DEMO_CONVERSATIONS.main.leftAgentName}
+                      agentAvatarUrlOverride={ariaAvatarUrl}
                       isRespondingOverride={(respondingByConvo.main || false) || (awaitingToolsByConvo.main || false)}
                       isAssistantStreamingOverride={respondingByConvo.main || false}
                       isAwaitingToolResultsOverride={awaitingToolsByConvo.main || false}
@@ -744,6 +754,7 @@ export default function DelegationDemo() {
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.gaia || false}
                         bottomPaddingPx={90}
                         userNameOverride={DEMO_CONVERSATIONS.gaia.rightUserLabel}
+                      userAvatarUrlOverride={ariaAvatarUrl}
                         userAvatarSeedOverride={DEMO_CONVERSATIONS.gaia.rightUserSeed}
                       />
                     </div>
@@ -804,6 +815,7 @@ export default function DelegationDemo() {
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.daedalus || false}
                         bottomPaddingPx={90}
                         userNameOverride={DEMO_CONVERSATIONS.daedalus.rightUserLabel}
+                      userAvatarUrlOverride={ariaAvatarUrl}
                         userAvatarSeedOverride={DEMO_CONVERSATIONS.daedalus.rightUserSeed}
                       />
                     </div>

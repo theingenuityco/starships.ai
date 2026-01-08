@@ -1,9 +1,10 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
+import { useAgentTemplates } from '@/hooks/useTemplates'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
 type DemoMessage = {
@@ -20,7 +21,59 @@ type DemoMessage = {
   toolCallId?: string
 }
 
-type ConvoId = 'aria' | 'doc_organizer' | 'lead_generator'
+type ConvoId = 'aria' | 'iris' | 'saga'
+
+type ConvoFlags = {
+  responding: boolean
+  awaitingTools: boolean
+  isRunning: boolean
+  hasRun: boolean
+}
+
+type ConvoFlagsByConvo = Record<ConvoId, ConvoFlags>
+
+const INITIAL_CONVO_FLAGS: ConvoFlagsByConvo = {
+  aria: { responding: false, awaitingTools: false, isRunning: false, hasRun: false },
+  iris: { responding: false, awaitingTools: false, isRunning: false, hasRun: false },
+  saga: { responding: false, awaitingTools: false, isRunning: false, hasRun: false },
+}
+
+type ConvoFlagsAction =
+  | { type: 'patch'; convoId: ConvoId; patch: Partial<ConvoFlags> }
+  | { type: 'reset'; convoId: ConvoId }
+
+function convoFlagsReducer(state: ConvoFlagsByConvo, action: ConvoFlagsAction): ConvoFlagsByConvo {
+  switch (action.type) {
+    case 'patch': {
+      const prev = state[action.convoId]
+      const next = { ...prev, ...action.patch }
+      if (
+        prev.responding === next.responding &&
+        prev.awaitingTools === next.awaitingTools &&
+        prev.isRunning === next.isRunning &&
+        prev.hasRun === next.hasRun
+      ) {
+        return state
+      }
+      return { ...state, [action.convoId]: next }
+    }
+    case 'reset': {
+      const prev = state[action.convoId]
+      const next: ConvoFlags = { ...prev, responding: false, awaitingTools: false, isRunning: false }
+      if (
+        prev.responding === next.responding &&
+        prev.awaitingTools === next.awaitingTools &&
+        prev.isRunning === next.isRunning &&
+        prev.hasRun === next.hasRun
+      ) {
+        return state
+      }
+      return { ...state, [action.convoId]: next }
+    }
+    default:
+      return state
+  }
+}
 
 type ConvoConfig = {
   id: ConvoId
@@ -34,27 +87,27 @@ type ConvoConfig = {
 const CONVOS: Record<ConvoId, ConvoConfig> = {
   aria: {
     id: 'aria',
-    label: 'Aria ↔ You',
+    label: 'You ↔ Aria',
     tabName: 'Demo',
     actorName: 'Aria',
     agentSeed: 'Aria',
-    subtitle: 'Q&A: what is Starships.ai?',
+    subtitle: 'Pick a first‑week win (live demo)',
   },
-  doc_organizer: {
-    id: 'doc_organizer',
-    label: 'Doc Organizer ↔ You',
-    tabName: 'Doc Organizer',
-    actorName: 'Doc Organizer',
-    agentSeed: 'Doc Organizer',
-    subtitle: 'Drive cleanup with visible tool progress',
+  iris: {
+    id: 'iris',
+    label: 'Iris ↔ You',
+    tabName: 'Inbox',
+    actorName: 'Iris',
+    agentSeed: 'Iris',
+    subtitle: 'Inbox triage + draft replies in Gmail',
   },
-  lead_generator: {
-    id: 'lead_generator',
-    label: 'Lead Generator ↔ You',
-    tabName: 'Lead Generator',
-    actorName: 'Lead Generator',
-    agentSeed: 'Lead Generator',
-    subtitle: 'Lead-gen campaign setup in Ads Manager',
+  saga: {
+    id: 'saga',
+    label: 'Saga ↔ You',
+    tabName: 'Blog',
+    actorName: 'Saga',
+    agentSeed: 'Saga',
+    subtitle: 'Write + publish a blog post in WordPress',
   },
 }
 
@@ -117,50 +170,50 @@ function createAbortableSleep(signal: AbortSignal) {
 const ARIA_TIMELINE: Step[] = [
   {
     role: 'user',
-    content: 'What is Starships.ai?',
+    content: 'What can Starships.ai do?',
   },
   {
     role: 'assistant',
     agentName: 'Aria',
     content:
-      'Starships.ai is where you build, manage, and deploy an AI team.\n\n- Create agents with clear roles and rules\n- Give them tools (connectors + automations)\n- Delegate work, watch progress stream live, and ship results\n\nDo you want to see a demo?',
+      'Starships.ai helps you **delegate real work** to AI teammates that can follow workflows and show their progress.\n\n- Get a specialist for a task (ops, marketing, docs, research, etc.)\n- Connect tools/apps and run step‑by‑step with visible tool results\n- Stay in control with guardrails like approvals and reviewable changes\n\nPick a quick demo to see it end‑to‑end:',
   },
 ]
 
-const DOC_ORGANIZER_TIMELINE: Step[] = [
+const SAGA_TIMELINE: Step[] = [
   {
     role: 'user',
-    content: 'Doc Organizer — clean up my Google Drive.\n\nGoals:\n- Find duplicate files\n- Move “Receipts” into a single folder\n- Archive old project docs (2022+)\n- Show progress step-by-step',
+    content:
+      'Saga — publish a blog post for our site.\n\nTopic:\n- “AI staff: what it is and how teams use it”\n\nGoals:\n- Outline + draft\n- Add SEO title + meta description\n- Create a featured image prompt\n- Publish as a draft (not live)\n- Show progress step-by-step',
   },
   {
     role: 'assistant',
-    agentName: 'Doc Organizer',
+    agentName: 'Saga',
     toolCalls: [
-      { id: 'tc_do_scan', type: 'function', function: { name: 'scan', arguments: '{ "scope": "my-drive", "maxFiles": 5000 }' } },
-      { id: 'tc_do_classify', type: 'function', function: { name: 'classify_folders', arguments: '{ "signals": ["receipts","projects","invoices","contracts"] }' } },
-      { id: 'tc_do_large', type: 'function', function: { name: 'list_large_files', arguments: '{ "minMb": 100, "limit": 20 }' } },
+      { id: 'tc_wp_site', type: 'function', function: { name: 'get_site_info', arguments: '{ "cms": "wordpress" }' } },
+      { id: 'tc_wp_topics', type: 'function', function: { name: 'list_categories_tags', arguments: '{ "limit": 30 }' } },
+      { id: 'tc_wp_recent', type: 'function', function: { name: 'list_recent_posts', arguments: '{ "limit": 5 }' } },
     ],
     content:
-      'On it. I’ll do this in phases:\n\n1) Index + classify your drive\n2) Duplicates + large-file hotspots\n3) Consolidate receipts (dry run → apply)\n4) Archive older project docs\n5) Prepare a safe “review” folder for duplicates',
+      'On it. I’ll do this in phases:\n\n1) Check your WordPress site + existing categories/tags\n2) Outline the post and confirm angle\n3) Draft the article (scannable + practical)\n4) Add SEO title + meta description\n5) Create a featured-image prompt\n6) Publish as a **draft** for review',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_do_scan',
+    toolCallId: 'tc_wp_site',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', scanned: 4821, folders: 214, notes: 'Index built for fast matching' }, null, 2),
+    content: JSON.stringify({ status: 'ok', site: 'Starships.ai Blog', url: 'https://starships.ai', cms: 'wordpress', permissions: ['create_post', 'upload_media'] }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_do_classify',
+    toolCallId: 'tc_wp_topics',
     noStream: true,
     content: JSON.stringify(
       {
         status: 'ok',
-        classifiedFolders: 214,
-        buckets: { receipts: 9, projects: 41, invoices: 6, contracts: 4, other: 154 },
-        notes: 'Using folder names + file patterns',
+        categories: ['Product', 'AI', 'Operations', 'Engineering'],
+        tags: ['ai staff', 'agents', 'workflows', 'automation', 'security'],
       },
       null,
       2
@@ -169,16 +222,14 @@ const DOC_ORGANIZER_TIMELINE: Step[] = [
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_do_large',
+    toolCallId: 'tc_wp_recent',
     noStream: true,
     content: JSON.stringify(
       {
         status: 'ok',
-        largeFiles: 20,
-        top: [
-          { name: 'Raw_footage_export.mov', sizeMb: 1840 },
-          { name: 'Final_presentation_2022.pptx', sizeMb: 312 },
-          { name: 'Design_assets.zip', sizeMb: 266 },
+        posts: [
+          { title: 'How we use AI staff to ship faster', status: 'published' },
+          { title: 'Security & approvals: staying in control', status: 'published' },
         ],
       },
       null,
@@ -187,38 +238,35 @@ const DOC_ORGANIZER_TIMELINE: Step[] = [
   },
   {
     role: 'assistant',
-    agentName: 'Doc Organizer',
+    agentName: 'Saga',
     content:
-      'Index built. I also found a few **large-file hotspots** that typically drive storage bloat.\n\nNext: duplicates detection + receipts consolidation (I’ll do a dry run first so it’s safe).',
+      'Great — I see existing content around AI staff + security, so I’ll keep this post practical and avoid repeating.\n\nNext: I’ll draft a crisp outline and then write the first draft.',
   },
   {
     role: 'assistant',
-    agentName: 'Doc Organizer',
+    agentName: 'Saga',
     toolCalls: [
-      { id: 'tc_do_dupes', type: 'function', function: { name: 'find_duplicates', arguments: '{ "match": ["hash","name","size"], "scope": "my-drive" }' } },
-      { id: 'tc_do_receipts_detect', type: 'function', function: { name: 'find_receipts', arguments: '{ "signals": ["receipt","vendor","invoice"], "max": 300 }' } },
-      { id: 'tc_do_receipts_folder', type: 'function', function: { name: 'ensure_folder', arguments: '{ "path": "Personal/Receipts" }' } },
+      { id: 'tc_wp_outline', type: 'function', function: { name: 'create_outline', arguments: '{ "topic": "AI staff: what it is and how teams use it", "sections": 6, "targetWords": 1200 }' } },
+      { id: 'tc_wp_seo', type: 'function', function: { name: 'generate_seo', arguments: '{ "keyword": "AI staff", "audience": "B2B ops + engineering" }' } },
     ],
-    content: 'Running duplicates + identifying receipt candidates…',
+    content: 'Drafting outline + SEO…',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_do_dupes',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', duplicateSets: 37, candidates: 112, largestSet: 9, heuristic: 'hash+name+size', next: 'Prepare review folder + keep-newest suggestions' }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_do_receipts_detect',
+    toolCallId: 'tc_wp_outline',
     noStream: true,
     content: JSON.stringify(
       {
         status: 'ok',
-        receiptCandidates: 158,
-        sources: ['Gmail exports', 'scans', 'PDF invoices'],
-        ambiguity: 12,
+        outline: [
+          'What “AI staff” means (vs. chatbots)',
+          'The 3 core patterns: triage, delegation, automation',
+          'How teams use it in week 1 (quick wins)',
+          'Guardrails: approvals, audit trails, human-in-the-loop',
+          'Examples: inbox, blog, research, ops',
+          'How to get started (template + iterate)',
+        ],
       },
       null,
       2
@@ -227,318 +275,215 @@ const DOC_ORGANIZER_TIMELINE: Step[] = [
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_do_receipts_folder',
+    toolCallId: 'tc_wp_seo',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', folder: 'Personal/Receipts', created: true }, null, 2),
+    content: JSON.stringify(
+      {
+        status: 'ok',
+        seoTitle: 'AI Staff: What It Is (and How Teams Use It)',
+        metaDescription: 'Learn what “AI staff” means, the most common workflows teams automate first, and the guardrails that keep you in control.',
+        primaryKeyword: 'ai staff',
+      },
+      null,
+      2
+    ),
   },
   {
     role: 'assistant',
-    agentName: 'Doc Organizer',
-    content: 'Found **37 duplicate sets** (112 files) and **158 receipt candidates**.\n\nNext I’ll consolidate receipts, then archive older project docs.',
+    agentName: 'Saga',
+    content: 'Outline + SEO are ready. Next I’ll write the draft, generate a featured-image prompt, and save it as a draft post in WordPress.',
   },
   {
     role: 'assistant',
-    agentName: 'Doc Organizer',
+    agentName: 'Saga',
     toolCalls: [
-      { id: 'tc_do_receipts_apply', type: 'function', function: { name: 'apply_moves', arguments: '{ "query": "receipt_candidates", "count": 158, "targetPath": "Personal/Receipts" }' } },
-      { id: 'tc_do_receipts_verify', type: 'function', function: { name: 'verify_moves', arguments: '{ "targetPath": "Personal/Receipts", "expectedMin": 120 }' } },
+      { id: 'tc_wp_draft', type: 'function', function: { name: 'draft_post', arguments: '{ "title": "AI Staff: What It Is (and How Teams Use It)", "outlineRef": "tc_wp_outline", "targetWords": 1200, "tone": "clear, practical" }' } },
+      { id: 'tc_wp_image_prompt', type: 'function', function: { name: 'create_featured_image_prompt', arguments: '{ "style": "modern, dark, minimal", "subject": "AI staff collaborating with humans", "size": "1200x630" }' } },
+      { id: 'tc_wp_create_post', type: 'function', function: { name: 'create_post', arguments: '{ "status": "draft", "category": "AI", "tags": ["ai staff","agents","workflows"], "includeMeta": true }' } },
     ],
-    content: 'Receipts consolidation: apply → verify…',
+    content: 'Writing + saving draft…',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_do_receipts_apply',
+    toolCallId: 'tc_wp_draft',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', moved: 146, skipped: 12, destination: 'Personal/Receipts' }, null, 2),
+    content: JSON.stringify({ status: 'ok', words: 1235, readingTimeMin: 6, includes: ['examples', 'guardrails', 'getting started'] }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_do_receipts_verify',
+    toolCallId: 'tc_wp_image_prompt',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', verified: true, inFolder: 146, spotChecks: 12 }, null, 2),
+    content: JSON.stringify({ status: 'ok', prompt: 'Dark, minimal hero illustration of a small AI crew (three stylized assistants) collaborating with a human at a desk, subtle starship UI overlays, high contrast, clean lines, 1200x630.' }, null, 2),
+  },
+  {
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_wp_create_post',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', postId: 1042, statusAfter: 'draft', title: 'AI Staff: What It Is (and How Teams Use It)', url: 'https://starships.ai/blog/?p=1042' }, null, 2),
   },
   {
     role: 'assistant',
-    agentName: 'Doc Organizer',
-    content: 'Receipts consolidated and verified. Next: archive older project docs (pre-2023) and create a “Review/Duplicates” holding area.',
-  },
-  {
-    role: 'assistant',
-    agentName: 'Doc Organizer',
-    toolCalls: [
-      { id: 'tc_do_archive_apply', type: 'function', function: { name: 'archive_old', arguments: '{ "before": "2023-01-01", "targetPath": "Archive/Projects (pre-2023)" }' } },
-      { id: 'tc_do_review_folder', type: 'function', function: { name: 'ensure_folder', arguments: '{ "path": "Review/Duplicates" }' } },
-      { id: 'tc_do_dupes_review', type: 'function', function: { name: 'move_duplicates_to_review', arguments: '{ "strategy": "keep_newest_keep_in_place", "reviewPath": "Review/Duplicates" }' } },
-      { id: 'tc_do_report', type: 'function', function: { name: 'generate_cleanup_report', arguments: '{ "format": "summary+csv", "include": ["receipts","archive","duplicates"] }' } },
-    ],
-    content: 'Archiving + preparing duplicates review folder…',
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_do_archive_apply',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', archived: 318, destination: 'Archive/Projects (pre-2023)' }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_do_review_folder',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', folder: 'Review/Duplicates', created: true }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_do_dupes_review',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', movedToReview: 74, leftInPlace: 38, rule: 'keep newest by modified date' }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_do_report',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', report: { path: 'Reports/drive-cleanup-summary.pdf', attachments: ['drive-cleanup.csv'] } }, null, 2),
-  },
-  {
-    role: 'assistant',
-    agentName: 'Doc Organizer',
+    agentName: 'Saga',
     content:
-      '✅ Cleanup complete\n\n- Indexed + classified: **4,821 files**\n- Consolidated receipts: **146 moved** (verified)\n- Archived older project docs: **318 moved**\n- Duplicates: **112 files** detected → **74 moved** to `Review/Duplicates` (kept newest in place)\n- Report: `Reports/drive-cleanup-summary.pdf`\n\nWant me to generate a **safe-delete list** for the duplicates in Review, or keep them as-is?',
+      '✅ Draft blog post ready\n\n- Title: **AI Staff: What It Is (and How Teams Use It)**\n- Length: **1,235 words** (~6 min)\n- SEO: title + meta description included\n- Featured image: prompt generated\n- Status: **Draft** (not published)\n\nWant me to add an **FAQ section** or tailor examples more toward **Ops** or **Engineering**?',
   },
 ]
 
-const LEAD_GENERATOR_TIMELINE: Step[] = [
+const IRIS_TIMELINE: Step[] = [
   {
     role: 'user',
     content:
-      'Lead Generator — set up a lead-gen campaign in Ads Manager for our product.\n\nTarget:\n- B2B teams (Ops + Engineering)\n- Goal: capture qualified leads (demo requests)\n- Placements: feed + stories\n- Show progress step-by-step',
+      'Iris — triage my Gmail inbox.\n\nGoals:\n- Find emails that need a reply\n- Label by topic (sales, support, bills)\n- Archive newsletters and promos\n- Draft replies for the top 3\n- Show progress step-by-step',
   },
   {
     role: 'assistant',
-    agentName: 'Lead Generator',
+    agentName: 'Iris',
     toolCalls: [
-      { id: 'tc_lg_account', type: 'function', function: { name: 'get_account', arguments: '{ "currency": "USD", "timezone": "America/Los_Angeles" }' } },
-      { id: 'tc_lg_objective', type: 'function', function: { name: 'recommend_objective', arguments: '{ "goal": "demo_requests", "options": ["LEAD_GENERATION","CONVERSIONS","TRAFFIC"] }' } },
       {
-        id: 'tc_lg_audience_est',
+        id: 'tc_ir_labels',
         type: 'function',
         function: {
-          name: 'estimate_audience',
-          arguments: '{ "locations": ["US","CA","UK"], "jobTitles": ["RevOps","Engineering Manager","Platform"], "companySize": "50-500", "placements": ["feed","stories"] }',
+          name: 'ensure_labels',
+          arguments: '{ "labels": ["Sales","Support","Bills","Newsletter"] }',
         },
       },
+      { id: 'tc_ir_unread', type: 'function', function: { name: 'list_unread', arguments: '{ "limit": 80, "include": ["inbox","important"] }' } },
+      { id: 'tc_ir_needs_reply', type: 'function', function: { name: 'find_needs_reply', arguments: '{ "threads": "unread", "signals": ["question","request","follow up"], "limit": 25 }' } },
     ],
     content:
-      'Absolutely. I’ll set this up like a real Ads Manager workflow:\n\n1) Confirm objective + audience size\n2) Create campaign + ad set (budget, schedule, placements)\n3) Build a lead form (qualifying questions + consent)\n4) Generate creatives + ads (A/B variants) + preview\n5) Add tracking + publish a draft for approval',
+      'Absolutely. I’ll do this like a real inbox workflow:\n\n1) Pull your current unread inbox\n2) Identify what needs a reply vs. can be filed\n3) Label by topic (Sales / Support / Bills / Newsletter)\n4) Archive newsletters + promos\n5) Draft replies for the top 3 (you review/send)',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_account',
+    toolCallId: 'tc_ir_labels',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', accountId: 'act_demo_01', currency: 'USD', timezone: 'America/Los_Angeles' }, null, 2),
+    content: JSON.stringify({ status: 'ok', created: 2, existing: 2, labels: ['Sales', 'Support', 'Bills', 'Newsletter'] }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_objective',
+    toolCallId: 'tc_ir_unread',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', recommended: 'LEAD_GENERATION', notes: 'Qualify leads on-platform; route to sales/CRM via webhook' }, null, 2),
+    content: JSON.stringify({ status: 'ok', unreadInInbox: 63, important: 9, timeWindowDays: 14 }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_audience_est',
+    toolCallId: 'tc_ir_needs_reply',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', audienceEstimate: { low: 18000, high: 42000 }, placements: ['feed', 'stories'] }, null, 2),
+    content: JSON.stringify({ status: 'ok', needsReply: 14, topSenders: ['Acme Procurement', 'Jane (Support)', 'Stripe'] }, null, 2),
   },
   {
     role: 'assistant',
-    agentName: 'Lead Generator',
-    content: 'Audience size looks healthy for testing. Next I’ll create the campaign + ad set (paused), then build the lead form and creatives.',
+    agentName: 'Iris',
+    content: 'Got it. Next I’ll label threads by topic, archive newsletters/promos, and draft replies for the top 3 (so you can review).',
   },
   {
     role: 'assistant',
-    agentName: 'Lead Generator',
+    agentName: 'Iris',
     toolCalls: [
       {
-        id: 'tc_lg_campaign',
+        id: 'tc_ir_classify',
         type: 'function',
-        function: { name: 'create_campaign', arguments: '{ "accountId": "act_demo_01", "name": "Starships — Lead Gen", "objective": "LEAD_GENERATION", "status": "PAUSED" }' },
+        function: { name: 'classify_threads', arguments: '{ "threads": "unread", "labels": ["Sales","Support","Bills","Newsletter"], "max": 63 }' },
       },
       {
-        id: 'tc_lg_adset',
+        id: 'tc_ir_archive_newsletters',
         type: 'function',
         function: {
-          name: 'create_ad_set',
-          arguments:
-            '{ "campaignId": "cmp_demo_019", "name": "Ops+Eng (50-500) — US/CA/UK", "dailyBudget": 120, "bidStrategy": "LOWEST_COST", "placements": ["feed","stories"], "optimizationGoal": "LEADS", "status": "PAUSED" }',
+          name: 'archive_by_label',
+          arguments: '{ "label": "Newsletter", "olderThanDays": 7, "max": 40 }',
         },
       },
       {
-        id: 'tc_lg_targeting',
+        id: 'tc_ir_archive_promos',
         type: 'function',
-        function: {
-          name: 'set_targeting',
-          arguments: '{ "adSetId": "adset_demo_044", "locations": ["US","CA","UK"], "jobTitles": ["RevOps","Engineering Manager","Platform"], "companySize": "50-500" }',
-        },
+        function: { name: 'archive_promotions', arguments: '{ "signals": ["promo","sale","unsubscribe"], "max": 30 }' },
       },
     ],
-    content: 'Campaign + ad set setup (budget, schedule, placements, targeting)…',
+    content: 'Classifying + filing…',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_campaign',
+    toolCallId: 'tc_ir_classify',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', campaignId: 'cmp_demo_019', objective: 'LEAD_GENERATION', statusAfter: 'PAUSED' }, null, 2),
+    content: JSON.stringify({ status: 'ok', labeled: { Sales: 8, Support: 10, Bills: 6, Newsletter: 24, Other: 15 } }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_adset',
+    toolCallId: 'tc_ir_archive_newsletters',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', adSetId: 'adset_demo_044', dailyBudget: 120, placements: ['feed', 'stories'], statusAfter: 'PAUSED' }, null, 2),
+    content: JSON.stringify({ status: 'ok', archived: 19, kept: 5, label: 'Newsletter' }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_targeting',
+    toolCallId: 'tc_ir_archive_promos',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', targetingApplied: true, audienceEstimate: { low: 18000, high: 42000 } }, null, 2),
+    content: JSON.stringify({ status: 'ok', archived: 11, notes: 'Detected promo/unsubscribe patterns' }, null, 2),
   },
   {
     role: 'assistant',
-    agentName: 'Lead Generator',
-    content: 'Campaign and ad set are created (paused). Next I’ll build the lead form (qualifying questions + consent) and generate A/B creative.',
+    agentName: 'Iris',
+    content: 'Inbox is cleaner now. Next: draft replies for the top 3 priority threads (you’ll review before sending).',
   },
   {
     role: 'assistant',
-    agentName: 'Lead Generator',
+    agentName: 'Iris',
     toolCalls: [
       {
-        id: 'tc_lg_form',
+        id: 'tc_ir_pick_top3',
         type: 'function',
         function: {
-          name: 'create_lead_form',
-          arguments:
-            '{ "name": "Request a demo", "policyUrl": "https://example.com/privacy", "questions": ["Work email","Company","Role","Primary use case"], "thankYou": { "headline": "Thanks — we’ll reach out", "ctaUrl": "https://starships.ai" } }',
+          name: 'select_top_threads',
+          arguments: '{ "from": "needs_reply", "count": 3, "rules": ["important first","older first","direct questions"] }',
         },
       },
-      { id: 'tc_lg_copy_a', type: 'function', function: { name: 'generate_ad_copy', arguments: '{ "variant": "A", "angle": "delegation_visibility", "cta": "Request demo" }' } },
-      { id: 'tc_lg_copy_b', type: 'function', function: { name: 'generate_ad_copy', arguments: '{ "variant": "B", "angle": "replace_manual_ops", "cta": "Request demo" }' } },
-      { id: 'tc_lg_assets', type: 'function', function: { name: 'upload_assets', arguments: '{ "assets": ["square_image","story_image"], "theme": "dark", "style": "product_ui" }' } },
+      { id: 'tc_ir_draft_1', type: 'function', function: { name: 'draft_reply', arguments: '{ "threadId": "t_sales_01", "tone": "crisp", "goal": "schedule_call" }' } },
+      { id: 'tc_ir_draft_2', type: 'function', function: { name: 'draft_reply', arguments: '{ "threadId": "t_support_02", "tone": "helpful", "goal": "unblock_user" }' } },
+      { id: 'tc_ir_draft_3', type: 'function', function: { name: 'draft_reply', arguments: '{ "threadId": "t_bills_03", "tone": "neutral", "goal": "confirm_receipt" }' } },
     ],
-    content: 'Lead form + A/B copy + creative assets…',
+    content: 'Preparing drafts…',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_form',
+    toolCallId: 'tc_ir_pick_top3',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', formId: 'form_demo_007', questions: 4, formStatus: 'DRAFT' }, null, 2),
+    content: JSON.stringify({ status: 'ok', threads: [{ id: 't_sales_01', from: 'Acme Procurement', subject: 'Quick questions before we buy' }, { id: 't_support_02', from: 'Jane', subject: 'Login failing for 2 users' }, { id: 't_bills_03', from: 'Stripe', subject: 'Invoice available' }] }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_copy_a',
+    toolCallId: 'tc_ir_draft_1',
     noStream: true,
-    content: JSON.stringify(
-      { status: 'ok', variant: 'A', primaryText: 'Delegate ops work to an AI team — see tools + results in real time.', headline: 'Request a demo', cta: 'Request demo' },
-      null,
-      2
-    ),
+    content: JSON.stringify({ status: 'ok', threadId: 't_sales_01', draftId: 'd_001', preview: 'Happy to help — can you share your timeline and team size? If it helps, we can hop on a 15‑min call this week.' }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_copy_b',
+    toolCallId: 'tc_ir_draft_2',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', variant: 'B', primaryText: 'Replace manual handoffs with an AI team (with approvals).', headline: 'Get demo requests', cta: 'Request demo' }, null, 2),
+    content: JSON.stringify({ status: 'ok', threadId: 't_support_02', draftId: 'd_002', preview: 'Thanks — I can help. Can you confirm the error message + whether SSO is enabled? In the meantime, try resetting the session…' }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_lg_assets',
+    toolCallId: 'tc_ir_draft_3',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', assetsUploaded: 2, assetIds: ['asset_img_sq_11', 'asset_img_story_22'] }, null, 2),
+    content: JSON.stringify({ status: 'ok', threadId: 't_bills_03', draftId: 'd_003', preview: 'Received — thank you. Please confirm the billing period and I’ll get this filed with our receipts.' }, null, 2),
   },
   {
     role: 'assistant',
-    agentName: 'Lead Generator',
-    toolCalls: [
-      {
-        id: 'tc_lg_creative_a',
-        type: 'function',
-        function: { name: 'create_creative', arguments: '{ "adSetId": "adset_demo_044", "assetId": "asset_img_sq_11", "copyVariant": "A", "formId": "form_demo_007" }' },
-      },
-      {
-        id: 'tc_lg_creative_b',
-        type: 'function',
-        function: { name: 'create_creative', arguments: '{ "adSetId": "adset_demo_044", "assetId": "asset_img_story_22", "copyVariant": "B", "formId": "form_demo_007" }' },
-      },
-      { id: 'tc_lg_ad_a', type: 'function', function: { name: 'create_ad', arguments: '{ "adSetId": "adset_demo_044", "creativeId": "creative_demo_A1", "name": "Variant A", "status": "PAUSED" }' } },
-      { id: 'tc_lg_ad_b', type: 'function', function: { name: 'create_ad', arguments: '{ "adSetId": "adset_demo_044", "creativeId": "creative_demo_B1", "name": "Variant B", "status": "PAUSED" }' } },
-      {
-        id: 'tc_lg_tracking',
-        type: 'function',
-        function: { name: 'setup_tracking', arguments: '{ "campaignId": "cmp_demo_019", "utm": true, "leadWebhook": true, "fields": ["variant","placement","creative"] }' },
-      },
-      { id: 'tc_lg_preview', type: 'function', function: { name: 'preview_ads', arguments: '{ "adIds": ["ad_demo_A1","ad_demo_B1"], "placements": ["feed","stories"] }' } },
-      {
-        id: 'tc_lg_publish',
-        type: 'function',
-        function: { name: 'publish_draft', arguments: '{ "campaignId": "cmp_demo_019", "adSetId": "adset_demo_044", "adIds": ["ad_demo_A1","ad_demo_B1"], "approvalRequired": true }' },
-      },
-    ],
-    content: 'Creating ads + wiring tracking + generating previews + publishing draft…',
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_lg_creative_a',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', creativeId: 'creative_demo_A1', variant: 'A', formId: 'form_demo_007' }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_lg_creative_b',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', creativeId: 'creative_demo_B1', variant: 'B', formId: 'form_demo_007' }, null, 2),
-  },
-  { role: 'tool', messageType: 'tool_result', toolCallId: 'tc_lg_ad_a', noStream: true, content: JSON.stringify({ status: 'ok', adId: 'ad_demo_A1', statusAfter: 'PAUSED' }, null, 2) },
-  { role: 'tool', messageType: 'tool_result', toolCallId: 'tc_lg_ad_b', noStream: true, content: JSON.stringify({ status: 'ok', adId: 'ad_demo_B1', statusAfter: 'PAUSED' }, null, 2) },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_lg_tracking',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', utmTemplate: 'utm_campaign=leadgen&utm_source=ads_manager&utm_content={variant}', leadWebhook: true }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_lg_preview',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', previews: 4, notes: 'Generated feed+stories previews for both variants' }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_lg_publish',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', draftCampaignId: 'cmp_demo_019', statusAfter: 'PAUSED', approvalRequired: true, variants: ['A', 'B'] }, null, 2),
-  },
-  {
-    role: 'assistant',
-    agentName: 'Lead Generator',
+    agentName: 'Iris',
     content:
-      '✅ Draft lead campaign ready for approval\n\n- Objective: **Lead Generation**\n- Placements: **feed + stories**\n- Budget: **$120/day** (paused)\n- Lead form: **4 questions** (draft)\n- Ads: **Variant A/B** (paused) + previews generated\n- Tracking: UTMs + lead webhook\n- Safety: **approval required** before publishing\n\nWant the offer to be a **2‑minute walkthrough** or a **15‑minute demo**?',
+      '✅ Inbox triage complete\n\n- Unread in inbox: **63** (last 14 days)\n- Needs reply: **14**\n- Labeled: Sales / Support / Bills / Newsletter\n- Archived: **30** (newsletters + promos)\n- Drafted: **3 replies** (ready for your review)\n\nWant me to apply an **auto-label rule** for newsletters going forward, or keep it manual?',
   },
 ]
 
@@ -546,39 +491,52 @@ function useConvoTimelines() {
   return useMemo<Record<ConvoId, Step[]>>(
     () => ({
       aria: ARIA_TIMELINE,
-      doc_organizer: DOC_ORGANIZER_TIMELINE,
-      lead_generator: LEAD_GENERATOR_TIMELINE,
+      iris: IRIS_TIMELINE,
+      saga: SAGA_TIMELINE,
     }),
     []
   )
 }
 
 export default function HeroConversationDemo() {
+  const { data: ariaTemplates = [] } = useAgentTemplates({ search: 'aria' })
+  const ariaAvatarUrl = useMemo(() => {
+    const aria = ariaTemplates.find(t => t.slug === 'aria' || t.name === 'Aria' || String(t.slug ?? '').toLowerCase().startsWith('aria'))
+    return aria?.avatarUrl
+  }, [ariaTemplates])
+
+  const { data: irisTemplates = [] } = useAgentTemplates({ search: 'iris' })
+  const irisAvatarUrl = useMemo(() => {
+    const iris = irisTemplates.find(t => t.slug === 'iris' || t.name === 'Iris' || String(t.slug ?? '').toLowerCase().startsWith('iris'))
+    return iris?.avatarUrl
+  }, [irisTemplates])
+
+  const { data: sagaTemplates = [] } = useAgentTemplates({ search: 'saga' })
+  const sagaAvatarUrl = useMemo(() => {
+    const saga = sagaTemplates.find(t => t.slug === 'saga' || t.name === 'Saga' || String(t.slug ?? '').toLowerCase().startsWith('saga'))
+    return saga?.avatarUrl
+  }, [sagaTemplates])
+
   const timelines = useConvoTimelines()
   const [activeConvoId, setActiveConvoId] = useState<ConvoId>('aria')
-  const [messagesByConvo, setMessagesByConvo] = useState<Record<ConvoId, DemoMessage[]>>({ aria: [], doc_organizer: [], lead_generator: [] })
-  const [respondingByConvo, setRespondingByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, doc_organizer: false, lead_generator: false })
-  const [awaitingToolsByConvo, setAwaitingToolsByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, doc_organizer: false, lead_generator: false })
-  const [isRunningByConvo, setIsRunningByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, doc_organizer: false, lead_generator: false })
-  const [hasRunByConvo, setHasRunByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, doc_organizer: false, lead_generator: false })
-  const runSeqRef = useState(() => ({ aria: 0, doc_organizer: 0, lead_generator: 0 }))[0]
+  const [messagesByConvo, setMessagesByConvo] = useState<Record<ConvoId, DemoMessage[]>>({ aria: [], iris: [], saga: [] })
+  const [flagsByConvo, dispatchConvoFlags] = useReducer(convoFlagsReducer, INITIAL_CONVO_FLAGS)
+  const runSeqRef = useState(() => ({ aria: 0, iris: 0, saga: 0 }))[0]
   const demoChooserClockRef = useRef<number>(Date.now())
   const [demoChoiceState, setDemoChoiceState] = useState<{ stage: 'choose' | 'calling' | 'done'; selected: ConvoId | null }>({
     stage: 'choose',
     selected: null,
   })
 
-  const abortControllerRef = useRef<AbortController | null>(null)
-  if (!abortControllerRef.current) abortControllerRef.current = new AbortController()
-  const sleepCtlRef = useRef<ReturnType<typeof createAbortableSleep> | null>(null)
-  if (!sleepCtlRef.current) sleepCtlRef.current = createAbortableSleep(abortControllerRef.current.signal)
+  const abortControllerRef = useRef<AbortController>(new AbortController())
+  const sleepCtlRef = useRef<ReturnType<typeof createAbortableSleep>>(createAbortableSleep(abortControllerRef.current.signal))
   const sleep = sleepCtlRef.current.sleep
   const signal = abortControllerRef.current.signal
 
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort()
-      sleepCtlRef.current?.clearAll()
+      abortControllerRef.current.abort()
+      sleepCtlRef.current.clearAll()
     }
   }, [])
 
@@ -611,7 +569,7 @@ export default function HeroConversationDemo() {
     appendDemoChooserMessage(convoId, {
       id: `demo-${convoId}-u-choice-${userCreatedAt}`,
       role: 'user',
-      content: target === 'doc_organizer' ? 'Sure, help me organize my drive' : 'Sure, help me run an ad campaign',
+      content: target === 'iris' ? 'Sure, help me triage my inbox' : 'Sure, help me publish a blog post',
       createdAt: userCreatedAt,
       updatedAt: userCreatedAt,
       messageType: 'user_input',
@@ -626,7 +584,7 @@ export default function HeroConversationDemo() {
       id: `demo-${convoId}-a-ack-${a1CreatedAt}`,
       role: 'assistant',
       agentName: 'Aria',
-      content: target === 'doc_organizer' ? 'Perfect — I’ll spin up **Doc Organizer** and hand it the task.' : 'Perfect — I’ll spin up **Lead Generator** and hand it the campaign setup.',
+      content: target === 'iris' ? 'Perfect — I’ll spin up **Iris** and hand it the inbox triage.' : 'Perfect — I’ll spin up **Saga** and hand it the blog draft.',
       createdAt: a1CreatedAt,
       updatedAt: a1CreatedAt,
       messageType: 'agent_response',
@@ -637,7 +595,7 @@ export default function HeroConversationDemo() {
     if (signal.aborted) return
 
     // Tool runner: call-agent
-    const toolCallId = target === 'doc_organizer' ? 'tc_demo_call_doc_organizer' : 'tc_demo_call_lead_generator'
+    const toolCallId = target === 'iris' ? 'tc_demo_call_iris' : 'tc_demo_call_saga'
     const toolRunnerAt = nextDemoChooserIso()
     appendDemoChooserMessage(convoId, {
       id: `demo-${convoId}-a-tools-${toolRunnerAt}`,
@@ -655,14 +613,14 @@ export default function HeroConversationDemo() {
           function: {
             name: 'call-agent',
             arguments:
-              target === 'doc_organizer'
-                ? '{ "agent": "Doc Organizer", "task": "Clean up my Google Drive", "conversationTitle": "Doc Organizer — Demo" }'
-                : '{ "agent": "Lead Generator", "task": "Set up a lead-gen campaign in Ads Manager", "conversationTitle": "Lead Generator — Demo" }',
+              target === 'iris'
+                ? '{ "agent": "Iris", "task": "Triage my Gmail inbox", "conversationTitle": "Iris — Demo" }'
+                : '{ "agent": "Saga", "task": "Publish a blog post as a draft in WordPress", "conversationTitle": "Saga — Demo" }',
           },
         },
       ],
     })
-    setAwaitingToolsByConvo(prev => ({ ...prev, aria: true }))
+    dispatchConvoFlags({ type: 'patch', convoId: 'aria', patch: { awaitingTools: true } })
 
     await sleep(520)
     if (signal.aborted) return
@@ -674,9 +632,9 @@ export default function HeroConversationDemo() {
       content: JSON.stringify(
         {
           status: 'ok',
-          delegatedTo: target === 'doc_organizer' ? 'Doc Organizer' : 'Lead Generator',
+          delegatedTo: target === 'iris' ? 'Iris' : 'Saga',
           conversation: {
-            id: target === 'doc_organizer' ? 'c_demo_doc_organizer' : 'c_demo_lead_generator',
+            id: target === 'iris' ? 'c_demo_iris' : 'c_demo_saga',
           },
         },
         null,
@@ -687,7 +645,7 @@ export default function HeroConversationDemo() {
       messageType: 'tool_result',
       toolCallId,
     })
-    setAwaitingToolsByConvo(prev => ({ ...prev, aria: false }))
+    dispatchConvoFlags({ type: 'patch', convoId: 'aria', patch: { awaitingTools: false } })
 
     await sleep(350)
     if (signal.aborted) return
@@ -697,7 +655,7 @@ export default function HeroConversationDemo() {
       id: `demo-${convoId}-a-switch-${a2CreatedAt}`,
       role: 'assistant',
       agentName: 'Aria',
-      content: target === 'doc_organizer' ? 'Done — switching you to **Doc Organizer**.' : 'Done — switching you to **Lead Generator**.',
+      content: target === 'iris' ? 'Done — switching you to **Iris**.' : 'Done — switching you to **Saga**.',
       createdAt: a2CreatedAt,
       updatedAt: a2CreatedAt,
       messageType: 'agent_response',
@@ -714,7 +672,7 @@ export default function HeroConversationDemo() {
   }
 
   const startConversation = async (convoId: ConvoId) => {
-    if (isRunningByConvo[convoId]) return
+    if (flagsByConvo[convoId]?.isRunning) return
     runSeqRef[convoId] += 1
     const runSeq = runSeqRef[convoId]
     if (signal.aborted) return
@@ -728,14 +686,12 @@ export default function HeroConversationDemo() {
       }))
     }
 
-    setIsRunningByConvo(prev => ({ ...prev, [convoId]: true }))
-    setHasRunByConvo(prev => ({ ...prev, [convoId]: true }))
+    dispatchConvoFlags({ type: 'patch', convoId, patch: { isRunning: true, hasRun: true } })
 
     try {
       const timeline = timelines[convoId] || []
       setMessagesByConvo(prev => ({ ...prev, [convoId]: [] }))
-      setRespondingByConvo(prev => ({ ...prev, [convoId]: false }))
-      setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: false }))
+      dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: false, awaitingTools: false } })
 
       let seq = 0
       let lastToolRunnerId: string | null = null
@@ -773,7 +729,7 @@ export default function HeroConversationDemo() {
           appendMessage(convoId, { id, role: 'tool', content: step.content, createdAt, updatedAt: createdAt, messageType: 'tool_result', toolCallId: step.toolCallId })
           if (lastToolRunnerId) updateMessage(convoId, lastToolRunnerId, { streaming: false })
           if (step.toolCallId) pendingToolIds.delete(step.toolCallId)
-          setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: pendingToolIds.size > 0 }))
+          dispatchConvoFlags({ type: 'patch', convoId, patch: { awaitingTools: pendingToolIds.size > 0 } })
           await sleep(420)
           if (signal.aborted) return
           continue
@@ -794,17 +750,20 @@ export default function HeroConversationDemo() {
           streaming: !step.noStream,
           chunks: [],
         })
-        setRespondingByConvo(prev => ({ ...prev, [convoId]: true }))
+        dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: true } })
 
         if (!step.noStream) {
           const parts = chunkTextForStreaming(step.content)
+          // IMPORTANT: `ConversationMessageContent.aggregateStreamChunks` treats `position` as a
+          // cumulative character position (not a chunk index). If we use 0,1,2,... the aggregator
+          // will drop all subsequent chunks once the first chunk is longer than position.
           let position = 0
           let chunks: DemoStreamChunk[] = []
           for (const part of parts) {
             if (runSeqRef[convoId] !== runSeq) return
             if (signal.aborted) return
+            position += part.length
             chunks = [...chunks, { content: part, position, timestamp: nextTs() }]
-            position += 1
             updateMessage(convoId, id, { chunks, streaming: true })
             await sleep(70)
             if (signal.aborted) return
@@ -816,7 +775,7 @@ export default function HeroConversationDemo() {
         }
 
         updateMessage(convoId, id, { content: step.content, streaming: false, updatedAt: nextIso() })
-        setRespondingByConvo(prev => ({ ...prev, [convoId]: false }))
+        dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: false } })
 
         if (hasToolCalls) {
           seq += 1
@@ -840,7 +799,7 @@ export default function HeroConversationDemo() {
             .filter(Boolean)
             .map((x: any) => String(x))
           pendingToolIds = new Set(ids)
-          setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: ids.length > 0 }))
+          dispatchConvoFlags({ type: 'patch', convoId, patch: { awaitingTools: ids.length > 0 } })
           await sleep(250)
           if (signal.aborted) return
         } else {
@@ -849,19 +808,25 @@ export default function HeroConversationDemo() {
         }
       }
     } finally {
-      setRespondingByConvo(prev => ({ ...prev, [convoId]: false }))
-      setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: false }))
-      setIsRunningByConvo(prev => ({ ...prev, [convoId]: false }))
+      dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: false, awaitingTools: false, isRunning: false } })
     }
   }
 
   const cfg = CONVOS[activeConvoId]
-  const isResponding = respondingByConvo[activeConvoId] || false || awaitingToolsByConvo[activeConvoId] || false
-  const isRunning = isRunningByConvo[activeConvoId] || false
-  const hasRun = hasRunByConvo[activeConvoId] || false
+  const actorsLine = cfg.id === 'aria' ? `You, ${cfg.actorName}` : `${cfg.actorName}, You`
+  const agentAvatarUrlOverride =
+    cfg.id === 'aria' ? ariaAvatarUrl : cfg.id === 'iris' ? irisAvatarUrl : cfg.id === 'saga' ? sagaAvatarUrl : undefined
+  const isResponding = (flagsByConvo[activeConvoId]?.responding ?? false) || (flagsByConvo[activeConvoId]?.awaitingTools ?? false)
+  const isRunning = flagsByConvo[activeConvoId]?.isRunning ?? false
+  const hasRun = flagsByConvo[activeConvoId]?.hasRun ?? false
   const hasAnyMessages = (messagesByConvo[activeConvoId] || []).length > 0
   const isAutoplayTab = activeConvoId === 'aria'
-  const showDemoChooser = activeConvoId === 'aria' && hasRunByConvo.aria && !isRunningByConvo.aria && demoChoiceState.stage === 'choose' && (messagesByConvo.aria?.length || 0) > 0
+  const showDemoChooser =
+    activeConvoId === 'aria' &&
+    flagsByConvo.aria.hasRun &&
+    !flagsByConvo.aria.isRunning &&
+    demoChoiceState.stage === 'choose' &&
+    (messagesByConvo.aria?.length || 0) > 0
   const isDemoCalling = activeConvoId === 'aria' && demoChoiceState.stage === 'calling'
 
   const handleRestart = () => {
@@ -893,7 +858,7 @@ export default function HeroConversationDemo() {
                   <div className="text-sm font-medium leading-none truncate">{cfg.subtitle}</div>
                   {/* Actors */}
                   <div className="mt-1 flex items-center gap-2 min-w-0">
-                    <div className="text-xs text-muted-foreground truncate">{cfg.actorName}, You</div>
+                    <div className="text-xs text-muted-foreground truncate">{actorsLine}</div>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">
@@ -922,9 +887,10 @@ export default function HeroConversationDemo() {
                 conversationId={null}
                 messagesOverride={(messagesByConvo[activeConvoId] || []) as any}
                 agentNameOverride={cfg.actorName}
+                agentAvatarUrlOverride={agentAvatarUrlOverride}
                 isRespondingOverride={isResponding}
-                isAssistantStreamingOverride={respondingByConvo[activeConvoId] || false}
-                isAwaitingToolResultsOverride={awaitingToolsByConvo[activeConvoId] || false}
+                isAssistantStreamingOverride={flagsByConvo[activeConvoId]?.responding ?? false}
+                isAwaitingToolResultsOverride={flagsByConvo[activeConvoId]?.awaitingTools ?? false}
                 bottomPaddingPx={140}
                 userNameOverride="You"
                 userAvatarFallbackVariantOverride="user-icon"
@@ -954,23 +920,23 @@ export default function HeroConversationDemo() {
                         <div className="flex flex-1 flex-col gap-2 items-end w-full">
                           <button
                             type="button"
-                            onClick={() => handleDemoChoice('doc_organizer')}
+                            onClick={() => handleDemoChoice('iris')}
                             className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            aria-label="Sure, help me organize my drive"
+                            aria-label="Sure, help me triage my inbox"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm leading-relaxed">Sure, help me organize my drive</div>
+                              <div className="text-sm leading-relaxed">Sure, help me triage my inbox</div>
                               <Icon name="caret-right" iconOverride={{ type: 'phosphor', component: 'CaretRight' }} weight="bold" className="w-4 h-4 text-muted-foreground" />
                             </div>
                           </button>
                           <button
                             type="button"
-                            onClick={() => handleDemoChoice('lead_generator')}
+                            onClick={() => handleDemoChoice('saga')}
                             className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            aria-label="Sure, help me run an ad campaign"
+                            aria-label="Sure, help me publish a blog post"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm leading-relaxed">Sure, help me run an ad campaign</div>
+                              <div className="text-sm leading-relaxed">Sure, help me publish a blog post</div>
                               <Icon name="caret-right" iconOverride={{ type: 'phosphor', component: 'CaretRight' }} weight="bold" className="w-4 h-4 text-muted-foreground" />
                             </div>
                           </button>

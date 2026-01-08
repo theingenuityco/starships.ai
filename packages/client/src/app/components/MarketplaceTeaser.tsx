@@ -1,6 +1,7 @@
 'use client'
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
+import { Skeleton } from '@/components/ui/skeleton'
 import { useAgentTemplates, useToolTemplates } from '@/hooks/useTemplates'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel'
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
@@ -15,7 +16,23 @@ export default function MarketplaceTeaser() {
   const agentCount = agentTemplates.length
   const toolCount = toolTemplates.length
 
-  const featuredAgents = agentTemplates.slice(0, 9)
+  const featuredAgents = (() => {
+    // Curate a small set that matches the hero demo. Fallback to the first N templates if not found.
+    const wanted = ['Aria', 'Iris', 'Saga']
+    const normalize = (s: unknown) => String(s ?? '').trim().toLowerCase()
+    const byNameOrSlug = (name: string) => {
+      const n = normalize(name)
+      return (
+        agentTemplates.find(t => normalize(t.name) === n) ??
+        agentTemplates.find(t => normalize((t as any).slug) === n) ??
+        agentTemplates.find(t => normalize(t.name).includes(n))
+      )
+    }
+
+    const picked = wanted.map(byNameOrSlug).filter(Boolean) as typeof agentTemplates
+    if (picked.length >= 2) return picked.slice(0, 9)
+    return agentTemplates.slice(0, 9)
+  })()
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
 
@@ -48,7 +65,41 @@ export default function MarketplaceTeaser() {
               {agentLoading
                 ? [...Array(6)].map((_, idx) => (
                     <CarouselItem key={idx} className="basis-full sm:basis-1/2 lg:basis-1/3">
-                      <div className="h-[270px] rounded-xl bg-muted/40 border border-muted-foreground/20 animate-pulse" />
+                      {/* Match the approximate AgentTemplateCard layout to prevent layout shift */}
+                      <div className="h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm overflow-hidden pointer-events-none">
+                        {/* Header (matches DeployedAgentCard: p-6, pt-5, pb-3, space-y-3) */}
+                        <div className="p-6 pt-5 pb-3 space-y-3">
+                          <div className="flex items-center gap-4">
+                            <div className="relative flex-shrink-0">
+                              <Skeleton className="h-14 w-14 rounded-full" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <Skeleton className="h-6 w-40" />
+                              <Skeleton className="mt-2 h-4 w-28" />
+                            </div>
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2 flex-wrap mb-2">
+                              <Skeleton className="h-5 w-20 rounded-full" />
+                              <Skeleton className="h-5 w-14 rounded-full" />
+                            </div>
+                            <div className="space-y-2">
+                              <Skeleton className="h-4 w-full" />
+                              <Skeleton className="h-4 w-[92%]" />
+                              <Skeleton className="h-4 w-[86%]" />
+                              <Skeleton className="h-4 w-[78%]" />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Footer/content (matches CardContent: p-6 pt-0 pb-5 mt-auto) */}
+                        <div className="p-6 pt-0 pb-5 mt-auto">
+                          <div className="flex items-center justify-between gap-3">
+                            <Skeleton className="h-6 w-24 rounded-md" />
+                            <Skeleton className="h-9 w-24 rounded-md" />
+                          </div>
+                        </div>
+                      </div>
                     </CarouselItem>
                   ))
                 : featuredAgents.map(template => (

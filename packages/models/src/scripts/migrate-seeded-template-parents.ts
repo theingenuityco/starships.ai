@@ -26,6 +26,7 @@ import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository'
 import { ToolRepository } from '@/repositories/ToolRepository';
 import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
 import { ALL_AGENT_TEMPLATES } from '@/seeders/agents';
+import { generateSlug } from '@/helpers/slugUtils';
 
 type Args = {
   starshipSlug?: string;
@@ -126,6 +127,41 @@ function toolSlugBaseFromName(name: string | undefined): string {
     .replace(/--+/g, '-');
 }
 
+async function resolveSeededAgentTemplateInternal(
+  db: ReturnType<typeof createConnection>,
+  templateRepo: AgentTemplateRepository,
+  seededSlug: string
+) {
+  // Agent template slugs now always have a random suffix (`<base>-<4 chars>`),
+  // but seeded definitions reference the base slug (e.g. `gaia`).
+  // Match behavior used for tool template assigned slugs:
+  // - Prefer exact slug match
+  // - Fall back to `^base-[a-z0-9]{4}$`
+  const base = generateSlug(String(seededSlug || ''));
+  if (!base) return null;
+
+  const exact = await templateRepo.findInternalBySlug(base);
+  if (exact) return exact;
+
+  // Escape for use inside a Postgres regex pattern (defensive; base is already slugified).
+  const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+  const baseRegex = `^${escapeRegex(base)}-[a-z0-9]{4}$`;
+
+  const row = await db.queryOne<{ id: string; slug: string }>(
+    `
+    SELECT id, slug
+    FROM agent_templates
+    WHERE slug = $1 OR slug ~ $2
+    ORDER BY (slug = $1) DESC, created_at DESC
+    LIMIT 1
+    `,
+    [base, baseRegex]
+  );
+  if (!row?.id) return null;
+
+  return await templateRepo.findInternalById(row.id);
+}
+
 export async function migrateSeededTemplateParents(args: Args): Promise<void> {
   const env = getEnvConfig();
   const db = createConnection({
@@ -197,7 +233,7 @@ export async function migrateSeededTemplateParents(args: Args): Promise<void> {
       try {
         // Use INTERNAL loader to ensure we have sensitive config fields (state/blueprint/systemPrompt)
         // required for creating parent agents.
-        const template = await templateRepo.findInternalBySlug(slug);
+        const template = await resolveSeededAgentTemplateInternal(db, templateRepo, slug);
         if (!template) {
           skippedMissingTemplate++;
           logger.warn(`Seeded template slug missing from DB: ${slug}`, {

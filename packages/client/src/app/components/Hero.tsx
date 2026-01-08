@@ -1,7 +1,6 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import Icon from '@/components/primitives/Icon'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant } from '@/lib/flags'
@@ -9,8 +8,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import HeroConversationDemo from '@/app/components/HeroConversationDemo'
-import { ErrorBoundary } from '@/components/error/ErrorBoundary'
+import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
 
 export default function Hero() {
   const router = useRouter()
@@ -68,45 +66,52 @@ export default function Hero() {
   }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
-    <section className="pt-44 md:pt-52 pb-20 px-4">
-      <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
-        <div>
-          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
+    <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
+        <div className="w-full min-w-0">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
             {(() => {
               const v = getHeadlineVariant()
-              if (v === 'B') return 'Hire your AI team, then brief them in plain language'
-              if (v === 'C') return 'A team of AI specialists that ships work with you'
+              if (v === 'B') return 'Hire your AI staff, brief in plain language'
+              if (v === 'C') return 'Turn prompts into workflows'
               return (
                 <>
-                  Your very own{' '}
                   <span className="warp-word" data-text="ai">
                     <span className="warp-letter">A</span>
                     <span className="warp-letter">I</span>
-                  </span>
-                  &nbsp;
-                  <span className="warp-word" data-text="team">
-                    <span className="warp-letter">t</span>
+                  </span>{' '}
+                  <span className="warp-word" data-text="employees">
                     <span className="warp-letter">e</span>
-                    <span className="warp-letter">a</span>
                     <span className="warp-letter">m</span>
-                  </span>
+                    <span className="warp-letter">p</span>
+                    <span className="warp-letter">l</span>
+                    <span className="warp-letter">o</span>
+                    <span className="warp-letter">y</span>
+                    <span className="warp-letter">e</span>
+                    <span className="warp-letter">e</span>
+                    <span className="warp-letter">s</span>
+                  </span>{' '}
+                  to manage your work
                 </>
               )
             })()}
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed max-w-[60ch] mx-auto">Build, manage and deploy agents to handle the busy work.</p>
-          <div className="flex flex-col items-center gap-3 justify-center">
+          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+            Triage your inbox, run your socials, manage products — and much more.
+          </p>
+          <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
+            <HeroMarketplaceCarousel />
             <Button
               size="lg"
-              className="h-14 sm:h-16 w-full sm:w-auto max-w-[min(28rem,100%)] px-8 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal text-center [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating}
               aria-busy={isPrimaryAnimating}
             >
-              <span className="inline-flex w-10 h-10 items-center justify-center mr-1">
+              <span className="inline-flex w-12 h-12 items-center justify-center mr-2">
                 <StarshipsLogo
-                  width={40}
-                  height={40}
+                  width={48}
+                  height={48}
                   className="text-primary-foreground"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}
@@ -115,38 +120,44 @@ export default function Hero() {
                   onEntryAnimationComplete={runPendingPrimaryAction}
                 />
               </span>
-              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get started for free'}
-            </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-base text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => {
-                router.push('/marketplace?from=public')
-              }}
-            >
-              <Icon name="store" className="w-6 h-6 mr-1" />
-              Explore agents in Marketplace
+              {isAuthenticated ? (
+                <span className="flex flex-col items-start text-left min-w-0 leading-tight">
+                  <span>Enter my starship</span>
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
+                </span>
+              ) : (
+                'Get started for free'
+              )}
             </Button>
           </div>
-        </div>
-
-        {/* Conversation demo (uses the same message renderer as /ship/.../conversations) */}
-        <div className="w-full mt-6 sm:mt-8 md:mt-10 text-left">
-          <ErrorBoundary name="HeroConversationDemo">
-            <HeroConversationDemo />
-          </ErrorBoundary>
         </div>
       </div>
       <style jsx>{`
         .warp-word {
-          display: inline-flex;
+          display: inline-block;
           gap: 0;
           position: relative;
+          /* Ensure warped text matches surrounding headline typography */
+          font-size: 1em;
+          font-weight: inherit;
+          line-height: inherit;
+          vertical-align: baseline;
+
+          overflow: visible;
+          /*
+            Prevent descenders (e.g. "y") from clipping without inflating multi-line spacing:
+            add a little extra bottom room, then cancel it out with a negative margin.
+          */
+          padding-bottom: 0.14em;
+          margin-bottom: -0.14em;
         }
 
         .warp-letter {
           display: inline-block;
+          overflow: visible;
+          font-size: 1em;
+          font-weight: inherit;
+          line-height: inherit;
           animation:
             warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) both,
             gradient-shift 8s ease-in-out 1.2s infinite,
@@ -171,6 +182,21 @@ export default function Hero() {
         }
         .warp-letter:nth-child(4) {
           animation-delay: 180ms;
+        }
+        .warp-letter:nth-child(5) {
+          animation-delay: 240ms;
+        }
+        .warp-letter:nth-child(6) {
+          animation-delay: 300ms;
+        }
+        .warp-letter:nth-child(7) {
+          animation-delay: 360ms;
+        }
+        .warp-letter:nth-child(8) {
+          animation-delay: 420ms;
+        }
+        .warp-letter:nth-child(9) {
+          animation-delay: 480ms;
         }
 
         @keyframes warp-letter-in {

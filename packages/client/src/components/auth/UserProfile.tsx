@@ -64,8 +64,8 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
 
   if (mode === 'collapsed') {
     const isInteractive = !!onClick
-    const avatarSizeClass = collapsedSize === 'md' ? 'w-8 h-8' : 'w-7 h-7'
-    const iconSize = collapsedSize === 'md' ? 20 : 18
+    const avatarSizeClass = collapsedSize === 'md' ? 'w-9 h-9' : 'w-7 h-7'
+    const iconSize = collapsedSize === 'md' ? 22 : 18
 
     return (
       <div className={centerInContainer ? 'flex items-center justify-center' : 'flex justify-start -ml-0.5'}>
@@ -86,7 +86,7 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
             </Avatar>
           ) : (
             <div className={`${avatarSizeClass} rounded-full flex items-center justify-center bg-muted/40`}>
-              <LordIcon src={getLordiconUrl('user')} width={iconSize} height={iconSize} className="w-4 h-4" trigger="click" />
+              <LordIcon src={getLordiconUrl('user')} width={iconSize} height={iconSize} className={collapsedSize === 'md' ? 'w-5 h-5' : 'w-4 h-4'} trigger="click" />
             </div>
           )}
         </div>

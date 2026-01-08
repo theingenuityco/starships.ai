@@ -6,7 +6,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo } from 'react'
+import { useEffect, useMemo, useRef, memo, useState, Fragment } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -16,6 +16,12 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { motion } from 'motion/react'
+import { staggerContainer, staggerItem } from '@/lib/animations'
+import { toast } from 'sonner'
+import { tableToMarkdown } from '@/components/markdown/markdownComponents'
+import { isAnimationComplete } from '@/hooks/useMessageAnimationState'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -83,7 +89,7 @@ export function ConversationMessageList({
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
-  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? (conversationAgents[0] as any) : undefined
+  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
   const agentName = agentNameOverride ?? agentObj?.name
   const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
@@ -98,41 +104,105 @@ export function ConversationMessageList({
   const isNearBottomRef = useRef(true)
   const SCROLL_THRESHOLD_PX = 120
 
+  // Track which turns have been marked as complete (to prevent flickering)
+  // Once a turn is complete, its buttons should always be shown
+  const completedTurnIdsRef = useRef<Set<string>>(new Set())
+
+  // Track which turns have already animated their buttons (to prevent re-animation)
+  const animatedTurnIdsRef = useRef<Set<string>>(new Set())
+
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
     // Sort ascending by createdAt
     const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
     // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
+    // IMPORTANT: For assistant messages with tool calls, deduplicate by (id + toolCallIds) to preserve
+    // multiple assistant messages with the same id but different tool calls
     const seenIds = new Set<string>()
     const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
     for (const m of sortedMessages) {
-      const key = (m as any)?.id != null ? String((m as any).id) : null
+      const key = m.id != null ? String(m.id) : null
       if (key) {
-        if (seenIds.has(key)) continue
-        seenIds.add(key)
+        // For assistant messages with tool calls, create a composite key to preserve messages with different tool calls
+        if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+          const toolCallIds = m.toolCalls
+            .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
+            .filter(Boolean)
+            .join(',')
+          const compositeKey = `${key}:${toolCallIds}`
+          if (seenIds.has(compositeKey)) continue
+          seenIds.add(compositeKey)
+        } else {
+          if (seenIds.has(key)) continue
+          seenIds.add(key)
+        }
       }
       uniqueMessages.push(m)
     }
 
-    // Collapse temp assistant shell followed by concrete assistant from server (UI-level safety if merging missed)
+    // Collapse temp user + assistant shells followed by concrete messages from server (UI-level safety if merging missed)
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
+
     for (let i = 0; i < uniqueMessages.length; i++) {
-      const cur: any = uniqueMessages[i]
+      const cur = uniqueMessages[i] as ExtendedMessage
+
+      // 0) Collapse local temp user message into the next concrete user message.
+      // This avoids a common "double user message" when we pre-seed a temp message during the
+      // /conversations -> /conversations/:id handoff and the server later emits the real message via SSE.
+      if (cur?.role === 'user' && typeof cur?.id === 'string' && cur.id.startsWith('temp-user-')) {
+        const next = uniqueMessages[i + 1] as ExtendedMessage | undefined
+        if (next && next.role === 'user' && !(typeof next.id === 'string' && next.id.startsWith('temp-user-'))) {
+          const curContent = String(cur?.content ?? '')
+          const nextContent = String(next?.content ?? '')
+          const curTs = Number(new Date(cur.createdAt).getTime())
+          const nextTs = Number(new Date(next.createdAt).getTime())
+          // Require same content and very close timestamps so we don't hide intentional repeats.
+          if (curContent === nextContent && Number.isFinite(curTs) && Number.isFinite(nextTs) && Math.abs(nextTs - curTs) <= 15_000) {
+            collapsedMessages.push(next)
+            i++ // skip next (we already pushed it)
+            continue
+          }
+        }
+      }
 
       // 1) Collapse local temp assistant shell into the next concrete assistant
       if (cur?.role === 'assistant' && typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-')) {
-        const next: any = uniqueMessages[i + 1]
+        const next = uniqueMessages[i + 1] as ExtendedMessage | undefined
         if (next && next.role === 'assistant' && !(typeof next.id === 'string' && next.id.startsWith('temp-assistant-'))) {
-          const merged: any = { ...next }
+          const merged: ExtendedMessage = { ...next }
           if (Array.isArray(cur.chunks) && (!Array.isArray(merged.chunks) || merged.chunks.length === 0)) {
             merged.chunks = cur.chunks
           }
           if (Array.isArray(cur.reasoningChunks) && (!Array.isArray(merged.reasoningChunks) || merged.reasoningChunks.length === 0)) {
             merged.reasoningChunks = cur.reasoningChunks
           }
-          if ((merged as any).toolCalls == null || (merged as any).toolCalls.length === 0) {
-            ;(merged as any).toolCalls = cur.toolCalls
+          // Merge tool calls: combine arrays to preserve all tool calls from both messages
+          const curToolCalls = Array.isArray(cur.toolCalls) ? cur.toolCalls : []
+          const mergedToolCalls = Array.isArray(merged.toolCalls) ? merged.toolCalls : []
+          if (curToolCalls.length > 0 || mergedToolCalls.length > 0) {
+            // Combine tool calls, avoiding duplicates by ID
+            const toolCallMap = new Map<string, LlmToolCall>()
+            // First add merged tool calls
+            mergedToolCalls.forEach(tc => {
+              const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+              const id = tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+              if (id != null) {
+                toolCallMap.set(String(id), tc)
+              }
+            })
+            // Then add current tool calls (will overwrite if duplicate ID, but that's fine)
+            curToolCalls.forEach(tc => {
+              const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+              const id = tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+              if (id != null) {
+                toolCallMap.set(String(id), tc)
+              } else {
+                // If no ID, add it anyway (might be a partial tool call)
+                toolCallMap.set(`no-id-${toolCallMap.size}`, tc)
+              }
+            })
+            merged.toolCalls = Array.from(toolCallMap.values())
           }
           merged.streaming = cur.streaming || merged.streaming
           collapsedMessages.push(merged)
@@ -143,25 +213,45 @@ export function ConversationMessageList({
 
       // 2) Drop server-side blank assistant shell (no content, chunks, reasoning, or toolCalls).
       // Preserve if it's actively streaming (so caret can show) and only drop if non-streaming.
+      // IMPORTANT: Always preserve assistant messages with tool calls, even if they have no content
       if (cur?.role === 'assistant' && !(typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-'))) {
-        const streaming = Boolean((cur as any)?.streaming)
-        const hasContent = typeof cur?.content === 'string' && cur.content.trim().length > 0
-        const hasChunks = Array.isArray(cur?.chunks) && cur.chunks.length > 0
-        const hasRChunks = Array.isArray(cur?.reasoningChunks) && cur.reasoningChunks.length > 0
-        const hasReasoning = typeof cur?.reasoning === 'string' && cur.reasoning.trim().length > 0
-        const hasToolCalls = Array.isArray(cur?.toolCalls) && cur.toolCalls.length > 0
-        const hasAttachments = Array.isArray((cur as any)?.attachmentIds) && (cur as any).attachmentIds.length > 0
+        const streaming = Boolean(cur.streaming)
+        const hasContent = typeof cur.content === 'string' && cur.content.trim().length > 0
+        const hasChunks = Array.isArray(cur.chunks) && cur.chunks.length > 0
+        const hasRChunks = Array.isArray(cur.reasoningChunks) && cur.reasoningChunks.length > 0
+        const hasReasoning = typeof cur.reasoning === 'string' && cur.reasoning.trim().length > 0
+        const hasToolCalls = Array.isArray(cur.toolCalls) && cur.toolCalls.length > 0
+        const hasAttachments = Array.isArray(cur.attachmentIds) && cur.attachmentIds.length > 0
 
-        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments)) {
+        // Always preserve assistant messages with tool calls, even if they have no other content
+        if (hasToolCalls) {
+          collapsedMessages.push(cur)
+          continue
+        }
+
+        if (!(hasContent || hasChunks || hasRChunks || hasReasoning || hasAttachments)) {
           // Keep actively streaming assistant shells visible
           if (streaming) {
             collapsedMessages.push(cur)
             continue
           }
-          const next: any = uniqueMessages[i + 1]
+          // IMPORTANT: When multiple assistant messages exist in sequence, we need to be careful
+          // If the next message is also an assistant, check if it has tool calls
+          // If it does, the current blank shell might be a placeholder that should be dropped
+          // If it doesn't, preserve the current one to avoid losing messages
+          const next = uniqueMessages[i + 1] as ExtendedMessage | undefined
           if (next && next.role === 'assistant') {
-            // skip current blank shell; next will be processed/pushed in subsequent iterations
-            continue
+            const nextHasToolCalls = Array.isArray(next.toolCalls) && next.toolCalls.length > 0
+            // If next has tool calls, current blank shell is likely a placeholder - skip it
+            // If next doesn't have tool calls either, preserve current to avoid losing messages
+            if (nextHasToolCalls) {
+              // skip current blank shell; next will be processed/pushed in subsequent iterations
+              continue
+            } else {
+              // Both are blank - preserve current
+              collapsedMessages.push(cur)
+              continue
+            }
           } else {
             // trailing blank shell — drop it
             continue
@@ -180,7 +270,8 @@ export function ConversationMessageList({
 
     baseMessages.forEach(msg => {
       if (msg.messageType === 'tool_result') {
-        const rid = (msg as any).toolCallId ?? (msg as any).call_id ?? (msg as any).id
+        const toolResultMsg = msg as ExtendedMessage & { toolCallId?: string; call_id?: string }
+        const rid = toolResultMsg.toolCallId ?? toolResultMsg.call_id ?? msg.id
         if (rid != null) {
           toolResultsMap.set(String(rid), msg)
         }
@@ -188,39 +279,87 @@ export function ConversationMessageList({
     })
 
     // Second pass: group messages and attach matching tool results
-    const groupedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean; toolResults?: any[] }> = []
+    const groupedMessages: ExtendedMessage[] = []
 
     for (const message of baseMessages) {
       // If this is an assistant message with tool calls, attach all matching tool results
-      if (message.role === 'assistant' && (message as any).toolCalls?.length > 0) {
-        const toolCallIds = ((message as any).toolCalls || [])
-          .map((tc: any) => (tc as any).id ?? (tc as any).call_id ?? (tc as any).toolCallId ?? (tc as any).function?.id)
-          .filter(Boolean)
-          .map((id: any) => String(id))
-        const toolResults: any[] = []
+      const assistantMsg = message as ExtendedMessage
+      if (assistantMsg.role === 'assistant' && Array.isArray(assistantMsg.toolCalls) && assistantMsg.toolCalls.length > 0) {
+        const toolCallIds = assistantMsg.toolCalls
+          .map(tc => {
+            const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+            return tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+          })
+          .filter((id): id is string => id != null)
+          .map(id => String(id))
+        const toolResults: ExtendedMessage[] = []
 
-        // Collect all matching tool results
+        // Collect all matching tool results that haven't been processed yet
         for (const toolCallId of toolCallIds) {
           if (toolResultsMap.has(toolCallId)) {
             const result = toolResultsMap.get(toolCallId)
-            toolResults.push(result)
-            processedResultIds.add(result.id) // Mark as processed
+            if (result) {
+              // Only attach if this result hasn't been processed yet (to avoid attaching same result to multiple messages)
+              if (!processedResultIds.has(result.id)) {
+                toolResults.push(result)
+                processedResultIds.add(result.id) // Mark as processed
+              }
+            }
           }
         }
 
-        // Add the grouped message with tool results
+        // Always add assistant messages with tool calls, even if no results are attached yet
+        // This ensures tool calls are visible even when results haven't arrived
         groupedMessages.push({
-          ...message,
+          ...assistantMsg,
           toolResults,
         })
       }
       // Only add tool result messages if they weren't already grouped with their tool calls
-      else if (message.messageType === 'tool_result' && !processedResultIds.has(message.id)) {
-        groupedMessages.push(message)
+      // IMPORTANT: Do NOT render standalone tool_result messages.
+      // Tool results should only render within the assistant message's tool panel once the matching tool call is present.
+      // This prevents the UI from showing orphan tool results (which can happen when results arrive before the
+      // assistant tool-call message is present client-side).
+      else if (message.messageType === 'tool_result') {
+        // Skip: tool results should only render within the assistant message's tool panel
+        continue
       }
       // For all other messages, add them normally
-      else if (message.messageType !== 'tool_result') {
+      else {
         groupedMessages.push(message)
+      }
+    }
+
+    // Cleanup pass: Find standalone tool results and attach them to matching assistant messages
+    // This handles the case where tool results arrive before their assistant messages
+    const standaloneToolResults = groupedMessages.filter(m => m.messageType === 'tool_result' && !processedResultIds.has(m.id))
+    for (let i = groupedMessages.length - 1; i >= 0; i--) {
+      const msg = groupedMessages[i] as ExtendedMessage
+      if (msg.messageType === 'tool_result' && !processedResultIds.has(msg.id)) {
+        const toolResultMsg = msg as ExtendedMessage & { toolCallId?: string; call_id?: string }
+        const toolCallId = toolResultMsg.toolCallId ?? toolResultMsg.call_id ?? msg.id
+        if (toolCallId != null) {
+          // Look for an assistant message that has this tool call
+          for (let j = 0; j < groupedMessages.length; j++) {
+            const assistantMsg = groupedMessages[j] as ExtendedMessage
+            if (assistantMsg.role === 'assistant' && Array.isArray(assistantMsg.toolCalls) && assistantMsg.toolCalls.length > 0) {
+              const hasMatchingToolCall = assistantMsg.toolCalls.some(tc => {
+                const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+                const tcId = tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+                return tcId != null && String(tcId) === String(toolCallId)
+              })
+              if (hasMatchingToolCall) {
+                // Attach this tool result to the assistant message
+                const existingResults = Array.isArray(assistantMsg.toolResults) ? assistantMsg.toolResults : []
+                assistantMsg.toolResults = [...existingResults, msg]
+                processedResultIds.add(msg.id) // Mark as processed
+                // Remove from groupedMessages
+                groupedMessages.splice(i, 1)
+                break
+              }
+            }
+          }
+        }
       }
     }
 
@@ -228,14 +367,15 @@ export function ConversationMessageList({
     // NOTE: Do NOT treat toolResults alone as renderable; without toolCalls the tool panel won't show.
     const pruned = groupedMessages.filter(msg => {
       if (msg.role !== 'assistant' || msg.messageType === 'tool_result') return true
-      const a: any = msg as any
+      const extendedMsg = msg as ExtendedMessage
       const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
-      const hasChunks = Array.isArray(a?.chunks) && a.chunks.length > 0
-      const hasRChunks = Array.isArray(a?.reasoningChunks) && a.reasoningChunks.length > 0
-      const hasReasoning = typeof a?.reasoning === 'string' && a.reasoning.trim().length > 0
-      const hasToolCalls = Array.isArray(a?.toolCalls) && a.toolCalls.length > 0
-      const hasAttachments = Array.isArray(a?.attachmentIds) && a.attachmentIds.length > 0
-      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments
+      const hasChunks = Array.isArray(extendedMsg.chunks) && extendedMsg.chunks.length > 0
+      const hasRChunks = Array.isArray(extendedMsg.reasoningChunks) && extendedMsg.reasoningChunks.length > 0
+      const hasReasoning = typeof extendedMsg.reasoning === 'string' && extendedMsg.reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray(extendedMsg.toolCalls) && extendedMsg.toolCalls.length > 0
+      const hasAttachments = Array.isArray(extendedMsg.attachmentIds) && extendedMsg.attachmentIds.length > 0
+      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments
+      return shouldKeep
     })
 
     return pruned
@@ -245,7 +385,8 @@ export function ConversationMessageList({
   const activeStreamingAssistantId = useMemo(() => {
     let lastId: string | null = null
     for (const m of displayMessages) {
-      if (m.role === 'assistant' && (m as any).streaming) {
+      const extendedMsg = m as ExtendedMessage
+      if (m.role === 'assistant' && extendedMsg.streaming) {
         lastId = m.id
       }
     }
@@ -260,26 +401,28 @@ export function ConversationMessageList({
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
   const renderMessages = useMemo(() => {
-    const canRenderAssistant = (msg: any) => {
+    const canRenderAssistant = (msg: ExtendedMessage) => {
       if (msg.role !== 'assistant') return true
       if (msg.messageType === 'tool_result') return true
       const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
       const hasChunks = Array.isArray(msg.chunks) && msg.chunks.length > 0
-      const hasRChunks = Array.isArray((msg as any)?.reasoningChunks) && (msg as any).reasoningChunks.length > 0
-      const hasReasoning = typeof (msg as any)?.reasoning === 'string' && (msg as any).reasoning.trim().length > 0
-      const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0
-      const hasToolResults = Array.isArray((msg as any)?.toolResults) && (msg as any).toolResults.length > 0
-      const hasAttachments = Array.isArray((msg as any)?.attachmentIds) && (msg as any).attachmentIds.length > 0
+      const hasRChunks = Array.isArray(msg.reasoningChunks) && msg.reasoningChunks.length > 0
+      const hasReasoning = typeof msg.reasoning === 'string' && msg.reasoning.trim().length > 0
+      const hasToolCalls = Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0
+      const hasToolResults = Array.isArray(msg.toolResults) && msg.toolResults.length > 0
+      const hasAttachments = Array.isArray(msg.attachmentIds) && msg.attachmentIds.length > 0
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments
     }
-    return displayMessages.filter(canRenderAssistant)
+    const filtered = displayMessages.filter(canRenderAssistant)
+    return filtered
   }, [displayMessages])
 
   // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
   const activeRenderedStreamingAssistantId = useMemo(() => {
     let lastId: string | null = null
     for (const m of renderMessages) {
-      if (m.role === 'assistant' && (m as any).streaming) {
+      const extendedM = m as ExtendedMessage
+      if (m.role === 'assistant' && extendedM.streaming) {
         lastId = m.id
       }
     }
@@ -287,7 +430,7 @@ export function ConversationMessageList({
   }, [renderMessages])
 
   // "Progress key" for streaming: changes when chunks/tool results advance even if message count doesn't.
-  const lastRenderedMessage: any = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as any) : null
+  const lastRenderedMessage: ExtendedMessage | null = renderMessages.length > 0 ? (renderMessages[renderMessages.length - 1] as ExtendedMessage) : null
   const lastRenderedChunkTs = useMemo(() => {
     const chunks = lastRenderedMessage?.chunks
     if (Array.isArray(chunks) && chunks.length > 0) {
@@ -353,6 +496,152 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
+  // Effect to mark turns as complete when they meet the criteria
+  // This runs after renderMessages is computed to avoid using it before declaration
+  useEffect(() => {
+    renderMessages.forEach((message, idx) => {
+      const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
+      const messageId = message.id
+
+      // Skip if already marked complete
+      if (completedTurnIdsRef.current.has(messageId)) return
+
+      // Only process assistant messages (not tool_result messages)
+      if (message.role !== 'assistant' || message.messageType === 'tool_result') return
+
+      // Check if this turn should be complete
+      const extendedMsg = message as ExtendedMessage
+      const isNotStreaming = !extendedMsg.streaming
+      const isTurnBoundary = next?.role === 'user' || next === null
+      const animationDone = isAnimationComplete(messageId)
+      const hasChunks = Array.isArray(extendedMsg.chunks) && extendedMsg.chunks.length > 0
+
+      // Check if all tool calls have completed
+      const toolCalls = extendedMsg.toolCalls || []
+      const toolResults = extendedMsg.toolResults || []
+      const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
+      const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
+      const allToolCallsDone = totalToolCalls === 0 || (totalToolCalls > 0 && completedToolResults >= totalToolCalls)
+
+      // Don't mark as complete if we're still awaiting tool results (for the last message)
+      const isLastMessage = idx === renderMessages.length - 1
+      const shouldWaitForToolResults = isLastMessage && isAwaitingToolResults
+
+      // Check if there are any more assistant messages in this turn after this one
+      // Look ahead to find the next user message, and check if there are any assistant messages between now and then
+      let hasMoreAssistantMessagesInTurn = false
+      if (!isTurnBoundary) {
+        // Look ahead through messages until we hit a user message or end
+        for (let i = idx + 1; i < renderMessages.length; i++) {
+          const futureMsg = renderMessages[i] as ExtendedMessage
+          if (futureMsg.role === 'user') {
+            // Found the next turn, stop looking
+            break
+          }
+          if (futureMsg.role === 'assistant' && futureMsg.messageType !== 'tool_result') {
+            // Found another assistant message in this turn
+            hasMoreAssistantMessagesInTurn = true
+            break
+          }
+        }
+      }
+
+      // A turn is complete if: assistant message (not tool_result), not streaming, at turn boundary,
+      // (animation done OR never streamed), all tool calls are done, not awaiting tool results,
+      // and there are no more assistant messages in this turn
+      if (isNotStreaming && isTurnBoundary && (animationDone || !hasChunks) && allToolCallsDone && !shouldWaitForToolResults && !hasMoreAssistantMessagesInTurn) {
+        completedTurnIdsRef.current.add(messageId)
+      }
+    })
+  }, [renderMessages, isAwaitingToolResults])
+
+  // Component to render action buttons after a complete turn
+  function TurnActionButtons({ turnMessages, turnId }: { turnMessages: MessageModel[]; turnId: string }) {
+    // Initialize state based on whether this turn has already been animated
+    // Once a turn is marked as animated, it will never animate again (even on re-renders)
+    const [shouldAnimateButtons] = useState<boolean>(() => {
+      const alreadyAnimated = animatedTurnIdsRef.current.has(turnId)
+      if (!alreadyAnimated) {
+        // Mark as animated immediately to prevent re-animation on future renders
+        animatedTurnIdsRef.current.add(turnId)
+        return true
+      }
+      return false
+    })
+
+    const extractTurnText = (): string => {
+      const parts: string[] = []
+      for (const msg of turnMessages) {
+        if (msg.role === 'user') {
+          parts.push(`**User:**\n${msg.content || ''}`)
+        } else if (msg.role === 'assistant') {
+          const content = msg.content || ''
+          const reasoning = (msg as ExtendedMessage).reasoning
+          if (reasoning && typeof reasoning === 'string' && reasoning.trim()) {
+            parts.push(`**Assistant (thinking):**\n${reasoning}`)
+          }
+          if (content.trim()) {
+            parts.push(`**Assistant:**\n${content}`)
+          }
+        }
+      }
+      return parts.join('\n\n')
+    }
+
+    const handleCopyTurn = async () => {
+      try {
+        const turnText = extractTurnText()
+        await navigator.clipboard.writeText(turnText)
+        toast.success('Turn copied to clipboard')
+      } catch (error) {
+        toast.error('Failed to copy turn')
+      }
+    }
+
+    const handleExportTurn = () => {
+      try {
+        const turnText = extractTurnText()
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
+        const filename = `turn-${turnId.slice(0, 8)}-${timestamp}.md`
+
+        const blob = new Blob([turnText], { type: 'text/markdown' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = filename
+        document.body.appendChild(a)
+        a.click()
+        a.remove()
+        URL.revokeObjectURL(url)
+
+        toast.success('Turn exported successfully')
+      } catch (error) {
+        toast.error('Failed to export turn')
+      }
+    }
+
+    return (
+      <div className="flex justify-start">
+        <div className="flex items-start gap-3 w-full">
+          {/* Spacer to match avatar width */}
+          <div className="flex-shrink-0 w-8 h-8" aria-hidden="true" />
+          <motion.div key={`turn-buttons-${turnId}`} variants={staggerContainer} initial={shouldAnimateButtons ? 'hidden' : 'visible'} animate="visible" className="flex items-center gap-2 mt-4 mb-4">
+            <motion.div variants={staggerItem}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTurn} title="Copy turn">
+                <Icon name="copy" className="w-3 h-3" />
+              </Button>
+            </motion.div>
+            <motion.div variants={staggerItem}>
+              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportTurn} title="Export turn">
+                <Icon name="download" className="w-3 h-3" />
+              </Button>
+            </motion.div>
+          </motion.div>
+        </div>
+      </div>
+    )
+  }
+
   if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
@@ -371,23 +660,53 @@ export function ConversationMessageList({
       >
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
-            const prev = idx > 0 ? (renderMessages[idx - 1] as any) : null
+            const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
+            const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+
+            // Check if this is the end of a complete turn
+            // Once a turn is marked as complete (via useEffect), always show its buttons (prevents flickering)
+            const messageId = message.id
+            const isTurnEnd = completedTurnIdsRef.current.has(messageId)
+
+            // Find the start of this turn (the user message before this assistant message)
+            // Use a reverse loop since findLastIndex is not available in older TypeScript targets
+            const turnStartIdx =
+              message.role === 'assistant'
+                ? (() => {
+                    const slice = renderMessages.slice(0, idx + 1)
+                    for (let i = slice.length - 1; i >= 0; i--) {
+                      if (slice[i].role === 'user') return i
+                    }
+                    return -1
+                  })()
+                : -1
+
+            const turnMessages = turnStartIdx >= 0 ? renderMessages.slice(turnStartIdx, idx + 1) : []
+
             return (
-              <MemoizedMessageBubble
-                key={message.id}
-                message={message}
-                agentName={message.agentName || agentName}
-                agentAvatarUrl={agentAvatarUrl}
-                isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                starshipId={starshipId}
-                showAssistantAvatar={showAssistantAvatar}
-                userNameOverride={userNameOverride}
-                userEmailOverride={userEmailOverride}
-                userAvatarUrlOverride={userAvatarUrlOverride}
-                userAvatarSeedOverride={userAvatarSeedOverride}
-                userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
-              />
+              <Fragment key={message.id}>
+                <MemoizedMessageBubble
+                  message={message}
+                  agentName={message.agentName || agentName}
+                  agentAvatarUrl={agentAvatarUrl}
+                  isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                  starshipId={starshipId}
+                  showAssistantAvatar={showAssistantAvatar}
+                  userNameOverride={userNameOverride}
+                  userEmailOverride={userEmailOverride}
+                  userAvatarUrlOverride={userAvatarUrlOverride}
+                  userAvatarSeedOverride={userAvatarSeedOverride}
+                  userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                  isAwaitingToolResults={isAwaitingToolResults}
+                  isLastMessage={idx === renderMessages.length - 1}
+                />
+                {/* Only show buttons after the final assistant message of a complete turn (not tool_result messages or intermediate messages) */}
+                {/* Must be: marked as turn end, assistant message, not tool_result, at turn boundary (next is user or null), and have turn messages */}
+                {isTurnEnd && message.role === 'assistant' && message.messageType !== 'tool_result' && (next?.role === 'user' || next === null) && turnMessages.length > 0 && (
+                  <TurnActionButtons turnMessages={turnMessages} turnId={message.id} />
+                )}
+              </Fragment>
             )
           })}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
@@ -445,6 +764,8 @@ interface ConversationMessageBubbleProps {
   userAvatarUrlOverride?: string
   userAvatarSeedOverride?: string
   userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
+  isAwaitingToolResults?: boolean
+  isLastMessage?: boolean
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -504,6 +825,8 @@ const MemoizedMessageBubble = memo(
     userAvatarUrlOverride,
     userAvatarSeedOverride,
     userAvatarFallbackVariantOverride,
+    isAwaitingToolResults = false,
+    isLastMessage = false,
   }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
@@ -521,7 +844,7 @@ const MemoizedMessageBubble = memo(
               {/* Attachments outside bubble */}
               {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
               {/* Message bubble (match navigation/sidebar background color) */}
-              <div className={`w-full sm:w-auto bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
+              <div className={`w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
                 <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
                 {message.sending && (
                   <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
@@ -583,6 +906,8 @@ const MemoizedMessageBubble = memo(
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
+                isAwaitingToolResults={isAwaitingToolResults}
+                isLastMessage={isLastMessage}
               />
             </div>
           </div>
@@ -608,13 +933,13 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.content !== nextProps.message.content) return false
 
     // Re-render when reasoning text changes (server may replace aggregated with finalized)
-    const prevReasoning = (prevProps.message as any).reasoning
-    const nextReasoning = (nextProps.message as any).reasoning
+    const prevReasoning = (prevProps.message as ExtendedMessage).reasoning
+    const nextReasoning = (nextProps.message as ExtendedMessage).reasoning
     if (prevReasoning !== nextReasoning) return false
 
     // Re-render when reasoningChunks count changes (reasoning-first streaming)
-    const prevRChunks = (prevProps.message as any).reasoningChunks?.length ?? 0
-    const nextRChunks = (nextProps.message as any).reasoningChunks?.length ?? 0
+    const prevRChunks = (prevProps.message as ExtendedMessage).reasoningChunks?.length ?? 0
+    const nextRChunks = (nextProps.message as ExtendedMessage).reasoningChunks?.length ?? 0
     if (prevRChunks !== nextRChunks) return false
 
     // Re-render when content chunks count changes
@@ -623,8 +948,8 @@ const MemoizedMessageBubble = memo(
     if (prevChunks !== nextChunks) return false
 
     // Re-render when tool calls count changes
-    const prevCalls = (prevProps.message as any).toolCalls?.length ?? 0
-    const nextCalls = (nextProps.message as any).toolCalls?.length ?? 0
+    const prevCalls = (prevProps.message as ExtendedMessage).toolCalls?.length ?? 0
+    const nextCalls = (nextProps.message as ExtendedMessage).toolCalls?.length ?? 0
     if (prevCalls !== nextCalls) return false
 
     // Re-render when user overrides change (demo/internal chats)
@@ -635,8 +960,8 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
-    const prevToolResults = (prevProps.message as any).toolResults?.length ?? 0
-    const nextToolResults = (nextProps.message as any).toolResults?.length ?? 0
+    const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0
+    const nextToolResults = (nextProps.message as ExtendedMessage).toolResults?.length ?? 0
     if (prevToolResults !== nextToolResults) return false
 
     return true

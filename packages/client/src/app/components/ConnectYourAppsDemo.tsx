@@ -71,7 +71,7 @@ export default function ConnectYourAppsDemo() {
         })}
 
         <div
-          className="flex items-center justify-center px-3.5 py-3 rounded bg-black/20 border border-white/10"
+          className="flex items-center px-3.5 py-3 rounded bg-black/20 border border-white/10"
           aria-label="And more"
         >
           <div className="min-w-0 text-sm sm:text-base text-white/80 truncate">and more...</div>

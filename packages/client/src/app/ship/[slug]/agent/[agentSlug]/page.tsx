@@ -7,7 +7,6 @@ import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
 
 import { AgentBuilderView, AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
-import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
@@ -18,7 +17,6 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import api, { agentAPI } from '@/lib/api'
 import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents } from '@/hooks/useConversations'
-import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { useAuth } from '@/hooks/useAuth'
 import { Badge } from '@/components/ui/badge'
 import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
@@ -36,8 +34,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const { data: starship } = useStarshipBySlug(slug, true)
   const agentBuilderRef = useRef<AgentBuilderViewRef>(null)
   const messageInputRef = useRef<ConversationMessageInputRef>(null)
-  // Baseline index for tool-call-driven navigation while streaming (tool builder route)
-  const toolNavInitialCountRef = useRef<number | null>(null)
   const queryClient = useQueryClient()
   const conversationId = searchParams.get('conversationId') || null
   const { data: agents = [], isLoading: isLoadingAgents } = useStarshipAgents(starship?.id || '', !!starship?.id)
@@ -49,24 +45,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
 
   // Keep conversation streaming state via the ship-layout provider
   const { messages: liveMessages = [], isResponding } = useConversationStreamContext()
-  const deferredToolCreate = useDeferredToolCreationModal({
-    liveMessages,
-    isStreaming: isResponding,
-    starshipSlug: String(slug),
-    conversationId,
-    starshipId: starship?.id || null,
-    agents,
-    setLeadingMentionAgent: (agent: any, afterText?: string) => {
-      try {
-        messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
-      } catch {}
-    },
-    focusInput: () => {
-      try {
-        messageInputRef.current?.focusInput?.()
-      } catch {}
-    },
-  })
 
   // Control the expandable overlay: user-driven; semi-expanded shows automatically while streaming
   const [isOverlayExpanded, setIsOverlayExpanded] = useState<boolean>(false)
@@ -94,62 +72,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
       agentBuilderRef.current.updateField('slug', String(agentSlug))
     }
   }, [agentSlug])
-
-  // Detect tool-related calls while streaming and navigate to Tool Builder
-  useEffect(() => {
-    if (!conversationId || !liveMessages.length || !isResponding) return
-
-    // On first render, record initial message count and don't process
-    if (toolNavInitialCountRef.current === null) {
-      toolNavInitialCountRef.current = liveMessages.length
-      return
-    }
-
-    // Only process if new messages have arrived
-    if (liveMessages.length <= toolNavInitialCountRef.current) {
-      return
-    }
-
-    // Tool-related fragments to monitor (align with ConversationInterface)
-    const toolRelatedFragments = ['open-tool', 'edit-tool', 'modify-tool-blueprint-node', 'modify-tool-blueprint-edge']
-
-    // Process only NEW messages (those after initial count)
-    const newMessages = liveMessages.slice(toolNavInitialCountRef.current)
-
-    for (const msg of newMessages as any[]) {
-      if (msg?.role !== 'assistant' || !Array.isArray(msg?.toolCalls)) continue
-
-      for (const toolCall of msg.toolCalls as any[]) {
-        const funcName = toolCall?.function?.name as string | undefined
-        const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
-        if (!funcNameLc) continue
-        if (!(toolRelatedFragments.some(s => funcNameLc.includes(s)) || funcNameLc.includes('tool-blueprint-'))) continue
-
-        // Parse arguments
-        let args: any = toolCall?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {
-            // ignore parse errors
-          }
-        }
-
-        // Extract tool slug from arguments (check both slug and toolSlug, default to 'new')
-        const nextToolSlug: string = args?.slug || args?.toolSlug || 'new'
-
-        // Don't navigate if we're somehow trying to navigate to ourselves
-        if (nextToolSlug === agentSlug) {
-          continue
-        }
-
-        // Construct URL with conversationId query param if present
-        const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-        router.push(`/ship/${slug}/tool/${encodeURIComponent(nextToolSlug)}${q}`)
-        return
-      }
-    }
-  }, [conversationId, liveMessages, slug, router, agentSlug, isResponding])
 
   // Resolve agent id from the already-fetched starship agent list to avoid slug-based lookups.
   const resolvedAgentId = useMemo(() => {
@@ -454,16 +376,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
           </Dialog>
 
           <div className="relative w-full rounded-2xl bg-background/80 shadow-sm min-h-[600px] mb-16">
-            <ToolCreatedModal
-              open={deferredToolCreate.isOpen}
-              names={deferredToolCreate.createdNames}
-              onOpenChange={deferredToolCreate.setIsOpen}
-              onOpenTool={deferredToolCreate.openToolInBuilder}
-              slugs={deferredToolCreate.createdSlugs}
-              tools={Array.isArray(deferredToolCreate.createdTools) ? (deferredToolCreate.createdTools as any) : undefined}
-              onAskGaiaAssignTool={deferredToolCreate.askGaiaAssignTool}
-            />
-
             <div className="relative h-full w-full">
               {isResolvingExistingAgentId ? (
                 <div className="flex items-center justify-center min-h-[600px]">

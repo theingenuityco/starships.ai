@@ -117,19 +117,32 @@ export function ConversationMessageList({
     const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
 
     // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
+    // IMPORTANT: For assistant messages with tool calls, deduplicate by (id + toolCallIds) to preserve
+    // multiple assistant messages with the same id but different tool calls
     const seenIds = new Set<string>()
     const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
     for (const m of sortedMessages) {
       const key = m.id != null ? String(m.id) : null
       if (key) {
-        if (seenIds.has(key)) continue
-        seenIds.add(key)
+        // For assistant messages with tool calls, create a composite key to preserve messages with different tool calls
+        if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
+          const toolCallIds = m.toolCalls.map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId).filter(Boolean).join(',')
+          const compositeKey = `${key}:${toolCallIds}`
+          if (seenIds.has(compositeKey)) continue
+          seenIds.add(compositeKey)
+        } else {
+          if (seenIds.has(key)) continue
+          seenIds.add(key)
+        }
       }
       uniqueMessages.push(m)
     }
 
     // Collapse temp assistant shell followed by concrete assistant from server (UI-level safety if merging missed)
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
+    
+    
+    
     for (let i = 0; i < uniqueMessages.length; i++) {
       const cur = uniqueMessages[i] as ExtendedMessage
 
@@ -202,10 +215,23 @@ export function ConversationMessageList({
             collapsedMessages.push(cur)
             continue
           }
+          // IMPORTANT: When multiple assistant messages exist in sequence, we need to be careful
+          // If the next message is also an assistant, check if it has tool calls
+          // If it does, the current blank shell might be a placeholder that should be dropped
+          // If it doesn't, preserve the current one to avoid losing messages
           const next = uniqueMessages[i + 1] as ExtendedMessage | undefined
           if (next && next.role === 'assistant') {
-            // skip current blank shell; next will be processed/pushed in subsequent iterations
-            continue
+            const nextHasToolCalls = Array.isArray(next.toolCalls) && next.toolCalls.length > 0
+            // If next has tool calls, current blank shell is likely a placeholder - skip it
+            // If next doesn't have tool calls either, preserve current to avoid losing messages
+            if (nextHasToolCalls) {
+              // skip current blank shell; next will be processed/pushed in subsequent iterations
+              continue
+            } else {
+              // Both are blank - preserve current
+              collapsedMessages.push(cur)
+              continue
+            }
           } else {
             // trailing blank shell — drop it
             continue
@@ -270,12 +296,48 @@ export function ConversationMessageList({
         })
       }
       // Only add tool result messages if they weren't already grouped with their tool calls
-      else if (message.messageType === 'tool_result' && !processedResultIds.has(message.id)) {
-        groupedMessages.push(message)
+      // IMPORTANT: Do NOT render standalone tool_result messages.
+      // Tool results should only render within the assistant message's tool panel once the matching tool call is present.
+      // This prevents the UI from showing orphan tool results (which can happen when results arrive before the
+      // assistant tool-call message is present client-side).
+      else if (message.messageType === 'tool_result') {
       }
       // For all other messages, add them normally
       else if (message.messageType !== 'tool_result') {
         groupedMessages.push(message)
+      }
+    }
+
+    // Cleanup pass: Find standalone tool results and attach them to matching assistant messages
+    // This handles the case where tool results arrive before their assistant messages
+    const standaloneToolResults = groupedMessages.filter(m => m.messageType === 'tool_result' && !processedResultIds.has(m.id))
+    for (let i = groupedMessages.length - 1; i >= 0; i--) {
+      const msg = groupedMessages[i] as ExtendedMessage
+      if (msg.messageType === 'tool_result' && !processedResultIds.has(msg.id)) {
+        const toolResultMsg = msg as ExtendedMessage & { toolCallId?: string; call_id?: string }
+        const toolCallId = toolResultMsg.toolCallId ?? toolResultMsg.call_id ?? msg.id
+        if (toolCallId != null) {
+          // Look for an assistant message that has this tool call
+          for (let j = 0; j < groupedMessages.length; j++) {
+            const assistantMsg = groupedMessages[j] as ExtendedMessage
+            if (assistantMsg.role === 'assistant' && Array.isArray(assistantMsg.toolCalls) && assistantMsg.toolCalls.length > 0) {
+              const hasMatchingToolCall = assistantMsg.toolCalls.some(tc => {
+                const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+                const tcId = tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+                return tcId != null && String(tcId) === String(toolCallId)
+              })
+              if (hasMatchingToolCall) {
+                // Attach this tool result to the assistant message
+                const existingResults = Array.isArray(assistantMsg.toolResults) ? assistantMsg.toolResults : []
+                assistantMsg.toolResults = [...existingResults, msg]
+                processedResultIds.add(msg.id) // Mark as processed
+                // Remove from groupedMessages
+                groupedMessages.splice(i, 1)
+                break
+              }
+            }
+          }
+        }
       }
     }
 
@@ -290,7 +352,8 @@ export function ConversationMessageList({
       const hasReasoning = typeof extendedMsg.reasoning === 'string' && extendedMsg.reasoning.trim().length > 0
       const hasToolCalls = Array.isArray(extendedMsg.toolCalls) && extendedMsg.toolCalls.length > 0
       const hasAttachments = Array.isArray(extendedMsg.attachmentIds) && extendedMsg.attachmentIds.length > 0
-      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments
+      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments
+      return shouldKeep
     })
 
     return pruned
@@ -328,7 +391,8 @@ export function ConversationMessageList({
       const hasAttachments = Array.isArray(msg.attachmentIds) && msg.attachmentIds.length > 0
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments
     }
-    return displayMessages.filter(canRenderAssistant)
+    const filtered = displayMessages.filter(canRenderAssistant)
+    return filtered
   }, [displayMessages])
 
   // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)

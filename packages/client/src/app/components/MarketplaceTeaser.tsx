@@ -15,7 +15,23 @@ export default function MarketplaceTeaser() {
   const agentCount = agentTemplates.length
   const toolCount = toolTemplates.length
 
-  const featuredAgents = agentTemplates.slice(0, 9)
+  const featuredAgents = (() => {
+    // Curate a small set that matches the hero demo. Fallback to the first N templates if not found.
+    const wanted = ['Doc Organizer', 'Lead Generator', 'Aria']
+    const normalize = (s: unknown) => String(s ?? '').trim().toLowerCase()
+    const byNameOrSlug = (name: string) => {
+      const n = normalize(name)
+      return (
+        agentTemplates.find(t => normalize(t.name) === n) ??
+        agentTemplates.find(t => normalize((t as any).slug) === n) ??
+        agentTemplates.find(t => normalize(t.name).includes(n))
+      )
+    }
+
+    const picked = wanted.map(byNameOrSlug).filter(Boolean) as typeof agentTemplates
+    if (picked.length >= 2) return picked.slice(0, 9)
+    return agentTemplates.slice(0, 9)
+  })()
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
 

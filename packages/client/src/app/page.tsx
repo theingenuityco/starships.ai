@@ -64,9 +64,9 @@ export default function HomePage() {
 
           {/* New Landing Sections */}
           <Hero />
+          <MarketplaceTeaser />
           <WhatAreAgents />
           <UseCases />
-          <MarketplaceTeaser />
           <Security />
           <PricingTeaser />
           <FAQ />

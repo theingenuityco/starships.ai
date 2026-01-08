@@ -55,7 +55,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
     const titleForPath = (path: string): string | null => {
       // Public pages
-      if (path === '/') return 'Starships.ai | Hire your AI team, brief them in plain language'
+      if (path === '/') return 'Starships.ai | Hire your AI staff, brief them in plain language'
       if (path === '/marketplace') return 'Marketplace | Starships.ai'
       if (path === '/login') return 'Login | Starships.ai'
       if (path === '/forgot-password') return 'Forgot Password | Starships.ai'

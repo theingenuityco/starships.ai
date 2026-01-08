@@ -38,7 +38,7 @@ const CONVOS: Record<ConvoId, ConvoConfig> = {
     tabName: 'Demo',
     actorName: 'Aria',
     agentSeed: 'Aria',
-    subtitle: 'Q&A: what is Starships.ai?',
+    subtitle: 'Pick a first‑week win (live demo)',
   },
   doc_organizer: {
     id: 'doc_organizer',
@@ -117,13 +117,13 @@ function createAbortableSleep(signal: AbortSignal) {
 const ARIA_TIMELINE: Step[] = [
   {
     role: 'user',
-    content: 'What is Starships.ai?',
+    content: 'What can Starships.ai do?',
   },
   {
     role: 'assistant',
     agentName: 'Aria',
     content:
-      'Starships.ai is where you build, manage, and deploy an AI team.\n\n- Create agents with clear roles and rules\n- Give them tools (connectors + automations)\n- Delegate work, watch progress stream live, and ship results\n\nDo you want to see a demo?',
+      'Starships.ai helps you put **AI staff** to work:\n\n- Triage inbox and draft replies\n- Organize files and clean up docs\n- Set up campaigns and workflows\n\nPick a quick demo to see it end‑to‑end (with approvals):',
   },
 ]
 
@@ -447,18 +447,14 @@ const LEAD_GENERATOR_TIMELINE: Step[] = [
     messageType: 'tool_result',
     toolCallId: 'tc_lg_copy_a',
     noStream: true,
-    content: JSON.stringify(
-      { status: 'ok', variant: 'A', primaryText: 'Delegate ops work to an AI team — see tools + results in real time.', headline: 'Request a demo', cta: 'Request demo' },
-      null,
-      2
-    ),
+    content: JSON.stringify({ status: 'ok', variant: 'A', primaryText: 'Delegate ops work to AI staff — see tools + results in real time.', headline: 'Request a demo', cta: 'Request demo' }, null, 2),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
     toolCallId: 'tc_lg_copy_b',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', variant: 'B', primaryText: 'Replace manual handoffs with an AI team (with approvals).', headline: 'Get demo requests', cta: 'Request demo' }, null, 2),
+    content: JSON.stringify({ status: 'ok', variant: 'B', primaryText: 'Replace manual handoffs with AI staff (with approvals).', headline: 'Get demo requests', cta: 'Request demo' }, null, 2),
   },
   {
     role: 'tool',

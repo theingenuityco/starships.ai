@@ -74,27 +74,28 @@ export default function Hero() {
           <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
             {(() => {
               const v = getHeadlineVariant()
-              if (v === 'B') return 'Hire your AI team, then brief them in plain language'
-              if (v === 'C') return 'A team of AI specialists that ships work with you'
+              if (v === 'B') return 'Hire your AI staff, brief in plain language'
+              if (v === 'C') return 'Turn prompts into workflows'
               return (
                 <>
-                  Your very own{' '}
                   <span className="warp-word" data-text="ai">
                     <span className="warp-letter">A</span>
                     <span className="warp-letter">I</span>
                   </span>
                   &nbsp;
-                  <span className="warp-word" data-text="team">
+                  <span className="warp-word" data-text="staff">
+                    <span className="warp-letter">s</span>
                     <span className="warp-letter">t</span>
-                    <span className="warp-letter">e</span>
                     <span className="warp-letter">a</span>
-                    <span className="warp-letter">m</span>
+                    <span className="warp-letter">f</span>
+                    <span className="warp-letter">f</span>
                   </span>
+                  &nbsp;to manage your work
                 </>
               )
             })()}
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed max-w-[60ch] mx-auto">Build, manage and deploy agents to handle the busy work.</p>
+          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed max-w-[72ch] mx-auto">Triage your inbox, run your socials, manage products — and much more.</p>
           <div className="flex flex-col items-center gap-3 justify-center">
             <Button
               size="lg"
@@ -171,6 +172,9 @@ export default function Hero() {
         }
         .warp-letter:nth-child(4) {
           animation-delay: 180ms;
+        }
+        .warp-letter:nth-child(5) {
+          animation-delay: 240ms;
         }
 
         @keyframes warp-letter-in {

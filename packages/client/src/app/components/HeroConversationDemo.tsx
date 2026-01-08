@@ -124,7 +124,7 @@ const ARIA_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Aria',
     content:
-      'Starships.ai is a platform where you can **hire and run AI employees**:\n\n- Hire specialists in minutes (no recruiting or onboarding)\n- Connect to your existing apps and workflows\n- Stay in control with live timelines, isolation, and approvals\n\nPick a quick demo to see it end‑to‑end:',
+      'Starships.ai helps you **delegate real work** to AI teammates that can follow workflows and show their progress.\n\n- Get a specialist for a task (ops, marketing, docs, research, etc.)\n- Connect tools/apps and run step‑by‑step with visible tool results\n- Stay in control with guardrails like approvals and reviewable changes\n\nPick a quick demo to see it end‑to‑end:',
   },
 ]
 

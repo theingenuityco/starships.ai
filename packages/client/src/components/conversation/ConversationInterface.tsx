@@ -18,8 +18,6 @@ import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useStarship } from '@/hooks/useStarships'
 import type { Agent } from '@/lib/api'
 import api, { agentAPI, templateAPI, toolAPI } from '@/lib/api'
-import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
-import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import { toast } from 'sonner'
@@ -728,30 +726,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     const liveMessages = (ctx?.messages as any[]) || []
     const lastUIAction = (ctx as any)?.lastUIAction
     const prevStreamingRef = useRef(false)
-    const deferredAgentCreate = useDeferredAgentCreationModal({
-      liveMessages,
-      isStreaming: uiStreaming,
-      starshipSlug,
-      conversationId: currentConversationId || externalConversationId || null,
-      starshipId,
-      agents: Array.isArray(starshipAgentsData) ? starshipAgentsData : undefined,
-      setLeadingMentionAgent: (agent: any, afterText?: string) => {
-        try {
-          console.debug('[ConversationInterface] forwarding setLeadingMentionAgent', {
-            agent: { id: agent?.id, name: agent?.name, slug: agent?.slug },
-            afterText,
-          })
-        } catch {}
-        try {
-          messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
-        } catch {}
-      },
-      focusInput: () => {
-        try {
-          messageInputRef.current?.focusInput?.()
-        } catch {}
-      },
-    })
     const deferredToolCreate = useDeferredToolCreationModal({
       liveMessages,
       isStreaming: uiStreaming,
@@ -852,14 +826,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
     return (
       <>
-        <AgentCreatedModal
-          open={deferredAgentCreate.isOpen}
-          names={deferredAgentCreate.createdNames}
-          onOpenChange={deferredAgentCreate.setIsOpen}
-          onChatWithAgent={deferredAgentCreate.chatWithAgent}
-          onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
-          agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
-        />
         <ToolCreatedModal
           open={deferredToolCreate.isOpen}
           names={deferredToolCreate.createdNames}

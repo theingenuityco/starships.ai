@@ -78,7 +78,7 @@ const DEMO_CONVERSATIONS: Record<
     userIsAgent: boolean
   }
 > = {
-  main: { id: 'main', label: 'Aria ↔ You', leftAgentName: 'Aria', leftAgentSeed: 'Aria', rightUserLabel: 'You', rightUserSeed: 'You', userIsAgent: false },
+  main: { id: 'main', label: 'You ↔ Aria', leftAgentName: 'Aria', leftAgentSeed: 'Aria', rightUserLabel: 'You', rightUserSeed: 'You', userIsAgent: false },
   gaia: { id: 'gaia', label: 'Aria ↔ Gaia', leftAgentName: 'Gaia', leftAgentSeed: 'Gaia', rightUserLabel: 'Aria', rightUserSeed: 'Aria', userIsAgent: true },
   daedalus: {
     id: 'daedalus',
@@ -662,7 +662,7 @@ export default function DelegationDemo() {
                       <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.main.label}</div>
                       <div className="mt-1 flex items-center gap-2 min-w-0">
                         <div className="text-xs text-muted-foreground truncate">
-                          {DEMO_CONVERSATIONS.main.leftAgentName}, {DEMO_CONVERSATIONS.main.rightUserLabel} · Delegator conversation
+                          {DEMO_CONVERSATIONS.main.rightUserLabel}, {DEMO_CONVERSATIONS.main.leftAgentName} · Delegator conversation
                         </div>
                       </div>
                     </div>

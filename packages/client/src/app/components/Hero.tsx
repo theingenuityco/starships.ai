@@ -66,8 +66,8 @@ export default function Hero() {
   }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
-    <section className="pt-24 sm:pt-32 md:pt-44 lg:pt-52 pb-16 sm:pb-20 px-4 sm:px-6">
-      <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
+    <section className="min-h-[100dvh] flex items-center px-4 sm:px-6 py-24 sm:py-28">
+      <div className="w-full max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
         <div className="w-full min-w-0">
           <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
             {(() => {
@@ -97,7 +97,8 @@ export default function Hero() {
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Triage your inbox, run your socials, manage products — and much more.
           </p>
-          <div className="flex flex-col items-center gap-3 justify-center w-full min-w-0">
+          <div className="flex flex-col items-center gap-4 justify-center w-full min-w-0">
+            <HeroMarketplaceCarousel />
             <Button
               size="lg"
               className="h-14 sm:h-16 w-full max-w-[28rem] px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
@@ -119,7 +120,6 @@ export default function Hero() {
               </span>
               {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get started for free'}
             </Button>
-            <HeroMarketplaceCarousel />
           </div>
         </div>
       </div>

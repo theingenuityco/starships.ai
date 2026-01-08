@@ -53,34 +53,32 @@ import { Skeleton } from '@/components/ui/skeleton'
   }, [])
 
   const featuredAgents = useMemo(() => {
-     // Prefer a few "known good" agents, then fill from the rest.
-     const wanted = ['Aria', 'Iris', 'Saga']
-     const picked: typeof agentTemplates = []
- 
-     for (const name of wanted) {
-       const n = normalize(name)
-       const found =
-         agentTemplates.find(t => normalize(t.name) === n) ??
-         agentTemplates.find(t => normalize((t as any).slug) === n) ??
-         agentTemplates.find(t => normalize(t.name).includes(n))
-       if (found && !picked.some(p => p.id === found.id)) picked.push(found)
-     }
- 
-     for (const t of agentTemplates) {
-      if (picked.length >= 64) break
-       if (!picked.some(p => p.id === t.id)) picked.push(t)
-     }
- 
-    if (picked.length === 0) return []
-    if (picked.length >= 64) return picked.slice(0, 64)
+    // Prefer a few "known good" agents, then fill from the rest.
+    const wanted = ['Aria', 'Iris', 'Saga']
+    const picked: typeof agentTemplates = []
 
-    // If we have fewer templates than the layout needs, repeat them to keep the carousel feeling "full".
-    const minSlides = Math.min(64, Math.max(cardsPerView * 6, cardsPerView + 8))
-    if (picked.length < minSlides) {
-      return Array.from({ length: minSlides }, (_, idx) => picked[idx % picked.length]!)
+    for (const name of wanted) {
+      const n = normalize(name)
+      const found =
+        agentTemplates.find(t => normalize(t.name) === n) ??
+        agentTemplates.find(t => normalize((t as any).slug) === n) ??
+        agentTemplates.find(t => normalize(t.name).includes(n))
+      if (found && !picked.some(p => p.id === found.id)) picked.push(found)
     }
 
-    return picked
+    for (const t of agentTemplates) {
+      if (picked.length >= 64) break
+      if (!picked.some(p => p.id === t.id)) picked.push(t)
+    }
+
+    const templates = picked.slice(0, 64)
+    if (templates.length === 0) return { templates: [], slideCount: 0 }
+
+    // If we have fewer templates than the layout needs, keep the carousel feeling "full"
+    // without allocating a repeated array of template objects.
+    const minSlides = Math.min(64, Math.max(cardsPerView * 6, cardsPerView + 8))
+    const slideCount = Math.max(templates.length, minSlides)
+    return { templates, slideCount }
   }, [agentTemplates, cardsPerView])
  
   // Autoplay the hero carousel slowly (pause on hover).
@@ -128,7 +126,8 @@ import { Skeleton } from '@/components/ui/skeleton'
                   </div>
                  </CarouselItem>
                ))
-             : featuredAgents.map((template, idx) => {
+             : Array.from({ length: featuredAgents.slideCount }, (_, idx) => {
+                 const template = featuredAgents.templates[idx % featuredAgents.templates.length]!
                  const name = String(template.name ?? '').trim()
                  const role = String((template as any)?.role ?? '').trim()
                  const primaryLabel =

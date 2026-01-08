@@ -30,6 +30,54 @@ interface StreamChunk {
   timestamp: number
 }
 
+/**
+ * Aggregate stream chunks into a single string.
+ *
+ * Notes:
+ * - Some producers emit true deltas (content = new tokens only)
+ * - Others emit cumulative chunks (content = full text so far)
+ * - `position` is treated as the accumulated length after applying the chunk (if present).
+ *
+ * This function is defensive and avoids the common "duplicate on completion" glitch where a final
+ * cumulative chunk would otherwise get concatenated onto prior deltas.
+ */
+function aggregateStreamChunks(chunks: StreamChunk[]): string {
+  if (!Array.isArray(chunks) || chunks.length === 0) return ''
+  const sorted = [...chunks].sort((a, b) => a.position - b.position)
+  let agg = ''
+
+  for (const c of sorted) {
+    const pos = typeof c.position === 'number' ? c.position : NaN
+    const text = String(c.content ?? '')
+    if (!text) continue
+
+    // If position is invalid, fall back to naive concatenation.
+    if (!Number.isFinite(pos) || pos <= 0) {
+      agg += text
+      continue
+    }
+
+    // If this chunk looks cumulative (or otherwise longer than the missing delta),
+    // only take the missing suffix so we don't duplicate what we've already shown.
+    const missing = pos - agg.length
+    if (missing <= 0) continue
+
+    if (text.length >= pos) {
+      // Cumulative: content contains at least the first `pos` chars.
+      agg = text.slice(0, pos)
+      continue
+    }
+
+    if (text.length > missing) {
+      agg += text.slice(text.length - missing)
+    } else {
+      agg += text
+    }
+  }
+
+  return agg
+}
+
 function useSlabTypewriterText({
   fullText,
   isStreaming,
@@ -329,14 +377,7 @@ export function ConversationMessageContent({
       return content
     }
 
-    // Sort chunks by position to ensure correct order
-    const sortedChunks = [...chunks].sort((a, b) => a.position - b.position)
-
-    // Build content from chunks
-    let aggregated = ''
-    for (const chunk of sortedChunks) {
-      aggregated += chunk.content
-    }
+    const aggregated = aggregateStreamChunks(chunks)
 
     // While streaming, use aggregated chunks
     if (isStreaming) return aggregated
@@ -348,9 +389,7 @@ export function ConversationMessageContent({
   const displayReasoningFull = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0
     if (!hasR) return reasoning || ''
-    const sorted = [...reasoningChunks].sort((a, b) => a.position - b.position)
-    let agg = ''
-    for (const rc of sorted) agg += rc.content
+    const agg = aggregateStreamChunks(reasoningChunks)
     return isStreaming ? agg : reasoning && reasoning.trim().length > 0 ? reasoning : agg
   }, [reasoning, reasoningChunks, isStreaming])
 

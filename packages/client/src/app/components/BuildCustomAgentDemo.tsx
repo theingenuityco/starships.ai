@@ -108,8 +108,10 @@ export default function BuildCustomAgentDemo() {
       let chunks: DemoStreamChunk[] = []
       for (const part of parts) {
         if (cancelled) return
+        // IMPORTANT: `ConversationMessageContent.aggregateStreamChunks` treats `position` as a
+        // cumulative character position (not a chunk index).
+        position += part.length
         chunks = [...chunks, { content: part, position, timestamp: Date.now() }]
-        position += 1
         updateMessage(id, { chunks, streaming: true })
         await sleep(105)
       }

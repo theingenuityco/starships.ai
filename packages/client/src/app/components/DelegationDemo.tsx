@@ -518,8 +518,10 @@ export default function DelegationDemo() {
 
             for (const part of parts) {
               if (cancelled || abortController.signal.aborted) return
+              // IMPORTANT: `ConversationMessageContent.aggregateStreamChunks` treats `position` as a
+              // cumulative character position (not a chunk index).
+              position += part.length
               chunks = [...chunks, { content: part, position, timestamp: Date.now() }]
-              position += 1
               updateMessage(step.convoId, id, { chunks, streaming: true })
               await sleep(70)
             }

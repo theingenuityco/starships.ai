@@ -18,7 +18,7 @@ export default function MarketplaceTeaser() {
 
   const featuredAgents = (() => {
     // Curate a small set that matches the hero demo. Fallback to the first N templates if not found.
-    const wanted = ['Doc Organizer', 'Lead Generator', 'Aria']
+    const wanted = ['Aria', 'Iris', 'Saga']
     const normalize = (s: unknown) => String(s ?? '').trim().toLowerCase()
     const byNameOrSlug = (name: string) => {
       const n = normalize(name)

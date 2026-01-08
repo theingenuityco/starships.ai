@@ -26,15 +26,15 @@ export default function ConnectYourAppsDemo() {
 
   const connectors: ConnectorTile[] = useMemo(
     () => [
-      { provider: 'context7', label: 'Context7' },
-      { provider: 'cursor', label: 'Cursor' },
-      { provider: 'discord', label: 'Discord' },
-      { provider: 'github', label: 'GitHub' },
       { provider: 'gmail', label: 'Gmail' },
       { provider: 'google_drive', label: 'Google Drive' },
-      { provider: 'linkedin', label: 'LinkedIn' },
-      { provider: 'shopify', label: 'Shopify' },
       { provider: 'wordpress', label: 'WordPress' },
+      { provider: 'discord', label: 'Discord' },
+      { provider: 'shopify', label: 'Shopify' },
+      { provider: 'github', label: 'GitHub' },
+      { provider: 'linkedin', label: 'LinkedIn' },
+      { provider: 'cursor', label: 'Cursor' },
+      { provider: 'context7', label: 'Context7' },
     ],
     []
   )
@@ -69,6 +69,13 @@ export default function ConnectYourAppsDemo() {
             </div>
           )
         })}
+
+        <div
+          className="flex items-center justify-center px-3.5 py-3 rounded bg-black/20 border border-white/10"
+          aria-label="And more"
+        >
+          <div className="min-w-0 text-sm sm:text-base text-white/80 truncate">and more...</div>
+        </div>
       </div>
 
       <div className="text-xs text-muted-foreground mt-3">Grant scoped access so agents can read, write, and act safely.</div>

@@ -75,11 +75,25 @@ export default function DeployAgentDemo() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
           {[0, 1, 2].map(i => (
             <div key={i} className="rounded-2xl overflow-hidden border border-white/20 bg-background/60 shadow-md shadow-black/30 p-4">
-              <Skeleton className="h-4 w-28 mb-3" />
-              <div className="flex items-center gap-2">
-                <Skeleton className="h-[104px] w-[92px] sm:h-[112px] sm:w-[104px] md:h-[120px] md:w-[112px] rounded-2xl" />
-                <Skeleton className="h-[104px] w-[92px] sm:h-[112px] sm:w-[104px] md:h-[120px] md:w-[112px] rounded-2xl" />
-                <Skeleton className="h-[104px] w-[92px] sm:h-[112px] sm:w-[104px] md:h-[120px] md:w-[112px] rounded-2xl" />
+              <Skeleton className="h-4 w-28" />
+              <div className="mt-3 flex items-start gap-2">
+                {[0, 1, 2].map(j => (
+                  <div
+                    key={j}
+                    className="w-[92px] sm:w-[104px] md:w-[112px] rounded-2xl border border-border/50 bg-muted/10 p-1.5"
+                    aria-hidden
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
+                        <Skeleton className="w-full h-full rounded-2xl" />
+                      </div>
+                      <div className="min-w-0 w-full px-1 text-left">
+                        <Skeleton className="h-3 w-16" />
+                        <Skeleton className="mt-0.5 h-[11px] w-12" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           ))}

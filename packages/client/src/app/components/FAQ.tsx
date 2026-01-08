@@ -3,7 +3,7 @@ import { Card } from '@/components/ui/card'
 const QA = [
   {
     q: 'What is Starships.ai?',
-    a: 'Starships is a workspace where you assemble an AI team: specialists you can brief, equip with tools, and collaborate with to get real work done.',
+    a: 'Starships is a workspace where you assemble AI staff: specialists you can brief, equip with tools, and collaborate with to get real work done.',
   },
   {
     q: 'How do I get started?',

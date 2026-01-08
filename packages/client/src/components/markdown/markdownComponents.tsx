@@ -199,6 +199,7 @@ export function getMarkdownComponents({ theme, enableLinkPreview = true, message
     h1: ({ children }: any) => <h1 className="text-xl font-bold mt-4 mb-2 first:mt-0">{children}</h1>,
     h2: ({ children }: any) => <h2 className="text-lg font-semibold mt-3 mb-2 first:mt-0">{children}</h2>,
     h3: ({ children }: any) => <h3 className="text-base font-medium mt-3 mb-2 first:mt-0">{children}</h3>,
+    hr: () => <hr className="border-t-2 border-border my-6" />,
   }
 }
 

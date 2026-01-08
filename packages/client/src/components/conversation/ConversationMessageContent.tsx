@@ -22,11 +22,222 @@ import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
+import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 
 interface StreamChunk {
   content: string
   position: number
   timestamp: number
+}
+
+/**
+ * Aggregate stream chunks into a single string.
+ *
+ * Notes:
+ * - Some producers emit true deltas (content = new tokens only)
+ * - Others emit cumulative chunks (content = full text so far)
+ * - `position` is treated as the accumulated length after applying the chunk (if present).
+ *
+ * This function is defensive and avoids the common "duplicate on completion" glitch where a final
+ * cumulative chunk would otherwise get concatenated onto prior deltas.
+ */
+function aggregateStreamChunks(chunks: StreamChunk[]): string {
+  if (!Array.isArray(chunks) || chunks.length === 0) return ''
+  const sorted = [...chunks].sort((a, b) => a.position - b.position)
+  let agg = ''
+
+  for (const c of sorted) {
+    const pos = typeof c.position === 'number' ? c.position : NaN
+    const text = String(c.content ?? '')
+    if (!text) continue
+
+    // If position is invalid, fall back to naive concatenation.
+    if (!Number.isFinite(pos) || pos <= 0) {
+      agg += text
+      continue
+    }
+
+    // If this chunk looks cumulative (or otherwise longer than the missing delta),
+    // only take the missing suffix so we don't duplicate what we've already shown.
+    const missing = pos - agg.length
+    if (missing <= 0) continue
+
+    if (text.length >= pos) {
+      // Cumulative: content contains at least the first `pos` chars.
+      agg = text.slice(0, pos)
+      continue
+    }
+
+    if (text.length > missing) {
+      agg += text.slice(text.length - missing)
+    } else {
+      agg += text
+    }
+  }
+
+  return agg
+}
+
+function useSlabTypewriterText({ fullText, isStreaming, resetKey, onComplete }: { fullText: string; isStreaming: boolean; resetKey: string; onComplete?: () => void }) {
+  // Slab-based typewriter effect: reveal chunks of text at a time
+  const [displayedLength, setDisplayedLength] = useState(0)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const displayedLengthRef = useRef<number>(0)
+  const targetLengthRef = useRef<number>(0)
+  const onCompleteRef = useRef<typeof onComplete>(onComplete)
+
+  // Avoid re-running the animation effect on every render due to unstable callback identities.
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    displayedLengthRef.current = displayedLength
+  }, [displayedLength])
+
+  // Reset displayed length when resetKey changes (new message / new stream)
+  useEffect(() => {
+    setDisplayedLength(0)
+    displayedLengthRef.current = 0
+    targetLengthRef.current = 0
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [resetKey])
+
+  useEffect(() => {
+    // Update target length ref whenever fullText changes
+    targetLengthRef.current = fullText.length
+
+    // If not streaming and we haven't started typewriting, sync the displayedLength
+    // This ensures state is correct even though displayText handles the rendering
+    if (!isStreaming && displayedLengthRef.current === 0 && fullText.length > 0) {
+      setDisplayedLength(fullText.length)
+      displayedLengthRef.current = fullText.length
+      onCompleteRef.current?.()
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+      return
+    }
+
+    // Calculate slab size and delay based on pending characters
+    // More pending = larger slabs and faster updates to catch up
+    const calculateSlabParams = (pending: number): { slabSize: number; delay: number } => {
+      if (pending <= 0) {
+        return { slabSize: 1, delay: 50 } // Small chunks when caught up
+      }
+
+      // Calculate slab size: larger when more pending
+      // Min slab: 3 chars, Max slab: 50 chars
+      const minSlab = 3
+      const maxSlab = 50
+      const slabScaleFactor = 20
+      const slabSize = Math.min(maxSlab, Math.max(minSlab, Math.round(minSlab + pending / slabScaleFactor)))
+
+      // Calculate delay: faster when more pending
+      // Min delay: 10ms, Max delay: 50ms
+      const minDelay = 10
+      const maxDelay = 50
+      const delayScaleFactor = 30
+      const delay = minDelay + (maxDelay - minDelay) / (1 + pending / delayScaleFactor)
+
+      return {
+        slabSize: Math.round(slabSize),
+        delay: Math.max(minDelay, Math.min(maxDelay, Math.round(delay))),
+      }
+    }
+
+    // Slab-based animation: reveal chunks of text at a time
+    const revealNextSlab = () => {
+      const current = displayedLengthRef.current
+      const target = targetLengthRef.current
+
+      if (current >= target) {
+        // All content revealed, stop and mark animation as complete
+        timeoutRef.current = null
+        onCompleteRef.current?.()
+        return
+      }
+
+      // Calculate pending and determine slab size
+      const pending = target - current
+      const { slabSize, delay } = calculateSlabParams(pending)
+
+      // Reveal next slab (but don't exceed target)
+      const next = Math.min(current + slabSize, target)
+      setDisplayedLength(next)
+      displayedLengthRef.current = next
+
+      // If we hit the target, complete immediately (avoid needing an extra tick).
+      if (next >= target) {
+        timeoutRef.current = null
+        onCompleteRef.current?.()
+        return
+      }
+
+      // Continue revealing slabs with dynamic delay
+      timeoutRef.current = setTimeout(revealNextSlab, delay)
+    }
+
+    // Continue animation if there's content to reveal (even after streaming stops)
+    // This ensures the typewriter effect completes smoothly
+    // Only start if we're streaming or have already started (displayedLength > 0)
+    if (timeoutRef.current === null && displayedLengthRef.current < targetLengthRef.current) {
+      // Only start typewriter if we're streaming or have already started (displayedLength > 0)
+      if (isStreaming || displayedLengthRef.current > 0) {
+        const pending = targetLengthRef.current - displayedLengthRef.current
+        const { delay, slabSize } = calculateSlabParams(pending)
+
+        // If just starting (displayedLength is 0), reveal first slab immediately
+        // then continue with delay for subsequent slabs
+        if (displayedLengthRef.current === 0 && pending > 0) {
+          // Reveal first slab immediately to avoid flash
+          const firstSlab = Math.min(slabSize, pending)
+          setDisplayedLength(firstSlab)
+          displayedLengthRef.current = firstSlab
+          // Then continue with delay for next slab
+          timeoutRef.current = setTimeout(revealNextSlab, delay)
+        } else {
+          // Already started, continue with delay
+          timeoutRef.current = setTimeout(revealNextSlab, delay)
+        }
+      }
+    }
+
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [fullText, isStreaming, resetKey])
+
+  // Build display text with typewriter effect
+  // Continue typewriter effect until it catches up to full text, even after streaming stops
+  const displayText = useMemo(() => {
+    // If not streaming and we haven't started typewriting (displayedLength is 0),
+    // show full text immediately. This handles completed messages.
+    if (!isStreaming && displayedLength === 0 && fullText.length > 0) {
+      return fullText
+    }
+    // If we're streaming and haven't started typewriting yet, show nothing
+    // This prevents the flash of content before animation starts
+    if (isStreaming && displayedLength === 0) {
+      return ''
+    }
+    // If we've started typewriting, show the revealed portion
+    if (displayedLength > 0) {
+      return fullText.slice(0, displayedLength)
+    }
+    // Fallback: show nothing if no content
+    return ''
+  }, [fullText, displayedLength, isStreaming])
+
+  return { displayText, displayedLength }
 }
 
 interface MessageContentProps {
@@ -48,6 +259,10 @@ interface MessageContentProps {
   // Attachments
   attachmentIds?: string[]
   starshipId?: string
+  // Whether we're awaiting tool results (for showing loading state)
+  isAwaitingToolResults?: boolean
+  // Whether this is the last message in the conversation
+  isLastMessage?: boolean
 }
 
 // Known widget types from public-docs
@@ -82,6 +297,8 @@ export function ConversationMessageContent({
   messageType,
   attachmentIds,
   starshipId,
+  isAwaitingToolResults = false,
+  isLastMessage = false,
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
@@ -91,13 +308,31 @@ export function ConversationMessageContent({
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
-  const normalizedToolCalls = useMemo<LlmToolCall[]>(() => (Array.isArray(toolCalls) ? (toolCalls as unknown as LlmToolCall[]).filter(tc => typeof tc === 'object' && tc !== null) : []), [toolCalls])
+  // Also require function object to exist for meaningful rendering
+  const normalizedToolCalls = useMemo<LlmToolCall[]>(() => {
+    if (!Array.isArray(toolCalls)) return []
+    return (toolCalls as unknown as LlmToolCall[]).filter(tc => {
+      if (typeof tc !== 'object' || tc === null) return false
+      const tcAny = tc as any
+      // Require function object to exist for meaningful rendering
+      if (!tcAny?.function || typeof tcAny.function !== 'object') return false
+      // Keep if function.name exists OR id exists OR function.arguments exists
+      const hasFunctionName = tcAny.function?.name != null && String(tcAny.function.name).trim().length > 0
+      const hasId = tcAny?.id != null && String(tcAny.id).trim().length > 0
+      const hasArguments =
+        tcAny.function?.arguments != null &&
+        ((typeof tcAny.function.arguments === 'string' && tcAny.function.arguments.trim().length > 0) ||
+          (typeof tcAny.function.arguments === 'object' && Object.keys(tcAny.function.arguments).length > 0))
+      return hasFunctionName || hasId || hasArguments
+    })
+  }, [toolCalls])
 
   // Tool call header icon state handling
   const totalToolCalls = normalizedToolCalls.length
   const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
   const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
-  const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
+  // Show loading if: we have tool calls but not all results yet, OR we're awaiting tool results for this message
+  const hasPendingToolCalls = totalToolCalls > 0 && (completedToolResults < totalToolCalls || (isLastMessage && isAwaitingToolResults))
   const hasAnyToolCalls = totalToolCalls > 0
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)
@@ -125,44 +360,48 @@ export function ConversationMessageContent({
     }
   }, [completedToolResults, totalToolCalls, messageId])
 
-  // Build display content from chunks when streaming; after completion fall back to chunks if final content wasn't persisted
-  const displayContent = useMemo(() => {
+  // Build full aggregated content from chunks
+  const fullContent = useMemo(() => {
     const hasChunks = Array.isArray(chunks) && chunks.length > 0
     if (!hasChunks) {
       return content
     }
 
-    // Sort chunks by position to ensure correct order
-    const sortedChunks = [...chunks].sort((a, b) => a.position - b.position)
+    const aggregated = aggregateStreamChunks(chunks)
 
-    // Build content from chunks
-    let aggregated = ''
-    for (const chunk of sortedChunks) {
-      aggregated += chunk.content
-    }
-
-    // While streaming, always render aggregated chunks
+    // While streaming, use aggregated chunks
     if (isStreaming) return aggregated
 
     // After completion, prefer server-finalized content; if missing, fall back to aggregated chunks
     return content && content.trim().length > 0 ? content : aggregated
   }, [content, chunks, isStreaming])
 
-  const displayReasoning = useMemo(() => {
+  const displayReasoningFull = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0
     if (!hasR) return reasoning || ''
-    const sorted = [...reasoningChunks].sort((a, b) => a.position - b.position)
-    let agg = ''
-    for (const rc of sorted) agg += rc.content
+    const agg = aggregateStreamChunks(reasoningChunks)
     return isStreaming ? agg : reasoning && reasoning.trim().length > 0 ? reasoning : agg
   }, [reasoning, reasoningChunks, isStreaming])
+
+  const { displayText: displayContent } = useSlabTypewriterText({
+    fullText: fullContent,
+    isStreaming,
+    resetKey: messageId,
+    onComplete: () => markAnimationComplete(messageId),
+  })
+
+  const { displayText: displayReasoning } = useSlabTypewriterText({
+    fullText: displayReasoningFull,
+    isStreaming,
+    resetKey: `${messageId}-reasoning`,
+  })
 
   // Determine whether reasoning panel should auto-open.
   // Keep it open only while reasoning-only is streaming; collapse once content OR toolCalls start (and on reload).
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
-  const openReasoning = Boolean(isStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
+  const openReasoning = Boolean(isStreaming && displayReasoningFull && displayReasoningFull.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
   const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Agent'
   const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
 
@@ -223,6 +462,40 @@ export function ConversationMessageContent({
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
+  const extractMessageText = (): string => {
+    const container = messageContainerRef.current
+    if (!container) {
+      return displayContent
+    }
+
+    const textClone = container.cloneNode(true) as HTMLElement
+
+    // Remove UI elements
+    textClone.querySelectorAll('button, [class*="group-hover"], [class*="opacity-0"]').forEach(el => el.remove())
+
+    // Build plain text by traversing DOM and converting tables to markdown
+    const extractPlainText = (node: Node): string => {
+      if (node.nodeType === Node.TEXT_NODE) {
+        return node.textContent || ''
+      }
+      if (node.nodeType !== Node.ELEMENT_NODE) {
+        return ''
+      }
+      const element = node as HTMLElement
+
+      // Convert table wrapper to markdown (same as individual table copy)
+      if (element.classList?.contains('table-wrapper')) {
+        const table = element.querySelector('table')
+        return table ? '\n' + tableToMarkdown(table as HTMLTableElement) + '\n\n' : ''
+      }
+
+      // Recursively process child nodes
+      return Array.from(node.childNodes).map(extractPlainText).join('')
+    }
+
+    return extractPlainText(textClone).trim()
+  }
+
   const handleCopyContent = async () => {
     try {
       const container = messageContainerRef.current
@@ -276,6 +549,28 @@ export function ConversationMessageContent({
       toast.success('Message copied to clipboard')
     } catch (error) {
       toast.error('Failed to copy message')
+    }
+  }
+
+  const handleExportContent = () => {
+    try {
+      const messageText = extractMessageText()
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5) // Remove milliseconds and timezone
+      const filename = `message-${messageId.slice(0, 8)}-${timestamp}.md`
+
+      const blob = new Blob([messageText], { type: 'text/markdown' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+
+      toast.success('Message exported successfully')
+    } catch (error) {
+      toast.error('Failed to export message')
     }
   }
 
@@ -371,11 +666,6 @@ export function ConversationMessageContent({
           {displayContent}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
-        {enableCopy && !isStreaming && (
-          <Button variant="ghost" size="icon" className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
-            <Icon name="copy" className="w-3 h-3" />
-          </Button>
-        )}
       </div>
     )
   }
@@ -384,7 +674,7 @@ export function ConversationMessageContent({
   return (
     <div ref={messageContainerRef} className={cn('relative group w-full', className)}>
       {/* Reasoning (thinking) collapsible */}
-      {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
+      {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
         <div className="mb-2">
           {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
@@ -418,7 +708,7 @@ export function ConversationMessageContent({
 
       {/* Unified markdown rendering - message content at normal size */}
       {messageType !== 'tool_result' && (
-        <div className={cn('text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content', enableCopy && !isStreaming && 'pr-6')}>
+        <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {displayContent}
           </ReactMarkdown>
@@ -431,7 +721,7 @@ export function ConversationMessageContent({
           {/* Tools panel: keep collapsed by default and preserve user toggle state */}
           <Collapsible defaultOpen={false}>
             <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {hasAnyToolCalls && completedToolResults < totalToolCalls ? (
+              {hasAnyToolCalls && hasPendingToolCalls ? (
                 <Icon name="loading" className="w-3 h-3 animate-spin" />
               ) : allToolCallsDone && showCompletionTick ? (
                 <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />
@@ -681,13 +971,6 @@ export function ConversationMessageContent({
             <code>{JSON.stringify(parsedJson, null, 2)}</code>
           </pre>
         </Card>
-      )}
-
-      {/* Copy button for entire message */}
-      {enableCopy && !isStreaming && (
-        <Button variant="ghost" size="icon" className="absolute bottom-0 right-0 opacity-0 group-hover:opacity-100 transition-opacity h-6 w-6" onClick={handleCopyContent}>
-          <Icon name="copy" className="w-3 h-3" />
-        </Button>
       )}
     </div>
   )

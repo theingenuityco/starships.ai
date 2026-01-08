@@ -6,7 +6,7 @@ import { useStarshipConversations, useConversationAgents } from '@/hooks/useConv
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { motion } from 'motion/react'
-import { useMemo } from 'react'
+import { useMemo, useEffect, useRef } from 'react'
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
@@ -24,11 +24,11 @@ interface ConversationAgent {
 
 export function ConversationSummaryBar({ conversationId, starshipId }: ConversationSummaryBarProps) {
   // Fetch all conversations to get the current one's details
-  const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
+  const { data: starshipConversationsData, isLoading: isLoadingConversations } = useStarshipConversations(starshipId || '', true)
   const currentConversation = starshipConversationsData?.conversations?.find(c => c.id === conversationId)
 
   // Derive agents for this conversation (same source as the left navigation list)
-  const { data: convAgents = [] } = useConversationAgents(conversationId)
+  const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
   const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
   const maxToShow = 4
   const visibleAgents = agents.slice(0, maxToShow)
@@ -37,11 +37,63 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   const avatarAttachmentIds = useMemo(() => {
     return visibleAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
   }, [visibleAgents])
-  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const hasAvatarIds = avatarAttachmentIds.length > 0
+  const { data: avatarAttachments = [], isLoading: isLoadingAvatars } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
-  if (!conversationId || !currentConversation) {
-    return null
+  // Only render actual header when all data is ready to prevent layout shifts
+  // If there are no avatars to load, don't wait for avatar loading
+  const isDataReady = !isLoadingConversations && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
+
+  // Use a key based on conversationId to ensure smooth remount animations
+  // This helps coordinate the animation when transitioning from starter page
+  const animationKey = useMemo(() => conversationId || 'none', [conversationId])
+
+  // Track if this is the initial mount to prevent animation on page reload
+  const isInitialMountRef = useRef(true)
+  useEffect(() => {
+    // Mark initial mount as complete after a short delay
+    const timer = setTimeout(() => {
+      isInitialMountRef.current = false
+    }, 100)
+    return () => clearTimeout(timer)
+  }, [])
+
+  // Reserve space even when loading to prevent layout shift
+  // Show placeholder if: no conversationId, no currentConversation, or data is still loading
+  if (!conversationId || !isDataReady) {
+    return (
+      <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
+      <div className="px-4 py-3.5">
+        <div className="max-w-4xl">
+          <div className="flex items-center justify-between gap-4">
+            {/* Title and metadata (stacked) - exact structural match */}
+            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+                {/* Title - exact match */}
+                <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">
+                  <span className="opacity-50">Loading...</span>
+                </h3>
+                {/* Agents + updated row - exact structural match with same classes */}
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
+                  {/* Agent placeholder - matches exact structure */}
+                  <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                    <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                      <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                    </Avatar>
+                    <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                  </div>
+                  {/* Separator and updated text - exact match */}
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                    <span className="font-medium leading-none opacity-50">Updated just now</span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const title = currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`
@@ -64,13 +116,22 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: -10 }}
+      key={animationKey}
+      initial={isInitialMountRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, ease: 'easeOut' }}
+      transition={
+        isInitialMountRef.current
+          ? { duration: 0 }
+          : {
+              duration: 0.5,
+              delay: 0.1,
+              ease: [0.25, 0.46, 0.45, 0.94],
+            }
+      }
       className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
     >
       <div className="px-4 py-3.5">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-4xl">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">

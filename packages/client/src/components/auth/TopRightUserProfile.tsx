@@ -88,7 +88,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
   return (
     <div className="fixed top-4 right-4 z-[60]">
       <div className="flex items-center gap-3">
-        <Button type="button" variant="ghost" size="sm" aria-label="Go to billing" onClick={handleBillingClick} className={`${topRightControlClassName} h-9 px-3`}>
+        <Button type="button" variant="ghost" size="sm" aria-label="Go to billing" onClick={handleBillingClick} className="h-8 px-3 py-1 cursor-pointer rounded-full bg-card border border-border/60 text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
           <Icon name="coins" className="w-4 h-4" />
           <span className="min-w-0">
             <BalanceStatusIndicator valueClassName="text-xs" wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
@@ -96,19 +96,19 @@ export function TopRightUserProfile(): React.JSX.Element | null {
         </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${topRightControlClassName} h-9 w-9`}>
+            <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${topRightControlClassName} h-10 w-10`}>
               <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-lg bg-card border border-border shadow-sm">
             <DropdownMenuLabel className="px-2 py-2 font-normal">
               <div className="flex items-center gap-3">
-                <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40">
+                <Avatar className="h-12 w-12 rounded-full ring-1 ring-border/40">
                   {isImageUrl(userAvatar) ? (
                     <AvatarImage src={userAvatar!} alt={userName || userEmail || 'User avatar'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" />
                   ) : null}
                   <AvatarFallback className="rounded-full bg-muted/40">
-                    <Icon name="user" className="h-4 w-4 text-muted-foreground" />
+                    <Icon name="user" className="h-5 w-5 text-muted-foreground" />
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0">

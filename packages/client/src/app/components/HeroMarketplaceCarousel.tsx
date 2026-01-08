@@ -1,7 +1,6 @@
  'use client'
  
  import AgentAvatar from '@/components/animated/AgentAvatar'
- import { Avatar } from '@/components/ui/avatar'
  import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel'
  import { useAgentTemplates } from '@/hooks/useTemplates'
  import { useRouter } from 'next/navigation'
@@ -17,6 +16,11 @@
    const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
    const [isHovering, setIsHovering] = useState(false)
  
+  // Fixed card widths (avoid percentage-based stretching on small screens)
+  const CARD_W = 208
+  const CARD_W_SM = 240
+  const CARD_W_MD = 260
+
   // Keep the hero visually "full-width" by ensuring at least N cards render
   // for the current breakpoint (so the row is filled even if API returns few).
   const [cardsPerView, setCardsPerView] = useState(5)
@@ -24,13 +28,10 @@
   useEffect(() => {
     const compute = () => {
       const w = window.innerWidth
-      // Tailwind default breakpoints: sm 640, md 768, lg 1024, xl 1280, 2xl 1536
-      if (w >= 1536) return 7
-      if (w >= 1280) return 6
-      if (w >= 1024) return 5
-      if (w >= 768) return 4
-      if (w >= 640) return 3
-      return 2
+      // Estimate visible cards for fixed-width slides (Embla padding is handled by CarouselItem pl-4).
+      const cardW = w >= 768 ? CARD_W_MD : w >= 640 ? CARD_W_SM : CARD_W
+      const count = Math.max(1, Math.floor(w / cardW))
+      return Math.min(7, count)
     }
 
     const onResize = () => setCardsPerView(compute())
@@ -84,9 +85,9 @@
    const goToMarketplace = () => router.push('/marketplace?from=public')
  
    return (
-    <div className="w-full mx-auto mt-20 mb-20">
+    <div className="w-full mx-auto mt-14 sm:mt-20 md:mt-24 lg:mt-28 mb-16 sm:mb-20">
        <Carousel
-         className="px-1 sm:px-2"
+         className="px-0 sm:px-2"
          opts={{ loop: true, align: 'start' }}
          setApi={setCarouselApi}
          onMouseEnter={() => setIsHovering(true)}
@@ -95,8 +96,8 @@
          <CarouselContent>
            {isLoading
             ? [...Array(cardsPerView)].map((_, idx) => (
-                <CarouselItem key={idx} className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6 2xl:basis-[14.2857%]">
-                   <div className="h-[196px] rounded-2xl bg-muted/40 border border-muted-foreground/20 animate-pulse" />
+                <CarouselItem key={idx} className="basis-auto w-[208px] sm:w-[240px] md:w-[260px]">
+                   <div className="h-[164px] sm:h-[184px] md:h-[196px] rounded-2xl bg-muted/40 border border-muted-foreground/20 animate-pulse" />
                  </CarouselItem>
                ))
              : featuredAgents.map((template, idx) => {
@@ -107,17 +108,17 @@
                  const avatarUrl = (template as any)?.avatarUrl as string | undefined
  
                  return (
-                  <CarouselItem key={`${template.id}-${idx}`} className="basis-1/2 sm:basis-1/3 md:basis-1/4 lg:basis-1/5 xl:basis-1/6 2xl:basis-[14.2857%]">
+                  <CarouselItem key={`${template.id}-${idx}`} className="basis-auto w-[208px] sm:w-[240px] md:w-[260px]">
                      <button
                        type="button"
                        onClick={goToMarketplace}
-                      className="group w-full rounded-2xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition-colors text-left p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="group w-full rounded-2xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition-colors text-left p-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`View ${name}${primaryLabel ? ` (${primaryLabel})` : ''} in Marketplace`}
                      >
-                      <div className="flex flex-col items-center gap-1">
-                        <Avatar className="h-36 w-36 rounded-2xl ring-1 ring-border/50 bg-background/40">
-                          <AgentAvatar seed={name} imageUrl={avatarUrl} size={144} rounded={false} className="rounded-xl overflow-hidden" />
-                         </Avatar>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
+                          <AgentAvatar seed={name} imageUrl={avatarUrl} fill clip className="w-full h-full rounded-2xl" />
+                         </div>
                          <div className="min-w-0 w-full px-1 text-left">
                           <div className="text-sm font-semibold leading-tight truncate max-w-[20ch]">{primaryLabel}</div>
                           <div className="text-[11px] text-muted-foreground leading-tight truncate max-w-[18ch]">{name}</div>

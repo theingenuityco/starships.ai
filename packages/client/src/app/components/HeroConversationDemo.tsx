@@ -709,13 +709,16 @@ export default function HeroConversationDemo() {
 
         if (!step.noStream) {
           const parts = chunkTextForStreaming(step.content)
+          // IMPORTANT: `ConversationMessageContent.aggregateStreamChunks` treats `position` as a
+          // cumulative character position (not a chunk index). If we use 0,1,2,... the aggregator
+          // will drop all subsequent chunks once the first chunk is longer than position.
           let position = 0
           let chunks: DemoStreamChunk[] = []
           for (const part of parts) {
             if (runSeqRef[convoId] !== runSeq) return
             if (signal.aborted) return
+            position += part.length
             chunks = [...chunks, { content: part, position, timestamp: nextTs() }]
-            position += 1
             updateMessage(convoId, id, { chunks, streaming: true })
             await sleep(70)
             if (signal.aborted) return

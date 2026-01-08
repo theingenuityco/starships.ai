@@ -378,6 +378,26 @@ export default function DelegationDemo() {
     return aria?.avatarUrl
   }, [ariaTemplates])
 
+  const { data: gaiaTemplates = [] } = useAgentTemplates({ search: 'gaia' })
+  const gaiaAvatarUrl = useMemo(() => {
+    const gaia = gaiaTemplates.find(
+      t => t.slug === 'gaia' || t.name === 'Gaia' || String(t.slug ?? '').toLowerCase().startsWith('gaia') || String(t.name ?? '').toLowerCase() === 'gaia'
+    )
+    return gaia?.avatarUrl
+  }, [gaiaTemplates])
+
+  const { data: daedalusTemplates = [] } = useAgentTemplates({ search: 'daedalus' })
+  const daedalusAvatarUrl = useMemo(() => {
+    const daedalus = daedalusTemplates.find(
+      t =>
+        t.slug === 'daedalus' ||
+        t.name === 'Daedalus' ||
+        String(t.slug ?? '').toLowerCase().startsWith('daedalus') ||
+        String(t.name ?? '').toLowerCase() === 'daedalus'
+    )
+    return daedalus?.avatarUrl
+  }, [daedalusTemplates])
+
   const [activeDemoConvoId, setActiveDemoConvoId] = useState<DemoConvoId>('main')
   const [demoByConvo, setDemoByConvo] = useState<Record<DemoConvoId, DemoMessage[]>>({ main: [], gaia: [], daedalus: [] })
   const [respondingByConvo, setRespondingByConvo] = useState<Record<DemoConvoId, boolean>>({ main: false, gaia: false, daedalus: false })
@@ -749,6 +769,7 @@ export default function DelegationDemo() {
                         conversationId={null}
                         messagesOverride={(demoByConvo.gaia || []) as any}
                         agentNameOverride={DEMO_CONVERSATIONS.gaia.leftAgentName}
+                        agentAvatarUrlOverride={gaiaAvatarUrl}
                         isRespondingOverride={(respondingByConvo.gaia || false) || (awaitingToolsByConvo.gaia || false)}
                         isAssistantStreamingOverride={respondingByConvo.gaia || false}
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.gaia || false}
@@ -810,6 +831,7 @@ export default function DelegationDemo() {
                         conversationId={null}
                         messagesOverride={(demoByConvo.daedalus || []) as any}
                         agentNameOverride={DEMO_CONVERSATIONS.daedalus.leftAgentName}
+                        agentAvatarUrlOverride={daedalusAvatarUrl}
                         isRespondingOverride={(respondingByConvo.daedalus || false) || (awaitingToolsByConvo.daedalus || false)}
                         isAssistantStreamingOverride={respondingByConvo.daedalus || false}
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.daedalus || false}

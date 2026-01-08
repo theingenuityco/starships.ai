@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { AgentBuilderView, type AgentBuilderViewRef } from '@/components/agents/AgentBuilder'
+import { useAgentTemplates } from '@/hooks/useTemplates'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
 type DemoMessage = {
@@ -66,6 +67,14 @@ function createAbortableSleep(signal: AbortSignal) {
 }
 
 export default function BuildCustomAgentDemo() {
+  const { data: gaiaTemplates = [] } = useAgentTemplates({ search: 'gaia' })
+  const gaiaAvatarUrl = useMemo(() => {
+    const gaia = gaiaTemplates.find(
+      t => t.slug === 'gaia' || t.name === 'Gaia' || String(t.slug ?? '').toLowerCase().startsWith('gaia') || String(t.name ?? '').toLowerCase() === 'gaia'
+    )
+    return gaia?.avatarUrl
+  }, [gaiaTemplates])
+
   const [messages, setMessages] = useState<DemoMessage[]>([])
   const [isUserActive, setIsUserActive] = useState(false)
   const [isResponding, setIsResponding] = useState(false)
@@ -446,6 +455,7 @@ export default function BuildCustomAgentDemo() {
                   conversationId={null}
                   messagesOverride={(messages || []) as any}
                   agentNameOverride="Gaia"
+                  agentAvatarUrlOverride={gaiaAvatarUrl}
                   isRespondingOverride={isResponding || isAwaitingTools}
                   isAssistantStreamingOverride={isResponding}
                   isAwaitingToolResultsOverride={isAwaitingTools}

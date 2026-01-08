@@ -590,6 +590,19 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessage[] {
     const clone = (arr: ClientMessage[]) => arr.map(m => ({ ...m }) as ClientMessage)
+    const toolCallKey = (m: any): string => {
+      const id = m?.id != null ? String(m.id) : ''
+      if (!id) return ''
+      if (m?.role === 'assistant' && Array.isArray(m?.toolCalls) && m.toolCalls.length > 0) {
+        const toolCallIds = m.toolCalls
+          .map((tc: any) => tc?.id ?? tc?.call_id ?? tc?.toolCallId)
+          .filter(Boolean)
+          .map((x: any) => String(x))
+          .join(',')
+        return `${id}:${toolCallIds}`
+      }
+      return id
+    }
 
     // Terminal turn states should stop any in-progress streaming message.
     if (chunk.type === 'turn.status') {
@@ -607,11 +620,32 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       // derived from Redis stream replay and should continue accumulating deltas.
       const turn = chunk.data.turn
       const isActiveTurn = turn && (turn.status === 'active' || turn.status === 'waiting_for_tools')
-      return msgs.map(m => {
+      const snap = msgs.map(m => {
         // If this is an assistant message for an active turn, keep it as streaming so deltas can accumulate
         const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && typeof m.turnId === 'string' && m.turnId === turn?.turnId)
         return withStreaming(m, shouldStream)
       })
+
+      // Merge snapshot with existing messages using composite keys.
+      // Rationale: server snapshots may collapse multiple assistant tool-call messages into a single `id`,
+      // so a pure replacement would drop valid assistant tool-call messages and leave tool results orphaned.
+      const snapMap = new Map<string, ClientMessage>()
+      for (const m of snap) {
+        const k = toolCallKey(m)
+        if (k) snapMap.set(k, m)
+      }
+      const merged: ClientMessage[] = [...snap]
+      let keptFromAcc = 0
+      for (const m of acc) {
+        const k = toolCallKey(m)
+        if (!k) continue
+        if (!snapMap.has(k)) {
+          merged.push(m)
+          keptFromAcc++
+        }
+      }
+
+      return merged
     }
 
     if (chunk.type === 'append') {
@@ -625,7 +659,31 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const msg = chunk.data.message as ClientMessage
       const messages = clone(acc)
       if (!msg || !msg.id) return messages
-      if (messages.some(m => m.id === msg.id)) return messages
+      // For assistant messages with tool calls, check for duplicates using composite key (id + toolCallIds)
+      // to allow multiple assistant messages with the same id but different tool calls
+      if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
+        const msgToolCallIds = msg.toolCalls
+          .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
+          .filter(Boolean)
+          .join(',')
+        const isDuplicate = messages.some(m => {
+          if (m.id !== msg.id) return false
+          if (m.role !== 'assistant' || !Array.isArray(m.toolCalls) || m.toolCalls.length === 0) return true
+          const mToolCallIds = m.toolCalls
+            .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
+            .filter(Boolean)
+            .join(',')
+          return mToolCallIds === msgToolCallIds
+        })
+        if (isDuplicate) {
+          return messages
+        }
+      } else {
+        // For non-assistant messages or assistant messages without tool calls, use simple ID check
+        if (messages.some(m => m.id === msg.id)) {
+          return messages
+        }
+      }
 
       // Replace the streaming placeholder message for this turn (stream-<turnId>) if present.
       const msgTurnId = msg.turnId
@@ -635,6 +693,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         if (idx !== -1) {
           messages[idx] = withStreaming(msg, false)
           return messages
+        }
+
+        // Check if there's already an assistant message with the same turnId
+        const existingAssistantIdx = messages.findIndex(m => m.role === 'assistant' && m.turnId === msgTurnId && m.id !== msg.id)
+        if (existingAssistantIdx !== -1) {
+          // Don't replace - add as a new message (multiple assistant messages per turn are valid)
         }
       }
 
@@ -751,41 +815,44 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const filteredChunks = useMemo(() => {
     const processed: StreamedChunk[] = []
     const queued: StreamedChunk[] = []
-    
+
     for (const chunk of chunks) {
       if (chunk.type === 'message.append') {
         const msg = (chunk as any).data?.message
         if (msg?.role === 'assistant') {
-          // Check if previous assistant message animation is complete
-          const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
-          const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
-          const lastAssistantId = getLastAssistantMessageId(currentMessages)
-          if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
-            // Queue this chunk for later processing
-            queued.push(chunk)
-            continue
+          const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
+          if (!hasToolCalls) {
+            // Check if previous assistant message animation is complete
+            const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
+            const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
+            const lastAssistantId = getLastAssistantMessageId(currentMessages)
+            if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
+              // Queue this chunk for later processing
+              queued.push(chunk)
+              continue
+            }
           }
         }
       }
       processed.push(chunk)
     }
-    
+
     // Store queued chunks
     queuedAppendChunksRef.current = [...queuedAppendChunksRef.current, ...queued]
     processedChunksRef.current = processed
-    
+
     return processed
   }, [chunksRevisionKey])
 
   // Process queued chunks when animation completes
   useEffect(() => {
     if (queuedAppendChunksRef.current.length === 0) return
-    
+
     const processQueued = () => {
       const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
       const currentMessages = processedChunksRef.current.reduce(reduceMessages, [] as ClientMessage[])
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
-      
+
       if (!lastAssistantId || isAnimationComplete(lastAssistantId)) {
         // Animation complete, add queued chunks to the query data
         const queued = queuedAppendChunksRef.current.splice(0)
@@ -799,7 +866,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
       return false
     }
-    
+
     // Try processing immediately
     if (!processQueued()) {
       // If not ready, set up callback for when animation completes
@@ -808,7 +875,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         processQueued()
       }
       addPendingAppendCallback(callback)
-      
+
       // Also poll periodically as fallback
       const intervalId = setInterval(() => {
         if (processQueued()) {
@@ -816,7 +883,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           removePendingAppendCallback(callback)
         }
       }, 100) // Check every 100ms
-      
+
       return () => {
         clearInterval(intervalId)
         removePendingAppendCallback(callback)

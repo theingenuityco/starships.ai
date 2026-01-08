@@ -97,19 +97,19 @@ export default function Hero() {
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
             Triage your inbox, run your socials, manage products — and much more.
           </p>
-          <div className="flex flex-col items-center gap-4 justify-center w-full min-w-0">
+          <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
             <HeroMarketplaceCarousel />
             <Button
               size="lg"
-              className="h-14 sm:h-16 w-full max-w-[28rem] px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating}
               aria-busy={isPrimaryAnimating}
             >
-              <span className="inline-flex w-10 h-10 items-center justify-center mr-1">
+              <span className="inline-flex w-12 h-12 items-center justify-center mr-2">
                 <StarshipsLogo
-                  width={40}
-                  height={40}
+                  width={48}
+                  height={48}
                   className="text-primary-foreground"
                   gradientId="hero-starships-logo-gradient"
                   idleLoop={false}
@@ -118,7 +118,16 @@ export default function Hero() {
                   onEntryAnimationComplete={runPendingPrimaryAction}
                 />
               </span>
-              {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get started for free'}
+              {isAuthenticated ? (
+                <span className="flex flex-col items-start text-left min-w-0 leading-tight">
+                  <span>Enter my starship</span>
+                  <span className="mt-0 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">
+                    {primaryStarship?.name || 'Your starship'}
+                  </span>
+                </span>
+              ) : (
+                'Get started for free'
+              )}
             </Button>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
 import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
 import ToolsBlueprintDemo from '@/app/components/ToolsBlueprintDemo'
+import DeployAgentDemo from '@/app/components/DeployAgentDemo'
 import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 
@@ -10,6 +11,24 @@ export default function UseCases() {
       <div className="max-w-7xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-2 text-center">How it works?</h2>
         <p className="text-sm md:text-base text-muted-foreground text-center max-w-2xl mx-auto mb-10 md:mb-14">Create agents, add tools, and collaborate in one workspace.</p>
+
+        {/* Deploy your agent */}
+        <div className="mt-14 md:mt-16">
+          <div className="w-full max-w-6xl mx-auto">
+            <div className="text-left mb-6 md:mb-8">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Deploy agents</h3>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
+                Deploy agentic teams of specialists to get the job done.
+              </p>
+            </div>
+
+            <div className="py-8 sm:py-10">
+              <ErrorBoundary name="DeployAgentDemo">
+                <DeployAgentDemo />
+              </ErrorBoundary>
+            </div>
+          </div>
+        </div>
 
         {/* Delegate like never before */}
         <div className="mt-14 md:mt-16">

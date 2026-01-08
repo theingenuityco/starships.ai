@@ -367,7 +367,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     agentName: 'Aria',
     noStream: true,
     content:
-      "✅ Scheduled **every Friday**\n✅ Posts **features + fixes** to **#announcements**\n✅ **Approval required** before publishing\n\nNext step: connect GitHub + Discord, then click **Deploy**.",
+      "- ✅ Scheduled **every Friday**\n- ✅ Posts **features + fixes** to **#announcements**\n- ✅ **Approval required** before publishing\n\nNext step: connect GitHub + Discord, then click **Deploy**.",
   },
 ]
 

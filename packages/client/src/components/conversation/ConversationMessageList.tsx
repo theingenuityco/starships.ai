@@ -126,7 +126,10 @@ export function ConversationMessageList({
       if (key) {
         // For assistant messages with tool calls, create a composite key to preserve messages with different tool calls
         if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
-          const toolCallIds = m.toolCalls.map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId).filter(Boolean).join(',')
+          const toolCallIds = m.toolCalls
+            .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
+            .filter(Boolean)
+            .join(',')
           const compositeKey = `${key}:${toolCallIds}`
           if (seenIds.has(compositeKey)) continue
           seenIds.add(compositeKey)
@@ -140,9 +143,7 @@ export function ConversationMessageList({
 
     // Collapse temp user + assistant shells followed by concrete messages from server (UI-level safety if merging missed)
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
-    
-    
-    
+
     for (let i = 0; i < uniqueMessages.length; i++) {
       const cur = uniqueMessages[i] as ExtendedMessage
 
@@ -320,9 +321,11 @@ export function ConversationMessageList({
       // This prevents the UI from showing orphan tool results (which can happen when results arrive before the
       // assistant tool-call message is present client-side).
       else if (message.messageType === 'tool_result') {
+        // Skip: tool results should only render within the assistant message's tool panel
+        continue
       }
       // For all other messages, add them normally
-      else if (message.messageType !== 'tool_result') {
+      else {
         groupedMessages.push(message)
       }
     }

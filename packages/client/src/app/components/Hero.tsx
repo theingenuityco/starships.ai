@@ -121,7 +121,7 @@ export default function Hero() {
               {isAuthenticated ? (
                 <span className="flex flex-col items-start text-left min-w-0 leading-tight">
                   <span>Enter my starship</span>
-                  <span className="mt-0 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">
                     {primaryStarship?.name || 'Your starship'}
                   </span>
                 </span>

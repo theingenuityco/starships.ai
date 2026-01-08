@@ -16,8 +16,6 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
-import { useDeferredAgentCreationModal } from '@/hooks/useDeferredAgentCreationModal'
-import { AgentCreatedModal } from '@/components/agents/AgentCreatedModal'
 import { useDeferredToolCreationModal } from '@/hooks/useDeferredToolCreationModal'
 import { ToolCreatedModal } from '@/components/tools/ToolCreatedModal'
 import { ToolUpdateNotification } from '@/components/tools/ToolUpdateNotification'
@@ -54,24 +52,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   // Keep conversation streaming state via the ship-layout provider
   const { messages: liveMessages = [], lastUIAction, isResponding } = useConversationStreamContext()
-  const deferredAgentCreate = useDeferredAgentCreationModal({
-    liveMessages,
-    isStreaming: isResponding,
-    starshipSlug: String(slug),
-    conversationId,
-    starshipId: starship?.id || null,
-    agents,
-    setLeadingMentionAgent: (agent: any, afterText?: string) => {
-      try {
-        messageInputRef.current?.setLeadingMentionAgent?.(agent, afterText)
-      } catch {}
-    },
-    focusInput: () => {
-      try {
-        messageInputRef.current?.focusInput?.()
-      } catch {}
-    },
-  })
   const deferredToolCreate = useDeferredToolCreationModal({
     liveMessages,
     isStreaming: isResponding,
@@ -590,70 +570,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     }
   }, [conversationId, liveMessages, starship?.id, toolSlug, router, slug])
 
-  // Navigate to Agent Builder for agent-related tool calls (only while streaming, new messages only)
-  useEffect(() => {
-    if (!conversationId || !liveMessages.length || !isResponding) return
-
-    // On first render, record initial message count and don't process
-    if (initialMessageCountRef.current === null) {
-      initialMessageCountRef.current = liveMessages.length
-      return
-    }
-
-    // Only process if new messages have arrived
-    if (liveMessages.length <= (initialMessageCountRef.current as number)) {
-      return
-    }
-
-    const agentToolSlugFragments = ['open-agent', 'edit-agent', 'assign-agent-tool', 'unassign-agent-tool']
-
-    // Process only NEW messages (those after initial count)
-    const consideration: any[] = (liveMessages as any[]).slice(initialMessageCountRef.current as number)
-
-    for (const msg of consideration) {
-      if (msg.role !== 'assistant') continue
-      const toolCalls = msg.toolCalls
-      if (!Array.isArray(toolCalls)) continue
-
-      for (const call of toolCalls) {
-        const funcName = call?.function?.name as string
-        const funcNameLc = typeof funcName === 'string' ? funcName.toLowerCase() : ''
-        if (!agentToolSlugFragments.some(s => funcNameLc.includes(s))) continue
-
-        const isOpen = funcNameLc.includes('open-agent')
-        const isEdit = funcNameLc.includes('edit-agent')
-        const isAssign = funcNameLc.includes('assign-agent-tool')
-        const isUnassign = funcNameLc.includes('unassign-agent-tool')
-
-        // Parse arguments
-        let args: any = call?.function?.arguments
-        if (typeof args === 'string') {
-          try {
-            args = JSON.parse(args)
-          } catch {}
-        }
-
-        // Robust nested extraction for agent slug
-        const src = args && typeof args === 'object' ? (args as any) : undefined
-        const nested = src?.agent || src?.data || src?.payload || src
-        const nestedSlug = nested && typeof nested.slug === 'string' && nested.slug.trim() ? String(nested.slug) : undefined
-        const altAgentSlug = typeof src?.agentSlug === 'string' && src.agentSlug.trim() ? String(src.agentSlug) : undefined
-        let nextAgentSlug: string | undefined = nestedSlug || altAgentSlug
-        if (isOpen && !nextAgentSlug) nextAgentSlug = 'new'
-        if ((isEdit || isAssign || isUnassign) && !nextAgentSlug) continue
-        if (!nextAgentSlug) continue
-
-        const q = conversationId ? `?conversationId=${encodeURIComponent(conversationId)}` : ''
-        const targetUrl = `/ship/${slug}/agent/${encodeURIComponent(nextAgentSlug)}${q}`
-
-        // Prevent duplicate attempts before unmount by advancing the baseline
-        initialMessageCountRef.current = liveMessages.length
-        router.push(targetUrl)
-        return
-      }
-    }
-  }, [conversationId, liveMessages, slug, router, toolSlug, isResponding])
-
   // Prefill when editing an existing tool
   const { data: existingTool } = useStarshipTool(starship?.id || '', toolSlug || '', !!starship?.id && !!toolSlug && toolSlug !== 'new')
   useEffect(() => {
@@ -676,14 +592,6 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
 
   return (
     <div className="relative h-screen w-full">
-      <AgentCreatedModal
-        open={deferredAgentCreate.isOpen}
-        names={deferredAgentCreate.createdNames}
-        onOpenChange={deferredAgentCreate.setIsOpen}
-        onChatWithAgent={deferredAgentCreate.chatWithAgent}
-        onAskDaedalusCreateTools={deferredAgentCreate.askDaedalusCreateTools}
-        agents={Array.isArray(deferredAgentCreate.createdAgents) ? (deferredAgentCreate.createdAgents as any) : undefined}
-      />
       <ToolCreatedModal
         open={deferredToolCreate.isOpen}
         names={deferredToolCreate.createdNames}

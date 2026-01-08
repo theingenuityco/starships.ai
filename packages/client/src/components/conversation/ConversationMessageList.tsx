@@ -138,13 +138,32 @@ export function ConversationMessageList({
       uniqueMessages.push(m)
     }
 
-    // Collapse temp assistant shell followed by concrete assistant from server (UI-level safety if merging missed)
+    // Collapse temp user + assistant shells followed by concrete messages from server (UI-level safety if merging missed)
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
     
     
     
     for (let i = 0; i < uniqueMessages.length; i++) {
       const cur = uniqueMessages[i] as ExtendedMessage
+
+      // 0) Collapse local temp user message into the next concrete user message.
+      // This avoids a common "double user message" when we pre-seed a temp message during the
+      // /conversations -> /conversations/:id handoff and the server later emits the real message via SSE.
+      if (cur?.role === 'user' && typeof cur?.id === 'string' && cur.id.startsWith('temp-user-')) {
+        const next = uniqueMessages[i + 1] as ExtendedMessage | undefined
+        if (next && next.role === 'user' && !(typeof next.id === 'string' && next.id.startsWith('temp-user-'))) {
+          const curContent = String(cur?.content ?? '')
+          const nextContent = String(next?.content ?? '')
+          const curTs = Number(new Date(cur.createdAt).getTime())
+          const nextTs = Number(new Date(next.createdAt).getTime())
+          // Require same content and very close timestamps so we don't hide intentional repeats.
+          if (curContent === nextContent && Number.isFinite(curTs) && Number.isFinite(nextTs) && Math.abs(nextTs - curTs) <= 15_000) {
+            collapsedMessages.push(next)
+            i++ // skip next (we already pushed it)
+            continue
+          }
+        }
+      }
 
       // 1) Collapse local temp assistant shell into the next concrete assistant
       if (cur?.role === 'assistant' && typeof cur?.id === 'string' && cur.id.startsWith('temp-assistant-')) {

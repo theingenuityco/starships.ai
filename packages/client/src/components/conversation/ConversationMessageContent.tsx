@@ -78,17 +78,7 @@ function aggregateStreamChunks(chunks: StreamChunk[]): string {
   return agg
 }
 
-function useSlabTypewriterText({
-  fullText,
-  isStreaming,
-  resetKey,
-  onComplete,
-}: {
-  fullText: string
-  isStreaming: boolean
-  resetKey: string
-  onComplete?: () => void
-}) {
+function useSlabTypewriterText({ fullText, isStreaming, resetKey, onComplete }: { fullText: string; isStreaming: boolean; resetKey: string; onComplete?: () => void }) {
   // Slab-based typewriter effect: reveal chunks of text at a time
   const [displayedLength, setDisplayedLength] = useState(0)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -411,9 +401,7 @@ export function ConversationMessageContent({
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
-  const openReasoning = Boolean(
-    isStreaming && displayReasoningFull && displayReasoningFull.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow)
-  )
+  const openReasoning = Boolean(isStreaming && displayReasoningFull && displayReasoningFull.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
   const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Agent'
   const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
 

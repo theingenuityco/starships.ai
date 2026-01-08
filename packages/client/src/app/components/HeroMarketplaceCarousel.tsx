@@ -1,7 +1,7 @@
  'use client'
  
  import AgentAvatar from '@/components/animated/AgentAvatar'
- import { Carousel, CarouselContent, CarouselItem } from '@/components/ui/carousel'
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel'
  import { useAgentTemplates } from '@/hooks/useTemplates'
  import { useRouter } from 'next/navigation'
  import { useEffect, useMemo, useRef, useState } from 'react'
@@ -14,6 +14,8 @@
    const router = useRouter()
    const { data: agentTemplates = [], isLoading } = useAgentTemplates()
   const containerRef = useRef<HTMLDivElement | null>(null)
+  const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
+  const [isHovering, setIsHovering] = useState(false)
  
   // Fixed card widths (avoid percentage-based stretching on small screens)
   const CARD_W = 136
@@ -80,6 +82,21 @@
     return picked
   }, [agentTemplates, cardsPerView])
  
+  // Autoplay the hero carousel slowly (pause on hover).
+  useEffect(() => {
+    if (!carouselApi) return
+
+    const AUTO_PLAY_MS = 6500
+    const id = setInterval(() => {
+      if (isHovering) return
+      try {
+        carouselApi.scrollNext()
+      } catch {}
+    }, AUTO_PLAY_MS)
+
+    return () => clearInterval(id)
+  }, [carouselApi, isHovering])
+
    const goToMarketplace = () => router.push('/marketplace?from=public')
  
    return (
@@ -87,6 +104,9 @@
        <Carousel
          className="w-full"
          opts={{ loop: true, align: 'start' }}
+        setApi={setCarouselApi}
+        onMouseEnter={() => setIsHovering(true)}
+        onMouseLeave={() => setIsHovering(false)}
        >
          {/* Use `!` important utilities so we truly override CarouselContent's default `-ml-4` */}
          <CarouselContent className="!-ml-1 sm:!-ml-2">

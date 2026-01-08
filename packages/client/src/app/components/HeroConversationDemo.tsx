@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
+import { useAgentTemplates } from '@/hooks/useTemplates'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
 type DemoMessage = {
@@ -550,6 +551,12 @@ function useConvoTimelines() {
 }
 
 export default function HeroConversationDemo() {
+  const { data: ariaTemplates = [] } = useAgentTemplates({ search: 'aria' })
+  const ariaAvatarUrl = useMemo(() => {
+    const aria = ariaTemplates.find(t => t.slug === 'aria' || t.name === 'Aria')
+    return aria?.avatarUrl
+  }, [ariaTemplates])
+
   const timelines = useConvoTimelines()
   const [activeConvoId, setActiveConvoId] = useState<ConvoId>('aria')
   const [messagesByConvo, setMessagesByConvo] = useState<Record<ConvoId, DemoMessage[]>>({ aria: [], doc_organizer: [], lead_generator: [] })
@@ -919,6 +926,7 @@ export default function HeroConversationDemo() {
                 conversationId={null}
                 messagesOverride={(messagesByConvo[activeConvoId] || []) as any}
                 agentNameOverride={cfg.actorName}
+                agentAvatarUrlOverride={cfg.id === 'aria' ? ariaAvatarUrl : undefined}
                 isRespondingOverride={isResponding}
                 isAssistantStreamingOverride={respondingByConvo[activeConvoId] || false}
                 isAwaitingToolResultsOverride={awaitingToolsByConvo[activeConvoId] || false}

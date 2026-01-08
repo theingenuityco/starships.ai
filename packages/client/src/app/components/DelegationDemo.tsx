@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import { useAgentTemplates } from '@/hooks/useTemplates'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
 type DemoMessage = {
@@ -371,6 +372,12 @@ const DEMO_TIMELINE: DemoStep[] = [
 ]
 
 export default function DelegationDemo() {
+  const { data: ariaTemplates = [] } = useAgentTemplates({ search: 'aria' })
+  const ariaAvatarUrl = useMemo(() => {
+    const aria = ariaTemplates.find(t => t.slug === 'aria' || t.name === 'Aria')
+    return aria?.avatarUrl
+  }, [ariaTemplates])
+
   const [activeDemoConvoId, setActiveDemoConvoId] = useState<DemoConvoId>('main')
   const [demoByConvo, setDemoByConvo] = useState<Record<DemoConvoId, DemoMessage[]>>({ main: [], gaia: [], daedalus: [] })
   const [respondingByConvo, setRespondingByConvo] = useState<Record<DemoConvoId, boolean>>({ main: false, gaia: false, daedalus: false })
@@ -677,6 +684,7 @@ export default function DelegationDemo() {
                       conversationId={null}
                       messagesOverride={(demoByConvo.main || []) as any}
                       agentNameOverride={DEMO_CONVERSATIONS.main.leftAgentName}
+                      agentAvatarUrlOverride={ariaAvatarUrl}
                       isRespondingOverride={(respondingByConvo.main || false) || (awaitingToolsByConvo.main || false)}
                       isAssistantStreamingOverride={respondingByConvo.main || false}
                       isAwaitingToolResultsOverride={awaitingToolsByConvo.main || false}
@@ -744,6 +752,7 @@ export default function DelegationDemo() {
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.gaia || false}
                         bottomPaddingPx={90}
                         userNameOverride={DEMO_CONVERSATIONS.gaia.rightUserLabel}
+                      userAvatarUrlOverride={ariaAvatarUrl}
                         userAvatarSeedOverride={DEMO_CONVERSATIONS.gaia.rightUserSeed}
                       />
                     </div>
@@ -804,6 +813,7 @@ export default function DelegationDemo() {
                         isAwaitingToolResultsOverride={awaitingToolsByConvo.daedalus || false}
                         bottomPaddingPx={90}
                         userNameOverride={DEMO_CONVERSATIONS.daedalus.rightUserLabel}
+                      userAvatarUrlOverride={ariaAvatarUrl}
                         userAvatarSeedOverride={DEMO_CONVERSATIONS.daedalus.rightUserSeed}
                       />
                     </div>

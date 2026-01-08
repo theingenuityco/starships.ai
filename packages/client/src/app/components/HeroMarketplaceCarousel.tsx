@@ -54,7 +54,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 
   const featuredAgents = useMemo(() => {
      // Prefer a few "known good" agents, then fill from the rest.
-     const wanted = ['Doc Organizer', 'Lead Generator', 'Aria']
+     const wanted = ['Aria', 'Iris', 'Saga']
      const picked: typeof agentTemplates = []
  
      for (const name of wanted) {

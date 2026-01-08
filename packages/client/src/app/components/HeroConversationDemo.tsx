@@ -266,6 +266,13 @@ const SAGA_TIMELINE: Step[] = [
     content: JSON.stringify({ status: 'ok', prompt: 'Dark, minimal hero illustration of a small AI crew (three stylized assistants) collaborating with a human at a desk, subtle starship UI overlays, high contrast, clean lines, 1200x630.' }, null, 2),
   },
   {
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_wp_create_post',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', postId: 1042, statusAfter: 'draft', title: 'AI Staff: What It Is (and How Teams Use It)', url: 'https://starships.ai/blog/?p=1042' }, null, 2),
+  },
+  {
     role: 'assistant',
     agentName: 'Saga',
     content:
@@ -442,9 +449,21 @@ function useConvoTimelines() {
 export default function HeroConversationDemo() {
   const { data: ariaTemplates = [] } = useAgentTemplates({ search: 'aria' })
   const ariaAvatarUrl = useMemo(() => {
-    const aria = ariaTemplates.find(t => t.slug === 'aria' || t.name === 'Aria')
+    const aria = ariaTemplates.find(t => t.slug === 'aria' || t.name === 'Aria' || String(t.slug ?? '').toLowerCase().startsWith('aria'))
     return aria?.avatarUrl
   }, [ariaTemplates])
+
+  const { data: irisTemplates = [] } = useAgentTemplates({ search: 'iris' })
+  const irisAvatarUrl = useMemo(() => {
+    const iris = irisTemplates.find(t => t.slug === 'iris' || t.name === 'Iris' || String(t.slug ?? '').toLowerCase().startsWith('iris'))
+    return iris?.avatarUrl
+  }, [irisTemplates])
+
+  const { data: sagaTemplates = [] } = useAgentTemplates({ search: 'saga' })
+  const sagaAvatarUrl = useMemo(() => {
+    const saga = sagaTemplates.find(t => t.slug === 'saga' || t.name === 'Saga' || String(t.slug ?? '').toLowerCase().startsWith('saga'))
+    return saga?.avatarUrl
+  }, [sagaTemplates])
 
   const timelines = useConvoTimelines()
   const [activeConvoId, setActiveConvoId] = useState<ConvoId>('aria')
@@ -749,6 +768,8 @@ export default function HeroConversationDemo() {
 
   const cfg = CONVOS[activeConvoId]
   const actorsLine = cfg.id === 'aria' ? `You, ${cfg.actorName}` : `${cfg.actorName}, You`
+  const agentAvatarUrlOverride =
+    cfg.id === 'aria' ? ariaAvatarUrl : cfg.id === 'iris' ? irisAvatarUrl : cfg.id === 'saga' ? sagaAvatarUrl : undefined
   const isResponding = respondingByConvo[activeConvoId] || false || awaitingToolsByConvo[activeConvoId] || false
   const isRunning = isRunningByConvo[activeConvoId] || false
   const hasRun = hasRunByConvo[activeConvoId] || false
@@ -815,7 +836,7 @@ export default function HeroConversationDemo() {
                 conversationId={null}
                 messagesOverride={(messagesByConvo[activeConvoId] || []) as any}
                 agentNameOverride={cfg.actorName}
-                agentAvatarUrlOverride={cfg.id === 'aria' ? ariaAvatarUrl : undefined}
+                agentAvatarUrlOverride={agentAvatarUrlOverride}
                 isRespondingOverride={isResponding}
                 isAssistantStreamingOverride={respondingByConvo[activeConvoId] || false}
                 isAwaitingToolResultsOverride={awaitingToolsByConvo[activeConvoId] || false}

@@ -34,7 +34,7 @@ type ConvoConfig = {
 const CONVOS: Record<ConvoId, ConvoConfig> = {
   aria: {
     id: 'aria',
-    label: 'Aria ↔ You',
+    label: 'You ↔ Aria',
     tabName: 'Demo',
     actorName: 'Aria',
     agentSeed: 'Aria',
@@ -852,6 +852,7 @@ export default function HeroConversationDemo() {
   }
 
   const cfg = CONVOS[activeConvoId]
+  const actorsLine = cfg.id === 'aria' ? `You, ${cfg.actorName}` : `${cfg.actorName}, You`
   const isResponding = respondingByConvo[activeConvoId] || false || awaitingToolsByConvo[activeConvoId] || false
   const isRunning = isRunningByConvo[activeConvoId] || false
   const hasRun = hasRunByConvo[activeConvoId] || false
@@ -889,7 +890,7 @@ export default function HeroConversationDemo() {
                   <div className="text-sm font-medium leading-none truncate">{cfg.subtitle}</div>
                   {/* Actors */}
                   <div className="mt-1 flex items-center gap-2 min-w-0">
-                    <div className="text-xs text-muted-foreground truncate">{cfg.actorName}, You</div>
+                    <div className="text-xs text-muted-foreground truncate">{actorsLine}</div>
                   </div>
                 </div>
                 <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">

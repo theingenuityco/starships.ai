@@ -81,12 +81,16 @@ export default function Hero() {
                     <span className="warp-letter">I</span>
                   </span>
                   {' '}
-                  <span className="warp-word" data-text="staff">
+                  <span className="warp-word" data-text="employees">
+                    <span className="warp-letter">e</span>
+                    <span className="warp-letter">m</span>
+                    <span className="warp-letter">p</span>
+                    <span className="warp-letter">l</span>
+                    <span className="warp-letter">o</span>
+                    <span className="warp-letter">y</span>
+                    <span className="warp-letter">e</span>
+                    <span className="warp-letter">e</span>
                     <span className="warp-letter">s</span>
-                    <span className="warp-letter">t</span>
-                    <span className="warp-letter">a</span>
-                    <span className="warp-letter">f</span>
-                    <span className="warp-letter">f</span>
                   </span>
                   {' '}
                   to manage your work
@@ -137,10 +141,15 @@ export default function Hero() {
           display: inline-flex;
           gap: 0;
           position: relative;
+          align-items: baseline;
+          overflow: visible;
+          /* Avoid adding line-gap on wraps; instead, nudge up to keep descenders visible */
+          transform: translateY(-0.06em);
         }
 
         .warp-letter {
           display: inline-block;
+          overflow: visible;
           animation:
             warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) both,
             gradient-shift 8s ease-in-out 1.2s infinite,
@@ -168,6 +177,18 @@ export default function Hero() {
         }
         .warp-letter:nth-child(5) {
           animation-delay: 240ms;
+        }
+        .warp-letter:nth-child(6) {
+          animation-delay: 300ms;
+        }
+        .warp-letter:nth-child(7) {
+          animation-delay: 360ms;
+        }
+        .warp-letter:nth-child(8) {
+          animation-delay: 420ms;
+        }
+        .warp-letter:nth-child(9) {
+          animation-delay: 480ms;
         }
 
         @keyframes warp-letter-in {

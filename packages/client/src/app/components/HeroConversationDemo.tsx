@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
@@ -22,6 +22,58 @@ type DemoMessage = {
 }
 
 type ConvoId = 'aria' | 'iris' | 'saga'
+
+type ConvoFlags = {
+  responding: boolean
+  awaitingTools: boolean
+  isRunning: boolean
+  hasRun: boolean
+}
+
+type ConvoFlagsByConvo = Record<ConvoId, ConvoFlags>
+
+const INITIAL_CONVO_FLAGS: ConvoFlagsByConvo = {
+  aria: { responding: false, awaitingTools: false, isRunning: false, hasRun: false },
+  iris: { responding: false, awaitingTools: false, isRunning: false, hasRun: false },
+  saga: { responding: false, awaitingTools: false, isRunning: false, hasRun: false },
+}
+
+type ConvoFlagsAction =
+  | { type: 'patch'; convoId: ConvoId; patch: Partial<ConvoFlags> }
+  | { type: 'reset'; convoId: ConvoId }
+
+function convoFlagsReducer(state: ConvoFlagsByConvo, action: ConvoFlagsAction): ConvoFlagsByConvo {
+  switch (action.type) {
+    case 'patch': {
+      const prev = state[action.convoId]
+      const next = { ...prev, ...action.patch }
+      if (
+        prev.responding === next.responding &&
+        prev.awaitingTools === next.awaitingTools &&
+        prev.isRunning === next.isRunning &&
+        prev.hasRun === next.hasRun
+      ) {
+        return state
+      }
+      return { ...state, [action.convoId]: next }
+    }
+    case 'reset': {
+      const prev = state[action.convoId]
+      const next: ConvoFlags = { ...prev, responding: false, awaitingTools: false, isRunning: false }
+      if (
+        prev.responding === next.responding &&
+        prev.awaitingTools === next.awaitingTools &&
+        prev.isRunning === next.isRunning &&
+        prev.hasRun === next.hasRun
+      ) {
+        return state
+      }
+      return { ...state, [action.convoId]: next }
+    }
+    default:
+      return state
+  }
+}
 
 type ConvoConfig = {
   id: ConvoId
@@ -468,10 +520,7 @@ export default function HeroConversationDemo() {
   const timelines = useConvoTimelines()
   const [activeConvoId, setActiveConvoId] = useState<ConvoId>('aria')
   const [messagesByConvo, setMessagesByConvo] = useState<Record<ConvoId, DemoMessage[]>>({ aria: [], iris: [], saga: [] })
-  const [respondingByConvo, setRespondingByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, iris: false, saga: false })
-  const [awaitingToolsByConvo, setAwaitingToolsByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, iris: false, saga: false })
-  const [isRunningByConvo, setIsRunningByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, iris: false, saga: false })
-  const [hasRunByConvo, setHasRunByConvo] = useState<Record<ConvoId, boolean>>({ aria: false, iris: false, saga: false })
+  const [flagsByConvo, dispatchConvoFlags] = useReducer(convoFlagsReducer, INITIAL_CONVO_FLAGS)
   const runSeqRef = useState(() => ({ aria: 0, iris: 0, saga: 0 }))[0]
   const demoChooserClockRef = useRef<number>(Date.now())
   const [demoChoiceState, setDemoChoiceState] = useState<{ stage: 'choose' | 'calling' | 'done'; selected: ConvoId | null }>({
@@ -479,17 +528,15 @@ export default function HeroConversationDemo() {
     selected: null,
   })
 
-  const abortControllerRef = useRef<AbortController | null>(null)
-  if (!abortControllerRef.current) abortControllerRef.current = new AbortController()
-  const sleepCtlRef = useRef<ReturnType<typeof createAbortableSleep> | null>(null)
-  if (!sleepCtlRef.current) sleepCtlRef.current = createAbortableSleep(abortControllerRef.current.signal)
+  const abortControllerRef = useRef<AbortController>(new AbortController())
+  const sleepCtlRef = useRef<ReturnType<typeof createAbortableSleep>>(createAbortableSleep(abortControllerRef.current.signal))
   const sleep = sleepCtlRef.current.sleep
   const signal = abortControllerRef.current.signal
 
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort()
-      sleepCtlRef.current?.clearAll()
+      abortControllerRef.current.abort()
+      sleepCtlRef.current.clearAll()
     }
   }, [])
 
@@ -573,7 +620,7 @@ export default function HeroConversationDemo() {
         },
       ],
     })
-    setAwaitingToolsByConvo(prev => ({ ...prev, aria: true }))
+    dispatchConvoFlags({ type: 'patch', convoId: 'aria', patch: { awaitingTools: true } })
 
     await sleep(520)
     if (signal.aborted) return
@@ -598,7 +645,7 @@ export default function HeroConversationDemo() {
       messageType: 'tool_result',
       toolCallId,
     })
-    setAwaitingToolsByConvo(prev => ({ ...prev, aria: false }))
+    dispatchConvoFlags({ type: 'patch', convoId: 'aria', patch: { awaitingTools: false } })
 
     await sleep(350)
     if (signal.aborted) return
@@ -625,7 +672,7 @@ export default function HeroConversationDemo() {
   }
 
   const startConversation = async (convoId: ConvoId) => {
-    if (isRunningByConvo[convoId]) return
+    if (flagsByConvo[convoId]?.isRunning) return
     runSeqRef[convoId] += 1
     const runSeq = runSeqRef[convoId]
     if (signal.aborted) return
@@ -639,14 +686,12 @@ export default function HeroConversationDemo() {
       }))
     }
 
-    setIsRunningByConvo(prev => ({ ...prev, [convoId]: true }))
-    setHasRunByConvo(prev => ({ ...prev, [convoId]: true }))
+    dispatchConvoFlags({ type: 'patch', convoId, patch: { isRunning: true, hasRun: true } })
 
     try {
       const timeline = timelines[convoId] || []
       setMessagesByConvo(prev => ({ ...prev, [convoId]: [] }))
-      setRespondingByConvo(prev => ({ ...prev, [convoId]: false }))
-      setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: false }))
+      dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: false, awaitingTools: false } })
 
       let seq = 0
       let lastToolRunnerId: string | null = null
@@ -684,7 +729,7 @@ export default function HeroConversationDemo() {
           appendMessage(convoId, { id, role: 'tool', content: step.content, createdAt, updatedAt: createdAt, messageType: 'tool_result', toolCallId: step.toolCallId })
           if (lastToolRunnerId) updateMessage(convoId, lastToolRunnerId, { streaming: false })
           if (step.toolCallId) pendingToolIds.delete(step.toolCallId)
-          setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: pendingToolIds.size > 0 }))
+          dispatchConvoFlags({ type: 'patch', convoId, patch: { awaitingTools: pendingToolIds.size > 0 } })
           await sleep(420)
           if (signal.aborted) return
           continue
@@ -705,7 +750,7 @@ export default function HeroConversationDemo() {
           streaming: !step.noStream,
           chunks: [],
         })
-        setRespondingByConvo(prev => ({ ...prev, [convoId]: true }))
+        dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: true } })
 
         if (!step.noStream) {
           const parts = chunkTextForStreaming(step.content)
@@ -730,7 +775,7 @@ export default function HeroConversationDemo() {
         }
 
         updateMessage(convoId, id, { content: step.content, streaming: false, updatedAt: nextIso() })
-        setRespondingByConvo(prev => ({ ...prev, [convoId]: false }))
+        dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: false } })
 
         if (hasToolCalls) {
           seq += 1
@@ -754,7 +799,7 @@ export default function HeroConversationDemo() {
             .filter(Boolean)
             .map((x: any) => String(x))
           pendingToolIds = new Set(ids)
-          setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: ids.length > 0 }))
+          dispatchConvoFlags({ type: 'patch', convoId, patch: { awaitingTools: ids.length > 0 } })
           await sleep(250)
           if (signal.aborted) return
         } else {
@@ -763,9 +808,7 @@ export default function HeroConversationDemo() {
         }
       }
     } finally {
-      setRespondingByConvo(prev => ({ ...prev, [convoId]: false }))
-      setAwaitingToolsByConvo(prev => ({ ...prev, [convoId]: false }))
-      setIsRunningByConvo(prev => ({ ...prev, [convoId]: false }))
+      dispatchConvoFlags({ type: 'patch', convoId, patch: { responding: false, awaitingTools: false, isRunning: false } })
     }
   }
 
@@ -773,12 +816,17 @@ export default function HeroConversationDemo() {
   const actorsLine = cfg.id === 'aria' ? `You, ${cfg.actorName}` : `${cfg.actorName}, You`
   const agentAvatarUrlOverride =
     cfg.id === 'aria' ? ariaAvatarUrl : cfg.id === 'iris' ? irisAvatarUrl : cfg.id === 'saga' ? sagaAvatarUrl : undefined
-  const isResponding = respondingByConvo[activeConvoId] || false || awaitingToolsByConvo[activeConvoId] || false
-  const isRunning = isRunningByConvo[activeConvoId] || false
-  const hasRun = hasRunByConvo[activeConvoId] || false
+  const isResponding = (flagsByConvo[activeConvoId]?.responding ?? false) || (flagsByConvo[activeConvoId]?.awaitingTools ?? false)
+  const isRunning = flagsByConvo[activeConvoId]?.isRunning ?? false
+  const hasRun = flagsByConvo[activeConvoId]?.hasRun ?? false
   const hasAnyMessages = (messagesByConvo[activeConvoId] || []).length > 0
   const isAutoplayTab = activeConvoId === 'aria'
-  const showDemoChooser = activeConvoId === 'aria' && hasRunByConvo.aria && !isRunningByConvo.aria && demoChoiceState.stage === 'choose' && (messagesByConvo.aria?.length || 0) > 0
+  const showDemoChooser =
+    activeConvoId === 'aria' &&
+    flagsByConvo.aria.hasRun &&
+    !flagsByConvo.aria.isRunning &&
+    demoChoiceState.stage === 'choose' &&
+    (messagesByConvo.aria?.length || 0) > 0
   const isDemoCalling = activeConvoId === 'aria' && demoChoiceState.stage === 'calling'
 
   const handleRestart = () => {
@@ -841,8 +889,8 @@ export default function HeroConversationDemo() {
                 agentNameOverride={cfg.actorName}
                 agentAvatarUrlOverride={agentAvatarUrlOverride}
                 isRespondingOverride={isResponding}
-                isAssistantStreamingOverride={respondingByConvo[activeConvoId] || false}
-                isAwaitingToolResultsOverride={awaitingToolsByConvo[activeConvoId] || false}
+                isAssistantStreamingOverride={flagsByConvo[activeConvoId]?.responding ?? false}
+                isAwaitingToolResultsOverride={flagsByConvo[activeConvoId]?.awaitingTools ?? false}
                 bottomPaddingPx={140}
                 userNameOverride="You"
                 userAvatarFallbackVariantOverride="user-icon"

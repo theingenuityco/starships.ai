@@ -80,7 +80,7 @@ export default function DeployAgentDemo() {
                 {[0, 1, 2].map(j => (
                   <div
                     key={j}
-                    className="w-[92px] sm:w-[104px] md:w-[112px] rounded-2xl border border-border/50 bg-muted/10 p-1.5"
+                    className="flex-1 basis-0 min-w-0 w-full max-w-[92px] sm:max-w-[104px] md:max-w-[112px] rounded-2xl border border-border/50 bg-muted/10 p-1.5"
                     aria-hidden
                   >
                     <div className="flex flex-col items-center gap-2">
@@ -115,7 +115,7 @@ export default function DeployAgentDemo() {
                       key={t.id}
                       type="button"
                       onClick={goToMarketplace}
-                      className="group w-[92px] sm:w-[104px] md:w-[112px] rounded-2xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition-colors text-left p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className="group flex-1 basis-0 min-w-0 w-full max-w-[92px] sm:max-w-[104px] md:max-w-[112px] rounded-2xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition-colors text-left p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       aria-label={`View ${name}${primaryLabel ? ` (${primaryLabel})` : ''} in Marketplace`}
                     >
                       <div className="flex flex-col items-center gap-2">
@@ -134,7 +134,7 @@ export default function DeployAgentDemo() {
                 {Array.from({ length: Math.min(3, team.missingSlots) }).map((_, idx) => (
                   <div
                     key={`${team.key}-slot-${idx}`}
-                    className="w-[92px] sm:w-[104px] md:w-[112px] rounded-2xl border border-dashed border-white/15 bg-muted/5 p-1.5"
+                    className="flex-1 basis-0 min-w-0 w-full max-w-[92px] sm:max-w-[104px] md:max-w-[112px] rounded-2xl border border-dashed border-white/15 bg-muted/5 p-1.5"
                     aria-label="Coming soon"
                   >
                     <div className="flex flex-col items-center gap-2">

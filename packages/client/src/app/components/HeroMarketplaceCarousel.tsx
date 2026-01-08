@@ -2,6 +2,7 @@
  
  import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel'
+import { Skeleton } from '@/components/ui/skeleton'
  import { useAgentTemplates } from '@/hooks/useTemplates'
  import { useRouter } from 'next/navigation'
  import { useEffect, useMemo, useRef, useState } from 'react'
@@ -113,7 +114,18 @@ import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/com
            {isLoading
             ? [...Array(cardsPerView)].map((_, idx) => (
                 <CarouselItem key={idx} className="basis-auto w-[136px] sm:w-[152px] md:w-[176px] !pl-1 sm:!pl-2">
-                   <div className="h-[120px] sm:h-[132px] md:h-[144px] rounded-2xl bg-muted/40 border border-muted-foreground/20 animate-pulse" />
+                  {/* Match the hydrated mini-card structure to prevent layout shift */}
+                  <div className="w-full rounded-2xl border border-border/50 bg-muted/10 p-1.5 pointer-events-none">
+                    <div className="flex flex-col items-center gap-2">
+                      <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
+                        <Skeleton className="w-full h-full rounded-2xl" />
+                      </div>
+                      <div className="min-w-0 w-full px-1 text-left">
+                        <Skeleton className="h-4 w-24 rounded-md" />
+                        <Skeleton className="mt-1 h-3 w-16 rounded-md" />
+                      </div>
+                    </div>
+                  </div>
                  </CarouselItem>
                ))
              : featuredAgents.map((template, idx) => {

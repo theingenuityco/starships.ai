@@ -8,8 +8,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import HeroConversationDemo from '@/app/components/HeroConversationDemo'
-import { ErrorBoundary } from '@/components/error/ErrorBoundary'
 import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
 
 export default function Hero() {
@@ -68,10 +66,10 @@ export default function Hero() {
   }, [isPrimaryAnimating, navigatePrimary, runPendingPrimaryAction])
 
   return (
-    <section className="pt-44 md:pt-52 pb-20 px-4">
+    <section className="pt-24 sm:pt-32 md:pt-44 lg:pt-52 pb-16 sm:pb-20 px-4 sm:px-6">
       <div className="max-w-6xl mx-auto flex flex-col gap-8 sm:gap-10 items-center text-center">
-        <div>
-          <h1 className="text-3xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 max-w-[26ch] mx-auto">
+        <div className="w-full min-w-0">
+          <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold tracking-tight leading-tight mb-4 w-full max-w-[26ch] mx-auto break-words text-balance">
             {(() => {
               const v = getHeadlineVariant()
               if (v === 'B') return 'Hire your AI staff, brief in plain language'
@@ -82,7 +80,7 @@ export default function Hero() {
                     <span className="warp-letter">A</span>
                     <span className="warp-letter">I</span>
                   </span>
-                  &nbsp;
+                  {' '}
                   <span className="warp-word" data-text="staff">
                     <span className="warp-letter">s</span>
                     <span className="warp-letter">t</span>
@@ -90,16 +88,19 @@ export default function Hero() {
                     <span className="warp-letter">f</span>
                     <span className="warp-letter">f</span>
                   </span>
-                  &nbsp;to manage your work
+                  {' '}
+                  to manage your work
                 </>
               )
             })()}
           </h1>
-          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed max-w-[72ch] mx-auto">Triage your inbox, run your socials, manage products — and much more.</p>
-          <div className="flex flex-col items-center gap-3 justify-center">
+          <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
+            Triage your inbox, run your socials, manage products — and much more.
+          </p>
+          <div className="flex flex-col items-center gap-3 justify-center w-full min-w-0">
             <Button
               size="lg"
-              className="h-14 sm:h-16 w-full sm:w-auto max-w-[min(28rem,100%)] px-8 sm:px-14 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal text-center [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
+              className="h-14 sm:h-16 w-full max-w-[28rem] px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-10 [&_svg]:!h-10 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"
               onClick={handlePrimaryClick}
               disabled={isPrimaryAnimating}
               aria-busy={isPrimaryAnimating}
@@ -120,13 +121,6 @@ export default function Hero() {
             </Button>
             <HeroMarketplaceCarousel />
           </div>
-        </div>
-
-        {/* Conversation demo (uses the same message renderer as /ship/.../conversations) */}
-        <div className="w-full mt-6 sm:mt-8 md:mt-10 text-left">
-          <ErrorBoundary name="HeroConversationDemo">
-            <HeroConversationDemo />
-          </ErrorBoundary>
         </div>
       </div>
       <style jsx>{`

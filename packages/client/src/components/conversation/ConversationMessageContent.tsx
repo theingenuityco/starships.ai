@@ -30,6 +30,178 @@ interface StreamChunk {
   timestamp: number
 }
 
+function useSlabTypewriterText({
+  fullText,
+  isStreaming,
+  resetKey,
+  onComplete,
+}: {
+  fullText: string
+  isStreaming: boolean
+  resetKey: string
+  onComplete?: () => void
+}) {
+  // Slab-based typewriter effect: reveal chunks of text at a time
+  const [displayedLength, setDisplayedLength] = useState(0)
+  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const displayedLengthRef = useRef<number>(0)
+  const targetLengthRef = useRef<number>(0)
+  const onCompleteRef = useRef<typeof onComplete>(onComplete)
+
+  // Avoid re-running the animation effect on every render due to unstable callback identities.
+  useEffect(() => {
+    onCompleteRef.current = onComplete
+  }, [onComplete])
+
+  // Keep ref in sync with state
+  useEffect(() => {
+    displayedLengthRef.current = displayedLength
+  }, [displayedLength])
+
+  // Reset displayed length when resetKey changes (new message / new stream)
+  useEffect(() => {
+    setDisplayedLength(0)
+    displayedLengthRef.current = 0
+    targetLengthRef.current = 0
+    if (timeoutRef.current !== null) {
+      clearTimeout(timeoutRef.current)
+      timeoutRef.current = null
+    }
+  }, [resetKey])
+
+  useEffect(() => {
+    // Update target length ref whenever fullText changes
+    targetLengthRef.current = fullText.length
+
+    // If not streaming and we haven't started typewriting, sync the displayedLength
+    // This ensures state is correct even though displayText handles the rendering
+    if (!isStreaming && displayedLengthRef.current === 0 && fullText.length > 0) {
+      setDisplayedLength(fullText.length)
+      displayedLengthRef.current = fullText.length
+      onCompleteRef.current?.()
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+      return
+    }
+
+    // Calculate slab size and delay based on pending characters
+    // More pending = larger slabs and faster updates to catch up
+    const calculateSlabParams = (pending: number): { slabSize: number; delay: number } => {
+      if (pending <= 0) {
+        return { slabSize: 1, delay: 50 } // Small chunks when caught up
+      }
+
+      // Calculate slab size: larger when more pending
+      // Min slab: 3 chars, Max slab: 50 chars
+      const minSlab = 3
+      const maxSlab = 50
+      const slabScaleFactor = 20
+      const slabSize = Math.min(maxSlab, Math.max(minSlab, Math.round(minSlab + pending / slabScaleFactor)))
+
+      // Calculate delay: faster when more pending
+      // Min delay: 10ms, Max delay: 50ms
+      const minDelay = 10
+      const maxDelay = 50
+      const delayScaleFactor = 30
+      const delay = minDelay + (maxDelay - minDelay) / (1 + pending / delayScaleFactor)
+
+      return {
+        slabSize: Math.round(slabSize),
+        delay: Math.max(minDelay, Math.min(maxDelay, Math.round(delay))),
+      }
+    }
+
+    // Slab-based animation: reveal chunks of text at a time
+    const revealNextSlab = () => {
+      const current = displayedLengthRef.current
+      const target = targetLengthRef.current
+
+      if (current >= target) {
+        // All content revealed, stop and mark animation as complete
+        timeoutRef.current = null
+        onCompleteRef.current?.()
+        return
+      }
+
+      // Calculate pending and determine slab size
+      const pending = target - current
+      const { slabSize, delay } = calculateSlabParams(pending)
+
+      // Reveal next slab (but don't exceed target)
+      const next = Math.min(current + slabSize, target)
+      setDisplayedLength(next)
+      displayedLengthRef.current = next
+
+      // If we hit the target, complete immediately (avoid needing an extra tick).
+      if (next >= target) {
+        timeoutRef.current = null
+        onCompleteRef.current?.()
+        return
+      }
+
+      // Continue revealing slabs with dynamic delay
+      timeoutRef.current = setTimeout(revealNextSlab, delay)
+    }
+
+    // Continue animation if there's content to reveal (even after streaming stops)
+    // This ensures the typewriter effect completes smoothly
+    // Only start if we're streaming or have already started (displayedLength > 0)
+    if (timeoutRef.current === null && displayedLengthRef.current < targetLengthRef.current) {
+      // Only start typewriter if we're streaming or have already started (displayedLength > 0)
+      if (isStreaming || displayedLengthRef.current > 0) {
+        const pending = targetLengthRef.current - displayedLengthRef.current
+        const { delay, slabSize } = calculateSlabParams(pending)
+
+        // If just starting (displayedLength is 0), reveal first slab immediately
+        // then continue with delay for subsequent slabs
+        if (displayedLengthRef.current === 0 && pending > 0) {
+          // Reveal first slab immediately to avoid flash
+          const firstSlab = Math.min(slabSize, pending)
+          setDisplayedLength(firstSlab)
+          displayedLengthRef.current = firstSlab
+          // Then continue with delay for next slab
+          timeoutRef.current = setTimeout(revealNextSlab, delay)
+        } else {
+          // Already started, continue with delay
+          timeoutRef.current = setTimeout(revealNextSlab, delay)
+        }
+      }
+    }
+
+    return () => {
+      if (timeoutRef.current !== null) {
+        clearTimeout(timeoutRef.current)
+        timeoutRef.current = null
+      }
+    }
+  }, [fullText, isStreaming, resetKey])
+
+  // Build display text with typewriter effect
+  // Continue typewriter effect until it catches up to full text, even after streaming stops
+  const displayText = useMemo(() => {
+    // If not streaming and we haven't started typewriting (displayedLength is 0),
+    // show full text immediately. This handles completed messages.
+    if (!isStreaming && displayedLength === 0 && fullText.length > 0) {
+      return fullText
+    }
+    // If we're streaming and haven't started typewriting yet, show nothing
+    // This prevents the flash of content before animation starts
+    if (isStreaming && displayedLength === 0) {
+      return ''
+    }
+    // If we've started typewriting, show the revealed portion
+    if (displayedLength > 0) {
+      return fullText.slice(0, displayedLength)
+    }
+    // Fallback: show nothing if no content
+    return ''
+  }, [fullText, displayedLength, isStreaming])
+
+  return { displayText, displayedLength }
+}
+
 interface MessageContentProps {
   content: string
   messageId: string
@@ -173,153 +345,7 @@ export function ConversationMessageContent({
     return content && content.trim().length > 0 ? content : aggregated
   }, [content, chunks, isStreaming])
 
-  // Slab-based typewriter effect: reveal chunks of text at a time
-  const [displayedLength, setDisplayedLength] = useState(0)
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null)
-  const displayedLengthRef = useRef<number>(0)
-  const targetLengthRef = useRef<number>(0)
-
-  // Keep ref in sync with state
-  useEffect(() => {
-    displayedLengthRef.current = displayedLength
-  }, [displayedLength])
-
-  useEffect(() => {
-    // Update target length ref whenever fullContent changes
-    targetLengthRef.current = fullContent.length
-
-    // If not streaming and we haven't started typewriting, sync the displayedLength
-    // This ensures state is correct even though displayContent handles the rendering
-    if (!isStreaming && displayedLengthRef.current === 0 && fullContent.length > 0) {
-      setDisplayedLength(fullContent.length)
-      displayedLengthRef.current = fullContent.length
-      // Mark animation as complete since we're showing it immediately
-      markAnimationComplete(messageId)
-      if (timeoutRef.current !== null) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
-      return
-    }
-
-    // Calculate slab size and delay based on pending characters
-    // More pending = larger slabs and faster updates to catch up
-    const calculateSlabParams = (pending: number): { slabSize: number; delay: number } => {
-      if (pending <= 0) {
-        return { slabSize: 1, delay: 50 } // Small chunks when caught up
-      }
-
-      // Calculate slab size: larger when more pending
-      // Min slab: 3 chars, Max slab: 50 chars
-      const minSlab = 3
-      const maxSlab = 50
-      const slabScaleFactor = 20
-      const slabSize = Math.min(maxSlab, Math.max(minSlab, Math.round(minSlab + pending / slabScaleFactor)))
-
-      // Calculate delay: faster when more pending
-      // Min delay: 10ms, Max delay: 50ms
-      const minDelay = 10
-      const maxDelay = 50
-      const delayScaleFactor = 30
-      const delay = minDelay + (maxDelay - minDelay) / (1 + pending / delayScaleFactor)
-
-      return {
-        slabSize: Math.round(slabSize),
-        delay: Math.max(minDelay, Math.min(maxDelay, Math.round(delay))),
-      }
-    }
-
-    // Slab-based animation: reveal chunks of text at a time
-    const revealNextSlab = () => {
-      const current = displayedLengthRef.current
-      const target = targetLengthRef.current
-
-      if (current >= target) {
-        // All content revealed, stop and mark animation as complete
-        timeoutRef.current = null
-        markAnimationComplete(messageId)
-        return
-      }
-
-      // Calculate pending and determine slab size
-      const pending = target - current
-      const { slabSize, delay } = calculateSlabParams(pending)
-
-      // Reveal next slab (but don't exceed target)
-      const next = Math.min(current + slabSize, target)
-      setDisplayedLength(next)
-      displayedLengthRef.current = next
-
-      // Continue revealing slabs with dynamic delay
-      timeoutRef.current = setTimeout(revealNextSlab, delay)
-    }
-
-    // Continue animation if there's content to reveal (even after streaming stops)
-    // This ensures the typewriter effect completes smoothly
-    // Only start if we're streaming or have already started (displayedLength > 0)
-    if (timeoutRef.current === null && displayedLengthRef.current < targetLengthRef.current) {
-      // Only start typewriter if we're streaming or have already started (displayedLength > 0)
-      if (isStreaming || displayedLengthRef.current > 0) {
-        const pending = targetLengthRef.current - displayedLengthRef.current
-        const { delay, slabSize } = calculateSlabParams(pending)
-
-        // If just starting (displayedLength is 0), reveal first slab immediately
-        // then continue with delay for subsequent slabs
-        if (displayedLengthRef.current === 0 && pending > 0) {
-          // Reveal first slab immediately to avoid flash
-          const firstSlab = Math.min(slabSize, pending)
-          setDisplayedLength(firstSlab)
-          displayedLengthRef.current = firstSlab
-          // Then continue with delay for next slab
-          timeoutRef.current = setTimeout(revealNextSlab, delay)
-        } else {
-          // Already started, continue with delay
-          timeoutRef.current = setTimeout(revealNextSlab, delay)
-        }
-      }
-    }
-
-    return () => {
-      if (timeoutRef.current !== null) {
-        clearTimeout(timeoutRef.current)
-        timeoutRef.current = null
-      }
-    }
-  }, [fullContent, isStreaming, messageId])
-
-  // Reset displayed length when messageId changes (new message)
-  useEffect(() => {
-    setDisplayedLength(0)
-    displayedLengthRef.current = 0
-    targetLengthRef.current = 0
-    if (timeoutRef.current !== null) {
-      clearTimeout(timeoutRef.current)
-      timeoutRef.current = null
-    }
-  }, [messageId])
-
-  // Build display content with typewriter effect
-  // Continue typewriter effect until it catches up to full content, even after streaming stops
-  const displayContent = useMemo(() => {
-    // If not streaming and we haven't started typewriting (displayedLength is 0),
-    // show full content immediately. This handles completed messages.
-    if (!isStreaming && displayedLength === 0 && fullContent.length > 0) {
-      return fullContent
-    }
-    // If we're streaming and haven't started typewriting yet, show nothing
-    // This prevents the flash of content before animation starts
-    if (isStreaming && displayedLength === 0) {
-      return ''
-    }
-    // If we've started typewriting, show the revealed portion
-    if (displayedLength > 0) {
-      return fullContent.slice(0, displayedLength)
-    }
-    // Fallback: show nothing if no content
-    return ''
-  }, [fullContent, displayedLength, isStreaming])
-
-  const displayReasoning = useMemo(() => {
+  const displayReasoningFull = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0
     if (!hasR) return reasoning || ''
     const sorted = [...reasoningChunks].sort((a, b) => a.position - b.position)
@@ -328,12 +354,27 @@ export function ConversationMessageContent({
     return isStreaming ? agg : reasoning && reasoning.trim().length > 0 ? reasoning : agg
   }, [reasoning, reasoningChunks, isStreaming])
 
+  const { displayText: displayContent } = useSlabTypewriterText({
+    fullText: fullContent,
+    isStreaming,
+    resetKey: messageId,
+    onComplete: () => markAnimationComplete(messageId),
+  })
+
+  const { displayText: displayReasoning } = useSlabTypewriterText({
+    fullText: displayReasoningFull,
+    isStreaming,
+    resetKey: `${messageId}-reasoning`,
+  })
+
   // Determine whether reasoning panel should auto-open.
   // Keep it open only while reasoning-only is streaming; collapse once content OR toolCalls start (and on reload).
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
-  const openReasoning = Boolean(isStreaming && displayReasoning && displayReasoning.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
+  const openReasoning = Boolean(
+    isStreaming && displayReasoningFull && displayReasoningFull.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow)
+  )
   const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Agent'
   const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
 
@@ -606,7 +647,7 @@ export function ConversationMessageContent({
   return (
     <div ref={messageContainerRef} className={cn('relative group w-full', className)}>
       {/* Reasoning (thinking) collapsible */}
-      {displayReasoning && displayReasoning.trim().length > 0 && messageType !== 'tool_result' && (
+      {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
         <div className="mb-2">
           {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>

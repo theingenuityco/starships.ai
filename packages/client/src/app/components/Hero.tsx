@@ -79,8 +79,7 @@ export default function Hero() {
                   <span className="warp-word" data-text="ai">
                     <span className="warp-letter">A</span>
                     <span className="warp-letter">I</span>
-                  </span>
-                  {' '}
+                  </span>{' '}
                   <span className="warp-word" data-text="employees">
                     <span className="warp-letter">e</span>
                     <span className="warp-letter">m</span>
@@ -91,8 +90,7 @@ export default function Hero() {
                     <span className="warp-letter">e</span>
                     <span className="warp-letter">e</span>
                     <span className="warp-letter">s</span>
-                  </span>
-                  {' '}
+                  </span>{' '}
                   to manage your work
                 </>
               )
@@ -125,9 +123,7 @@ export default function Hero() {
               {isAuthenticated ? (
                 <span className="flex flex-col items-start text-left min-w-0 leading-tight">
                   <span>Enter my starship</span>
-                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">
-                    {primaryStarship?.name || 'Your starship'}
-                  </span>
+                  <span className="-mt-0.5 text-xs sm:text-sm font-normal text-primary-foreground/80 truncate max-w-[18rem] sm:max-w-[22rem]">{primaryStarship?.name || 'Your starship'}</span>
                 </span>
               ) : (
                 'Get started for free'
@@ -138,18 +134,30 @@ export default function Hero() {
       </div>
       <style jsx>{`
         .warp-word {
-          display: inline-flex;
+          display: inline-block;
           gap: 0;
           position: relative;
-          align-items: baseline;
+          /* Ensure warped text matches surrounding headline typography */
+          font-size: 1em;
+          font-weight: inherit;
+          line-height: inherit;
+          vertical-align: baseline;
+
           overflow: visible;
-          /* Avoid adding line-gap on wraps; instead, nudge up to keep descenders visible */
-          transform: translateY(-0.06em);
+          /*
+            Prevent descenders (e.g. "y") from clipping without inflating multi-line spacing:
+            add a little extra bottom room, then cancel it out with a negative margin.
+          */
+          padding-bottom: 0.14em;
+          margin-bottom: -0.14em;
         }
 
         .warp-letter {
           display: inline-block;
           overflow: visible;
+          font-size: 1em;
+          font-weight: inherit;
+          line-height: inherit;
           animation:
             warp-letter-in 640ms cubic-bezier(0.22, 1, 0.36, 1) both,
             gradient-shift 8s ease-in-out 1.2s infinite,

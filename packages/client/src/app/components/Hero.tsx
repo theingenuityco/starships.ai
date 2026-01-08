@@ -1,7 +1,6 @@
 'use client'
 
 import { Button } from '@/components/ui/button'
-import Icon from '@/components/primitives/Icon'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { track } from '@/lib/analytics'
 import { getHeadlineVariant } from '@/lib/flags'
@@ -11,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import HeroConversationDemo from '@/app/components/HeroConversationDemo'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
+import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
 
 export default function Hero() {
   const router = useRouter()
@@ -118,17 +118,7 @@ export default function Hero() {
               </span>
               {isAuthenticated ? `Enter ${primaryStarship?.name || 'your starship'}` : 'Get started for free'}
             </Button>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-base text-muted-foreground transition-colors hover:text-foreground"
-              onClick={() => {
-                router.push('/marketplace?from=public')
-              }}
-            >
-              <Icon name="store" className="w-6 h-6 mr-1" />
-              Explore agents in Marketplace
-            </Button>
+            <HeroMarketplaceCarousel />
           </div>
         </div>
 

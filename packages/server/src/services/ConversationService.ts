@@ -248,21 +248,6 @@ export class ConversationService {
       const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
       const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
       this.streamingAssistantMessageId.set(conversationId, messageId);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run2',
-          hypothesisId: 'H7',
-          location: 'ConversationService.ts:flushDelta',
-          message: 'publishing delta',
-          data: { conversationId, kind, turnId, messageId, deltaLen: payload.length },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
       const event: ConversationStreamEvent =
         kind === 'content'
           ? {
@@ -1368,22 +1353,6 @@ export class ConversationService {
     const leaseService = new StarshipTurnLeaseService();
 
     try {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run2',
-          hypothesisId: 'H5',
-          location: 'ConversationService.ts:continueAfterToolApproval',
-          message: 'resume entry',
-          data: { conversationId, agentId, hasCancellation: ConversationService.activeCancellations.has(conversationId) },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
-
       const conversation = await this.getConversationById(conversationId);
       const turnActive =
         conversation?.state &&
@@ -1418,29 +1387,6 @@ export class ConversationService {
         ConversationService.activeCancellations.delete(conversationId);
         throw new NotFoundError('Agent', agentId);
       }
-
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run2',
-          hypothesisId: 'H5',
-          location: 'ConversationService.ts:continueAfterToolApproval',
-          message: 'resume ready (before execute)',
-          data: {
-            conversationId,
-            agentId: agentModel.id,
-            starshipId: starship.id,
-            currentTurnId: this.currentTurnId.get(conversationId) || null,
-            generationId: this.generationId.get(conversationId) || null,
-            streamingAssistantMessageId: this.streamingAssistantMessageId.get(conversationId) || null,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {});
-      // #endregion
 
       // Publish a turn.status=active event so clients immediately re-enter "responding" UI.
       // Unlike the initial message flow, there is no new turn.started event here.
@@ -2767,27 +2713,6 @@ export class ConversationService {
           })();
 
           if (isApprovalRequired) {
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'run2',
-                hypothesisId: 'H6',
-                location: 'ConversationService.ts:workflow_completed',
-                message: 'workflow_completed treated as waiting_for_tools (approval required)',
-                data: {
-                  conversationId,
-                  currentTurnId: this.currentTurnId.get(conversationId) || null,
-                  generationId: this.generationId.get(conversationId) || null,
-                  streamingAssistantMessageId: this.streamingAssistantMessageId.get(conversationId) || null,
-                },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion
-
             // Persist any in-flight partial so reload shows the latest assistant content (best-effort).
             try {
               const persisted = await this.persistActivePartial(conversationId);

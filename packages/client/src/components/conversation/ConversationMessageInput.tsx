@@ -262,21 +262,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       setSubmittingToolApprovalId(String(topPendingApproval.id))
       // Immediate UX feedback (do not wait for server-side tool execution).
       toast.success('Tool approved')
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId: 'H3',
-          location: 'ConversationMessageInput.tsx:approveTopPendingTool',
-          message: 'approve clicked (optimistic hide + toast)',
-          data: { conversationId, approvalId: String(topPendingApproval.id), toolSlug: String((topPendingApproval as any).toolSlug || '') },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/approve`)
         // IMPORTANT: do NOT await message invalidation here. The messages query is SSE-backed and may never "settle",
@@ -334,21 +319,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
       setSubmittingToolApprovalId(String(topPendingApproval.id))
       toast.message('Tool denied')
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run1',
-          hypothesisId: 'H3',
-          location: 'ConversationMessageInput.tsx:denyTopPendingTool',
-          message: 'deny clicked (optimistic hide + toast)',
-          data: { conversationId, approvalId: String(topPendingApproval.id) },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/deny`)
         void refreshPendingToolApprovals(conversationId)

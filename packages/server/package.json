@@ -10,6 +10,7 @@
     "start": "NODE_OPTIONS=--no-node-snapshot node dist/index.js",
     "schedule:worker": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/scheduledRunsWorker.ts",
     "schedule:scheduler": "NODE_OPTIONS=--no-node-snapshot tsx src/workers/scheduleScheduler.ts",
+    "avatars:optimize-existing": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/optimize-existing-avatars.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
     "test": "jest"

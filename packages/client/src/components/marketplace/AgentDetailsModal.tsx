@@ -14,6 +14,7 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { withAvatarCacheBuster } from '@/lib/avatar'
 
 interface AgentDetailsModalProps {
   template: AgentTemplateModel | null
@@ -77,6 +78,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   }
 
   if (!template) return null
+  const avatarUrl = withAvatarCacheBuster((template as any)?.avatarUrl, (template as any)?.avatarUpdatedAt)
 
   // Match Marketplace card CTA semantics
   const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
@@ -88,7 +90,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden flex flex-col">
         <div className="px-6 pt-4 pb-0 pr-14 flex items-center gap-4">
           <Avatar className="h-14 w-14 rounded-full ring-1 ring-border/40 shadow-lg">
-            <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={56} rounded />
+            <AgentAvatar seed={template.name} imageUrl={avatarUrl} size={56} rounded />
           </Avatar>
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-xl font-bold leading-tight truncate">{template.name}</DialogTitle>

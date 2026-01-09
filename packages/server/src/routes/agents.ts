@@ -557,7 +557,9 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
 
     // Store as attachment (auth-scoped)
     const attachmentService = new AttachmentService();
-    const filename = `agent-${agent.slug || agent.id}-avatar.${gen.mimeType.includes('png') ? 'png' : gen.mimeType.includes('jpeg') ? 'jpg' : 'img'}`;
+    const filename = `agent-${agent.slug || agent.id}-avatar.${
+      gen.mimeType.includes('webp') ? 'webp' : gen.mimeType.includes('png') ? 'png' : gen.mimeType.includes('jpeg') ? 'jpg' : 'img'
+    }`;
     const attachment = await attachmentService.createAttachment({
       starshipId: agent.starshipId,
       conversationId: `agent-avatar-${agent.id}`,

@@ -4,6 +4,7 @@ import { useAgentTemplates } from '@/hooks/useTemplates'
 import { Skeleton } from '@/components/ui/skeleton'
 import type { AgentTemplateModel } from '@starships/protocol'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { withAvatarCacheBuster } from '@/lib/avatar'
 import { useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 
@@ -109,7 +110,7 @@ export default function DeployAgentDemo() {
                   const role = String((t as any)?.role ?? '').trim()
                   const primaryLabel =
                     role || String((t as any)?.category ?? '').trim() || String((t as any)?.slug ?? '').trim() || name
-                  const avatarUrl = (t as any)?.avatarUrl as string | undefined
+                  const avatarUrl = withAvatarCacheBuster((t as any)?.avatarUrl, (t as any)?.avatarUpdatedAt)
                   return (
                     <button
                       key={t.id}

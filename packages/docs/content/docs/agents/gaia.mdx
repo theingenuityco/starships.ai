@@ -67,6 +67,12 @@ Add capabilities based on actual usage patterns and performance data.
 </Steps>
 
 <Callout type="info">
+  **Identity fields matter**: Every agent needs both a `name` and a `role`. Gaia automatically includes both when it calls the `open-agent`
+  tool (for example, `{ "name": "Customer Inbox Assistant", "role": "Customer Support Specialist" }`). If you trigger the tool or API
+  directly, always provide `role` as a non-empty string so the platform can create the agent successfully.
+</Callout>
+
+<Callout type="info">
   **No Technical Skills Required**: Gaia handles all the technical complexity while you focus on describing what you need in plain language.
 </Callout>
 

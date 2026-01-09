@@ -54,7 +54,11 @@ Automatically inferred from agent state (do not pass manually):
       },
       role: {
         type: 'string',
-        description: 'Human-readable role label for the agent (required when creating a new agent)',
+        minLength: 1,
+        maxLength: 255,
+        description:
+          'Human-readable role label for the agent (required when creating a new agent). Examples: "Customer Support Specialist", "Agent Creator".',
+        examples: ['Customer Support Specialist', 'Sales Assistant', 'Agent Creator'],
       },
       description: {
         type: 'string',
@@ -108,7 +112,7 @@ Automatically inferred from agent state (do not pass manually):
                 }
                 const role = typeof input.role === 'string' ? input.role.trim() : '';
                 if (!role) {
-                  throw new Error('role is required when creating an agent');
+                  throw new Error('role is required when creating an agent (set input.role to a non-empty string)');
                 }
                 // Create draft
                 const args = {
@@ -219,10 +223,10 @@ export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentOpenTool.blueprint,
 
   slug: 'open-agent',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage:
-    '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',
+    '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "role": "Customer Support Specialist", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "role": "Senior Coding Assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',
   requiresApiKey: false,
   configurationFields: [],
 };

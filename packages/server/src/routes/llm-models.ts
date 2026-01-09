@@ -1,7 +1,9 @@
 import { Router, type Request, type Response } from 'express';
+import { z } from 'zod';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { validateData } from '@/utils/validation';
 import { getEnvConfig } from '@starships/env';
 import { LlmModelRepository } from '@starships/models';
 import type { OpenRouterModel, LlmModelModel, LlmModelProviderModel } from '@starships/protocol';
@@ -9,6 +11,17 @@ import type { OpenRouterModel, LlmModelModel, LlmModelProviderModel } from '@sta
 const router: Router = Router();
 
 const repo = new LlmModelRepository();
+
+const ModelIdentifierSchema = z
+  .string()
+  .trim()
+  .min(1, 'model is required')
+  .max(255, 'model must be 255 characters or less')
+  // OpenRouter-style ids commonly include provider/model, and may include dots or suffixes like :free
+  .regex(/^[A-Za-z0-9][A-Za-z0-9._:/_-]*$/, 'Invalid model identifier');
+
+const ModelParamSchema = z.object({ model: ModelIdentifierSchema }).passthrough();
+const CreateModelBodySchema = z.object({ model: ModelIdentifierSchema }).passthrough();
 
 /**
  * GET /llm/models
@@ -44,11 +57,9 @@ router.get('/llm/models', jwtAuthMiddleware, async (req: Request, res: Response)
  */
 router.get('/llm/models/:model/providers', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    const model = String(req.params.model || '').trim();
-    if (!model) {
-      sendError(res, 'VALIDATION_ERROR', 'model is required', 400);
-      return;
-    }
+    const params = validateData(ModelParamSchema, req.params, res, 'llm model params');
+    if (!params) return;
+    const { model } = params;
     const enabledOnly = String(req.query.enabledOnly ?? 'true') !== 'false';
     const rows = await repo.listProvidersForModel(model, { enabledOnly });
     const out: LlmModelProviderModel[] = rows.map((r) => ({
@@ -79,12 +90,9 @@ router.post('/llm/models', jwtAuthMiddleware, async (req: Request, res: Response
       sendError(res, 'FORBIDDEN', 'Admin access required', 403);
       return;
     }
-    const body = (req.body || {}) as Record<string, unknown>;
-    const model = String(body.model ?? '').trim();
-    if (!model) {
-      sendError(res, 'VALIDATION_ERROR', 'model is required', 400);
-      return;
-    }
+    const body = validateData(CreateModelBodySchema, req.body, res, 'create llm model body');
+    if (!body) return;
+    const { model } = body;
 
     await repo.upsertModels([
       {
@@ -117,11 +125,9 @@ router.put('/llm/models/:model', jwtAuthMiddleware, async (req: Request, res: Re
       sendError(res, 'FORBIDDEN', 'Admin access required', 403);
       return;
     }
-    const model = String(req.params.model || '').trim();
-    if (!model) {
-      sendError(res, 'VALIDATION_ERROR', 'model is required', 400);
-      return;
-    }
+    const params = validateData(ModelParamSchema, req.params, res, 'llm model params');
+    if (!params) return;
+    const { model } = params;
 
     const body = (req.body || {}) as Record<string, unknown>;
     await repo.updateModel(model, {
@@ -152,11 +158,9 @@ router.post('/llm/models/:model/providers', jwtAuthMiddleware, async (req: Reque
       sendError(res, 'FORBIDDEN', 'Admin access required', 403);
       return;
     }
-    const model = String(req.params.model || '').trim();
-    if (!model) {
-      sendError(res, 'VALIDATION_ERROR', 'model is required', 400);
-      return;
-    }
+    const params = validateData(ModelParamSchema, req.params, res, 'llm model params');
+    if (!params) return;
+    const { model } = params;
     const body = (req.body || {}) as Record<string, unknown>;
     const provider = String(body.provider ?? '').trim();
     const providerModelId = String(body.providerModelId ?? '').trim();
@@ -195,7 +199,9 @@ router.delete('/llm/models/:model/providers', jwtAuthMiddleware, async (req: Req
       sendError(res, 'FORBIDDEN', 'Admin access required', 403);
       return;
     }
-    const model = String(req.params.model || '').trim();
+    const params = validateData(ModelParamSchema, req.params, res, 'llm model params');
+    if (!params) return;
+    const { model } = params;
     const provider = String(req.query.provider ?? '').trim();
     const providerModelId = String(req.query.providerModelId ?? '').trim();
     if (!model || !provider || !providerModelId) {
@@ -239,8 +245,15 @@ router.post('/llm/models/sync/openrouter', jwtAuthMiddleware, async (req: Reques
     });
 
     if (!resp.ok) {
-      const body = await resp.text().catch(() => '');
-      sendError(res, 'SERVICE_UNAVAILABLE', `OpenRouter responded with ${resp.status}`, resp.status, { body });
+      const rawBody = await resp.text().catch(() => '');
+      const bodySnippet = rawBody ? rawBody.slice(0, 1000) : '';
+      // Log upstream details server-side, but don't leak response bodies to clients.
+      console.warn('[LLM_MODELS] OpenRouter sync failed', {
+        status: resp.status,
+        statusText: resp.statusText,
+        bodySnippet,
+      });
+      sendError(res, 'SERVICE_UNAVAILABLE', `OpenRouter responded with ${resp.status}`, resp.status);
       return;
     }
 

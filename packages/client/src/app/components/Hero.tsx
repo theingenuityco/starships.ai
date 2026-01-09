@@ -9,8 +9,10 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useRouter } from 'next/navigation'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import HeroMarketplaceCarousel from '@/app/components/HeroMarketplaceCarousel'
+import type { AgentTemplateModel } from '@starships/protocol'
 
-export default function Hero() {
+export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
+  const initialAgentTemplates = props.initialAgentTemplates ?? []
   const router = useRouter()
   const { isAuthenticated, user } = useAuth()
   const { data: starships = [] } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
@@ -100,7 +102,7 @@ export default function Hero() {
             Triage your inbox, run your socials, manage products — and much more.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
-            <HeroMarketplaceCarousel />
+            <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />
             <Button
               size="lg"
               className="h-14 sm:h-16 w-full sm:w-auto max-w-[22rem] sm:max-w-none px-6 sm:px-10 text-lg sm:text-xl leading-none overflow-hidden rounded-full whitespace-normal break-words text-center [&_svg]:!w-12 [&_svg]:!h-12 disabled:opacity-100 disabled:bg-primary disabled:text-primary-foreground"

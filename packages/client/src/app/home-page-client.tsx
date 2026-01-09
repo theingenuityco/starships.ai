@@ -16,8 +16,12 @@ import { StarTheme } from '@/components/theme-context'
 import { Button } from '@/components/ui/button'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import Link from 'next/link'
+import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 
-export default function HomePageClient() {
+export default function HomePageClient(props: { initialAgentTemplates?: AgentTemplateModel[]; initialToolTemplates?: ToolTemplateModel[] }) {
+  const initialAgentTemplates = props.initialAgentTemplates ?? []
+  const initialToolTemplates = props.initialToolTemplates ?? []
+
   return (
     <StarTheme theme="dark">
       <div className="min-h-[100dvh] bg-background relative overflow-x-hidden">
@@ -47,10 +51,10 @@ export default function HomePageClient() {
           <PublicHeader />
 
           {/* New Landing Sections */}
-          <Hero />
-          <HeroDemoSection />
+          <Hero initialAgentTemplates={initialAgentTemplates} />
+          <HeroDemoSection initialAgentTemplates={initialAgentTemplates} />
           <UseCases />
-          <MarketplaceTeaser />
+          <MarketplaceTeaser initialAgentTemplates={initialAgentTemplates} initialToolTemplates={initialToolTemplates} />
           <Security />
           <PricingTeaser />
           <FAQ />

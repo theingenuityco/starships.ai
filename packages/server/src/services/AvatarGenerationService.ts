@@ -7,6 +7,7 @@
 import { Agent, ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { AgentParams, Blueprint, EngineConfig, LlmMessage } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
+import sharp from 'sharp';
 
 export type AvatarGenerationResult = {
   /** data URL from OpenRouter: data:image/png;base64,... */
@@ -20,6 +21,33 @@ export type AvatarGenerationResult = {
 };
 
 export class AvatarGenerationService {
+  /**
+   * Post-process the model output for avatar usage:
+   * - Cap dimensions (avatars are rendered at small sizes in UI)
+   * - Transcode to WebP to dramatically reduce bytes vs PNG
+   */
+  private async optimizeAvatarImage(input: { buffer: Buffer; mimeType: string }): Promise<{ buffer: Buffer; mimeType: string }> {
+    // Keep this conservative: we only optimize common still-image formats.
+    if (!input.mimeType.startsWith('image/')) return input;
+    if (input.mimeType === 'image/gif') return input; // avoid breaking animated gifs
+
+    try {
+      // Typical UI sizes are 14–40px; largest preview in app is ~384px.
+      // 512px gives a crisp result with minimal over-download.
+      const targetMax = 512;
+      const out = await sharp(input.buffer)
+        .rotate()
+        .resize(targetMax, targetMax, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 80, effort: 4 })
+        .toBuffer();
+
+      return { buffer: out, mimeType: 'image/webp' };
+    } catch {
+      // If optimization fails for any reason, fall back to original bytes.
+      return input;
+    }
+  }
+
   /**
    * Ask the agent to describe its own appearance ("mirror" prompt).
    * This is later persisted per-agent and fed into avatar generation.
@@ -467,8 +495,10 @@ export class AvatarGenerationService {
       }
 
       if (typeof firstUrl === 'string' && firstUrl.length > 0) {
-        const { buffer, mimeType } = this.decodeDataUrl(firstUrl);
-        return { dataUrl: firstUrl, mimeType, buffer, ...(text ? { text } : {}), model };
+        const decoded = this.decodeDataUrl(firstUrl);
+        const optimized = await this.optimizeAvatarImage(decoded);
+        const dataUrl = `data:${optimized.mimeType};base64,${optimized.buffer.toString('base64')}`;
+        return { dataUrl, mimeType: optimized.mimeType, buffer: optimized.buffer, ...(text ? { text } : {}), model };
       }
 
       lastDebug = {

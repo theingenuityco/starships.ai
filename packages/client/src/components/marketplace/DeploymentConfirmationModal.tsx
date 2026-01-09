@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Avatar } from '@/components/ui/avatar'
+import { withAvatarCacheBuster } from '@/lib/avatar'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -24,6 +25,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
   const isAgent = type === 'agent'
   const actionText = isAgent ? 'deploy' : 'install'
   const ActionIconName = isAgent ? 'bot' : 'wrench'
+  const avatarUrl = isAgent ? withAvatarCacheBuster((template as any)?.avatarUrl, (template as any)?.avatarUpdatedAt) : undefined
 
   const handleConfirm = async () => {
     await onConfirm()
@@ -49,7 +51,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             <div className="flex items-start gap-3">
               {isAgent ? (
                 <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shadow-sm">
-                  <AgentAvatar seed={template.name} imageUrl={(template as any).avatarUrl} size={40} rounded />
+                  <AgentAvatar seed={template.name} imageUrl={avatarUrl} size={40} rounded />
                 </Avatar>
               ) : (
                 <div className="flex-shrink-0 p-2 rounded-lg bg-primary/20">

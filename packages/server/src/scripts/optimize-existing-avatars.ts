@@ -23,6 +23,7 @@ type Target = 'agents' | 'templates' | 'all';
 type Args = {
   apply: boolean;
   target: Target;
+  force: boolean;
   concurrency: number;
   // Agents
   agentsLimit?: number;
@@ -40,6 +41,7 @@ function parseArgs(argv: string[]): Args {
   const args: Args = {
     apply: false,
     target: 'all',
+    force: false,
     concurrency: 3,
     agentsMinBytes: 150 * 1024,
     templatesMinBytes: 150 * 1024,
@@ -51,6 +53,7 @@ function parseArgs(argv: string[]): Args {
     const a = argv[i];
     if (a === '--apply') args.apply = true;
     else if (a === '--dry-run') args.apply = false;
+    else if (a === '--force') args.force = true;
     else if (a === '--target') args.target = String(argv[i + 1] ?? '') as Target;
     else if (a === '--concurrency') args.concurrency = Number(argv[i + 1] ?? '');
     else if (a === '--agents-limit') args.agentsLimit = Number(argv[i + 1] ?? '');
@@ -114,6 +117,30 @@ type AgentRow = {
   filename: string;
 };
 
+function replaceExtension(path: string, extWithoutDot: string): string {
+  const p = String(path || '');
+  const ext = String(extWithoutDot || '').replace(/^\./, '');
+  if (!ext) return p;
+
+  const lastSlash = p.lastIndexOf('/');
+  const filename = lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
+  const dot = filename.lastIndexOf('.');
+  const base = dot > 0 ? filename.slice(0, dot) : filename;
+  const nextFilename = `${base}.${ext}`;
+
+  return lastSlash >= 0 ? `${p.slice(0, lastSlash + 1)}${nextFilename}` : nextFilename;
+}
+
+async function optimizeToWebp(inputBuf: Buffer, maxDim: number, quality: number): Promise<{ buffer: Buffer; width?: number; height?: number }> {
+  const pipeline = sharp(inputBuf)
+    .rotate()
+    .resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true })
+    .webp({ quality, effort: 4 });
+
+  const [outBuf, meta] = await Promise.all([pipeline.toBuffer(), pipeline.metadata()]);
+  return { buffer: outBuf, width: meta.width, height: meta.height };
+}
+
 async function optimizeAgentAvatars(args: Args, env: ReturnType<typeof getEnvConfig>, s3: S3Client): Promise<void> {
   const db = createConnection({
     host: env.POSTGRES_HOST,
@@ -131,9 +158,11 @@ async function optimizeAgentAvatars(args: Args, env: ReturnType<typeof getEnvCon
     // only starship-owned attachment objects (never touch public/agent-templates from this path)
     "att.s3_key LIKE 'starship-%'",
     "att.mime_type LIKE 'image/%'",
-    "att.mime_type <> 'image/webp'",
     "att.mime_type <> 'image/gif'",
   ];
+  if (!args.force) {
+    where.push("att.mime_type <> 'image/webp'");
+  }
   const params: unknown[] = [];
   if (args.agentsStarshipId) {
     params.push(args.agentsStarshipId);
@@ -141,7 +170,11 @@ async function optimizeAgentAvatars(args: Args, env: ReturnType<typeof getEnvCon
   }
   if (args.agentsMinBytes > 0) {
     params.push(args.agentsMinBytes);
-    where.push(`COALESCE(att.size_bytes, 0) >= $${params.length}`);
+    // IMPORTANT:
+    // Some attachment rows are created as references and have size_bytes=0 even though the
+    // underlying S3 object can be large. Treat 0 as "unknown" and include them here; we
+    // enforce min-bytes after downloading from S3.
+    where.push(`(COALESCE(att.size_bytes, 0) = 0 OR COALESCE(att.size_bytes, 0) >= $${params.length})`);
   }
 
   const limitSql = args.agentsLimit ? `LIMIT ${Math.floor(args.agentsLimit)}` : '';
@@ -164,7 +197,7 @@ async function optimizeAgentAvatars(args: Args, env: ReturnType<typeof getEnvCon
   const rows = (await pool.query(query, params)).rows as AgentRow[];
 
   console.log(
-    `[optimize-existing-avatars] (agents) candidates=${rows.length} apply=${args.apply} concurrency=${args.concurrency} agentsMinBytes=${args.agentsMinBytes}` +
+    `[optimize-existing-avatars] (agents) candidates=${rows.length} apply=${args.apply} force=${args.force} concurrency=${args.concurrency} agentsMinBytes=${args.agentsMinBytes}` +
       (args.agentsStarshipId ? ` starshipId=${args.agentsStarshipId}` : '')
   );
 
@@ -193,11 +226,14 @@ async function optimizeAgentAvatars(args: Args, env: ReturnType<typeof getEnvCon
       const inputBuf = await streamToBuffer(getRes.Body);
       bytesBefore += inputBuf.length;
 
-      const outBuf = await sharp(inputBuf)
-        .rotate()
-        .resize(args.maxDim, args.maxDim, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: args.quality, effort: 4 })
-        .toBuffer();
+      // Enforce min-bytes against the real object size (DB size_bytes can be 0 for references).
+      if (args.agentsMinBytes > 0 && inputBuf.length < args.agentsMinBytes) {
+        skipped++;
+        return;
+      }
+
+      const optimized = await optimizeToWebp(inputBuf, args.maxDim, args.quality);
+      const outBuf = optimized.buffer;
       bytesAfter += outBuf.length;
 
       if (outBuf.length >= inputBuf.length) {
@@ -205,25 +241,24 @@ async function optimizeAgentAvatars(args: Args, env: ReturnType<typeof getEnvCon
         return;
       }
 
-      const dir = origKey.split('/').slice(0, -1).join('/');
-      const base = (row.filename || 'avatar').replace(/\.[a-z0-9]+$/i, '');
-      const newFilename = `${base}.webp`;
-      const newKey = `${dir}/${Date.now()}_optimized_${base}.webp`;
+      // Keep the same key "stem", but change extension to match format.
+      const newKey = replaceExtension(origKey, 'webp');
+      const newFilename = replaceExtension(row.filename || 'avatar', 'webp');
 
       if (!args.apply) {
         updated++;
         console.log(
-          `[dry-run] agent=${row.agent_id} attachment=${row.attachment_id} ${origKey} (${Math.round(inputBuf.length / 1024)}KB) -> ${newKey} (${Math.round(
+          `[dry-run] agent=${row.agent_id} attachment=${row.attachment_id} ${origKey} -> ${newKey} (${Math.round(inputBuf.length / 1024)}KB -> ${Math.round(
             outBuf.length / 1024
           )}KB)`
         );
         return;
       }
 
+      // Write new object at the derived key (extension matches content).
       await s3.send(new PutObjectCommand({ Bucket: env.AWS_S3_BUCKET!, Key: newKey, Body: outBuf, ContentType: 'image/webp' }));
-      const meta = await sharp(outBuf).metadata();
-      const w = typeof meta.width === 'number' ? meta.width : null;
-      const h = typeof meta.height === 'number' ? meta.height : null;
+      const w = typeof optimized.width === 'number' ? optimized.width : null;
+      const h = typeof optimized.height === 'number' ? optimized.height : null;
 
       // attachments has no updated_at column (see migration 007_add_attachments)
       await pool.query(
@@ -243,7 +278,7 @@ async function optimizeAgentAvatars(args: Args, env: ReturnType<typeof getEnvCon
 
       updated++;
       console.log(
-        `[updated] agent=${row.agent_id} attachment=${row.attachment_id} ${origKey} (${Math.round(inputBuf.length / 1024)}KB) -> ${newKey} (${Math.round(
+        `[updated] agent=${row.agent_id} attachment=${row.attachment_id} ${origKey} -> ${newKey} (${Math.round(inputBuf.length / 1024)}KB -> ${Math.round(
           outBuf.length / 1024
         )}KB)`
       );
@@ -292,7 +327,7 @@ async function optimizeTemplateAvatars(args: Args, env: ReturnType<typeof getEnv
       SELECT id, avatar_s3_key, avatar_mime_type, avatar_updated_at
       FROM agent_templates
       WHERE avatar_s3_key IS NOT NULL
-        AND COALESCE(avatar_mime_type, '') <> 'image/webp'
+        ${args.force ? '' : "AND COALESCE(avatar_mime_type, '') <> 'image/webp'"}
       ORDER BY updated_at DESC
       ${limitSql}
       `
@@ -300,7 +335,7 @@ async function optimizeTemplateAvatars(args: Args, env: ReturnType<typeof getEnv
   ).rows as TemplateRow[];
 
   console.log(
-    `[optimize-existing-avatars] (templates) candidates=${rows.length} apply=${args.apply} concurrency=${args.concurrency} templatesMinBytes=${args.templatesMinBytes}`
+    `[optimize-existing-avatars] (templates) candidates=${rows.length} apply=${args.apply} force=${args.force} concurrency=${args.concurrency} templatesMinBytes=${args.templatesMinBytes}`
   );
 
   let processed = 0;
@@ -328,11 +363,8 @@ async function optimizeTemplateAvatars(args: Args, env: ReturnType<typeof getEnv
         return;
       }
 
-      const outBuf = await sharp(inputBuf)
-        .rotate()
-        .resize(args.maxDim, args.maxDim, { fit: 'inside', withoutEnlargement: true })
-        .webp({ quality: args.quality, effort: 4 })
-        .toBuffer();
+      const optimized = await optimizeToWebp(inputBuf, args.maxDim, args.quality);
+      const outBuf = optimized.buffer;
       bytesAfter += outBuf.length;
 
       if (outBuf.length >= inputBuf.length) {
@@ -340,20 +372,19 @@ async function optimizeTemplateAvatars(args: Args, env: ReturnType<typeof getEnv
         return;
       }
 
-      const dir = origKey.split('/').slice(0, -1).join('/');
-      const base = `template-${row.id}-avatar`;
-      const newKey = `${dir}/${Date.now()}_optimized_${base}.webp`;
+      const newKey = replaceExtension(origKey, 'webp');
 
       if (!args.apply) {
         updated++;
         console.log(
-          `[dry-run] template=${row.id} ${origKey} (${Math.round(inputBuf.length / 1024)}KB) -> ${newKey} (${Math.round(outBuf.length / 1024)}KB)`
+          `[dry-run] template=${row.id} ${origKey} -> ${newKey} (${Math.round(inputBuf.length / 1024)}KB -> ${Math.round(outBuf.length / 1024)}KB)`
         );
         return;
       }
 
       await s3.send(new PutObjectCommand({ Bucket: env.AWS_S3_BUCKET!, Key: newKey, Body: outBuf, ContentType: 'image/webp' }));
 
+      // IMPORTANT: landing page cache-busting uses avatarUpdatedAt, so bump it even though the key stays stable.
       await repo.updateAvatarStorage(row.id, {
         avatarS3Key: newKey,
         avatarMimeType: 'image/webp',
@@ -362,7 +393,7 @@ async function optimizeTemplateAvatars(args: Args, env: ReturnType<typeof getEnv
 
       updated++;
       console.log(
-        `[updated] template=${row.id} ${origKey} (${Math.round(inputBuf.length / 1024)}KB) -> ${newKey} (${Math.round(outBuf.length / 1024)}KB)`
+        `[updated] template=${row.id} ${origKey} -> ${newKey} (${Math.round(inputBuf.length / 1024)}KB -> ${Math.round(outBuf.length / 1024)}KB)`
       );
     } catch (e) {
       errors++;
@@ -388,7 +419,7 @@ async function main(): Promise<void> {
   const s3 = getS3(env);
 
   console.log(
-    `[optimize-existing-avatars] start target=${args.target} apply=${args.apply} concurrency=${args.concurrency} maxDim=${args.maxDim} quality=${args.quality}`
+    `[optimize-existing-avatars] start target=${args.target} apply=${args.apply} force=${args.force} concurrency=${args.concurrency} maxDim=${args.maxDim} quality=${args.quality}`
   );
 
   if (args.target === 'agents' || args.target === 'all') {

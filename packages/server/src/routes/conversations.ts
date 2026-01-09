@@ -832,13 +832,27 @@ router.post(
       });
 
       // Do NOT persist any interim tool result before approval; this message is the first persisted tool result for this call.
-      const created = await messageService.createMessage({
-        conversationId,
-        role: 'tool',
-        content,
-        messageType: 'tool_result',
-        toolCallId: approval.toolCallId,
-      });
+      // Persist into the current DB-backed turn so ordering remains stable across refreshes and subsequent turns.
+      const latestTurn = await new TurnRepository().findLatestByConversationId(conversationId);
+      const turnId = latestTurn?.id ? String(latestTurn.id) : '';
+      const turnSeq = turnId ? (await messageService.getMaxTurnSeq(turnId)) + 1 : 0;
+      const created = turnId
+        ? await messageService.upsertMessageByTurnSlot({
+            conversationId,
+            turnId,
+            turnSeq: Math.max(0, turnSeq),
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          })
+        : await messageService.createMessage({
+            conversationId,
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          });
 
       // Best-effort broadcast: update last message (after client supports replace for non-assistant)
       try {
@@ -1002,13 +1016,26 @@ router.post(
         },
       });
 
-      const created = await messageService.createMessage({
-        conversationId,
-        role: 'tool',
-        content,
-        messageType: 'tool_result',
-        toolCallId: approval.toolCallId,
-      });
+      const latestTurn = await new TurnRepository().findLatestByConversationId(conversationId);
+      const turnId = latestTurn?.id ? String(latestTurn.id) : '';
+      const turnSeq = turnId ? (await messageService.getMaxTurnSeq(turnId)) + 1 : 0;
+      const created = turnId
+        ? await messageService.upsertMessageByTurnSlot({
+            conversationId,
+            turnId,
+            turnSeq: Math.max(0, turnSeq),
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          })
+        : await messageService.createMessage({
+            conversationId,
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          });
 
       try {
         const bus = ConversationStreamBus.getInstance();

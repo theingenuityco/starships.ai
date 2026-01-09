@@ -3,7 +3,6 @@
 import Icon from '@/components/primitives/Icon'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Avatar } from '@/components/ui/avatar'
-import { withAvatarCacheBuster } from '@/lib/avatar'
 
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -25,7 +24,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
   const isAgent = type === 'agent'
   const actionText = isAgent ? 'deploy' : 'install'
   const ActionIconName = isAgent ? 'bot' : 'wrench'
-  const avatarUrl = isAgent ? withAvatarCacheBuster((template as any)?.avatarUrl, (template as any)?.avatarUpdatedAt) : undefined
+  const avatarUrl = isAgent ? ((template as any)?.avatarUrl as string | undefined) : undefined
 
   const handleConfirm = async () => {
     await onConfirm()

@@ -17,7 +17,6 @@ import { useMemo, useState } from 'react'
 import type { AgentModel, AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { getCategoryColor, getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
-import { withAvatarCacheBuster } from '@/lib/avatar'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -104,7 +103,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
     category: (template as any).category as any,
   } as unknown as AgentModel
 
-  const avatarUrl = withAvatarCacheBuster((template as any).avatarUrl, (template as any).avatarUpdatedAt)
+  const avatarUrl = (template as any).avatarUrl as string | undefined
 
   const handleConfirmDeploy = async () => {
     if (!primaryStarship) {
@@ -194,7 +193,7 @@ export function AgentTemplateCardCompact({ template, onClick }: AgentTemplateCar
   const subtitle = (template.role || '').trim() || ((template as any)?.slug || '').trim()
   const version = (template as any)?.version
   const category = (template as any)?.category
-  const avatarUrl = withAvatarCacheBuster((template as any).avatarUrl, (template as any).avatarUpdatedAt)
+  const avatarUrl = (template as any).avatarUrl as string | undefined
   return (
     <Card className="frosted-glass-card shadow-frosted-lg hover:shadow-frosted-lg group relative overflow-hidden transition-shadow duration-300 cursor-pointer" onClick={() => onClick?.(template)}>
       <div className="absolute inset-0 bg-gradient-to-br from-primary/30 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />

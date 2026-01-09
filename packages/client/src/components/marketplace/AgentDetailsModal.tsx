@@ -14,7 +14,6 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { withAvatarCacheBuster } from '@/lib/avatar'
 
 interface AgentDetailsModalProps {
   template: AgentTemplateModel | null
@@ -78,7 +77,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   }
 
   if (!template) return null
-  const avatarUrl = withAvatarCacheBuster((template as any)?.avatarUrl, (template as any)?.avatarUpdatedAt)
+  const avatarUrl = (template as any)?.avatarUrl as string | undefined
 
   // Match Marketplace card CTA semantics
   const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'

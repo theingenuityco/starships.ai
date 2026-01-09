@@ -4,7 +4,6 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAgentTemplates } from '@/hooks/useTemplates'
-import { withAvatarCacheBuster } from '@/lib/avatar'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 
@@ -125,7 +124,7 @@ export default function HeroMarketplaceCarousel() {
                 const name = String(template.name ?? '').trim()
                 const role = String((template as any)?.role ?? '').trim()
                 const primaryLabel = role || String((template as any)?.category ?? '').trim() || String((template as any)?.slug ?? '').trim() || name
-                const avatarUrl = withAvatarCacheBuster((template as any)?.avatarUrl, (template as any)?.avatarUpdatedAt)
+                const avatarUrl = (template as any)?.avatarUrl as string | undefined
 
                 return (
                   <CarouselItem key={`${template.id}-${idx}`} className="basis-auto w-[136px] sm:w-[152px] md:w-[176px] !pl-1 sm:!pl-2">

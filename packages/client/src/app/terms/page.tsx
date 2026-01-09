@@ -1,5 +1,9 @@
 import Link from 'next/link'
 
+// Public legal page: cacheable at the edge with ISR.
+export const dynamic = 'force-static'
+export const revalidate = 3600 // 1 hour
+
 export default function TermsOfServicePage() {
   return (
     <div className="min-h-screen bg-background">

@@ -1,5 +1,14 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationState, ConversationStreamEvent, ConversationStreamSnapshot, TurnStatus as StreamTurnStatus, MessageModel } from '@starships/protocol'
+import type {
+  ApiResponse,
+  ConversationModel,
+  ConversationState,
+  ConversationStreamEvent,
+  ConversationStreamSnapshot,
+  TurnStatus as StreamTurnStatus,
+  MessageModel,
+  ToolCallApprovalModel,
+} from '@starships/protocol'
 import { experimental_streamedQuery as streamedQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
@@ -60,7 +69,14 @@ export const CONVERSATION_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (id: string) => [...CONVERSATION_QUERY_KEYS.all, 'detail', id] as const,
   messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
+  toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
+
+export type PendingToolCallApproval = ToolCallApprovalModel & {
+  toolSlug?: string
+  toolName?: string
+  agentName?: string
+}
 
 /**
  * Unified conversation hook - handles everything conversation-related
@@ -105,6 +121,27 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
     enabled: !!starshipId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+  })
+}
+
+/**
+ * Pending ask-first tool approvals for a conversation.
+ *
+ * Required for refresh/deeplinks: approvals are persisted in DB and are not replayed via SSE.
+ */
+export function usePendingToolApprovals(conversationId: string | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: conversationId ? CONVERSATION_QUERY_KEYS.toolApprovalsPending(conversationId) : (['__noop__'] as const),
+    enabled: Boolean(conversationId && enabled),
+    queryFn: async (): Promise<PendingToolCallApproval[]> => {
+      const id = String(conversationId || '')
+      if (!id) return []
+      const response: FetchResponse<ApiResponse<PendingToolCallApproval[]>> = await api.get(`/api/v1/conversations/${id}/tool-approvals/pending`)
+      return response.data.data || []
+    },
+    staleTime: 5_000,
+    gcTime: 60_000,
+    refetchOnWindowFocus: true,
   })
 }
 

@@ -115,6 +115,10 @@ export default function PlatformSecretsAdminPage(): React.JSX.Element {
                 <Link href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
                   Platform secrets
                 </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/llm-models" className="text-sm font-medium underline underline-offset-4">
+                  LLM models
+                </Link>
               </div>
               <p className="text-muted-foreground mt-2">Instance-level encrypted secrets used by connectors (OAuth client IDs/secrets, bot tokens, etc.). Values are never displayed after saving.</p>
             </div>

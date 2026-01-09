@@ -33,6 +33,87 @@ export class LlmModelRepository extends BaseRepository {
     super('LlmModelRepository');
   }
 
+  async updateModel(
+    model: string,
+    updates: Partial<
+      Pick<
+        LlmModelRow,
+        | 'displayName'
+        | 'description'
+        | 'contextLength'
+        | 'inputModalities'
+        | 'outputModalities'
+        | 'supportedParameters'
+        | 'metadata'
+        | 'isEnabled'
+        | 'isDeprecated'
+      >
+    >
+  ): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const m = String(model || '').trim();
+        if (!m) throw new Error('model is required');
+
+        const sets: string[] = [];
+        const values: unknown[] = [];
+        let idx = 1;
+
+        const add = (col: string, val: unknown) => {
+          sets.push(`${col} = $${idx++}`);
+          values.push(val);
+        };
+
+        if (updates.displayName !== undefined) add('display_name', updates.displayName);
+        if (updates.description !== undefined) add('description', updates.description);
+        if (updates.contextLength !== undefined) add('context_length', updates.contextLength);
+        if (updates.inputModalities !== undefined) add('input_modalities', updates.inputModalities ?? []);
+        if (updates.outputModalities !== undefined) add('output_modalities', updates.outputModalities ?? []);
+        if (updates.supportedParameters !== undefined) add('supported_parameters', updates.supportedParameters ?? []);
+        if (updates.metadata !== undefined) add('metadata', updates.metadata ?? {});
+        if (updates.isEnabled !== undefined) add('is_enabled', updates.isEnabled);
+        if (updates.isDeprecated !== undefined) add('is_deprecated', updates.isDeprecated);
+
+        // Always bump updated_at
+        sets.push('updated_at = NOW()');
+
+        values.push(m);
+        const q = `UPDATE llm_models SET ${sets.join(', ')} WHERE model = $${idx}`;
+
+        const conn = this.getConnection();
+        await conn.query(q, values);
+      },
+      'updateModel',
+      'LlmModel',
+      model
+    );
+  }
+
+  async deleteProviderRoute(args: { model: string; provider: string; providerModelId: string }): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const model = String(args.model || '').trim();
+        const provider = String(args.provider || '').trim();
+        const providerModelId = String(args.providerModelId || '').trim();
+        if (!model) throw new Error('model is required');
+        if (!provider) throw new Error('provider is required');
+        if (!providerModelId) throw new Error('providerModelId is required');
+
+        const conn = this.getConnection();
+        await conn.query(
+          `
+          DELETE FROM llm_model_providers
+          WHERE model = $1 AND provider = $2 AND provider_model_id = $3
+          `,
+          [model, provider, providerModelId]
+        );
+      },
+      'deleteProviderRoute',
+      'LlmModelProvider',
+      `${args.model}:${args.provider}:${args.providerModelId}`
+    );
+  }
+
   async listModels(opts: { enabledOnly?: boolean } = {}): Promise<LlmModelRow[]> {
     return this.executeWithErrorHandling(
       async () => {

@@ -10,21 +10,6 @@ const router: Router = Router();
 
 const repo = new LlmModelRepository();
 
-// Curated allowlist for now (canonical OpenRouter-style IDs).
-const ALLOWED_CANONICAL_MODELS = new Set<string>([
-  'openai/gpt-4o',
-  'openai/gpt-4o-mini',
-  'openai/gpt-5.2',
-  'openai/gpt-5.2-mini',
-  'anthropic/claude-sonnet-4.5',
-  'anthropic/claude-opus-4.5',
-  'anthropic/claude-haiku-4.5',
-  'google/gemini-3-pro-image-preview',
-  'google/gemini-3-flash-preview',
-  'google/gemini-3-flash-lite-preview',
-  'google/gemini-3-pro-preview',
-]);
-
 /**
  * GET /llm/models
  * List canonical models from DB catalog.
@@ -85,6 +70,137 @@ router.get('/llm/models/:model/providers', jwtAuthMiddleware, async (req: Reques
 });
 
 /**
+ * POST /llm/models
+ * Admin-only: create a canonical model (or upsert basic fields).
+ */
+router.post('/llm/models', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user)) {
+      sendError(res, 'FORBIDDEN', 'Admin access required', 403);
+      return;
+    }
+    const body = (req.body || {}) as Record<string, unknown>;
+    const model = String(body.model ?? '').trim();
+    if (!model) {
+      sendError(res, 'VALIDATION_ERROR', 'model is required', 400);
+      return;
+    }
+
+    await repo.upsertModels([
+      {
+        model,
+        displayName: typeof body.displayName === 'string' ? body.displayName : null,
+        description: typeof body.description === 'string' ? body.description : null,
+        contextLength: typeof body.contextLength === 'number' ? body.contextLength : null,
+        isEnabled: typeof body.isEnabled === 'boolean' ? body.isEnabled : true,
+        isDeprecated: typeof body.isDeprecated === 'boolean' ? body.isDeprecated : false,
+        metadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? (body.metadata as Record<string, unknown>) : { source: 'admin' },
+      },
+    ]);
+
+    sendSuccess(res, { model });
+  } catch (error) {
+    handleError(error, res, 'creating LLM model');
+  }
+});
+
+/**
+ * PUT /llm/models/:model
+ * Admin-only: update canonical model fields.
+ */
+router.put('/llm/models/:model', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user)) {
+      sendError(res, 'FORBIDDEN', 'Admin access required', 403);
+      return;
+    }
+    const model = String(req.params.model || '').trim();
+    if (!model) {
+      sendError(res, 'VALIDATION_ERROR', 'model is required', 400);
+      return;
+    }
+
+    const body = (req.body || {}) as Record<string, unknown>;
+    await repo.updateModel(model, {
+      displayName: typeof body.displayName === 'string' ? body.displayName : undefined,
+      description: typeof body.description === 'string' ? body.description : undefined,
+      contextLength: typeof body.contextLength === 'number' ? body.contextLength : undefined,
+      isEnabled: typeof body.isEnabled === 'boolean' ? body.isEnabled : undefined,
+      isDeprecated: typeof body.isDeprecated === 'boolean' ? body.isDeprecated : undefined,
+      metadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? (body.metadata as Record<string, unknown>) : undefined,
+    });
+
+    sendSuccess(res, { model });
+  } catch (error) {
+    handleError(error, res, 'updating LLM model');
+  }
+});
+
+/**
+ * POST /llm/models/:model/providers
+ * Admin-only: upsert a provider route for a canonical model.
+ */
+router.post('/llm/models/:model/providers', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user)) {
+      sendError(res, 'FORBIDDEN', 'Admin access required', 403);
+      return;
+    }
+    const model = String(req.params.model || '').trim();
+    if (!model) {
+      sendError(res, 'VALIDATION_ERROR', 'model is required', 400);
+      return;
+    }
+    const body = (req.body || {}) as Record<string, unknown>;
+    const provider = String(body.provider ?? '').trim();
+    const providerModelId = String(body.providerModelId ?? '').trim();
+    if (!provider || !providerModelId) {
+      sendError(res, 'VALIDATION_ERROR', 'provider and providerModelId are required', 400);
+      return;
+    }
+
+    await repo.upsertModelProviders([
+      {
+        model,
+        provider,
+        providerModelId,
+        priority: typeof body.priority === 'number' ? body.priority : 0,
+        isEnabled: typeof body.isEnabled === 'boolean' ? body.isEnabled : true,
+        metadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? (body.metadata as Record<string, unknown>) : { source: 'admin' },
+      },
+    ]);
+
+    sendSuccess(res, { model, provider, providerModelId });
+  } catch (error) {
+    handleError(error, res, 'upserting LLM model provider');
+  }
+});
+
+/**
+ * DELETE /llm/models/:model/providers?provider=...&providerModelId=...
+ * Admin-only: delete one provider route.
+ */
+router.delete('/llm/models/:model/providers', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user)) {
+      sendError(res, 'FORBIDDEN', 'Admin access required', 403);
+      return;
+    }
+    const model = String(req.params.model || '').trim();
+    const provider = String(req.query.provider ?? '').trim();
+    const providerModelId = String(req.query.providerModelId ?? '').trim();
+    if (!model || !provider || !providerModelId) {
+      sendError(res, 'VALIDATION_ERROR', 'model, provider, and providerModelId are required', 400);
+      return;
+    }
+    await repo.deleteProviderRoute({ model, provider, providerModelId });
+    sendSuccess(res, { model, provider, providerModelId });
+  } catch (error) {
+    handleError(error, res, 'deleting LLM model provider');
+  }
+});
+
+/**
  * POST /llm/models/sync/openrouter
  * Admin-only: Sync OpenRouter /models/user into DB catalog.
  *
@@ -126,10 +242,11 @@ router.post('/llm/models/sync/openrouter', jwtAuthMiddleware, async (req: Reques
         ? (payload as OpenRouterModel[])
         : [];
 
-    // Only keep allowlisted canonical models.
-    const filtered = (models || []).filter(
-      (m) => m && m.id && m.id !== 'openrouter/auto' && ALLOWED_CANONICAL_MODELS.has(m.id)
-    );
+    // Only sync models that exist in our DB catalog (canonical allowlist is DB-driven).
+    const catalog = await repo.listModels({ enabledOnly: false });
+    const allowlist = new Set(catalog.map((m) => m.model));
+
+    const filtered = (models || []).filter((m) => m && m.id && m.id !== 'openrouter/auto' && allowlist.has(m.id));
 
     const nowIso = new Date().toISOString();
 
@@ -172,10 +289,10 @@ router.post('/llm/models/sync/openrouter', jwtAuthMiddleware, async (req: Reques
     );
 
     // Prune any previously-synced OpenRouter routes outside the allowlist.
-    // Keeps the DB catalog consistent with the curated list.
+    // Keeps the DB catalog consistent with the curated list in DB.
     try {
       const conn = (repo as unknown as { getConnection: () => { query: (q: string, p?: unknown[]) => Promise<unknown> } }).getConnection();
-      const allow = Array.from(ALLOWED_CANONICAL_MODELS);
+      const allow = Array.from(allowlist);
 
       await conn.query(
         `
@@ -204,7 +321,7 @@ router.post('/llm/models/sync/openrouter', jwtAuthMiddleware, async (req: Reques
     sendSuccess(res, {
       syncedModels: filtered.length,
       provider: 'openrouter',
-      allowlistSize: ALLOWED_CANONICAL_MODELS.size,
+      allowlistSize: allowlist.size,
       at: nowIso,
     });
   } catch (error) {

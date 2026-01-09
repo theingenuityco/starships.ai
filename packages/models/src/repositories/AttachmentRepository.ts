@@ -15,6 +15,52 @@ export class AttachmentRepository extends BaseRepository {
   }
 
   /**
+   * Update attachment storage + metadata fields.
+   * Note: This does NOT move/delete S3 objects; it only updates the DB row.
+   */
+  async update(id: string, updates: {
+    filename?: string;
+    mimeType?: string;
+    sizeBytes?: number;
+    s3Key?: string;
+    imageWidth?: number;
+    imageHeight?: number;
+  }): Promise<AttachmentModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const sets: string[] = [];
+        const values: unknown[] = [id];
+        let idx = 1;
+
+        const add = (col: string, value: unknown) => {
+          idx += 1;
+          sets.push(`${col} = $${idx}`);
+          values.push(value);
+        };
+
+        if (typeof updates.filename === 'string') add('filename', updates.filename);
+        if (typeof updates.mimeType === 'string') add('mime_type', updates.mimeType);
+        if (typeof updates.sizeBytes === 'number') add('size_bytes', updates.sizeBytes);
+        if (typeof updates.s3Key === 'string') add('s3_key', updates.s3Key);
+        if (typeof updates.imageWidth === 'number') add('image_width', updates.imageWidth);
+        if (typeof updates.imageHeight === 'number') add('image_height', updates.imageHeight);
+
+        if (sets.length === 0) return await this.findById(id);
+
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `UPDATE attachments SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
+          values
+        );
+        return row ? this.mapToModel(row) : null;
+      },
+      'update',
+      'Attachment',
+      id
+    );
+  }
+
+  /**
    * Find an attachment by (starshipId, s3Key).
    * Useful when you want to reuse the same underlying S3 object within a starship.
    */

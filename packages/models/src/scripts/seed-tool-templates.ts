@@ -5,15 +5,36 @@
 
 import { logger } from '@/helpers/logging';
 import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
-import type { CreateToolTemplateRequest } from '@starships/protocol';
+import type { CreateToolTemplateRequest, ToolTemplateModel } from '@starships/protocol';
 import { ALL_TOOL_TEMPLATES } from '@/seeders/tools';
 import type { UpdateToolTemplateRequest } from '@starships/protocol';
+
+type SeededToolTemplate = Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'>;
+
+export interface SeedToolTemplatesOptions {
+  /**
+   * Limit the seed run to only these templates.
+   *
+   * Notes:
+   * - Matching is done against the seeded template's `name` or `slug`.
+   * - DB upserts are still keyed by name (see repo behavior), this is only a
+   *   convenience filter for *which* templates to apply from seeders.
+   */
+  only?: {
+    names?: string[];
+    slugs?: string[];
+  };
+}
+
+function normalize(s: string): string {
+  return s.trim().toLowerCase();
+}
 
 /**
  * Seeds the database with default tool templates
  * Safe to run multiple times - updates existing templates to keep them current
  */
-export async function seedToolTemplates(): Promise<void> {
+export async function seedToolTemplates(options?: SeedToolTemplatesOptions): Promise<void> {
   try {
     logger.info('Starting tool template seeding...');
 
@@ -26,7 +47,27 @@ export async function seedToolTemplates(): Promise<void> {
     let updatedCount = 0;
     let errorCount = 0;
 
-    for (const template of ALL_TOOL_TEMPLATES) {
+    const allToolTemplates = ALL_TOOL_TEMPLATES as readonly SeededToolTemplate[];
+    const onlyNames = (options?.only?.names ?? []).map(normalize);
+    const onlySlugs = (options?.only?.slugs ?? []).map(normalize);
+    const isFiltered = onlyNames.length > 0 || onlySlugs.length > 0;
+
+    const selectedTemplates = isFiltered
+      ? allToolTemplates.filter((t) => {
+          const slug = normalize(t.slug);
+          const name = normalize(t.name);
+          return (onlyNames.length > 0 && onlyNames.includes(name)) || (onlySlugs.length > 0 && onlySlugs.includes(slug));
+        })
+      : allToolTemplates;
+
+    if (isFiltered) {
+      logger.info(`Tool template seeding filter enabled: ${selectedTemplates.length}/${allToolTemplates.length} selected`, {
+        component: 'seed-tool-templates',
+        metadata: { onlyNames: options?.only?.names ?? [], onlySlugs: options?.only?.slugs ?? [] },
+      });
+    }
+
+    for (const template of selectedTemplates) {
       try {
         // Template slugs are server-generated (random suffix) and not stable enough for upserts.
         // Seed upserts are keyed by name.

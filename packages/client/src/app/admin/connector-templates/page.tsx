@@ -145,6 +145,10 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                 <Link href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
                   Platform secrets
                 </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/llm-models" className="text-sm font-medium underline underline-offset-4">
+                  LLM models
+                </Link>
               </div>
               <p className="text-muted-foreground mt-3">Manage connector templates (enabled/disabled, runtime fields like auth/baseUrl/endpoints) for this instance.</p>
             </div>

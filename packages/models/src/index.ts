@@ -58,6 +58,7 @@ export { WidgetRepository } from './repositories/WidgetRepository';
 export { ScheduleRepository } from './repositories/ScheduleRepository';
 export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepository';
 export { TurnRepository } from './repositories/TurnRepository';
+export { LlmModelRepository } from './repositories/LlmModelRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

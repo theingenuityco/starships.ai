@@ -198,7 +198,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       return list.filter(a => a && typeof a.id === 'string' && !optimisticallyHiddenApprovalIds.has(String(a.id)))
     }, [pendingToolApprovals, optimisticallyHiddenApprovalIds])
     const topPendingApproval = Array.isArray(visiblePendingApprovals) && visiblePendingApprovals.length > 0 ? visiblePendingApprovals[0] : null
-    const [toolApprovalSubmitting, setToolApprovalSubmitting] = useState(false)
+    // IMPORTANT: submitting must be tracked per approval id.
+    // Otherwise, a second pending approval can show up while the first approve/deny request is still in-flight,
+    // causing the new callout's buttons to be incorrectly disabled until a reload resets local state.
+    const [submittingToolApprovalId, setSubmittingToolApprovalId] = useState<string | null>(null)
 
     // Local state for web browsing preference before conversation exists
     const [pendingWebBrowsing, setPendingWebBrowsing] = useState(false)
@@ -253,10 +256,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     )
 
     const approveTopPendingTool = useCallback(async () => {
-      if (!conversationId || !topPendingApproval || toolApprovalSubmitting) return
+      if (!conversationId || !topPendingApproval || submittingToolApprovalId === String(topPendingApproval.id)) return
       // Optimistically hide immediately for snappy UX; refetch will reconcile.
       setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
-      setToolApprovalSubmitting(true)
+      setSubmittingToolApprovalId(String(topPendingApproval.id))
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/approve`)
         await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
@@ -270,12 +273,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const msg = e?.message ? String(e.message) : 'Failed to approve tool'
         toast.error('Failed to approve tool', { description: msg })
       } finally {
-        setToolApprovalSubmitting(false)
+        setSubmittingToolApprovalId(cur => (cur === String(topPendingApproval.id) ? null : cur))
       }
-    }, [conversationId, topPendingApproval, toolApprovalSubmitting, queryClient, refreshPendingToolApprovals])
+    }, [conversationId, topPendingApproval, submittingToolApprovalId, queryClient, refreshPendingToolApprovals])
 
     const alwaysAllowTopPendingTool = useCallback(async () => {
-      if (!conversationId || !topPendingApproval || toolApprovalSubmitting) return
+      if (!conversationId || !topPendingApproval || submittingToolApprovalId === String(topPendingApproval.id)) return
       const agentId = String(topPendingApproval.agentId || '')
       const toolSlug = String((topPendingApproval as any).toolSlug || '')
       if (!agentId || !toolSlug) {
@@ -285,7 +288,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
       // Optimistically hide immediately for snappy UX; refetch will reconcile.
       setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
-      setToolApprovalSubmitting(true)
+      setSubmittingToolApprovalId(String(topPendingApproval.id))
       try {
         // 1) Flip permission to allow so future calls don't require approval
         await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
@@ -302,15 +305,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const msg = e?.message ? String(e.message) : 'Failed to set always-allow'
         toast.error('Failed to set always-allow', { description: msg })
       } finally {
-        setToolApprovalSubmitting(false)
+        setSubmittingToolApprovalId(cur => (cur === String(topPendingApproval.id) ? null : cur))
       }
-    }, [conversationId, topPendingApproval, toolApprovalSubmitting, queryClient, refreshPendingToolApprovals])
+    }, [conversationId, topPendingApproval, submittingToolApprovalId, queryClient, refreshPendingToolApprovals])
 
     const denyTopPendingTool = useCallback(async () => {
-      if (!conversationId || !topPendingApproval || toolApprovalSubmitting) return
+      if (!conversationId || !topPendingApproval || submittingToolApprovalId === String(topPendingApproval.id)) return
       // Optimistically hide immediately for snappy UX; refetch will reconcile.
       setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
-      setToolApprovalSubmitting(true)
+      setSubmittingToolApprovalId(String(topPendingApproval.id))
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/deny`)
         await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
@@ -324,9 +327,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         const msg = e?.message ? String(e.message) : 'Failed to deny tool'
         toast.error('Failed to deny tool', { description: msg })
       } finally {
-        setToolApprovalSubmitting(false)
+        setSubmittingToolApprovalId(cur => (cur === String(topPendingApproval.id) ? null : cur))
       }
-    }, [conversationId, topPendingApproval, toolApprovalSubmitting, queryClient, refreshPendingToolApprovals])
+    }, [conversationId, topPendingApproval, submittingToolApprovalId, queryClient, refreshPendingToolApprovals])
 
     // Track previous streaming state to detect transition to complete and refocus input
     const prevIsStreamingRef = useRef(isStreamingEffective)
@@ -1508,7 +1511,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
               toolName: String((topPendingApproval as any).toolName || ''),
               argsJson: (topPendingApproval as any).argsJson ?? {},
             }}
-            isSubmitting={toolApprovalSubmitting}
+            isSubmitting={submittingToolApprovalId === String(topPendingApproval.id)}
             onApproveOnce={approveTopPendingTool}
             onAlwaysAllow={alwaysAllowTopPendingTool}
             onDeny={denyTopPendingTool}

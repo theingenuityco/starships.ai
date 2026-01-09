@@ -40,6 +40,7 @@ export * from './domains/wallet';
 export * from './domains/topup';
 export * from './domains/ledger';
 export * from './domains/openrouter';
+export * from './domains/llm-model';
 export * from './domains/promo';
 export * from './domains/schedule';
 export * from './domains/widget';

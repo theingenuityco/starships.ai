@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import type { AgentModel, ConversationState, ConversationPlugin } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
+import { ToolApprovalCallout } from '@/components/conversation/ToolApprovalCallout'
 
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent, ReactRenderer, ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react'
@@ -190,7 +191,13 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Pending ask-first tool approvals (durable, DB-backed)
     const { data: pendingToolApprovals = [] } = usePendingToolApprovals(conversationId ?? null, Boolean(conversationId))
-    const topPendingApproval = Array.isArray(pendingToolApprovals) && pendingToolApprovals.length > 0 ? pendingToolApprovals[0] : null
+    const [optimisticallyHiddenApprovalIds, setOptimisticallyHiddenApprovalIds] = useState<Set<string>>(new Set())
+    const visiblePendingApprovals = useMemo(() => {
+      const list = Array.isArray(pendingToolApprovals) ? pendingToolApprovals : []
+      if (optimisticallyHiddenApprovalIds.size === 0) return list
+      return list.filter(a => a && typeof a.id === 'string' && !optimisticallyHiddenApprovalIds.has(String(a.id)))
+    }, [pendingToolApprovals, optimisticallyHiddenApprovalIds])
+    const topPendingApproval = Array.isArray(visiblePendingApprovals) && visiblePendingApprovals.length > 0 ? visiblePendingApprovals[0] : null
     const [toolApprovalSubmitting, setToolApprovalSubmitting] = useState(false)
 
     // Local state for web browsing preference before conversation exists
@@ -247,15 +254,19 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     const approveTopPendingTool = useCallback(async () => {
       if (!conversationId || !topPendingApproval || toolApprovalSubmitting) return
+      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+      setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
       setToolApprovalSubmitting(true)
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/approve`)
-        await Promise.all([
-          refreshPendingToolApprovals(conversationId),
-          queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) }),
-        ])
+        await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
         toast.success('Tool approved')
       } catch (e: any) {
+        setOptimisticallyHiddenApprovalIds(prev => {
+          const next = new Set(prev)
+          next.delete(String(topPendingApproval.id))
+          return next
+        })
         const msg = e?.message ? String(e.message) : 'Failed to approve tool'
         toast.error('Failed to approve tool', { description: msg })
       } finally {
@@ -263,17 +274,53 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
     }, [conversationId, topPendingApproval, toolApprovalSubmitting, queryClient, refreshPendingToolApprovals])
 
+    const alwaysAllowTopPendingTool = useCallback(async () => {
+      if (!conversationId || !topPendingApproval || toolApprovalSubmitting) return
+      const agentId = String(topPendingApproval.agentId || '')
+      const toolSlug = String((topPendingApproval as any).toolSlug || '')
+      if (!agentId || !toolSlug) {
+        toast.error('Cannot always-allow', { description: 'Missing agentId or tool slug.' })
+        return
+      }
+
+      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+      setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
+      setToolApprovalSubmitting(true)
+      try {
+        // 1) Flip permission to allow so future calls don't require approval
+        await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
+        // 2) Approve this pending tool call
+        await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/approve`)
+        await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
+        toast.success('Always allow enabled')
+      } catch (e: any) {
+        setOptimisticallyHiddenApprovalIds(prev => {
+          const next = new Set(prev)
+          next.delete(String(topPendingApproval.id))
+          return next
+        })
+        const msg = e?.message ? String(e.message) : 'Failed to set always-allow'
+        toast.error('Failed to set always-allow', { description: msg })
+      } finally {
+        setToolApprovalSubmitting(false)
+      }
+    }, [conversationId, topPendingApproval, toolApprovalSubmitting, queryClient, refreshPendingToolApprovals])
+
     const denyTopPendingTool = useCallback(async () => {
       if (!conversationId || !topPendingApproval || toolApprovalSubmitting) return
+      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+      setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
       setToolApprovalSubmitting(true)
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/deny`)
-        await Promise.all([
-          refreshPendingToolApprovals(conversationId),
-          queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) }),
-        ])
+        await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
         toast.message('Tool denied')
       } catch (e: any) {
+        setOptimisticallyHiddenApprovalIds(prev => {
+          const next = new Set(prev)
+          next.delete(String(topPendingApproval.id))
+          return next
+        })
         const msg = e?.message ? String(e.message) : 'Failed to deny tool'
         toast.error('Failed to deny tool', { description: msg })
       } finally {
@@ -1451,42 +1498,21 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           </div>
         )}
 
-        {/* Pending tool approval banner (ask-first tools) */}
+        {/* Pending tool approval callout (ask-first tools) */}
         {conversationId && topPendingApproval && (
-          <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-blue-50/80 to-indigo-50/60 dark:from-blue-950/20 dark:to-indigo-950/10 border border-blue-200/50 dark:border-blue-800/30 backdrop-blur-sm shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0">
-                <Icon name="shield" className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Approval required</p>
-                <p className="text-xs text-blue-700 dark:text-blue-300 leading-relaxed">
-                  {(topPendingApproval.agentName || 'An agent') + ' wants to run '}
-                  <span className="font-mono">{topPendingApproval.toolSlug || topPendingApproval.toolName || 'a tool'}</span>.
-                </p>
-                <details className="mt-2">
-                  <summary className="cursor-pointer select-none text-xs text-blue-700/90 dark:text-blue-300/90">View arguments</summary>
-                  <pre className="mt-2 text-[11px] whitespace-pre-wrap rounded-md border border-blue-200/60 dark:border-blue-800/40 bg-background/40 p-2 overflow-auto max-h-40">
-                    {(() => {
-                      try {
-                        return JSON.stringify(topPendingApproval.argsJson ?? {}, null, 2)
-                      } catch {
-                        return String(topPendingApproval.argsJson ?? '{}')
-                      }
-                    })()}
-                  </pre>
-                </details>
-              </div>
-              <div className="flex flex-col gap-2 flex-shrink-0">
-                <Button variant="outline" size="sm" onClick={denyTopPendingTool} disabled={toolApprovalSubmitting}>
-                  Deny
-                </Button>
-                <Button variant="default" size="sm" onClick={approveTopPendingTool} disabled={toolApprovalSubmitting}>
-                  Approve
-                </Button>
-              </div>
-            </div>
-          </div>
+          <ToolApprovalCallout
+            approval={{
+              id: String(topPendingApproval.id),
+              agentName: String((topPendingApproval as any).agentName || ''),
+              toolSlug: String((topPendingApproval as any).toolSlug || ''),
+              toolName: String((topPendingApproval as any).toolName || ''),
+              argsJson: (topPendingApproval as any).argsJson ?? {},
+            }}
+            isSubmitting={toolApprovalSubmitting}
+            onApproveOnce={approveTopPendingTool}
+            onAlwaysAllow={alwaysAllowTopPendingTool}
+            onDeny={denyTopPendingTool}
+          />
         )}
         {/* Low credits warning banner */}
         {showLowBalanceWarning && (

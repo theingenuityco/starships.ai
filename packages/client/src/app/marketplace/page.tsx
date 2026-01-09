@@ -1,6 +1,7 @@
 import { Suspense } from 'react'
 import type { Metadata } from 'next'
 import MarketplacePageClient from './MarketplacePageClient'
+import { fetchPublicAgentTemplates } from '@/lib/server/public-templates'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
@@ -45,11 +46,12 @@ export const metadata: Metadata = {
   },
 }
 
-export default function MarketplacePage() {
+export default async function MarketplacePage() {
+  const agentTemplates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
   return (
     <>
       <Suspense fallback={<div className="bg-background min-h-[50vh]" />}>
-        <MarketplacePageClient />
+        <MarketplacePageClient initialAgentTemplates={agentTemplates} />
       </Suspense>
     </>
   )

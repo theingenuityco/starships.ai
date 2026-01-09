@@ -5,6 +5,7 @@ import { ConversationMessageList } from '@/components/conversation/ConversationM
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
 import { useAgentTemplates } from '@/hooks/useTemplates'
+import type { AgentTemplateModel } from '@starships/protocol'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
 type DemoMessage = {
@@ -498,24 +499,30 @@ function useConvoTimelines() {
   )
 }
 
-export default function HeroConversationDemo() {
-  const { data: ariaTemplates = [] } = useAgentTemplates({ search: 'aria' })
+export default function HeroConversationDemo(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
+  const initialAgentTemplates = props.initialAgentTemplates ?? []
+  const useServerInitial = initialAgentTemplates.length > 0
+
+  const { data: ariaTemplatesQ = [] } = useAgentTemplates({ search: 'aria' }, !useServerInitial)
   const ariaAvatarUrl = useMemo(() => {
-    const aria = ariaTemplates.find(t => t.slug === 'aria' || t.name === 'Aria' || String(t.slug ?? '').toLowerCase().startsWith('aria'))
+    const list = (useServerInitial ? initialAgentTemplates : ariaTemplatesQ) as AgentTemplateModel[]
+    const aria = list.find(t => t.slug === 'aria' || t.name === 'Aria' || String(t.slug ?? '').toLowerCase().startsWith('aria'))
     return aria?.avatarUrl
-  }, [ariaTemplates])
+  }, [ariaTemplatesQ, initialAgentTemplates, useServerInitial])
 
-  const { data: irisTemplates = [] } = useAgentTemplates({ search: 'iris' })
+  const { data: irisTemplatesQ = [] } = useAgentTemplates({ search: 'iris' }, !useServerInitial)
   const irisAvatarUrl = useMemo(() => {
-    const iris = irisTemplates.find(t => t.slug === 'iris' || t.name === 'Iris' || String(t.slug ?? '').toLowerCase().startsWith('iris'))
+    const list = (useServerInitial ? initialAgentTemplates : irisTemplatesQ) as AgentTemplateModel[]
+    const iris = list.find(t => t.slug === 'iris' || t.name === 'Iris' || String(t.slug ?? '').toLowerCase().startsWith('iris'))
     return iris?.avatarUrl
-  }, [irisTemplates])
+  }, [initialAgentTemplates, irisTemplatesQ, useServerInitial])
 
-  const { data: sagaTemplates = [] } = useAgentTemplates({ search: 'saga' })
+  const { data: sagaTemplatesQ = [] } = useAgentTemplates({ search: 'saga' }, !useServerInitial)
   const sagaAvatarUrl = useMemo(() => {
-    const saga = sagaTemplates.find(t => t.slug === 'saga' || t.name === 'Saga' || String(t.slug ?? '').toLowerCase().startsWith('saga'))
+    const list = (useServerInitial ? initialAgentTemplates : sagaTemplatesQ) as AgentTemplateModel[]
+    const saga = list.find(t => t.slug === 'saga' || t.name === 'Saga' || String(t.slug ?? '').toLowerCase().startsWith('saga'))
     return saga?.avatarUrl
-  }, [sagaTemplates])
+  }, [initialAgentTemplates, sagaTemplatesQ, useServerInitial])
 
   const timelines = useConvoTimelines()
   const [activeConvoId, setActiveConvoId] = useState<ConvoId>('aria')

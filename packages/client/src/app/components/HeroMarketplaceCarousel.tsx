@@ -6,6 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import type { AgentTemplateModel } from '@starships/protocol'
 
 function normalize(s: unknown) {
   return String(s ?? '')
@@ -13,9 +14,13 @@ function normalize(s: unknown) {
     .toLowerCase()
 }
 
-export default function HeroMarketplaceCarousel() {
+export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const router = useRouter()
-  const { data: agentTemplates = [], isLoading } = useAgentTemplates()
+  const initialAgentTemplates = props.initialAgentTemplates ?? []
+  const useServerInitial = initialAgentTemplates.length > 0
+  const { data, isLoading } = useAgentTemplates(undefined, !useServerInitial)
+  const agentTemplates = (data ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
+  const agentTemplatesLoading = isLoading && !useServerInitial
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
@@ -102,7 +107,7 @@ export default function HeroMarketplaceCarousel() {
       <Carousel className="w-full" opts={{ loop: true, align: 'center' }} setApi={setCarouselApi} onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
         {/* Use `!` important utilities so we truly override CarouselContent's default `-ml-4` */}
         <CarouselContent className="!-ml-1 sm:!-ml-2">
-          {isLoading
+          {agentTemplatesLoading
             ? [...Array(cardsPerView)].map((_, idx) => (
                 <CarouselItem key={idx} className="basis-auto w-[136px] sm:w-[152px] md:w-[176px] !pl-1 sm:!pl-2">
                   {/* Match the hydrated mini-card structure to prevent layout shift */}

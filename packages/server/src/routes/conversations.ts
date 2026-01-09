@@ -789,6 +789,22 @@ router.post(
         return;
       }
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H4',
+          location: 'routes/conversations.ts:toolApprovalApprove',
+          message: 'approve endpoint executing tool + will resume agent',
+          data: { conversationId, approvalId, agentId: approval.agentId, toolId: approval.toolId, toolCallId: approval.toolCallId },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
       // Execute tool (server-side) and update the placeholder tool message
       const toolRepo = new ToolRepository();
       const tool = await toolRepo.findById(approval.toolId);
@@ -872,6 +888,21 @@ router.post(
       }
 
       // Continue agent execution without billing a new user message (async; UI watches SSE)
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H4',
+          location: 'routes/conversations.ts:toolApprovalApprove',
+          message: 'calling continueAfterToolApproval',
+          data: { conversationId, agentId: approval.agentId, approvalId },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       void conversationService
         .continueAfterToolApproval(conversationId, approval.agentId, { authContext: { userId: authUserId } })
         .catch((e) => console.warn('[tool-approval] continueAfterToolApproval failed', e));

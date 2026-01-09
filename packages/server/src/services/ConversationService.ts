@@ -248,6 +248,21 @@ export class ConversationService {
       const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
       const messageId = this.streamingAssistantMessageId.get(conversationId) || `stream-${turnId}`;
       this.streamingAssistantMessageId.set(conversationId, messageId);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run2',
+          hypothesisId: 'H7',
+          location: 'ConversationService.ts:flushDelta',
+          message: 'publishing delta',
+          data: { conversationId, kind, turnId, messageId, deltaLen: payload.length },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       const event: ConversationStreamEvent =
         kind === 'content'
           ? {
@@ -1353,6 +1368,22 @@ export class ConversationService {
     const leaseService = new StarshipTurnLeaseService();
 
     try {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run2',
+          hypothesisId: 'H5',
+          location: 'ConversationService.ts:continueAfterToolApproval',
+          message: 'resume entry',
+          data: { conversationId, agentId, hasCancellation: ConversationService.activeCancellations.has(conversationId) },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
+
       const conversation = await this.getConversationById(conversationId);
       const turnActive =
         conversation?.state &&
@@ -1387,6 +1418,29 @@ export class ConversationService {
         ConversationService.activeCancellations.delete(conversationId);
         throw new NotFoundError('Agent', agentId);
       }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run2',
+          hypothesisId: 'H5',
+          location: 'ConversationService.ts:continueAfterToolApproval',
+          message: 'resume ready (before execute)',
+          data: {
+            conversationId,
+            agentId: agentModel.id,
+            starshipId: starship.id,
+            currentTurnId: this.currentTurnId.get(conversationId) || null,
+            generationId: this.generationId.get(conversationId) || null,
+            streamingAssistantMessageId: this.streamingAssistantMessageId.get(conversationId) || null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
 
       // Publish a turn.status=active event so clients immediately re-enter "responding" UI.
       // Unlike the initial message flow, there is no new turn.started event here.
@@ -2689,6 +2743,94 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // If the workflow ended because a tool approval is required, we must NOT mark the turn as completed.
+        // Otherwise, the client will drop "responding" UI during the approval flow and any subsequent resume
+        // can be overwritten by a late 'completed' status event.
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: Execution | undefined = execEvent?.data?.execution;
+          const results = Array.isArray(execution?.results) ? execution!.results : [];
+
+          const isApprovalRequired = (() => {
+            for (let i = results.length - 1; i >= 0; i--) {
+              const items = Array.isArray(results[i]?.items) ? results[i].items : [];
+              for (let j = items.length - 1; j >= 0; j--) {
+                const json = items[j]?.json && typeof items[j].json === 'object' ? (items[j].json as Record<string, unknown>) : null;
+                if (!json) continue;
+                const body = (json['body'] && typeof json['body'] === 'object' ? (json['body'] as Record<string, unknown>) : null) || null;
+                const err = body && typeof body['error'] === 'object' ? (body['error'] as Record<string, unknown>) : null;
+                const code = err && typeof err['code'] === 'string' ? String(err['code']) : '';
+                if (code === 'TOOL_APPROVAL_REQUIRED') return true;
+              }
+            }
+            return false;
+          })();
+
+          if (isApprovalRequired) {
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: 'debug-session',
+                runId: 'run2',
+                hypothesisId: 'H6',
+                location: 'ConversationService.ts:workflow_completed',
+                message: 'workflow_completed treated as waiting_for_tools (approval required)',
+                data: {
+                  conversationId,
+                  currentTurnId: this.currentTurnId.get(conversationId) || null,
+                  generationId: this.generationId.get(conversationId) || null,
+                  streamingAssistantMessageId: this.streamingAssistantMessageId.get(conversationId) || null,
+                },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {});
+            // #endregion
+
+            // Persist any in-flight partial so reload shows the latest assistant content (best-effort).
+            try {
+              const persisted = await this.persistActivePartial(conversationId);
+              if (persisted) {
+                await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
+              }
+            } catch {
+              /* ignore */
+            }
+
+            // Publish waiting_for_tools (Redis Streams)
+            try {
+              const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+              await this.streamBus.publish(conversationId, {
+                type: 'turn.status',
+                data: { conversationId, turnId, status: 'waiting_for_tools', at: new Date().toISOString() },
+              });
+            } catch {
+              /* ignore */
+            }
+
+            // CRITICAL: clear streaming message id so resumed deltas don't attach to a stale placeholder id.
+            this.streamingAssistantMessageId.delete(conversationId);
+
+            // Mark the turn as NOT actively running while awaiting approval.
+            // IMPORTANT: continueAfterToolApproval() must be able to resume from this state.
+            try {
+              const convo = await this.getConversationById(conversationId);
+              const prev = (convo?.state as ConversationState | undefined) || {};
+              await this.conversationRepository.update(conversationId, {
+                state: { ...prev, turnActive: false },
+                updatedAt: new Date().toISOString(),
+              });
+            } catch {
+              /* ignore */
+            }
+
+            break;
+          }
+        } catch {
+          // Best-effort detection only; fall through to normal completion behavior.
+        }
+
         // Flush buffered deltas so clients see the final output immediately.
         try {
           await this.flushPendingDeltas(conversationId);

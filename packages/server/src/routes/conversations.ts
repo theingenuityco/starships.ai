@@ -42,6 +42,11 @@ const INTERNAL_SCHEDULE_HEADER = 'x-internal-schedule-token';
 const PERMISSION_CACHE_TTL_MS = 15_000;
 const TOOL_CACHE_TTL_MS = 15_000;
 
+const PERMISSION_CACHE_MAX_SIZE = 5000;
+const PERMISSION_CACHE_TARGET_SIZE = 4500;
+const TOOL_CACHE_MAX_SIZE = 2000;
+const TOOL_CACHE_TARGET_SIZE = 1750;
+
 const permissionCache = new Map<string, { value: 'allow' | 'ask' | 'deny' | null; expiresAt: number }>();
 const toolCache = new Map<string, { value: ToolModel | null; expiresAt: number }>();
 
@@ -52,25 +57,28 @@ function getCachedPermission(key: string): ('allow' | 'ask' | 'deny' | null) | u
     permissionCache.delete(key);
     return undefined;
   }
+  // LRU touch: keep hot keys near the end of iteration order.
+  permissionCache.delete(key);
+  permissionCache.set(key, hit);
   return hit.value;
 }
 
 function setCachedPermission(key: string, value: 'allow' | 'ask' | 'deny' | null): void {
   permissionCache.set(key, { value, expiresAt: Date.now() + PERMISSION_CACHE_TTL_MS });
-  // Guardrail to prevent unbounded growth in long-lived processes
-  if (permissionCache.size > 5000) {
-    // Simple prune: delete expired entries first; if still too big, delete oldest-ish by iteration.
+  // Guardrail to prevent unbounded growth in long-lived processes.
+  // Avoid full-map scans: evict oldest (LRU-ish) entries in a bounded batch.
+  if (permissionCache.size > PERMISSION_CACHE_MAX_SIZE) {
     const now = Date.now();
-    for (const [k, v] of permissionCache) {
-      if (v.expiresAt <= now) permissionCache.delete(k);
-      if (permissionCache.size <= 4000) break;
-    }
-    if (permissionCache.size > 4500) {
-      let i = 0;
-      for (const k of permissionCache.keys()) {
-        permissionCache.delete(k);
-        if (++i >= 500) break;
+    while (permissionCache.size > PERMISSION_CACHE_TARGET_SIZE) {
+      const oldestKey = permissionCache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      const oldest = permissionCache.get(oldestKey);
+      // Prefer deleting expired entries, otherwise evict oldest.
+      if (!oldest || oldest.expiresAt <= now) {
+        permissionCache.delete(oldestKey);
+        continue;
       }
+      permissionCache.delete(oldestKey);
     }
   }
 }
@@ -82,16 +90,25 @@ function getCachedTool(key: string): ToolModel | null | undefined {
     toolCache.delete(key);
     return undefined;
   }
+  // LRU touch
+  toolCache.delete(key);
+  toolCache.set(key, hit);
   return hit.value;
 }
 
 function setCachedTool(key: string, value: ToolModel | null): void {
   toolCache.set(key, { value, expiresAt: Date.now() + TOOL_CACHE_TTL_MS });
-  if (toolCache.size > 2000) {
+  if (toolCache.size > TOOL_CACHE_MAX_SIZE) {
     const now = Date.now();
-    for (const [k, v] of toolCache) {
-      if (v.expiresAt <= now) toolCache.delete(k);
-      if (toolCache.size <= 1500) break;
+    while (toolCache.size > TOOL_CACHE_TARGET_SIZE) {
+      const oldestKey = toolCache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      const oldest = toolCache.get(oldestKey);
+      if (!oldest || oldest.expiresAt <= now) {
+        toolCache.delete(oldestKey);
+        continue;
+      }
+      toolCache.delete(oldestKey);
     }
   }
 }

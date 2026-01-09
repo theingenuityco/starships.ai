@@ -16,6 +16,7 @@ import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-even
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
+import { addPendingAppendCallback, getLastAssistantMessageId, isAnimationComplete, removePendingAppendCallback } from './useMessageAnimationState'
 
 // Ensure only one live SSE stream exists per conversation.
 // We observed duplicate assistant deltas when multiple streamedQuery instances ran concurrently
@@ -797,40 +798,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const delta = chunk.data.delta
       if (!messageId || !delta) return messages
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'run5',
-          hypothesisId: 'H14',
-          location: 'useConversations.ts:reduceMessages',
-          message: 'assistant delta recv',
-          data: { type: chunk.type, messageId, turnId: (chunk as any)?.data?.turnId ?? null, deltaLen: String(delta).length, at: (chunk as any)?.data?.at ?? null },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-      // #endregion
-
       const idx = messages.findIndex(m => m.id === messageId)
       const now = new Date().toISOString()
       if (idx === -1) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'run5',
-            hypothesisId: 'H14',
-            location: 'useConversations.ts:reduceMessages',
-            message: 'assistant delta created shell (missing messageId)',
-            data: { messageId, turnId: (chunk as any)?.data?.turnId ?? null },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-        // #endregion
         const shell: ClientMessage = {
           id: messageId,
           role: 'assistant',
@@ -914,7 +884,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
           if (!hasToolCalls) {
             // Check if previous assistant message animation is complete
-            const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
             const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
             const lastAssistantId = getLastAssistantMessageId(currentMessages)
             if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
@@ -940,7 +909,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     if (queuedAppendChunksRef.current.length === 0) return
 
     const processQueued = () => {
-      const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
       const currentMessages = processedChunksRef.current.reduce(reduceMessages, [] as ClientMessage[])
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
 
@@ -961,7 +929,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     // Try processing immediately
     if (!processQueued()) {
       // If not ready, set up callback for when animation completes
-      const { addPendingAppendCallback, removePendingAppendCallback } = require('./useMessageAnimationState')
       const callback = () => {
         processQueued()
       }

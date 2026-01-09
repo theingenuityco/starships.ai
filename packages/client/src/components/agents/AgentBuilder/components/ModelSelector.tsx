@@ -3,7 +3,7 @@
 
 import React from 'react'
 import { Label } from '@/components/ui/label'
-import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
+import { useLlmModels } from '@/hooks/useLlmModels'
 import { StandardSelect } from './StandardSelect'
 
 interface ModelSelectorProps {
@@ -12,9 +12,9 @@ interface ModelSelectorProps {
 }
 
 export const ModelSelector: React.FC<ModelSelectorProps> = ({ selectedModel, onModelChange }) => {
-  const { data: openRouterModels, isLoading } = useOpenRouterModels()
+  const { data: llmModels, isLoading } = useLlmModels()
 
-  const models = openRouterModels?.map(m => m.id) || []
+  const models = llmModels?.map(m => m.model) || []
 
   return (
     <div className="space-y-1.5">

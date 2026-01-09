@@ -126,6 +126,10 @@ export default function AdminConnectorTemplateDetailPage(): React.JSX.Element {
                 <Link href="/admin/platform-secrets" className="text-sm font-medium underline underline-offset-4">
                   Platform secrets
                 </Link>
+                <span className="text-muted-foreground">·</span>
+                <Link href="/admin/llm-models" className="text-sm font-medium underline underline-offset-4">
+                  LLM models
+                </Link>
               </div>
               <p className="text-muted-foreground mt-3">Edit connector template configuration. Values are stored in `connector_templates`.</p>
             </div>

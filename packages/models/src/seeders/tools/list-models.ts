@@ -3,7 +3,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 
 /**
  * Tool: list_models
- * List all available OpenRouter models via the Starships HTTP API.
+ * List canonical models from the Starships model catalog.
  */
 export const modelsListTool: ToolParams = {
   name: 'List Models',
@@ -12,8 +12,7 @@ export const modelsListTool: ToolParams = {
 
 When to use:
 - Before creating or editing an agent to choose the most appropriate model
-- To discover new models that have been added to OpenRouter
-- To check model capabilities, pricing, and context windows
+- To check which canonical models are enabled on this instance
 
 Inputs:
 - {} (no arguments)
@@ -31,9 +30,9 @@ Model Selection Guidelines:
 
 Behavior and limits:
 - Read-only and idempotent
-- Cached on server for 6 hours
+- Backed by the instance model catalog (DB)
 - Timeouts: prepare 3s, HTTP 10s
-- Typical failures: missing env, 401/403, network errors, OpenRouter API unavailability`,
+- Typical failures: 401/403, network errors`,
   parameters: {
     type: 'object',
     properties: {},
@@ -45,7 +44,7 @@ Behavior and limits:
         ref: 'http_models',
         type: 'connector_action',
         name: 'List Models (Starships)',
-        description: 'List models via Starships OpenRouter proxy API',
+        description: 'List models via Starships model catalog',
         parameters: {
           connector: 'starships',
           action: 'list-models',
@@ -69,9 +68,9 @@ Behavior and limits:
                 ? payload.data
                 : (Array.isArray(payload) ? payload : []);
 
-              // Return only model identifiers (prefer id, fallback to name)
+              // Return only model identifiers (prefer canonical model id).
               const ids = (Array.isArray(data) ? data : [])
-                .map((m) => (m && (m.id || m.name)))
+                .map((m) => (m && (m.model || m.id || m.name)))
                 .filter((v) => typeof v === 'string' && v.length > 0);
               return ids;
             }
@@ -105,7 +104,7 @@ export const modelsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: modelsListTool.blueprint,
 
   slug: 'list-models',
-  version: '1.0.3',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{} // returns array of model IDs as strings (e.g., "anthropic/claude-sonnet-4.5")',
   requiresApiKey: false,

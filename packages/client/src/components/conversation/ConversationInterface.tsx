@@ -22,7 +22,7 @@ import { toast } from 'sonner'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ConversationContextBar } from '@/components/conversation/ConversationContextBar'
-import { useModelContextLength } from '@/hooks/useOpenRouterModels'
+import { useModelContextLength } from '@/hooks/useLlmModels'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'

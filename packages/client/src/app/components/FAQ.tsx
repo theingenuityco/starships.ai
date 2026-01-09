@@ -15,7 +15,7 @@ const QA = [
   },
   {
     q: 'Which models and providers are supported?',
-    a: 'All popular model providers are supported, including Google, OpenAI, Anthropic, xAI, and DeepSeek.',
+    a: 'All popular model providers are supported, including Google, OpenAI, and Anthropic.',
   },
   {
     q: 'Do I need to bring my own model keys?',

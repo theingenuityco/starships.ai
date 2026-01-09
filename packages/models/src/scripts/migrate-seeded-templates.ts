@@ -17,7 +17,54 @@ import { logger } from '@/helpers/logging';
 import { seedToolTemplates } from '@/scripts/seed-tool-templates';
 import { seedAgentTemplates } from '@/scripts/seed-agent-templates';
 
+function parseArgs(argv: string[]): {
+  toolNames?: string[];
+  toolSlugs?: string[];
+  skipAgents: boolean;
+} {
+  const toolNames: string[] = [];
+  const toolSlugs: string[] = [];
+  let skipAgents = false;
+
+  for (let i = 0; i < argv.length; i++) {
+    const a = argv[i];
+    if (a === '--tool' || a === '--tool-slug') {
+      const v = argv[i + 1];
+      if (v) {
+        toolSlugs.push(v);
+        i++;
+      }
+      continue;
+    }
+    if (a === '--tool-name') {
+      const v = argv[i + 1];
+      if (v) {
+        toolNames.push(v);
+        i++;
+      }
+      continue;
+    }
+    if (a === '--tools-only' || a === '--skip-agents') {
+      skipAgents = true;
+      continue;
+    }
+  }
+
+  // If user provided a tool filter, default to tools-only to avoid agent template
+  // seeding being incomplete (agents reference many tools).
+  if (toolNames.length > 0 || toolSlugs.length > 0) {
+    skipAgents = true;
+  }
+
+  return {
+    toolNames: toolNames.length > 0 ? toolNames : undefined,
+    toolSlugs: toolSlugs.length > 0 ? toolSlugs : undefined,
+    skipAgents,
+  };
+}
+
 export async function migrateSeededTemplates(): Promise<void> {
+  const args = parseArgs(process.argv.slice(2));
   const env = getEnvConfig();
   const db = createConnection({
     host: env.POSTGRES_HOST,
@@ -36,8 +83,24 @@ export async function migrateSeededTemplates(): Promise<void> {
     });
 
     // Agent templates can reference tool templates by slug, so tools must be seeded first.
-    await seedToolTemplates();
-    await seedAgentTemplates();
+    await seedToolTemplates({
+      only:
+        args.toolNames || args.toolSlugs
+          ? {
+              names: args.toolNames,
+              slugs: args.toolSlugs,
+            }
+          : undefined,
+    });
+
+    if (!args.skipAgents) {
+      await seedAgentTemplates();
+    } else {
+      logger.info('Skipping agent template seeding (tools-only run)', {
+        component: 'migrate-seeded-templates',
+        metadata: { toolNames: args.toolNames ?? [], toolSlugs: args.toolSlugs ?? [] },
+      });
+    }
 
     logger.info('✅ Seeded template migration completed', { component: 'migrate-seeded-templates' });
   } finally {

@@ -17,6 +17,11 @@ import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
 
+// Ensure only one live SSE stream exists per conversation.
+// We observed duplicate assistant deltas when multiple streamedQuery instances ran concurrently
+// (e.g. reload during pending tool approval, or cursor updates triggering a reconnect).
+const activeSseGuards: Map<string, AbortController> = new Map()
+
 // Import FetchResponse type
 interface FetchResponse<T = any> {
   data: T
@@ -519,8 +524,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     let closed = false
     const controller = new AbortController()
+    const instanceController = new AbortController()
+    try {
+      const prev = activeSseGuards.get(convId)
+      if (prev) prev.abort()
+    } catch {}
+    activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
-    const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+    const combinedSignal = signal
+      ? AbortSignal.any([signal, controller.signal, instanceController.signal])
+      : AbortSignal.any([controller.signal, instanceController.signal])
 
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []
@@ -541,12 +554,22 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       closed = true
       clearTimeout(timeoutId)
       controller.abort()
+      instanceController.abort()
+      try {
+        if (activeSseGuards.get(convId) === instanceController) activeSseGuards.delete(convId)
+      } catch {}
       while (resolvers.length > 0) {
         const resolve = resolvers.shift()!
         resolve({ value: undefined as any, done: true })
       }
       queue.length = 0
     }
+
+    // If this instance is aborted (e.g. superseded by a newer stream), force cleanup so any
+    // late events from the old fetchEventSource are ignored.
+    try {
+      instanceController.signal.addEventListener('abort', () => cleanup('manual'), { once: true })
+    } catch {}
 
     fetchEventSource(url, {
       method: 'GET',
@@ -774,9 +797,40 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const delta = chunk.data.delta
       if (!messageId || !delta) return messages
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run5',
+          hypothesisId: 'H14',
+          location: 'useConversations.ts:reduceMessages',
+          message: 'assistant delta recv',
+          data: { type: chunk.type, messageId, turnId: (chunk as any)?.data?.turnId ?? null, deltaLen: String(delta).length, at: (chunk as any)?.data?.at ?? null },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
+
       const idx = messages.findIndex(m => m.id === messageId)
       const now = new Date().toISOString()
       if (idx === -1) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sessionId: 'debug-session',
+            runId: 'run5',
+            hypothesisId: 'H14',
+            location: 'useConversations.ts:reduceMessages',
+            message: 'assistant delta created shell (missing messageId)',
+            data: { messageId, turnId: (chunk as any)?.data?.turnId ?? null },
+            timestamp: Date.now(),
+          }),
+        }).catch(() => {})
+        // #endregion
         const shell: ClientMessage = {
           id: messageId,
           role: 'assistant',

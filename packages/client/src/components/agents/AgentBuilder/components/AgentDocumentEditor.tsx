@@ -21,7 +21,7 @@ import api, { getCurrentToken } from '@/lib/api'
 import type { ToolModel, ApiResponse, AgentModel, AgentTemplateModel, UpdateAgentRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import { toast } from 'sonner'
-import { useOpenRouterModels } from '@/hooks/useOpenRouterModels'
+import { useLlmModels } from '@/hooks/useLlmModels'
 import { useUpdateAgentFromTemplate } from '@/hooks/useAgentUpdate'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -73,7 +73,7 @@ export function AgentDocumentEditor({
   readOnly = false,
   embedded = false,
 }: AgentDocumentEditorProps) {
-  const { data: openRouterModels, isLoading: isLoadingModels } = useOpenRouterModels()
+  const { data: llmModels, isLoading: isLoadingModels } = useLlmModels()
   const queryClient = useQueryClient()
   // Track whether the user explicitly changed the Reasoning dropdown.
   // Important: we must NOT mutate agent reasoning/blueprint just by opening the editor.
@@ -83,10 +83,10 @@ export function AgentDocumentEditor({
     'rounded-lg border border-border/70 bg-background/80 px-2 transition-colors hover:bg-muted/30 hover:shadow-sm hover:border-border/80 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring focus-visible:ring-offset-0 focus-visible:border-ring'
 
   const availableModels = useMemo(() => {
-    const fetched = openRouterModels?.map(m => m.id).filter(Boolean) || []
+    const fetched = llmModels?.map(m => m.model).filter(Boolean) || []
     const current = typeof value?.model === 'string' && value.model.trim() ? [value.model.trim()] : []
     return Array.from(new Set([...fetched, ...current]))
-  }, [openRouterModels, value?.model])
+  }, [llmModels, value?.model])
 
   const generatedSlug = useMemo(
     () =>

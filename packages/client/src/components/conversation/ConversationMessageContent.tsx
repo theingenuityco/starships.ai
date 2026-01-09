@@ -331,8 +331,10 @@ export function ConversationMessageContent({
   const totalToolCalls = normalizedToolCalls.length
   const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
   const allToolCallsDone = totalToolCalls > 0 && completedToolResults >= totalToolCalls
-  // Show loading if: we have tool calls but not all results yet, OR we're awaiting tool results for this message
-  const hasPendingToolCalls = totalToolCalls > 0 && (completedToolResults < totalToolCalls || (isLastMessage && isAwaitingToolResults))
+  // Show loading ONLY when some tool results are missing.
+  // IMPORTANT: do NOT keep showing loading solely because the global turn is in `waiting_for_tools`;
+  // once the matching tool_result messages arrive, the tool panel should stop spinning immediately.
+  const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
   const hasAnyToolCalls = totalToolCalls > 0
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)

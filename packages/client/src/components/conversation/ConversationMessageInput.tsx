@@ -260,10 +260,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Optimistically hide immediately for snappy UX; refetch will reconcile.
       setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
       setSubmittingToolApprovalId(String(topPendingApproval.id))
+      // Immediate UX feedback (do not wait for server-side tool execution).
+      toast.success('Tool approved')
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/approve`)
-        await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
-        toast.success('Tool approved')
+        // IMPORTANT: do NOT await message invalidation here. The messages query is SSE-backed and may never "settle",
+        // which would delay UX feedback like toasts until navigation/unmount.
+        void refreshPendingToolApprovals(conversationId)
+        void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
       } catch (e: any) {
         setOptimisticallyHiddenApprovalIds(prev => {
           const next = new Set(prev)
@@ -289,13 +293,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Optimistically hide immediately for snappy UX; refetch will reconcile.
       setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
       setSubmittingToolApprovalId(String(topPendingApproval.id))
+      // Immediate UX feedback (permission + execution may still fail; we handle errors separately).
+      toast.success('Always allow enabled')
       try {
         // 1) Flip permission to allow so future calls don't require approval
         await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
         // 2) Approve this pending tool call
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/approve`)
-        await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
-        toast.success('Always allow enabled')
+        void refreshPendingToolApprovals(conversationId)
+        void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
       } catch (e: any) {
         setOptimisticallyHiddenApprovalIds(prev => {
           const next = new Set(prev)
@@ -314,10 +320,11 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Optimistically hide immediately for snappy UX; refetch will reconcile.
       setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(String(topPendingApproval.id)))
       setSubmittingToolApprovalId(String(topPendingApproval.id))
+      toast.message('Tool denied')
       try {
         await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${topPendingApproval.id}/deny`)
-        await Promise.all([refreshPendingToolApprovals(conversationId), queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })])
-        toast.message('Tool denied')
+        void refreshPendingToolApprovals(conversationId)
+        void queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
       } catch (e: any) {
         setOptimisticallyHiddenApprovalIds(prev => {
           const next = new Set(prev)

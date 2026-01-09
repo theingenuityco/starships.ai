@@ -80,6 +80,13 @@ export class MessageService {
   }
 
   /**
+   * Get max turnSeq for a given turn id (or -1 if none).
+   */
+  async getMaxTurnSeq(turnId: string): Promise<number> {
+    return await this.messageRepository.getMaxTurnSeq(turnId);
+  }
+
+  /**
    * Update an existing message by id
    */
   async updateMessage(id: string, updates: Partial<MessageModel>): Promise<MessageModel | null> {

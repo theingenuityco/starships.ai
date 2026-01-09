@@ -598,6 +598,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // Builders are route-based now; no in-place form updates
 
         switch (action) {
+          case 'tool_approval_required': {
+            const cid = (payload as any)?.conversationId
+            if (cid) {
+              // Pull durable DB-backed pending approvals (covers refresh/deeplinks too)
+              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(String(cid)) })
+            }
+            break
+          }
+          case 'tool_approval_resolved': {
+            const cid = (payload as any)?.conversationId
+            if (cid) {
+              queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(String(cid)) })
+            }
+            break
+          }
           case 'conversation_title_updated': {
             const cid = (payload as any)?.conversationId
             try {

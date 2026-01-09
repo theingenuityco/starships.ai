@@ -151,6 +151,9 @@ export class ConversationService {
   }
   // Track last persisted message index to avoid re-persisting on workflow loops
   private lastPersistedIndex: Map<string, number> = new Map();
+  // When resuming a turn (e.g., after tool approval), we need to keep turnSeq monotonic.
+  // We do that by shifting currentTurnBaseIndex so i - baseIdx continues after max(existing turnSeq).
+  private resumeTurnSeqOffset: Map<string, number> = new Map();
   // Suppress broadcasting 'complete' for conversations during multi-agent orchestration
   private suppressCompleteFor: Set<string> = new Set();
   // Track if an assistant message has been persisted for the current turn to avoid duplicates on stop
@@ -1385,6 +1388,36 @@ export class ConversationService {
         throw new NotFoundError('Agent', agentId);
       }
 
+      // Publish a turn.status=active event so clients immediately re-enter "responding" UI.
+      // Unlike the initial message flow, there is no new turn.started event here.
+      // Also seed resumeTurnSeqOffset so new messages don't overwrite prior turn slots.
+      try {
+        const at = new Date().toISOString();
+        const latestTurnId =
+          this.currentTurnId.get(conversationId) ||
+          (await this.turnRepository.findLatestByConversationId(conversationId).then((t) => (t?.id ? t.id : null)).catch(() => null)) ||
+          null;
+        const turnId = latestTurnId || conversationId;
+
+        // Ensure turn-aware persistence uses the real DB turn id (not a synthetic generation id).
+        if (latestTurnId) {
+          this.currentTurnId.set(conversationId, latestTurnId);
+          try {
+            const maxSeq = await this.messageService.getMaxTurnSeq(latestTurnId);
+            this.resumeTurnSeqOffset.set(conversationId, Math.max(0, Number(maxSeq) || 0));
+          } catch {
+            // best-effort; fallback keeps old behavior
+          }
+        }
+
+        await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'active', at } });
+      } catch (err) {
+        console.warn('[ConversationService] Failed to publish resume turn.status=active', {
+          conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
       // Load latest persisted conversation messages and convert to LlmMessage array
       const messages = await this.getConversationMessages(conversationId);
       const llmMessages: LlmMessage[] = await Promise.all(
@@ -1845,9 +1878,15 @@ export class ConversationService {
 
         if (msgs) {
           const baselineIndex = msgs.length - 1;
-          this.currentTurnBaseIndex.set(conversationId, baselineIndex);
+          const offset = this.resumeTurnSeqOffset.get(conversationId) ?? 0;
+          // For normal turns offset=0 (first new message → turnSeq=1).
+          // For resumed turns offset=maxTurnSeq, so first new message → turnSeq=maxTurnSeq+1.
+          this.currentTurnBaseIndex.set(conversationId, baselineIndex - Math.max(0, offset));
           this.lastPersistedIndex.set(conversationId, baselineIndex);
         }
+
+        // One-shot: consume resume offset if present.
+        this.resumeTurnSeqOffset.delete(conversationId);
 
         // Reset streaming assistant message id for the new turn
         this.streamingAssistantMessageId.delete(conversationId);
@@ -2650,6 +2689,84 @@ export class ConversationService {
       }
 
       case 'workflow_completed': {
+        // If the workflow ended because a tool approval is required, we must NOT mark the turn as completed.
+        // Otherwise, the client will drop "responding" UI during the approval flow and any subsequent resume
+        // can be overwritten by a late 'completed' status event.
+        try {
+          const execEvent = event as ExecutionEvent;
+          const execution: Execution | undefined = execEvent?.data?.execution;
+          const results = Array.isArray(execution?.results) ? execution!.results : [];
+
+          const isApprovalRequired = (() => {
+            for (let i = results.length - 1; i >= 0; i--) {
+              const items = Array.isArray(results[i]?.items) ? results[i].items : [];
+              for (let j = items.length - 1; j >= 0; j--) {
+                const json = items[j]?.json && typeof items[j].json === 'object' ? (items[j].json as Record<string, unknown>) : null;
+                if (!json) continue;
+                const body = (json['body'] && typeof json['body'] === 'object' ? (json['body'] as Record<string, unknown>) : null) || null;
+                const err = body && typeof body['error'] === 'object' ? (body['error'] as Record<string, unknown>) : null;
+                const code = err && typeof err['code'] === 'string' ? String(err['code']) : '';
+                if (code === 'TOOL_APPROVAL_REQUIRED') return true;
+              }
+            }
+            return false;
+          })();
+
+          if (isApprovalRequired) {
+            // Persist any in-flight partial so reload shows the latest assistant content (best-effort).
+            try {
+              const persisted = await this.persistActivePartial(conversationId);
+              if (persisted) {
+                await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
+              }
+            } catch {
+              /* ignore */
+            }
+
+            // Publish waiting_for_tools (Redis Streams)
+            try {
+              const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+              await this.streamBus.publish(conversationId, {
+                type: 'turn.status',
+                data: { conversationId, turnId, status: 'waiting_for_tools', at: new Date().toISOString() },
+              });
+            } catch {
+              /* ignore */
+            }
+
+            // Persist waiting_for_tools to DB so SSE snapshot reflects the paused state on refresh.
+            // Without this, snapshots see 'active' and can inject synthetic `stream-${turnId}` messages.
+            try {
+              const turnId = this.currentTurnId.get(conversationId);
+              if (turnId) {
+                await this.turnRepository.updateTurn(turnId, { status: 'waiting_for_tools', completedAt: null });
+              }
+            } catch {
+              /* ignore */
+            }
+
+            // CRITICAL: clear streaming message id so resumed deltas don't attach to a stale placeholder id.
+            this.streamingAssistantMessageId.delete(conversationId);
+
+            // Mark the turn as NOT actively running while awaiting approval.
+            // IMPORTANT: continueAfterToolApproval() must be able to resume from this state.
+            try {
+              const convo = await this.getConversationById(conversationId);
+              const prev = (convo?.state as ConversationState | undefined) || {};
+              await this.conversationRepository.update(conversationId, {
+                state: { ...prev, turnActive: false },
+                updatedAt: new Date().toISOString(),
+              });
+            } catch {
+              /* ignore */
+            }
+
+            break;
+          }
+        } catch {
+          // Best-effort detection only; fall through to normal completion behavior.
+        }
+
         // Flush buffered deltas so clients see the final output immediately.
         try {
           await this.flushPendingDeltas(conversationId);

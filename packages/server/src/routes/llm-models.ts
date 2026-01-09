@@ -94,7 +94,10 @@ router.post('/llm/models', jwtAuthMiddleware, async (req: Request, res: Response
         contextLength: typeof body.contextLength === 'number' ? body.contextLength : null,
         isEnabled: typeof body.isEnabled === 'boolean' ? body.isEnabled : true,
         isDeprecated: typeof body.isDeprecated === 'boolean' ? body.isDeprecated : false,
-        metadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? (body.metadata as Record<string, unknown>) : { source: 'admin' },
+        metadata:
+          body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+            ? (body.metadata as Record<string, unknown>)
+            : { source: 'admin' },
       },
     ]);
 
@@ -127,7 +130,10 @@ router.put('/llm/models/:model', jwtAuthMiddleware, async (req: Request, res: Re
       contextLength: typeof body.contextLength === 'number' ? body.contextLength : undefined,
       isEnabled: typeof body.isEnabled === 'boolean' ? body.isEnabled : undefined,
       isDeprecated: typeof body.isDeprecated === 'boolean' ? body.isDeprecated : undefined,
-      metadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? (body.metadata as Record<string, unknown>) : undefined,
+      metadata:
+        body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+          ? (body.metadata as Record<string, unknown>)
+          : undefined,
     });
 
     sendSuccess(res, { model });
@@ -166,7 +172,10 @@ router.post('/llm/models/:model/providers', jwtAuthMiddleware, async (req: Reque
         providerModelId,
         priority: typeof body.priority === 'number' ? body.priority : 0,
         isEnabled: typeof body.isEnabled === 'boolean' ? body.isEnabled : true,
-        metadata: body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata) ? (body.metadata as Record<string, unknown>) : { source: 'admin' },
+        metadata:
+          body.metadata && typeof body.metadata === 'object' && !Array.isArray(body.metadata)
+            ? (body.metadata as Record<string, unknown>)
+            : { source: 'admin' },
       },
     ]);
 

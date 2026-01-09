@@ -870,6 +870,81 @@ router.post(
 );
 
 /**
+ * GET /conversations/:conversationId/tool-approvals/pending
+ *
+ * Used by the client to render pending ask-first approvals on refresh/navigation,
+ * not just via SSE `ui_action`.
+ */
+router.get('/conversations/:conversationId/tool-approvals/pending', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramsValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!paramsValidation) return;
+    const { conversationId } = paramsValidation as { conversationId: string };
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+      return;
+    }
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+
+    const approvalsRepo = new ToolCallApprovalRepository();
+    const approvals = await approvalsRepo.findPendingByConversation(conversationId);
+
+    // Join tool + agent display metadata for UI convenience.
+    const toolRepo = new ToolRepository();
+    const agentService = new AgentService();
+
+    const toolIds = Array.from(new Set((approvals || []).map((a) => a.toolId).filter((x) => typeof x === 'string' && x.trim().length > 0)));
+    const agentIds = Array.from(new Set((approvals || []).map((a) => a.agentId).filter((x) => typeof x === 'string' && x.trim().length > 0)));
+
+    const [tools, agents] = await Promise.all([
+      Promise.all(toolIds.map(async (id) => ({ id, tool: await toolRepo.findById(id).catch(() => null) }))),
+      Promise.all(agentIds.map(async (id) => ({ id, agent: await agentService.getAgent(id).catch(() => null) }))),
+    ]);
+
+    const toolById = new Map<string, (ToolModel & { id: string }) | null>();
+    for (const t of tools) {
+      const tool = t.tool;
+      // Starship guard: only expose tools that belong to the conversation's starship
+      if (tool && tool.starshipId !== conversation.starshipId) toolById.set(t.id, null);
+      else toolById.set(t.id, tool as (ToolModel & { id: string }) | null);
+    }
+
+    const agentNameById = new Map<string, string>();
+    for (const a of agents) {
+      const agent = a.agent;
+      if (agent && agent.starshipId === conversation.starshipId) {
+        agentNameById.set(a.id, agent.name);
+      }
+    }
+
+    const payload = (approvals || [])
+      .filter((a) => a.status === 'pending' && a.starshipId === conversation.starshipId)
+      .map((a) => {
+        const tool = toolById.get(a.toolId) ?? null;
+        return {
+          ...a,
+          toolSlug: tool?.slug ?? '',
+          toolName: tool?.name ?? '',
+          agentName: agentNameById.get(a.agentId) ?? '',
+        };
+      });
+
+    sendSuccess(res, payload, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching pending tool approvals');
+  }
+});
+
+/**
  * POST /conversations/:conversationId/tool-approvals/:approvalId/deny
  */
 router.post(

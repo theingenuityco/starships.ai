@@ -151,6 +151,9 @@ export class ConversationService {
   }
   // Track last persisted message index to avoid re-persisting on workflow loops
   private lastPersistedIndex: Map<string, number> = new Map();
+  // When resuming a turn (e.g., after tool approval), we need to keep turnSeq monotonic.
+  // We do that by shifting currentTurnBaseIndex so i - baseIdx continues after max(existing turnSeq).
+  private resumeTurnSeqOffset: Map<string, number> = new Map();
   // Suppress broadcasting 'complete' for conversations during multi-agent orchestration
   private suppressCompleteFor: Set<string> = new Set();
   // Track if an assistant message has been persisted for the current turn to avoid duplicates on stop
@@ -1385,6 +1388,36 @@ export class ConversationService {
         throw new NotFoundError('Agent', agentId);
       }
 
+      // Publish a turn.status=active event so clients immediately re-enter "responding" UI.
+      // Unlike the initial message flow, there is no new turn.started event here.
+      // Also seed resumeTurnSeqOffset so new messages don't overwrite prior turn slots.
+      try {
+        const at = new Date().toISOString();
+        const latestTurnId =
+          this.currentTurnId.get(conversationId) ||
+          (await this.turnRepository.findLatestByConversationId(conversationId).then((t) => (t?.id ? t.id : null)).catch(() => null)) ||
+          null;
+        const turnId = latestTurnId || conversationId;
+
+        // Ensure turn-aware persistence uses the real DB turn id (not a synthetic generation id).
+        if (latestTurnId) {
+          this.currentTurnId.set(conversationId, latestTurnId);
+          try {
+            const maxSeq = await this.messageService.getMaxTurnSeq(latestTurnId);
+            this.resumeTurnSeqOffset.set(conversationId, Math.max(0, Number(maxSeq) || 0));
+          } catch {
+            // best-effort; fallback keeps old behavior
+          }
+        }
+
+        await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'active', at } });
+      } catch (err) {
+        console.warn('[ConversationService] Failed to publish resume turn.status=active', {
+          conversationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
       // Load latest persisted conversation messages and convert to LlmMessage array
       const messages = await this.getConversationMessages(conversationId);
       const llmMessages: LlmMessage[] = await Promise.all(
@@ -1845,9 +1878,15 @@ export class ConversationService {
 
         if (msgs) {
           const baselineIndex = msgs.length - 1;
-          this.currentTurnBaseIndex.set(conversationId, baselineIndex);
+          const offset = this.resumeTurnSeqOffset.get(conversationId) ?? 0;
+          // For normal turns offset=0 (first new message → turnSeq=1).
+          // For resumed turns offset=maxTurnSeq, so first new message → turnSeq=maxTurnSeq+1.
+          this.currentTurnBaseIndex.set(conversationId, baselineIndex - Math.max(0, offset));
           this.lastPersistedIndex.set(conversationId, baselineIndex);
         }
+
+        // One-shot: consume resume offset if present.
+        this.resumeTurnSeqOffset.delete(conversationId);
 
         // Reset streaming assistant message id for the new turn
         this.streamingAssistantMessageId.delete(conversationId);

@@ -517,6 +517,22 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const cursor = typeof window !== 'undefined' ? window.localStorage.getItem(cursorKey) : null
     const url = `/api/v1/conversations/${convId}/messages?stream=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run3',
+        hypothesisId: 'H9',
+        location: 'useConversations.ts:makeSSEAsyncIterable',
+        message: 'sse connect',
+        data: { convId, hasCursor: !!cursor, cursor: cursor ? String(cursor) : null, url },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+    // #endregion
+
     let closed = false
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
@@ -536,7 +552,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
 
-    const cleanup = () => {
+    const cleanup = (reason: 'onclose' | 'onerror' | 'bad_status' | 'manual' = 'manual') => {
       if (closed) return
       closed = true
       clearTimeout(timeoutId)
@@ -546,6 +562,22 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         resolve({ value: undefined as any, done: true })
       }
       queue.length = 0
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run3',
+          hypothesisId: 'H9',
+          location: 'useConversations.ts:makeSSEAsyncIterable',
+          message: 'sse cleanup',
+          data: { convId, reason },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
     }
 
     fetchEventSource(url, {
@@ -556,7 +588,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       async onopen(response) {
         if (!response.ok) {
           push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
-          cleanup()
+          cleanup('bad_status')
         }
       },
       onmessage(ev: EventSourceMessage) {
@@ -594,11 +626,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
       },
       onclose() {
-        cleanup()
+        cleanup('onclose')
       },
       onerror(err) {
         push({ type: 'error', error: err })
-        cleanup()
+        cleanup('onerror')
       },
     })
 
@@ -611,11 +643,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             return new Promise<IteratorResult<StreamedChunk>>(resolve => resolvers.push(resolve))
           },
           return: () => {
-            cleanup()
+            cleanup('manual')
             return Promise.resolve({ value: undefined as any, done: true })
           },
           throw: e => {
-            cleanup()
+            cleanup('manual')
             return Promise.reject(e)
           },
         }
@@ -774,6 +806,22 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const delta = chunk.data.delta
       if (!messageId || !delta) return messages
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run2',
+          hypothesisId: 'H8',
+          location: 'useConversations.ts:reduceMessages',
+          message: 'assistant delta received',
+          data: { type: chunk.type, messageId, turnId: (chunk as any)?.data?.turnId ?? null, deltaLen: String(delta).length },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
+
       const idx = messages.findIndex(m => m.id === messageId)
       const now = new Date().toISOString()
       if (idx === -1) {
@@ -807,6 +855,21 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return acc
     }
     if (chunk.type === 'turn.started') {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H1',
+          location: 'useConversations.ts:reduceTurn',
+          message: 'turn.started received',
+          data: { prev: acc, next: { turnId: (chunk as any)?.data?.turnId ?? null, status: 'active' } },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       return { turnId: chunk.data.turnId, status: 'active' }
     }
     if (chunk.type === 'turn.status') {
@@ -814,6 +877,21 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const data: any = (chunk as any)?.data ?? (chunk as any)?.payload
       const status: any = data?.status
       if (!status) return acc
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H1',
+          location: 'useConversations.ts:reduceTurn',
+          message: 'turn.status received',
+          data: { prev: acc, incoming: { turnId: data?.turnId ?? null, status }, next: { turnId: data?.turnId ?? acc.turnId ?? null, status } },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+      // #endregion
       return { turnId: data?.turnId ?? acc.turnId, status }
     }
     // Back-compat for local pre-seed
@@ -936,6 +1014,24 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const turnActive = turnState.status === 'active' || turnState.status === 'waiting_for_tools'
   const isResponding = Boolean(turnActive || isAssistantStreaming)
   const isAwaitingAssistant = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+
+  // #region agent log
+  useEffect(() => {
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'H2',
+        location: 'useConversations.ts:isResponding',
+        message: 'derived responding flags',
+        data: { turnState, isAwaitingToolResults, isAssistantStreaming, isResponding, isAwaitingAssistant },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [turnState.turnId, turnState.status, isAwaitingToolResults, isAssistantStreaming, isResponding, isAwaitingAssistant])
+  // #endregion
 
   const lastUIAction = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) return null

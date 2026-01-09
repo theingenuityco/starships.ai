@@ -1,5 +1,14 @@
 import api, { getCurrentToken } from '@/lib/api'
-import type { ApiResponse, ConversationModel, ConversationState, ConversationStreamEvent, ConversationStreamSnapshot, TurnStatus as StreamTurnStatus, MessageModel } from '@starships/protocol'
+import type {
+  ApiResponse,
+  ConversationModel,
+  ConversationState,
+  ConversationStreamEvent,
+  ConversationStreamSnapshot,
+  TurnStatus as StreamTurnStatus,
+  MessageModel,
+  ToolCallApprovalModel,
+} from '@starships/protocol'
 import { experimental_streamedQuery as streamedQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
@@ -7,6 +16,12 @@ import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-even
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
 import { WALLET_QUERY_KEYS } from '@/hooks/useWallet'
 import { getSafeErrorMessage } from '@/lib/error-utils'
+import { addPendingAppendCallback, getLastAssistantMessageId, isAnimationComplete, removePendingAppendCallback } from './useMessageAnimationState'
+
+// Ensure only one live SSE stream exists per conversation.
+// We observed duplicate assistant deltas when multiple streamedQuery instances ran concurrently
+// (e.g. reload during pending tool approval, or cursor updates triggering a reconnect).
+const activeSseGuards: Map<string, AbortController> = new Map()
 
 // Import FetchResponse type
 interface FetchResponse<T = any> {
@@ -60,7 +75,14 @@ export const CONVERSATION_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (id: string) => [...CONVERSATION_QUERY_KEYS.all, 'detail', id] as const,
   messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
+  toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
+
+export type PendingToolCallApproval = ToolCallApprovalModel & {
+  toolSlug?: string
+  toolName?: string
+  agentName?: string
+}
 
 /**
  * Unified conversation hook - handles everything conversation-related
@@ -105,6 +127,27 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
     enabled: !!starshipId && enabled,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+  })
+}
+
+/**
+ * Pending ask-first tool approvals for a conversation.
+ *
+ * Required for refresh/deeplinks: approvals are persisted in DB and are not replayed via SSE.
+ */
+export function usePendingToolApprovals(conversationId: string | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: conversationId ? CONVERSATION_QUERY_KEYS.toolApprovalsPending(conversationId) : (['__noop__'] as const),
+    enabled: Boolean(conversationId && enabled),
+    queryFn: async (): Promise<PendingToolCallApproval[]> => {
+      const id = String(conversationId || '')
+      if (!id) return []
+      const response: FetchResponse<ApiResponse<PendingToolCallApproval[]>> = await api.get(`/api/v1/conversations/${id}/tool-approvals/pending`)
+      return response.data.data || []
+    },
+    staleTime: 5_000,
+    gcTime: 60_000,
+    refetchOnWindowFocus: true,
   })
 }
 
@@ -482,8 +525,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     let closed = false
     const controller = new AbortController()
+    const instanceController = new AbortController()
+    try {
+      const prev = activeSseGuards.get(convId)
+      if (prev) prev.abort()
+    } catch {}
+    activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
-    const combinedSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal
+    const combinedSignal = signal
+      ? AbortSignal.any([signal, controller.signal, instanceController.signal])
+      : AbortSignal.any([controller.signal, instanceController.signal])
 
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []
@@ -499,17 +550,27 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
     }
 
-    const cleanup = () => {
+    const cleanup = (reason: 'onclose' | 'onerror' | 'bad_status' | 'manual' = 'manual') => {
       if (closed) return
       closed = true
       clearTimeout(timeoutId)
       controller.abort()
+      instanceController.abort()
+      try {
+        if (activeSseGuards.get(convId) === instanceController) activeSseGuards.delete(convId)
+      } catch {}
       while (resolvers.length > 0) {
         const resolve = resolvers.shift()!
         resolve({ value: undefined as any, done: true })
       }
       queue.length = 0
     }
+
+    // If this instance is aborted (e.g. superseded by a newer stream), force cleanup so any
+    // late events from the old fetchEventSource are ignored.
+    try {
+      instanceController.signal.addEventListener('abort', () => cleanup('manual'), { once: true })
+    } catch {}
 
     fetchEventSource(url, {
       method: 'GET',
@@ -519,7 +580,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       async onopen(response) {
         if (!response.ok) {
           push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
-          cleanup()
+          cleanup('bad_status')
         }
       },
       onmessage(ev: EventSourceMessage) {
@@ -557,11 +618,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
       },
       onclose() {
-        cleanup()
+        cleanup('onclose')
       },
       onerror(err) {
         push({ type: 'error', error: err })
-        cleanup()
+        cleanup('onerror')
       },
     })
 
@@ -574,11 +635,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             return new Promise<IteratorResult<StreamedChunk>>(resolve => resolvers.push(resolve))
           },
           return: () => {
-            cleanup()
+            cleanup('manual')
             return Promise.resolve({ value: undefined as any, done: true })
           },
           throw: e => {
-            cleanup()
+            cleanup('manual')
             return Promise.reject(e)
           },
         }
@@ -823,7 +884,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
           if (!hasToolCalls) {
             // Check if previous assistant message animation is complete
-            const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
             const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
             const lastAssistantId = getLastAssistantMessageId(currentMessages)
             if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
@@ -849,7 +909,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     if (queuedAppendChunksRef.current.length === 0) return
 
     const processQueued = () => {
-      const { getLastAssistantMessageId, isAnimationComplete } = require('./useMessageAnimationState')
       const currentMessages = processedChunksRef.current.reduce(reduceMessages, [] as ClientMessage[])
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
 
@@ -870,7 +929,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     // Try processing immediately
     if (!processQueued()) {
       // If not ready, set up callback for when animation completes
-      const { addPendingAppendCallback, removePendingAppendCallback } = require('./useMessageAnimationState')
       const callback = () => {
         processQueued()
       }

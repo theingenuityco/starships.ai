@@ -42,6 +42,11 @@ const INTERNAL_SCHEDULE_HEADER = 'x-internal-schedule-token';
 const PERMISSION_CACHE_TTL_MS = 15_000;
 const TOOL_CACHE_TTL_MS = 15_000;
 
+const PERMISSION_CACHE_MAX_SIZE = 5000;
+const PERMISSION_CACHE_TARGET_SIZE = 4500;
+const TOOL_CACHE_MAX_SIZE = 2000;
+const TOOL_CACHE_TARGET_SIZE = 1750;
+
 const permissionCache = new Map<string, { value: 'allow' | 'ask' | 'deny' | null; expiresAt: number }>();
 const toolCache = new Map<string, { value: ToolModel | null; expiresAt: number }>();
 
@@ -52,25 +57,28 @@ function getCachedPermission(key: string): ('allow' | 'ask' | 'deny' | null) | u
     permissionCache.delete(key);
     return undefined;
   }
+  // LRU touch: keep hot keys near the end of iteration order.
+  permissionCache.delete(key);
+  permissionCache.set(key, hit);
   return hit.value;
 }
 
 function setCachedPermission(key: string, value: 'allow' | 'ask' | 'deny' | null): void {
   permissionCache.set(key, { value, expiresAt: Date.now() + PERMISSION_CACHE_TTL_MS });
-  // Guardrail to prevent unbounded growth in long-lived processes
-  if (permissionCache.size > 5000) {
-    // Simple prune: delete expired entries first; if still too big, delete oldest-ish by iteration.
+  // Guardrail to prevent unbounded growth in long-lived processes.
+  // Avoid full-map scans: evict oldest (LRU-ish) entries in a bounded batch.
+  if (permissionCache.size > PERMISSION_CACHE_MAX_SIZE) {
     const now = Date.now();
-    for (const [k, v] of permissionCache) {
-      if (v.expiresAt <= now) permissionCache.delete(k);
-      if (permissionCache.size <= 4000) break;
-    }
-    if (permissionCache.size > 4500) {
-      let i = 0;
-      for (const k of permissionCache.keys()) {
-        permissionCache.delete(k);
-        if (++i >= 500) break;
+    while (permissionCache.size > PERMISSION_CACHE_TARGET_SIZE) {
+      const oldestKey = permissionCache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      const oldest = permissionCache.get(oldestKey);
+      // Prefer deleting expired entries, otherwise evict oldest.
+      if (!oldest || oldest.expiresAt <= now) {
+        permissionCache.delete(oldestKey);
+        continue;
       }
+      permissionCache.delete(oldestKey);
     }
   }
 }
@@ -82,16 +90,25 @@ function getCachedTool(key: string): ToolModel | null | undefined {
     toolCache.delete(key);
     return undefined;
   }
+  // LRU touch
+  toolCache.delete(key);
+  toolCache.set(key, hit);
   return hit.value;
 }
 
 function setCachedTool(key: string, value: ToolModel | null): void {
   toolCache.set(key, { value, expiresAt: Date.now() + TOOL_CACHE_TTL_MS });
-  if (toolCache.size > 2000) {
+  if (toolCache.size > TOOL_CACHE_MAX_SIZE) {
     const now = Date.now();
-    for (const [k, v] of toolCache) {
-      if (v.expiresAt <= now) toolCache.delete(k);
-      if (toolCache.size <= 1500) break;
+    while (toolCache.size > TOOL_CACHE_TARGET_SIZE) {
+      const oldestKey = toolCache.keys().next().value as string | undefined;
+      if (!oldestKey) break;
+      const oldest = toolCache.get(oldestKey);
+      if (!oldest || oldest.expiresAt <= now) {
+        toolCache.delete(oldestKey);
+        continue;
+      }
+      toolCache.delete(oldestKey);
     }
   }
 }
@@ -318,7 +335,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const activeTurnId =
         latestTurn &&
         typeof latestTurn.id === 'string' &&
-        ((latestTurn.status as StreamTurnStatus) === 'active' || (latestTurn.status as StreamTurnStatus) === 'waiting_for_tools')
+        // Only augment snapshot with Redis deltas for *actively streaming* turns.
+        // For waiting_for_tools (tool approval flow), augmenting can inject a synthetic `stream-${turnId}`
+        // assistant message even though the DB already contains the tool-call assistant message, which
+        // leads to perceived duplicates / ordering glitches after refresh.
+        ((latestTurn.status as StreamTurnStatus) === 'active')
           ? latestTurn.id
           : null;
 
@@ -368,7 +389,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
             if (bestId && bestScore > 0) {
               const buf = buffers.get(bestId)!;
-              const alreadyPersisted = Array.isArray(snapshotMessages) && snapshotMessages.some((m: MessageModel) => m.id === bestId);
+              const alreadyPersistedById = Array.isArray(snapshotMessages) && snapshotMessages.some((m: MessageModel) => m.id === bestId);
+
+              const alreadyPersisted = alreadyPersistedById;
               if (!alreadyPersisted) {
                 const now = new Date().toISOString();
                 const at = buf.lastAt || buf.firstAt || now;
@@ -832,13 +855,27 @@ router.post(
       });
 
       // Do NOT persist any interim tool result before approval; this message is the first persisted tool result for this call.
-      const created = await messageService.createMessage({
-        conversationId,
-        role: 'tool',
-        content,
-        messageType: 'tool_result',
-        toolCallId: approval.toolCallId,
-      });
+      // Persist into the current DB-backed turn so ordering remains stable across refreshes and subsequent turns.
+      const latestTurn = await new TurnRepository().findLatestByConversationId(conversationId);
+      const turnId = latestTurn?.id ? String(latestTurn.id) : '';
+      const turnSeq = turnId ? (await messageService.getMaxTurnSeq(turnId)) + 1 : 0;
+      const created = turnId
+        ? await messageService.upsertMessageByTurnSlot({
+            conversationId,
+            turnId,
+            turnSeq: Math.max(0, turnSeq),
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          })
+        : await messageService.createMessage({
+            conversationId,
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          });
 
       // Best-effort broadcast: update last message (after client supports replace for non-assistant)
       try {
@@ -865,6 +902,89 @@ router.post(
       sendSuccess(res, { approvalId, status: 'approved' }, 202);
     } catch (error) {
       handleError(error, res, 'approving tool');
+    }
+  }
+);
+
+/**
+ * GET /conversations/:conversationId/tool-approvals/pending
+ *
+ * Used by the client to render pending ask-first approvals on refresh/navigation,
+ * not just via SSE `ui_action`.
+ */
+router.get(
+  '/conversations/:conversationId/tool-approvals/pending',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramsValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!paramsValidation) return;
+      const { conversationId } = paramsValidation as { conversationId: string };
+
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+        return;
+      }
+      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+
+      const approvalsRepo = new ToolCallApprovalRepository();
+      const approvals = await approvalsRepo.findPendingByConversation(conversationId);
+
+      // Join tool + agent display metadata for UI convenience.
+      const toolRepo = new ToolRepository();
+      const agentService = new AgentService();
+
+      const toolIds = Array.from(
+        new Set((approvals || []).map((a) => a.toolId).filter((x) => typeof x === 'string' && x.trim().length > 0))
+      );
+      const agentIds = Array.from(
+        new Set((approvals || []).map((a) => a.agentId).filter((x) => typeof x === 'string' && x.trim().length > 0))
+      );
+
+      const [tools, agents] = await Promise.all([
+        Promise.all(toolIds.map(async (id) => ({ id, tool: await toolRepo.findById(id).catch(() => null) }))),
+        Promise.all(agentIds.map(async (id) => ({ id, agent: await agentService.getAgent(id).catch(() => null) }))),
+      ]);
+
+      const toolById = new Map<string, (ToolModel & { id: string }) | null>();
+      for (const t of tools) {
+        const tool = t.tool;
+        // Starship guard: only expose tools that belong to the conversation's starship
+        if (tool && tool.starshipId !== conversation.starshipId) toolById.set(t.id, null);
+        else toolById.set(t.id, tool as (ToolModel & { id: string }) | null);
+      }
+
+      const agentNameById = new Map<string, string>();
+      for (const a of agents) {
+        const agent = a.agent;
+        if (agent && agent.starshipId === conversation.starshipId) {
+          agentNameById.set(a.id, agent.name);
+        }
+      }
+
+      const payload = (approvals || [])
+        .filter((a) => a.status === 'pending' && a.starshipId === conversation.starshipId)
+        .map((a) => {
+          const tool = toolById.get(a.toolId) ?? null;
+          return {
+            ...a,
+            toolSlug: tool?.slug ?? '',
+            toolName: tool?.name ?? '',
+            agentName: agentNameById.get(a.agentId) ?? '',
+          };
+        });
+
+      sendSuccess(res, payload, 200);
+    } catch (error) {
+      handleError(error, res, 'fetching pending tool approvals');
     }
   }
 );
@@ -927,13 +1047,26 @@ router.post(
         },
       });
 
-      const created = await messageService.createMessage({
-        conversationId,
-        role: 'tool',
-        content,
-        messageType: 'tool_result',
-        toolCallId: approval.toolCallId,
-      });
+      const latestTurn = await new TurnRepository().findLatestByConversationId(conversationId);
+      const turnId = latestTurn?.id ? String(latestTurn.id) : '';
+      const turnSeq = turnId ? (await messageService.getMaxTurnSeq(turnId)) + 1 : 0;
+      const created = turnId
+        ? await messageService.upsertMessageByTurnSlot({
+            conversationId,
+            turnId,
+            turnSeq: Math.max(0, turnSeq),
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          })
+        : await messageService.createMessage({
+            conversationId,
+            role: 'tool',
+            content,
+            messageType: 'tool_result',
+            toolCallId: approval.toolCallId,
+          });
 
       try {
         const bus = ConversationStreamBus.getInstance();

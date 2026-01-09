@@ -2734,6 +2734,17 @@ export class ConversationService {
               /* ignore */
             }
 
+            // Persist waiting_for_tools to DB so SSE snapshot reflects the paused state on refresh.
+            // Without this, snapshots see 'active' and can inject synthetic `stream-${turnId}` messages.
+            try {
+              const turnId = this.currentTurnId.get(conversationId);
+              if (turnId) {
+                await this.turnRepository.updateTurn(turnId, { status: 'waiting_for_tools', completedAt: null });
+              }
+            } catch {
+              /* ignore */
+            }
+
             // CRITICAL: clear streaming message id so resumed deltas don't attach to a stale placeholder id.
             this.streamingAssistantMessageId.delete(conversationId);
 

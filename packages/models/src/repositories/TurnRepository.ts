@@ -1,6 +1,6 @@
 import { BaseRepository } from '@/repositories/BaseRepository';
 
-export type TurnStatus = 'active' | 'completed' | 'cancelled' | 'failed';
+export type TurnStatus = 'active' | 'waiting_for_tools' | 'completed' | 'cancelled' | 'failed';
 
 export type TurnModel = {
   id: string;

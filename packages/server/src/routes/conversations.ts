@@ -318,7 +318,11 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const activeTurnId =
         latestTurn &&
         typeof latestTurn.id === 'string' &&
-        ((latestTurn.status as StreamTurnStatus) === 'active' || (latestTurn.status as StreamTurnStatus) === 'waiting_for_tools')
+        // Only augment snapshot with Redis deltas for *actively streaming* turns.
+        // For waiting_for_tools (tool approval flow), augmenting can inject a synthetic `stream-${turnId}`
+        // assistant message even though the DB already contains the tool-call assistant message, which
+        // leads to perceived duplicates / ordering glitches after refresh.
+        ((latestTurn.status as StreamTurnStatus) === 'active')
           ? latestTurn.id
           : null;
 
@@ -368,7 +372,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
             if (bestId && bestScore > 0) {
               const buf = buffers.get(bestId)!;
-              const alreadyPersisted = Array.isArray(snapshotMessages) && snapshotMessages.some((m: MessageModel) => m.id === bestId);
+              const alreadyPersistedById = Array.isArray(snapshotMessages) && snapshotMessages.some((m: MessageModel) => m.id === bestId);
+
+              const alreadyPersisted = alreadyPersistedById;
               if (!alreadyPersisted) {
                 const now = new Date().toISOString();
                 const at = buf.lastAt || buf.firstAt || now;

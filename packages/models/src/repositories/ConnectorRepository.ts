@@ -159,4 +159,26 @@ export class ConnectorRepository extends BaseRepository {
       id
     );
   }
+
+  async countByTemplateId(templateId: string): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!templateId?.trim()) {
+          throw new Error('templateId is required');
+        }
+
+        const connection = this.getConnection();
+        const result = await connection.queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM connectors WHERE template_id = $1', [
+          templateId,
+        ]);
+
+        if (!result?.count) return 0;
+        const parsed = Number(result.count);
+        return Number.isNaN(parsed) ? 0 : parsed;
+      },
+      'countByTemplateId',
+      'Connector',
+      templateId
+    );
+  }
 }

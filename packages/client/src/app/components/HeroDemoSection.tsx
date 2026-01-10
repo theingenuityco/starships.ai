@@ -2,8 +2,10 @@
 
 import HeroConversationDemo from '@/app/components/HeroConversationDemo'
 import { ErrorBoundary } from '@/components/error/ErrorBoundary'
+import type { AgentTemplateModel } from '@starships/protocol'
 
-export default function HeroDemoSection() {
+export default function HeroDemoSection(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
+  const initialAgentTemplates = props.initialAgentTemplates ?? []
   return (
     <section className="pb-16 sm:pb-20 px-4">
       <div className="max-w-6xl mx-auto">
@@ -16,7 +18,7 @@ export default function HeroDemoSection() {
 
         <div className="w-full text-left">
           <ErrorBoundary name="HeroConversationDemo">
-            <HeroConversationDemo />
+            <HeroConversationDemo initialAgentTemplates={initialAgentTemplates} />
           </ErrorBoundary>
         </div>
       </div>

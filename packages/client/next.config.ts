@@ -8,6 +8,10 @@ import path from 'path'
 const monorepoRoot = path.resolve(__dirname, '../..')
 loadEnvConfig(monorepoRoot)
 
+const PUBLIC_HTML_CACHE_CONTROL = 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400'
+const PRIVATE_NO_STORE = 'private, no-store'
+const IMMUTABLE_STATIC = 'public, max-age=31536000, immutable'
+
 const nextConfig: NextConfig = {
   eslint: {
     // Warning: This allows production builds to successfully complete even if
@@ -25,6 +29,39 @@ const nextConfig: NextConfig = {
   experimental: {
     // Enable optimizations for CI builds to reduce memory usage
     ...(process.env.CI ? { optimizePackageImports: ['@radix-ui/react-icons', '@iconify/react'] } : {}),
+  },
+  async headers() {
+    // NOTE: These are HTTP cache headers for CDN/edge + browser caching.
+    // App Router static/ISR controls *generation*; these headers control *delivery*.
+    return [
+      // Next build assets
+      {
+        source: '/_next/static/:path*',
+        headers: [{ key: 'Cache-Control', value: IMMUTABLE_STATIC }],
+      },
+      // Public static assets we ship (e.g. OG images, favicons)
+      {
+        source: '/static-assets/:path*',
+        headers: [{ key: 'Cache-Control', value: IMMUTABLE_STATIC }],
+      },
+      {
+        source: '/favicons/:path*',
+        headers: [{ key: 'Cache-Control', value: IMMUTABLE_STATIC }],
+      },
+      // Public pages (cache at edge; browsers revalidate)
+      { source: '/', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
+      { source: '/marketplace', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
+      { source: '/privacy', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
+      { source: '/terms', headers: [{ key: 'Cache-Control', value: PUBLIC_HTML_CACHE_CONTROL }] },
+      // Authenticated / app area (never cache)
+      { source: '/ship/:path*', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+      { source: '/admin/:path*', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+      { source: '/profile', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+      // Auth entry points (avoid caching login/register HTML)
+      { source: '/login', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+      { source: '/forgot-password', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+      { source: '/reset-password', headers: [{ key: 'Cache-Control', value: PRIVATE_NO_STORE }] },
+    ]
   },
   webpack: (config, { isServer }) => {
     // Prevent Node.js modules from being bundled in the browser

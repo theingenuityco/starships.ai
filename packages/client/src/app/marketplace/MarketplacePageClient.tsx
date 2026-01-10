@@ -17,7 +17,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel } from '@starships/protocol'
 
-export default function MarketplacePageClient() {
+export default function MarketplacePageClient(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const { isAuthenticated } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const searchParams = useSearchParams()
@@ -35,8 +35,13 @@ export default function MarketplacePageClient() {
   const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
   const [isAgentModalOpen, setIsAgentModalOpen] = useState(false)
 
-  // Fetch templates data
-  const { data: agentTemplates = [], isLoading: agentTemplatesLoading } = useAgentTemplates()
+  const initialAgentTemplates = props.initialAgentTemplates ?? []
+  const useServerInitial = initialAgentTemplates.length > 0
+
+  // Fetch templates data (disabled when server provided initial data)
+  const { data: agentData, isLoading: agentTemplatesLoadingRaw } = useAgentTemplates(undefined, !useServerInitial)
+  const agentTemplates = (agentData ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
+  const agentTemplatesLoading = agentTemplatesLoadingRaw && !useServerInitial
 
   // Agent categories
   const allCategories = ['all', 'general', 'coding', 'creative', 'analysis', 'support', 'integration', 'automation', 'data', 'communication']

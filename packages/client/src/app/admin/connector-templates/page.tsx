@@ -230,10 +230,8 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                     )}
                     {!isLoading &&
                       !isError &&
-                      connectors.map(c => {
-                        const isInUse = (c.usageCount ?? 0) > 0
-                        return (
-                          <tr key={c.id} className="border-b last:border-0 transition-colors hover:bg-muted/30 cursor-pointer" onClick={() => router.push(`/admin/connector-templates/${c.id}`)}>
+                      connectors.map(c => (
+                        <tr key={c.id} className="border-b last:border-0 transition-colors hover:bg-muted/30 cursor-pointer" onClick={() => router.push(`/admin/connector-templates/${c.id}`)}>
                           <td className="px-4 py-3 text-sm font-mono">{c.provider}</td>
                           <td className="px-4 py-3 text-sm">{c.name}</td>
                           <td className="px-4 py-3 text-sm font-mono">{c.auth?.type}</td>
@@ -289,24 +287,20 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                                 </DropdownMenuItem>
                                 <DropdownMenuSeparator />
                                 <DropdownMenuItem
-                                  disabled={isInUse}
                                   onClick={e => {
-                                    if (isInUse) return
                                     e.stopPropagation()
                                     handleRequestDelete({ id: c.id, provider: c.provider, name: c.name })
                                   }}
-                                  title={isInUse ? 'Disconnect connectors using this template before deleting.' : undefined}
                                   className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10"
                                 >
                                   <Icon name="trash" className="w-4 h-4 text-destructive" />
-                                  <span>{isInUse ? 'In use by connectors' : 'Delete'}</span>
+                                  <span>Delete</span>
                                 </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
                         </tr>
-                        )
-                      })}
+                      ))}
                   </tbody>
                 </table>
               </div>

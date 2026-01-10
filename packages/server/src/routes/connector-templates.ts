@@ -448,21 +448,7 @@ router.delete('/admin/connector-templates/:id', async (req: Request, res: Respon
       return;
     }
 
-    const attachedConnectors = await connectorRepo.countByTemplateId(existing.id);
-    if (attachedConnectors > 0) {
-      sendError(
-        res,
-        'RESOURCE_CONSTRAINT_VIOLATION',
-        'Cannot delete connector template while connectors are still linked to it. Disconnect or delete those connectors first.',
-        409,
-        {
-          connectorCount: attachedConnectors,
-          templateId: existing.id,
-          provider: existing.provider,
-        }
-      );
-      return;
-    }
+    const deletedConnectors = await connectorRepo.deleteByTemplateId(existing.id);
 
     const deleted = await repo.delete(existing.id);
     if (!deleted) {
@@ -472,6 +458,7 @@ router.delete('/admin/connector-templates/:id', async (req: Request, res: Respon
 
     const payload: AdminConnectorTemplateDeleteResponse = {
       message: 'Connector template deleted',
+      deletedConnectors: deletedConnectors || undefined,
     };
 
     sendSuccess(res, payload);

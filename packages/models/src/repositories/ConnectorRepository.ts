@@ -160,7 +160,7 @@ export class ConnectorRepository extends BaseRepository {
     );
   }
 
-  async countByTemplateId(templateId: string): Promise<number> {
+  async deleteByTemplateId(templateId: string): Promise<number> {
     return this.executeWithErrorHandling(
       async () => {
         if (!templateId?.trim()) {
@@ -168,15 +168,14 @@ export class ConnectorRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const result = await connection.queryOne<{ count: string }>('SELECT COUNT(*)::text AS count FROM connectors WHERE template_id = $1', [
-          templateId,
-        ]);
+        const result = await connection.query<Record<string, unknown>>(
+          'DELETE FROM connectors WHERE template_id = $1 RETURNING id',
+          [templateId]
+        );
 
-        if (!result?.count) return 0;
-        const parsed = Number(result.count);
-        return Number.isNaN(parsed) ? 0 : parsed;
+        return Array.isArray(result) ? result.length : 0;
       },
-      'countByTemplateId',
+      'deleteByTemplateId',
       'Connector',
       templateId
     );

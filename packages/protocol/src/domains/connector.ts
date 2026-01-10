@@ -408,6 +408,10 @@ export interface AdminConnectorTemplateDeleteResponse {
    * Human-readable confirmation message returned after deleting a template.
    */
   message: string;
+  /**
+   * Number of connectors that were deleted as part of the cascade.
+   */
+  deletedConnectors?: number;
 }
 
 export interface UpdateConnectorTemplateRequest {

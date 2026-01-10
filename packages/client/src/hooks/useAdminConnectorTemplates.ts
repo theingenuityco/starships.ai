@@ -96,10 +96,15 @@ export function useDeleteAdminConnectorTemplate() {
       const response: FetchResponse<ApiResponse<AdminConnectorTemplateDeleteResponse>> = await api.delete(`/api/v1/admin/connector-templates/${id}`)
       return response.data.data
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all })
-      const description = variables.provider || variables.name || variables.id
-      toast.success('Connector template deleted', { description })
+      const descriptionParts = [variables.provider || variables.name || variables.id]
+      if (result?.deletedConnectors) {
+        const count = result.deletedConnectors
+        const label = count === 1 ? 'connector' : 'connectors'
+        descriptionParts.push(`${count} ${label} removed`)
+      }
+      toast.success('Connector template deleted', { description: descriptionParts.filter(Boolean).join(' • ') })
     },
     onError: (error: any) => {
       const message = error?.response?.data?.error || error?.message || 'Failed to delete connector template'

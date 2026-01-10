@@ -159,4 +159,25 @@ export class ConnectorRepository extends BaseRepository {
       id
     );
   }
+
+  async deleteByTemplateId(templateId: string): Promise<number> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!templateId?.trim()) {
+          throw new Error('templateId is required');
+        }
+
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          'DELETE FROM connectors WHERE template_id = $1 RETURNING id',
+          [templateId]
+        );
+
+        return Array.isArray(result) ? result.length : 0;
+      },
+      'deleteByTemplateId',
+      'Connector',
+      templateId
+    );
+  }
 }

@@ -21,7 +21,7 @@ import type {
   ConnectorTemplateExportPayloadV1,
   UpdateConnectorTemplateRequest,
 } from '@starships/protocol';
-import { ConnectorTemplateEntity, ConnectorTemplateRepository } from '@starships/models';
+import { ConnectorTemplateEntity, ConnectorTemplateRepository, ConnectorRepository } from '@starships/models';
 
 const router: Router = Router();
 
@@ -441,11 +441,14 @@ router.delete('/admin/connector-templates/:id', async (req: Request, res: Respon
     if (!params) return;
 
     const repo = new ConnectorTemplateRepository();
+    const connectorRepo = new ConnectorRepository();
     const existing = (await repo.findById(params.id)) ?? (await repo.findByProvider(params.id));
     if (!existing) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { id: params.id });
       return;
     }
+
+    const deletedConnectors = await connectorRepo.deleteByTemplateId(existing.id);
 
     const deleted = await repo.delete(existing.id);
     if (!deleted) {
@@ -455,6 +458,7 @@ router.delete('/admin/connector-templates/:id', async (req: Request, res: Respon
 
     const payload: AdminConnectorTemplateDeleteResponse = {
       message: 'Connector template deleted',
+      deletedConnectors: deletedConnectors || undefined,
     };
 
     sendSuccess(res, payload);

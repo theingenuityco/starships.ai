@@ -6,7 +6,7 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { useAuth } from '@/hooks/useAuth'
-import { ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS, useAdminConnectorTemplates, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
+import { ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS, useAdminConnectorTemplates, useDeleteAdminConnectorTemplate, useUpdateAdminConnectorTemplate } from '@/hooks/useAdminConnectorTemplates'
 import api from '@/lib/api'
 import type { ApiResponse, AdminConnectorTemplateImportResponse, ImportExportContainerV1 } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
@@ -15,7 +15,14 @@ import { useRouter } from 'next/navigation'
 import React, { useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useQueryClient } from '@tanstack/react-query'
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+
+type DeleteTarget = {
+  id: string
+  provider: string
+  name: string
+}
 
 export default function AdminConnectorTemplatesPage(): React.JSX.Element {
   const router = useRouter()
@@ -23,9 +30,11 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
   const queryClient = useQueryClient()
   const { data: connectors = [], isLoading, isError, error } = useAdminConnectorTemplates(isAuthenticated && isInstanceAdmin)
   const updateMutation = useUpdateAdminConnectorTemplate()
+  const deleteMutation = useDeleteAdminConnectorTemplate()
   const fileInputRef = useRef<HTMLInputElement | null>(null)
   const [isImporting, setIsImporting] = useState(false)
   const [isExportingId, setIsExportingId] = useState<string | null>(null)
+  const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null)
 
   const downloadJson = (filename: string, data: unknown) => {
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
@@ -93,6 +102,25 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
     } finally {
       setIsExportingId(null)
     }
+  }
+
+  const handleRequestDelete = (template: DeleteTarget) => {
+    setDeleteTarget(template)
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!deleteTarget) return
+    try {
+      await deleteMutation.mutateAsync(deleteTarget)
+      setDeleteTarget(null)
+    } catch {
+      // Keep dialog open so the user can retry after an error toast.
+    }
+  }
+
+  const handleCloseDeleteDialog = () => {
+    if (deleteMutation.isPending) return
+    setDeleteTarget(null)
   }
 
   if (!isAuthenticated) {
@@ -257,6 +285,17 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                                   <Icon name="download" className="w-4 h-4 text-muted-foreground" />
                                   <span>{isExportingId === c.id ? 'Exporting…' : 'Export JSON'}</span>
                                 </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={e => {
+                                    e.stopPropagation()
+                                    handleRequestDelete({ id: c.id, provider: c.provider, name: c.name })
+                                  }}
+                                  className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10"
+                                >
+                                  <Icon name="trash" className="w-4 h-4 text-destructive" />
+                                  <span>Delete</span>
+                                </DropdownMenuItem>
                               </DropdownMenuContent>
                             </DropdownMenu>
                           </td>
@@ -269,6 +308,39 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
           </div>
         </div>
       </div>
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onOpenChange={open => {
+          if (!open) handleCloseDeleteDialog()
+        }}
+      >
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-destructive">
+              <Icon name="trash" className="h-4 w-4" />
+              Delete connector template
+            </DialogTitle>
+            <DialogDescription>This action cannot be undone. Deleting a template removes it for all users of this instance.</DialogDescription>
+          </DialogHeader>
+          {deleteTarget && (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-4 text-sm space-y-2">
+              <div className="flex items-center gap-2 font-medium">
+                <Icon name="plug" className="h-4 w-4 text-destructive" />
+                {deleteTarget.provider}
+              </div>
+              <p className="text-muted-foreground">{deleteTarget.name}</p>
+            </div>
+          )}
+          <DialogFooter className="gap-2">
+            <Button type="button" variant="outline" onClick={handleCloseDeleteDialog} disabled={deleteMutation.isPending}>
+              Cancel
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleConfirmDelete} disabled={deleteMutation.isPending}>
+              {deleteMutation.isPending ? 'Deleting…' : 'Delete template'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </PageLayout>
   )
 }

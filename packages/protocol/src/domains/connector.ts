@@ -403,6 +403,13 @@ export interface AdminConnectorTemplateImportResponse {
   warnings?: string[];
 }
 
+export interface AdminConnectorTemplateDeleteResponse {
+  /**
+   * Human-readable confirmation message returned after deleting a template.
+   */
+  message: string;
+}
+
 export interface UpdateConnectorTemplateRequest {
   name?: string;
   description?: string;

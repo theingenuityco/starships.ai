@@ -2,6 +2,7 @@
 
 import api from '@/lib/api'
 import type {
+  AdminConnectorTemplateDeleteResponse,
   AdminConnectorTemplateListResponse,
   AdminConnectorTemplateResponse,
   ApiResponse,
@@ -78,6 +79,31 @@ export function useCreateAdminConnectorTemplate() {
     onError: (error: any) => {
       const message = error?.response?.data?.error || error?.message || 'Failed to create connector template'
       toast.error('Failed to create connector template', { description: message })
+    },
+  })
+}
+
+type DeleteConnectorTemplateVariables = {
+  id: string
+  provider?: string
+  name?: string
+}
+
+export function useDeleteAdminConnectorTemplate() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id }: DeleteConnectorTemplateVariables): Promise<AdminConnectorTemplateDeleteResponse> => {
+      const response: FetchResponse<ApiResponse<AdminConnectorTemplateDeleteResponse>> = await api.delete(`/api/v1/admin/connector-templates/${id}`)
+      return response.data.data
+    },
+    onSuccess: (_, variables) => {
+      queryClient.invalidateQueries({ queryKey: ADMIN_CONNECTOR_TEMPLATES_QUERY_KEYS.all })
+      const description = variables.provider || variables.name || variables.id
+      toast.success('Connector template deleted', { description })
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.message || 'Failed to delete connector template'
+      toast.error('Failed to delete connector template', { description: message })
     },
   })
 }

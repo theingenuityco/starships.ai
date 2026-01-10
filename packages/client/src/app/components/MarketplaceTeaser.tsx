@@ -7,11 +7,23 @@ import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 
-export default function MarketplaceTeaser() {
+export default function MarketplaceTeaser(props: { initialAgentTemplates?: AgentTemplateModel[]; initialToolTemplates?: ToolTemplateModel[] }) {
   const router = useRouter()
-  const { data: agentTemplates = [], isLoading: agentLoading } = useAgentTemplates()
-  const { data: toolTemplates = [] } = useToolTemplates()
+  const initialAgentTemplates = props.initialAgentTemplates ?? []
+  const initialToolTemplates = props.initialToolTemplates ?? []
+
+  const useServerInitialAgents = initialAgentTemplates.length > 0
+  const useServerInitialTools = initialToolTemplates.length > 0
+
+  const { data: agentData, isLoading: agentLoadingRaw } = useAgentTemplates(undefined, !useServerInitialAgents)
+  const { data: toolData, isLoading: toolLoadingRaw } = useToolTemplates(undefined, !useServerInitialTools)
+
+  const agentTemplates = (agentData ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
+  const toolTemplates = (toolData ?? initialToolTemplates ?? []) as ToolTemplateModel[]
+  const agentLoading = agentLoadingRaw && !useServerInitialAgents
+  const toolLoading = toolLoadingRaw && !useServerInitialTools
 
   const agentCount = agentTemplates.length
   const toolCount = toolTemplates.length

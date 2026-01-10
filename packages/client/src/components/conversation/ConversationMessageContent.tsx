@@ -280,6 +280,61 @@ function tryParseJSON(value: any): any {
   return value
 }
 
+type WidgetPayload = {
+  id?: string
+  name?: string
+  description?: string
+  widgetType: string
+  props: Record<string, unknown>
+}
+
+function isWidgetPayload(value: unknown): value is WidgetPayload {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Record<string, unknown>
+  return typeof record.widgetType === 'string' && record.props !== null && typeof record.props === 'object'
+}
+
+function normalizeWidgetType(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const direct = value.trim()
+  if (!direct) return null
+  if (KNOWN_WIDGET_TYPES.has(direct)) return direct
+
+  const normalized = direct.replace(/[\s_-]+/g, '').toLowerCase()
+  for (const candidate of KNOWN_WIDGET_TYPES) {
+    const candidateKey = candidate.replace(/[\s_-]+/g, '').toLowerCase()
+    if (candidateKey === normalized) {
+      return candidate
+    }
+  }
+  return null
+}
+
+function extractWidgetPayload(raw: unknown): WidgetPayload | null {
+  if (isWidgetPayload(raw)) return raw
+  if (!raw || typeof raw !== 'object') return null
+
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const nested = extractWidgetPayload(item)
+      if (nested) return nested
+    }
+    return null
+  }
+
+  const object = raw as Record<string, unknown>
+
+  const nestedKeys: Array<'data' | 'result' | 'widget'> = ['data', 'result', 'widget']
+  for (const key of nestedKeys) {
+    if (key in object) {
+      const nested = extractWidgetPayload(object[key])
+      if (nested) return nested
+    }
+  }
+
+  return null
+}
+
 export function ConversationMessageContent({
   content,
   messageId,
@@ -637,21 +692,22 @@ export function ConversationMessageContent({
 
     return toolResults
       .map((toolResult, index) => {
-        // Parse result (might be string or object)
-        const data = tryParseJSON(toolResult.content || toolResult.result)
+        // Parse result (might be string or object) and normalize envelope structures
+        const parsed = tryParseJSON(toolResult.content ?? toolResult.result)
+        const payload = extractWidgetPayload(parsed)
+        if (!payload) return null
 
-        // Check if it's a widget result
-        if (!data || typeof data !== 'object') return null
-        if (!data.widgetType || !KNOWN_WIDGET_TYPES.has(data.widgetType)) return null
-        if (!data.props || typeof data.props !== 'object') return null
+        const widgetType = normalizeWidgetType(payload.widgetType)
+        if (!widgetType) return null
+        if (!payload.props || typeof payload.props !== 'object') return null
 
         // Extract widget info
         return {
-          id: data.id || `widget-${index}`,
-          widgetType: data.widgetType,
-          props: data.props,
-          name: data.name || 'Untitled Widget',
-          description: data.description,
+          id: payload.id || `widget-${index}`,
+          widgetType,
+          props: payload.props,
+          name: payload.name || 'Untitled Widget',
+          description: payload.description,
           toolName: toolResult.toolName,
           toolCallId: toolResult.toolCallId,
           index,

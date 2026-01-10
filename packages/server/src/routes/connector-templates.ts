@@ -9,6 +9,7 @@ import type {
   AdminConnectorTemplateListResponse,
   AdminConnectorTemplateImportResponse,
   AdminConnectorTemplateResponse,
+  AdminConnectorTemplateDeleteResponse,
   AuthUser,
   ConnectorAuthV2,
   ConnectorEndpointV2,
@@ -452,7 +453,11 @@ router.delete('/admin/connector-templates/:id', async (req: Request, res: Respon
       return;
     }
 
-    res.status(204).send();
+    const payload: AdminConnectorTemplateDeleteResponse = {
+      message: 'Connector template deleted',
+    };
+
+    sendSuccess(res, payload);
   } catch (error) {
     handleError(error, res, 'deleting connector template');
   }

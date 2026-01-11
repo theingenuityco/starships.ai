@@ -280,6 +280,51 @@ function tryParseJSON(value: any): any {
   return value
 }
 
+type WidgetLike = {
+  id?: string
+  slug?: string
+  name?: string
+  description?: string
+  widgetType?: string
+  props?: Record<string, any>
+}
+
+/**
+ * Extract a widget payload from a tool result message.
+ *
+ * Supports both:
+ * - local tool execution: tool result content is the widget object itself
+ * - server-tools execution: tool result content is `{ success: true, data: { toolCallId, result } }`
+ */
+function extractWidgetFromToolResult(toolResultMsg: any): WidgetLike | null {
+  const raw = tryParseJSON(toolResultMsg?.content ?? toolResultMsg?.result)
+  if (!raw || typeof raw !== 'object') return null
+
+  // Common wrapper shapes (server-tools mode)
+  const candidates: unknown[] = [
+    raw,
+    (raw as any)?.result,
+    (raw as any)?.data,
+    (raw as any)?.data?.result,
+    // Some producers may double-wrap under { body: ... }
+    (raw as any)?.body,
+    (raw as any)?.body?.data,
+    (raw as any)?.body?.data?.result,
+  ]
+
+  for (const c of candidates) {
+    if (!c || typeof c !== 'object') continue
+    const w = c as WidgetLike
+    const widgetType = typeof w.widgetType === 'string' ? w.widgetType : ''
+    const propsOk = w.props && typeof w.props === 'object'
+    if (widgetType && propsOk && KNOWN_WIDGET_TYPES.has(widgetType)) {
+      return w
+    }
+  }
+
+  return null
+}
+
 export function ConversationMessageContent({
   content,
   messageId,
@@ -637,21 +682,15 @@ export function ConversationMessageContent({
 
     return toolResults
       .map((toolResult, index) => {
-        // Parse result (might be string or object)
-        const data = tryParseJSON(toolResult.content || toolResult.result)
+        const widget = extractWidgetFromToolResult(toolResult)
+        if (!widget) return null
 
-        // Check if it's a widget result
-        if (!data || typeof data !== 'object') return null
-        if (!data.widgetType || !KNOWN_WIDGET_TYPES.has(data.widgetType)) return null
-        if (!data.props || typeof data.props !== 'object') return null
-
-        // Extract widget info
         return {
-          id: data.id || `widget-${index}`,
-          widgetType: data.widgetType,
-          props: data.props,
-          name: data.name || 'Untitled Widget',
-          description: data.description,
+          id: widget.id || widget.slug || `widget-${index}`,
+          widgetType: widget.widgetType as string,
+          props: widget.props as Record<string, any>,
+          name: widget.name || 'Untitled Widget',
+          description: widget.description,
           toolName: toolResult.toolName,
           toolCallId: toolResult.toolCallId,
           index,

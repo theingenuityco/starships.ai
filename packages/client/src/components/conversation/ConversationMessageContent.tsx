@@ -289,6 +289,30 @@ type WidgetLike = {
   props?: Record<string, any>
 }
 
+function isWidgetLike(value: unknown): value is Required<Pick<WidgetLike, 'widgetType' | 'props'>> & WidgetLike {
+  if (!value || typeof value !== 'object') return false
+  const v = value as any
+  return typeof v.widgetType === 'string' && v.props && typeof v.props === 'object' && KNOWN_WIDGET_TYPES.has(v.widgetType)
+}
+
+/**
+ * Server-tools execution path persists tool results as an API-contract envelope:
+ * `{ success: true, data: { toolCallId, result } }`
+ *
+ * We intentionally only support this explicit shape (no "guessing" via nested `body`/`result`),
+ * so contract drift surfaces quickly instead of silently failing.
+ */
+function unwrapServerToolSuccessEnvelope(raw: unknown): unknown | null {
+  if (!raw || typeof raw !== 'object') return null
+  const r = raw as any
+  if (r.success !== true) return null
+  const data = r.data
+  if (!data || typeof data !== 'object') return null
+  // Canonical: { toolCallId, result }
+  if (Object.prototype.hasOwnProperty.call(data, 'result')) return (data as any).result ?? null
+  return null
+}
+
 /**
  * Extract a widget payload from a tool result message.
  *
@@ -298,29 +322,14 @@ type WidgetLike = {
  */
 function extractWidgetFromToolResult(toolResultMsg: any): WidgetLike | null {
   const raw = tryParseJSON(toolResultMsg?.content ?? toolResultMsg?.result)
-  if (!raw || typeof raw !== 'object') return null
+  if (!raw) return null
 
-  // Common wrapper shapes (server-tools mode)
-  const candidates: unknown[] = [
-    raw,
-    (raw as any)?.result,
-    (raw as any)?.data,
-    (raw as any)?.data?.result,
-    // Some producers may double-wrap under { body: ... }
-    (raw as any)?.body,
-    (raw as any)?.body?.data,
-    (raw as any)?.body?.data?.result,
-  ]
+  // 1) Direct widget object (tool returns widget as top-level JSON)
+  if (isWidgetLike(raw)) return raw as WidgetLike
 
-  for (const c of candidates) {
-    if (!c || typeof c !== 'object') continue
-    const w = c as WidgetLike
-    const widgetType = typeof w.widgetType === 'string' ? w.widgetType : ''
-    const propsOk = w.props && typeof w.props === 'object'
-    if (widgetType && propsOk && KNOWN_WIDGET_TYPES.has(widgetType)) {
-      return w
-    }
-  }
+  // 2) Server-tools envelope from /tool-calls/authorize-and-maybe-execute
+  const unwrapped = unwrapServerToolSuccessEnvelope(raw)
+  if (isWidgetLike(unwrapped)) return unwrapped as WidgetLike
 
   return null
 }

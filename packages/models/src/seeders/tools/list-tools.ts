@@ -22,7 +22,7 @@ Implicit environment (do not pass as arguments):
 - STARSHIP_ID: derived from the current starship context
 
 Output:
-- Array of { slug, name, description, isEnabled } (deliberately lean; heavy fields like blueprint are omitted)
+- Array of { slug, name, description } (deliberately lean; heavy fields like blueprint are omitted)
 
 Behavior and limits:
 - Read-only and idempotent
@@ -73,7 +73,6 @@ Behavior and limits:
                 slug: t && t.slug,
                 name: t && t.name,
                 description: t && t.description,
-                isEnabled: t && t.isEnabled,
               }));
             }
           `,
@@ -106,7 +105,7 @@ export const toolListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolListTool.blueprint,
 
   slug: 'list-tools',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of tools; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

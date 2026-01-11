@@ -9,6 +9,8 @@ import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { cn } from '@/lib/utils'
+import { useUserPreferencesStore } from '@/store/user-preferences-store'
+import { useAuth } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef } from 'react'
 
@@ -31,6 +33,11 @@ interface ConversationAgent {
 }
 
 export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens }: ConversationSummaryBarProps) {
+  const expertMode = useUserPreferencesStore(s => s.expertMode)
+  const { isInstanceAdmin } = useAuth()
+  const showTokens = expertMode
+  const showCost = expertMode && isInstanceAdmin
+
   // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
   const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
 
@@ -49,7 +56,8 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
   // Token indicator: utilization (server totals) vs max (model context window)
-  const { data: totalsData } = useConversationUsageTotals(conversationId)
+  const usageConversationId = showTokens ? conversationId : null
+  const { data: totalsData } = useConversationUsageTotals(usageConversationId)
   const totalTokens = Number(totalsData?.totalTokens ?? 0)
   const totalCost = Number(totalsData?.cost ?? 0)
   const primaryModelId = useMemo(() => {
@@ -112,22 +120,27 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                     <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                     <span className="font-medium leading-none opacity-50">Updated just now</span>
                   </span>
-                  {/* Token indicator placeholder (reserved space) */}
-                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
-                      <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
-                      <span className="opacity-50 font-medium tabular-nums">—/—</span>
-                    </span>
-                  </span>
-                  {/* Cost placeholder (reserved space) */}
-                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
-                      <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
-                      <span className="opacity-50 font-medium tabular-nums">$—</span>
-                    </span>
-                  </span>
+                  {showTokens ? (
+                    <>
+                      {/* Token indicator placeholder (reserved space) */}
+                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                        <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
+                          <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
+                          <span className="opacity-50 font-medium tabular-nums">—/—</span>
+                        </span>
+                      </span>
+                      {showCost ? (
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
+                            <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
+                            <span className="opacity-50 font-medium tabular-nums">$—</span>
+                          </span>
+                        </span>
+                      ) : null}
+                    </>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -240,28 +253,39 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                     </span>
 
                     {/* Tokens: utilized vs max (always render) */}
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <TokensPill />
-                    </span>
+                    {showTokens ? (
+                      <>
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                          <TokensPill />
+                        </span>
 
-                    {/* Cost burn */}
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <CostPill />
-                    </span>
+                        {showCost ? (
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <CostPill />
+                          </span>
+                        ) : null}
+                      </>
+                    ) : null}
                   </>
                 ) : (
                   <>
                     <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <TokensPill />
-                    </span>
-                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <CostPill />
-                    </span>
+                    {showTokens ? (
+                      <>
+                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                          <TokensPill />
+                        </span>
+                        {showCost ? (
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <CostPill />
+                          </span>
+                        ) : null}
+                      </>
+                    ) : null}
                   </>
                 )}
               </div>

@@ -820,6 +820,67 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return messages
     }
 
+    if (chunk.type === 'ui_action') {
+      const messages = clone(acc)
+      const payload: any = (chunk as any)?.data
+      const action = typeof payload?.__ui_action === 'string' ? String(payload.__ui_action) : ''
+      if (action !== 'widget_created' && action !== 'widget_updated') {
+        return messages
+      }
+
+      const widget = payload?.widget
+      if (!widget || typeof widget !== 'object') return messages
+      const widgetId = widget?.id != null ? String(widget.id) : ''
+      const widgetType = widget?.widgetType != null ? String(widget.widgetType) : ''
+      const props = widget?.props
+      if (!widgetId || !widgetType || !props || typeof props !== 'object') return messages
+
+      const toolCallId = payload?.toolCallId != null ? String(payload.toolCallId) : ''
+      const toolName = action === 'widget_updated' ? 'update-widget' : 'create-widget'
+
+      const msgId = `ui-widget-${widgetId}`
+      const now = new Date().toISOString()
+
+      const toolResultLike = {
+        toolName,
+        toolCallId,
+        content: JSON.stringify(widget),
+      }
+
+      const existingIdx = messages.findIndex(m => m.id === msgId)
+      if (existingIdx !== -1) {
+        const existing = messages[existingIdx] as any
+        const createdAt = typeof existing?.createdAt === 'string' ? existing.createdAt : (widget?.createdAt || now)
+        messages[existingIdx] = {
+          ...(existing as any),
+          id: msgId,
+          role: 'assistant',
+          messageType: 'agent_response',
+          content: '',
+          createdAt,
+          updatedAt: widget?.updatedAt || now,
+          streaming: false,
+          toolResults: [toolResultLike],
+        } as any
+        return messages
+      }
+
+      const createdAt = widget?.createdAt || now
+      return [
+        ...messages,
+        {
+          id: msgId,
+          role: 'assistant',
+          content: '',
+          messageType: 'agent_response',
+          createdAt,
+          updatedAt: widget?.updatedAt || now,
+          streaming: false,
+          toolResults: [toolResultLike],
+        } as any,
+      ]
+    }
+
     return acc
   }
 

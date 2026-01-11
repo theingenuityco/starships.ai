@@ -280,6 +280,37 @@ function tryParseJSON(value: any): any {
   return value
 }
 
+function extractWidgetLike(payload: any): any | null {
+  if (!payload || typeof payload !== 'object') return null
+
+  // Common envelopes we see from tool execution + HTTP wrappers:
+  // - { widgetType, props, ... }
+  // - { widget: { widgetType, props, ... } }
+  // - { result: { widgetType, props, ... } }
+  // - { data: { result: { widgetType, props, ... } } }
+  // - { success: true, data: { result: { ... } } }
+  const candidates = [
+    payload,
+    (payload as any).widget,
+    (payload as any).result,
+    (payload as any).data,
+    (payload as any).data?.widget,
+    (payload as any).data?.result,
+    (payload as any).data?.result?.widget,
+  ].filter(Boolean)
+
+  for (const c of candidates) {
+    if (!c || typeof c !== 'object') continue
+    const widgetType = (c as any).widgetType
+    const props = (c as any).props
+    if (typeof widgetType === 'string' && widgetType.trim().length > 0 && props && typeof props === 'object') {
+      return c
+    }
+  }
+
+  return null
+}
+
 export function ConversationMessageContent({
   content,
   messageId,
@@ -638,7 +669,8 @@ export function ConversationMessageContent({
     return toolResults
       .map((toolResult, index) => {
         // Parse result (might be string or object)
-        const data = tryParseJSON(toolResult.content || toolResult.result)
+        const parsed = tryParseJSON(toolResult.content || toolResult.result)
+        const data = extractWidgetLike(parsed)
 
         // Check if it's a widget result
         if (!data || typeof data !== 'object') return null

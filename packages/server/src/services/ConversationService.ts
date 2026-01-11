@@ -79,6 +79,9 @@ export class ConversationService {
   private messageService!: MessageService;
   private turnRepository!: TurnRepository;
   private streamBus!: ConversationStreamBus;
+  // Best-effort mapping of toolCallId -> tool function name (per conversation).
+  // Used to derive richer UI actions (e.g., widget_created vs widget_updated) from tool results.
+  private lastToolCallNameByConversation: Map<string, Map<string, string>> = new Map();
   // Streaming assistant message id per conversation (per current turn)
   private streamingAssistantMessageId: Map<string, string> = new Map();
   // Buffer deltas so we don't XADD per token (which slows streaming dramatically).
@@ -2738,6 +2741,27 @@ export class ConversationService {
 
                 // Mark that an assistant message has been persisted for this turn
                 if (role === 'assistant') {
+                  // Snapshot toolCallId -> function.name mapping for later tool_result interpretation.
+                  // IMPORTANT: we clear streaming tool call accumulators for subsequent assistant outputs, so keep
+                  // a separate, best-effort mapping.
+                  try {
+                    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+                      const m = new Map<string, string>();
+                      for (const tc of toolCalls) {
+                        const id = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.toolCallId;
+                        const name = (tc as any)?.function?.name;
+                        if (id != null && typeof name === 'string' && name.trim().length > 0) {
+                          m.set(String(id), name.trim());
+                        }
+                      }
+                      if (m.size > 0) {
+                        this.lastToolCallNameByConversation.set(conversationId, m);
+                      }
+                    }
+                  } catch {
+                    // ignore best-effort mapping failures
+                  }
+
                   // ROOT CAUSE FIX:
                   // We buffer deltas (timer-based) to avoid XADD per token. Without forcing a flush here,
                   // the last buffered assistant.delta can land AFTER this message.append (which already
@@ -2771,6 +2795,66 @@ export class ConversationService {
                   await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
                 } catch (e) {
                   console.warn('[STREAM] Failed to publish message.append', e);
+                }
+
+                // If this was a tool_result message that produced a widget, emit a structured ui_action so
+                // clients can render it immediately (and in a stable, tool-agnostic way).
+                try {
+                  if (role === 'tool') {
+                    const toolCallId = typeof (persistedMsg as any)?.toolCallId === 'string' ? String((persistedMsg as any).toolCallId) : '';
+                    const raw = typeof persistedMsg.content === 'string' ? persistedMsg.content : '';
+                    const t = raw.trim();
+                    if (toolCallId && t && (t.startsWith('{') || t.startsWith('['))) {
+                      let parsed: any = null;
+                      try {
+                        parsed = JSON.parse(t);
+                      } catch {
+                        parsed = null;
+                      }
+
+                      const candidate =
+                        (parsed && typeof parsed === 'object' ? parsed : null) ??
+                        null;
+
+                      const maybeWidget =
+                        candidate?.widget ??
+                        candidate?.data?.widget ??
+                        candidate?.data?.result?.widget ??
+                        candidate?.data?.result ??
+                        candidate?.data ??
+                        candidate?.result ??
+                        candidate;
+
+                      const hasRenderableShape =
+                        maybeWidget &&
+                        typeof maybeWidget === 'object' &&
+                        typeof (maybeWidget as any).widgetType === 'string' &&
+                        (maybeWidget as any).widgetType.trim().length > 0 &&
+                        (maybeWidget as any).props &&
+                        typeof (maybeWidget as any).props === 'object';
+
+                      if (hasRenderableShape) {
+                        const toolName = this.lastToolCallNameByConversation.get(conversationId)?.get(toolCallId) || '';
+                        const action = toolName.includes('update-widget') ? 'widget_updated' : 'widget_created';
+
+                        await this.streamBus.publish(conversationId, {
+                          type: 'ui_action',
+                          data: {
+                            __ui_action: action,
+                            conversationId,
+                            toolCallId,
+                            widget: maybeWidget,
+                          },
+                        } as ConversationStreamEvent);
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // Best-effort only; never fail the turn for UI emission issues
+                  console.warn('[STREAM] Failed to emit widget ui_action', {
+                    conversationId,
+                    error: e instanceof Error ? e.message : String(e),
+                  });
                 }
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);

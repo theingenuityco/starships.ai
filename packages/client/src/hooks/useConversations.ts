@@ -532,9 +532,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     } catch {}
     activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
-    const combinedSignal = signal
-      ? AbortSignal.any([signal, controller.signal, instanceController.signal])
-      : AbortSignal.any([controller.signal, instanceController.signal])
+    const combinedSignal = signal ? AbortSignal.any([signal, controller.signal, instanceController.signal]) : AbortSignal.any([controller.signal, instanceController.signal])
 
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []

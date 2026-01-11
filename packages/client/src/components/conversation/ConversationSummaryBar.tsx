@@ -3,7 +3,7 @@
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
 import { Avatar } from '@/components/ui/avatar'
-import { useStarshipConversations, useConversationAgents } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -17,6 +17,8 @@ interface ConversationSummaryBarProps {
   starshipId: string
   /** Optional override for the active model id (e.g. selected agent model). */
   modelId?: string | null
+  /** Optional override for the max token budget (used as denominator). */
+  maxTokens?: number | null
 }
 
 interface ConversationAgent {
@@ -28,10 +30,9 @@ interface ConversationAgent {
   avatarAttachmentId?: string
 }
 
-export function ConversationSummaryBar({ conversationId, starshipId, modelId }: ConversationSummaryBarProps) {
-  // Fetch all conversations to get the current one's details
-  const { data: starshipConversationsData, isLoading: isLoadingConversations } = useStarshipConversations(starshipId || '', true)
-  const currentConversation = starshipConversationsData?.conversations?.find(c => c.id === conversationId)
+export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens }: ConversationSummaryBarProps) {
+  // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
+  const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
 
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
@@ -66,7 +67,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId }: 
 
   // Only render actual header when all data is ready to prevent layout shifts
   // If there are no avatars to load, don't wait for avatar loading
-  const isDataReady = !isLoadingConversations && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
+  const isDataReady = !isLoadingConversation && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
 
   // Use a key based on conversationId to ensure smooth remount animations
   // This helps coordinate the animation when transitioning from starter page
@@ -148,9 +149,32 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId }: 
   const formatCompactTokens = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
   const ctx =
     typeof maxContextTokens === 'number' && Number.isFinite(maxContextTokens) && maxContextTokens > 0 ? maxContextTokens : null
-  const max = ctx ?? fallbackMaxTokens
+  const overrideMax = typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : null
+  const max = ctx ?? overrideMax ?? fallbackMaxTokens
   const pct = max ? Math.max(0, Math.min(100, (totalTokens / max) * 100)) : null
   const isOver = Boolean(max && totalTokens > max)
+
+  const TokensPill = () => (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px]',
+        isOver ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-muted/60 border-border/50 text-muted-foreground'
+      )}
+      title={max ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens` : `${totalTokens.toLocaleString()} tokens`}
+    >
+      <Icon name="sparkles" className={cn('h-3 w-3', isOver ? 'text-destructive' : 'text-primary')} />
+      <span className={cn('font-semibold tabular-nums', isOver ? 'text-destructive' : 'text-foreground')}>
+        {formatCompactTokens(totalTokens)}/{max ? formatCompactTokens(max) : '—'}
+      </span>
+      {max ? (
+        <span className="ml-1 inline-flex items-center">
+          <span className="w-14 h-1.5 rounded-full bg-border/50 overflow-hidden">
+            <span className={cn('block h-full', isOver ? 'bg-destructive' : 'bg-primary')} style={{ width: `${pct ?? 0}%` }} />
+          </span>
+        </span>
+      ) : null}
+    </span>
+  )
 
   return (
     <motion.div
@@ -195,39 +219,20 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId }: 
                       <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
                     </span>
 
-                    {/* Tokens: utilized vs max context window (when available) */}
+                    {/* Tokens: utilized vs max (always render) */}
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <span
-                        className={cn(
-                          'inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px]',
-                          isOver ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-muted/60 border-border/50 text-muted-foreground'
-                        )}
-                        title={
-                          max
-                          ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens`
-                            : `${totalTokens.toLocaleString()} tokens`
-                        }
-                      >
-                        <Icon name="sparkles" className={cn('h-3 w-3', isOver ? 'text-destructive' : 'text-primary')} />
-                        <span className={cn('font-semibold tabular-nums', isOver ? 'text-destructive' : 'text-foreground')}>
-                        {formatCompactTokens(totalTokens)}/{max ? formatCompactTokens(max) : '—'}
-                        </span>
-                        {max ? (
-                          <span className="ml-1 inline-flex items-center">
-                            <span className="w-14 h-1.5 rounded-full bg-border/50 overflow-hidden">
-                              <span
-                                className={cn('block h-full', isOver ? 'bg-destructive' : 'bg-primary')}
-                                style={{ width: `${pct ?? 0}%` }}
-                              />
-                            </span>
-                          </span>
-                        ) : null}
-                      </span>
+                      <TokensPill />
                     </span>
                   </>
                 ) : (
-                  <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                  <>
+                    <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                      <TokensPill />
+                    </span>
+                  </>
                 )}
               </div>
             </div>

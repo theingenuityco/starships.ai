@@ -1,5 +1,6 @@
 import { connection } from 'next/server'
 import { GoogleAnalytics } from './google-analytics'
+import { GaPageView } from './ga-pageview'
 import { PostHogProvider } from './posthog-provider'
 import { getPublicEnvConfig } from '@starships/env/public'
 
@@ -20,7 +21,12 @@ export async function AnalyticsProvider() {
 
   return (
     <>
-      {measurementId ? <GoogleAnalytics measurementId={measurementId} /> : null}
+      {measurementId ? (
+        <>
+          <GoogleAnalytics measurementId={measurementId} />
+          <GaPageView />
+        </>
+      ) : null}
       <PostHogProvider />
     </>
   )

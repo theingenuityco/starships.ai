@@ -5,7 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
 
 import type { Blueprint } from '@starships/autopilot'
-import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
+import { BlueprintVisualization } from '@/components/blueprint/BlueprintVisualization'
 import type { ToolBuilderViewProps, ToolBuilderViewRef } from './types'
 import { useToolForm } from './hooks/useToolForm'
 import { ToolInfoPanel } from './components/ToolInfoPanel'

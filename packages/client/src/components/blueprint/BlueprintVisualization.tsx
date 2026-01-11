@@ -3,6 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 
 import React, { useMemo, useState, useCallback, useEffect, useRef } from 'react'
+import dynamic from 'next/dynamic'
 import { useTheme } from 'next-themes'
 import {
   ReactFlow,
@@ -28,7 +29,12 @@ import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import Editor, { OnMount } from '@monaco-editor/react'
+import type { OnMount } from '@monaco-editor/react'
+
+const MonacoEditor = dynamic(() => import('@monaco-editor/react').then(m => m.default), {
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full bg-muted/20" />,
+})
 
 interface BlueprintVisualizationProps {
   blueprint: Blueprint
@@ -215,9 +221,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
   const incomingSpacing = isCompact ? 12 : 16
   // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
   // Responsive: never exceed viewport width on mobile (prevents horizontal page overflow)
-  const containerClass = isCompact
-    ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]'
-    : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
+  const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]' : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
   // Slightly larger icon container to add more breathing room around the glyph
   const iconClass = isCompact ? 'w-12 h-12' : 'w-14 h-14'
   const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'
@@ -379,9 +383,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
   const incomingSpacing = isCompact ? 12 : 16
   // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
   // Responsive: never exceed viewport width on mobile (prevents horizontal page overflow)
-  const containerClass = isCompact
-    ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]'
-    : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
+  const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]' : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
   // Slightly larger icon container to add more breathing room around the glyph
   const iconClass = isCompact ? 'w-12 h-12' : 'w-14 h-14'
   const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'
@@ -987,7 +989,7 @@ const NodeDetailsPanel: React.FC<{
             <div className="space-y-1.5">
               <h4 className="text-xs font-medium text-muted-foreground uppercase">Code</h4>
               <div className="rounded-lg border bg-background overflow-hidden">
-                <Editor
+                <MonacoEditor
                   height={editorHeight ? `${editorHeight}px` : '200px'}
                   defaultLanguage="javascript"
                   value={(node as any).parameters.code as string}

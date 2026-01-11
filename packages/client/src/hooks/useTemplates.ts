@@ -173,7 +173,7 @@ export function useCreateToolFromTemplate() {
         queryKey: ['tools'],
       })
 
-      // Invalidate starship-specific tool queries used by ToolTemplateCard
+      // Invalidate starship-specific tool queries (used by any template-driven tool UI)
       queryClient.invalidateQueries({
         queryKey: ['starship-tools', variables.starshipId],
       })

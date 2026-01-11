@@ -5,9 +5,15 @@ import Icon from '@/components/primitives/Icon'
 import React, { useState, useEffect, useRef } from 'react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 
-import Editor, { OnMount } from '@monaco-editor/react'
+import dynamic from 'next/dynamic'
+import type { OnMount } from '@monaco-editor/react'
 import type { editor } from 'monaco-editor'
 import { useTheme } from 'next-themes'
+
+const MonacoEditor = dynamic(() => import('@monaco-editor/react').then(m => m.default), {
+  ssr: false,
+  loading: () => <div className="h-[300px] w-full rounded-b-xl bg-muted/20" />,
+})
 
 interface ParameterEditorProps {
   value: string
@@ -542,7 +548,7 @@ export const ParameterEditor: React.FC<ParameterEditorProps> = ({ value, onChang
       {/* Monaco Editor */}
       <div className="relative rounded-b-xl overflow-hidden">
         <div className="pr-4 frosted-glass-card">
-          <Editor
+          <MonacoEditor
             height="300px"
             defaultLanguage="json"
             value={value}

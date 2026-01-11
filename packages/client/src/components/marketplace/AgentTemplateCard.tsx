@@ -17,6 +17,7 @@ import { useMemo, useState } from 'react'
 import type { AgentModel, AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { getCategoryColor, getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
+import { track } from '@/lib/analytics'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -56,6 +57,13 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   const searchParams = useSearchParams()
 
   const requestDeploy = () => {
+    track({
+      type: 'marketplace_agent_deploy_clicked',
+      templateId: template.id,
+      templateName: template.name,
+      category: (template as any)?.category,
+      authenticated: !!isAuthenticated,
+    })
     if (!isAuthenticated) {
       const current = `${pathname}${searchParams && searchParams.toString() ? `?${searchParams.toString()}` : ''}`
       const params = new URLSearchParams({ returnUrl: current })
@@ -70,6 +78,12 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   }
 
   const handleCardClick = () => {
+    track({
+      type: 'marketplace_agent_template_opened',
+      templateId: template.id,
+      templateName: template.name,
+      category: (template as any)?.category,
+    })
     onClick?.(template)
   }
 

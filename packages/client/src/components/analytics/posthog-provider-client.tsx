@@ -42,4 +42,3 @@ export function PostHogProviderClient({ apiKey, apiHost }: PostHogProviderClient
     </>
   )
 }
-

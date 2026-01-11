@@ -10,6 +10,7 @@ import { useForgotPassword } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
 import { useState } from 'react'
 import Link from 'next/link'
+import { track } from '@/lib/analytics'
 
 /**
  * Forgot Password Form Component
@@ -23,6 +24,7 @@ export function ForgotPasswordForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    track({ type: 'forgot_password_submitted' })
     setFormError(null)
 
     if (!email) {
@@ -38,6 +40,7 @@ export function ForgotPasswordForm() {
     try {
       await forgotPassword.mutateAsync({ email })
       setEmailSent(true)
+      track({ type: 'forgot_password_success_shown' })
     } catch (error: any) {
       setFormError(error.message || 'Failed to send reset email. Please try again.')
     }
@@ -78,6 +81,7 @@ export function ForgotPasswordForm() {
             <div className="space-y-4">
               <Button
                 onClick={() => {
+                  track({ type: 'forgot_password_send_another_clicked' })
                   setEmailSent(false)
                   setEmail('')
                 }}

@@ -1410,7 +1410,7 @@ router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req
 
     // Use service layer to get conversations by starship
     const conversationService = new ConversationService();
-    const allConversations = await conversationService.getConversationsByStarship(starshipId);
+    const allConversations = await conversationService.getConversationsByStarshipWithAgents(starshipId);
 
     // Apply pagination
     const offset = (page - 1) * limit;

@@ -16,6 +16,7 @@ import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { AgentTemplateModel } from '@starships/protocol'
+import { track } from '@/lib/analytics'
 
 export default function MarketplacePageClient(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
   const { isAuthenticated } = useAuth()
@@ -62,6 +63,12 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
   }
 
   const handleAgentClick = (template: AgentTemplateModel) => {
+    track({
+      type: 'marketplace_agent_template_opened',
+      templateId: template.id,
+      templateName: template.name,
+      category: (template as any)?.category,
+    })
     setSelectedAgent(template)
     setIsAgentModalOpen(true)
   }
@@ -96,6 +103,12 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
                     placeholder="Search agents..."
                     value={searchQuery}
                     onChange={e => setSearchQuery(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        const q = searchQuery.trim()
+                        if (q) track({ type: 'marketplace_search_used', query: q })
+                      }
+                    }}
                     className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
                   />
                 </div>
@@ -110,6 +123,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
                       variant={selectedCategory === category ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => {
+                        track({ type: 'marketplace_category_selected', category })
                         setSelectedCategory(category)
                         const params = new URLSearchParams(searchParams?.toString() ?? '')
                         if (category && category !== 'all') params.set('category', category)

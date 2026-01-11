@@ -1,5 +1,7 @@
 import { connection } from 'next/server'
 import { GoogleAnalytics } from './google-analytics'
+import { PostHogProvider } from './posthog-provider'
+import { getPublicEnvConfig } from '@starships/env/public'
 
 /**
  * Server Component that reads GA_MEASUREMENT_ID at runtime
@@ -13,14 +15,13 @@ export async function AnalyticsProvider() {
   // This ensures env vars are evaluated at runtime, not build time
   await connection()
 
-  // Read env var at runtime (available on server-side only by default)
-  const measurementId = process.env.GA_MEASUREMENT_ID
+  const { GA_MEASUREMENT_ID } = getPublicEnvConfig()
+  const measurementId = GA_MEASUREMENT_ID
 
-  if (!measurementId) {
-    console.warn('GA_MEASUREMENT_ID not found in environment variables')
-    return null
-  }
-
-  // Pass the runtime value to the client component
-  return <GoogleAnalytics measurementId={measurementId} />
+  return (
+    <>
+      {measurementId ? <GoogleAnalytics measurementId={measurementId} /> : null}
+      <PostHogProvider />
+    </>
+  )
 }

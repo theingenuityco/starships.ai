@@ -1,5 +1,6 @@
 import { connection } from 'next/server'
 import { UserbackProvider } from './userback-provider'
+import { getPublicEnvConfig } from '@starships/env/public'
 
 /**
  * Server component that reads USERBACK_TOKEN at runtime and passes it to the client
@@ -9,8 +10,8 @@ export async function UserbackWrapper({ children }: { children: React.ReactNode 
   // Force dynamic rendering
   await connection()
 
-  // Read env var at runtime
-  const token = process.env.USERBACK_TOKEN
+  const { USERBACK_TOKEN } = getPublicEnvConfig()
+  const token = USERBACK_TOKEN
 
   if (!token) {
     console.warn('USERBACK_TOKEN not found in environment variables')

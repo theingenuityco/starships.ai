@@ -1,6 +1,5 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
 import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
-import ToolsBlueprintDemo from '@/app/components/ToolsBlueprintDemo'
 import DeployAgentDemo from '@/app/components/DeployAgentDemo'
 import ConnectYourAppsDemo from '@/app/components/ConnectYourAppsDemo'
 import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'
@@ -79,16 +78,6 @@ export default function UseCases() {
             <div className="py-8 sm:py-10">
               <ErrorBoundary name="BuildCustomAgentDemo">
                 <BuildCustomAgentDemo />
-              </ErrorBoundary>
-            </div>
-
-            <p className="mt-8 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-              Daedalus turns steps into workflows your agents can run.
-            </p>
-
-            <div className="py-8 sm:py-10">
-              <ErrorBoundary name="ToolsBlueprintDemo">
-                <ToolsBlueprintDemo />
               </ErrorBoundary>
             </div>
           </div>

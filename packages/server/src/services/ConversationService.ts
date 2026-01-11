@@ -15,7 +15,7 @@ import type {
   EngineConfig,
 } from '@starships/autopilot';
 import { NotFoundError, ConflictError } from '@starships/errors';
-import { ConversationRepository, AgentRepository, TurnRepository } from '@starships/models';
+import { ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository } from '@starships/models';
 import {
   AgentModel,
   ConversationModel,
@@ -160,6 +160,13 @@ export class ConversationService {
   private assistantPersistedThisTurn: Set<string> = new Set();
   // Track which agent is currently producing streamed content for a conversation (for attribution)
   private currentAgentForConversation: Map<string, { id: string; name: string }> = new Map();
+  // LLM model catalog repository (for pricing/context metadata)
+  private llmModelRepository!: LlmModelRepository;
+  // Best-effort in-memory pricing cache to avoid DB reads on every turn
+  private static modelPricingCache: Map<
+    string,
+    { promptPer1M?: number; completionPer1M?: number; request?: number; expiresAt: number }
+  > = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: Runner;
 
@@ -181,6 +188,7 @@ export class ConversationService {
     this.agentRepository = new AgentRepository();
     this.messageService = new MessageService();
     this.turnRepository = new TurnRepository();
+    this.llmModelRepository = new LlmModelRepository();
     this.streamBus = ConversationStreamBus.getInstance();
     this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
@@ -199,6 +207,86 @@ export class ConversationService {
 
     ConversationService.instance = this;
     return this;
+  }
+
+  /**
+   * Compute USD cost when provider does not include usage.cost (e.g. BYOK OpenRouter).
+   *
+   * We currently interpret OpenRouter-style pricing values as USD per 1M tokens:
+   * - pricing.prompt: $/1M input tokens
+   * - pricing.completion: $/1M output tokens
+   * - pricing.request: $/request (optional)
+   *
+   * This uses our DB-backed catalog (`llm_model_providers.pricing`) populated via sync.
+   */
+  private async computeCostFromCatalog(args: {
+    model: string | undefined;
+    promptTokens: number;
+    completionTokens: number;
+  }): Promise<number | null> {
+    const model = typeof args.model === 'string' ? args.model.trim() : '';
+    if (!model) return null;
+
+    const promptTokens = Number(args.promptTokens || 0);
+    const completionTokens = Number(args.completionTokens || 0);
+    if (!Number.isFinite(promptTokens) || !Number.isFinite(completionTokens)) return null;
+
+    const now = Date.now();
+    const cached = ConversationService.modelPricingCache.get(model);
+    if (cached && cached.expiresAt > now) {
+      const per1mIn = typeof cached.promptPer1M === 'number' ? cached.promptPer1M : 0;
+      const per1mOut = typeof cached.completionPer1M === 'number' ? cached.completionPer1M : 0;
+      const perReq = typeof cached.request === 'number' ? cached.request : 0;
+      const cost = (promptTokens * per1mIn) / 1_000_000 + (completionTokens * per1mOut) / 1_000_000 + perReq;
+      return Number.isFinite(cost) ? cost : null;
+    }
+
+    // Fetch provider routes; repository orders by priority DESC so [0] is "best".
+    const routes = await this.llmModelRepository.listProvidersForModel(model, { enabledOnly: true }).catch(() => []);
+    const best: any = Array.isArray(routes) && routes.length > 0 ? routes[0] : null;
+    const pricing: any = best?.pricing ?? null;
+
+    const toNum = (v: unknown): number | undefined => {
+      if (typeof v === 'number' && Number.isFinite(v)) return v;
+      if (typeof v === 'string') {
+        const n = Number(v);
+        if (Number.isFinite(n)) return n;
+      }
+      return undefined;
+    };
+
+    const promptPer1M = toNum(pricing?.prompt);
+    const completionPer1M = toNum(pricing?.completion);
+    const request = toNum(pricing?.request);
+
+    // Cache for 10 minutes (best-effort)
+    ConversationService.modelPricingCache.set(model, {
+      promptPer1M,
+      completionPer1M,
+      request,
+      expiresAt: now + 10 * 60 * 1000,
+    });
+
+    const per1mIn = typeof promptPer1M === 'number' ? promptPer1M : 0;
+    const per1mOut = typeof completionPer1M === 'number' ? completionPer1M : 0;
+    const perReq = typeof request === 'number' ? request : 0;
+    const cost = (promptTokens * per1mIn) / 1_000_000 + (completionTokens * per1mOut) / 1_000_000 + perReq;
+    return Number.isFinite(cost) ? cost : null;
+  }
+
+  /**
+   * Prefer BYOK upstream USD cost when present.
+   * OpenRouter usage accounting may include:
+   * - usage.cost (credits charged to OpenRouter)
+   * - usage.cost_details.upstream_inference_cost (BYOK: upstream provider USD cost)
+   */
+  private extractProviderCost(usage: unknown): number | undefined {
+    const u: any = usage as any;
+    const upstream = u?.cost_details?.upstream_inference_cost;
+    if (typeof upstream === 'number' && Number.isFinite(upstream)) return upstream;
+    const cost = u?.cost;
+    if (typeof cost === 'number' && Number.isFinite(cost)) return cost;
+    return undefined;
   }
 
   private enqueueDelta(kind: 'content' | 'reasoning', conversationId: string, delta: string): void {
@@ -1584,13 +1672,24 @@ export class ConversationService {
       if (latest) {
         const starship = await this.getConversationStarship(conversationId);
         if (starship) {
+          const promptTokens = Number(latest.promptTokens || 0);
+          const completionTokens = Number(latest.completionTokens || 0);
+          const rawCost = typeof latest.cost === 'number' && Number.isFinite(latest.cost) ? latest.cost : undefined;
+          const computedCost =
+            rawCost !== undefined
+              ? rawCost
+              : await this.computeCostFromCatalog({
+                  model: typeof latest.model === 'string' ? latest.model : undefined,
+                  promptTokens,
+                  completionTokens,
+                });
           await this.usageService.createUsageForTurn({
             starshipId: starship.id,
             conversationId,
-            promptTokens: Number(latest.promptTokens || 0),
-            completionTokens: Number(latest.completionTokens || 0),
+            promptTokens,
+            completionTokens,
             totalTokens: Number(latest.totalTokens || 0),
-            cost: Number(latest.cost || 0),
+            cost: Number(computedCost ?? 0),
             ...(latest.model ? { model: latest.model } : {}),
           });
           // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
@@ -1688,14 +1787,25 @@ export class ConversationService {
       // Record usage if provided by LLM (camelCase fields)
       try {
         if (usage && typeof usage.total_tokens === 'number') {
+          const promptTokens = Number(usage.prompt_tokens ?? 0);
+          const completionTokens = Number(usage.completion_tokens ?? 0);
+          const totalTokens = Number(usage.total_tokens ?? 0);
+          const providerCost = this.extractProviderCost(usage);
+          const computedCost = providerCost !== undefined
+            ? providerCost
+            : await this.computeCostFromCatalog({
+                model: String(model),
+                promptTokens,
+                completionTokens,
+              });
           await this.usageService
             .createUsageForTurn({
               starshipId,
               conversationId,
-              promptTokens: Number(usage.prompt_tokens ?? 0),
-              completionTokens: Number(usage.completion_tokens ?? 0),
-              totalTokens: Number(usage.total_tokens ?? 0),
-              cost: Number((usage as { cost?: unknown }).cost ?? 0),
+              promptTokens,
+              completionTokens,
+              totalTokens,
+              cost: Number(computedCost ?? 0),
               model: String(model),
             })
             .then(async () => {
@@ -2398,7 +2508,7 @@ export class ConversationService {
                   ? llmUsage.totalTokens
                   : (typeof llmUsage.promptTokens === 'number' ? llmUsage.promptTokens : 0) +
                     (typeof llmUsage.completionTokens === 'number' ? llmUsage.completionTokens : 0),
-              cost: Number(llmUsage.cost) || 0,
+              cost: this.extractProviderCost(llmUsage),
               ...(typeof model === 'string' ? { model } : {}),
             }
           : (() => {
@@ -2408,7 +2518,7 @@ export class ConversationService {
                     promptTokens: Number(latest.promptTokens || 0),
                     completionTokens: Number(latest.completionTokens || 0),
                     totalTokens: Number(latest.totalTokens || 0),
-                    cost: Number(latest.cost || 0),
+                    cost: typeof latest.cost === 'number' && Number.isFinite(latest.cost) ? latest.cost : undefined,
                     ...(latest.model ? { model: latest.model } : {}),
                   }
                 : undefined;
@@ -2418,13 +2528,21 @@ export class ConversationService {
           try {
             const starship = await this.getConversationStarship(conversationId);
             if (starship) {
+              const computedCost =
+                typeof usagePayload.cost === 'number' && Number.isFinite(usagePayload.cost)
+                  ? usagePayload.cost
+                  : await this.computeCostFromCatalog({
+                      model: typeof usagePayload.model === 'string' ? usagePayload.model : undefined,
+                      promptTokens: usagePayload.promptTokens,
+                      completionTokens: usagePayload.completionTokens,
+                    });
               await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,
                 promptTokens: usagePayload.promptTokens,
                 completionTokens: usagePayload.completionTokens,
                 totalTokens: usagePayload.totalTokens,
-                cost: usagePayload.cost,
+                cost: Number(computedCost ?? 0),
                 model: usagePayload.model,
               });
 

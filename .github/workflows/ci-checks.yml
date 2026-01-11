@@ -55,6 +55,8 @@ jobs:
 
       # Analytics (optional for CI)
       GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
+      POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
+      POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
 
     steps:
       - name: Checkout code

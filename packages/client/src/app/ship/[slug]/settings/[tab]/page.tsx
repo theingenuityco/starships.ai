@@ -67,7 +67,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                   {showAnalytics ? (
                     <TabsTrigger
                       value="usage"
-                      className="gap-2 rounded-xl px-3 py-1 border border-slate-300/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-100/70 via-background to-transparent text-slate-800 dark:text-slate-100 data-[state=active]:border-slate-300/80 dark:data-[state=active]:border-slate-600/80 data-[state=active]:from-slate-100"
+                      className="gap-2 rounded-xl px-3 py-1 border border-border/50 hover:border-border/80"
                     >
                       <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
                       <span>Analytics</span>

@@ -13,8 +13,8 @@ export const useUserPreferencesStore = create<UserPreferencesState>()(
   persist(
     set => ({
       expertMode: false,
-      setExpertMode: (enabled: boolean) => set({ expertMode: enabled }, false, 'prefs/setExpertMode'),
-      toggleExpertMode: () => set(s => ({ expertMode: !s.expertMode }), false, 'prefs/toggleExpertMode'),
+      setExpertMode: (enabled: boolean) => set({ expertMode: enabled }),
+      toggleExpertMode: () => set(s => ({ expertMode: !s.expertMode })),
     }),
     {
       name: 'user-preferences',

@@ -7,14 +7,27 @@ function normalizeBaseUrl(value: string): string {
   return String(value || '').replace(/\/+$/, '')
 }
 
-function getBackendBaseUrl(): string {
-  // Prefer the internal backend URL when available (K8s service / local dev).
-  const serverUrl = normalizeBaseUrl(process.env.SERVER_URL || '')
-  if (serverUrl) return serverUrl
-
-  // Fallback to the public origin (goes through ingress / proxy).
+function getPublicBaseUrl(): string {
+  // Public marketing pages should fetch from the *public* origin so the HTML
+  // they generate is consistent with what the browser can reach.
+  // (Using SERVER_URL can succeed server-side, but the browser may not have the same routing.)
   const { PUBLIC_URL } = getPublicEnvConfig()
-  return normalizeBaseUrl(PUBLIC_URL || 'https://starships.ai')
+  const fromPublicEnv = normalizeBaseUrl(PUBLIC_URL || '')
+  if (!fromPublicEnv) {
+    // No fallbacks: this must be configured explicitly.
+    throw new Error('[public-templates] PUBLIC_URL is required for public marketing ISR fetches')
+  }
+  return fromPublicEnv
+}
+
+function absolutizePublicUrl(pathOrUrl: unknown, publicBaseUrl: string): string | undefined {
+  const raw = typeof pathOrUrl === 'string' ? pathOrUrl.trim() : ''
+  if (!raw) return undefined
+  // Already absolute (http/https)
+  if (/^https?:\/\//i.test(raw)) return raw
+  // Only absolutize root-relative URLs
+  if (raw.startsWith('/')) return `${publicBaseUrl}${raw}`
+  return raw
 }
 
 async function fetchJson<T>(url: string, init?: RequestInit): Promise<T> {
@@ -31,21 +44,27 @@ export async function fetchPublicAgentTemplates(args?: {
   search?: string
   revalidateSeconds?: number
 }): Promise<AgentTemplateModel[]> {
-  const base = getBackendBaseUrl()
-  const u = new URL('/api/v1/agent-templates', base)
-  if (args?.category) u.searchParams.set('category', args.category)
-  if (args?.search) u.searchParams.set('search', args.search)
-
   try {
+    const base = getPublicBaseUrl()
+
+    const u = new URL('/api/v1/agent-templates', base)
+    if (args?.category) u.searchParams.set('category', args.category)
+    if (args?.search) u.searchParams.set('search', args.search)
+
     const json = await fetchJson<ApiResponse<AgentTemplateModel[]>>(u.toString(), {
       // Match our page ISR window by default.
       next: { revalidate: args?.revalidateSeconds ?? 3600 },
       headers: { Accept: 'application/json' },
     })
-    return Array.isArray(json.data) ? json.data : []
+    const list = Array.isArray(json.data) ? json.data : []
+    // Ensure any avatar URLs embedded in the HTML are reachable from the public origin.
+    return list.map(t => ({
+      ...t,
+      avatarUrl: absolutizePublicUrl((t as any)?.avatarUrl, base),
+    }))
   } catch (e) {
     console.warn('[public-templates] fetchPublicAgentTemplates failed', {
-      url: u.toString(),
+      // base/url may not be available depending on failure mode
       error: e instanceof Error ? e.message : String(e),
     })
     return []
@@ -57,12 +76,13 @@ export async function fetchPublicToolTemplates(args?: {
   search?: string
   revalidateSeconds?: number
 }): Promise<ToolTemplateModel[]> {
-  const base = getBackendBaseUrl()
-  const u = new URL('/api/v1/tool-templates', base)
-  if (args?.category) u.searchParams.set('category', args.category)
-  if (args?.search) u.searchParams.set('search', args.search)
-
   try {
+    const base = getPublicBaseUrl()
+
+    const u = new URL('/api/v1/tool-templates', base)
+    if (args?.category) u.searchParams.set('category', args.category)
+    if (args?.search) u.searchParams.set('search', args.search)
+
     const json = await fetchJson<ApiResponse<ToolTemplateModel[]>>(u.toString(), {
       next: { revalidate: args?.revalidateSeconds ?? 3600 },
       headers: { Accept: 'application/json' },
@@ -70,7 +90,6 @@ export async function fetchPublicToolTemplates(args?: {
     return Array.isArray(json.data) ? json.data : []
   } catch (e) {
     console.warn('[public-templates] fetchPublicToolTemplates failed', {
-      url: u.toString(),
       error: e instanceof Error ? e.message : String(e),
     })
     return []

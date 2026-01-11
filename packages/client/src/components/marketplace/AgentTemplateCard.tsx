@@ -87,7 +87,6 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
     onClick?.(template)
   }
 
-
   const agentLike: AgentModel = {
     // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
     id: template.id,

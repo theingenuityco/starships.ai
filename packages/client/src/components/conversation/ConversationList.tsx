@@ -61,7 +61,11 @@ function CompactConversationAgents({ conversationId, starshipId }: { conversatio
           <span className="truncate">{formatAgentDisplayName(agent)}</span>
         </div>
       ))}
-      {remaining > 0 && <span className="text-muted-foreground/70 group-hover:text-foreground/80" style={{ fontSize: '12px' }}>+{remaining}</span>}
+      {remaining > 0 && (
+        <span className="text-muted-foreground/70 group-hover:text-foreground/80" style={{ fontSize: '12px' }}>
+          +{remaining}
+        </span>
+      )}
     </div>
   )
 }
@@ -146,7 +150,9 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         style={isChild ? { paddingLeft: '1.5rem' } : undefined}
       >
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-          <p className={cn('font-medium truncate leading-tight', isActive && 'text-primary')} style={{ fontSize: '14px' }}>{title}</p>
+          <p className={cn('font-medium truncate leading-tight', isActive && 'text-primary')} style={{ fontSize: '14px' }}>
+            {title}
+          </p>
           <CompactConversationAgents conversationId={conversation.id} starshipId={starshipId} />
         </div>
         {/* Delete button - appears on hover */}

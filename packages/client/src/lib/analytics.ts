@@ -34,19 +34,33 @@ export function track(event: AnalyticsEvent) {
   try {
     if (typeof window === 'undefined') return
 
-    ;(window as any).dataLayer = (window as any).dataLayer || []
-    ;(window as any).dataLayer.push({ event: event.type, ...event })
+    const { type, ...props } = event
+
+    // Google Analytics (GA4 via gtag). @next/third-parties/google injects gtag().
+    // Note: pushing plain objects to dataLayer is for GTM-style tags, not GA4 gtag events.
+    const gtag = (window as any).gtag as undefined | ((...args: any[]) => void)
+    if (typeof gtag === 'function') {
+      gtag('event', type, props)
+    } else {
+      // Keep GTM-compatible dataLayer push as a fallback (no-op if GTM isn't present).
+      ;(window as any).dataLayer = (window as any).dataLayer || []
+      ;(window as any).dataLayer.push({ event: type, ...event })
+    }
 
     // PostHog Product Analytics: mirror the same event name + properties.
     // Note: safe even if PostHog isn't configured (it will no-op / queue until init).
-    const { type, ...props } = event
-    // Lazy import to avoid pulling posthog-js into server bundles.
-    posthogImportPromise ??= import('posthog-js')
-    posthogImportPromise
-      .then(mod => mod.default.capture(type, props))
-      .catch(() => {
-        // no-op
-      })
+    const maybeWindowPosthog = (window as any).posthog as undefined | { capture?: (name: string, properties?: Record<string, unknown>) => void }
+    if (maybeWindowPosthog?.capture) {
+      maybeWindowPosthog.capture(type, props)
+    } else {
+      // Lazy import to avoid pulling posthog-js into server bundles.
+      posthogImportPromise ??= import('posthog-js')
+      posthogImportPromise
+        .then(mod => mod.default.capture(type, props))
+        .catch(() => {
+          // no-op
+        })
+    }
   } catch (_) {
     // no-op
   }

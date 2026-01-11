@@ -15,6 +15,7 @@ import ConfirmUpdateDialog from './ConfirmUpdateDialog'
 import ConfirmDeleteDialog from './ConfirmDeleteDialog'
 import AccountFormSkeleton from './AccountFormSkeleton'
 import SignOutSection from './SignOutSection'
+import ExpertModeCard from './ExpertModeCard'
 
 export default function AccountForm() {
   const router = useRouter()
@@ -108,6 +109,8 @@ export default function AccountForm() {
             currentPasswordRef={currentPasswordRef}
             onSetPassword={() => setShowSetPassword(true)}
           />
+
+          <ExpertModeCard />
 
           <SignOutSection onSignOut={logout} onNavigateHome={() => router.push('/')} />
         </div>

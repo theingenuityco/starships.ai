@@ -249,6 +249,7 @@ api.interceptors.request.use(
       config.url?.includes('/api/v1/agents') ||
       config.url?.includes('/api/v1/users') ||
       config.url?.includes('/api/v1/conversations') ||
+      config.url?.includes('/api/v1/llm') ||
       config.url?.includes('/api/v1/openrouter') ||
       config.url?.includes('/api/v1/ledger')
 

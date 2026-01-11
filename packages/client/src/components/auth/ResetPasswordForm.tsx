@@ -8,11 +8,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useResetPassword } from '@/hooks/useAuth'
 import { motion } from 'motion/react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 import { validatePassword } from '@/utils/passwordStrength'
+import { track } from '@/lib/analytics'
 
 interface ResetPasswordFormProps {
   token: string
@@ -45,9 +46,18 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [isValidToken, setIsValidToken] = useState(true)
+  const [invalidTokenTracked, setInvalidTokenTracked] = useState(false)
+
+  useEffect(() => {
+    if (!isValidToken && !invalidTokenTracked) {
+      track({ type: 'reset_password_invalid_token_shown' })
+      setInvalidTokenTracked(true)
+    }
+  }, [isValidToken, invalidTokenTracked])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    track({ type: 'reset_password_submitted' })
     setError(null)
 
     if (!newPassword || !confirmPassword) {
@@ -100,7 +110,10 @@ export function ResetPasswordForm({ token }: ResetPasswordFormProps) {
 
             <div className="space-y-4">
               <Button
-                onClick={() => router.push('/forgot-password')}
+                onClick={() => {
+                  track({ type: 'reset_password_request_new_link_clicked' })
+                  router.push('/forgot-password')
+                }}
                 className="w-full"
               >
                 <Icon name="mail" className="h-4 w-4 mr-2" />

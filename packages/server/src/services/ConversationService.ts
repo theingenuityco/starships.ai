@@ -165,7 +165,7 @@ export class ConversationService {
   // Best-effort in-memory pricing cache to avoid DB reads on every turn
   private static modelPricingCache: Map<
     string,
-    { promptPer1M?: number; completionPer1M?: number; request?: number; expiresAt: number }
+    { promptPerToken?: number; completionPerToken?: number; request?: number; expiresAt: number }
   > = new Map();
   // Default runner for non-streaming paths (child process)
   private defaultRunner!: Runner;
@@ -234,17 +234,19 @@ export class ConversationService {
     const now = Date.now();
     const cached = ConversationService.modelPricingCache.get(model);
     if (cached && cached.expiresAt > now) {
-      const per1mIn = typeof cached.promptPer1M === 'number' ? cached.promptPer1M : 0;
-      const per1mOut = typeof cached.completionPer1M === 'number' ? cached.completionPer1M : 0;
+      const perTokenIn = typeof cached.promptPerToken === 'number' ? cached.promptPerToken : 0;
+      const perTokenOut = typeof cached.completionPerToken === 'number' ? cached.completionPerToken : 0;
       const perReq = typeof cached.request === 'number' ? cached.request : 0;
-      const cost = (promptTokens * per1mIn) / 1_000_000 + (completionTokens * per1mOut) / 1_000_000 + perReq;
+      const cost = promptTokens * perTokenIn + completionTokens * perTokenOut + perReq;
       return Number.isFinite(cost) ? cost : null;
     }
 
     // Fetch provider routes; repository orders by priority DESC so [0] is "best".
     const routes = await this.llmModelRepository.listProvidersForModel(model, { enabledOnly: true }).catch(() => []);
-    const best: any = Array.isArray(routes) && routes.length > 0 ? routes[0] : null;
-    const pricing: any = best?.pricing ?? null;
+    const best = (Array.isArray(routes) && routes.length > 0 ? routes[0] : null) as
+      | { pricing?: Record<string, unknown> | null }
+      | null;
+    const pricing = best?.pricing ?? null;
 
     const toNum = (v: unknown): number | undefined => {
       if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -255,22 +257,23 @@ export class ConversationService {
       return undefined;
     };
 
-    const promptPer1M = toNum(pricing?.prompt);
-    const completionPer1M = toNum(pricing?.completion);
-    const request = toNum(pricing?.request);
+    // OpenRouter catalog pricing fields are USD per 1 token (strings in the API).
+    const promptPerToken = toNum(pricing ? pricing['prompt'] : undefined);
+    const completionPerToken = toNum(pricing ? pricing['completion'] : undefined);
+    const request = toNum(pricing ? pricing['request'] : undefined);
 
     // Cache for 10 minutes (best-effort)
     ConversationService.modelPricingCache.set(model, {
-      promptPer1M,
-      completionPer1M,
+      promptPerToken,
+      completionPerToken,
       request,
       expiresAt: now + 10 * 60 * 1000,
     });
 
-    const per1mIn = typeof promptPer1M === 'number' ? promptPer1M : 0;
-    const per1mOut = typeof completionPer1M === 'number' ? completionPer1M : 0;
+    const perTokenIn = typeof promptPerToken === 'number' ? promptPerToken : 0;
+    const perTokenOut = typeof completionPerToken === 'number' ? completionPerToken : 0;
     const perReq = typeof request === 'number' ? request : 0;
-    const cost = (promptTokens * per1mIn) / 1_000_000 + (completionTokens * per1mOut) / 1_000_000 + perReq;
+    const cost = promptTokens * perTokenIn + completionTokens * perTokenOut + perReq;
     return Number.isFinite(cost) ? cost : null;
   }
 
@@ -281,10 +284,15 @@ export class ConversationService {
    * - usage.cost_details.upstream_inference_cost (BYOK: upstream provider USD cost)
    */
   private extractProviderCost(usage: unknown): number | undefined {
-    const u: any = usage as any;
-    const upstream = u?.cost_details?.upstream_inference_cost;
+    const u = usage && typeof usage === 'object' ? (usage as Record<string, unknown>) : null;
+    if (!u) return undefined;
+
+    const costDetails = u['cost_details'];
+    const cd = costDetails && typeof costDetails === 'object' ? (costDetails as Record<string, unknown>) : null;
+    const upstream = cd ? cd['upstream_inference_cost'] : undefined;
     if (typeof upstream === 'number' && Number.isFinite(upstream)) return upstream;
-    const cost = u?.cost;
+
+    const cost = u['cost'];
     if (typeof cost === 'number' && Number.isFinite(cost)) return cost;
     return undefined;
   }

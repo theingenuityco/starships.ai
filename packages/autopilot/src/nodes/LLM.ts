@@ -985,11 +985,13 @@ export class LLM extends BaseNode<LlmParams> {
       };
       // Preserve cost for downstream streaming consumers (may only appear on final chunk).
       try {
-        const cd = (chunk.usage as unknown as { cost_details?: unknown }).cost_details as any;
-        const upstream = cd?.upstream_inference_cost;
-        const cost = typeof upstream === 'number' ? upstream : (chunk.usage as any)?.cost;
+        const u = chunk.usage as unknown as Record<string, unknown>;
+        const costDetails = u['cost_details'];
+        const cd = costDetails && typeof costDetails === 'object' ? (costDetails as Record<string, unknown>) : null;
+        const upstream = cd ? cd['upstream_inference_cost'] : undefined;
+        const cost = typeof upstream === 'number' ? upstream : u['cost'];
         if (typeof cost === 'number' && Number.isFinite(cost)) {
-          (base as any).cost = cost;
+          (base as Record<string, unknown>)['cost'] = cost;
         }
       } catch {
         // ignore

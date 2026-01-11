@@ -1,6 +1,5 @@
 import DelegationDemo from '@/app/components/DelegationDemo'
 import BuildCustomAgentDemo from '@/app/components/BuildCustomAgentDemo'
-import ToolsBlueprintDemo from '@/app/components/ToolsBlueprintDemo'
 import DeployAgentDemo from '@/app/components/DeployAgentDemo'
 import ConnectYourAppsDemo from '@/app/components/ConnectYourAppsDemo'
 import ScheduleRepetitiveTasksDemo from '@/app/components/ScheduleRepetitiveTasksDemo'
@@ -18,9 +17,7 @@ export default function UseCases() {
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Deploy agents</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Deploy agentic teams of specialists to get the job done.
-              </p>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Deploy agentic teams of specialists to get the job done.</p>
             </div>
 
             <div className="py-8 sm:py-10">
@@ -36,9 +33,7 @@ export default function UseCases() {
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Connect your apps</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Integrate with apps you already use.
-              </p>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Integrate with apps you already use.</p>
             </div>
 
             <div className="py-8 sm:py-10">
@@ -81,16 +76,6 @@ export default function UseCases() {
                 <BuildCustomAgentDemo />
               </ErrorBoundary>
             </div>
-
-            <p className="mt-8 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-              Daedalus turns steps into workflows your agents can run.
-            </p>
-
-            <div className="py-8 sm:py-10">
-              <ErrorBoundary name="ToolsBlueprintDemo">
-                <ToolsBlueprintDemo />
-              </ErrorBoundary>
-            </div>
           </div>
         </div>
 
@@ -99,9 +84,7 @@ export default function UseCases() {
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Schedule repetitive tasks</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Run on a schedule, review a draft, then approve.
-              </p>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Run on a schedule, review a draft, then approve.</p>
             </div>
 
             <div className="py-8 sm:py-10">

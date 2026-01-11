@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import type { AgentTemplateModel } from '@starships/protocol'
@@ -39,21 +38,14 @@ const INITIAL_CONVO_FLAGS: ConvoFlagsByConvo = {
   saga: { responding: false, awaitingTools: false, isRunning: false, hasRun: false },
 }
 
-type ConvoFlagsAction =
-  | { type: 'patch'; convoId: ConvoId; patch: Partial<ConvoFlags> }
-  | { type: 'reset'; convoId: ConvoId }
+type ConvoFlagsAction = { type: 'patch'; convoId: ConvoId; patch: Partial<ConvoFlags> } | { type: 'reset'; convoId: ConvoId }
 
 function convoFlagsReducer(state: ConvoFlagsByConvo, action: ConvoFlagsAction): ConvoFlagsByConvo {
   switch (action.type) {
     case 'patch': {
       const prev = state[action.convoId]
       const next = { ...prev, ...action.patch }
-      if (
-        prev.responding === next.responding &&
-        prev.awaitingTools === next.awaitingTools &&
-        prev.isRunning === next.isRunning &&
-        prev.hasRun === next.hasRun
-      ) {
+      if (prev.responding === next.responding && prev.awaitingTools === next.awaitingTools && prev.isRunning === next.isRunning && prev.hasRun === next.hasRun) {
         return state
       }
       return { ...state, [action.convoId]: next }
@@ -61,12 +53,7 @@ function convoFlagsReducer(state: ConvoFlagsByConvo, action: ConvoFlagsAction): 
     case 'reset': {
       const prev = state[action.convoId]
       const next: ConvoFlags = { ...prev, responding: false, awaitingTools: false, isRunning: false }
-      if (
-        prev.responding === next.responding &&
-        prev.awaitingTools === next.awaitingTools &&
-        prev.isRunning === next.isRunning &&
-        prev.hasRun === next.hasRun
-      ) {
+      if (prev.responding === next.responding && prev.awaitingTools === next.awaitingTools && prev.isRunning === next.isRunning && prev.hasRun === next.hasRun) {
         return state
       }
       return { ...state, [action.convoId]: next }
@@ -240,8 +227,7 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Saga',
-    content:
-      'Great — I see existing content around AI staff + security, so I’ll keep this post practical and avoid repeating.\n\nNext: I’ll draft a crisp outline and then write the first draft.',
+    content: 'Great — I see existing content around AI staff + security, so I’ll keep this post practical and avoid repeating.\n\nNext: I’ll draft a crisp outline and then write the first draft.',
   },
   {
     role: 'assistant',
@@ -298,9 +284,21 @@ const SAGA_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Saga',
     toolCalls: [
-      { id: 'tc_wp_draft', type: 'function', function: { name: 'draft_post', arguments: '{ "title": "AI Staff: What It Is (and How Teams Use It)", "outlineRef": "tc_wp_outline", "targetWords": 1200, "tone": "clear, practical" }' } },
-      { id: 'tc_wp_image_prompt', type: 'function', function: { name: 'create_featured_image_prompt', arguments: '{ "style": "modern, dark, minimal", "subject": "AI staff collaborating with humans", "size": "1200x630" }' } },
-      { id: 'tc_wp_create_post', type: 'function', function: { name: 'create_post', arguments: '{ "status": "draft", "category": "AI", "tags": ["ai staff","agents","workflows"], "includeMeta": true }' } },
+      {
+        id: 'tc_wp_draft',
+        type: 'function',
+        function: { name: 'draft_post', arguments: '{ "title": "AI Staff: What It Is (and How Teams Use It)", "outlineRef": "tc_wp_outline", "targetWords": 1200, "tone": "clear, practical" }' },
+      },
+      {
+        id: 'tc_wp_image_prompt',
+        type: 'function',
+        function: { name: 'create_featured_image_prompt', arguments: '{ "style": "modern, dark, minimal", "subject": "AI staff collaborating with humans", "size": "1200x630" }' },
+      },
+      {
+        id: 'tc_wp_create_post',
+        type: 'function',
+        function: { name: 'create_post', arguments: '{ "status": "draft", "category": "AI", "tags": ["ai staff","agents","workflows"], "includeMeta": true }' },
+      },
     ],
     content: 'Writing + saving draft…',
   },
@@ -316,7 +314,15 @@ const SAGA_TIMELINE: Step[] = [
     messageType: 'tool_result',
     toolCallId: 'tc_wp_image_prompt',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', prompt: 'Dark, minimal hero illustration of a small AI crew (three stylized assistants) collaborating with a human at a desk, subtle starship UI overlays, high contrast, clean lines, 1200x630.' }, null, 2),
+    content: JSON.stringify(
+      {
+        status: 'ok',
+        prompt:
+          'Dark, minimal hero illustration of a small AI crew (three stylized assistants) collaborating with a human at a desk, subtle starship UI overlays, high contrast, clean lines, 1200x630.',
+      },
+      null,
+      2
+    ),
   },
   {
     role: 'tool',
@@ -457,28 +463,56 @@ const IRIS_TIMELINE: Step[] = [
     messageType: 'tool_result',
     toolCallId: 'tc_ir_pick_top3',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', threads: [{ id: 't_sales_01', from: 'Acme Procurement', subject: 'Quick questions before we buy' }, { id: 't_support_02', from: 'Jane', subject: 'Login failing for 2 users' }, { id: 't_bills_03', from: 'Stripe', subject: 'Invoice available' }] }, null, 2),
+    content: JSON.stringify(
+      {
+        status: 'ok',
+        threads: [
+          { id: 't_sales_01', from: 'Acme Procurement', subject: 'Quick questions before we buy' },
+          { id: 't_support_02', from: 'Jane', subject: 'Login failing for 2 users' },
+          { id: 't_bills_03', from: 'Stripe', subject: 'Invoice available' },
+        ],
+      },
+      null,
+      2
+    ),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
     toolCallId: 'tc_ir_draft_1',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', threadId: 't_sales_01', draftId: 'd_001', preview: 'Happy to help — can you share your timeline and team size? If it helps, we can hop on a 15‑min call this week.' }, null, 2),
+    content: JSON.stringify(
+      { status: 'ok', threadId: 't_sales_01', draftId: 'd_001', preview: 'Happy to help — can you share your timeline and team size? If it helps, we can hop on a 15‑min call this week.' },
+      null,
+      2
+    ),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
     toolCallId: 'tc_ir_draft_2',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', threadId: 't_support_02', draftId: 'd_002', preview: 'Thanks — I can help. Can you confirm the error message + whether SSO is enabled? In the meantime, try resetting the session…' }, null, 2),
+    content: JSON.stringify(
+      {
+        status: 'ok',
+        threadId: 't_support_02',
+        draftId: 'd_002',
+        preview: 'Thanks — I can help. Can you confirm the error message + whether SSO is enabled? In the meantime, try resetting the session…',
+      },
+      null,
+      2
+    ),
   },
   {
     role: 'tool',
     messageType: 'tool_result',
     toolCallId: 'tc_ir_draft_3',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', threadId: 't_bills_03', draftId: 'd_003', preview: 'Received — thank you. Please confirm the billing period and I’ll get this filed with our receipts.' }, null, 2),
+    content: JSON.stringify(
+      { status: 'ok', threadId: 't_bills_03', draftId: 'd_003', preview: 'Received — thank you. Please confirm the billing period and I’ll get this filed with our receipts.' },
+      null,
+      2
+    ),
   },
   {
     role: 'assistant',
@@ -506,21 +540,42 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
   const { data: ariaTemplatesQ = [] } = useAgentTemplates({ search: 'aria' }, !useServerInitial)
   const ariaAvatarUrl = useMemo(() => {
     const list = (useServerInitial ? initialAgentTemplates : ariaTemplatesQ) as AgentTemplateModel[]
-    const aria = list.find(t => t.slug === 'aria' || t.name === 'Aria' || String(t.slug ?? '').toLowerCase().startsWith('aria'))
+    const aria = list.find(
+      t =>
+        t.slug === 'aria' ||
+        t.name === 'Aria' ||
+        String(t.slug ?? '')
+          .toLowerCase()
+          .startsWith('aria')
+    )
     return aria?.avatarUrl
   }, [ariaTemplatesQ, initialAgentTemplates, useServerInitial])
 
   const { data: irisTemplatesQ = [] } = useAgentTemplates({ search: 'iris' }, !useServerInitial)
   const irisAvatarUrl = useMemo(() => {
     const list = (useServerInitial ? initialAgentTemplates : irisTemplatesQ) as AgentTemplateModel[]
-    const iris = list.find(t => t.slug === 'iris' || t.name === 'Iris' || String(t.slug ?? '').toLowerCase().startsWith('iris'))
+    const iris = list.find(
+      t =>
+        t.slug === 'iris' ||
+        t.name === 'Iris' ||
+        String(t.slug ?? '')
+          .toLowerCase()
+          .startsWith('iris')
+    )
     return iris?.avatarUrl
   }, [initialAgentTemplates, irisTemplatesQ, useServerInitial])
 
   const { data: sagaTemplatesQ = [] } = useAgentTemplates({ search: 'saga' }, !useServerInitial)
   const sagaAvatarUrl = useMemo(() => {
     const list = (useServerInitial ? initialAgentTemplates : sagaTemplatesQ) as AgentTemplateModel[]
-    const saga = list.find(t => t.slug === 'saga' || t.name === 'Saga' || String(t.slug ?? '').toLowerCase().startsWith('saga'))
+    const saga = list.find(
+      t =>
+        t.slug === 'saga' ||
+        t.name === 'Saga' ||
+        String(t.slug ?? '')
+          .toLowerCase()
+          .startsWith('saga')
+    )
     return saga?.avatarUrl
   }, [initialAgentTemplates, sagaTemplatesQ, useServerInitial])
 
@@ -821,19 +876,13 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
 
   const cfg = CONVOS[activeConvoId]
   const actorsLine = cfg.id === 'aria' ? `You, ${cfg.actorName}` : `${cfg.actorName}, You`
-  const agentAvatarUrlOverride =
-    cfg.id === 'aria' ? ariaAvatarUrl : cfg.id === 'iris' ? irisAvatarUrl : cfg.id === 'saga' ? sagaAvatarUrl : undefined
+  const agentAvatarUrlOverride = cfg.id === 'aria' ? ariaAvatarUrl : cfg.id === 'iris' ? irisAvatarUrl : cfg.id === 'saga' ? sagaAvatarUrl : undefined
   const isResponding = (flagsByConvo[activeConvoId]?.responding ?? false) || (flagsByConvo[activeConvoId]?.awaitingTools ?? false)
   const isRunning = flagsByConvo[activeConvoId]?.isRunning ?? false
   const hasRun = flagsByConvo[activeConvoId]?.hasRun ?? false
   const hasAnyMessages = (messagesByConvo[activeConvoId] || []).length > 0
   const isAutoplayTab = activeConvoId === 'aria'
-  const showDemoChooser =
-    activeConvoId === 'aria' &&
-    flagsByConvo.aria.hasRun &&
-    !flagsByConvo.aria.isRunning &&
-    demoChoiceState.stage === 'choose' &&
-    (messagesByConvo.aria?.length || 0) > 0
+  const showDemoChooser = activeConvoId === 'aria' && flagsByConvo.aria.hasRun && !flagsByConvo.aria.isRunning && demoChoiceState.stage === 'choose' && (messagesByConvo.aria?.length || 0) > 0
   const isDemoCalling = activeConvoId === 'aria' && demoChoiceState.stage === 'calling'
 
   const handleRestart = () => {

@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import AgentAvatar from '@/components/animated/AgentAvatar'
 import Icon from '@/components/primitives/Icon'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import type { AgentTemplateModel } from '@starships/protocol'

@@ -65,13 +65,23 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
     const requesterUserId = req.user?.id;
     const repo = new AgentTemplateRepository();
 
+    const templateIds = paginatedTemplates
+      .map((t) => (t as any)?.id)
+      .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
+
     // Only creators can see sensitive fields. Everyone else gets the public-stripped model.
     const creatorIdsByTemplateId =
-      requesterUserId && paginatedTemplates.length > 0
-        ? await repo.getCreatorUserIdsByTemplateIds(
-            paginatedTemplates.map((t) => (t as any)?.id).filter((id): id is string => typeof id === 'string' && id.trim().length > 0)
-          )
+      requesterUserId && templateIds.length > 0
+        ? await repo.getCreatorUserIdsByTemplateIds(templateIds)
         : new Map<string, string>();
+
+    // Batch-load internals only for templates that belong to the requester.
+    const creatorTemplateIds =
+      requesterUserId && templateIds.length > 0
+        ? templateIds.filter((id) => creatorIdsByTemplateId.get(id) === requesterUserId)
+        : [];
+    const internalsByTemplateId =
+      creatorTemplateIds.length > 0 ? await repo.findInternalByIds(creatorTemplateIds) : new Map<string, any>();
 
     const hydrated = await Promise.all(
       paginatedTemplates.map(async (t) => {
@@ -93,7 +103,7 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
           return publicModel;
         }
 
-        const internal = await repo.findInternalById(templateId);
+        const internal = internalsByTemplateId.get(templateId);
         if (!internal) return publicModel;
         return toCreatorSafeTemplateModel({ ...(internal as unknown as Record<string, unknown>) });
       })

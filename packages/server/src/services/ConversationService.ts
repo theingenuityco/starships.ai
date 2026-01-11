@@ -243,9 +243,7 @@ export class ConversationService {
 
     // Fetch provider routes; repository orders by priority DESC so [0] is "best".
     const routes = await this.llmModelRepository.listProvidersForModel(model, { enabledOnly: true }).catch(() => []);
-    const best = (Array.isArray(routes) && routes.length > 0 ? routes[0] : null) as
-      | { pricing?: Record<string, unknown> | null }
-      | null;
+    const best = (Array.isArray(routes) && routes.length > 0 ? routes[0] : null) as { pricing?: Record<string, unknown> | null } | null;
     const pricing = best?.pricing ?? null;
 
     const toNum = (v: unknown): number | undefined => {
@@ -1491,7 +1489,10 @@ export class ConversationService {
         const at = new Date().toISOString();
         const latestTurnId =
           this.currentTurnId.get(conversationId) ||
-          (await this.turnRepository.findLatestByConversationId(conversationId).then((t) => (t?.id ? t.id : null)).catch(() => null)) ||
+          (await this.turnRepository
+            .findLatestByConversationId(conversationId)
+            .then((t) => (t?.id ? t.id : null))
+            .catch(() => null)) ||
           null;
         const turnId = latestTurnId || conversationId;
 
@@ -1799,13 +1800,14 @@ export class ConversationService {
           const completionTokens = Number(usage.completion_tokens ?? 0);
           const totalTokens = Number(usage.total_tokens ?? 0);
           const providerCost = this.extractProviderCost(usage);
-          const computedCost = providerCost !== undefined
-            ? providerCost
-            : await this.computeCostFromCatalog({
-                model: String(model),
-                promptTokens,
-                completionTokens,
-              });
+          const computedCost =
+            providerCost !== undefined
+              ? providerCost
+              : await this.computeCostFromCatalog({
+                  model: String(model),
+                  promptTokens,
+                  completionTokens,
+                });
           await this.usageService
             .createUsageForTurn({
               starshipId,

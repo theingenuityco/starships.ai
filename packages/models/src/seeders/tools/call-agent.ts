@@ -52,10 +52,12 @@ Mode B: Post into existing child conversation
   - Sends the provided content as a new user message in that child conversation
 
 In both modes, the tool returns the childConversationId and the HTTP response
-from the message send endpoint so callers can inspect status and results.
+from the message send endpoint. To keep tool outputs small and focused, the
+tool returns only the **last message** from the delegated conversation (not the
+entire message history).
 
 ## Response & Behavior
-- **Output**: { childConversationId, status, result, message }
+- **Output**: { childConversationId, status, result, lastMessage, message }
 - **Timeout**: 60 seconds for agent execution
 - **Common failures**: Agent not found (404), invalid configuration, execution timeout, tool errors`,
   parameters: {
@@ -166,6 +168,13 @@ from the message send endpoint so callers can inspect status and results.
               const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               const data = body && typeof body === 'object' && body.data ? body.data : body;
+              const conversation = data && typeof data === 'object' && data.conversation ? data.conversation : null;
+              const messages =
+                conversation && typeof conversation === 'object' && Array.isArray(conversation.messages)
+                  ? conversation.messages
+                  : (data && typeof data === 'object' && Array.isArray(data.messages) ? data.messages : null);
+
+              const lastMessage = Array.isArray(messages) && messages.length > 0 ? messages[messages.length - 1] : null;
 
               // Extract child conversation id from previous node
               let childConversationId = null;
@@ -210,11 +219,35 @@ from the message send endpoint so callers can inspect status and results.
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
 
+              // Remove the full message history from the result to keep tool output small.
+              // Preserve the overall response shape but only keep the last message.
+              let result = data;
+              try {
+                if (conversation && typeof conversation === 'object') {
+                  result = {
+                    ...(data && typeof data === 'object' ? data : {}),
+                    conversation: {
+                      ...conversation,
+                      messages: lastMessage ? [lastMessage] : [],
+                    },
+                  };
+                } else if (data && typeof data === 'object' && Array.isArray((data).messages)) {
+                  result = {
+                    ...data,
+                    messages: lastMessage ? [lastMessage] : [],
+                  };
+                }
+              } catch (e) {
+                // best-effort only
+                result = data;
+              }
+
               return {
                 childConversationId,
                 success,
                 status,
-                result: data,
+                result,
+                lastMessage,
                 message: success
                   ? 'Agent call in new child conversation completed successfully'
                   : 'Agent call in new child conversation failed',
@@ -255,6 +288,13 @@ from the message send endpoint so callers can inspect status and results.
               const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               const data = body && typeof body === 'object' && body.data ? body.data : body;
+              const conversation = data && typeof data === 'object' && data.conversation ? data.conversation : null;
+              const messages =
+                conversation && typeof conversation === 'object' && Array.isArray(conversation.messages)
+                  ? conversation.messages
+                  : (data && typeof data === 'object' && Array.isArray(data.messages) ? data.messages : null);
+
+              const lastMessage = Array.isArray(messages) && messages.length > 0 ? messages[messages.length - 1] : null;
 
               const prep = (ctx.lastOutputOf && ctx.lastOutputOf('prepare')) || {};
               const childConversationId = prep && prep.childConversationId ? String(prep.childConversationId) : null;
@@ -262,11 +302,34 @@ from the message send endpoint so callers can inspect status and results.
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
 
+              // Remove the full message history from the result to keep tool output small.
+              let result = data;
+              try {
+                if (conversation && typeof conversation === 'object') {
+                  result = {
+                    ...(data && typeof data === 'object' ? data : {}),
+                    conversation: {
+                      ...conversation,
+                      messages: lastMessage ? [lastMessage] : [],
+                    },
+                  };
+                } else if (data && typeof data === 'object' && Array.isArray((data).messages)) {
+                  result = {
+                    ...data,
+                    messages: lastMessage ? [lastMessage] : [],
+                  };
+                }
+              } catch (e) {
+                // best-effort only
+                result = data;
+              }
+
               return {
                 childConversationId,
                 success,
                 status,
-                result: data,
+                result,
+                lastMessage,
                 message: success
                   ? 'Agent call in existing child conversation completed successfully'
                   : 'Agent call in existing child conversation failed'
@@ -311,7 +374,7 @@ export const agentCallToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentCallTool.blueprint,
 
   slug: 'call-agent',
-  version: '1.0.3',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Handle this request" }] } // delegate with messages\n{ "slug": "analyzer", "input": "Analyze this data in a child conversation" } // delegate with simple text',

@@ -221,9 +221,7 @@ const CustomConditionalNode: React.FC<{ data: ReactFlowNode['data'] & { outgoing
   const incomingSpacing = isCompact ? 12 : 16
   // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
   // Responsive: never exceed viewport width on mobile (prevents horizontal page overflow)
-  const containerClass = isCompact
-    ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]'
-    : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
+  const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]' : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
   // Slightly larger icon container to add more breathing room around the glyph
   const iconClass = isCompact ? 'w-12 h-12' : 'w-14 h-14'
   const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'
@@ -385,9 +383,7 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
   const incomingSpacing = isCompact ? 12 : 16
   // Compact nodes: keep the card small, but make the *contents* (icon + typography) much larger.
   // Responsive: never exceed viewport width on mobile (prevents horizontal page overflow)
-  const containerClass = isCompact
-    ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]'
-    : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
+  const containerClass = isCompact ? 'gap-2.5 px-3 py-2 w-[min(320px,calc(100vw-3rem))]' : 'gap-4 px-5 py-4 w-[min(420px,calc(100vw-3rem))]'
   // Slightly larger icon container to add more breathing room around the glyph
   const iconClass = isCompact ? 'w-12 h-12' : 'w-14 h-14'
   const iconInnerClass = isCompact ? 'w-9 h-9' : 'w-6 h-6'

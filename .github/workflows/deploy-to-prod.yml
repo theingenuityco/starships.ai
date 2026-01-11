@@ -117,6 +117,8 @@ jobs:
           ENABLE_INDEXING: ${{ vars.ENABLE_INDEXING || 'false' }}
           GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
           USERBACK_TOKEN: ${{ secrets.USERBACK_TOKEN }}
+          POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
+          POSTHOG_HOST: ${{ vars.POSTHOG_HOST }}
           SENTRY_DSN_CLIENT: ${{ secrets.SENTRY_DSN_CLIENT }}
           SENTRY_DSN_SERVER: ${{ secrets.SENTRY_DSN_SERVER }}
           GHCR_PULL_TOKEN: ${{ secrets.GHCR_PULL_TOKEN }}
@@ -172,6 +174,8 @@ jobs:
             --from-literal=ENABLE_INDEXING="$ENABLE_INDEXING" \
             --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
             --from-literal=USERBACK_TOKEN="$USERBACK_TOKEN" \
+            --from-literal=POSTHOG_KEY="$POSTHOG_KEY" \
+            --from-literal=POSTHOG_HOST="$POSTHOG_HOST" \
             --from-literal=SENTRY_DSN_CLIENT="$SENTRY_DSN_CLIENT" \
             --from-literal=SENTRY_DSN_SERVER="$SENTRY_DSN_SERVER" \
             --from-literal=RUNNER_AUTH_TOKEN="$RUNNER_AUTH_TOKEN" \

@@ -16,6 +16,7 @@ import Link from 'next/link'
 import { toast } from 'sonner'
 import { PasswordStrengthMeter, PasswordLabelWithTooltip } from '@/components/ui/password-strength-meter'
 import { validatePassword } from '@/utils/passwordStrength'
+import { track } from '@/lib/analytics'
 
 /**
  * OAuth error handling helper
@@ -56,6 +57,7 @@ export function LoginForm({
 
   // OAuth initiation function - uses relative URL like regular auth
   const initiateOAuth = (provider: 'google' | 'github') => {
+    track({ type: 'auth_oauth_clicked', provider })
     window.location.href = `/api/v1/auth/${provider}`
   }
 
@@ -153,6 +155,7 @@ export function LoginForm({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
+    track({ type: 'auth_login_submitted' })
     setFormError(null)
     setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
@@ -181,6 +184,7 @@ export function LoginForm({
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault()
+    track({ type: 'auth_register_submitted' })
     setFormError(null)
     setEmailVerificationStatus(null)
     setAutoSwitchedToRegister(false)
@@ -239,6 +243,7 @@ export function LoginForm({
 
   // Resend verification handler following established patterns
   const handleResendVerification = async (email: string) => {
+    track({ type: 'auth_resend_verification_clicked' })
     await resendVerification(email)
   }
 
@@ -280,6 +285,7 @@ export function LoginForm({
             onValueChange={value => {
               if (!isAuthTab(value)) return
               setActiveTab(value)
+              track({ type: 'auth_tab_changed', tab: value })
               onTabChange?.(value) // Notify parent of tab change
               setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
               setFormError(null) // Clear form errors when switching tabs
@@ -352,15 +358,29 @@ export function LoginForm({
                 <div className="text-center space-y-2">
                   <p className="text-xs text-muted-foreground/80">
                     By signing in, you agree to our{' '}
-                    <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                    <a
+                      href="/terms"
+                      target="_blank"
+                      className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
+                      onClick={() => track({ type: 'auth_terms_clicked' })}
+                    >
                       Terms of Service
                     </a>{' '}
                     and{' '}
-                    <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                    <a
+                      href="/privacy"
+                      target="_blank"
+                      className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
+                      onClick={() => track({ type: 'auth_privacy_clicked' })}
+                    >
                       Privacy Policy
                     </a>
                   </p>
-                  <Link href="/forgot-password" className="text-sm text-blue-600 hover:text-blue-800 transition-colors">
+                  <Link
+                    href="/forgot-password"
+                    onClick={() => track({ type: 'auth_forgot_password_clicked' })}
+                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                  >
                     Forgot your password?
                   </Link>
                 </div>
@@ -469,11 +489,21 @@ export function LoginForm({
 
                 <p className="text-xs text-muted-foreground/80 text-center">
                   By signing up, you agree to our{' '}
-                  <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                  <a
+                    href="/terms"
+                    target="_blank"
+                    className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
+                    onClick={() => track({ type: 'auth_terms_clicked' })}
+                  >
                     Terms of Service
                   </a>{' '}
                   and{' '}
-                  <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2">
+                  <a
+                    href="/privacy"
+                    target="_blank"
+                    className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
+                    onClick={() => track({ type: 'auth_privacy_clicked' })}
+                  >
                     Privacy Policy
                   </a>
                 </p>

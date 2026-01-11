@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import Link from 'next/link'
 import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
+import { track } from '@/lib/analytics'
 
 export default function HomePageClient(props: { initialAgentTemplates?: AgentTemplateModel[]; initialToolTemplates?: ToolTemplateModel[] }) {
   const initialAgentTemplates = props.initialAgentTemplates ?? []
@@ -70,20 +71,33 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
                   <p className="text-muted-foreground mb-2">© 2025 Starships.ai - Where Ideas meet Intelligence</p>
                   <p className="text-muted-foreground text-sm">
                     🪐 Manifested by{' '}
-                    <a href="https://theingenuity.co" target="_blank" rel="noopener noreferrer" className="hover:text-primary transition-colors underline">
+                    <a
+                      href="https://theingenuity.co"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:text-primary transition-colors underline"
+                      onClick={() => track({ type: 'public_footer_link_clicked', fromPath: '/', destination: 'https://theingenuity.co' })}
+                    >
                       The Ingenuity Co
                     </a>
                   </p>
                 </div>
                 <div className="flex flex-wrap items-center justify-center md:justify-end gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => window.open('/docs', '_blank')}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      track({ type: 'public_footer_link_clicked', fromPath: '/', destination: '/docs' })
+                      window.open('/docs', '_blank')
+                    }}
+                  >
                     <Icon name="book" className="w-4 h-4 mr-2" />
                     Documentation
                   </Button>
-                  <Button variant="ghost" size="sm" asChild>
+                  <Button variant="ghost" size="sm" asChild onClick={() => track({ type: 'public_footer_link_clicked', fromPath: '/', destination: '/privacy' })}>
                     <Link href="/privacy">Privacy Policy</Link>
                   </Button>
-                  <Button variant="ghost" size="sm" asChild>
+                  <Button variant="ghost" size="sm" asChild onClick={() => track({ type: 'public_footer_link_clicked', fromPath: '/', destination: '/terms' })}>
                     <Link href="/terms">Terms &amp; Conditions</Link>
                   </Button>
                   <BackToTop />

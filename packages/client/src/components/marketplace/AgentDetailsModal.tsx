@@ -14,6 +14,7 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { track } from '@/lib/analytics'
 
 interface AgentDetailsModalProps {
   template: AgentTemplateModel | null
@@ -48,6 +49,13 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
 
   const handleDeployClick = () => {
     if (!template) return
+    track({
+      type: 'marketplace_agent_deploy_clicked',
+      templateId: template.id,
+      templateName: template.name,
+      category: (template as any)?.category,
+      authenticated: !!isAuthenticated,
+    })
     if (!isAuthenticated) {
       const current = `${pathname}${searchParams && searchParams.toString() ? `?${searchParams.toString()}` : ''}`
       const params = new URLSearchParams({ returnUrl: current })

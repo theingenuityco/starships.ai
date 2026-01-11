@@ -645,7 +645,7 @@ export class ConversationService {
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
       if (conversation.parentConversationId) {
-        const payload: ConversationStreamUIAction['data'] = {
+        const payload: ConversationStreamUIAction = {
           __ui_action: 'child_conversation_created',
           parentConversationId: conversation.parentConversationId,
           childConversationId: conversation.id,
@@ -654,7 +654,7 @@ export class ConversationService {
         await this.streamBus.publish(conversation.parentConversationId, {
           type: 'ui_action',
           data: payload,
-        } as ConversationStreamEvent);
+        });
       }
     } catch (e) {
       // Non-fatal: failure to emit UI hint must not break conversation creation
@@ -2748,10 +2748,10 @@ export class ConversationService {
                     if (Array.isArray(toolCalls) && toolCalls.length > 0) {
                       const m = new Map<string, string>();
                       for (const tc of toolCalls) {
-                        const id = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.toolCallId;
-                        const name = (tc as any)?.function?.name;
-                        if (id != null && typeof name === 'string' && name.trim().length > 0) {
-                          m.set(String(id), name.trim());
+                        const id = typeof tc.id === 'string' ? tc.id : '';
+                        const name = typeof tc.function?.name === 'string' ? tc.function.name : '';
+                        if (id && name.trim().length > 0) {
+                          m.set(id, name.trim());
                         }
                       }
                       if (m.size > 0) {
@@ -2801,37 +2801,42 @@ export class ConversationService {
                 // clients can render it immediately (and in a stable, tool-agnostic way).
                 try {
                   if (role === 'tool') {
-                    const toolCallId = typeof (persistedMsg as any)?.toolCallId === 'string' ? String((persistedMsg as any).toolCallId) : '';
+                    const toolCallId = typeof persistedMsg.toolCallId === 'string' ? persistedMsg.toolCallId : '';
                     const raw = typeof persistedMsg.content === 'string' ? persistedMsg.content : '';
                     const t = raw.trim();
                     if (toolCallId && t && (t.startsWith('{') || t.startsWith('['))) {
-                      let parsed: any = null;
+                      const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+                      const get = (v: unknown, key: string): unknown => (isRecord(v) ? v[key] : undefined);
+                      const getNested = (v: unknown, keys: string[]): unknown => {
+                        let cur: unknown = v;
+                        for (const k of keys) cur = get(cur, k);
+                        return cur;
+                      };
+
+                      let parsed: unknown = null;
                       try {
                         parsed = JSON.parse(t);
                       } catch {
                         parsed = null;
                       }
 
-                      const candidate =
-                        (parsed && typeof parsed === 'object' ? parsed : null) ??
-                        null;
+                      const candidate = isRecord(parsed) ? parsed : null;
 
-                      const maybeWidget =
-                        candidate?.widget ??
-                        candidate?.data?.widget ??
-                        candidate?.data?.result?.widget ??
-                        candidate?.data?.result ??
-                        candidate?.data ??
-                        candidate?.result ??
+                      const maybeWidget: unknown =
+                        (candidate ? get(candidate, 'widget') : undefined) ??
+                        (candidate ? getNested(candidate, ['data', 'widget']) : undefined) ??
+                        (candidate ? getNested(candidate, ['data', 'result', 'widget']) : undefined) ??
+                        (candidate ? getNested(candidate, ['data', 'result']) : undefined) ??
+                        (candidate ? get(candidate, 'data') : undefined) ??
+                        (candidate ? get(candidate, 'result') : undefined) ??
                         candidate;
 
                       const hasRenderableShape =
-                        maybeWidget &&
-                        typeof maybeWidget === 'object' &&
-                        typeof (maybeWidget as any).widgetType === 'string' &&
-                        (maybeWidget as any).widgetType.trim().length > 0 &&
-                        (maybeWidget as any).props &&
-                        typeof (maybeWidget as any).props === 'object';
+                        isRecord(maybeWidget) &&
+                        typeof maybeWidget['widgetType'] === 'string' &&
+                        maybeWidget['widgetType'].trim().length > 0 &&
+                        typeof maybeWidget['props'] === 'object' &&
+                        maybeWidget['props'] !== null;
 
                       if (hasRenderableShape) {
                         const toolName = this.lastToolCallNameByConversation.get(conversationId)?.get(toolCallId) || '';
@@ -2845,7 +2850,7 @@ export class ConversationService {
                             toolCallId,
                             widget: maybeWidget,
                           },
-                        } as ConversationStreamEvent);
+                        });
                       }
                     }
                   }

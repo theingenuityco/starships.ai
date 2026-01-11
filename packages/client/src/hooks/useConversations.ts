@@ -532,9 +532,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     } catch {}
     activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
-    const combinedSignal = signal
-      ? AbortSignal.any([signal, controller.signal, instanceController.signal])
-      : AbortSignal.any([controller.signal, instanceController.signal])
+    const combinedSignal = signal ? AbortSignal.any([signal, controller.signal, instanceController.signal]) : AbortSignal.any([controller.signal, instanceController.signal])
 
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []
@@ -957,6 +955,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const turnActive = turnState.status === 'active' || turnState.status === 'waiting_for_tools'
   const isResponding = Boolean(turnActive || isAssistantStreaming)
   const isAwaitingAssistant = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
+
+  // When a turn completes, refresh usage + wallet so any header indicators update immediately.
+  useEffect(() => {
+    if (!conversationId) return
+    const s = turnState.status
+    if (s === 'completed' || s === 'failed' || s === 'cancelled') {
+      queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
+      if (starshipId) queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
+    }
+  }, [conversationId, starshipId, turnState.status, queryClient])
 
   const lastUIAction = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) return null

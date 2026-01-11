@@ -205,11 +205,11 @@ export function Navigation(props: NavigationProps) {
   const mainNavigationItems = useMemo(
     () => [
       ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
+      { href: `/marketplace`, label: 'Explore Agents', icon: 'store', isActive: pathname === '/marketplace' },
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }] : []),
-      { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && isInstanceAdmin
         ? [
             {

@@ -164,6 +164,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const { data: starshipData } = useStarship(starshipId || '', !!starshipId)
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
+  const storedConversationAgentId = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId]?.agentId : undefined))
 
   // Build suggestion cards from the selected agent's preview/example prompts
   const agentSuggestionCards = useMemo(() => {
@@ -436,8 +437,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       userSelectedAgentRef.current = false
       // Reset the auto-select guard so messages can update the agent
       lastAutoSelectedAgentIdRef.current = null
-      // Clear the selected agent so it gets re-selected from new conversation's messages
-      setSelectedAgentWithLogging(null)
+      // Do NOT clear the selected agent. Clearing causes header state (e.g. token limit) to flicker/disappear
+      // while messages load. The stream-driven restore effect will still update the agent when the new
+      // conversation's messages arrive.
     } else if (wasNull && isNowSet) {
       // First conversation created - DON'T change key, DON'T remount input
       // Keep stable key so input preserves the user's @mention
@@ -458,6 +460,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
     setCurrentConversationId(prev => (prev === externalConversationId ? prev : externalConversationId))
   }, [externalConversationId])
+
+  // When switching conversations, immediately restore the last-known agent for that conversation (if we have one).
+  // This prevents UI flicker (token limit / model indicators) during the messages-loading window.
+  useEffect(() => {
+    if (!currentConversationId) return
+    if (!storedConversationAgentId) return
+    if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) return
+    const match = starshipAgentsData.find(a => a.id === storedConversationAgentId) || null
+    if (!match) return
+    if (selectedAgent?.id === match.id) return
+    setSelectedAgentWithLogging(match)
+  }, [currentConversationId, storedConversationAgentId, starshipAgentsData, selectedAgent?.id, setSelectedAgentWithLogging])
 
   useEffect(() => {
     // Reset user selection flag when conversation actually changes
@@ -787,7 +801,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         {/* Messages Area */}
         {showMessagesArea ? (
           <>
-            <ConversationSummaryBar conversationId={currentConversationId} starshipId={starshipId} modelId={selectedAgent?.model ?? null} />
+            <ConversationSummaryBar
+              conversationId={currentConversationId}
+              starshipId={starshipId}
+              modelId={selectedAgent?.model ?? null}
+              maxTokens={
+                typeof (selectedAgent as any)?.maxTokens === 'number'
+                  ? (selectedAgent as any).maxTokens
+                  : typeof (selectedAgent as any)?.maxTokens === 'string'
+                    ? Number((selectedAgent as any).maxTokens)
+                    : null
+              }
+            />
             <div className="relative flex-1 min-h-0">
               <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
             </div>

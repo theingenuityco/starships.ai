@@ -13,6 +13,7 @@ import StarshipBillingSection from '@/components/billing/StarshipBillingSection'
 import AccountForm from '@/components/profile/AccountForm'
 import { useAuth } from '@/hooks/useAuth'
 import { MyStarshipSettingsSection } from '@/components/settings/MyStarshipSettingsSection'
+import { useUserPreferencesStore } from '@/store/user-preferences-store'
 
 const ALL_TABS = ['my-profile', 'my-starship', 'billing', 'usage'] as const
 type TabValue = (typeof ALL_TABS)[number]
@@ -21,7 +22,9 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
   const { isInstanceAdmin, isLoading: authLoading } = useAuth()
-  const visibleTabs: readonly TabValue[] = isInstanceAdmin ? ALL_TABS : (['my-profile', 'my-starship', 'billing'] as const)
+  const expertMode = useUserPreferencesStore(s => s.expertMode)
+  const showAnalytics = isInstanceAdmin && expertMode
+  const visibleTabs: readonly TabValue[] = showAnalytics ? ALL_TABS : (['my-profile', 'my-starship', 'billing'] as const)
   const isValidTab = visibleTabs.includes(tab as TabValue)
   const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'my-profile'
 
@@ -61,7 +64,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <Icon name="credit-card" className="h-4 w-4" />
                     <span>Billing</span>
                   </TabsTrigger>
-                  {isInstanceAdmin ? (
+                  {showAnalytics ? (
                     <TabsTrigger
                       value="usage"
                       className="gap-2 rounded-xl px-3 py-1 border border-slate-300/50 dark:border-slate-700/50 bg-gradient-to-r from-slate-100/70 via-background to-transparent text-slate-800 dark:text-slate-100 data-[state=active]:border-slate-300/80 dark:data-[state=active]:border-slate-600/80 data-[state=active]:from-slate-100"
@@ -85,7 +88,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                 </section>
               </TabsContent>
 
-              {isInstanceAdmin && (
+              {showAnalytics && (
                 <TabsContent value="usage">
                   <section aria-labelledby="usage-section" className="rounded-xl border border-border/80 bg-background p-6">
                     {starshipData?.id ? <ShipManagement starshipId={starshipData.id} /> : null}

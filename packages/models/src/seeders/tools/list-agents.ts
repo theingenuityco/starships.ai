@@ -20,7 +20,7 @@ Implicit environment (do not pass as arguments):
 - STARSHIP_ID: derived from agent.state.starshipId
 
 Output:
-- Array of { slug, name, description, category, model } (deliberately lean; heavy fields like blueprint are omitted)
+- Array of { slug, name, description, category } (deliberately lean; heavy fields like blueprint are omitted)
 
 Behavior and limits:
 - Read-only and idempotent
@@ -85,7 +85,6 @@ Behavior and limits:
                 name: a && a.name,
                 description: a && a.description,
                 category: a && a.category,
-                model: a && a.model,
               }));
             }
           `,
@@ -119,7 +118,7 @@ export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentListTool.blueprint,
 
   slug: 'list-agents',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of agents; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

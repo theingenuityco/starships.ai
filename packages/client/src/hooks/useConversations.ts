@@ -958,6 +958,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const isResponding = Boolean(turnActive || isAssistantStreaming)
   const isAwaitingAssistant = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
 
+  // When a turn completes, refresh usage + wallet so any header indicators update immediately.
+  useEffect(() => {
+    if (!conversationId) return
+    const s = turnState.status
+    if (s === 'completed' || s === 'failed' || s === 'cancelled') {
+      queryClient.invalidateQueries({ queryKey: USAGE_QUERY_KEYS.conversationTotals(conversationId) })
+      if (starshipId) queryClient.invalidateQueries({ queryKey: WALLET_QUERY_KEYS.detail(starshipId) })
+    }
+  }, [conversationId, starshipId, turnState.status, queryClient])
+
   const lastUIAction = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) return null
     for (let i = chunks.length - 1; i >= 0; i--) {

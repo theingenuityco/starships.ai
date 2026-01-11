@@ -787,7 +787,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         {/* Messages Area */}
         {showMessagesArea ? (
           <>
-            <ConversationSummaryBar conversationId={currentConversationId} starshipId={starshipId} />
+            <ConversationSummaryBar conversationId={currentConversationId} starshipId={starshipId} modelId={selectedAgent?.model ?? null} />
             <div className="relative flex-1 min-h-0">
               <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
             </div>

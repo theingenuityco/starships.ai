@@ -1,16 +1,22 @@
 'use client'
 
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import Icon from '@/components/primitives/Icon'
 import { Avatar } from '@/components/ui/avatar'
 import { useStarshipConversations, useConversationAgents } from '@/hooks/useConversations'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import { useModelContextLength } from '@/hooks/useLlmModels'
+import { cn } from '@/lib/utils'
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef } from 'react'
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
   starshipId: string
+  /** Optional override for the active model id (e.g. selected agent model). */
+  modelId?: string | null
 }
 
 interface ConversationAgent {
@@ -22,7 +28,7 @@ interface ConversationAgent {
   avatarAttachmentId?: string
 }
 
-export function ConversationSummaryBar({ conversationId, starshipId }: ConversationSummaryBarProps) {
+export function ConversationSummaryBar({ conversationId, starshipId, modelId }: ConversationSummaryBarProps) {
   // Fetch all conversations to get the current one's details
   const { data: starshipConversationsData, isLoading: isLoadingConversations } = useStarshipConversations(starshipId || '', true)
   const currentConversation = starshipConversationsData?.conversations?.find(c => c.id === conversationId)
@@ -40,6 +46,23 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
   const hasAvatarIds = avatarAttachmentIds.length > 0
   const { data: avatarAttachments = [], isLoading: isLoadingAvatars } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  // Token indicator: utilization (server totals) vs max (model context window)
+  const { data: totalsData } = useConversationUsageTotals(conversationId)
+  const totalTokens = Number(totalsData?.totalTokens ?? 0)
+  const primaryModelId = useMemo(() => {
+    const override = typeof modelId === 'string' && modelId.trim().length > 0 ? modelId.trim() : null
+    if (override) return override
+    const m = agents?.[0]?.model
+    return typeof m === 'string' && m.trim().length > 0 ? m.trim() : null
+  }, [agents, modelId])
+  const { contextLength: maxContextTokens } = useModelContextLength(primaryModelId)
+  const fallbackMaxTokens = useMemo(() => {
+    const a0: any = agents?.[0]
+    const raw = a0?.maxTokens ?? a0?.state?.maxTokens
+    const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN
+    return Number.isFinite(n) && n > 0 ? n : null
+  }, [agents])
 
   // Only render actual header when all data is ready to prevent layout shifts
   // If there are no avatars to load, don't wait for avatar loading
@@ -87,6 +110,14 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
                     <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                     <span className="font-medium leading-none opacity-50">Updated just now</span>
                   </span>
+                  {/* Token indicator placeholder (reserved space) */}
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
+                      <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
+                      <span className="opacity-50 font-medium tabular-nums">—/—</span>
+                    </span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -113,6 +144,13 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
     if (diffDays < 7) return `${diffDays}d ago`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
+
+  const formatCompactTokens = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
+  const ctx =
+    typeof maxContextTokens === 'number' && Number.isFinite(maxContextTokens) && maxContextTokens > 0 ? maxContextTokens : null
+  const max = ctx ?? fallbackMaxTokens
+  const pct = max ? Math.max(0, Math.min(100, (totalTokens / max) * 100)) : null
+  const isOver = Boolean(max && totalTokens > max)
 
   return (
     <motion.div
@@ -155,6 +193,37 @@ export function ConversationSummaryBar({ conversationId, starshipId }: Conversat
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                       <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                    </span>
+
+                    {/* Tokens: utilized vs max context window (when available) */}
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                      <span
+                        className={cn(
+                          'inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px]',
+                          isOver ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-muted/60 border-border/50 text-muted-foreground'
+                        )}
+                        title={
+                          max
+                          ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens`
+                            : `${totalTokens.toLocaleString()} tokens`
+                        }
+                      >
+                        <Icon name="sparkles" className={cn('h-3 w-3', isOver ? 'text-destructive' : 'text-primary')} />
+                        <span className={cn('font-semibold tabular-nums', isOver ? 'text-destructive' : 'text-foreground')}>
+                        {formatCompactTokens(totalTokens)}/{max ? formatCompactTokens(max) : '—'}
+                        </span>
+                        {max ? (
+                          <span className="ml-1 inline-flex items-center">
+                            <span className="w-14 h-1.5 rounded-full bg-border/50 overflow-hidden">
+                              <span
+                                className={cn('block h-full', isOver ? 'bg-destructive' : 'bg-primary')}
+                                style={{ width: `${pct ?? 0}%` }}
+                              />
+                            </span>
+                          </span>
+                        ) : null}
+                      </span>
                     </span>
                   </>
                 ) : (

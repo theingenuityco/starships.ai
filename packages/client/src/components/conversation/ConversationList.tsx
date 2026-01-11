@@ -2,9 +2,9 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useStarshipConversations, useConversationAgents } from '@/hooks/useConversations'
+import { useStarshipConversations } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
-import type { ConversationModel } from '@starships/protocol'
+import type { AgentModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
@@ -25,26 +25,21 @@ interface ConversationListProps {
   compact?: boolean
 }
 
-interface ConversationAgent {
-  id?: string
-  name: string
-  role?: string
-  slug?: string
-  model?: string
-  avatarAttachmentId?: string
-}
+type ConversationWithAgents = ConversationModel & { agents: AgentModel[] }
 
-function CompactConversationAgents({ conversationId, starshipId }: { conversationId: string; starshipId: string }) {
-  const { data: convAgents = [] } = useConversationAgents(conversationId || null)
-
-  const agents = Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []
+function CompactConversationAgents({
+  starshipId,
+  agents,
+}: {
+  starshipId: string
+  agents: AgentModel[]
+}) {
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
   const remaining = agents.length - visibleAgents.length
 
   const avatarAttachmentIds = useMemo(() => {
-    const ids = visibleAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-    return ids
+    return visibleAgents.map(a => a.avatarAttachmentId).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
   }, [visibleAgents])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
@@ -54,9 +49,9 @@ function CompactConversationAgents({ conversationId, starshipId }: { conversatio
   return (
     <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-foreground">
       {visibleAgents.map(agent => (
-        <div key={agent.id ?? agent.slug ?? agent.name} className="flex items-center gap-1 max-w-[6rem]">
+        <div key={agent.id} className="flex items-center gap-1 max-w-[6rem]">
           <Avatar className="h-3.5 w-3.5 ring-1 ring-border/40">
-            <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={14} />
+            <AgentAvatar seed={agent.name} imageUrl={agent.avatarAttachmentId ? avatarUrlById.get(agent.avatarAttachmentId) : undefined} size={14} />
           </Avatar>
           <span className="truncate">{formatAgentDisplayName(agent)}</span>
         </div>
@@ -85,14 +80,14 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       if (!searchQuery) return true
       const title = conv.title || `Conversation ${conv.id.slice(0, 8)}`
       return title.toLowerCase().includes(searchQuery.toLowerCase())
-    }) || []
+    }) || ([] as ConversationWithAgents[])
 
   // Build parent/child tree: root conversations and their children
-  const roots: ConversationModel[] = []
-  const childrenByParent: Record<string, ConversationModel[]> = {}
+  const roots: ConversationWithAgents[] = []
+  const childrenByParent: Record<string, ConversationWithAgents[]> = {}
 
   for (const conv of filteredConversations) {
-    const parentId = (conv as any).parentConversationId as string | undefined
+    const parentId = conv.parentConversationId
     if (parentId) {
       if (!childrenByParent[parentId]) {
         childrenByParent[parentId] = []
@@ -132,9 +127,10 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   )
 
   // Helper render function for compact list (flat, but with visual indentation for children)
-  const renderCompactConversation = (conversation: ConversationModel, isChild: boolean) => {
+  const renderCompactConversation = (conversation: ConversationWithAgents, isChild: boolean) => {
     const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
     const isActive = conversation.id === currentConversationId
+    const agents = conversation.agents
 
     return (
       <div
@@ -147,7 +143,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       >
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
           <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{title}</p>
-          <CompactConversationAgents conversationId={conversation.id} starshipId={starshipId} />
+          <CompactConversationAgents starshipId={starshipId} agents={agents} />
         </div>
         {/* Delete button - appears on hover */}
         {onConversationDelete && (

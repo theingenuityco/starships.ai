@@ -135,6 +135,62 @@ export class ConversationRepository extends BaseRepository {
   }
 
   /**
+   * Find all conversations for a starship, including linked agents.
+   *
+   * This is used to avoid client-side N+1 fetches when rendering conversation lists.
+   */
+  async findByStarshipWithAgents(starshipId: string): Promise<Array<ConversationModel & { agents: AgentModel[] }>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+
+        const convRows = await connection.query<Record<string, unknown>>(
+          'SELECT * FROM conversations WHERE starship_id = $1 ORDER BY created_at DESC',
+          [starshipId]
+        );
+        const conversations = fromDatabaseArray(ConversationEntity, convRows);
+        const conversationIds = conversations.map((c) => c.id).filter((id) => typeof id === 'string' && id.trim().length > 0);
+
+        if (conversationIds.length === 0) {
+          return conversations.map((c) => ({ ...c, agents: [] }));
+        }
+
+        // Fetch all linked agents for these conversations in one query.
+        const agentRows = await connection.query<Record<string, unknown>>(
+          `SELECT ca.conversation_id, a.*
+           FROM conversation_agents ca
+           INNER JOIN agents a ON a.id = ca.agent_id
+           WHERE ca.conversation_id = ANY($1::text[])
+           ORDER BY a.name`,
+          [conversationIds]
+        );
+
+        const agentsByConversationId = new Map<string, AgentModel[]>();
+        for (const row of agentRows) {
+          const rawConversationId = (row as Record<string, unknown>)['conversation_id'];
+          const conversationId = typeof rawConversationId === 'string' ? rawConversationId : '';
+          if (!conversationId) continue;
+
+          // Drop the join column before entity conversion.
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { conversation_id: _conversationId, ...agentRow } = row as Record<string, unknown> & { conversation_id?: unknown };
+          const agent = fromDatabase(AgentEntity, agentRow);
+          const list = agentsByConversationId.get(conversationId) || [];
+          list.push(agent);
+          agentsByConversationId.set(conversationId, list);
+        }
+
+        return conversations.map((c) => ({
+          ...c,
+          agents: agentsByConversationId.get(c.id) || [],
+        }));
+      },
+      'findByStarshipWithAgents',
+      'Conversation'
+    );
+  }
+
+  /**
    * Get the starship associated with a conversation using JOIN
    */
   async getConversationStarship(conversationId: string): Promise<StarshipModel | null> {

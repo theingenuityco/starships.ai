@@ -227,7 +227,13 @@ export class LLM extends BaseNode<LlmParams> {
     const promptTokens = typeof usageObj.prompt_tokens === 'number' ? usageObj.prompt_tokens : 0;
     const completionTokens = typeof usageObj.completion_tokens === 'number' ? usageObj.completion_tokens : 0;
     const totalTokens = typeof usageObj.total_tokens === 'number' ? usageObj.total_tokens : promptTokens + completionTokens;
-    const cost = typeof usageObj.cost === 'number' ? usageObj.cost : 0;
+    // Prefer BYOK upstream provider cost when available (OpenRouter usage accounting).
+    // - cost_details.upstream_inference_cost: upstream USD cost (BYOK)
+    // - cost: OpenRouter billed cost (credits/USD)
+    const costDetails = (usageObj.cost_details && typeof usageObj.cost_details === 'object') ? (usageObj.cost_details as Record<string, unknown>) : null;
+    const upstream = costDetails ? costDetails.upstream_inference_cost : undefined;
+    const rawCost = typeof upstream === 'number' ? upstream : typeof usageObj.cost === 'number' ? usageObj.cost : 0;
+    const cost = Number.isFinite(rawCost) ? rawCost : 0;
 
     return {
       promptTokens,
@@ -977,6 +983,17 @@ export class LLM extends BaseNode<LlmParams> {
         completionTokens: chunk.usage.completion_tokens ?? 0,
         totalTokens: chunk.usage.total_tokens ?? 0,
       };
+      // Preserve cost for downstream streaming consumers (may only appear on final chunk).
+      try {
+        const cd = (chunk.usage as unknown as { cost_details?: unknown }).cost_details as any;
+        const upstream = cd?.upstream_inference_cost;
+        const cost = typeof upstream === 'number' ? upstream : (chunk.usage as any)?.cost;
+        if (typeof cost === 'number' && Number.isFinite(cost)) {
+          (base as any).cost = cost;
+        }
+      } catch {
+        // ignore
+      }
       if (typeof chunk.usage.completion_tokens_details === 'object' && chunk.usage.completion_tokens_details !== null) {
         const details = chunk.usage.completion_tokens_details as Record<string, unknown>;
         const r = details?.reasoning_tokens;

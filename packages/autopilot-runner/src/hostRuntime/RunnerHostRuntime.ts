@@ -392,6 +392,11 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
     };
 
+    // OpenRouter usage accounting (required for reliable cost reporting, especially BYOK).
+    // Docs: include usage in final response / last SSE message.
+    // NOTE: This can add ~100-300ms to the final chunk.
+    baseRequest.usage = { include: true };
+
     // OpenRouter image generation (OpenRouter extension):
     // - modalities: ['image','text']
     // - image_config: { aspect_ratio: '16:9', ... }

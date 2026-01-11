@@ -89,11 +89,11 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   if (!conversationId || !isDataReady) {
     return (
       <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
-      <div className="px-4 py-3.5">
-        <div className="max-w-4xl">
-          <div className="flex items-center justify-between gap-4">
-            {/* Title and metadata (stacked) - exact structural match */}
-            <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
+        <div className="px-4 py-3.5">
+          <div className="max-w-4xl">
+            <div className="flex items-center justify-between gap-4">
+              {/* Title and metadata (stacked) - exact structural match */}
+              <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 {/* Title - exact match */}
                 <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">
                   <span className="opacity-50">Loading...</span>
@@ -156,8 +156,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   }
 
   const formatCompactTokens = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
-  const ctx =
-    typeof maxContextTokens === 'number' && Number.isFinite(maxContextTokens) && maxContextTokens > 0 ? maxContextTokens : null
+  const ctx = typeof maxContextTokens === 'number' && Number.isFinite(maxContextTokens) && maxContextTokens > 0 ? maxContextTokens : null
   const overrideMax = typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : null
   const max = ctx ?? overrideMax ?? fallbackMaxTokens
   const pct = max ? Math.max(0, Math.min(100, (totalTokens / max) * 100)) : null
@@ -169,10 +168,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   }
 
   const CostPill = () => (
-    <span
-      className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px] bg-muted/60 border-border/50 text-muted-foreground"
-      title={`${formatUSD2(totalCost)} spent`}
-    >
+    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px] bg-muted/60 border-border/50 text-muted-foreground" title={`${formatUSD2(totalCost)} spent`}>
       <Icon name="coins" className="h-3 w-3 text-amber-500" />
       <span className="font-semibold tabular-nums text-foreground">{formatUSD2(totalCost)}</span>
     </span>

@@ -6,7 +6,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState, Fragment } from 'react'
+import { useEffect, useMemo, useRef, memo, useState, Fragment, useCallback } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -22,6 +22,8 @@ import { staggerContainer, staggerItem } from '@/lib/animations'
 import { toast } from 'sonner'
 import { tableToMarkdown } from '@/components/markdown/markdownComponents'
 import { isAnimationComplete } from '@/hooks/useMessageAnimationState'
+import { useStarshipUIStore } from '@/store/starship-ui-store'
+import type { RuntimeWidgetInstance } from '@/types/runtime-widgets'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -86,6 +88,7 @@ export function ConversationMessageList({
   const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
+  const runtimeWidgets = useStarshipUIStore(state => (conversationId ? state.conversations[conversationId]?.runtimeWidgets ?? [] : []))
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
@@ -400,7 +403,7 @@ export function ConversationMessageList({
   const shouldShowGapLoader = Boolean(isResponding && !isAssistantStreaming && !isAwaitingToolResults)
 
   // Filter out assistant shells with no renderable content to avoid blank duplicate bubbles
-  const renderMessages = useMemo(() => {
+const renderMessages = useMemo(() => {
     const canRenderAssistant = (msg: ExtendedMessage) => {
       if (msg.role !== 'assistant') return true
       if (msg.messageType === 'tool_result') return true
@@ -415,7 +418,84 @@ export function ConversationMessageList({
     }
     const filtered = displayMessages.filter(canRenderAssistant)
     return filtered
-  }, [displayMessages])
+}, [displayMessages])
+
+  const lastAssistantMessageId = useMemo(() => {
+    for (let i = renderMessages.length - 1; i >= 0; i--) {
+      const msg = renderMessages[i] as ExtendedMessage
+      if (msg.role === 'assistant' && msg.messageType !== 'tool_result') {
+        return msg.id
+      }
+    }
+    return null
+  }, [renderMessages])
+
+  const runtimeWidgetLookup = useMemo(() => {
+    const byMessage = new Map<string, RuntimeWidgetInstance[]>()
+    const byToolCall = new Map<string, RuntimeWidgetInstance[]>()
+    const fallback: RuntimeWidgetInstance[] = []
+
+    runtimeWidgets.forEach(widget => {
+      if (widget.messageId) {
+        const current = byMessage.get(widget.messageId) ?? []
+        current.push(widget)
+        byMessage.set(widget.messageId, current)
+      } else if (widget.toolCallId) {
+        const current = byToolCall.get(widget.toolCallId) ?? []
+        current.push(widget)
+        byToolCall.set(widget.toolCallId, current)
+      } else {
+        fallback.push(widget)
+      }
+    })
+
+    return { byMessage, byToolCall, fallback }
+  }, [runtimeWidgets])
+
+  const getRuntimeWidgetsForMessage = useCallback(
+    (message: ExtendedMessage): RuntimeWidgetInstance[] => {
+      if (
+        runtimeWidgetLookup.byMessage.size === 0 &&
+        runtimeWidgetLookup.byToolCall.size === 0 &&
+        runtimeWidgetLookup.fallback.length === 0
+      ) {
+        return []
+      }
+
+      const collected: RuntimeWidgetInstance[] = []
+      const seen = new Set<string>()
+      const addWidgets = (widgets?: RuntimeWidgetInstance[]) => {
+        widgets?.forEach(widget => {
+          if (seen.has(widget.runtimeId)) return
+          seen.add(widget.runtimeId)
+          collected.push(widget)
+        })
+      }
+
+      if (message.id) {
+        addWidgets(runtimeWidgetLookup.byMessage.get(message.id))
+      }
+
+      if (Array.isArray(message.toolCalls) && message.toolCalls.length > 0) {
+        const toolCallIds = new Set<string>()
+        message.toolCalls.forEach(tc => {
+          const tcWithExtras = tc as LlmToolCall & { call_id?: string; toolCallId?: string }
+          const id = tc.id ?? tcWithExtras.call_id ?? tcWithExtras.toolCallId
+          if (id) {
+            toolCallIds.add(String(id))
+          }
+        })
+        toolCallIds.forEach(id => addWidgets(runtimeWidgetLookup.byToolCall.get(id)))
+      }
+
+      if (message.id && lastAssistantMessageId && message.id === lastAssistantMessageId) {
+        addWidgets(runtimeWidgetLookup.fallback)
+      }
+
+      return collected
+    },
+    [runtimeWidgetLookup, lastAssistantMessageId]
+  )
 
   // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
   const activeRenderedStreamingAssistantId = useMemo(() => {
@@ -683,6 +763,7 @@ export function ConversationMessageList({
                 : -1
 
             const turnMessages = turnStartIdx >= 0 ? renderMessages.slice(turnStartIdx, idx + 1) : []
+            const runtimeWidgetsForMessage = getRuntimeWidgetsForMessage(message as ExtendedMessage)
 
             return (
               <Fragment key={message.id}>
@@ -700,6 +781,7 @@ export function ConversationMessageList({
                   userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={idx === renderMessages.length - 1}
+                  runtimeWidgets={runtimeWidgetsForMessage}
                 />
                 {/* Only show buttons after the final assistant message of a complete turn (not tool_result messages or intermediate messages) */}
                 {/* Must be: marked as turn end, assistant message, not tool_result, at turn boundary (next is user or null), and have turn messages */}
@@ -766,6 +848,7 @@ interface ConversationMessageBubbleProps {
   userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
   isAwaitingToolResults?: boolean
   isLastMessage?: boolean
+  runtimeWidgets?: RuntimeWidgetInstance[]
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -827,6 +910,7 @@ const MemoizedMessageBubble = memo(
     userAvatarFallbackVariantOverride,
     isAwaitingToolResults = false,
     isLastMessage = false,
+    runtimeWidgets = [],
   }: ConversationMessageBubbleProps) {
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
@@ -923,6 +1007,7 @@ const MemoizedMessageBubble = memo(
                 starshipId={starshipId}
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
+                runtimeWidgets={runtimeWidgets}
               />
             </div>
           </div>
@@ -978,6 +1063,13 @@ const MemoizedMessageBubble = memo(
     const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0
     const nextToolResults = (nextProps.message as ExtendedMessage).toolResults?.length ?? 0
     if (prevToolResults !== nextToolResults) return false
+
+    const prevRuntimeWidgets = prevProps.runtimeWidgets ?? []
+    const nextRuntimeWidgets = nextProps.runtimeWidgets ?? []
+    if (prevRuntimeWidgets.length !== nextRuntimeWidgets.length) return false
+    const prevRuntimeSignature = JSON.stringify(prevRuntimeWidgets)
+    const nextRuntimeSignature = JSON.stringify(nextRuntimeWidgets)
+    if (prevRuntimeSignature !== nextRuntimeSignature) return false
 
     return true
   }

@@ -23,6 +23,8 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
+import { isSupportedWidgetType } from '@/lib/widgets'
+import type { RuntimeWidgetInstance, RuntimeWidgetStatus } from '@/types/runtime-widgets'
 
 interface StreamChunk {
   content: string
@@ -263,6 +265,7 @@ interface MessageContentProps {
   isAwaitingToolResults?: boolean
   // Whether this is the last message in the conversation
   isLastMessage?: boolean
+  runtimeWidgets?: RuntimeWidgetInstance[]
 }
 
 // Known widget types from public-docs
@@ -286,6 +289,18 @@ type WidgetPayload = {
   description?: string
   widgetType: string
   props: Record<string, unknown>
+}
+
+type WidgetDisplayEntry = {
+  id: string
+  widgetType: string
+  props: Record<string, unknown>
+  name?: string
+  description?: string
+  toolName?: string
+  toolCallId?: string
+  status?: RuntimeWidgetStatus | 'ready'
+  source: 'runtime' | 'persisted'
 }
 
 function isWidgetPayload(value: unknown): value is WidgetPayload {
@@ -354,6 +369,7 @@ export function ConversationMessageContent({
   starshipId,
   isAwaitingToolResults = false,
   isLastMessage = false,
+  runtimeWidgets = [],
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
@@ -716,6 +732,47 @@ export function ConversationMessageContent({
       .filter((w): w is NonNullable<typeof w> => w !== null)
   }, [toolResults])
 
+  const runtimeWidgetResults = useMemo<WidgetDisplayEntry[]>(() => {
+    if (!Array.isArray(runtimeWidgets) || runtimeWidgets.length === 0) return []
+
+    const persistedIds = new Set(widgetResults.map(widget => widget.id).filter(Boolean))
+    const persistedToolCallIds = new Set(
+      widgetResults
+        .map(widget => (widget.toolCallId ? String(widget.toolCallId) : null))
+        .filter((value): value is string => value !== null)
+    )
+
+    return runtimeWidgets
+      .filter(widget => {
+        if (!widget || typeof widget !== 'object') return false
+        if (!isSupportedWidgetType(widget.widgetType)) return false
+        if (!widget.props || typeof widget.props !== 'object') return false
+        if (widget.widgetId && persistedIds.has(widget.widgetId)) return false
+        if (widget.toolCallId && persistedToolCallIds.has(String(widget.toolCallId))) return false
+        return true
+      })
+      .map(widget => ({
+        id: widget.widgetId || widget.runtimeId,
+        widgetType: widget.widgetType,
+        props: widget.props,
+        name: widget.name || 'Untitled Widget',
+        description: widget.description,
+        toolName: undefined,
+        toolCallId: widget.toolCallId ? String(widget.toolCallId) : undefined,
+        status: widget.status,
+        source: 'runtime' as const,
+      }))
+  }, [runtimeWidgets, widgetResults])
+
+  const combinedWidgetResults = useMemo<WidgetDisplayEntry[]>(() => {
+    const persistedEntries = widgetResults.map(widget => ({
+      ...widget,
+      status: 'ready' as const,
+      source: 'persisted' as const,
+    }))
+    return [...runtimeWidgetResults, ...persistedEntries]
+  }, [runtimeWidgetResults, widgetResults])
+
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
     return (
@@ -942,25 +999,31 @@ export function ConversationMessageContent({
       )}
 
       {/* Widget rendering: Display widgets inline when created/updated */}
-      {widgetResults.length > 0 && messageType !== 'tool_result' && (
+      {combinedWidgetResults.length > 0 && messageType !== 'tool_result' && (
         <div className="space-y-4 mt-3 w-full max-w-none">
-          {widgetResults.map(widget => {
+          {combinedWidgetResults.map(widget => {
             // Check if widget creation is pending (tool called but no result yet)
             const matchingToolCall = normalizedToolCalls.find((tc: any) => {
               const callId = tc?.id ?? tc?.call_id ?? tc?.toolCallId
               return callId && String(callId) === widget.toolCallId
             })
-            const isPending =
+            const persistedPending =
+              widget.source === 'persisted' &&
               matchingToolCall &&
               !toolResults?.some((r: any) => {
                 const rid = r?.toolCallId ?? r?.call_id ?? r?.id
                 return rid && String(rid) === widget.toolCallId
               })
+            const statusPending =
+              widget.status === 'pending' ||
+              widget.status === 'creating' ||
+              widget.status === 'updated'
+            const isPending = Boolean(statusPending || persistedPending)
 
-            const isUpdate = widget.toolName?.toLowerCase().includes('update')
+            const isUpdate = widget.toolName ? widget.toolName.toLowerCase().includes('update') : widget.status === 'updated'
 
             return (
-              <div key={widget.id} className="w-full max-w-none mb-4">
+              <div key={`${widget.source}-${widget.id}`} className="w-full max-w-none mb-4">
                 {/* Conversational widget header - looks like text */}
                 <div className="text-sm w-full mb-4">
                   <div className="flex items-baseline gap-1">

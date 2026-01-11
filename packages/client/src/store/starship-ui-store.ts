@@ -2,6 +2,7 @@ import React from 'react'
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 import type { MessageModel } from '@starships/protocol'
+import type { RuntimeWidgetInstance } from '@/types/runtime-widgets'
 
 // UI conversation message shape (extends protocol with UI flags)
 interface UIStreamChunk {
@@ -33,6 +34,7 @@ interface ConversationData {
   isResponding?: boolean
   isAssistantStreaming?: boolean
   isAwaitingAssistant?: boolean
+  runtimeWidgets?: RuntimeWidgetInstance[]
   // Internal: lightweight signature to prevent no-op updates causing render loops
   __sig?: string
 }
@@ -62,6 +64,9 @@ interface StarshipUIState {
   markMessageStreaming: (conversationId: string, index: number, isStreaming: boolean) => void
   clearConversation: (conversationId: string) => void
   setConversationAgent: (conversationId: string, agentId: string, agentName: string) => void
+  addOrUpdateRuntimeWidget: (widget: RuntimeWidgetInstance) => void
+  removeRuntimeWidget: (conversationId: string, runtimeId: string) => void
+  clearRuntimeWidgets: (conversationId: string) => void
 }
 
 export const useStarshipUIStore = create<StarshipUIState>()(
@@ -139,6 +144,7 @@ export const useStarshipUIStore = create<StarshipUIState>()(
                     isResponding: typeof data.isResponding === 'boolean' ? data.isResponding : prev?.isResponding,
                     isAssistantStreaming: typeof data.isAssistantStreaming === 'boolean' ? data.isAssistantStreaming : prev?.isAssistantStreaming,
                     isAwaitingAssistant: typeof data.isAwaitingAssistant === 'boolean' ? data.isAwaitingAssistant : prev?.isAwaitingAssistant,
+                    runtimeWidgets: prev?.runtimeWidgets ?? [],
                     // Override with the latest snapshot fields
                     messages: nextMessages,
                     total: nextTotal,
@@ -285,6 +291,62 @@ export const useStarshipUIStore = create<StarshipUIState>()(
             },
             false,
             'convo/setAgent'
+          ),
+        addOrUpdateRuntimeWidget: (widget: RuntimeWidgetInstance) =>
+          set(
+            state => {
+              const conversationId = widget.conversationId
+              if (!conversationId) return { conversations: state.conversations }
+              const current = state.conversations[conversationId] || { messages: [], total: 0, runtimeWidgets: [] }
+              const existing = Array.isArray(current.runtimeWidgets) ? [...current.runtimeWidgets] : []
+              const idx = existing.findIndex(
+                item => item.runtimeId === widget.runtimeId || (!!widget.widgetId && item.widgetId === widget.widgetId)
+              )
+              if (idx >= 0) {
+                existing[idx] = { ...existing[idx], ...widget }
+              } else {
+                existing.push(widget)
+              }
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, runtimeWidgets: existing },
+                },
+              }
+            },
+            false,
+            'convo/upsertRuntimeWidget'
+          ),
+        removeRuntimeWidget: (conversationId: string, runtimeId: string) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId]
+              if (!current || !Array.isArray(current.runtimeWidgets)) return { conversations: state.conversations }
+              const filtered = current.runtimeWidgets.filter(widget => widget.runtimeId !== runtimeId)
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, runtimeWidgets: filtered },
+                },
+              }
+            },
+            false,
+            'convo/removeRuntimeWidget'
+          ),
+        clearRuntimeWidgets: (conversationId: string) =>
+          set(
+            state => {
+              const current = state.conversations[conversationId]
+              if (!current || !current.runtimeWidgets?.length) return { conversations: state.conversations }
+              return {
+                conversations: {
+                  ...state.conversations,
+                  [conversationId]: { ...current, runtimeWidgets: [] },
+                },
+              }
+            },
+            false,
+            'convo/clearRuntimeWidgets'
           ),
       }),
       {

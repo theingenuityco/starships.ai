@@ -306,35 +306,6 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 <h1 className="text-3xl sm:text-4xl font-semibold truncate max-w-xs sm:max-w-xl">{headerAgentDisplayName}</h1>
               </div>
             </div>
-            <div className="flex items-center justify-center gap-2 mt-4">
-              <Breadcrumb>
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href={`/ship/${slug}/conversations`} className="font-mono">
-                      <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
-                        {slug}
-                      </Badge>
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbLink href={`/ship/${slug}/agents`}>
-                      <Badge variant="outline" className="text-muted-foreground border-muted-foreground/30 hover:text-foreground">
-                        Agents
-                      </Badge>
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                  <BreadcrumbSeparator />
-                  <BreadcrumbItem>
-                    <BreadcrumbPage>
-                      <Badge variant="outline" className="text-foreground">
-                        {headerAgentSubtitle || (agentSlug === 'new' ? 'new' : 'details')}
-                      </Badge>
-                    </BreadcrumbPage>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
-            </div>
           </div>
 
           {/* Avatar Preview / Regenerate Modal */}

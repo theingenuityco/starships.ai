@@ -279,27 +279,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
                 <Icon name="wrench" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Tools</h1>
               </div>
-              <div className="flex items-center justify-center gap-2">
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink href={`/ship/${slug}/conversations`} className="font-mono">
-                        <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
-                          {slug}
-                        </Badge>
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>
-                        <Badge variant="outline" className="text-foreground">
-                          Tools
-                        </Badge>
-                      </BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </div>
               <p className="text-muted-foreground mt-2">Installed tools available to your agents</p>
             </div>
 

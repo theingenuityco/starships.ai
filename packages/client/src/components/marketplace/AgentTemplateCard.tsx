@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { useCreateAgentFromTemplate, useToolTemplates } from '@/hooks/useTemplates'
+import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
@@ -87,23 +87,6 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
     onClick?.(template)
   }
 
-  const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s => typeof s === 'string' && s.trim().length > 0) : []
-  const visibleToolSlugs = toolSlugs.slice(0, 4)
-  const hiddenToolsCount = Math.max(0, toolSlugs.length - visibleToolSlugs.length)
-
-  const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
-
-  const toolTemplateNameBySlug = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const t of toolTemplates) {
-      const slug = (t as any)?.slug
-      const name = (t as any)?.name
-      if (typeof slug === 'string' && slug.trim() && typeof name === 'string' && name.trim()) {
-        map.set(slug, name)
-      }
-    }
-    return map
-  }, [toolTemplates])
 
   const agentLike: AgentModel = {
     // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
@@ -149,26 +132,6 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         hideChatControl={true}
         showActions={false}
         disableEntranceMotion={true}
-        belowDescription={
-          toolSlugs.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground mr-1">
-                <Icon name="wrench" className="w-3.5 h-3.5" />
-                Tools:
-              </span>
-              {visibleToolSlugs.map(slug => (
-                <Badge key={slug} variant="secondary" className="text-[10px] px-1.5 py-0.5" title={slug}>
-                  {toolTemplateNameBySlug.get(slug) ?? slug}
-                </Badge>
-              ))}
-              {hiddenToolsCount > 0 ? (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium">
-                  +{hiddenToolsCount} more
-                </Badge>
-              ) : null}
-            </div>
-          ) : null
-        }
         primaryAction={
           showDeployCta
             ? {

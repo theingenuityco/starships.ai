@@ -94,7 +94,6 @@ function generateOccurrencesForSchedule(sched: ScheduleModel, rangeStart: Date, 
     const MAX_ITERATIONS = 1000
     let iterations = 0
 
-     
     while (true) {
       if (iterations++ >= MAX_ITERATIONS) {
         break
@@ -320,27 +319,6 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                 <Icon name="clock" className="h-6 w-6 text-primary" />
                 <h1 className="text-2xl font-bold">Schedules</h1>
               </div>
-              <div className="flex items-center justify-center gap-2">
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink href={`/ship/${slug}/conversations`} className="font-mono">
-                        <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
-                          {slug}
-                        </Badge>
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>
-                        <Badge variant="outline" className="text-foreground">
-                          Schedules
-                        </Badge>
-                      </BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
-              </div>
               <p className="text-muted-foreground mt-2">See when your agents are scheduled to run.</p>
             </div>
 
@@ -423,13 +401,7 @@ export default function StarshipSchedulesPage(): React.JSX.Element {
                           ))}
                         </div>
                       ) : viewMode === 'month' ? (
-                        <MonthScheduleCalendar
-                          currentMonth={currentMonth}
-                          monthCells={monthCells}
-                          todayKey={todayKey}
-                          runsByDay={monthRunsByDay}
-                          onDayClick={date => openScheduleModalForDate(date)}
-                        />
+                        <MonthScheduleCalendar currentMonth={currentMonth} monthCells={monthCells} todayKey={todayKey} runsByDay={monthRunsByDay} onDayClick={date => openScheduleModalForDate(date)} />
                       ) : (
                         <div className="space-y-3">
                           <div className="grid grid-cols-[64px_repeat(7,minmax(0,1fr))] gap-1 text-xs text-muted-foreground mb-1">

@@ -391,11 +391,13 @@ export function Navigation(props: NavigationProps) {
                   >
                     <Icon name="history" className="w-4 h-4" />
                   </div>
-                  <span className="text-[13px] font-medium">Recents</span>
+                  <span className="font-medium" style={{ fontSize: '14px' }}>
+                    Recents
+                  </span>
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="pb-2 space-y-0">
+                <div className="pb-2 space-y-1">
                   <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
                 </div>
               </div>

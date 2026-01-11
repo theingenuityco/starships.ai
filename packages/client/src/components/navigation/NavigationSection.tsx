@@ -34,7 +34,7 @@ export function NavigationSection({ title, items, pathname, renderAfter, showLab
         const uniqueKey = `${item.href}-${item.label}-${index}`
 
         return (
-          <div key={uniqueKey} className="w-full">
+          <div key={uniqueKey} className="w-full" style={{ marginTop: '4px', marginBottom: '4px' }}>
             <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} special={item.special} onItemClick={onItemClick} />
             {renderAfter ? renderAfter(item, index) : null}
           </div>

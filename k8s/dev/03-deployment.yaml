@@ -178,6 +178,16 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: USERBACK_TOKEN
+            - name: POSTHOG_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTHOG_KEY
+            - name: POSTHOG_HOST
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: POSTHOG_HOST
             - name: SENTRY_DSN_CLIENT
               valueFrom:
                 secretKeyRef:

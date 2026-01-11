@@ -27,13 +27,7 @@ interface ConversationListProps {
 
 type ConversationWithAgents = ConversationModel & { agents: AgentModel[] }
 
-function CompactConversationAgents({
-  starshipId,
-  agents,
-}: {
-  starshipId: string
-  agents: AgentModel[]
-}) {
+function CompactConversationAgents({ starshipId, agents }: { starshipId: string; agents: AgentModel[] }) {
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
   const remaining = agents.length - visibleAgents.length

@@ -53,11 +53,10 @@ Mode B: Post into existing child conversation
 
 In both modes, the tool returns the childConversationId and the HTTP response
 from the message send endpoint. To keep tool outputs small and focused, the
-tool returns only the **last message** from the delegated conversation (not the
-entire message history).
+tool returns only the **last message** from the delegated conversation.
 
 ## Response & Behavior
-- **Output**: { childConversationId, status, result, lastMessage, message }
+- **Output**: { childConversationId, success, status, lastMessage, message }
 - **Timeout**: 60 seconds for agent execution
 - **Common failures**: Agent not found (404), invalid configuration, execution timeout, tool errors`,
   parameters: {
@@ -169,12 +168,26 @@ entire message history).
               const body = http && typeof http === 'object' ? http.body : http;
               const data = body && typeof body === 'object' && body.data ? body.data : body;
               const conversation = data && typeof data === 'object' && data.conversation ? data.conversation : null;
-              const messages =
-                conversation && typeof conversation === 'object' && Array.isArray(conversation.messages)
-                  ? conversation.messages
-                  : (data && typeof data === 'object' && Array.isArray(data.messages) ? data.messages : null);
-
-              const lastMessage = Array.isArray(messages) && messages.length > 0 ? messages[messages.length - 1] : null;
+              const messages = conversation && typeof conversation === 'object' && Array.isArray(conversation.messages) ? conversation.messages : null;
+              const lastRaw = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+              const lastMessage = (() => {
+                if (!lastRaw || typeof lastRaw !== 'object') return null;
+                const m = lastRaw;
+                const role = typeof m.role === 'string' ? m.role : '';
+                const content = typeof m.content === 'string' ? m.content : '';
+                const messageType = typeof m.messageType === 'string' ? m.messageType : '';
+                const out = {
+                  ...(role ? { role } : {}),
+                  ...(messageType ? { messageType } : {}),
+                  ...(content ? { content } : {}),
+                };
+                // Only keep toolCallId when this is a tool result (minimal linking metadata).
+                const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';
+                if (role === 'tool' && toolCallId) {
+                  return { ...out, toolCallId };
+                }
+                return out;
+              })();
 
               // Extract child conversation id from previous node
               let childConversationId = null;
@@ -193,68 +206,17 @@ entire message history).
               }
 
               // Extract parent conversation id from prepare step (if any)
-              let parentConversationId = null;
-              try {
-                const prep = ctx.lastOutputOf && ctx.lastOutputOf('prepare') ? ctx.lastOutputOf('prepare') : null;
-                if (prep && typeof prep === 'object' && typeof prep.parentConversationId === 'string') {
-                  parentConversationId = prep.parentConversationId;
-                }
-              } catch (e) {
-                // optional; parentConversationId is best-effort
-              }
-
-              // Extract starship id from environment (for client-side cache invalidation)
-              let starshipId = null;
-              try {
-                if (ctx.env) {
-                  const sid = ctx.env('STARSHIP_ID');
-                  if (sid) {
-                    starshipId = String(sid);
-                  }
-                }
-              } catch (e) {
-                // ignore env errors
-              }
-
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
-
-              // Remove the full message history from the result to keep tool output small.
-              // Preserve the overall response shape but only keep the last message.
-              let result = data;
-              try {
-                if (conversation && typeof conversation === 'object') {
-                  result = {
-                    ...(data && typeof data === 'object' ? data : {}),
-                    conversation: {
-                      ...conversation,
-                      messages: lastMessage ? [lastMessage] : [],
-                    },
-                  };
-                } else if (data && typeof data === 'object' && Array.isArray((data).messages)) {
-                  result = {
-                    ...data,
-                    messages: lastMessage ? [lastMessage] : [],
-                  };
-                }
-              } catch (e) {
-                // best-effort only
-                result = data;
-              }
 
               return {
                 childConversationId,
                 success,
                 status,
-                result,
                 lastMessage,
                 message: success
                   ? 'Agent call in new child conversation completed successfully'
                   : 'Agent call in new child conversation failed',
-                // UI hint for clients: let them refresh conversation lists when a child is created
-                __ui_action: 'child_conversation_created',
-                parentConversationId,
-                starshipId,
               };
             }
           `,
@@ -289,12 +251,25 @@ entire message history).
               const body = http && typeof http === 'object' ? http.body : http;
               const data = body && typeof body === 'object' && body.data ? body.data : body;
               const conversation = data && typeof data === 'object' && data.conversation ? data.conversation : null;
-              const messages =
-                conversation && typeof conversation === 'object' && Array.isArray(conversation.messages)
-                  ? conversation.messages
-                  : (data && typeof data === 'object' && Array.isArray(data.messages) ? data.messages : null);
-
-              const lastMessage = Array.isArray(messages) && messages.length > 0 ? messages[messages.length - 1] : null;
+              const messages = conversation && typeof conversation === 'object' && Array.isArray(conversation.messages) ? conversation.messages : null;
+              const lastRaw = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+              const lastMessage = (() => {
+                if (!lastRaw || typeof lastRaw !== 'object') return null;
+                const m = lastRaw;
+                const role = typeof m.role === 'string' ? m.role : '';
+                const content = typeof m.content === 'string' ? m.content : '';
+                const messageType = typeof m.messageType === 'string' ? m.messageType : '';
+                const out = {
+                  ...(role ? { role } : {}),
+                  ...(messageType ? { messageType } : {}),
+                  ...(content ? { content } : {}),
+                };
+                const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';
+                if (role === 'tool' && toolCallId) {
+                  return { ...out, toolCallId };
+                }
+                return out;
+              })();
 
               const prep = (ctx.lastOutputOf && ctx.lastOutputOf('prepare')) || {};
               const childConversationId = prep && prep.childConversationId ? String(prep.childConversationId) : null;
@@ -302,33 +277,10 @@ entire message history).
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
 
-              // Remove the full message history from the result to keep tool output small.
-              let result = data;
-              try {
-                if (conversation && typeof conversation === 'object') {
-                  result = {
-                    ...(data && typeof data === 'object' ? data : {}),
-                    conversation: {
-                      ...conversation,
-                      messages: lastMessage ? [lastMessage] : [],
-                    },
-                  };
-                } else if (data && typeof data === 'object' && Array.isArray((data).messages)) {
-                  result = {
-                    ...data,
-                    messages: lastMessage ? [lastMessage] : [],
-                  };
-                }
-              } catch (e) {
-                // best-effort only
-                result = data;
-              }
-
               return {
                 childConversationId,
                 success,
                 status,
-                result,
                 lastMessage,
                 message: success
                   ? 'Agent call in existing child conversation completed successfully'
@@ -374,7 +326,7 @@ export const agentCallToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentCallTool.blueprint,
 
   slug: 'call-agent',
-  version: '1.0.4',
+  version: '1.0.7',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Handle this request" }] } // delegate with messages\n{ "slug": "analyzer", "input": "Analyze this data in a child conversation" } // delegate with simple text',

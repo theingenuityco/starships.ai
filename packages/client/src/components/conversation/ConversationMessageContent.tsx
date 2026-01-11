@@ -471,6 +471,16 @@ export function ConversationMessageContent({
     return null as any
   }, [displayContent])
 
+  const widgetUIAction = useMemo(() => {
+    const p = parsedJson
+    if (!p || typeof p !== 'object') return null
+    const action = (p as any).__ui_action
+    if (action !== 'widget_created' && action !== 'widget_updated') return null
+    const widget = (p as any).widget
+    if (!isWidgetLike(widget)) return null
+    return { action: String(action), widget: widget as WidgetLike }
+  }, [parsedJson])
+
   // Collapsible should always start closed; users can expand manually
 
   // Natural language header with tense and inline code chips for tool names (no 'tool' word):
@@ -687,6 +697,9 @@ export function ConversationMessageContent({
 
   // Widget detection: Extract widgets from tool results
   const widgetResults = useMemo(() => {
+    // Prefer ui_action-driven rendering (durable system_notification messages).
+    // Tool-result widget detection remains as a backwards-compatible fallback.
+    if (widgetUIAction) return []
     if (!Array.isArray(toolResults) || toolResults.length === 0) return []
 
     return toolResults
@@ -757,11 +770,39 @@ export function ConversationMessageContent({
       )}
 
       {/* Unified markdown rendering - message content at normal size */}
-      {messageType !== 'tool_result' && (
+      {messageType !== 'tool_result' && !widgetUIAction && (
         <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content">
           <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
             {displayContent}
           </ReactMarkdown>
+        </div>
+      )}
+
+      {/* UI action widget rendering (preferred path) */}
+      {widgetUIAction && messageType !== 'tool_result' && (
+        <div className="space-y-4 mt-3 w-full max-w-none">
+          <div className="w-full max-w-none mb-4">
+            <div className="text-sm w-full mb-4">
+              <div className="flex items-baseline gap-1">
+                <span className="text-muted-foreground">{widgetUIAction.action === 'widget_updated' ? 'Updated' : 'Created'}</span>
+                <span className="font-medium">{(widgetUIAction.widget as any)?.name || 'Widget'}</span>
+              </div>
+              {(widgetUIAction.widget as any)?.description && (
+                <div className="text-muted-foreground text-xs mt-1">{String((widgetUIAction.widget as any).description)}</div>
+              )}
+            </div>
+
+            <div className="relative w-full max-w-none overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <InlineWidgetRenderer
+                widget={{
+                  widgetType: String((widgetUIAction.widget as any).widgetType),
+                  props: (widgetUIAction.widget as any).props as Record<string, any>,
+                }}
+                compactMode={true}
+                className="w-full"
+              />
+            </div>
+          </div>
         </div>
       )}
 
@@ -934,7 +975,7 @@ export function ConversationMessageContent({
       )}
 
       {/* Widget rendering: Display widgets inline when created/updated */}
-      {widgetResults.length > 0 && messageType !== 'tool_result' && (
+      {widgetResults.length > 0 && messageType !== 'tool_result' && !widgetUIAction && (
         <div className="space-y-4 mt-3 w-full max-w-none">
           {widgetResults.map(widget => {
             // Check if widget creation is pending (tool called but no result yet)

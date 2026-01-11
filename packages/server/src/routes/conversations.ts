@@ -756,6 +756,62 @@ router.post(
         runnerConfig: engineConfig,
       });
 
+      // -----------------------------------------------------------------------
+      // Widget UI actions (durable + explicit)
+      //
+      // For dynamic UI rendering, we emit a first-class ui_action and also persist
+      // an idempotent message that replays on refresh/snapshot.
+      // -----------------------------------------------------------------------
+      try {
+        const isWidgetTool = toolSlug === 'create-widget' || toolSlug === 'update-widget';
+        const rAny = result as any;
+        const isWidgetResult =
+          rAny &&
+          typeof rAny === 'object' &&
+          typeof rAny.widgetType === 'string' &&
+          rAny.props &&
+          typeof rAny.props === 'object' &&
+          typeof rAny.id === 'string';
+
+        if (isWidgetTool && isWidgetResult) {
+          const action = toolSlug === 'create-widget' ? 'widget_created' : 'widget_updated';
+          const payload = {
+            __ui_action: action,
+            conversationId,
+            toolCallId,
+            widget: result,
+          } as const;
+
+          const bus = ConversationStreamBus.getInstance();
+          await bus.publish(conversationId, { type: 'ui_action', data: payload } as ConversationStreamEvent);
+
+          // Persist as a replayable message keyed by toolCallId (idempotent).
+          const messageService = new MessageService();
+          const persisted = await messageService.upsertMessageByTurnSlot({
+            conversationId,
+            turnId: `ui_action:${toolCallId}`,
+            turnSeq: 0,
+            role: 'assistant',
+            messageType: 'system_notification',
+            content: JSON.stringify(payload),
+            ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
+          } as any);
+
+          await bus.publish(conversationId, {
+            type: 'message.append',
+            data: { conversationId, message: persisted },
+          } as ConversationStreamEvent);
+        }
+      } catch (e) {
+        // Best-effort: tool execution succeeded; UI action emission should not fail the tool call.
+        console.warn('[tool-calls/authorize-and-maybe-execute] Failed to emit widget ui_action', {
+          conversationId,
+          toolSlug,
+          toolCallId,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
+
       sendSuccess(res, { toolCallId, result }, 200);
     } catch (e) {
       const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;

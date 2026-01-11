@@ -108,10 +108,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
                   </div>
                 </TooltipProvider>
               </UserbackWrapper>
+              <AnalyticsProvider />
             </AuthProvider>
           </QueryProvider>
         </ThemeProvider>
-        <AnalyticsProvider />
       </body>
     </html>
   )

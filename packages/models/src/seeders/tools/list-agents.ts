@@ -124,5 +124,3 @@ export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   requiresApiKey: false,
   configurationFields: [],
 };
-
-

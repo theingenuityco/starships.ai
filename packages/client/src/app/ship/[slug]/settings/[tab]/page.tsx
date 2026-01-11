@@ -65,10 +65,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <span>Billing</span>
                   </TabsTrigger>
                   {showAnalytics ? (
-                    <TabsTrigger
-                      value="usage"
-                      className="gap-2 rounded-xl px-3 py-1 border border-border/50 hover:border-border/80"
-                    >
+                    <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1 border border-border/50 hover:border-border/80">
                       <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
                       <span>Analytics</span>
                     </TabsTrigger>

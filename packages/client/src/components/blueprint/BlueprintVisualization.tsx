@@ -474,9 +474,13 @@ const CustomBlueprintNode: React.FC<{ data: ReactFlowNode['data'] & { outgoingEd
 }
 
 // Use ELK (Eclipse Layout Kernel) with SCC condensation
-const elk = new ELK()
+// IMPORTANT: Do NOT instantiate ELK at module scope.
+// Even in `'use client'` components, Next.js will evaluate modules in the server bundle,
+// and ELK may attempt to create a Worker (which isn't available in SSR).
+let elk: InstanceType<typeof ELK> | null = null
 
 const getElkLayout = async (nodes: ReactFlowNode[], edges: Edge[]) => {
+  if (!elk) elk = new ELK()
   const graph = {
     id: 'root',
     layoutOptions: {

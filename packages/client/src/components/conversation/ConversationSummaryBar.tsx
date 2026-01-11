@@ -51,6 +51,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   // Token indicator: utilization (server totals) vs max (model context window)
   const { data: totalsData } = useConversationUsageTotals(conversationId)
   const totalTokens = Number(totalsData?.totalTokens ?? 0)
+  const totalCost = Number(totalsData?.cost ?? 0)
   const primaryModelId = useMemo(() => {
     const override = typeof modelId === 'string' && modelId.trim().length > 0 ? modelId.trim() : null
     if (override) return override
@@ -119,6 +120,14 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                       <span className="opacity-50 font-medium tabular-nums">—/—</span>
                     </span>
                   </span>
+                  {/* Cost placeholder (reserved space) */}
+                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
+                      <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
+                      <span className="opacity-50 font-medium tabular-nums">$—</span>
+                    </span>
+                  </span>
                 </div>
               </div>
             </div>
@@ -153,6 +162,21 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   const max = ctx ?? overrideMax ?? fallbackMaxTokens
   const pct = max ? Math.max(0, Math.min(100, (totalTokens / max) * 100)) : null
   const isOver = Boolean(max && totalTokens > max)
+
+  const formatUSD2 = (v: number) => {
+    if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.00'
+    return `$${v.toFixed(2)}`
+  }
+
+  const CostPill = () => (
+    <span
+      className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px] bg-muted/60 border-border/50 text-muted-foreground"
+      title={`${formatUSD2(totalCost)} spent`}
+    >
+      <Icon name="coins" className="h-3 w-3 text-amber-500" />
+      <span className="font-semibold tabular-nums text-foreground">{formatUSD2(totalCost)}</span>
+    </span>
+  )
 
   const TokensPill = () => (
     <span
@@ -224,6 +248,12 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                       <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                       <TokensPill />
                     </span>
+
+                    {/* Cost burn */}
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                      <CostPill />
+                    </span>
                   </>
                 ) : (
                   <>
@@ -231,6 +261,10 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                       <TokensPill />
+                    </span>
+                    <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                      <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                      <CostPill />
                     </span>
                   </>
                 )}

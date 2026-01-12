@@ -45,6 +45,7 @@ export const docsSearchTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'search-docs',
+          failOnNon2xx: true,
           args: '{{ lastOutputOf("prepare") }}',
           timeout: 5000,
         },
@@ -96,7 +97,7 @@ export const docsSearchToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: docsSearchTool.blueprint,
 
   slug: 'search-docs',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'data',
   exampleUsage: '{ "q": "tools", "limit": 10 } // returns search results; env baseUrl inferred',
   requiresApiKey: false,

@@ -56,6 +56,7 @@ export const agentUnassignToolTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-agent',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).agentSlug }}',
@@ -99,6 +100,7 @@ export const agentUnassignToolTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'unassign-agent-tool',
+          failOnNon2xx: true,
           args: {
             agentId: '{{ (lastOutputOf("update_tools") || {}).agentId }}',
             toolSlug: '{{ (lastOutputOf("update_tools") || {}).toolSlug }}',
@@ -137,7 +139,7 @@ export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   blueprint: agentUnassignToolTool.blueprint,
 
   slug: 'unassign-agent-tool',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // remove wikipedia tool from support agent',
   requiresApiKey: false,

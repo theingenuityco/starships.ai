@@ -56,6 +56,7 @@ export const agentAssignToolTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-agent',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).agentSlug }}',
@@ -106,6 +107,7 @@ export const agentAssignToolTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'assign-agent-tool',
+          failOnNon2xx: true,
           args: {
             agentId: '{{ (lastOutputOf("update_tools") || {}).agentId }}',
             toolSlug: '{{ (lastOutputOf("update_tools") || {}).toolSlug }}',
@@ -144,7 +146,7 @@ export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'create
   blueprint: agentAssignToolTool.blueprint,
 
   slug: 'assign-agent-tool',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // assign wikipedia tool to support agent',
   requiresApiKey: false,

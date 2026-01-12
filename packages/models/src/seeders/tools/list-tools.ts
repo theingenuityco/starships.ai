@@ -25,6 +25,7 @@ export const toolListTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'list-tools',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
           },
@@ -88,7 +89,7 @@ export const toolListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolListTool.blueprint,
 
   slug: 'list-tools',
-  version: '1.0.4',
+  version: '1.0.6',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of tools; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

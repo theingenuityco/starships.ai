@@ -92,6 +92,7 @@ export const toolOpenTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'create-tool',
+          failOnNon2xx: true,
           args: '{{ (lastOutputOf("prepare") || {}).args }}',
           timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
         },
@@ -104,6 +105,7 @@ export const toolOpenTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-tool',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
@@ -112,25 +114,15 @@ export const toolOpenTool: ToolParams = {
         },
       },
       {
-        ref: 'unwrap_or_throw',
+        ref: 'unwrap',
         type: 'code',
-        name: 'Unwrap (or Throw)',
-        description: 'If connector response is non-2xx, throw; else return body.data (or body)',
+        name: 'Unwrap',
+        description: 'Return body.data/body.error where applicable; otherwise return body/resp',
         parameters: {
           code: `
             async function main(ctx) {
               const resp = ctx.lastOutputOf('create_tool') || ctx.lastOutputOf('get_tool') || {};
-              const status = resp && typeof resp === 'object' ? resp.status : undefined;
               const body = resp && typeof resp === 'object' ? resp.body : undefined;
-
-              if (typeof status === 'number' && (status < 200 || status >= 300)) {
-                const errObj = body && typeof body === 'object' ? (body.error ?? body) : body;
-                const msg =
-                  errObj && typeof errObj === 'object' && typeof errObj.message === 'string'
-                    ? errObj.message
-                    : 'Request failed (' + String(status) + ')';
-                throw new Error(msg);
-              }
 
               if (body && typeof body === 'object') {
                 if (body.success === true) return body.data ?? body;
@@ -148,7 +140,7 @@ export const toolOpenTool: ToolParams = {
         name: 'End',
         description: 'Return tool model (created or fetched)',
         parameters: {
-          output: '{{ lastOutputOf("unwrap_or_throw") }}',
+          output: '{{ lastOutputOf("unwrap") }}',
         },
       },
     ],
@@ -156,10 +148,10 @@ export const toolOpenTool: ToolParams = {
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'route_mode' },
       { ref: 'e3', from: 'route_mode', to: 'create_tool', condition: 'true' },
-      { ref: 'e4', from: 'create_tool', to: 'unwrap_or_throw' },
+      { ref: 'e4', from: 'create_tool', to: 'unwrap' },
       { ref: 'e5', from: 'route_mode', to: 'get_tool', condition: 'false' },
-      { ref: 'e6', from: 'get_tool', to: 'unwrap_or_throw' },
-      { ref: 'e7', from: 'unwrap_or_throw', to: 'end_1' },
+      { ref: 'e6', from: 'get_tool', to: 'unwrap' },
+      { ref: 'e7', from: 'unwrap', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -175,7 +167,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolOpenTool.blueprint,
 
   slug: 'open-tool',
-  version: '1.0.5',
+  version: '1.0.6',
   category: 'automation',
   exampleUsage:
     '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (server generates slug; env inferred)',

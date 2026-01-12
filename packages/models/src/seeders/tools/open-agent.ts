@@ -139,6 +139,7 @@ export const agentOpenTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'create-agent',
+          failOnNon2xx: true,
           args: '{{ (lastOutputOf("prepare") || {}).args }}',
           timeout: '{{ (lastOutputOf("prepare") || {}).timeout }}',
         },
@@ -151,6 +152,7 @@ export const agentOpenTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-agent',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
@@ -190,7 +192,7 @@ export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentOpenTool.blueprint,
 
   slug: 'open-agent',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',

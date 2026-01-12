@@ -84,6 +84,7 @@ export const toolEditTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-tool',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
@@ -125,6 +126,7 @@ export const toolEditTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'update-tool',
+          failOnNon2xx: true,
           args: '{{ lastOutputOf("prepare_update") }}',
           timeout: 10000,
         },
@@ -160,7 +162,7 @@ export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolEditTool.blueprint,
 
   slug: 'edit-tool',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
   requiresApiKey: false,

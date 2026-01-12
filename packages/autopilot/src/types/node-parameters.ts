@@ -81,6 +81,14 @@ export interface ConnectorActionParams extends BaseParams {
   connector: string;
   action: string;
   args?: Record<string, unknown>;
+  /**
+   * When true, throw an Error for non-2xx HTTP-like responses returned by the connector.
+   *
+   * NOTE: connector_action is intentionally "low level" by default (does not throw on non-2xx),
+   * because many workflows want to branch/handle errors in-graph. This flag provides an opt-in
+   * strict mode to avoid repeating status-check boilerplate in code nodes.
+   */
+  failOnNon2xx?: boolean;
   timeout?: number;
 }
 

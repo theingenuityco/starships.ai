@@ -111,6 +111,7 @@ export const blueprintModifyEdgeTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-tool',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).toolSlug }}',
@@ -340,6 +341,7 @@ export const blueprintModifyEdgeTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'update-tool',
+          failOnNon2xx: true,
           args: '{{ (() => { const result = lastOutputOf("modify_edge") || {}; return { toolId: result.toolData && result.toolData.id ? String(result.toolData.id) : "", blueprint: result.updatedBlueprint }; })() }}',
           timeout: 10000,
         },
@@ -377,7 +379,7 @@ export const toolModifyBlueprintEdgeToolTemplate: Omit<
   blueprint: blueprintModifyEdgeTool.blueprint,
 
   slug: 'modify-tool-blueprint-edge',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage:
     '{ "toolSlug": "my-tool", "op": "add", "edge": { "ref": "edge_process", "from": "start", "to": "process" } }',

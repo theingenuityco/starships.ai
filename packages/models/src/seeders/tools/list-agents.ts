@@ -41,6 +41,7 @@ export const agentListTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'list-agents',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
           },
@@ -102,7 +103,7 @@ export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentListTool.blueprint,
 
   slug: 'list-agents',
-  version: '1.0.3',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of agents; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,

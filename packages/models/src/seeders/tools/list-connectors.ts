@@ -25,6 +25,7 @@ export const connectorsListTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'list-connectors',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ String(env("STARSHIP_ID") ?? "") }}',
           },
@@ -83,7 +84,7 @@ export const connectorsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'created
   blueprint: connectorsListTool.blueprint,
 
   slug: 'list-connectors',
-  version: '1.0.2',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage:
     '{} // returns ConnectorListResponse { connectors[] }, where each connector has provider, status, scopes (if applicable), and lastError (if any); env is inferred',

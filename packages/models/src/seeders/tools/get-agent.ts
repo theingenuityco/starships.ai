@@ -51,6 +51,7 @@ export const agentGetTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-agent',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
@@ -84,7 +85,7 @@ export const agentGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: agentGetTool.blueprint,
 
   slug: 'get-agent',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{ "slug": "customer-support" } // returns complete agent details',
   requiresApiKey: false,

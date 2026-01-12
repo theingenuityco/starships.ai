@@ -71,6 +71,7 @@ export const toolTestTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-tool',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ lastOutputOf("prepare").slug }}',
@@ -178,7 +179,7 @@ export const toolTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolTestTool.blueprint,
 
   slug: 'test-tool',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{ "targetSlug": "my-tool", "arguments": { ... } } // returns { ok, durationMs, result } (env inferred)',
   requiresApiKey: false,

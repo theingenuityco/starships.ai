@@ -108,4 +108,3 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
     </StarTheme>
   )
 }
-

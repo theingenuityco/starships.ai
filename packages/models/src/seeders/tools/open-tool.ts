@@ -25,7 +25,7 @@ export const toolOpenTool: ToolParams = {
       },
       description: {
         type: 'string',
-        description: 'Description (required when creating a new tool)',
+        description: 'Description (required when creating a new tool; max 320 characters)',
       },
     },
     required: [],

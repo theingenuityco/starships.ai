@@ -9,7 +9,7 @@ export const connectorsListTool: ToolParams = {
   name: 'List Connectors',
   slug: 'list-connectors',
   description:
-    'List connectors available/configured for the current starship, including connection status and scopes/keys where applicable. Useful before building tools that rely on third-party services.',
+    'List connectors available/configured for the current starship. Returns a lean array (provider, status, authType, scopes, actions). Useful before building tools that rely on third-party services.',
   parameters: {
     type: 'object',
     properties: {},
@@ -35,8 +35,8 @@ export const connectorsListTool: ToolParams = {
       {
         ref: 'summarize',
         type: 'code',
-        name: 'Normalize Connector Response',
-        description: 'Unwrap the HTTP ApiResponse and return the ConnectorListResponse payload as-is for agents',
+        name: 'Summarize Connectors',
+        description: 'Unwrap ApiResponse and return a lean connector list',
         parameters: {
           code: `
             async function main(ctx) {
@@ -51,8 +51,40 @@ export const connectorsListTool: ToolParams = {
                 throw new Error('Invalid connector response shape: expected { data: { connectors: [] } }');
               }
 
-              // Return the HTTP response schema's payload (ConnectorListResponse)
-              return payload.data;
+              const data = payload.data;
+              const connectors = data && typeof data === 'object' && Array.isArray(data.connectors) ? data.connectors : [];
+
+              // Return a lean list to avoid sending connector template runtime fields (endpoints/baseUrl/etc)
+              return connectors
+                // Hide the internal Starships connector; it's always present and not actionable for users.
+                .filter((c) => !(c && typeof c === 'object' && c.provider === 'starships'))
+                .map((c) => {
+                const template = c && typeof c === 'object' ? c.template : null;
+                const auth = template && typeof template === 'object' ? template.auth : null;
+                const authType = auth && typeof auth === 'object' && typeof auth.type === 'string' ? auth.type : undefined;
+                const scopes = c && typeof c === 'object' && Array.isArray(c.scopes) ? c.scopes.filter((s) => typeof s === 'string') : undefined;
+                const endpointsRaw = template && typeof template === 'object' && Array.isArray(template.endpoints) ? template.endpoints : undefined;
+                const actions =
+                  endpointsRaw && endpointsRaw.length > 0
+                    ? endpointsRaw
+                        .map((e) => {
+                          if (!e || typeof e !== 'object') return null;
+                          const name = typeof e.name === 'string' ? e.name : undefined;
+                          const schema = e.parameters && typeof e.parameters === 'object' ? e.parameters : undefined;
+                          if (!name) return null;
+                          return { name, ...(schema ? { schema } : {}) };
+                        })
+                        .filter(Boolean)
+                    : undefined;
+
+                return {
+                  provider: c && typeof c === 'object' ? c.provider : undefined,
+                  status: c && typeof c === 'object' ? c.status : undefined,
+                  authType,
+                  ...(scopes && scopes.length > 0 ? { scopes } : {}),
+                  ...(actions && actions.length > 0 ? { actions } : {}),
+                };
+              });
             }
           `,
           timeout: 2000,
@@ -84,10 +116,10 @@ export const connectorsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'created
   blueprint: connectorsListTool.blueprint,
 
   slug: 'list-connectors',
-  version: '1.0.4',
+  version: '1.0.10',
   category: 'automation',
   exampleUsage:
-    '{} // returns ConnectorListResponse { connectors[] }, where each connector has provider, status, scopes (if applicable), and lastError (if any); env is inferred',
+    '{} // returns lean connectors[]: { provider, status, authType?, scopes?, actions?: [{ name, schema? }] } (starships connector omitted)',
   requiresApiKey: false,
   configurationFields: [],
 };

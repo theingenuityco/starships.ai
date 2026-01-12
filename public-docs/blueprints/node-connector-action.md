@@ -21,6 +21,7 @@ Specification (authoritative)
   - connector: string (required) — connector slug/provider (e.g. `"starships"` or any provider configured via `connector_templates`)
   - action: string (required) — endpoint name from the connector template (e.g. `"list-issues"`)
   - args?: Record<string, unknown> (optional)
+  - failOnNon2xx?: boolean (optional; default false) — when true, the node throws on non-2xx responses
   - timeout?: number (ms; default 30000)
 
 Execution behavior
@@ -39,6 +40,27 @@ Execution behavior
 ```ts
 { status: number, statusText: string, headers: Record<string, unknown>, body: unknown, url: string }
 ```
+
+Error behavior (important)
+
+- `connector_action` **does not throw by default** on non-2xx HTTP statuses.
+  - Non-2xx responses are returned as normal output via the `{ status, body, ... }` wrapper.
+  - If you want a non-2xx connector call to be treated as a workflow/tool failure, you can enable:
+    - `parameters.failOnNon2xx: true` (recommended when you want “fail-fast” behavior)
+  - Alternatively (or when you want custom logic), you can still **explicitly throw** via a downstream `code` node that checks `status`.
+
+Example pattern (throw on non-2xx)
+
+Option A (preferred): enable `failOnNon2xx` on the connector_action node and only unwrap in code
+
+```js
+async function main(ctx) {
+  const resp = ctx.lastOutputOf('some_connector_action') || {};
+  return resp?.body?.data ?? resp?.body;
+}
+```
+
+Option B: explicit throw in code (when you need conditional handling)
 
 Validation rules
 
@@ -91,6 +113,13 @@ Example (as used by the default Agent blueprint):
 ```
 
 On failure, the Starships endpoint may respond with an error code like `TOOL_APPROVAL_REQUIRED`; the default Agent blueprint stops the workflow turn in that case.
+
+Note on response semantics (Starships hosted)
+
+- The `authorize-and-maybe-execute-tool` endpoint returns an **application-level contract** (typically over HTTP 200):
+  - success: `{ success: true, data: { toolCallId, result } }`
+  - error: `{ success: false, error: { code, message, details } }`
+- In the default Agent loop, tool call success/failure is determined by this envelope. The Agent loop does not inspect the inner `result` payload to infer failure.
 
 Template rules (full-string only)
 

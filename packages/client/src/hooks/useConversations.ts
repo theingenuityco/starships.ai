@@ -1,6 +1,7 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type {
   ApiResponse,
+  AgentModel,
   ConversationModel,
   ConversationState,
   ConversationStreamEvent,
@@ -120,8 +121,10 @@ export function useCreateConversation() {
 export function useStarshipConversations(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
-      const response: FetchResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
+    queryFn: async (): Promise<{ conversations: Array<ConversationModel & { agents: AgentModel[] }> }> => {
+      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(
+        `/api/v1/starships/${starshipId}/conversations`
+      )
       return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,

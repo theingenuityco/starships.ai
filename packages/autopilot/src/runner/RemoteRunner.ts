@@ -68,7 +68,7 @@ export class RemoteRunner implements Runner {
       let finalResult: ExecutionItem[] | undefined = undefined;
 
       type CompletedPayload = { duration_ms?: number; result_json?: string };
-      type ErrorPayload = { error?: { message?: string } };
+      type ErrorPayload = { error?: { message?: string; cause?: unknown } };
 
       const emit = async (name: 'message' | 'completed' | 'error', data: unknown) => {
         if (name === 'message') {
@@ -89,7 +89,11 @@ export class RemoteRunner implements Runner {
         }
 
         const env = data as ErrorPayload;
-        throw new Error(String(env?.error?.message || 'stream error'));
+        const e = new Error(String(env?.error?.message || 'stream error'));
+        if (env?.error && 'cause' in env.error) {
+          (e as unknown as { cause?: unknown }).cause = env.error.cause;
+        }
+        throw e;
       };
 
       // Minimal SSE parser

@@ -13,13 +13,15 @@ import {
   IsString,
   Length,
   validate,
-  ValidationError,
+  ValidationError as ClassValidatorValidationError,
   IsOptional,
   IsObject,
   IsNumber,
   IsBoolean,
   IsArray,
 } from 'class-validator';
+import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
+import { ValidationError } from '@starships/errors';
 
 export class ToolTemplateEntity implements ToolTemplateModel {
   // Core database fields
@@ -49,7 +51,7 @@ export class ToolTemplateEntity implements ToolTemplateModel {
 
   @Expose()
   @IsString()
-  @Length(0, 4000) // Increased to allow richly documented tool descriptions used by management tools
+  @Length(0, TOOL_DESCRIPTION_MAX_LENGTH)
   description!: string;
 
   @Expose()
@@ -122,7 +124,7 @@ export class ToolTemplateEntity implements ToolTemplateModel {
    */
   static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
-      throw new Error('Data must be an object');
+      throw new ValidationError('Data must be an object');
     }
     const dataRecord = data as Record<string, unknown>;
     const entity = new ToolTemplateEntity();
@@ -161,8 +163,12 @@ export class ToolTemplateEntity implements ToolTemplateModel {
     });
 
     if (errors.length > 0) {
-      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
-      throw new Error(`Validation failed: ${errorMessages}`);
+      const fieldErrors = errors.map((e: ClassValidatorValidationError) => ({
+        field: e.property || 'unknown',
+        message: Object.values(e.constraints || {}).join(', '),
+      }));
+      const message = `Validation failed: ${fieldErrors.map((e) => `${e.field}: ${e.message}`).join('; ')}`;
+      throw new ValidationError(message, fieldErrors[0]?.field, { fieldErrors });
     }
   }
 }

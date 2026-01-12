@@ -680,6 +680,13 @@ export class ConversationService {
   }
 
   /**
+   * Get conversations by starship (includes linked agents)
+   */
+  async getConversationsByStarshipWithAgents(starshipId: string): Promise<Array<ConversationModel & { agents: AgentModel[] }>> {
+    return this.conversationRepository.findByStarshipWithAgents(starshipId);
+  }
+
+  /**
    * Link conversation to starship
    */
   async linkConversationToStarship(conversationId: string, starshipId: string): Promise<void> {

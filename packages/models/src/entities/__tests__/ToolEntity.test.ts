@@ -8,6 +8,7 @@
 import { ToolEntity } from '@/entities/ToolEntity';
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { EntityTestHelper } from './entity-test-helper';
+import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
 
 describe('ToolEntity', () => {
   let testHelper: EntityTestHelper<ToolEntity>;
@@ -242,7 +243,7 @@ describe('ToolEntity', () => {
           slug: 'test-tool',
           starshipId: 'starship-456',
           name: 'Test Tool',
-          description: 'a'.repeat(4001),
+          description: 'a'.repeat(TOOL_DESCRIPTION_MAX_LENGTH + 1),
           parameters: { type: 'object', properties: {} },
           blueprint: { nodes: [], edges: [] },
         })

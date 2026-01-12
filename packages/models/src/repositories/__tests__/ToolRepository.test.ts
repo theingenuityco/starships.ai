@@ -306,6 +306,7 @@ describe('ToolRepository', () => {
 
       const result = await repository.update('tool-1', updates);
 
+      expect(ToolEntity.validate).toHaveBeenCalled();
       expect(result).not.toBeNull();
       expect(result!.name).toBe('Updated Tool');
     });

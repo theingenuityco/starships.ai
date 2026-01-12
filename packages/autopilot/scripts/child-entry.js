@@ -160,9 +160,12 @@ process.on('message', async (msg) => {
 
     safeSend({ type: 'done', result });
   } catch (err) {
+    // Preserve Error.cause across IPC when present (e.g. connector_action failOnNon2xx attaches
+    // the raw connector response as `cause` and the parent/server can use it to preserve error codes).
     const errorPayload = {
       message: err && err.message ? String(err.message) : String(err),
       stack: err && err.stack ? String(err.stack) : undefined,
+      cause: err && typeof err === 'object' && err.cause !== undefined ? sanitizeForIpc(err.cause) : undefined,
     };
     safeSend({ type: 'error', error: errorPayload });
   }

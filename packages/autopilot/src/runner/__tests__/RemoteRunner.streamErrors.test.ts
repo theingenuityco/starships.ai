@@ -44,6 +44,38 @@ describe('RemoteRunner (SSE)', () => {
     await expect(runner.run(blueprint, execution, { eventCallback: jest.fn() })).rejects.toThrow('boom');
   });
 
+  it('preserves error.cause when the runner includes it in SSE error payload', async () => {
+    autopilot.setRunnerConfig({ url: 'http://runner.test' });
+
+    const body = createSseBody([
+      ':ok\n\n',
+      'event: error\n',
+      'data: {"error":{"message":"boom","cause":{"status":400,"body":{"success":false,"error":{"code":"VALIDATION_ERROR","message":"bad"}}}}}\n\n',
+    ]);
+
+    const fetchMock = globalThis.fetch as unknown as jest.Mock;
+    fetchMock.mockResolvedValue({
+      ok: true,
+      status: 200,
+      statusText: 'OK',
+      body,
+    });
+
+    const runner = new RemoteRunner();
+    const blueprint = globalThis.createMockBlueprint() as Blueprint;
+    const execution = globalThis.createMockExecution() as Execution;
+
+    try {
+      await runner.run(blueprint, execution, { eventCallback: jest.fn() });
+      throw new Error('expected runner to throw');
+    } catch (e) {
+      expect(e).toBeInstanceOf(Error);
+      const err = e as unknown as { message?: string; cause?: unknown };
+      expect(err.message).toBe('boom');
+      expect(err.cause).toMatchObject({ status: 400 });
+    }
+  });
+
   it('rejects if the stream ends without a completed event', async () => {
     autopilot.setRunnerConfig({ url: 'http://runner.test' });
 

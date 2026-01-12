@@ -573,7 +573,28 @@ export class Agent implements NodeHandler {
             const toolCallId = tc?.id ?? '';
             const resp = ctx.lastOutputOf("${httpNodeRef}") || {};
             const body = resp?.body || {};
-            const content = JSON.stringify(body);
+            // Normalize tool output:
+            // - Success: unwrap server envelope -> data.result (or data)
+            // - Error: unwrap server envelope -> error (or body)
+            // This keeps tool result content consistent across success/failure and avoids
+            // leaking transport-level wrappers to the model/UI.
+            let payload = body;
+            if (body && typeof body === 'object') {
+              const rec = body;
+              const isSuccess = rec.success === true;
+              const isError = rec.success === false;
+              if (isSuccess) {
+                const data = rec.data;
+                if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'result')) {
+                  payload = data.result;
+                } else {
+                  payload = data != null ? data : body;
+                }
+              } else if (isError) {
+                payload = rec.error != null ? rec.error : body;
+              }
+            }
+            const content = typeof payload === 'string' ? payload : JSON.stringify(payload);
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
             const nextIdx = idx + 1;

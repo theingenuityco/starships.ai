@@ -17,7 +17,7 @@ export default function PrivacyPolicyPage() {
               Privacy Policy
             </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-              Last updated: October 2025
+              Last updated: January 2026
             </p>
           <p className="mt-4 text-sm text-muted-foreground">
             This Privacy Policy explains how Starships.ai (&quot;we&quot;, &quot;us&quot;, or &quot;our&quot;) collects, uses, and protects personal

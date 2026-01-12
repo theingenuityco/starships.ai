@@ -8,7 +8,6 @@ import Security from '@/app/components/Security'
 import PricingTeaser from '@/app/components/PricingTeaser'
 import FAQ from '@/app/components/FAQ'
 import FinalCTA from '@/app/components/FinalCTA'
-import MarketplaceTeaser from '@/app/components/MarketplaceTeaser'
 import StarryBackground from '@/app/components/StarryBackground'
 import BackToTop from '@/app/components/BackToTop'
 
@@ -55,7 +54,6 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
           <Hero initialAgentTemplates={initialAgentTemplates} />
           <HeroDemoSection initialAgentTemplates={initialAgentTemplates} />
           <UseCases />
-          <MarketplaceTeaser initialAgentTemplates={initialAgentTemplates} initialToolTemplates={initialToolTemplates} />
           <Security />
           <PricingTeaser />
           <FAQ />
@@ -68,7 +66,7 @@ export default function HomePageClient(props: { initialAgentTemplates?: AgentTem
             <div className="max-w-6xl mx-auto relative">
               <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                 <div className="mb-6 md:mb-0 text-center md:text-left">
-                  <p className="text-muted-foreground mb-2">© 2025 Starships.ai - Where Ideas meet Intelligence</p>
+                  <p className="text-muted-foreground mb-2">© 2026 Starships.ai - Where Ideas meet Intelligence</p>
                   <p className="text-muted-foreground text-sm">
                     🪐 Manifested by{' '}
                     <a

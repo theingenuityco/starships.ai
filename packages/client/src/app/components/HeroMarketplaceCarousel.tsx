@@ -1,7 +1,7 @@
 'use client'
 
 import AgentAvatar from '@/components/animated/AgentAvatar'
-import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from '@/components/ui/carousel'
+import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import { useRouter } from 'next/navigation'
@@ -104,7 +104,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
 
   return (
     <div ref={containerRef} className="w-full max-w-6xl mx-auto mt-4 sm:mt-6 mb-14 sm:mb-16">
-      <Carousel className="w-full" opts={{ loop: true, align: 'center' }} setApi={setCarouselApi} onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
+      <Carousel className="w-full px-2 sm:px-4 md:px-8" opts={{ loop: true, align: 'center' }} setApi={setCarouselApi} onMouseEnter={() => setIsHovering(true)} onMouseLeave={() => setIsHovering(false)}>
         {/* Use `!` important utilities so we truly override CarouselContent's default `-ml-4` */}
         <CarouselContent className="!-ml-1 sm:!-ml-2">
           {agentTemplatesLoading
@@ -153,6 +153,8 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
                 )
               })}
         </CarouselContent>
+        <CarouselPrevious className="hidden md:inline-flex" />
+        <CarouselNext className="hidden md:inline-flex" />
       </Carousel>
     </div>
   )

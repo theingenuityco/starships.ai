@@ -17,7 +17,7 @@ export default function TermsOfServicePage() {
             Terms of Service
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Last updated: October 2025
+            Last updated: January 2026
           </p>
           <p className="mt-4 text-sm text-muted-foreground">
             These Terms of Service (&quot;Terms&quot;) govern your access to and use of the Starships.ai platform and related

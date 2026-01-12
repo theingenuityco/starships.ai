@@ -261,10 +261,6 @@ export function StarshipUpgradeSection({ starshipId }: StarshipUpgradeSectionPro
                 </div>
               </div>
             ) : null}
-            <p className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Icon name="external-link" className="h-3.5 w-3.5" />
-              You will be redirected to Stripe to complete your payment.
-            </p>
           </>
         ) : (
           <div className="text-sm text-muted-foreground">No upgrade plans available.</div>

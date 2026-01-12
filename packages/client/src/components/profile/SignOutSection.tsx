@@ -2,7 +2,7 @@
 
 import React from 'react'
 import Icon from '@/components/primitives/Icon'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
@@ -23,14 +23,13 @@ export default function SignOutSection({ onSignOut, onNavigateHome }: SignOutSec
 
   return (
     <Card className={PROFILE_SECTION_CARD_CLASS}>
-      <CardHeader>
+      <CardHeader className="pb-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-destructive">Sign Out</h3>
-            <p className="text-sm text-muted-foreground">End your current session</p>
-          </div>
-          <Button variant="destructive" className="gap-2" onClick={handleSignOut}>
-            <Icon name="log-out" className="w-4 h-4" />
+          <CardTitle className="text-base flex items-center gap-2">
+            <Icon name="log-out" className="h-4 w-4 text-primary" />
+            End Session
+          </CardTitle>
+          <Button variant="destructive" onClick={handleSignOut}>
             Sign Out
           </Button>
         </div>

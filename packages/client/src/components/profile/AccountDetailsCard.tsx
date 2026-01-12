@@ -37,12 +37,11 @@ export default function AccountDetailsCard({
           <Icon name="id-card" className="h-4 w-4 text-primary" />
           Account details
         </CardTitle>
-        <CardDescription className="text-sm">Keep your personal information accurate.</CardDescription>
       </CardHeader>
       <CardContent className="flex flex-1 flex-col gap-5">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
-            <Label htmlFor="displayName">Display name</Label>
+            <Label htmlFor="displayName">Name</Label>
             <div className="relative">
               <Input
                 id="displayName"
@@ -56,7 +55,7 @@ export default function AccountDetailsCard({
             </div>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
               <Input
@@ -70,9 +69,6 @@ export default function AccountDetailsCard({
               />
               <Icon name="mail" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
             </div>
-            {!pendingEmailChange && (
-              <p className="text-[11px] text-muted-foreground">Changing email will send a verification email to the new address.</p>
-            )}
           </div>
         </div>
 

@@ -71,7 +71,7 @@ export default function AccountForm() {
       <form
         id="account-form"
         onSubmit={onSave}
-        className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start"
+        className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[520px_1fr] xl:items-start"
       >
         <div className="space-y-6">
           <ProfileOverviewCard

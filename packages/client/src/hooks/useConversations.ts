@@ -527,7 +527,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const url = `/api/v1/conversations/${convId}/messages?stream=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
 
     // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'useConversations.ts:makeSSEAsyncIterable',message:'SSE connect',data:{convId,hasCursor:!!cursor,cursor:cursor?String(cursor).slice(0,32):null,urlHasCursor:!!cursor},timestamp:Date.now()})}).catch(()=>{});
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'useConversations.ts:makeSSEAsyncIterable',message:'SSE connect v2',data:{convId,hasCursor:!!cursor,cursor:cursor?String(cursor).slice(0,32):null,urlHasCursor:!!cursor,url},timestamp:Date.now()})}).catch(()=>{});
     // #endregion
 
     let closed = false
@@ -599,6 +599,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const eventType = String(ev.event || '')
           const data = ev.data ? JSON.parse(ev.data) : null
           if (!eventType || data == null) return
+
+          if (eventType === 'stream_debug') {
+            // #region agent log
+            try {
+              const dAny: any = data
+              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H',location:'useConversations.ts:onmessage:stream_debug',message:'SSE stream_debug received',data:{convId,evId:ev.id||null,cursor:dAny?.cursor??null,lastId:dAny?.lastId??null,len:dAny?.len??null},timestamp:Date.now()})}).catch(()=>{});
+            } catch {}
+            // #endregion
+            return
+          }
 
           if (eventType === 'snapshot') {
             // #region agent log
@@ -799,8 +809,26 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const streamId = `stream-${msgTurnId}`
         const idx = messages.findIndex(m => m.id === streamId)
         if (idx !== -1) {
-          messages[idx] = withStreaming(msg, false)
-          return messages
+          const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0
+          const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
+          const willReplaceStreamPlaceholder = !(hasToolCalls && !hasContent)
+
+          // #region agent log
+          try {
+            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'post-fix',hypothesisId:'J',location:'useConversations.ts:reduceMessages:message_append:streamPlaceholder',message:'message.append saw stream placeholder',data:{convId:conversationId||null,msgId:String(msg.id),msgTurnId,streamId,streamIdx:idx,hasToolCalls,hasContent,action:willReplaceStreamPlaceholder?'replace_stream_placeholder':'keep_stream_placeholder'},timestamp:Date.now()})}).catch(()=>{});
+          } catch {}
+          // #endregion
+
+          // IMPORTANT:
+          // During a turn with tool calls, the server can append an assistant "tool-call message"
+          // (toolCalls present, content often empty) while *still* streaming deltas into `stream-<turnId>`.
+          // If we replace the stream placeholder with the tool-call message, subsequent deltas no longer
+          // find `stream-<turnId>` and we recreate shells → duplicated/out-of-order chunks until the final append.
+          if (willReplaceStreamPlaceholder) {
+            messages[idx] = withStreaming(msg, false)
+            return messages
+          }
+          // Keep the stream placeholder; allow this tool-call message to be appended separately below.
         }
 
         // Check if there's already an assistant message with the same turnId
@@ -847,6 +875,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
       // If there are duplicates (should be prevented, but can occur during edge-case merges),
       // always apply deltas to the LAST occurrence so streaming continues at the tail.
+      // #region agent log
+      try {
+        const occurrences = messages.reduce((n, m) => (m?.id === messageId ? n + 1 : n), 0)
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'I',location:'useConversations.ts:reduceMessages:assistant_delta:occurrences',message:'assistant delta occurrences check',data:{convId:conversationId||null,chunkType:chunk.type,messageId,occurrences,messagesLen:messages.length},timestamp:Date.now()})}).catch(()=>{});
+      } catch {}
+      // #endregion
       let idx = -1
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i]?.id === messageId) {

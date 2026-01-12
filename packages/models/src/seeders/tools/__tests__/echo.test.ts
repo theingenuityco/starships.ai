@@ -22,7 +22,7 @@ describe('Echo Tool', () => {
     });
 
     it('should have correct tool name', () => {
-      expect(echoTool.name).toBe('echo');
+      expect(echoTool.name).toBe('Echo');
     });
 
     it('should have descriptive description', () => {

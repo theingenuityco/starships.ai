@@ -6,7 +6,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * No API key required - uses public Instant Answer API
  */
 export const duckduckgoTool: ToolParams = {
-  name: 'duckduckgo_instant',
+  name: 'DuckDuckGo Instant',
   slug: 'duckduckgo-instant',
   description: 'Fetch instant answers, definitions, calculations, and quick facts from DuckDuckGo.',
   parameters: {
@@ -306,10 +306,10 @@ export const duckduckgoToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   category: 'data',
   exampleUsage: JSON.stringify(
     {
-      calculation: { name: 'duckduckgo_instant', arguments: { query: '15% of 250' } },
-      definition: { name: 'duckduckgo_instant', arguments: { query: 'define quantum computing' } },
-      fact: { name: 'duckduckgo_instant', arguments: { query: 'population of Tokyo' } },
-      conversion: { name: 'duckduckgo_instant', arguments: { query: '100 USD to EUR' } },
+      calculation: { name: 'duckduckgo-instant', arguments: { query: '15% of 250' } },
+      definition: { name: 'duckduckgo-instant', arguments: { query: 'define quantum computing' } },
+      fact: { name: 'duckduckgo-instant', arguments: { query: 'population of Tokyo' } },
+      conversion: { name: 'duckduckgo-instant', arguments: { query: '100 USD to EUR' } },
     },
     null,
     2

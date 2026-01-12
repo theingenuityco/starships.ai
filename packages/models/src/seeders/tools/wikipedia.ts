@@ -6,7 +6,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * No NPM packages required - uses native http_request node
  */
 export const wikipediaTool: ToolParams = {
-  name: 'wikipedia_search',
+  name: 'Wikipedia Search',
   slug: 'wikipedia-search',
   description: 'Search Wikipedia and return results via the Wikipedia REST API.',
   parameters: {
@@ -394,10 +394,10 @@ export const wikipediaToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   category: 'data',
   exampleUsage: JSON.stringify(
     {
-      search: { name: 'wikipedia_search', arguments: { query: 'artificial intelligence', action: 'search' } },
-      summary: { name: 'wikipedia_search', arguments: { query: 'Machine learning', action: 'summary' } },
-      content: { name: 'wikipedia_search', arguments: { query: 'Deep learning', action: 'content' } },
-      sections: { name: 'wikipedia_search', arguments: { query: 'Neural network', action: 'sections' } },
+      search: { name: 'wikipedia-search', arguments: { query: 'artificial intelligence', action: 'search' } },
+      summary: { name: 'wikipedia-search', arguments: { query: 'Machine learning', action: 'summary' } },
+      content: { name: 'wikipedia-search', arguments: { query: 'Deep learning', action: 'content' } },
+      sections: { name: 'wikipedia-search', arguments: { query: 'Neural network', action: 'sections' } },
     },
     null,
     2

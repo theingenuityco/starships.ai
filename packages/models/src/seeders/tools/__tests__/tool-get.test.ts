@@ -52,7 +52,7 @@ describe('Tool Get Tool', () => {
       expect(Array.isArray(bp.edges)).toBe(true);
       // Required nodes present
       const nodeRefs = new Set(bp.nodes.map((n) => n.ref));
-      ['start_1', 'prepare', 'http_get', 'extract', 'end_1'].forEach((r) => expect(nodeRefs.has(r)).toBe(true));
+      ['start_1', 'prepare', 'http_get', 'extract', 'slim', 'end_1'].forEach((r) => expect(nodeRefs.has(r)).toBe(true));
       // Edges reference valid nodes
       for (const e of bp.edges) {
         expect(nodeRefs.has(e.from)).toBe(true);
@@ -139,9 +139,10 @@ describe('Tool Get Tool', () => {
       const result = await executeToolWithMockRuntime({ slug: 'calc' }, hostRuntime);
 
       expect(result).toBeDefined();
-      const tool = result as { id: string; slug: string; name: string };
+      const tool = result as { id?: string; slug: string; name: string; blueprint?: unknown };
       expect(tool.slug).toBe('calc');
       expect(tool.name).toBe('Calculator');
+      expect(tool.blueprint).toEqual({ nodes: [], edges: [] });
       expect(connectorActionMock).toHaveBeenCalledTimes(1);
     });
 

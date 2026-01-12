@@ -9,7 +9,7 @@ export const blueprintModifyNodeTool: ToolParams = {
   name: 'Modify Tool Blueprint Node',
   slug: 'modify-tool-blueprint-node',
   description:
-    'Add, edit, or remove a blueprint node in an existing tool by slug using a single interface (op=add/edit/remove). Returns the updated tool or validation errors.',
+    'Add, edit, or remove a blueprint node in an existing tool by slug using a single interface (op=add/edit/remove). Returns { ok: true } on success, or validation errors.',
   parameters: {
     type: 'object',
     properties: {
@@ -363,12 +363,56 @@ export const blueprintModifyNodeTool: ToolParams = {
         },
       },
       {
+        ref: 'unwrap_update',
+        type: 'code',
+        name: 'Unwrap Update Response',
+        description: 'Return body.data/body.error where applicable; otherwise return body/resp',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const resp = ctx.input || {};
+              const body = resp && typeof resp === 'object' ? resp.body : undefined;
+
+              if (body && typeof body === 'object') {
+                if (body.success === true) return body.data ?? body;
+                if (body.success === false) return body.error ?? body;
+              }
+              return body ?? resp;
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
+        ref: 'okify',
+        type: 'code',
+        name: 'Ok',
+        description: 'Return { ok: true } on success; pass through errors',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const input = ctx.input;
+
+              // Preserve structured API errors when present.
+              if (input && typeof input === 'object') {
+                const any = input;
+                if (typeof any.code === 'string' && typeof any.message === 'string') return any;
+                if (any.success === false) return any; // validation errors from modify_node
+              }
+
+              return { ok: true };
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated tool or validation errors',
+        description: 'Return ok on success, or validation errors',
         parameters: {
-          output: '{{ lastOutputOf("update_tool") || lastOutputOf("modify_node") }}',
+          output: '{{ lastOutputOf("okify") || lastOutputOf("modify_node") }}',
         },
       },
     ],
@@ -378,8 +422,10 @@ export const blueprintModifyNodeTool: ToolParams = {
       { ref: 'e3', from: 'fetch_tool', to: 'modify_node' },
       { ref: 'e4', from: 'modify_node', to: 'route_update' },
       { ref: 'e5', from: 'route_update', to: 'update_tool', condition: 'true' },
-      { ref: 'e6', from: 'update_tool', to: 'end_1' },
-      { ref: 'e7', from: 'route_update', to: 'end_1', condition: 'false' },
+      { ref: 'e6', from: 'update_tool', to: 'unwrap_update' },
+      { ref: 'e7', from: 'unwrap_update', to: 'okify' },
+      { ref: 'e8', from: 'okify', to: 'end_1' },
+      { ref: 'e9', from: 'route_update', to: 'end_1', condition: 'false' },
     ],
     metadata: {},
   },
@@ -392,7 +438,7 @@ export const toolModifyBlueprintNodeToolTemplate: Omit<ToolTemplateModel, 'id' |
   blueprint: blueprintModifyNodeTool.blueprint,
 
   slug: 'modify-tool-blueprint-node',
-  version: '1.0.1',
+  version: '1.0.2',
   category: 'automation',
   exampleUsage:
     '{ "toolSlug": "my-tool", "op": "add", "node": { "ref": "process", "type": "code", "name": "Process Data", "parameters": { "code": "return input;" } } }',

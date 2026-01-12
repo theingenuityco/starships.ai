@@ -9,7 +9,7 @@ export const toolEditTool: ToolParams = {
   name: 'Edit Tool',
   slug: 'edit-tool',
   description:
-    'Update an existing tool by slug with partial fields (name, description, parameters, blueprint) on the current starship. Returns the updated tool model.',
+    'Update an existing tool by slug with partial fields (name, description, parameters, blueprint) on the current starship. Returns a lean tool summary (no blueprint).',
   parameters: {
     type: 'object',
     properties: {
@@ -132,12 +132,72 @@ export const toolEditTool: ToolParams = {
         },
       },
       {
+        ref: 'unwrap',
+        type: 'code',
+        name: 'Unwrap',
+        description: 'Return body.data/body.error where applicable; otherwise return body/resp',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const resp = ctx.input || {};
+              const body = resp && typeof resp === 'object' ? resp.body : undefined;
+
+              if (body && typeof body === 'object') {
+                if (body.success === true) return body.data ?? body;
+                if (body.success === false) return body.error ?? body;
+              }
+              return body ?? resp;
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
+        ref: 'slim',
+        type: 'code',
+        name: 'Slim Tool',
+        description: 'Return a lean tool summary (omit heavy/unneeded fields like blueprint)',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const tool = ctx.input;
+
+              // If this is already an error-like payload, pass through unchanged.
+              if (tool && typeof tool === 'object') {
+                const t = tool;
+                if (typeof t.code === 'string' && typeof t.message === 'string') {
+                  return t;
+                }
+              }
+
+              if (!tool || typeof tool !== 'object') return tool;
+
+              const t = tool;
+              const out = {};
+
+              if (typeof t.slug === 'string') out.slug = t.slug;
+              if (typeof t.name === 'string') out.name = t.name;
+              if (typeof t.description === 'string') out.description = t.description;
+              if (typeof t.category === 'string') out.category = t.category;
+
+              if (typeof t.status === 'string') out.status = t.status;
+              if (typeof t.version === 'string') out.version = t.version;
+
+              if (t.parameters && typeof t.parameters === 'object') out.parameters = t.parameters;
+
+              return out;
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated tool',
+        description: 'Return lean updated tool summary',
         parameters: {
-          output: '{{ lastOutputOf("http_update") }}',
+          output: '{{ lastOutputOf("slim") }}',
         },
       },
     ],
@@ -146,7 +206,9 @@ export const toolEditTool: ToolParams = {
       { ref: 'e2', from: 'prepare', to: 'fetch_tool' },
       { ref: 'e3', from: 'fetch_tool', to: 'prepare_update' },
       { ref: 'e4', from: 'prepare_update', to: 'http_update' },
-      { ref: 'e5', from: 'http_update', to: 'end_1' },
+      { ref: 'e5', from: 'http_update', to: 'unwrap' },
+      { ref: 'e6', from: 'unwrap', to: 'slim' },
+      { ref: 'e7', from: 'slim', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -162,7 +224,7 @@ export const toolEditToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolEditTool.blueprint,
 
   slug: 'edit-tool',
-  version: '1.0.3',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{ "slug": "weather-lookup", "description": "Updated description" } // partial updates by slug',
   requiresApiKey: false,

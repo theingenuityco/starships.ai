@@ -18,20 +18,17 @@ export function UserbackProvider({ children, token }: UserbackProviderProps) {
   const { isAuthenticated, userId, userEmail, userName } = useAuthContext()
 
   useEffect(() => {
+    let cancelled = false
+
     const init = async () => {
       try {
+        // Avoid re-initializing if we already have an instance.
+        if (userback) return
+
         // Initialize Userback widget and get the instance
         const instance = await Userback(token, { autohide: false })
 
-        // Identify the user after initialization if userId is available
-        if (userId) {
-          instance.identify(userId, {
-            name: userName || userEmail,
-            email: userEmail,
-          })
-        }
-
-        setUserback(instance)
+        if (!cancelled) setUserback(instance)
       } catch (error) {
         console.error('Failed to initialize Userback:', error)
       }
@@ -40,7 +37,26 @@ export function UserbackProvider({ children, token }: UserbackProviderProps) {
     if (token) {
       init()
     }
-  }, [token, isAuthenticated, userId, userEmail, userName])
+
+    return () => {
+      cancelled = true
+    }
+    // Intentionally only keyed on token + current instance to prevent repeated init loops.
+  }, [token, userback])
+
+  useEffect(() => {
+    if (!userback) return
+    if (!isAuthenticated || !userId) return
+
+    try {
+      userback.identify(userId, {
+        name: userName || userEmail,
+        email: userEmail,
+      })
+    } catch (error) {
+      console.error('Failed to identify Userback user:', error)
+    }
+  }, [userback, isAuthenticated, userId, userEmail, userName])
 
   return <UserbackContext.Provider value={userback}>{children}</UserbackContext.Provider>
 }

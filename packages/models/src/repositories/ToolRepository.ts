@@ -23,10 +23,11 @@ export class ToolRepository extends BaseRepository {
   private async toolSlugExistsOnStarship(starshipId: string, slug: string, excludeId?: string): Promise<boolean> {
     const connection = this.getConnection();
     if (excludeId) {
-      const row = await connection.queryOne<{ id: string }>(
-        'SELECT id FROM tools WHERE starship_id = $1 AND slug = $2 AND id <> $3',
-        [starshipId, slug, excludeId]
-      );
+      const row = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE starship_id = $1 AND slug = $2 AND id <> $3', [
+        starshipId,
+        slug,
+        excludeId,
+      ]);
       return !!row?.id;
     }
     const row = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE starship_id = $1 AND slug = $2', [starshipId, slug]);
@@ -469,6 +470,9 @@ export class ToolRepository extends BaseRepository {
             { fallbackBase: 'tool', maxLength: 100 }
           );
         }
+
+        // Validate updates using entity rules (e.g., description max length).
+        await ToolEntity.validate(updateProps, 'update');
 
         // Convert entity updates to database format
         const updateData = toDatabase(toEntityInstance(ToolEntity, updateProps));

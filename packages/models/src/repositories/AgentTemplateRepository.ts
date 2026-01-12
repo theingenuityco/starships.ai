@@ -170,6 +170,67 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
+   * INTERNAL: Batch-load templates including sensitive configuration fields
+   * (systemPrompt/state/blueprint + tuning params) for a set of ids.
+   *
+   * Returns a map keyed by template id. Missing ids will not be present.
+   */
+  async findInternalByIds(ids: string[]): Promise<Map<string, AgentTemplateModel>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const uniqueIds = Array.from(
+          new Set((ids || []).map((t) => String(t)).filter((t) => t.trim().length > 0))
+        );
+        if (uniqueIds.length === 0) return new Map();
+
+        const connection = this.getConnection();
+
+        const rows = await connection.query<Record<string, unknown>>(
+          `SELECT *
+           FROM agent_templates
+           WHERE id = ANY($1)`,
+          [uniqueIds]
+        );
+
+        const templates = fromDatabaseArray(AgentTemplateEntity, rows) as Array<AgentTemplateModel & Record<string, unknown>>;
+        if (!templates || templates.length === 0) return new Map();
+
+        // Populate assignedToolSlugs from junction table in one query.
+        const toolRows = await connection.query<{ agent_template_id: string; slug: string }>(
+          `SELECT attt.agent_template_id, tt.slug
+           FROM agent_template_tool_templates attt
+           JOIN tool_templates tt ON tt.id = attt.tool_template_id
+           WHERE attt.agent_template_id = ANY($1)
+           ORDER BY attt.agent_template_id, tt.name`,
+          [uniqueIds]
+        );
+
+        const assignedToolSlugsByTemplateId = new Map<string, string[]>();
+        for (const row of toolRows || []) {
+          if (!row?.agent_template_id || !row?.slug) continue;
+          const key = String(row.agent_template_id);
+          const list = assignedToolSlugsByTemplateId.get(key) ?? [];
+          list.push(row.slug);
+          assignedToolSlugsByTemplateId.set(key, list);
+        }
+
+        const out = new Map<string, AgentTemplateModel>();
+        for (const t of templates) {
+          const id = String(t.id);
+          out.set(id, {
+            ...(t as AgentTemplateModel),
+            assignedToolSlugs: assignedToolSlugsByTemplateId.get(id) ?? [],
+          });
+        }
+
+        return out;
+      },
+      'findInternalByIds',
+      'AgentTemplate'
+    );
+  }
+
+  /**
    * INTERNAL: Convenience wrapper to load a template by slug including config fields.
    */
   async findInternalBySlug(slug: string): Promise<AgentTemplateModel | null> {

@@ -3,6 +3,7 @@ import { LedgerRepository, PromoRedemptionRepository, WalletRepository, getConne
 import { StarshipService } from '@/services/StarshipService';
 import type { RedeemPromoRequest, RedeemPromoResponse } from '@starships/protocol';
 import { getEnvConfig } from '@starships/env';
+import { CREDITS_PER_USD, toCreditsString } from '@/config/credits';
 
 const envConfig = getEnvConfig();
 
@@ -85,8 +86,8 @@ export class PromoService {
 
     if (!chosen || !couponObj) throw new Error('UNSUPPORTED_COUPON');
 
-    const reward = couponObj?.amount_off && couponObj?.currency?.toLowerCase() === 'usd' ? couponObj.amount_off / 100 : 0;
-    if (reward <= 0) {
+    const rewardUsd = couponObj?.amount_off && couponObj?.currency?.toLowerCase() === 'usd' ? couponObj.amount_off / 100 : 0;
+    if (rewardUsd <= 0) {
       throw new Error('UNSUPPORTED_COUPON');
     }
 
@@ -96,8 +97,11 @@ export class PromoService {
       throw new Error('WALLET_NOT_FOUND');
     }
 
+    // Convert USD reward to credits (same conversion as credit payments)
+    const amountUsd = rewardUsd.toFixed(2);
+    const creditsGranted = toCreditsString(rewardUsd * Number(CREDITS_PER_USD || 0));
+
     const connection = getConnection();
-    const rewardStr = reward.toFixed(6);
 
     // Atomic transaction: enforce max_redemptions (if any) -> create redemption (unique per user+code) -> credit wallet -> ledger
     const { balance } = await connection.transaction(async (client) => {
@@ -127,7 +131,7 @@ export class PromoService {
           promoCode: code,
           stripeCouponId: couponObj.id,
           stripePromotionId: chosen.id,
-          rewardAmount: rewardStr,
+          rewardAmount: creditsGranted, // Store credits amount (converted from USD)
           status: 'success',
           message: 'Wallet credit',
         });
@@ -140,28 +144,33 @@ export class PromoService {
         throw e;
       }
 
-      // Credit wallet
-      const newBalance = await this.walletRepo.incrementBalanceReturningWithClient(client, wallet.id, rewardStr);
+      // Credit wallet with credits (converted from USD)
+      const newBalance = await this.walletRepo.incrementBalanceReturningWithClient(client, wallet.id, creditsGranted);
 
       // Ledger entry
       await this.ledgerRepo.createWithClient(client, {
         walletId: wallet.id,
         type: 'ADJUSTMENT',
-        amount: rewardStr,
+        amount: creditsGranted,
         balanceAfter: newBalance.balance,
         meta: {
           source: 'PROMO',
           promoCode: code,
           stripeCouponId: couponObj.id,
           stripePromotionId: chosen.id,
+          amountUsd, // Store original USD amount for audit
+          creditsGranted, // Store credits granted
+          creditsPerUsd: Number(CREDITS_PER_USD), // Store conversion rate
         },
       });
 
       return newBalance;
     });
 
+    // Format credits for display (round to whole number for user-friendly message)
+    const creditsDisplay = Math.round(Number(creditsGranted)).toLocaleString();
     return {
-      message: `✅ Promo applied! $${Number(rewardStr).toFixed(2)} added to your wallet.`,
+      message: `✅ Promo applied! ${creditsDisplay} credits added to your wallet.`,
       newBalance: balance,
     };
   }

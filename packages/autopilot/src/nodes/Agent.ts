@@ -573,7 +573,30 @@ export class Agent implements NodeHandler {
             const toolCallId = tc?.id ?? '';
             const resp = ctx.lastOutputOf("${httpNodeRef}") || {};
             const body = resp?.body || {};
-            const content = JSON.stringify(body);
+            // Normalize tool-call result for the agent:
+            // - Always emit: { success: boolean, data: any }
+            //
+            // IMPORTANT: In server-tools mode, the *canonical* success/failure signal is the
+            // server-tools envelope (authorize-and-maybe-execute-tool):
+            // - Success: { success: true, data: { toolCallId, result } }
+            // - Error:   { success: false, error: { code, message, details } }
+            //
+            // We intentionally do NOT infer failure by inspecting the inner result payload (e.g. status codes).
+            // Tools that want non-2xx to be treated as failure must throw explicitly.
+            let payload = { success: false, data: body };
+            if (body && typeof body === 'object') {
+              if (body.success === false) {
+                payload = { success: false, data: body.error != null ? body.error : body };
+              } else if (body.success === true) {
+                const inner =
+                  body?.data && typeof body.data === 'object' && Object.prototype.hasOwnProperty.call(body.data, 'result')
+                    ? body.data.result
+                    : body.data;
+                payload = { success: true, data: inner };
+              }
+            }
+
+            const content = typeof payload === 'string' ? payload : JSON.stringify(payload);
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
             const nextIdx = idx + 1;
@@ -605,7 +628,7 @@ export class Agent implements NodeHandler {
             const slug = tc?.function?.name ?? 'unknown';
             const toolCallId = tc?.id ?? '';
             const next = { ...(state || {}) };
-            const payload = { ok: false, error: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." };
+            const payload = { success: false, data: { code: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." } };
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content: JSON.stringify(payload) }];
             const nextIdx = idx + 1;
             if (pending.length > 0 && nextIdx >= pending.length) {

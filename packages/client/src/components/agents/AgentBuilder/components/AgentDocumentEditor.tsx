@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { motion } from 'motion/react'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
@@ -12,7 +13,6 @@ import type { AgentFormData } from '../types'
 import { cn } from '@/lib/utils'
 import { getCategoryColor, getCategoryDotColor, getCategoryIcon } from '../utils/categoryHelpers'
 import { AGENT_CATEGORIES } from '../constants'
-import { BlueprintVisualization } from '@/components/marketplace/BlueprintVisualization'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { StandardSelect } from './StandardSelect'
@@ -30,6 +30,16 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AgentPublishModal } from './AgentPublishModal'
 import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlugins } from '@/utils/agent-state'
 import type { ConversationState } from '@starships/protocol'
+
+// Lazy-load the blueprint visualizer so the landing-page "embedded" demo doesn't
+// pull in ELK/WebWorker code (which can break when evaluated in the SSR bundle).
+const BlueprintVisualization = dynamic(
+  () => import('@/components/blueprint/BlueprintVisualization').then(m => m.BlueprintVisualization),
+  {
+    ssr: false,
+    loading: () => <div className="h-[320px] w-full rounded-lg bg-muted/20" />,
+  }
+)
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -1615,28 +1625,30 @@ export function AgentDocumentEditor({
         <CollapsibleContent>
           <div className="space-y-4 mt-1">
             {/* Blueprint first */}
-            <div>
-              <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
-                  <Icon name="network" className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Blueprint</span>
-                </div>
-                <div className="flex-1">
-                  <BlueprintVisualization
-                    blueprint={(() => {
-                      try {
-                        return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
-                      } catch {
-                        return { nodes: [], edges: [] } as any
-                      }
-                    })()}
-                    className="h-[320px]"
-                    transparent
-                    nodesDraggable={false}
-                  />
+            {!embedded ? (
+              <div>
+                <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
+                  <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
+                    <Icon name="network" className="w-4 h-4" />
+                    <span className="text-xs font-semibold">Blueprint</span>
+                  </div>
+                  <div className="flex-1">
+                    <BlueprintVisualization
+                      blueprint={(() => {
+                        try {
+                          return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                        } catch {
+                          return { nodes: [], edges: [] } as any
+                        }
+                      })()}
+                      className="h-[320px]"
+                      transparent
+                      nodesDraggable={false}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
+            ) : null}
 
             {/* Then numeric advanced controls */}
             <div className="space-y-2 border-t border-border/10 pt-2">

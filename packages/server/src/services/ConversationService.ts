@@ -79,6 +79,9 @@ export class ConversationService {
   private messageService!: MessageService;
   private turnRepository!: TurnRepository;
   private streamBus!: ConversationStreamBus;
+  // Best-effort mapping of toolCallId -> tool function name (per conversation).
+  // Used to derive richer UI actions (e.g., widget_created vs widget_updated) from tool results.
+  private lastToolCallNameByConversation: Map<string, Map<string, string>> = new Map();
   // Streaming assistant message id per conversation (per current turn)
   private streamingAssistantMessageId: Map<string, string> = new Map();
   // Buffer deltas so we don't XADD per token (which slows streaming dramatically).
@@ -642,7 +645,7 @@ export class ConversationService {
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
       if (conversation.parentConversationId) {
-        const payload: ConversationStreamUIAction['data'] = {
+        const payload: ConversationStreamUIAction = {
           __ui_action: 'child_conversation_created',
           parentConversationId: conversation.parentConversationId,
           childConversationId: conversation.id,
@@ -651,7 +654,7 @@ export class ConversationService {
         await this.streamBus.publish(conversation.parentConversationId, {
           type: 'ui_action',
           data: payload,
-        } as ConversationStreamEvent);
+        });
       }
     } catch (e) {
       // Non-fatal: failure to emit UI hint must not break conversation creation
@@ -677,6 +680,13 @@ export class ConversationService {
    */
   async getConversationsByStarship(starshipId: string): Promise<ConversationModel[]> {
     return this.conversationRepository.findByStarship(starshipId);
+  }
+
+  /**
+   * Get conversations by starship (includes linked agents)
+   */
+  async getConversationsByStarshipWithAgents(starshipId: string): Promise<Array<ConversationModel & { agents: AgentModel[] }>> {
+    return this.conversationRepository.findByStarshipWithAgents(starshipId);
   }
 
   /**
@@ -2738,6 +2748,27 @@ export class ConversationService {
 
                 // Mark that an assistant message has been persisted for this turn
                 if (role === 'assistant') {
+                  // Snapshot toolCallId -> function.name mapping for later tool_result interpretation.
+                  // IMPORTANT: we clear streaming tool call accumulators for subsequent assistant outputs, so keep
+                  // a separate, best-effort mapping.
+                  try {
+                    if (Array.isArray(toolCalls) && toolCalls.length > 0) {
+                      const m = new Map<string, string>();
+                      for (const tc of toolCalls) {
+                        const id = typeof tc.id === 'string' ? tc.id : '';
+                        const name = typeof tc.function?.name === 'string' ? tc.function.name : '';
+                        if (id && name.trim().length > 0) {
+                          m.set(id, name.trim());
+                        }
+                      }
+                      if (m.size > 0) {
+                        this.lastToolCallNameByConversation.set(conversationId, m);
+                      }
+                    }
+                  } catch {
+                    // ignore best-effort mapping failures
+                  }
+
                   // ROOT CAUSE FIX:
                   // We buffer deltas (timer-based) to avoid XADD per token. Without forcing a flush here,
                   // the last buffered assistant.delta can land AFTER this message.append (which already
@@ -2771,6 +2802,71 @@ export class ConversationService {
                   await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
                 } catch (e) {
                   console.warn('[STREAM] Failed to publish message.append', e);
+                }
+
+                // If this was a tool_result message that produced a widget, emit a structured ui_action so
+                // clients can render it immediately (and in a stable, tool-agnostic way).
+                try {
+                  if (role === 'tool') {
+                    const toolCallId = typeof persistedMsg.toolCallId === 'string' ? persistedMsg.toolCallId : '';
+                    const raw = typeof persistedMsg.content === 'string' ? persistedMsg.content : '';
+                    const t = raw.trim();
+                    if (toolCallId && t && (t.startsWith('{') || t.startsWith('['))) {
+                      const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
+                      const get = (v: unknown, key: string): unknown => (isRecord(v) ? v[key] : undefined);
+                      const getNested = (v: unknown, keys: string[]): unknown => {
+                        let cur: unknown = v;
+                        for (const k of keys) cur = get(cur, k);
+                        return cur;
+                      };
+
+                      let parsed: unknown = null;
+                      try {
+                        parsed = JSON.parse(t);
+                      } catch {
+                        parsed = null;
+                      }
+
+                      const candidate = isRecord(parsed) ? parsed : null;
+
+                      const maybeWidget: unknown =
+                        (candidate ? get(candidate, 'widget') : undefined) ??
+                        (candidate ? getNested(candidate, ['data', 'widget']) : undefined) ??
+                        (candidate ? getNested(candidate, ['data', 'result', 'widget']) : undefined) ??
+                        (candidate ? getNested(candidate, ['data', 'result']) : undefined) ??
+                        (candidate ? get(candidate, 'data') : undefined) ??
+                        (candidate ? get(candidate, 'result') : undefined) ??
+                        candidate;
+
+                      const hasRenderableShape =
+                        isRecord(maybeWidget) &&
+                        typeof maybeWidget['widgetType'] === 'string' &&
+                        maybeWidget['widgetType'].trim().length > 0 &&
+                        typeof maybeWidget['props'] === 'object' &&
+                        maybeWidget['props'] !== null;
+
+                      if (hasRenderableShape) {
+                        const toolName = this.lastToolCallNameByConversation.get(conversationId)?.get(toolCallId) || '';
+                        const action = toolName.includes('update-widget') ? 'widget_updated' : 'widget_created';
+
+                        await this.streamBus.publish(conversationId, {
+                          type: 'ui_action',
+                          data: {
+                            __ui_action: action,
+                            conversationId,
+                            toolCallId,
+                            widget: maybeWidget,
+                          },
+                        });
+                      }
+                    }
+                  }
+                } catch (e) {
+                  // Best-effort only; never fail the turn for UI emission issues
+                  console.warn('[STREAM] Failed to emit widget ui_action', {
+                    conversationId,
+                    error: e instanceof Error ? e.message : String(e),
+                  });
                 }
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);

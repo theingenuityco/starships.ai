@@ -8,31 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentAssignToolTool: ToolParams = {
   name: 'Assign Agent Tool',
   slug: 'assign-agent-tool',
-  description: `Assign a tool to an agent by creating an Agent→Tool relationship.
-
-## Purpose
-Grant an agent access to a specific tool by its slug. The tool must exist on the starship before assignment.
-
-## Required Parameters
-- **agentSlug**: Agent slug to update
-- **toolSlug**: Tool slug to assign
-
-## Behavior
-1. Fetches current agent by slug
-2. Calls POST /agents/:id/tools/:toolSlug with { starshipId } to create relationship
-3. Returns server response
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-
-## Response
-Returns server response indicating success.
-
-## Common Failures
-- Agent or Tool not found (404)
-- Missing environment variables
-- Invalid slugs`,
+  description:
+    'Assign a tool to an agent by slug on the current starship (creates an Agent→Tool relationship). Returns { ok: true } on success.',
   parameters: {
     type: 'object',
     properties: {
@@ -79,6 +56,7 @@ Returns server response indicating success.
         parameters: {
           connector: 'starships',
           action: 'get-agent',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).agentSlug }}',
@@ -129,6 +107,7 @@ Returns server response indicating success.
         parameters: {
           connector: 'starships',
           action: 'assign-agent-tool',
+          failOnNon2xx: true,
           args: {
             agentId: '{{ (lastOutputOf("update_tools") || {}).agentId }}',
             toolSlug: '{{ (lastOutputOf("update_tools") || {}).toolSlug }}',
@@ -137,12 +116,27 @@ Returns server response indicating success.
         },
       },
       {
+        ref: 'lean',
+        type: 'code',
+        name: 'Lean Result',
+        description: 'Return minimal success payload',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              // If we reached here, connector_action succeeded (failOnNon2xx would have failed the run).
+              return { ok: true };
+            }
+          `,
+          timeout: 1000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated agent',
+        description: 'Return { ok: true }',
         parameters: {
-          output: '{{ lastOutputOf("http_update") }}',
+          output: '{{ lastOutputOf("lean") }}',
         },
       },
     ],
@@ -151,7 +145,8 @@ Returns server response indicating success.
       { ref: 'e2', from: 'prepare', to: 'fetch_agent' },
       { ref: 'e3', from: 'fetch_agent', to: 'update_tools' },
       { ref: 'e4', from: 'update_tools', to: 'http_update' },
-      { ref: 'e5', from: 'http_update', to: 'end_1' },
+      { ref: 'e5', from: 'http_update', to: 'lean' },
+      { ref: 'e6', from: 'lean', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -167,7 +162,7 @@ export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'create
   blueprint: agentAssignToolTool.blueprint,
 
   slug: 'assign-agent-tool',
-  version: '1.0.2',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // assign wikipedia tool to support agent',
   requiresApiKey: false,

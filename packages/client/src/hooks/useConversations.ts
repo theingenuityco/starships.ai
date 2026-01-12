@@ -1,6 +1,7 @@
 import api, { getCurrentToken } from '@/lib/api'
 import type {
   ApiResponse,
+  AgentModel,
   ConversationModel,
   ConversationState,
   ConversationStreamEvent,
@@ -47,6 +48,13 @@ interface ClientMessage extends MessageModel {
     content: string
     position: number
     timestamp: number
+  }>
+  // Derived/grouped tool results (not part of DB MessageModel)
+  toolResults?: Array<{
+    toolName?: string
+    toolCallId?: string
+    content?: string
+    result?: unknown
   }>
 }
 
@@ -120,8 +128,10 @@ export function useCreateConversation() {
 export function useStarshipConversations(starshipId: string, enabled: boolean = true) {
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
-    queryFn: async (): Promise<{ conversations: ConversationModel[] }> => {
-      const response: FetchResponse<ApiResponse<ConversationModel[]>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
+    queryFn: async (): Promise<{ conversations: Array<ConversationModel & { agents: AgentModel[] }> }> => {
+      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(
+        `/api/v1/starships/${starshipId}/conversations`
+      )
       return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,
@@ -154,6 +164,7 @@ export function usePendingToolApprovals(conversationId: string | null, enabled: 
 // Delete conversation
 export function useDeleteConversation() {
   const queryClient = useQueryClient()
+  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
 
   return useMutation({
     mutationFn: async (conversationId: string) => {
@@ -162,8 +173,9 @@ export function useDeleteConversation() {
     },
     onMutate: async conversationId => {
       // Get conversation details to know which starship it belongs to
-      const conversationData = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.detail(conversationId)) as any
-      let starshipId = conversationData?.conversation?.starshipId
+      const conversationData = queryClient.getQueryData(CONVERSATION_QUERY_KEYS.detail(conversationId))
+      const convo = isRecord(conversationData) ? conversationData['conversation'] : undefined
+      let starshipId = isRecord(convo) && typeof convo['starshipId'] === 'string' ? convo['starshipId'] : undefined
 
       // If starshipId is not available from cached conversation, try to find it from starship conversations cache
       if (!starshipId) {
@@ -509,12 +521,13 @@ export function useConversationStop() {
 export function useConversationStreamed(conversationId: string | null, starshipId?: string | null, options?: { enabled?: boolean }) {
   const queryClient = useQueryClient()
   const enabledFlag = options?.enabled !== false
+  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
 
   type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
 
   type LegacyChunk = { type: 'append'; message: ClientMessage } | { type: 'turn_started'; payload?: { local?: boolean } }
   type StreamErrorChunk = { type: 'error'; error: unknown }
-  type StreamedChunk = ConversationStreamEvent | LegacyChunk | StreamErrorChunk
+  type StreamedChunk = { type: ConversationStreamEvent['type']; data: any } | LegacyChunk | StreamErrorChunk
 
   // Bridge fetch-event-source SSE into an AsyncIterable that yields StreamedChunk events.
   // IMPORTANT: This function does not use React local state; the entire event log lives in TanStack Query cache.
@@ -559,7 +572,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       } catch {}
       while (resolvers.length > 0) {
         const resolve = resolvers.shift()!
-        resolve({ value: undefined as any, done: true })
+        resolve({ value: undefined, done: true })
       }
       queue.length = 0
     }
@@ -594,22 +607,33 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           if (!eventType || data == null) return
 
           if (eventType === 'snapshot') {
-            push({ type: 'snapshot', data: data as ConversationStreamSnapshot })
+            push({ type: 'snapshot', data })
             return
           }
 
-          // All other stream events are typed by the shared protocol contract:
-          // event name == ConversationStreamEvent['type'], data == ConversationStreamEvent['data']
-          if (
-            eventType === 'turn.started' ||
-            eventType === 'turn.status' ||
-            eventType === 'assistant.delta' ||
-            eventType === 'assistant.reasoning_delta' ||
-            eventType === 'message.append' ||
-            eventType === 'ui_action'
-          ) {
-            push({ type: eventType as ConversationStreamEvent['type'], data } as ConversationStreamEvent)
-            return
+          // All other stream events use `type`+`data` shape; we keep `data` loosely typed
+          // to avoid runtime coupling and to allow forward-compatible fields.
+          switch (eventType) {
+            case 'turn.started':
+              push({ type: 'turn.started', data })
+              return
+            case 'turn.status':
+              push({ type: 'turn.status', data })
+              return
+            case 'assistant.delta':
+              push({ type: 'assistant.delta', data })
+              return
+            case 'assistant.reasoning_delta':
+              push({ type: 'assistant.reasoning_delta', data })
+              return
+            case 'message.append':
+              push({ type: 'message.append', data })
+              return
+            case 'ui_action':
+              push({ type: 'ui_action', data })
+              return
+            default:
+              return
           }
         } catch (e) {
           push({ type: 'error', error: e })
@@ -629,12 +653,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         return {
           next: () => {
             if (queue.length > 0) return Promise.resolve({ value: queue.shift()!, done: false })
-            if (closed) return Promise.resolve({ value: undefined as any, done: true })
+            if (closed) return Promise.resolve({ value: undefined, done: true })
             return new Promise<IteratorResult<StreamedChunk>>(resolve => resolvers.push(resolve))
           },
           return: () => {
             cleanup('manual')
-            return Promise.resolve({ value: undefined as any, done: true })
+            return Promise.resolve({ value: undefined, done: true })
           },
           throw: e => {
             cleanup('manual')
@@ -646,9 +670,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   }
 
   const withStreaming = (m: ClientMessage, streaming: boolean): ClientMessage => ({ ...m, streaming })
+  const emptyMessages: ClientMessage[] = []
 
   function reduceMessages(acc: ClientMessage[], chunk: StreamedChunk): ClientMessage[] {
-    const clone = (arr: ClientMessage[]) => arr.map(m => ({ ...m }) as ClientMessage)
+    const clone = (arr: ClientMessage[]): ClientMessage[] => arr.map(m => ({ ...m }))
     const toolCallKey = (m: any): string => {
       const id = m?.id != null ? String(m.id) : ''
       if (!id) return ''
@@ -665,8 +690,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     // Terminal turn states should stop any in-progress streaming message.
     if (chunk.type === 'turn.status') {
-      // NOTE: Some local/legacy chunks used `payload` instead of `data`.
-      const status: any = (chunk as any)?.data?.status ?? (chunk as any)?.payload?.status
+      const status = chunk.data?.status
       if (status === 'completed' || status === 'failed' || status === 'cancelled') {
         return acc.map(m => (m.streaming ? withStreaming(m, false) : m))
       }
@@ -674,7 +698,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
 
     if (chunk.type === 'snapshot') {
-      const msgs = Array.isArray(chunk.data.messages) ? (chunk.data.messages as ClientMessage[]) : []
+      const msgs: ClientMessage[] = Array.isArray(chunk.data.messages) ? chunk.data.messages : []
       // Preserve streaming state for assistant messages in active turns - they may have been
       // derived from Redis stream replay and should continue accumulating deltas.
       const turn = chunk.data.turn
@@ -708,14 +732,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
 
     if (chunk.type === 'append') {
-      return reduceMessages(acc, {
+      const evt: ConversationStreamEvent = {
         type: 'message.append',
         data: { conversationId: conversationId || '', message: chunk.message },
-      } as ConversationStreamEvent)
+      }
+      return reduceMessages(acc, evt)
     }
 
     if (chunk.type === 'message.append') {
-      const msg = chunk.data.message as ClientMessage
+      const msg = chunk.data?.message
       const messages = clone(acc)
       if (!msg || !msg.id) return messages
       // For assistant messages with tool calls, check for duplicates using composite key (id + toolCallIds)
@@ -808,16 +833,86 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           createdAt: now,
           updatedAt: now,
           streaming: true,
-        } as ClientMessage
+        }
         return [...messages, shell]
       }
-      const cur: ClientMessage = { ...(messages[idx] as ClientMessage) }
+      const cur: ClientMessage = { ...messages[idx] }
       cur.updatedAt = now
       cur.streaming = true
       if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
       else cur.reasoning = String(cur.reasoning || '') + delta
       messages[idx] = cur
       return messages
+    }
+
+    if (chunk.type === 'ui_action') {
+      const messages = clone(acc)
+      const payload = chunk.data
+      const action = payload.__ui_action
+      if (action !== 'widget_created' && action !== 'widget_updated') {
+        return messages
+      }
+
+      const widgetUnknown = payload['widget']
+      if (!isRecord(widgetUnknown)) return messages
+      const widget = widgetUnknown
+      const widgetId = typeof widget['id'] === 'string' ? widget['id'] : widget['id'] != null ? String(widget['id']) : ''
+      const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : widget['widgetType'] != null ? String(widget['widgetType']) : ''
+      const props = widget['props']
+      if (!widgetId || !widgetType || !props || typeof props !== 'object') return messages
+
+      const toolCallIdUnknown = payload['toolCallId']
+      const toolCallId = typeof toolCallIdUnknown === 'string' ? toolCallIdUnknown : toolCallIdUnknown != null ? String(toolCallIdUnknown) : ''
+      const toolName = action === 'widget_updated' ? 'update-widget' : 'create-widget'
+
+      const msgId = `ui-widget-${widgetId}`
+      const now = new Date().toISOString()
+
+      const toolResultLike = {
+        toolName,
+        toolCallId,
+        content: JSON.stringify(widget),
+      }
+
+      const existingIdx = messages.findIndex(m => m.id === msgId)
+      if (existingIdx !== -1) {
+        const existing = messages[existingIdx]
+        const createdAtUnknown = widget['createdAt']
+        const updatedAtUnknown = widget['updatedAt']
+        const createdAt =
+          (typeof existing?.createdAt === 'string' && existing.createdAt) ||
+          (typeof createdAtUnknown === 'string' ? createdAtUnknown : now)
+
+        messages[existingIdx] = {
+          ...existing,
+          id: msgId,
+          role: 'assistant',
+          messageType: 'agent_response',
+          content: '',
+          createdAt,
+          updatedAt: typeof updatedAtUnknown === 'string' ? updatedAtUnknown : now,
+          streaming: false,
+          toolResults: [toolResultLike],
+        }
+        return messages
+      }
+
+      const createdAtUnknown = widget['createdAt']
+      const updatedAtUnknown = widget['updatedAt']
+      const createdAt = typeof createdAtUnknown === 'string' ? createdAtUnknown : now
+      return [
+        ...messages,
+        {
+          id: msgId,
+          role: 'assistant',
+          content: '',
+          messageType: 'agent_response',
+          createdAt,
+          updatedAt: typeof updatedAtUnknown === 'string' ? updatedAtUnknown : now,
+          streaming: false,
+          toolResults: [toolResultLike],
+        },
+      ]
     }
 
     return acc
@@ -832,9 +927,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return { turnId: chunk.data.turnId, status: 'active' }
     }
     if (chunk.type === 'turn.status') {
-      // NOTE: Some local/legacy chunks used `payload` instead of `data`.
-      const data: any = (chunk as any)?.data ?? (chunk as any)?.payload
-      const status: any = data?.status
+      const data = chunk.data
+      const status = data?.status
       if (!status) return acc
       return { turnId: data?.turnId ?? acc.turnId, status }
     }
@@ -845,7 +939,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return acc
   }
 
-  const messagesQuery = useQuery({
+  const messagesQuery = useQuery<StreamedChunk[]>({
     queryKey: conversationId ? CONVERSATION_QUERY_KEYS.messages(conversationId) : ['__noop__'],
     queryFn: streamedQuery({
       queryFn: async (_ctx: any) => {
@@ -860,10 +954,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     gcTime: 2 * 60 * 1000,
   })
 
-  const chunks = (messagesQuery.data as StreamedChunk[]) || []
+  const chunks: StreamedChunk[] = messagesQuery.data ?? []
   const chunksLen = Array.isArray(chunks) ? chunks.length : 0
-  const lastChunkAny: any = chunksLen > 0 ? (chunks as any)[chunksLen - 1] : null
-  const lastChunkSig = lastChunkAny?.type ? String(lastChunkAny.type) : 'none'
+  const lastChunk = chunksLen > 0 ? chunks[chunksLen - 1] : null
+  const lastChunkSig = lastChunk?.type ? String(lastChunk.type) : 'none'
   const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
 
   // Queue for message.append chunks that are delayed due to animation
@@ -877,12 +971,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     for (const chunk of chunks) {
       if (chunk.type === 'message.append') {
-        const msg = (chunk as any).data?.message
+        const msg = chunk.data?.message
         if (msg?.role === 'assistant') {
           const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
           if (!hasToolCalls) {
             // Check if previous assistant message animation is complete
-            const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
+            const currentMessages = processed.reduce(reduceMessages, emptyMessages)
             const lastAssistantId = getLastAssistantMessageId(currentMessages)
             if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
               // Queue this chunk for later processing
@@ -907,7 +1001,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     if (queuedAppendChunksRef.current.length === 0) return
 
     const processQueued = () => {
-      const currentMessages = processedChunksRef.current.reduce(reduceMessages, [] as ClientMessage[])
+      const currentMessages = processedChunksRef.current.reduce(reduceMessages, emptyMessages)
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
 
       if (!lastAssistantId || isAnimationComplete(lastAssistantId)) {
@@ -947,7 +1041,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
   }, [filteredChunks, conversationId, queryClient])
 
-  const computedMessages = useMemo(() => filteredChunks.reduce(reduceMessages, [] as ClientMessage[]), [filteredChunks])
+  const computedMessages = useMemo(() => filteredChunks.reduce(reduceMessages, emptyMessages), [filteredChunks])
   const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
   const isAwaitingToolResults = turnState.status === 'waiting_for_tools'

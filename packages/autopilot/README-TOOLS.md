@@ -89,6 +89,31 @@ Autopilot ships an `Agent` node with a default blueprint. In the Starships hoste
 
 Even in that mode, tools are still represented as `ToolParams` and must include a `blueprint` (it’s used as part of the allowlist check in the default blueprint).
 
+## ConnectorAction and “failure”
+
+`connector_action` returns a response object like:
+
+```js
+{ status, statusText, headers, body, url }
+```
+
+It does **not** throw on non-2xx statuses by default.
+
+If you want a connector-backed call to be treated as a tool/workflow failure, prefer enabling:
+
+- `failOnNon2xx: true` on the `connector_action` node parameters
+
+You can still **explicitly throw** in a downstream `code` node when you need custom branching or error handling.
+
+Example pattern (preferred: failOnNon2xx on the connector action; then just unwrap):
+
+```js
+async function main(ctx) {
+  const resp = ctx.lastOutputOf('some_connector_action') || {};
+  return resp?.body?.data ?? resp?.body;
+}
+```
+
 ## Code node requirement (inside tools)
 
 When authoring `code` nodes inside tool blueprints, you must define:

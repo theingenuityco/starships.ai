@@ -187,18 +187,104 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
 
     expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
     expect(typeof msgs[2]?.content).toBe('string');
-    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({
-      success: true,
-      data: { toolCallId: 'call_1', result: { label: 'A', input: { value: 'one' } } },
-    });
+    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({ success: true, data: { label: 'A', input: { value: 'one' } } });
 
     expect(msgs[3]).toMatchObject({ role: 'tool', toolCallId: 'call_2' });
     expect(typeof msgs[3]?.content).toBe('string');
-    expect(JSON.parse(String(msgs[3]?.content))).toMatchObject({
-      success: true,
-      data: { toolCallId: 'call_2', result: { label: 'B', input: { value: 'two' } } },
-    });
+    expect(JSON.parse(String(msgs[3]?.content))).toMatchObject({ success: true, data: { label: 'B', input: { value: 'two' } } });
 
     expect(msgs[4]).toMatchObject({ role: 'assistant', content: 'done' });
+  });
+
+  it('does not infer failure from inner status without an explicit throw', async () => {
+    const toolA = makeTool('tool_a', 'A');
+
+    let llmCallCount = 0;
+    const hostRuntime: HostRuntime = {
+      http: async () => {
+        throw new Error('http not used in this test');
+      },
+      connectorAction: async ({ connector, action, args, timeoutMs }) => {
+        const objArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) as Record<string, unknown>;
+        const toolCallId = String(objArgs.toolCallId ?? '');
+
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: {
+            success: true,
+            data: {
+              toolCallId,
+              // Inner tool result looks like an HTTP 400 response.
+              // The agent wrapper should NOT reinterpret this as failure.
+              result: { status: 400, statusText: 'Bad Request', body: { success: false, error: { code: 'VALIDATION_ERROR', message: 'bad' } } },
+            },
+          },
+          url: `connector://${String(connector)}/${String(action)}`,
+          timeoutMs,
+        };
+      },
+      llm: async () => {
+        llmCallCount++;
+        if (llmCallCount === 1) {
+          async function* stream() {
+            yield {
+              id: 'resp_1',
+              model: 'test-model',
+              created: 0,
+              choices: [
+                {
+                  index: 0,
+                  delta: {
+                    tool_calls: [{ index: 0, id: 'call_1', type: 'function', function: { name: 'tool_a', arguments: '{"value":"one"}' } }],
+                  },
+                },
+              ],
+            };
+            yield { id: 'resp_1', model: 'test-model', created: 0, choices: [{ index: 0, delta: {}, finish_reason: 'tool_calls' }] };
+          }
+          return stream();
+        }
+
+        async function* stream() {
+          yield { id: 'resp_2', model: 'test-model', created: 0, choices: [{ index: 0, delta: { content: 'done' } }] };
+          yield { id: 'resp_2', model: 'test-model', created: 0, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+        }
+        return stream();
+      },
+    };
+
+    const agent = new Agent({
+      name: 'TestAgent',
+      model: 'test-model',
+      state: {
+        messages: [{ role: 'user', content: 'hi' }],
+        tools: [toolA],
+      },
+    });
+
+    const blueprint = agent.getCurrentBlueprint();
+    const execution = ExecutionItemUtils.createExecution();
+    execution.state = {
+      model: 'test-model',
+      messages: [{ role: 'user', content: 'hi' }],
+      tools: [toolA],
+    };
+
+    const engine = new Engine({ hostRuntime, failOnNodeError: false });
+    await engine.executeBlueprint(blueprint, execution);
+
+    const state = execution.state as Record<string, unknown>;
+    const msgsUnknown = state.messages;
+    expect(Array.isArray(msgsUnknown)).toBe(true);
+    const msgs = msgsUnknown as Array<Record<string, unknown>>;
+    expect(msgs).toHaveLength(4);
+    expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
+    const parsed = JSON.parse(String(msgs[2]?.content));
+    expect(parsed).toMatchObject({
+      success: true,
+      data: { status: 400, body: { success: false, error: { code: 'VALIDATION_ERROR', message: 'bad' } } },
+    });
   });
 });

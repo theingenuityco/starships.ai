@@ -8,18 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const docsGetDocTool: ToolParams = {
   name: 'Get Doc',
   slug: 'get-doc',
-  description: `Fetch the raw markdown content for a documentation page by slug.
-
-Inputs:
-- slug: string (doc slug; nested slugs supported, e.g., "core-concepts/tools")
-
-Output:
-- { slug: string, title: string, content: string }
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing baseUrl, invalid slug, not found (404), network errors`,
+  description:
+    'Fetch the raw markdown content for a Starships documentation page by slug (nested slugs supported, no extension). Returns { slug, title, content }.',
   parameters: {
     type: 'object',
     properties: {
@@ -55,6 +45,7 @@ Behavior and limits:
         parameters: {
           connector: 'starships',
           action: 'get-doc',
+          failOnNon2xx: true,
           args: {
             slug: '{{ (lastOutputOf("validate") || {}).slug }}',
           },
@@ -108,7 +99,7 @@ export const docsGetDocToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: docsGetDocTool.blueprint,
 
   slug: 'get-doc',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'data',
   exampleUsage: '{ "slug": "core-concepts/tools" } // returns markdown content; env baseUrl inferred',
   requiresApiKey: false,

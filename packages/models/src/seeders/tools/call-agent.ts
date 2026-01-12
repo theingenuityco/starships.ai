@@ -12,52 +12,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentCallTool: ToolParams = {
   name: 'Call Agent',
   slug: 'call-agent',
-  description: `Call another agent on this starship in a linked child conversation.
-
-## Purpose
-Use this tool to delegate work to another agent while preserving a parent/child
-relationship between conversations. The child conversation records the
-delegated agent's turns and usage separately, while remaining attached to the
-current conversation for navigation and auditing.
-
-## Parameters
-- **slug**: Agent slug to call (required)
-- **content**: Text content to send as the user's message (required)
-- **childConversationId**: Optional existing child conversation to continue in
-- **parentConversationId**: Optional parent conversation id. Defaults to the current conversation when available.
-
-## Input Formats
-Example:
-\`\`\`json
-{
-  "slug": "support-agent",
-  "content": "Please handle this customer support request"
-}
-\`\`\`
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-- **CONVERSATION_ID**: Current parent conversation identifier
-
-## Behavior
-Mode A: Create new child conversation
-- When childConversationId is NOT provided:
-  - Creates a new child conversation with parentConversationId = current conversation id
-  - Assigns the target agent (by slug) to that conversation
-  - Sends the provided content as the first user message in the child conversation
-
-Mode B: Post into existing child conversation
-- When childConversationId IS provided:
-  - Sends the provided content as a new user message in that child conversation
-
-In both modes, the tool returns the childConversationId and the HTTP response
-from the message send endpoint so callers can inspect status and results.
-
-## Response & Behavior
-- **Output**: { childConversationId, status, result, message }
-- **Timeout**: 60 seconds for agent execution
-- **Common failures**: Agent not found (404), invalid configuration, execution timeout, tool errors`,
+  description:
+    'Delegate a message to another agent by slug using a linked child conversation (create a new child or continue an existing childConversationId). Returns the child conversation/message result.',
   parameters: {
     type: 'object',
     properties: {
@@ -139,6 +95,7 @@ from the message send endpoint so callers can inspect status and results.
         parameters: {
           connector: 'starships',
           action: 'create-conversation',
+          failOnNon2xx: true,
           args: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const slug = prep.slug || "";\n            const title = "Delegated • " + (slug || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentSlug: slug || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
           timeout: 10000,
         },
@@ -151,6 +108,7 @@ from the message send endpoint so callers can inspect status and results.
         parameters: {
           connector: 'starships',
           action: 'send-message',
+          failOnNon2xx: true,
           args: '{{ (() => {\n            const raw = lastOutputOf("create_child_conversation") || {};\n            const hasBody = raw && typeof raw === "object" && Object.prototype.hasOwnProperty.call(raw, "body");\n            const payload = hasBody ? raw.body : raw;\n            const data = payload && typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;\n            const cid = data && typeof data === "object" && data.id ? String(data.id) : "";\n            return {\n              conversationId: cid,\n              content: (lastOutputOf("prepare") || {}).content,\n              sync: true,\n            };\n          })() }}',
           timeout: 300000,
         },
@@ -166,6 +124,27 @@ from the message send endpoint so callers can inspect status and results.
               const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               const data = body && typeof body === 'object' && body.data ? body.data : body;
+              const conversation = data && typeof data === 'object' && data.conversation ? data.conversation : null;
+              const messages = conversation && typeof conversation === 'object' && Array.isArray(conversation.messages) ? conversation.messages : null;
+              const lastRaw = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+              const lastMessage = (() => {
+                if (!lastRaw || typeof lastRaw !== 'object') return null;
+                const m = lastRaw;
+                const role = typeof m.role === 'string' ? m.role : '';
+                const content = typeof m.content === 'string' ? m.content : '';
+                const messageType = typeof m.messageType === 'string' ? m.messageType : '';
+                const out = {
+                  ...(role ? { role } : {}),
+                  ...(messageType ? { messageType } : {}),
+                  ...(content ? { content } : {}),
+                };
+                // Only keep toolCallId when this is a tool result (minimal linking metadata).
+                const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';
+                if (role === 'tool' && toolCallId) {
+                  return { ...out, toolCallId };
+                }
+                return out;
+              })();
 
               // Extract child conversation id from previous node
               let childConversationId = null;
@@ -184,29 +163,6 @@ from the message send endpoint so callers can inspect status and results.
               }
 
               // Extract parent conversation id from prepare step (if any)
-              let parentConversationId = null;
-              try {
-                const prep = ctx.lastOutputOf && ctx.lastOutputOf('prepare') ? ctx.lastOutputOf('prepare') : null;
-                if (prep && typeof prep === 'object' && typeof prep.parentConversationId === 'string') {
-                  parentConversationId = prep.parentConversationId;
-                }
-              } catch (e) {
-                // optional; parentConversationId is best-effort
-              }
-
-              // Extract starship id from environment (for client-side cache invalidation)
-              let starshipId = null;
-              try {
-                if (ctx.env) {
-                  const sid = ctx.env('STARSHIP_ID');
-                  if (sid) {
-                    starshipId = String(sid);
-                  }
-                }
-              } catch (e) {
-                // ignore env errors
-              }
-
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
 
@@ -214,14 +170,10 @@ from the message send endpoint so callers can inspect status and results.
                 childConversationId,
                 success,
                 status,
-                result: data,
+                lastMessage,
                 message: success
                   ? 'Agent call in new child conversation completed successfully'
                   : 'Agent call in new child conversation failed',
-                // UI hint for clients: let them refresh conversation lists when a child is created
-                __ui_action: 'child_conversation_created',
-                parentConversationId,
-                starshipId,
               };
             }
           `,
@@ -236,6 +188,7 @@ from the message send endpoint so callers can inspect status and results.
         parameters: {
           connector: 'starships',
           action: 'send-message',
+          failOnNon2xx: true,
           args: {
             conversationId: '{{ (lastOutputOf("prepare") || {}).childConversationId }}',
             content: '{{ (lastOutputOf("prepare") || {}).content }}',
@@ -255,6 +208,26 @@ from the message send endpoint so callers can inspect status and results.
               const http = ctx.input;
               const body = http && typeof http === 'object' ? http.body : http;
               const data = body && typeof body === 'object' && body.data ? body.data : body;
+              const conversation = data && typeof data === 'object' && data.conversation ? data.conversation : null;
+              const messages = conversation && typeof conversation === 'object' && Array.isArray(conversation.messages) ? conversation.messages : null;
+              const lastRaw = messages && messages.length > 0 ? messages[messages.length - 1] : null;
+              const lastMessage = (() => {
+                if (!lastRaw || typeof lastRaw !== 'object') return null;
+                const m = lastRaw;
+                const role = typeof m.role === 'string' ? m.role : '';
+                const content = typeof m.content === 'string' ? m.content : '';
+                const messageType = typeof m.messageType === 'string' ? m.messageType : '';
+                const out = {
+                  ...(role ? { role } : {}),
+                  ...(messageType ? { messageType } : {}),
+                  ...(content ? { content } : {}),
+                };
+                const toolCallId = typeof m.toolCallId === 'string' ? m.toolCallId : '';
+                if (role === 'tool' && toolCallId) {
+                  return { ...out, toolCallId };
+                }
+                return out;
+              })();
 
               const prep = (ctx.lastOutputOf && ctx.lastOutputOf('prepare')) || {};
               const childConversationId = prep && prep.childConversationId ? String(prep.childConversationId) : null;
@@ -266,7 +239,7 @@ from the message send endpoint so callers can inspect status and results.
                 childConversationId,
                 success,
                 status,
-                result: data,
+                lastMessage,
                 message: success
                   ? 'Agent call in existing child conversation completed successfully'
                   : 'Agent call in existing child conversation failed'
@@ -311,7 +284,7 @@ export const agentCallToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentCallTool.blueprint,
 
   slug: 'call-agent',
-  version: '1.0.3',
+  version: '1.0.8',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Handle this request" }] } // delegate with messages\n{ "slug": "analyzer", "input": "Analyze this data in a child conversation" } // delegate with simple text',

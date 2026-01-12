@@ -8,6 +8,7 @@
 import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { fromDatabase, toDatabase, fromDatabaseArray } from '@/helpers/serialization-helper';
 import { EntityTestHelper } from './entity-test-helper';
+import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
 
 describe('ToolTemplateEntity', () => {
   let testHelper: EntityTestHelper<ToolTemplateEntity>;
@@ -246,7 +247,7 @@ describe('ToolTemplateEntity', () => {
         ToolTemplateEntity.validate({
           slug: 'test-template',
           name: 'Test Template',
-          description: 'a'.repeat(4001),
+          description: 'a'.repeat(TOOL_DESCRIPTION_MAX_LENGTH + 1),
           parameters: { type: 'object', properties: {} },
           blueprint: { nodes: [], edges: [] },
           category: 'general',

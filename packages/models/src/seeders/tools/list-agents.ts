@@ -8,24 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentListTool: ToolParams = {
   name: 'List Agents',
   slug: 'list-agents',
-  description: `List all agents on the current starship via the Starships API.
-
-When to use:
-- Inventory, discovery, or to find an agent id/slug before creation/update/testing.
-
-Inputs:
-- {} (no arguments)
-
-Implicit environment (do not pass as arguments):
-- STARSHIP_ID: derived from agent.state.starshipId
-
-Output:
-- Array of { slug, name, description, category, model } (deliberately lean; heavy fields like blueprint are omitted)
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing env, 401/403, network errors, server unavailability`,
+  description:
+    'List all agents on the current starship for discovery. Returns a lean array (slug, name, description, category) without heavy fields like blueprint.',
   parameters: {
     type: 'object',
     properties: {},
@@ -57,6 +41,7 @@ Behavior and limits:
         parameters: {
           connector: 'starships',
           action: 'list-agents',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
           },
@@ -85,7 +70,6 @@ Behavior and limits:
                 name: a && a.name,
                 description: a && a.description,
                 category: a && a.category,
-                model: a && a.model,
               }));
             }
           `,
@@ -119,11 +103,9 @@ export const agentListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentListTool.blueprint,
 
   slug: 'list-agents',
-  version: '1.0.2',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{} // returns a lean array of agents; env (baseUrl, authToken, starshipId) is inferred',
   requiresApiKey: false,
   configurationFields: [],
 };
-
-

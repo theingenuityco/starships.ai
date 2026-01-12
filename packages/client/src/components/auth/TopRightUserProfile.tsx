@@ -7,6 +7,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/hooks/useAuth'
 import { useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
 import { useWallet } from '@/hooks/useWallet'
@@ -94,6 +95,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
             <BalanceStatusIndicator valueClassName="text-xs" wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
           </span>
         </Button>
+        <ThemeToggle size="md" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${topRightControlClassName} h-10 w-10`}>

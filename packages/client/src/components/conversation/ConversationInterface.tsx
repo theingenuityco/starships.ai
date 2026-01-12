@@ -889,7 +889,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                             messageInputRef.current?.focusInput?.()
                           } catch {}
                         }}
-                        className="group flex w-full rounded-2xl bg-card border border-border/40 shadow-sm px-3 py-2 text-left transition-all duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md hover:-translate-y-1"
+                        className="group flex w-full rounded-2xl bg-card/60 backdrop-blur-sm border border-border/50 shadow-md px-3 py-2.5 text-left transition-all duration-200 hover:bg-card/80 hover:border-primary/30 hover:shadow-lg hover:-translate-y-0.5"
                       >
                         <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
                           <span className="mr-1 text-base align-top text-primary/70">“</span>

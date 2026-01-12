@@ -101,7 +101,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
           </Avatar>
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-xl font-bold leading-tight truncate">{template.name}</DialogTitle>
-            {(template as any)?.slug ? <div className="mt-0.5 font-mono text-sm text-muted-foreground truncate">{(template as any).slug}</div> : null}
+            {template.role ? <div className="mt-0.5 text-sm text-muted-foreground truncate">{template.role}</div> : null}
           </div>
         </div>
         <div className="flex-1 min-h-0 overflow-y-auto">

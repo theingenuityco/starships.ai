@@ -573,27 +573,38 @@ export class Agent implements NodeHandler {
             const toolCallId = tc?.id ?? '';
             const resp = ctx.lastOutputOf("${httpNodeRef}") || {};
             const body = resp?.body || {};
-            // Normalize tool output:
-            // - Success: unwrap server envelope -> data.result (or data)
-            // - Error: unwrap server envelope -> error (or body)
-            // This keeps tool result content consistent across success/failure and avoids
-            // leaking transport-level wrappers to the model/UI.
-            let payload = body;
+            // Normalize tool-call result for the agent:
+            // - Always emit: { success: boolean, data: any }
+            //
+            // We do a shallow unwrap of the server-tools envelope (authorize-and-maybe-execute),
+            // then infer success from the *inner* tool execution result's HTTP-like status when present.
+            // This prevents "success: true" at the transport layer while the tool itself returned 400/500.
+            //
+            // Server-tools contract:
+            // - Success: { success: true, data: { toolCallId, result } }
+            // - Error:   { success: false, error: { code, message, details } }
+            let payload = { success: false, data: body };
             if (body && typeof body === 'object') {
-              const rec = body;
-              const isSuccess = rec.success === true;
-              const isError = rec.success === false;
-              if (isSuccess) {
-                const data = rec.data;
-                if (data && typeof data === 'object' && Object.prototype.hasOwnProperty.call(data, 'result')) {
-                  payload = data.result;
+              if (body.success === false) {
+                payload = { success: false, data: body.error != null ? body.error : body };
+              } else if (body.success === true) {
+                const inner = body?.data && typeof body.data === 'object' && Object.prototype.hasOwnProperty.call(body.data, 'result') ? body.data.result : body.data;
+                // If inner has an HTTP-like status, treat >=400 as failure.
+                const s = inner && typeof inner === 'object' ? inner.status : undefined;
+                const hasStatus = typeof s === 'number' && Number.isFinite(s);
+                const ok = hasStatus ? (s >= 200 && s < 300) : true;
+                if (hasStatus) {
+                  const innerBody = inner && typeof inner === 'object' ? inner.body : undefined;
+                  const data = ok ? (innerBody && typeof innerBody === 'object' ? (innerBody.data ?? innerBody) : (innerBody ?? inner))
+                                  : (innerBody && typeof innerBody === 'object' ? (innerBody.error ?? innerBody) : (innerBody ?? inner));
+                  payload = { success: ok, data };
                 } else {
-                  payload = data != null ? data : body;
+                  // No status to judge; assume success and pass through inner.
+                  payload = { success: true, data: inner };
                 }
-              } else if (isError) {
-                payload = rec.error != null ? rec.error : body;
               }
             }
+
             const content = typeof payload === 'string' ? payload : JSON.stringify(payload);
             const next = { ...(state || {}) };
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content }];
@@ -626,7 +637,7 @@ export class Agent implements NodeHandler {
             const slug = tc?.function?.name ?? 'unknown';
             const toolCallId = tc?.id ?? '';
             const next = { ...(state || {}) };
-            const payload = { ok: false, error: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." };
+            const payload = { success: false, data: { code: 'TOOL_NOT_ASSIGNED', message: "Tool '" + String(slug) + "' is not available to this agent." } };
             next.messages = [...(state?.messages ?? []), { role: 'tool', toolCallId, content: JSON.stringify(payload) }];
             const nextIdx = idx + 1;
             if (pending.length > 0 && nextIdx >= pending.length) {

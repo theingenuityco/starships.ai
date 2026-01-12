@@ -187,11 +187,11 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
 
     expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
     expect(typeof msgs[2]?.content).toBe('string');
-    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({ label: 'A', input: { value: 'one' } });
+    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({ success: true, data: { label: 'A', input: { value: 'one' } } });
 
     expect(msgs[3]).toMatchObject({ role: 'tool', toolCallId: 'call_2' });
     expect(typeof msgs[3]?.content).toBe('string');
-    expect(JSON.parse(String(msgs[3]?.content))).toMatchObject({ label: 'B', input: { value: 'two' } });
+    expect(JSON.parse(String(msgs[3]?.content))).toMatchObject({ success: true, data: { label: 'B', input: { value: 'two' } } });
 
     expect(msgs[4]).toMatchObject({ role: 'assistant', content: 'done' });
   });

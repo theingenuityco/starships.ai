@@ -275,7 +275,10 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
     const engine = new Engine({ hostRuntime, failOnNodeError: false });
     await engine.executeBlueprint(blueprint, execution);
 
-    const msgs = (execution.state as any).messages as Array<Record<string, unknown>>;
+    const state = execution.state as Record<string, unknown>;
+    const msgsUnknown = state.messages;
+    expect(Array.isArray(msgsUnknown)).toBe(true);
+    const msgs = msgsUnknown as Array<Record<string, unknown>>;
     expect(msgs).toHaveLength(4);
     expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
     const parsed = JSON.parse(String(msgs[2]?.content));

@@ -489,6 +489,25 @@ export function ConversationMessageList({
       if (!conversationId) return
       // Log only while actively responding/streaming to keep noise low.
       if (!(isResponding || isAssistantStreaming || activeRenderedStreamingAssistantId)) return
+      const ids = renderMessages.map(m => String((m as any)?.id ?? ''))
+      const idCounts = new Map<string, number>()
+      for (const id of ids) idCounts.set(id, (idCounts.get(id) || 0) + 1)
+      const dupIds = Array.from(idCounts.entries())
+        .filter(([, n]) => n > 1)
+        .map(([id, n]) => ({ id, n }))
+        .slice(0, 10)
+      const tailMeta = renderMessages.slice(-6).map(m => ({
+        id: String((m as any)?.id ?? ''),
+        role: String((m as any)?.role ?? ''),
+        messageType: String((m as any)?.messageType ?? ''),
+        streaming: Boolean((m as any)?.streaming),
+        contentLen: typeof (m as any)?.content === 'string' ? (m as any).content.length : 0,
+        reasoningLen: typeof (m as any)?.reasoning === 'string' ? (m as any).reasoning.length : 0,
+        toolCallsLen: Array.isArray((m as any)?.toolCalls) ? (m as any).toolCalls.length : 0,
+        toolResultsLen: Array.isArray((m as any)?.toolResults) ? (m as any).toolResults.length : 0,
+        createdAt: String((m as any)?.createdAt ?? ''),
+        updatedAt: String((m as any)?.updatedAt ?? ''),
+      }))
       const tail = renderMessages.slice(-6).map(m => ({
         id: String(m.id),
         role: (m as any)?.role,
@@ -506,12 +525,14 @@ export function ConversationMessageList({
           runId: 'post-fix-2',
           hypothesisId: 'F',
           location: 'ConversationMessageList.tsx:useEffect:renderOrder',
-          message: 'Render order tail (createdAt-sorted)',
+          message: 'Render order tail (createdAt-sorted) v2',
           data: {
             conversationId,
             isResponding: Boolean(isResponding),
             isAssistantStreaming: Boolean(isAssistantStreaming),
             activeRenderedStreamingAssistantId: activeRenderedStreamingAssistantId ?? null,
+            dupIds,
+            tailMeta,
             tail,
             streamIdsInTail,
           },

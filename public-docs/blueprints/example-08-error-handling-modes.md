@@ -4,6 +4,8 @@ Goal: Demonstrate Engine `failOnNodeError` behavior.
 
 Scenario: HTTP 404 triggers an error.
 
+Note: this example uses `http_request`, which throws on non-2xx. Connector-backed calls made via `connector_action` do not throw on non-2xx by default; you must explicitly throw (typically via a `code` node) if you want a connector response to fail a workflow.
+
 Code (fail-fast, default)
 
 ```ts

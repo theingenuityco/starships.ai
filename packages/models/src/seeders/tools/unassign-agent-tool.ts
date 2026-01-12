@@ -9,7 +9,7 @@ export const agentUnassignToolTool: ToolParams = {
   name: 'Unassign Agent Tool',
   slug: 'unassign-agent-tool',
   description:
-    'Unassign a tool from an agent by slug on the current starship (deletes the Agent→Tool relationship). Returns the updated agent or server response.',
+    'Unassign a tool from an agent by slug on the current starship (deletes the Agent→Tool relationship). Returns { ok: true } on success.',
   parameters: {
     type: 'object',
     properties: {
@@ -109,12 +109,27 @@ export const agentUnassignToolTool: ToolParams = {
         },
       },
       {
+        ref: 'lean',
+        type: 'code',
+        name: 'Lean Result',
+        description: 'Return minimal success payload',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              // If we reached here, connector_action succeeded (failOnNon2xx would have failed the run).
+              return { ok: true };
+            }
+          `,
+          timeout: 1000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated agent',
+        description: 'Return { ok: true }',
         parameters: {
-          output: '{{ lastOutputOf("http_update") }}',
+          output: '{{ lastOutputOf("lean") }}',
         },
       },
     ],
@@ -123,7 +138,8 @@ export const agentUnassignToolTool: ToolParams = {
       { ref: 'e2', from: 'prepare', to: 'fetch_agent' },
       { ref: 'e3', from: 'fetch_agent', to: 'update_tools' },
       { ref: 'e4', from: 'update_tools', to: 'http_update' },
-      { ref: 'e5', from: 'http_update', to: 'end_1' },
+      { ref: 'e5', from: 'http_update', to: 'lean' },
+      { ref: 'e6', from: 'lean', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -139,7 +155,7 @@ export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   blueprint: agentUnassignToolTool.blueprint,
 
   slug: 'unassign-agent-tool',
-  version: '1.0.3',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // remove wikipedia tool from support agent',
   requiresApiKey: false,

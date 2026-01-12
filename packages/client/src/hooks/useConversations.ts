@@ -128,8 +128,8 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
       return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000, // No cache in dev, 10 minutes in prod
   })
 }
 
@@ -148,8 +148,8 @@ export function usePendingToolApprovals(conversationId: string | null, enabled: 
       const response: FetchResponse<ApiResponse<PendingToolCallApproval[]>> = await api.get(`/api/v1/conversations/${id}/tool-approvals/pending`)
       return response.data.data || []
     },
-    staleTime: 5_000,
-    gcTime: 60_000,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5_000, // No cache in dev
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000, // No cache in dev
     refetchOnWindowFocus: true,
   })
 }
@@ -297,8 +297,8 @@ export function useConversationAgents(conversationId: string | null) {
       return response.data.data.agents || []
     },
     enabled: !!conversationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000, // No cache in dev, 10 minutes in prod
   })
 }
 
@@ -346,7 +346,7 @@ export function useConversationDetail(conversationId: string | null) {
       return response.data.data
     },
     enabled: !!conversationId,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 30 * 1000, // No cache in dev, 30 seconds in prod
   })
 }
 

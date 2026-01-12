@@ -97,20 +97,19 @@ Even in that mode, tools are still represented as `ToolParams` and must include 
 { status, statusText, headers, body, url }
 ```
 
-It does **not** throw on non-2xx statuses. If you want a connector-backed call to be treated as a tool/workflow failure, you must **explicitly throw** (typically via a `code` node after the `connector_action`).
+It does **not** throw on non-2xx statuses by default.
 
-Example pattern:
+If you want a connector-backed call to be treated as a tool/workflow failure, prefer enabling:
+
+- `failOnNon2xx: true` on the `connector_action` node parameters
+
+You can still **explicitly throw** in a downstream `code` node when you need custom branching or error handling.
+
+Example pattern (preferred: failOnNon2xx on the connector action; then just unwrap):
 
 ```js
 async function main(ctx) {
   const resp = ctx.lastOutputOf('some_connector_action') || {};
-  const status = resp?.status;
-  if (typeof status === 'number' && (status < 200 || status >= 300)) {
-    const body = resp?.body;
-    const err = body?.error ?? body;
-    const msg = typeof err?.message === 'string' ? err.message : `Request failed (${status})`;
-    throw new Error(msg);
-  }
   return resp?.body?.data ?? resp?.body;
 }
 ```

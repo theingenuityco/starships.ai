@@ -25,6 +25,7 @@ export const modelsListTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'list-models',
+          failOnNon2xx: true,
           args: {},
           timeout: 10000,
         },
@@ -81,7 +82,7 @@ export const modelsListToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: modelsListTool.blueprint,
 
   slug: 'list-models',
-  version: '1.0.4',
+  version: '1.0.6',
   category: 'automation',
   exampleUsage: '{} // returns array of model IDs as strings (e.g., "anthropic/claude-sonnet-4.5")',
   requiresApiKey: false,

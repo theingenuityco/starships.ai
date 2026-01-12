@@ -95,6 +95,7 @@ export const agentCallTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'create-conversation',
+          failOnNon2xx: true,
           args: '{{ (() => {\n            const prep = lastOutputOf("prepare") || {};\n            const slug = prep.slug || "";\n            const title = "Delegated • " + (slug || "agent");\n            let parentConversationId = prep.parentConversationId;\n            try {\n              const fromEnv = env("CONVERSATION_ID");\n              if (!parentConversationId && fromEnv) {\n                parentConversationId = String(fromEnv);\n              }\n            } catch (e) {}\n            return {\n              title,\n              starshipId: String(env("STARSHIP_ID")),\n              agentSlug: slug || undefined,\n              parentConversationId: parentConversationId || undefined,\n            };\n          })() }}',
           timeout: 10000,
         },
@@ -107,6 +108,7 @@ export const agentCallTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'send-message',
+          failOnNon2xx: true,
           args: '{{ (() => {\n            const raw = lastOutputOf("create_child_conversation") || {};\n            const hasBody = raw && typeof raw === "object" && Object.prototype.hasOwnProperty.call(raw, "body");\n            const payload = hasBody ? raw.body : raw;\n            const data = payload && typeof payload === "object" && Object.prototype.hasOwnProperty.call(payload, "data") ? payload.data : payload;\n            const cid = data && typeof data === "object" && data.id ? String(data.id) : "";\n            return {\n              conversationId: cid,\n              content: (lastOutputOf("prepare") || {}).content,\n              sync: true,\n            };\n          })() }}',
           timeout: 300000,
         },
@@ -186,6 +188,7 @@ export const agentCallTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'send-message',
+          failOnNon2xx: true,
           args: {
             conversationId: '{{ (lastOutputOf("prepare") || {}).childConversationId }}',
             content: '{{ (lastOutputOf("prepare") || {}).content }}',
@@ -281,7 +284,7 @@ export const agentCallToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentCallTool.blueprint,
 
   slug: 'call-agent',
-  version: '1.0.7',
+  version: '1.0.8',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Handle this request" }] } // delegate with messages\n{ "slug": "analyzer", "input": "Analyze this data in a child conversation" } // delegate with simple text',

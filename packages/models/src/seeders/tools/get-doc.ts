@@ -45,6 +45,7 @@ export const docsGetDocTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-doc',
+          failOnNon2xx: true,
           args: {
             slug: '{{ (lastOutputOf("validate") || {}).slug }}',
           },
@@ -98,7 +99,7 @@ export const docsGetDocToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' 
   blueprint: docsGetDocTool.blueprint,
 
   slug: 'get-doc',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'data',
   exampleUsage: '{ "slug": "core-concepts/tools" } // returns markdown content; env baseUrl inferred',
   requiresApiKey: false,

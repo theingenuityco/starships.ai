@@ -80,6 +80,7 @@ export const createWidgetTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'search-docs',
+          failOnNon2xx: true,
           args: {
             q: '{{ (lastOutputOf("validate_input") || {}).query }}',
             limit: 10,
@@ -115,6 +116,7 @@ export const createWidgetTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'create-widget',
+          failOnNon2xx: true,
           args: {
             name: '{{ (lastOutputOf("validate_input") || {}).name }}',
             description: '{{ (lastOutputOf("validate_input") || {}).description }}',
@@ -176,7 +178,7 @@ export const createWidgetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt
   blueprint: createWidgetTool.blueprint,
 
   slug: 'create-widget',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'utility',
   exampleUsage: 'Step 1 (search): { "name": "Sales Chart", "description": "Pie chart showing sales", "query": "pie chart" }\nStep 2 (create): { "name": "Sales Chart", "description": "Pie chart showing sales", "widgetType": "PieChart", "props": { "title": "Q4 Sales", "segments": [{ "label": "Electronics", "value": 40 }] } }',
   requiresApiKey: false,

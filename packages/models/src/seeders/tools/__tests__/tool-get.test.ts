@@ -162,8 +162,10 @@ describe('Tool Get Tool', () => {
         connectorAction: connectorActionMock,
       };
 
-      // connector_action nodes do not throw on non-2xx; this tool returns the connector body payload.
+      // With failOnNon2xx enabled on the connector_action node, non-2xx responses are surfaced
+      // as a Tool node error payload (ok=false) with the most relevant message we can extract.
       await expect(executeToolWithMockRuntime({ slug: 'missing' }, hostRuntime)).resolves.toMatchObject({
+        ok: false,
         error: 'Not Found',
       });
     });

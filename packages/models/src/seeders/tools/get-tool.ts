@@ -46,6 +46,7 @@ export const toolGetTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-tool',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
@@ -100,7 +101,7 @@ export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | '
   blueprint: toolGetTool.blueprint,
 
   slug: 'get-tool',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{ "slug": "calc" } // returns full tool model; connector infers starship context',
   requiresApiKey: false,

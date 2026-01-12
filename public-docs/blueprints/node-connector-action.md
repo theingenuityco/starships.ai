@@ -21,6 +21,7 @@ Specification (authoritative)
   - connector: string (required) — connector slug/provider (e.g. `"starships"` or any provider configured via `connector_templates`)
   - action: string (required) — endpoint name from the connector template (e.g. `"list-issues"`)
   - args?: Record<string, unknown> (optional)
+  - failOnNon2xx?: boolean (optional; default false) — when true, the node throws on non-2xx responses
   - timeout?: number (ms; default 30000)
 
 Execution behavior
@@ -42,25 +43,24 @@ Execution behavior
 
 Error behavior (important)
 
-- `connector_action` **does not throw** on non-2xx HTTP statuses.
+- `connector_action` **does not throw by default** on non-2xx HTTP statuses.
   - Non-2xx responses are returned as normal output via the `{ status, body, ... }` wrapper.
-  - If you want a non-2xx connector call to be treated as a workflow/tool failure, you must **explicitly throw** (typically via a downstream `code` node that checks `status`).
+  - If you want a non-2xx connector call to be treated as a workflow/tool failure, you can enable:
+    - `parameters.failOnNon2xx: true` (recommended when you want “fail-fast” behavior)
+  - Alternatively (or when you want custom logic), you can still **explicitly throw** via a downstream `code` node that checks `status`.
 
 Example pattern (throw on non-2xx)
+
+Option A (preferred): enable `failOnNon2xx` on the connector_action node and only unwrap in code
 
 ```js
 async function main(ctx) {
   const resp = ctx.lastOutputOf('some_connector_action') || {};
-  const status = resp?.status;
-  if (typeof status === 'number' && (status < 200 || status >= 300)) {
-    const body = resp?.body;
-    const err = body?.error ?? body;
-    const msg = typeof err?.message === 'string' ? err.message : 'Request failed (' + String(status) + ')';
-    throw new Error(msg);
-  }
   return resp?.body?.data ?? resp?.body;
 }
 ```
+
+Option B: explicit throw in code (when you need conditional handling)
 
 Validation rules
 

@@ -113,8 +113,37 @@ export function ConversationMessageList({
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
-    // Sort ascending by createdAt
-    const sortedMessages = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime())
+    // Sort ascending by createdAt, with a special rule for the active stream placeholder.
+    //
+    // Why:
+    // During an active turn the backend streams deltas into a stable placeholder message id:
+    // `stream-${turnId}`. Tool-call messages can be persisted as separate assistant messages with a
+    // slightly later createdAt, which would cause the placeholder bubble to appear *above* them.
+    // Then, when more deltas arrive, it looks like "streaming resumed from an earlier message"
+    // even though the correct messageId is being updated.
+    //
+    // UX: while streaming, keep the stream placeholder pinned to the bottom of the list.
+    const toTime = (s: any): number => {
+      const t = typeof s === 'string' ? Date.parse(s) : NaN
+      return Number.isFinite(t) ? t : 0
+    }
+    const sortKey = (m: any): number => {
+      const base = toTime(m?.createdAt)
+      const id = typeof m?.id === 'string' ? m.id : ''
+      const streaming = Boolean(m?.streaming)
+      if (streaming && id.startsWith('stream-')) return Number.MAX_SAFE_INTEGER
+      return base
+    }
+    const sortedMessages = [...messages].sort((a, b) => {
+      const ka = sortKey(a as any)
+      const kb = sortKey(b as any)
+      if (ka !== kb) return ka - kb
+      // Tie-breaker: createdAt then id for deterministic order
+      const ta = toTime((a as any)?.createdAt)
+      const tb = toTime((b as any)?.createdAt)
+      if (ta !== tb) return ta - tb
+      return String((a as any)?.id ?? '').localeCompare(String((b as any)?.id ?? ''))
+    })
 
     // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
     // IMPORTANT: For assistant messages with tool calls, deduplicate by (id + toolCallIds) to preserve
@@ -452,6 +481,46 @@ export function ConversationMessageList({
     lastRenderedMessage?.toolResults,
     shouldShowGapLoader,
   ])
+
+  // #region agent log
+  // Debug: prove whether createdAt-sorting causes the streaming message to appear "earlier" after reload.
+  useEffect(() => {
+    try {
+      if (!conversationId) return
+      // Log only while actively responding/streaming to keep noise low.
+      if (!(isResponding || isAssistantStreaming || activeRenderedStreamingAssistantId)) return
+      const tail = renderMessages.slice(-6).map(m => ({
+        id: String(m.id),
+        role: (m as any)?.role,
+        createdAt: String((m as any)?.createdAt ?? ''),
+        updatedAt: String((m as any)?.updatedAt ?? ''),
+        streaming: Boolean((m as any)?.streaming),
+        hasToolCalls: Array.isArray((m as any)?.toolCalls) && (m as any).toolCalls.length > 0,
+      }))
+      const streamIdsInTail = tail.filter(x => x.id.startsWith('stream-')).map(x => x.id)
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'post-fix-2',
+          hypothesisId: 'F',
+          location: 'ConversationMessageList.tsx:useEffect:renderOrder',
+          message: 'Render order tail (createdAt-sorted)',
+          data: {
+            conversationId,
+            isResponding: Boolean(isResponding),
+            isAssistantStreaming: Boolean(isAssistantStreaming),
+            activeRenderedStreamingAssistantId: activeRenderedStreamingAssistantId ?? null,
+            tail,
+            streamIdsInTail,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {})
+    } catch {}
+  }, [conversationId, isResponding, isAssistantStreaming, activeRenderedStreamingAssistantId, lastRenderedProgressKey])
+  // #endregion
 
   // Initialize near-bottom status on mount / when container ref becomes available.
   useEffect(() => {

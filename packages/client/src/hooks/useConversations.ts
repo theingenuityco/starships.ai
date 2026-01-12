@@ -526,6 +526,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const cursor = typeof window !== 'undefined' ? window.localStorage.getItem(cursorKey) : null
     const url = `/api/v1/conversations/${convId}/messages?stream=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
 
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'useConversations.ts:makeSSEAsyncIterable',message:'SSE connect',data:{convId,hasCursor:!!cursor,cursor:cursor?String(cursor).slice(0,32):null,urlHasCursor:!!cursor},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+
     let closed = false
     const controller = new AbortController()
     const instanceController = new AbortController()
@@ -597,6 +601,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           if (!eventType || data == null) return
 
           if (eventType === 'snapshot') {
+            // #region agent log
+            try {
+              const snapAny: any = data
+              const turn = snapAny?.turn ?? null
+              const msgs = Array.isArray(snapAny?.messages) ? snapAny.messages : []
+              const last = msgs.length > 0 ? msgs[msgs.length - 1] : null
+              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'useConversations.ts:onmessage:snapshot',message:'SSE snapshot received',data:{convId,evId:ev.id||null,msgsLen:msgs.length,turnId:turn?.turnId??null,turnStatus:turn?.status??null,lastMsgId:last?.id??null,lastMsgRole:last?.role??null},timestamp:Date.now()})}).catch(()=>{});
+            } catch {}
+            // #endregion
             push({ type: 'snapshot', data: data as ConversationStreamSnapshot })
             return
           }
@@ -611,6 +624,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             eventType === 'message.append' ||
             eventType === 'ui_action'
           ) {
+            // #region agent log
+            try {
+              const dAny: any = data
+              const msgId = (eventType === 'assistant.delta' || eventType === 'assistant.reasoning_delta') ? (dAny?.messageId ?? null) : null
+              const turnId = (eventType === 'assistant.delta' || eventType === 'assistant.reasoning_delta' || eventType === 'turn.started' || eventType === 'turn.status') ? (dAny?.turnId ?? null) : null
+              const deltaLen = (eventType === 'assistant.delta' || eventType === 'assistant.reasoning_delta') ? (typeof dAny?.delta === 'string' ? dAny.delta.length : null) : null
+              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'useConversations.ts:onmessage:event',message:'SSE event received',data:{convId,evId:ev.id||null,eventType,turnId,msgId,deltaLen},timestamp:Date.now()})}).catch(()=>{});
+            } catch {}
+            // #endregion
             push({ type: eventType as ConversationStreamEvent['type'], data } as ConversationStreamEvent)
             return
           }
@@ -683,29 +705,43 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const turn = chunk.data.turn
       const isActiveTurn = turn && (turn.status === 'active' || turn.status === 'waiting_for_tools')
       const snap = msgs.map(m => {
-        // If this is an assistant message for an active turn, keep it as streaming so deltas can accumulate
-        const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && typeof m.turnId === 'string' && m.turnId === turn?.turnId)
+        // Only mark the *stream placeholder* as streaming on snapshot.
+        //
+        // Why:
+        // The server emits deltas targeting a single messageId (usually `stream-${turnId}`).
+        // Marking *all* assistant messages in the active turn as `streaming=true` makes the UI
+        // think multiple messages are "actively streaming", which can move the caret and confuse
+        // which bubble should visually "continue" after refresh.
+        const isStreamPlaceholder = typeof (m as any)?.id === 'string' && typeof turn?.turnId === 'string' && String((m as any).id) === `stream-${turn.turnId}`
+        const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && isStreamPlaceholder)
         return withStreaming(m, shouldStream)
       })
 
-      // Merge snapshot with existing messages using composite keys.
-      // Rationale: server snapshots may collapse multiple assistant tool-call messages into a single `id`,
-      // so a pure replacement would drop valid assistant tool-call messages and leave tool results orphaned.
-      const snapMap = new Map<string, ClientMessage>()
+      // Merge snapshot with existing messages carefully:
+      // - Snapshot is authoritative for any given message id.
+      // - We only keep "extra" messages from acc when their id is NOT present in the snapshot.
+      //
+      // Why: allowing multiple entries with the same `id` (even when toolCalls differ) breaks
+      // `assistant.delta` routing (findIndex hits the first match), which is exactly how streaming
+      // can appear to "resume" on an older bubble after refresh/tool-call phases.
+      const snapIds = new Set<string>()
       for (const m of snap) {
-        const k = toolCallKey(m)
-        if (k) snapMap.set(k, m)
+        if (m?.id != null) snapIds.add(String(m.id))
       }
       const merged: ClientMessage[] = [...snap]
       let keptFromAcc = 0
       for (const m of acc) {
-        const k = toolCallKey(m)
-        if (!k) continue
-        if (!snapMap.has(k)) {
+        const id = m?.id != null ? String(m.id) : ''
+        if (!id) continue
+        if (!snapIds.has(id)) {
           merged.push(m)
           keptFromAcc++
         }
       }
+
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'useConversations.ts:reduceMessages:snapshot',message:'reduceMessages applied snapshot',data:{convId:conversationId||null,accLen:acc.length,snapLen:snap.length,mergedLen:merged.length,keptFromAcc,isActiveTurn:!!isActiveTurn,turnId:turn?.turnId??null,turnStatus:turn?.status??null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
 
       return merged
     }
@@ -721,30 +757,40 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const msg = chunk.data.message as ClientMessage
       const messages = clone(acc)
       if (!msg || !msg.id) return messages
-      // For assistant messages with tool calls, check for duplicates using composite key (id + toolCallIds)
-      // to allow multiple assistant messages with the same id but different tool calls
-      if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
-        const msgToolCallIds = msg.toolCalls
-          .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
-          .filter(Boolean)
-          .join(',')
-        const isDuplicate = messages.some(m => {
-          if (m.id !== msg.id) return false
-          if (m.role !== 'assistant' || !Array.isArray(m.toolCalls) || m.toolCalls.length === 0) return true
-          const mToolCallIds = m.toolCalls
-            .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
-            .filter(Boolean)
-            .join(',')
-          return mToolCallIds === msgToolCallIds
-        })
-        if (isDuplicate) {
-          return messages
-        }
-      } else {
-        // For non-assistant messages or assistant messages without tool calls, use simple ID check
-        if (messages.some(m => m.id === msg.id)) {
-          return messages
-        }
+      // If a message with the same id already exists, treat this as an update rather than a new message.
+      // This avoids duplicate ids, which can cause streaming deltas to "attach" to an older copy.
+      const existingIdxById = messages.findIndex(m => m.id === msg.id)
+      if (existingIdxById !== -1) {
+        const existing = messages[existingIdxById] as ClientMessage
+        // Merge toolCalls if both have them (preserve whichever is more complete).
+        const nextToolCalls = (() => {
+          const a = Array.isArray((existing as any)?.toolCalls) ? ((existing as any).toolCalls as any[]) : []
+          const b = Array.isArray((msg as any)?.toolCalls) ? ((msg as any).toolCalls as any[]) : []
+          if (a.length === 0) return b
+          if (b.length === 0) return a
+          const out: any[] = []
+          const seen = new Set<string>()
+          const add = (tc: any) => {
+            const id = tc?.id ?? tc?.call_id ?? tc?.toolCallId
+            const key = id != null ? String(id) : `no-id-${out.length}`
+            if (seen.has(key)) return
+            seen.add(key)
+            out.push(tc)
+          }
+          // Prefer the newer message's toolCalls first, then fill with any missing from existing.
+          b.forEach(add)
+          a.forEach(add)
+          return out
+        })()
+        messages[existingIdxById] = withStreaming(
+          {
+            ...existing,
+            ...msg,
+            ...(Array.isArray(nextToolCalls) ? { toolCalls: nextToolCalls as any } : null),
+          } as ClientMessage,
+          false
+        )
+        return messages
       }
 
       // Replace the streaming placeholder message for this turn (stream-<turnId>) if present.
@@ -799,22 +845,39 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const delta = chunk.data.delta
       if (!messageId || !delta) return messages
 
-      const idx = messages.findIndex(m => m.id === messageId)
-      const now = new Date().toISOString()
+      // If there are duplicates (should be prevented, but can occur during edge-case merges),
+      // always apply deltas to the LAST occurrence so streaming continues at the tail.
+      let idx = -1
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i]?.id === messageId) {
+          idx = i
+          break
+        }
+      }
+      const at = (chunk as any)?.data?.at
+      const now = typeof at === 'string' && at.trim().length > 0 ? at : new Date().toISOString()
       if (idx === -1) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'useConversations.ts:reduceMessages:assistant_delta:newShell',message:'assistant delta created new shell (messageId not in current messages)',data:{convId:conversationId||null,chunkType:chunk.type,messageId,deltaLen:typeof delta==='string'?delta.length:null,turnId:(chunk as any)?.data?.turnId??null,existingMsgIdsTail:messages.slice(-3).map(m=>String(m.id))},timestamp:Date.now()})}).catch(()=>{});
+        // #endregion
         const shell: ClientMessage = {
           id: messageId,
           role: 'assistant',
           content: chunk.type === 'assistant.delta' ? delta : '',
           reasoning: chunk.type === 'assistant.reasoning_delta' ? delta : undefined,
           messageType: 'agent_response',
+          // Use the server event timestamp when available to keep ordering stable across refreshes.
           createdAt: now,
           updatedAt: now,
+          ...(typeof (chunk as any)?.data?.turnId === 'string' ? { turnId: String((chunk as any).data.turnId) } : null),
           streaming: true,
         } as ClientMessage
         return [...messages, shell]
       }
       const cur: ClientMessage = { ...(messages[idx] as ClientMessage) }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'useConversations.ts:reduceMessages:assistant_delta:append',message:'assistant delta appended to existing message',data:{convId:conversationId||null,chunkType:chunk.type,messageId,idx,deltaLen:typeof delta==='string'?delta.length:null,beforeLen:(chunk.type==='assistant.delta'?String(cur.content||'').length:String(cur.reasoning||'').length),turnId:(chunk as any)?.data?.turnId??null},timestamp:Date.now()})}).catch(()=>{});
+      // #endregion
       cur.updatedAt = now
       cur.streaming = true
       if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
@@ -888,6 +951,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
             const lastAssistantId = getLastAssistantMessageId(currentMessages)
             if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
+              // #region agent log
+              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B',location:'useConversations.ts:filteredChunks:queueAppend',message:'Queued assistant message.append waiting for animation complete',data:{convId:conversationId||null,queuedMsgId:msg?.id??null,lastAssistantId,hasToolCalls:false,isLastAssistantAnimationComplete:false},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
               // Queue this chunk for later processing
               queued.push(chunk)
               continue

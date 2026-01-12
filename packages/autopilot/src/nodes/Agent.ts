@@ -576,32 +576,23 @@ export class Agent implements NodeHandler {
             // Normalize tool-call result for the agent:
             // - Always emit: { success: boolean, data: any }
             //
-            // We do a shallow unwrap of the server-tools envelope (authorize-and-maybe-execute),
-            // then infer success from the *inner* tool execution result's HTTP-like status when present.
-            // This prevents "success: true" at the transport layer while the tool itself returned 400/500.
-            //
-            // Server-tools contract:
+            // IMPORTANT: In server-tools mode, the *canonical* success/failure signal is the
+            // server-tools envelope (authorize-and-maybe-execute-tool):
             // - Success: { success: true, data: { toolCallId, result } }
             // - Error:   { success: false, error: { code, message, details } }
+            //
+            // We intentionally do NOT infer failure by inspecting the inner result payload (e.g. status codes).
+            // Tools that want non-2xx to be treated as failure must throw explicitly.
             let payload = { success: false, data: body };
             if (body && typeof body === 'object') {
               if (body.success === false) {
                 payload = { success: false, data: body.error != null ? body.error : body };
               } else if (body.success === true) {
-                const inner = body?.data && typeof body.data === 'object' && Object.prototype.hasOwnProperty.call(body.data, 'result') ? body.data.result : body.data;
-                // If inner has an HTTP-like status, treat >=400 as failure.
-                const s = inner && typeof inner === 'object' ? inner.status : undefined;
-                const hasStatus = typeof s === 'number' && Number.isFinite(s);
-                const ok = hasStatus ? (s >= 200 && s < 300) : true;
-                if (hasStatus) {
-                  const innerBody = inner && typeof inner === 'object' ? inner.body : undefined;
-                  const data = ok ? (innerBody && typeof innerBody === 'object' ? (innerBody.data ?? innerBody) : (innerBody ?? inner))
-                                  : (innerBody && typeof innerBody === 'object' ? (innerBody.error ?? innerBody) : (innerBody ?? inner));
-                  payload = { success: ok, data };
-                } else {
-                  // No status to judge; assume success and pass through inner.
-                  payload = { success: true, data: inner };
-                }
+                const inner =
+                  body?.data && typeof body.data === 'object' && Object.prototype.hasOwnProperty.call(body.data, 'result')
+                    ? body.data.result
+                    : body.data;
+                payload = { success: true, data: inner };
               }
             }
 

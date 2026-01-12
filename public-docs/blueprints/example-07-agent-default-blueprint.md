@@ -4,6 +4,21 @@ Goal: Use `Agent` to auto-generate a full tool-enabled loop when no blueprint is
 
 Important: The current default Agent blueprint delegates tool execution to the **Starships server** via a `connector_action` call (`connector: "starships"`, `action: "authorize-and-maybe-execute-tool"`). This example is intended for the hosted Starships environment (or an embedding host that provides an equivalent Starships connector template + sessions).
 
+Tool result output note (server-tools mode)
+
+- The default agent loop appends tool results into `execution.state.messages` as `role: "tool"` messages.
+- Each tool result message content is a JSON string with a stable wrapper:
+
+```json
+{ "success": true, "data": <tool_output> }
+```
+
+or on failure:
+
+```json
+{ "success": false, "data": <error_object> }
+```
+
 Code
 
 ```ts

@@ -8,7 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const duckduckgoTool: ToolParams = {
   name: 'duckduckgo_instant',
   slug: 'duckduckgo-instant',
-  description: 'Get instant answers, definitions, calculations, and quick facts from DuckDuckGo',
+  description: 'Fetch instant answers, definitions, calculations, and quick facts from DuckDuckGo.',
   parameters: {
     type: 'object',
     properties: {

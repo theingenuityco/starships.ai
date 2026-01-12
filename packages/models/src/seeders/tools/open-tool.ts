@@ -9,7 +9,7 @@ export const toolOpenTool: ToolParams = {
   name: 'Open Tool',
   slug: 'open-tool',
   description:
-    'Create a new tool (provide name + description; server generates slug) or open an existing tool by slug on the current starship. Returns the tool model.',
+    'Create a new tool (provide name + description; server generates slug) or open an existing tool by slug on the current starship. Returns a lean tool summary (no blueprint).',
   parameters: {
     type: 'object',
     properties: {
@@ -135,12 +135,55 @@ export const toolOpenTool: ToolParams = {
         },
       },
       {
+        ref: 'slim',
+        type: 'code',
+        name: 'Slim Tool',
+        description: 'Return a lean tool summary (omit heavy/unneeded fields like blueprint)',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const tool = ctx.input;
+
+              // If this is already an error-like payload, pass through unchanged.
+              if (tool && typeof tool === 'object') {
+                const t = tool;
+                if (typeof t.code === 'string' && typeof t.message === 'string') {
+                  return t;
+                }
+              }
+
+              if (!tool || typeof tool !== 'object') return tool;
+
+              // ToolModel fields are not consistent across all endpoints; keep this defensive.
+              const t = tool;
+              const out = {};
+
+              // Core identity
+              if (typeof t.slug === 'string') out.slug = t.slug;
+              if (typeof t.name === 'string') out.name = t.name;
+              if (typeof t.description === 'string') out.description = t.description;
+              if (typeof t.category === 'string') out.category = t.category;
+
+              // Status/versioning
+              if (typeof t.status === 'string') out.status = t.status;
+              if (typeof t.version === 'string') out.version = t.version;
+
+              // Schema (useful for downstream tool editing)
+              if (t.parameters && typeof t.parameters === 'object') out.parameters = t.parameters;
+
+              return out;
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return tool model (created or fetched)',
+        description: 'Return lean tool summary (created or fetched)',
         parameters: {
-          output: '{{ lastOutputOf("unwrap") }}',
+          output: '{{ lastOutputOf("slim") }}',
         },
       },
     ],
@@ -151,7 +194,8 @@ export const toolOpenTool: ToolParams = {
       { ref: 'e4', from: 'create_tool', to: 'unwrap' },
       { ref: 'e5', from: 'route_mode', to: 'get_tool', condition: 'false' },
       { ref: 'e6', from: 'get_tool', to: 'unwrap' },
-      { ref: 'e7', from: 'unwrap', to: 'end_1' },
+      { ref: 'e7', from: 'unwrap', to: 'slim' },
+      { ref: 'e8', from: 'slim', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -167,7 +211,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolOpenTool.blueprint,
 
   slug: 'open-tool',
-  version: '1.0.6',
+  version: '1.0.8',
   category: 'automation',
   exampleUsage:
     '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (server generates slug; env inferred)',

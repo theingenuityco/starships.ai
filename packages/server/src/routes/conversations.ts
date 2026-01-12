@@ -339,7 +339,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // For waiting_for_tools (tool approval flow), augmenting can inject a synthetic `stream-${turnId}`
         // assistant message even though the DB already contains the tool-call assistant message, which
         // leads to perceived duplicates / ordering glitches after refresh.
-        ((latestTurn.status as StreamTurnStatus) === 'active')
+        (latestTurn.status as StreamTurnStatus) === 'active'
           ? latestTurn.id
           : null;
 

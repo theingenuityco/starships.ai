@@ -436,18 +436,20 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
               if (!alreadyPersisted) {
                 const now = new Date().toISOString();
                 const at = buf.lastAt || buf.firstAt || now;
+                // CRITICAL FIX: Send empty streaming placeholder instead of replayed content
+                // to avoid showing stale deltas from previous turns. The live stream will
+                // populate it with fresh content.
                 const derivedAssistantMsg: MessageModel = {
                   id: bestId,
                   role: 'assistant',
-                  content: buf.content || '',
+                  content: '', // Empty - let live stream populate it
                   messageType: 'agent_response',
                   createdAt: buf.firstAt || at,
                   updatedAt: at,
                   turnId: activeTurnId,
-                  ...(buf.reasoning && { reasoning: buf.reasoning }),
                 };
                 // #region agent log
-                try { const fs3 = require('fs'); fs3.appendFileSync('/Users/brayn003/theingenuityco/starships.ai/.cursor/debug.log', JSON.stringify({location:'conversations.ts:443',message:'derived message added',data:{conversationId,derivedMsgId:bestId,contentLen:buf.content.length,contentPreview:buf.content.substring(0,50),dbMsgCount:conversationMessages.length,dbMsgIds:conversationMessages.map((m:any)=>m.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})+'\n'); } catch (logErr) {}
+                try { const fs3 = require('fs'); fs3.appendFileSync('/Users/brayn003/theingenuityco/starships.ai/.cursor/debug.log', JSON.stringify({location:'conversations.ts:443',message:'derived message added (EMPTY)',data:{conversationId,derivedMsgId:bestId,replayedContentLen:buf.content.length,replayedContentPreview:buf.content.substring(0,50),sentContentLen:0,dbMsgCount:conversationMessages.length,dbMsgIds:conversationMessages.map((m:any)=>m.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'EMPTY_SNAPSHOT_FIX'})+'\n'); } catch (logErr) {}
                 // #endregion
                 snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
               }

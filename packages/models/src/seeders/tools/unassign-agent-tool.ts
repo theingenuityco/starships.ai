@@ -8,31 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentUnassignToolTool: ToolParams = {
   name: 'Unassign Agent Tool',
   slug: 'unassign-agent-tool',
-  description: `Remove a tool from an agent by deleting the Agent→Tool relationship.
-
-## Purpose
-Revoke an agent's access to a specific tool by its slug.
-
-## Required Parameters
-- **agentSlug**: Agent slug to update
-- **toolSlug**: Tool slug to remove
-
-## Behavior
-1. Fetches current agent by slug
-2. Calls DELETE /agents/:id/tools/:toolSlug?starshipId=... to remove relationship
-3. Returns server response
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-
-## Response
-Returns server response.
-
-## Common Failures
-- Agent not found (404)
-- Missing environment variables
-- Invalid slugs`,
+  description:
+    'Unassign a tool from an agent by slug on the current starship (deletes the Agent→Tool relationship). Returns { ok: true } on success.',
   parameters: {
     type: 'object',
     properties: {
@@ -79,6 +56,7 @@ Returns server response.
         parameters: {
           connector: 'starships',
           action: 'get-agent',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).agentSlug }}',
@@ -122,6 +100,7 @@ Returns server response.
         parameters: {
           connector: 'starships',
           action: 'unassign-agent-tool',
+          failOnNon2xx: true,
           args: {
             agentId: '{{ (lastOutputOf("update_tools") || {}).agentId }}',
             toolSlug: '{{ (lastOutputOf("update_tools") || {}).toolSlug }}',
@@ -130,12 +109,27 @@ Returns server response.
         },
       },
       {
+        ref: 'lean',
+        type: 'code',
+        name: 'Lean Result',
+        description: 'Return minimal success payload',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              // If we reached here, connector_action succeeded (failOnNon2xx would have failed the run).
+              return { ok: true };
+            }
+          `,
+          timeout: 1000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated agent',
+        description: 'Return { ok: true }',
         parameters: {
-          output: '{{ lastOutputOf("http_update") }}',
+          output: '{{ lastOutputOf("lean") }}',
         },
       },
     ],
@@ -144,7 +138,8 @@ Returns server response.
       { ref: 'e2', from: 'prepare', to: 'fetch_agent' },
       { ref: 'e3', from: 'fetch_agent', to: 'update_tools' },
       { ref: 'e4', from: 'update_tools', to: 'http_update' },
-      { ref: 'e5', from: 'http_update', to: 'end_1' },
+      { ref: 'e5', from: 'http_update', to: 'lean' },
+      { ref: 'e6', from: 'lean', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -160,7 +155,7 @@ export const agentUnassignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   blueprint: agentUnassignToolTool.blueprint,
 
   slug: 'unassign-agent-tool',
-  version: '1.0.2',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // remove wikipedia tool from support agent',
   requiresApiKey: false,

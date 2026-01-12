@@ -33,6 +33,24 @@ Generated default blueprint (when omitted)
   - This means there is **no persisted tool result message** for that tool call at this point (no interim/placeholder tool output is recorded).
   - The tool `role: "tool"` message (with the final approved result or a denial payload) is only **persisted after** a user approve/deny action resolves the pending approval, at which point the server continues the agent turn.
 
+Tool result message shape (server-tools mode)
+
+- For each completed tool call (permission === allow), the default blueprint appends a `role: "tool"` message to `execution.state.messages` with:
+  - `toolCallId`: the tool call id from the LLM response
+  - `content`: a JSON string of the form:
+
+```json
+{ "success": true, "data": <tool_output> }
+```
+
+- If the server-tools call fails (permission denied, validation, internal error), the appended tool message content is:
+
+```json
+{ "success": false, "data": <error_object> }
+```
+
+Important: the default Agent loop determines success/failure from the server-tools envelope (`{ success, data/error }`). It does **not** inspect the tool output payload to infer failure (for example, it does not treat an inner `{ status: 400 }` object as failure automatically). If a tool wants a non-2xx connector response to be treated as failure, it should explicitly throw.
+
 Execution behavior
 
 - Execution state is created; `state` (messages/tools) is merged into `execution.state`.

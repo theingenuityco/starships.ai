@@ -6,9 +6,9 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * Echo back the provided input for testing purposes
  */
 export const echoTool: ToolParams = {
-  name: 'echo',
+  name: 'Echo',
   slug: 'echo',
-  description: 'Echo back the provided input for testing purposes',
+  description: 'Echo back the provided input for testing purposes.',
   parameters: {
     type: 'object',
     properties: {

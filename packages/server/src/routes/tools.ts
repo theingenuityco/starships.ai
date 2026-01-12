@@ -7,7 +7,7 @@ import { IdSchema, SlugSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from
 import { ToolRepository, ToolTemplateRepository, StarshipRepository, UserRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
-import { sendError, sendSuccess } from '../utils/responseHelpers';
+import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
@@ -23,7 +23,7 @@ const CreateToolSchema = z
       .min(1, 'Name is required')
       .max(100, 'Name must be less than 100 characters')
       .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
-    description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional().default(''),
+    description: z.string().min(0).max(320, 'Description must be less than or equal to 320 characters').optional().default(''),
     parameters: z
       .object({
         type: z.literal('object'),
@@ -102,7 +102,7 @@ const UpdateToolSchema = z.object({
     .max(100, 'Name must be less than 100 characters')
     .optional()
     .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
-  description: z.string().min(0).max(4000, 'Description must be less than 4000 characters').optional(),
+  description: z.string().min(0).max(320, 'Description must be less than or equal to 320 characters').optional(),
   parameters: z
     .object({
       type: z.literal('object'),
@@ -372,8 +372,7 @@ router.post('/starships/:starshipId/tools', jwtAuthMiddleware, validateToolBalan
     console.log(`[TOOLS] Tool created successfully: ${tool.slug} for starship ${starshipId}`);
     sendSuccess(res, tool, 201);
   } catch (error) {
-    console.error('[TOOLS] Error creating tool:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create tool');
+    handleError(error, res, 'create tool', 'Failed to create tool');
   }
 });
 
@@ -457,8 +456,7 @@ router.put('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Response):
 
     sendSuccess(res, tool);
   } catch (error) {
-    console.error('[TOOLS] Error updating tool:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update tool');
+    handleError(error, res, 'update tool', 'Failed to update tool');
   }
 });
 

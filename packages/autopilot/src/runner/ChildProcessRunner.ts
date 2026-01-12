@@ -44,7 +44,7 @@ export interface ChildProcessRunnerOptions {
 type ChildMessage =
   | { type: 'event'; event: unknown }
   | { type: 'done'; result: ExecutionItem[] }
-  | { type: 'error'; error: { message?: string; stack?: string } };
+  | { type: 'error'; error: { message?: string; stack?: string; cause?: unknown } };
 
 function isChildMessage(msg: unknown): msg is ChildMessage {
   if (!msg || typeof msg !== 'object') return false;
@@ -222,6 +222,12 @@ export class ChildProcessRunner implements Runner {
               .finally(() => {
                 cleanup();
                 const e = new Error(msg.error?.message ?? 'Child runner error');
+                if (msg.error && 'cause' in msg.error) {
+                  // Preserve causal metadata from the child process when available.
+                  // This is used for richer server-side error mapping (e.g. surfacing VALIDATION_ERROR
+                  // instead of INTERNAL_SERVER_ERROR for connector_action failOnNon2xx).
+                  (e as unknown as { cause?: unknown }).cause = msg.error.cause;
+                }
                 rejectPromise(e);
                 try {
                   child.disconnect();

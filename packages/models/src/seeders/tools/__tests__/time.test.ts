@@ -22,7 +22,7 @@ describe('Time Tool', () => {
     });
 
     it('should have correct tool name', () => {
-      expect(timeTool.name).toBe('get_current_time');
+      expect(timeTool.name).toBe('Get Current Time');
     });
 
     it('should have descriptive description', () => {

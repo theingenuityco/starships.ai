@@ -31,7 +31,7 @@ describe('Calculator Tool', () => {
 
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
-      expect(calculatorTool.name).toBe('calculator');
+      expect(calculatorTool.name).toBe('Calculator');
       expect(calculatorTool.description).toContain('mathematical');
       expect(calculatorTool.description.length).toBeGreaterThan(10);
       expect(calculatorTool.parameters).toBeDefined();

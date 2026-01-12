@@ -40,6 +40,20 @@ export class GrpcServer {
     this.opts = opts;
   }
 
+  private static safeCauseForJson(err: unknown): unknown {
+    if (!err || typeof err !== 'object') return undefined;
+    // Preserve Error.cause when present (common for connector_action failOnNon2xx).
+    const cause = (err as { cause?: unknown }).cause;
+    if (cause === undefined) return undefined;
+    try {
+      // Ensure it's JSON-serializable (avoid crashing the error handler).
+      JSON.stringify(cause);
+      return cause;
+    } catch {
+      return undefined;
+    }
+  }
+
   async start(): Promise<void> {
     await new Promise<void>((resolve) => {
       const server = http.createServer(async (req, res) => {
@@ -168,6 +182,7 @@ export class GrpcServer {
             res.end();
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
+            const cause = GrpcServer.safeCauseForJson(err);
 
             console.error('[GrpcServer] ExecuteStream error', {
               error: message,
@@ -176,7 +191,7 @@ export class GrpcServer {
             });
             try {
               res.write(`event: error\n`);
-              res.write(`data: ${JSON.stringify({ error: { message } })}\n\n`);
+              res.write(`data: ${JSON.stringify({ error: { message, ...(cause !== undefined ? { cause } : {}) } })}\n\n`);
             } catch {
               console.error('[GrpcServer] ExecuteStream error');
             }
@@ -212,6 +227,7 @@ export class GrpcServer {
             res.end(JSON.stringify(response));
           } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
+            const cause = GrpcServer.safeCauseForJson(err);
 
             console.error('[GrpcServer] Execute error', {
               error: message,
@@ -221,7 +237,7 @@ export class GrpcServer {
             res.statusCode = 500;
             res.setHeader('Content-Type', 'application/json');
             // We cannot rely on body here; no request_id if parsing failed before
-            res.end(JSON.stringify({ error: { message } }));
+            res.end(JSON.stringify({ error: { message, ...(cause !== undefined ? { cause } : {}) } }));
           }
           return;
         }

@@ -35,7 +35,7 @@ describe('Tool Get Tool', () => {
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
       expect(toolGetTool.name).toBe('Get Tool');
-      expect(toolGetTool.description).toContain('Get full details');
+      expect(toolGetTool.description).toContain('Fetch full tool details');
       expect(toolGetTool.parameters).toBeDefined();
       expect(toolGetTool.blueprint).toBeDefined();
     });
@@ -52,7 +52,7 @@ describe('Tool Get Tool', () => {
       expect(Array.isArray(bp.edges)).toBe(true);
       // Required nodes present
       const nodeRefs = new Set(bp.nodes.map((n) => n.ref));
-      ['start_1', 'prepare', 'http_get', 'extract', 'end_1'].forEach((r) => expect(nodeRefs.has(r)).toBe(true));
+      ['start_1', 'prepare', 'http_get', 'extract', 'slim', 'end_1'].forEach((r) => expect(nodeRefs.has(r)).toBe(true));
       // Edges reference valid nodes
       for (const e of bp.edges) {
         expect(nodeRefs.has(e.from)).toBe(true);
@@ -139,9 +139,10 @@ describe('Tool Get Tool', () => {
       const result = await executeToolWithMockRuntime({ slug: 'calc' }, hostRuntime);
 
       expect(result).toBeDefined();
-      const tool = result as { id: string; slug: string; name: string };
+      const tool = result as { id?: string; slug: string; name: string; blueprint?: unknown };
       expect(tool.slug).toBe('calc');
       expect(tool.name).toBe('Calculator');
+      expect(tool.blueprint).toEqual({ nodes: [], edges: [] });
       expect(connectorActionMock).toHaveBeenCalledTimes(1);
     });
 
@@ -162,8 +163,10 @@ describe('Tool Get Tool', () => {
         connectorAction: connectorActionMock,
       };
 
-      // connector_action nodes do not throw on non-2xx; this tool returns the connector body payload.
+      // With failOnNon2xx enabled on the connector_action node, non-2xx responses are surfaced
+      // as a Tool node error payload (ok=false) with the most relevant message we can extract.
       await expect(executeToolWithMockRuntime({ slug: 'missing' }, hostRuntime)).resolves.toMatchObject({
+        ok: false,
         error: 'Not Found',
       });
     });

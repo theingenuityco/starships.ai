@@ -112,12 +112,34 @@ export const toolOpenTool: ToolParams = {
         },
       },
       {
+        ref: 'normalize',
+        type: 'code',
+        name: 'Normalize Response',
+        description: 'Unwrap Starships connector response to return tool model on success or error payload on failure',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const resp = ctx.lastOutputOf('create_tool') || ctx.lastOutputOf('get_tool') || {};
+              const body = resp && typeof resp === 'object' ? resp.body : undefined;
+              // Starships API contract: { success: true, data } OR { success: false, error }
+              if (body && typeof body === 'object') {
+                if (body.success === true) return body.data ?? body;
+                if (body.success === false) return body.error ?? body;
+              }
+              // Fallback: return whatever body was (or the raw response if body missing)
+              return body ?? resp;
+            }
+          `,
+          timeout: 3000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
         description: 'Return tool model (created or fetched)',
         parameters: {
-          output: '{{ lastOutputOf("create_tool") || lastOutputOf("get_tool") }}',
+          output: '{{ lastOutputOf("normalize") }}',
         },
       },
     ],
@@ -125,9 +147,10 @@ export const toolOpenTool: ToolParams = {
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'route_mode' },
       { ref: 'e3', from: 'route_mode', to: 'create_tool', condition: 'true' },
-      { ref: 'e4', from: 'create_tool', to: 'end_1' },
+      { ref: 'e4', from: 'create_tool', to: 'normalize' },
       { ref: 'e5', from: 'route_mode', to: 'get_tool', condition: 'false' },
-      { ref: 'e6', from: 'get_tool', to: 'end_1' },
+      { ref: 'e6', from: 'get_tool', to: 'normalize' },
+      { ref: 'e7', from: 'normalize', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -143,7 +166,7 @@ export const toolOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolOpenTool.blueprint,
 
   slug: 'open-tool',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage:
     '{ "slug": "weather-lookup" } // open existing\n{ "name": "My Tool", "description": "Does something useful" } // create new (server generates slug; env inferred)',

@@ -526,10 +526,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const cursor = typeof window !== 'undefined' ? window.localStorage.getItem(cursorKey) : null
     const url = `/api/v1/conversations/${convId}/messages?stream=true${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'D',location:'useConversations.ts:makeSSEAsyncIterable',message:'SSE connect v2',data:{convId,hasCursor:!!cursor,cursor:cursor?String(cursor).slice(0,32):null,urlHasCursor:!!cursor,url},timestamp:Date.now()})}).catch(()=>{});
-    // #endregion
-
     let closed = false
     const controller = new AbortController()
     const instanceController = new AbortController()
@@ -600,26 +596,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const data = ev.data ? JSON.parse(ev.data) : null
           if (!eventType || data == null) return
 
-          if (eventType === 'stream_debug') {
-            // #region agent log
-            try {
-              const dAny: any = data
-              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H',location:'useConversations.ts:onmessage:stream_debug',message:'SSE stream_debug received',data:{convId,evId:ev.id||null,cursor:dAny?.cursor??null,lastId:dAny?.lastId??null,len:dAny?.len??null},timestamp:Date.now()})}).catch(()=>{});
-            } catch {}
-            // #endregion
-            return
-          }
-
           if (eventType === 'snapshot') {
-            // #region agent log
-            try {
-              const snapAny: any = data
-              const turn = snapAny?.turn ?? null
-              const msgs = Array.isArray(snapAny?.messages) ? snapAny.messages : []
-              const last = msgs.length > 0 ? msgs[msgs.length - 1] : null
-              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'useConversations.ts:onmessage:snapshot',message:'SSE snapshot received',data:{convId,evId:ev.id||null,msgsLen:msgs.length,turnId:turn?.turnId??null,turnStatus:turn?.status??null,lastMsgId:last?.id??null,lastMsgRole:last?.role??null},timestamp:Date.now()})}).catch(()=>{});
-            } catch {}
-            // #endregion
             push({ type: 'snapshot', data: data as ConversationStreamSnapshot })
             return
           }
@@ -634,15 +611,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             eventType === 'message.append' ||
             eventType === 'ui_action'
           ) {
-            // #region agent log
-            try {
-              const dAny: any = data
-              const msgId = (eventType === 'assistant.delta' || eventType === 'assistant.reasoning_delta') ? (dAny?.messageId ?? null) : null
-              const turnId = (eventType === 'assistant.delta' || eventType === 'assistant.reasoning_delta' || eventType === 'turn.started' || eventType === 'turn.status') ? (dAny?.turnId ?? null) : null
-              const deltaLen = (eventType === 'assistant.delta' || eventType === 'assistant.reasoning_delta') ? (typeof dAny?.delta === 'string' ? dAny.delta.length : null) : null
-              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'useConversations.ts:onmessage:event',message:'SSE event received',data:{convId,evId:ev.id||null,eventType,turnId,msgId,deltaLen},timestamp:Date.now()})}).catch(()=>{});
-            } catch {}
-            // #endregion
             push({ type: eventType as ConversationStreamEvent['type'], data } as ConversationStreamEvent)
             return
           }
@@ -749,10 +717,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
       }
 
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'C',location:'useConversations.ts:reduceMessages:snapshot',message:'reduceMessages applied snapshot',data:{convId:conversationId||null,accLen:acc.length,snapLen:snap.length,mergedLen:merged.length,keptFromAcc,isActiveTurn:!!isActiveTurn,turnId:turn?.turnId??null,turnStatus:turn?.status??null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
-
       return merged
     }
 
@@ -813,12 +777,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
           const willReplaceStreamPlaceholder = !(hasToolCalls && !hasContent)
 
-          // #region agent log
-          try {
-            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'post-fix',hypothesisId:'J',location:'useConversations.ts:reduceMessages:message_append:streamPlaceholder',message:'message.append saw stream placeholder',data:{convId:conversationId||null,msgId:String(msg.id),msgTurnId,streamId,streamIdx:idx,hasToolCalls,hasContent,action:willReplaceStreamPlaceholder?'replace_stream_placeholder':'keep_stream_placeholder'},timestamp:Date.now()})}).catch(()=>{});
-          } catch {}
-          // #endregion
-
           // IMPORTANT:
           // During a turn with tool calls, the server can append an assistant "tool-call message"
           // (toolCalls present, content often empty) while *still* streaming deltas into `stream-<turnId>`.
@@ -875,12 +833,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
       // If there are duplicates (should be prevented, but can occur during edge-case merges),
       // always apply deltas to the LAST occurrence so streaming continues at the tail.
-      // #region agent log
-      try {
-        const occurrences = messages.reduce((n, m) => (m?.id === messageId ? n + 1 : n), 0)
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'I',location:'useConversations.ts:reduceMessages:assistant_delta:occurrences',message:'assistant delta occurrences check',data:{convId:conversationId||null,chunkType:chunk.type,messageId,occurrences,messagesLen:messages.length},timestamp:Date.now()})}).catch(()=>{});
-      } catch {}
-      // #endregion
       let idx = -1
       for (let i = messages.length - 1; i >= 0; i--) {
         if (messages[i]?.id === messageId) {
@@ -891,9 +843,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const at = (chunk as any)?.data?.at
       const now = typeof at === 'string' && at.trim().length > 0 ? at : new Date().toISOString()
       if (idx === -1) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'E',location:'useConversations.ts:reduceMessages:assistant_delta:newShell',message:'assistant delta created new shell (messageId not in current messages)',data:{convId:conversationId||null,chunkType:chunk.type,messageId,deltaLen:typeof delta==='string'?delta.length:null,turnId:(chunk as any)?.data?.turnId??null,existingMsgIdsTail:messages.slice(-3).map(m=>String(m.id))},timestamp:Date.now()})}).catch(()=>{});
-        // #endregion
         const shell: ClientMessage = {
           id: messageId,
           role: 'assistant',
@@ -909,9 +858,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         return [...messages, shell]
       }
       const cur: ClientMessage = { ...(messages[idx] as ClientMessage) }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'A',location:'useConversations.ts:reduceMessages:assistant_delta:append',message:'assistant delta appended to existing message',data:{convId:conversationId||null,chunkType:chunk.type,messageId,idx,deltaLen:typeof delta==='string'?delta.length:null,beforeLen:(chunk.type==='assistant.delta'?String(cur.content||'').length:String(cur.reasoning||'').length),turnId:(chunk as any)?.data?.turnId??null},timestamp:Date.now()})}).catch(()=>{});
-      // #endregion
       cur.updatedAt = now
       cur.streaming = true
       if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
@@ -985,9 +931,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
             const lastAssistantId = getLastAssistantMessageId(currentMessages)
             if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'pre-fix',hypothesisId:'B',location:'useConversations.ts:filteredChunks:queueAppend',message:'Queued assistant message.append waiting for animation complete',data:{convId:conversationId||null,queuedMsgId:msg?.id??null,lastAssistantId,hasToolCalls:false,isLastAssistantAnimationComplete:false},timestamp:Date.now()})}).catch(()=>{});
-              // #endregion
               // Queue this chunk for later processing
               queued.push(chunk)
               continue

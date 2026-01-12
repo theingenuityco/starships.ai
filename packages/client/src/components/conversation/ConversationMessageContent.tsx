@@ -125,24 +125,19 @@ function useSlabTypewriterText({
     }
   }, [resetKey])
 
-  // #region agent log
   // On refresh mid-stream, mount can have a large non-empty `fullText`.
   // Hydrate the typewriter to the current tail so we don't replay already streamed tokens.
   useEffect(() => {
-    try {
-      if (didHydrateOnMountRef.current) return
-      if (!hydrateFromExistingOnMount) return
-      if (!isStreaming) return
-      if (!fullText || fullText.length === 0) return
-      didHydrateOnMountRef.current = true
-      setDisplayedLength(fullText.length)
-      displayedLengthRef.current = fullText.length
-      targetLengthRef.current = fullText.length
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'post-fix-3',hypothesisId:'G',location:'ConversationMessageContent.tsx:useSlabTypewriterText:hydrate',message:'Hydrated typewriter to existing stream tail on mount',data:{resetKey,fullTextLen:fullText.length},timestamp:Date.now()})}).catch(()=>{});
-    } catch {}
+    if (didHydrateOnMountRef.current) return
+    if (!hydrateFromExistingOnMount) return
+    if (!isStreaming) return
+    if (!fullText || fullText.length === 0) return
+    didHydrateOnMountRef.current = true
+    setDisplayedLength(fullText.length)
+    displayedLengthRef.current = fullText.length
+    targetLengthRef.current = fullText.length
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hydrateFromExistingOnMount, isStreaming, fullText, resetKey])
-  // #endregion
 
   useEffect(() => {
     // Update target length ref whenever fullText changes

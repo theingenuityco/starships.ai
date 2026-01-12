@@ -28,6 +28,7 @@ import type {
   ConversationStreamEvent,
   TurnStatus as StreamTurnStatus,
   MessageModel,
+  StandardErrorCode,
 } from '@starships/protocol';
 import { buildAutopilotExecutionBundle, buildAutopilotRuntimeEnv } from '@/services/autopilot-execution-bundle';
 
@@ -182,6 +183,40 @@ function getSafeErrorMessageWithCause(error: unknown): string {
     return error.cause?.message ? `${error.message}: ${error.cause.message}` : error.message;
   }
   return error instanceof Error ? error.message : String(error);
+}
+
+function extractConnectorActionApiError(
+  error: unknown
+): { code?: string; message?: string; details?: Record<string, unknown> } | null {
+  // When connector_action is used with failOnNon2xx, the node throws an Error and attaches
+  // the raw connector response as `error.cause`:
+  //   { status, statusText, headers, body, url }
+  //
+  // If the underlying API uses the Starships ApiResponse contract:
+  //   { success:false, error:{ code, message, details } }
+  // we should preserve that error code for the server-tools envelope instead of
+  // collapsing everything to INTERNAL_SERVER_ERROR.
+  if (!(error instanceof Error)) return null;
+  const cause = (error as unknown as { cause?: unknown }).cause;
+  if (!cause || typeof cause !== 'object') return null;
+
+  const body = (cause as Record<string, unknown>).body;
+  if (!body || typeof body !== 'object') return null;
+
+  const anyBody = body as Record<string, unknown>;
+  if (anyBody.success !== false) return null;
+
+  const err = anyBody.error;
+  if (!err || typeof err !== 'object') return null;
+  const anyErr = err as Record<string, unknown>;
+
+  const code = typeof anyErr.code === 'string' && anyErr.code.trim().length > 0 ? anyErr.code : undefined;
+  const message =
+    typeof anyErr.message === 'string' && anyErr.message.trim().length > 0 ? anyErr.message : (error.message || undefined);
+  const details = anyErr.details && typeof anyErr.details === 'object' && !Array.isArray(anyErr.details) ? (anyErr.details as Record<string, unknown>) : undefined;
+
+  if (!code && !message && !details) return null;
+  return { code, message, details };
 }
 
 // tool execution uses the same runner config bundle as agent execution
@@ -761,7 +796,13 @@ router.post(
       const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
       const toolCallId = typeof body.toolCallId === 'string' ? String(body.toolCallId) : '';
       const msg = getSafeErrorMessageWithCause(e);
-      sendError(res, 'INTERNAL_SERVER_ERROR', msg, 200, { toolCallId });
+      const extracted = extractConnectorActionApiError(e);
+      const code = extracted?.code ?? 'INTERNAL_SERVER_ERROR';
+      const message = extracted?.message ?? msg;
+      const details = { toolCallId, ...(extracted?.details ?? {}) };
+      // extracted.code originates from Starships API responses (e.g. VALIDATION_ERROR) and
+      // is compatible with StandardErrorCode at runtime, but is not statically typed here.
+      sendError(res, code as unknown as StandardErrorCode, message, 200, details);
     }
   }
 );

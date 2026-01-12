@@ -15,9 +15,9 @@ describe('Tool Templates Test Suite', () => {
 
       // Verify we have the expected tools
       const toolNames = ALL_TOOL_TEMPLATES.map((template) => template.name);
-      expect(toolNames).toContain('calculator');
-      expect(toolNames).toContain('echo');
-      expect(toolNames).toContain('get_current_time');
+      expect(toolNames).toContain('Calculator');
+      expect(toolNames).toContain('Echo');
+      expect(toolNames).toContain('Get Current Time');
       // Test Tool template is currently named "Test Tool"
       expect(toolNames).toContain('Test Tool');
       expect(toolNames).toContain('List Tools');
@@ -93,9 +93,9 @@ describe('Tool Templates Test Suite', () => {
       expect(utilityTools.length).toBeGreaterThan(0);
 
       const utilityNames = utilityTools.map((t) => t.name);
-      expect(utilityNames).toContain('calculator');
-      expect(utilityNames).toContain('echo');
-      expect(utilityNames).toContain('get_current_time');
+      expect(utilityNames).toContain('Calculator');
+      expect(utilityNames).toContain('Echo');
+      expect(utilityNames).toContain('Get Current Time');
     });
 
     it('should test automation tools', () => {

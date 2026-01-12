@@ -185,9 +185,7 @@ function getSafeErrorMessageWithCause(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-function extractConnectorActionApiError(
-  error: unknown
-): { code?: string; message?: string; details?: Record<string, unknown> } | null {
+function extractConnectorActionApiError(error: unknown): { code?: string; message?: string; details?: Record<string, unknown> } | null {
   // When connector_action is used with failOnNon2xx, the node throws an Error and attaches
   // the raw connector response as `error.cause`:
   //   { status, statusText, headers, body, url }
@@ -211,9 +209,11 @@ function extractConnectorActionApiError(
   const anyErr = err as Record<string, unknown>;
 
   const code = typeof anyErr.code === 'string' && anyErr.code.trim().length > 0 ? anyErr.code : undefined;
-  const message =
-    typeof anyErr.message === 'string' && anyErr.message.trim().length > 0 ? anyErr.message : (error.message || undefined);
-  const details = anyErr.details && typeof anyErr.details === 'object' && !Array.isArray(anyErr.details) ? (anyErr.details as Record<string, unknown>) : undefined;
+  const message = typeof anyErr.message === 'string' && anyErr.message.trim().length > 0 ? anyErr.message : error.message || undefined;
+  const details =
+    anyErr.details && typeof anyErr.details === 'object' && !Array.isArray(anyErr.details)
+      ? (anyErr.details as Record<string, unknown>)
+      : undefined;
 
   if (!code && !message && !details) return null;
   return { code, message, details };

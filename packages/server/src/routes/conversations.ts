@@ -381,9 +381,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       if (activeTurnId) {
         try {
           const recentDesc = await bus.readReverse(conversationId, snapshotCursor, { count: 2_000 }, redisReader);
-          // #region agent log
-          try { const fs = require('fs'); const path = require('path'); const logPath = '/Users/brayn003/theingenuityco/starships.ai/.cursor/debug.log'; const logDir = path.dirname(logPath); if (!fs.existsSync(logDir)) fs.mkdirSync(logDir, { recursive: true }); fs.appendFileSync(logPath, JSON.stringify({location:'conversations.ts:383',message:'redis replay start',data:{conversationId,activeTurnId,snapshotCursor,recentDescLen:recentDesc?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})+'\n'); } catch (logErr) {}
-          // #endregion
           if (Array.isArray(recentDesc) && recentDesc.length > 0) {
             const recent = recentDesc.slice().reverse(); // chronological
 
@@ -424,9 +421,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                 bestId = id;
               }
             }
-            // #region agent log
-            try { const fs2 = require('fs'); fs2.appendFileSync('/Users/brayn003/theingenuityco/starships.ai/.cursor/debug.log', JSON.stringify({location:'conversations.ts:423',message:'redis replay accumulated',data:{conversationId,bufferCount:buffers.size,bufferIds:Array.from(buffers.keys()),bestId,bestScore,bestContentPreview:bestId?buffers.get(bestId)?.content.substring(0,50):null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A'}) + '\n'); } catch (logErr) {}
-            // #endregion
 
             if (bestId && bestScore > 0) {
               const buf = buffers.get(bestId)!;
@@ -448,9 +442,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
                   updatedAt: at,
                   turnId: activeTurnId,
                 };
-                // #region agent log
-                try { const fs3 = require('fs'); fs3.appendFileSync('/Users/brayn003/theingenuityco/starships.ai/.cursor/debug.log', JSON.stringify({location:'conversations.ts:443',message:'derived message added (EMPTY)',data:{conversationId,derivedMsgId:bestId,replayedContentLen:buf.content.length,replayedContentPreview:buf.content.substring(0,50),sentContentLen:0,dbMsgCount:conversationMessages.length,dbMsgIds:conversationMessages.map((m:any)=>m.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'EMPTY_SNAPSHOT_FIX'})+'\n'); } catch (logErr) {}
-                // #endregion
                 snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
               }
             }
@@ -465,9 +456,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       }
 
       const snapshotEvt = { type: 'snapshot', data: { conversationId, messages: snapshotMessages, turn } };
-      // #region agent log
-      try { const fs4 = require('fs'); fs4.appendFileSync('/Users/brayn003/theingenuityco/starships.ai/.cursor/debug.log', JSON.stringify({location:'conversations.ts:456',message:'snapshot sent',data:{conversationId,snapshotCursor,msgCount:snapshotMessages.length,msgSummary:snapshotMessages.map((m:any)=>({id:m.id,role:m.role,contentLen:m.content?.length||0})),turnId:turn?.turnId,turnStatus:turn?.status},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,D'})+'\n'); } catch (logErr) {}
-      // #endregion
       // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
       res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
@@ -495,9 +483,6 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             const id = item.id;
             const evt = item.evt;
             cursor = id;
-            // #region agent log
-            if (evt.type === 'assistant.delta' || evt.type === 'message.append') { try { const fs5 = require('fs'); fs5.appendFileSync('/Users/brayn003/theingenuityco/starships.ai/.cursor/debug.log', JSON.stringify({location:'conversations.ts:483',message:`streaming ${evt.type}`,data:{conversationId,eventId:id,evtType:evt.type,messageId:(evt as any).data?.messageId,delta:(evt as any).data?.delta?.substring(0,30),msgId:(evt as any).data?.message?.id,msgContentLen:(evt as any).data?.message?.content?.length||0},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C,D'})+'\n'); } catch (logErr) {} }
-            // #endregion
             try {
               res.write(`id: ${id}\n`);
               res.write(`event: ${evt.type}\n`);

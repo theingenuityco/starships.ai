@@ -829,9 +829,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             {/* Starter layout: Agent select, Message input, Suggested prompts — stable mount (use CSS to show/hide). */}
             <div className={cn('flex flex-col gap-6')} key="composer-stack">
               <div className={cn(showMessagesArea && 'hidden')} key="agent-selector">
-                <div className="mb-1">
-                  <p className="text-xs font-medium text-muted-foreground">Select an agent</p>
-                </div>
                 <div className="flex items-center justify-start gap-3">
                   <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={false} />
                 </div>
@@ -861,11 +858,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
 
               <div className={cn((showMessagesArea || agentSuggestionCards.length < 3) && 'hidden')} key="suggestions">
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="text-left">
-                    <p className="text-xs font-medium text-muted-foreground">Example prompts</p>
-                  </div>
-                  {agentSuggestionCards.length > 3 && (
+                <div className="mb-1 flex items-center justify-start">
+                  {agentSuggestionCards.length > 3 ? (
                     <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                       {showAllSuggestions ? (
                         <>
@@ -874,11 +868,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                         </>
                       ) : (
                         <>
-                          Explore all
+                          Example Prompts
                           <Icon name="chevron-down" className="h-3 w-3" />
                         </>
                       )}
                     </button>
+                  ) : (
+                    <p className="text-xs font-medium text-primary">Example Prompts</p>
                   )}
                 </div>
                 <ul className="space-y-3">

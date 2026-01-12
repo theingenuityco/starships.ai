@@ -126,7 +126,6 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                     </Avatar>
                     <div className="min-w-0">
                       <div className="font-medium leading-5">{formatAgentDisplayName(agent)}</div>
-                      {agent.description && <div className="text-xs text-muted-foreground mt-0.5 line-clamp-2">{agent.description}</div>}
                     </div>
                   </div>
                 </button>

@@ -131,14 +131,15 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         hideChatControl={true}
         showActions={false}
         disableEntranceMotion={true}
+        isAlreadyDeployed={isAlreadyDeployed || isPublishedFromThisStarship}
         primaryAction={
           showDeployCta
             ? {
-                label: isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
+                label: isAlreadyDeployed ? 'Deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
                 iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
                 disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
-                // Match the Chat CTA style from DeployedAgentCard
-                variant: 'ghost',
+                variant: isAlreadyDeployed || isPublishedFromThisStarship ? 'ghost' : 'default',
+                className: isAlreadyDeployed || isPublishedFromThisStarship ? undefined : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 onAction: () => requestDeploy(),
               }
             : undefined

@@ -742,9 +742,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      if (!promptAgent) return 'Select an agent to assign a task or ask anything'
+      if (!promptAgent) return 'Select an agent to assign a task'
       // Show placeholder even after the conversation has started.
-      return `Assign a task to ${promptAgent.name} or ask anything`
+      return `Assign a task to ${promptAgent.name}`
     }
 
     // Track if there's actual content beyond just the mention and space

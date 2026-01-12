@@ -81,6 +81,11 @@ interface DeployedAgentCardProps {
    * When true, disable ONLY hover lift, while keeping entrance animation.
    */
   disableHoverMotion?: boolean
+  /**
+   * When true, indicates this agent/template is already deployed.
+   * Used to apply different styling to show it's already available.
+   */
+  isAlreadyDeployed?: boolean
 }
 
 export function DeployedAgentCard({
@@ -99,6 +104,7 @@ export function DeployedAgentCard({
   disableMotion = false,
   disableEntranceMotion = false,
   disableHoverMotion = false,
+  isAlreadyDeployed = false,
 }: DeployedAgentCardProps) {
   const { isInstanceAdmin } = useAuth()
   const [isExporting, setIsExporting] = useState(false)
@@ -174,12 +180,16 @@ export function DeployedAgentCard({
     <motion.div
       initial={entranceOff ? undefined : { opacity: 0, y: 10 }}
       animate={entranceOff ? undefined : { opacity: 1, y: 0 }}
-      whileHover={hoverOff ? undefined : { y: -4 }}
+      whileHover={hoverOff ? undefined : undefined}
       transition={entranceOff && hoverOff ? undefined : { duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
       className="h-full"
     >
       <Card
-        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md"
+        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card/50 backdrop-blur-sm border border-border/60 shadow-md transition-all duration-200 hover:border-[rgba(245,158,11,0.4)] hover:bg-card/70 hover:bg-gradient-to-br hover:from-[rgba(245,158,11,0.05)] hover:to-[rgba(251,191,36,0.02)] hover:shadow-lg"
+        style={{
+          transform: 'translateZ(0)',
+          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+        }}
         onClick={onClick}
       >
         {/* Actions dropdown */}
@@ -230,17 +240,17 @@ export function DeployedAgentCard({
           </div>
         )}
 
-        <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
-          <div className="flex items-center gap-4">
+        <CardHeader className="pb-3 relative z-10 pt-4 space-y-3">
+          <div className="flex items-center gap-3">
             {/* Avatar (same row as title) */}
             <div className="relative flex-shrink-0">
               <Avatar
-                className="h-14 w-14 rounded-full transition-all duration-300 relative z-10 shadow-lg"
+                className="h-16 w-16 rounded-full transition-all duration-200 relative z-10 shadow-sm ring-1 ring-border/30"
                 style={{
-                  boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                  boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
                 }}
               >
-                <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={56} rounded />
+                <AgentAvatar seed={agent.name} imageUrl={avatarUrl} size={64} rounded />
               </Avatar>
               {isGeneratingAvatar ? (
                 <div className="absolute inset-0 z-20 rounded-full bg-background/60 backdrop-blur-sm flex items-center justify-center pointer-events-none">
@@ -258,30 +268,30 @@ export function DeployedAgentCard({
             {/* Text content */}
             <div className="min-w-0 flex-1">
               <div className="mb-0.5 min-w-0">
-                <CardTitle className="truncate text-xl font-bold transition-colors duration-200 group-hover:text-foreground">{displayName || 'Unnamed agent'}</CardTitle>
+                <CardTitle className="truncate text-lg font-semibold">{displayName || 'Unnamed agent'}</CardTitle>
               </div>
               {/* Role row (below title). Falls back to slug if role isn't set. */}
               {subtitle ? (
-                <div className="-mt-1 mb-0 min-w-0">
-                  <span className="text-sm text-muted-foreground truncate">{subtitle}</span>
+                <div className="mt-0.5 mb-0 min-w-0">
+                  <span className="text-base text-muted-foreground truncate">{subtitle}</span>
                 </div>
               ) : null}
             </div>
           </div>
 
           {/* New section: badges + description (below avatar/name/slug) */}
-          <div className="mt-0">
-            <div className="flex items-center gap-2 flex-wrap mb-2">
+          <div className="mt-2">
+            <div className="flex items-center gap-1.5 flex-wrap mb-2">
               {/* Category badge */}
               {typeof category === 'string' && category.trim() ? (
-                <Badge variant="outline" className="text-[10px] px-2 py-1 font-medium capitalize inline-flex items-center gap-1.5">
+                <Badge variant="outline" className="text-xs px-2.5 py-1 font-medium capitalize inline-flex items-center gap-1.5 border-border/40">
                   <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />
                   <span>{category}</span>
                 </Badge>
               ) : null}
               {/* Version (inline, after category) */}
               {agent.version ? (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-mono">
+                <Badge variant="outline" className="text-xs px-2 py-1 font-mono border-border/40">
                   v{agent.version}
                 </Badge>
               ) : null}
@@ -289,7 +299,7 @@ export function DeployedAgentCard({
               {needsUpdate && (
                 <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.3, ease: 'easeOut' }}>
                   <Badge
-                    className="text-[10px] px-1.5 py-0.5 font-medium relative overflow-hidden flex items-center"
+                    className="text-xs px-2 py-1 font-medium relative overflow-hidden flex items-center"
                     style={{
                       background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.12), rgba(124, 58, 237, 0.08))',
                       borderColor: 'rgba(139, 92, 246, 0.3)',
@@ -319,15 +329,13 @@ export function DeployedAgentCard({
                 </motion.div>
               )}
             </div>
-            <CardDescription className="line-clamp-5 text-sm text-muted-foreground leading-relaxed group-hover:text-foreground/80 transition-colors duration-200">
-              {agent.description || 'No description provided'}
-            </CardDescription>
-            {belowDescription ? <div className="mt-3">{belowDescription}</div> : null}
+            <CardDescription className="line-clamp-4 text-sm text-muted-foreground leading-relaxed">{agent.description || 'No description provided'}</CardDescription>
+            {belowDescription ? <div className="mt-2">{belowDescription}</div> : null}
           </div>
         </CardHeader>
 
-        <CardContent className="relative z-10 pt-0 pb-5 mt-auto">
-          <div className="flex items-center justify-between gap-3">
+        <CardContent className="relative z-10 pt-0 pb-4 mt-auto border-t border-border/20">
+          <div className="flex items-center justify-between gap-3 pt-3">
             {showPublicationBadge ? (
               <div className="inline-flex items-center gap-1.5 text-[10px] text-muted-foreground px-2 py-1 leading-none">
                 <Icon name={statusMeta.iconName} className="w-3 h-3" />
@@ -341,15 +349,19 @@ export function DeployedAgentCard({
             {primaryAction ? (
               <Button
                 size="sm"
-                variant={primaryAction.variant ?? 'ghost'}
+                variant={primaryAction.variant ?? 'default'}
                 disabled={primaryAction.disabled}
-                className={primaryAction.className ?? CHAT_CTA_BUTTON_CLASS}
+                className={primaryAction.className ?? (primaryAction.variant === 'ghost' ? CHAT_CTA_BUTTON_CLASS : '')}
                 onClick={e => {
                   e.stopPropagation()
                   primaryAction.onAction(agent)
                 }}
               >
-                {primaryAction.iconName ? <Icon name={primaryAction.iconName} className={primaryAction.iconClassName ?? CHAT_CTA_ICON_CLASS} /> : null}
+                {isAlreadyDeployed && primaryAction.label === 'Deployed' ? (
+                  <Icon name="check-circle" className="w-4 h-4 text-emerald-500 mr-1.5" />
+                ) : primaryAction.iconName ? (
+                  <Icon name={primaryAction.iconName} className={primaryAction.iconClassName ?? (primaryAction.variant === 'ghost' ? CHAT_CTA_ICON_CLASS : 'mr-1.5 h-4 w-4')} />
+                ) : null}
                 {primaryAction.label}
               </Button>
             ) : onChat ? (
@@ -362,8 +374,8 @@ export function DeployedAgentCard({
                   onChat(agent)
                 }}
               >
-                <Icon name="message-square" className={CHAT_CTA_ICON_CLASS} />
-                Chat
+                <Icon name="user" className={CHAT_CTA_ICON_CLASS} />
+                View Profile
               </Button>
             ) : hideChatControl ? null : (
               <div

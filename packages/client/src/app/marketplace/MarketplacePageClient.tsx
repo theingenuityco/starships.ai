@@ -7,10 +7,12 @@ import { AgentDetailsModal } from '@/components/marketplace/AgentDetailsModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { useAuth } from '@/hooks/useAuth'
 import PublicHeader from '@/components/navigation/PublicHeader'
+import { getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
 
 import { motion } from 'motion/react'
 import { useEffect, useMemo, useState } from 'react'
@@ -89,65 +91,70 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
               <div className="text-center">
                 <div className="flex items-center justify-center gap-2 mb-2">
                   <Icon name="store" className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                  <h1 className="text-xl sm:text-2xl font-bold">Marketplace</h1>
+                  <h1 className="text-xl sm:text-2xl font-bold">Agent Marketplace</h1>
+                  <Badge variant="outline" className="ml-2 text-base px-3 py-1">
+                    {filteredAgentTemplates.length}
+                  </Badge>
                 </div>
-                <p className="text-sm sm:text-base text-muted-foreground">Discover and deploy powerful agent and tools to enhance your starship&apos;s capabilities.</p>
+                <p className="text-sm sm:text-base text-muted-foreground">Browse and deploy AI agents ready to use.</p>
               </div>
 
               {/* Search and Filters */}
               <div className="mb-6 sm:mb-8 sticky top-16 sm:top-20 z-30">
-                <div className="relative max-w-md mb-6 mx-auto">
-                  <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-                  <Input
-                    type="text"
-                    placeholder="Search agents..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') {
-                        const q = searchQuery.trim()
-                        if (q) track({ type: 'marketplace_search_used', query: q })
-                      }
-                    }}
-                    className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
-                  />
-                </div>
-              </div>
-
-              {/* Category Filter */}
-              <div className="mb-6 sm:mb-8">
-                <div className="flex sm:flex-wrap sm:justify-center gap-2 overflow-x-auto whitespace-nowrap -mx-4 px-4">
-                  {allCategories.map(category => (
-                    <Button
-                      key={category}
-                      variant={selectedCategory === category ? 'default' : 'outline'}
-                      size="sm"
-                      onClick={() => {
-                        track({ type: 'marketplace_category_selected', category })
-                        setSelectedCategory(category)
-                        const params = new URLSearchParams(searchParams?.toString() ?? '')
-                        if (category && category !== 'all') params.set('category', category)
-                        else params.delete('category')
-                        router.replace(`${pathname}?${params.toString()}`)
+                <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto">
+                  <div className="relative flex-1">
+                    <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+                    <Input
+                      type="text"
+                      placeholder="Search agents..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          const q = searchQuery.trim()
+                          if (q) track({ type: 'marketplace_search_used', query: q })
+                        }
                       }}
-                      className="capitalize shrink-0"
-                    >
-                      {category === 'all' ? 'All Categories' : category}
-                    </Button>
-                  ))}
+                      className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent"
+                    />
+                  </div>
+                  <Select
+                    value={selectedCategory}
+                    onValueChange={category => {
+                      track({ type: 'marketplace_category_selected', category })
+                      setSelectedCategory(category)
+                      const params = new URLSearchParams(searchParams?.toString() ?? '')
+                      if (category && category !== 'all') params.set('category', category)
+                      else params.delete('category')
+                      router.replace(`${pathname}?${params.toString()}`)
+                    }}
+                  >
+                    <SelectTrigger className="w-full sm:w-[200px] frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent">
+                      <div className="flex items-center gap-2">
+                        {selectedCategory && selectedCategory !== 'all' && (
+                          <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(selectedCategory as any)}`} />
+                        )}
+                        <SelectValue placeholder="All Categories" />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allCategories.map(category => (
+                        <SelectItem key={category} value={category} className="capitalize">
+                          <div className="flex items-center gap-2">
+                            {category !== 'all' && (
+                              <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />
+                            )}
+                            <span>{category === 'all' ? 'All Categories' : category}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
               {/* Agents Section */}
               <div className="space-y-4 sm:space-y-6">
-                <div className="flex items-center gap-3">
-                  <Icon name="head-circuit" className="w-5 h-5 sm:w-6 sm:h-6 text-primary" />
-                  <h2 className="text-lg sm:text-xl font-semibold">Agents</h2>
-                  <Badge variant="outline" className="ml-2">
-                    {filteredAgentTemplates.length}
-                  </Badge>
-                </div>
-
                 {agentTemplatesLoading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                     {[...Array(3)].map((_, i) => (

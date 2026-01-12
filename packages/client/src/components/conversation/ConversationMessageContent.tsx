@@ -10,6 +10,7 @@ import { cn } from '@/lib/utils'
 
 import { useTheme } from 'next-themes'
 import { useState, useMemo, useEffect, useRef } from 'react'
+import type { ReactNode } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
@@ -285,8 +286,8 @@ interface MessageContentProps {
   reasoning?: string
   reasoningChunks?: StreamChunk[]
   agentName?: string
-  toolCalls?: NonNullable<MessageModel['toolCalls']>
-  toolResults?: any[]
+  toolCalls?: LlmToolCall[]
+  toolResults?: ToolResultLike[]
   messageType?: MessageModel['messageType']
   // Attachments
   attachmentIds?: string[]
@@ -295,6 +296,15 @@ interface MessageContentProps {
   isAwaitingToolResults?: boolean
   // Whether this is the last message in the conversation
   isLastMessage?: boolean
+}
+
+type ToolResultLike = {
+  toolName?: string
+  toolCallId?: string
+  call_id?: string
+  id?: string
+  content?: unknown
+  result?: unknown
 }
 
 // Known widget types from public-docs
@@ -310,6 +320,45 @@ function tryParseJSON(value: any): any {
     }
   }
   return value
+}
+
+function extractWidgetLike(payload: unknown): Record<string, unknown> | null {
+  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+  const get = (v: unknown, key: string): unknown => (isRecord(v) ? v[key] : undefined)
+  const getNested = (v: unknown, keys: string[]): unknown => {
+    let cur: unknown = v
+    for (const k of keys) cur = get(cur, k)
+    return cur
+  }
+
+  if (!isRecord(payload)) return null
+
+  // Common envelopes we see from tool execution + HTTP wrappers:
+  // - { widgetType, props, ... }
+  // - { widget: { widgetType, props, ... } }
+  // - { result: { widgetType, props, ... } }
+  // - { data: { result: { widgetType, props, ... } } }
+  // - { success: true, data: { result: { ... } } }
+  const candidates = [
+    payload,
+    get(payload, 'widget'),
+    get(payload, 'result'),
+    get(payload, 'data'),
+    getNested(payload, ['data', 'widget']),
+    getNested(payload, ['data', 'result']),
+    getNested(payload, ['data', 'result', 'widget']),
+  ].filter(Boolean)
+
+  for (const c of candidates) {
+    if (!isRecord(c)) continue
+    const widgetType = get(c, 'widgetType')
+    const props = get(c, 'props')
+    if (typeof widgetType === 'string' && widgetType.trim().length > 0 && props && typeof props === 'object') {
+      return c
+    }
+  }
+
+  return null
 }
 
 export function ConversationMessageContent({
@@ -343,18 +392,16 @@ export function ConversationMessageContent({
   // Also require function object to exist for meaningful rendering
   const normalizedToolCalls = useMemo<LlmToolCall[]>(() => {
     if (!Array.isArray(toolCalls)) return []
-    return (toolCalls as unknown as LlmToolCall[]).filter(tc => {
-      if (typeof tc !== 'object' || tc === null) return false
-      const tcAny = tc as any
+    return toolCalls.filter(tc => {
       // Require function object to exist for meaningful rendering
-      if (!tcAny?.function || typeof tcAny.function !== 'object') return false
+      if (!tc.function || typeof tc.function !== 'object') return false
       // Keep if function.name exists OR id exists OR function.arguments exists
-      const hasFunctionName = tcAny.function?.name != null && String(tcAny.function.name).trim().length > 0
-      const hasId = tcAny?.id != null && String(tcAny.id).trim().length > 0
+      const hasFunctionName = typeof tc.function?.name === 'string' && tc.function.name.trim().length > 0
+      const hasId = typeof tc.id === 'string' && tc.id.trim().length > 0
       const hasArguments =
-        tcAny.function?.arguments != null &&
-        ((typeof tcAny.function.arguments === 'string' && tcAny.function.arguments.trim().length > 0) ||
-          (typeof tcAny.function.arguments === 'object' && Object.keys(tcAny.function.arguments).length > 0))
+        tc.function?.arguments != null &&
+        ((typeof tc.function.arguments === 'string' && tc.function.arguments.trim().length > 0) ||
+          (typeof tc.function.arguments === 'object' && tc.function.arguments !== null && Object.keys(tc.function.arguments).length > 0))
       return hasFunctionName || hasId || hasArguments
     })
   }, [toolCalls])
@@ -441,14 +488,14 @@ export function ConversationMessageContent({
   const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Agent'
   const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
 
-  const parsedJson = useMemo(() => {
+  const parsedJson = useMemo<unknown | null>(() => {
     try {
       const t = (displayContent || '').trim()
       if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
         return JSON.parse(t)
       }
     } catch {}
-    return null as any
+    return null
   }, [displayContent])
 
   // Collapsible should always start closed; users can expand manually
@@ -456,16 +503,16 @@ export function ConversationMessageContent({
   // Natural language header with tense and inline code chips for tool names (no 'tool' word):
   // Ongoing: "<agent> is using `X`[, `Y`] [& some others...]"
   // Completed: "<agent> used `X`[, `Y`] [& some others...]"
-  const toolCallHeaderLabel = useMemo(() => {
+  const toolCallHeaderLabel = useMemo<ReactNode | null>(() => {
     if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return null
-    const names = normalizedToolCalls.map(tc => (tc as any)?.function?.name).filter(Boolean) as string[]
+    const names = normalizedToolCalls.map(tc => tc.function?.name).filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
     const unique = Array.from(new Set(names))
     const agent = agentName || 'Agent'
 
     const isOngoing = hasPendingToolCalls || (isStreaming && hasAnyToolCalls && !allToolCallsDone)
     const verb = isOngoing ? 'is using' : 'used'
 
-    const Chip = ({ children }: any) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
+    const Chip = ({ children }: { children: ReactNode }) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
 
     if (unique.length === 0) {
       return (
@@ -495,6 +542,190 @@ export function ConversationMessageContent({
       </>
     )
   }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
+
+  const shouldRenderToolPanel: boolean = normalizedToolCalls.length > 0 && messageType !== 'tool_result'
+  const toolPanelNode: any = shouldRenderToolPanel ? (
+    <div className="my-2.5">
+      {/* Tools panel: keep collapsed by default and preserve user toggle state */}
+      <Collapsible defaultOpen={false}>
+        <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
+          {hasAnyToolCalls && hasPendingToolCalls ? (
+            <Icon name="loading" className="w-3 h-3 animate-spin" />
+          ) : allToolCallsDone && showCompletionTick ? (
+            <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />
+          ) : (
+            <Icon name="wrench" className="w-3 h-3" />
+          )}
+          {toolCallHeaderLabel ?? `Tool Calls (${normalizedToolCalls.length})`}
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="space-y-1.5">
+            {normalizedToolCalls.map((tc, idx) => {
+              const rawArgsAny = tc.function?.arguments ?? ''
+              let prettyArgs = ''
+              try {
+                // Handle case where arguments might already be an object
+                if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                  prettyArgs = JSON.stringify(rawArgsAny, null, 2)
+                } else {
+                  const asStr = String(rawArgsAny)
+                  prettyArgs = JSON.stringify(JSON.parse(asStr), null, 2)
+                }
+              } catch {
+                prettyArgs = String(rawArgsAny)
+              }
+              const hasArgs = (() => {
+                // Handle case where arguments might already be an object
+                if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                  return Array.isArray(rawArgsAny) ? rawArgsAny.length > 0 : Object.keys(rawArgsAny).length > 0
+                }
+
+                const raw = typeof rawArgsAny === 'string' ? rawArgsAny.trim() : ''
+                if (!raw) return false
+                try {
+                  const parsed = JSON.parse(raw)
+                  if (parsed && typeof parsed === 'object') {
+                    return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
+                  }
+                  return String(parsed).trim().length > 0
+                } catch {
+                  return raw.length > 0
+                }
+              })()
+              const funcName = typeof tc.function?.name === 'string' && tc.function.name.trim() ? tc.function.name : 'unknown'
+
+              // Normalize tool call id from multiple potential fields to be resilient across providers
+              const rawCallId = tc.id ?? null
+
+              const toolCallId = rawCallId != null ? String(rawCallId) : ''
+              const combinedBlockId = `${messageId}-tool-all-${idx}`
+
+              // Find matching tool result using multiple possible id fields, normalized to strings
+              const matchingResult = toolResults?.find((result: any) => {
+                const rid = result?.toolCallId ?? result?.call_id ?? result?.id
+                if (rid == null) return false
+                return String(rid) === toolCallId
+              })
+
+              return (
+                <div key={idx}>
+                  <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
+                    <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="text-xs text-muted-foreground flex-shrink-0">Function</span>
+                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted truncate">{funcName}</span>
+                        {/* ID removed from header */}
+                      </div>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-6 w-6"
+                          onClick={() => {
+                            // Build a single payload that includes function, id, arguments and (optional) result
+                            let argsParsed: any
+                            if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                              argsParsed = rawArgsAny
+                            } else {
+                              try {
+                                argsParsed = JSON.parse(String(rawArgsAny))
+                              } catch {
+                                // Fallback to the prettified string for non-JSON args
+                                argsParsed = prettyArgs
+                              }
+                            }
+
+                            let resultParsed: any = undefined
+                            if (matchingResult) {
+                              const resultContent = (() => {
+                                const raw = matchingResult.content ?? matchingResult.result ?? ''
+                                if (typeof raw === 'string') return raw
+                                try {
+                                  return JSON.stringify(raw)
+                                } catch {
+                                  return String(raw)
+                                }
+                              })()
+                              try {
+                                const t = (resultContent || '').trim()
+                                if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                  resultParsed = JSON.parse(t)
+                                } else {
+                                  resultParsed = resultContent
+                                }
+                              } catch {
+                                resultParsed = resultContent
+                              }
+                            }
+
+                            const payload: any = {
+                              function: funcName,
+                              id: toolCallId || undefined,
+                              arguments: argsParsed,
+                              ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
+                            }
+
+                            handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
+                          }}
+                        >
+                          {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div>
+                      {hasArgs && (
+                        <>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
+                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                            <code>{prettyArgs}</code>
+                          </pre>
+                        </>
+                      )}
+
+                      {matchingResult && (
+                        <>
+                          <div className="border-t border-border/50" />
+                          <div className="flex items-center justify-between px-3 pt-2">
+                            <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
+                              <Icon name="check" className="w-3 h-3" />
+                              Result
+                            </div>
+                          </div>
+                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                            <code>
+                              {(() => {
+                                const resultContent = (() => {
+                                  const raw = matchingResult.content ?? matchingResult.result ?? ''
+                                  if (typeof raw === 'string') return raw
+                                  try {
+                                    return JSON.stringify(raw, null, 2)
+                                  } catch {
+                                    return String(raw)
+                                  }
+                                })()
+                                try {
+                                  const t = (resultContent || '').trim()
+                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                    return JSON.stringify(JSON.parse(t), null, 2)
+                                  }
+                                } catch {}
+                                return resultContent
+                              })()}
+                            </code>
+                          </pre>
+                        </>
+                      )}
+                    </div>
+                  </Card>
+                </div>
+              )
+            })}
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
+    </div>
+  ) : null
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
 
@@ -672,20 +903,23 @@ export function ConversationMessageContent({
     return toolResults
       .map((toolResult, index) => {
         // Parse result (might be string or object)
-        const data = tryParseJSON(toolResult.content || toolResult.result)
+        const parsed = tryParseJSON(toolResult.content ?? toolResult.result)
+        const data = extractWidgetLike(parsed)
 
         // Check if it's a widget result
-        if (!data || typeof data !== 'object') return null
-        if (!data.widgetType || !KNOWN_WIDGET_TYPES.has(data.widgetType)) return null
-        if (!data.props || typeof data.props !== 'object') return null
+        if (!data) return null
+        const widgetType = typeof data['widgetType'] === 'string' ? data['widgetType'] : ''
+        const props = data['props']
+        if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
+        if (!props || typeof props !== 'object') return null
 
         // Extract widget info
         return {
-          id: data.id || `widget-${index}`,
-          widgetType: data.widgetType,
-          props: data.props,
-          name: data.name || 'Untitled Widget',
-          description: data.description,
+          id: typeof data['id'] === 'string' && data['id'].trim().length > 0 ? data['id'] : `widget-${index}`,
+          widgetType,
+          props,
+          name: typeof data['name'] === 'string' && data['name'].trim().length > 0 ? data['name'] : 'Untitled Widget',
+          description: typeof data['description'] === 'string' ? data['description'] : undefined,
           toolName: toolResult.toolName,
           toolCallId: toolResult.toolCallId,
           index,
@@ -752,172 +986,7 @@ export function ConversationMessageContent({
       )}
 
       {/* Tool calls and results rendering for assistant messages */}
-      {Array.isArray(normalizedToolCalls) && normalizedToolCalls.length > 0 && messageType !== 'tool_result' && (
-        <div className="my-2.5">
-          {/* Tools panel: keep collapsed by default and preserve user toggle state */}
-          <Collapsible defaultOpen={false}>
-            <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {hasAnyToolCalls && hasPendingToolCalls ? (
-                <Icon name="loading" className="w-3 h-3 animate-spin" />
-              ) : allToolCallsDone && showCompletionTick ? (
-                <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />
-              ) : (
-                <Icon name="wrench" className="w-3 h-3" />
-              )}
-              {toolCallHeaderLabel ?? `Tool Calls (${normalizedToolCalls.length})`}
-            </CollapsibleTrigger>
-            <CollapsibleContent>
-              <div className="space-y-1.5">
-                {normalizedToolCalls.map((tc, idx) => {
-                  const rawArgsAny = (tc as any)?.function?.arguments ?? ''
-                  let prettyArgs = ''
-                  try {
-                    // Handle case where arguments might already be an object
-                    if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                      prettyArgs = JSON.stringify(rawArgsAny, null, 2)
-                    } else {
-                      const asStr = String(rawArgsAny)
-                      prettyArgs = JSON.stringify(JSON.parse(asStr), null, 2)
-                    }
-                  } catch {
-                    prettyArgs = String(rawArgsAny)
-                  }
-                  const hasArgs = (() => {
-                    // Handle case where arguments might already be an object
-                    if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                      return Array.isArray(rawArgsAny) ? rawArgsAny.length > 0 : Object.keys(rawArgsAny).length > 0
-                    }
-
-                    const raw = typeof rawArgsAny === 'string' ? rawArgsAny.trim() : ''
-                    if (!raw) return false
-                    try {
-                      const parsed = JSON.parse(raw)
-                      if (parsed && typeof parsed === 'object') {
-                        return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
-                      }
-                      return String(parsed).trim().length > 0
-                    } catch {
-                      return raw.length > 0
-                    }
-                  })()
-                  const funcName = (tc as any)?.function?.name || 'unknown'
-
-                  // Normalize tool call id from multiple potential fields to be resilient across providers
-                  const rawCallId = (tc as any)?.id ?? (tc as any)?.call_id ?? (tc as any)?.toolCallId ?? (tc as any)?.function?.id ?? null
-
-                  const toolCallId = rawCallId != null ? String(rawCallId) : ''
-                  const combinedBlockId = `${messageId}-tool-all-${idx}`
-
-                  // Find matching tool result using multiple possible id fields, normalized to strings
-                  const matchingResult = toolResults?.find((result: any) => {
-                    const rid = (result as any)?.toolCallId ?? (result as any)?.call_id ?? (result as any)?.id
-                    if (rid == null) return false
-                    return String(rid) === toolCallId
-                  })
-
-                  return (
-                    <div key={idx}>
-                      <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
-                        <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
-                          <div className="flex items-center gap-2 min-w-0 flex-1">
-                            <span className="text-xs text-muted-foreground flex-shrink-0">Function</span>
-                            <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted truncate">{funcName}</span>
-                            {/* ID removed from header */}
-                          </div>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-6 w-6"
-                              onClick={() => {
-                                // Build a single payload that includes function, id, arguments and (optional) result
-                                let argsParsed: any
-                                if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                                  argsParsed = rawArgsAny
-                                } else {
-                                  try {
-                                    argsParsed = JSON.parse(String(rawArgsAny))
-                                  } catch {
-                                    // Fallback to the prettified string for non-JSON args
-                                    argsParsed = prettyArgs
-                                  }
-                                }
-
-                                let resultParsed: any = undefined
-                                if (matchingResult) {
-                                  const resultContent = matchingResult.content || ''
-                                  try {
-                                    const t = (resultContent || '').trim()
-                                    if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                      resultParsed = JSON.parse(t)
-                                    } else {
-                                      resultParsed = resultContent
-                                    }
-                                  } catch {
-                                    resultParsed = resultContent
-                                  }
-                                }
-
-                                const payload: any = {
-                                  function: funcName,
-                                  id: toolCallId || undefined,
-                                  arguments: argsParsed,
-                                  ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
-                                }
-
-                                handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
-                              }}
-                            >
-                              {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-                            </Button>
-                          </div>
-                        </div>
-
-                        <div>
-                          {hasArgs && (
-                            <>
-                              <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
-                              <pre className="text-xs p-3 pt-1 overflow-x-auto">
-                                <code>{prettyArgs}</code>
-                              </pre>
-                            </>
-                          )}
-
-                          {matchingResult && (
-                            <>
-                              <div className="border-t border-border/50" />
-                              <div className="flex items-center justify-between px-3 pt-2">
-                                <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
-                                  <Icon name="check" className="w-3 h-3" />
-                                  Result
-                                </div>
-                              </div>
-                              <pre className="text-xs p-3 pt-1 overflow-x-auto">
-                                <code>
-                                  {(() => {
-                                    const resultContent = matchingResult.content || ''
-                                    try {
-                                      const t = (resultContent || '').trim()
-                                      if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                        return JSON.stringify(JSON.parse(t), null, 2)
-                                      }
-                                    } catch {}
-                                    return resultContent
-                                  })()}
-                                </code>
-                              </pre>
-                            </>
-                          )}
-                        </div>
-                      </Card>
-                    </div>
-                  )
-                })}
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </div>
-      )}
+      {toolPanelNode}
 
       {/* Widget rendering: Display widgets inline when created/updated */}
       {widgetResults.length > 0 && messageType !== 'tool_result' && (

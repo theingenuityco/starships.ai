@@ -117,14 +117,16 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                   className={cn(
                     // Match NavigationItem hover/active styling
                     'w-full text-left px-3 py-2 rounded-lg transition-colors focus-visible-ring',
-                    selectedAgent?.id === agent.id ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                    selectedAgent?.id === agent.id
+                      ? 'text-primary bg-primary/10 border-transparent'
+                      : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/15 hover:shadow-sm'
                   )}
                 >
-                  <div className="flex items-start gap-3">
-                    <Avatar className={cn('h-7 w-7 ring-1 ring-border/40 rounded-full')}>
-                      <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={28} rounded />
+                  <div className="flex items-center gap-3">
+                    <Avatar className={cn('h-9 w-9 ring-1 ring-border/40 rounded-full flex-shrink-0')}>
+                      <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={36} rounded />
                     </Avatar>
-                    <div className="min-w-0">
+                    <div className="min-w-0 flex items-center">
                       <div className="font-medium leading-5">{formatAgentDisplayName(agent)}</div>
                     </div>
                   </div>

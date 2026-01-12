@@ -677,26 +677,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
 
     if (chunk.type === 'snapshot') {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'useConversations.ts:679',
-          message: 'snapshot received',
-          data: {
-            accLen: acc.length,
-            snapshotMsgCount: Array.isArray(chunk.data.messages) ? chunk.data.messages.length : 0,
-            turnId: chunk.data.turn?.turnId,
-            turnStatus: chunk.data.turn?.status,
-            accMsgIds: acc.map((m: any) => ({ id: m.id, role: m.role, contentLen: m.content?.length || 0 })),
-          },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          hypothesisId: 'A,B,D',
-        }),
-      }).catch(() => {})
-      // #endregion
       const msgs = Array.isArray(chunk.data.messages) ? (chunk.data.messages as ClientMessage[]) : []
       // Preserve streaming state for assistant messages in active turns - they may have been
       // derived from Redis stream replay and should continue accumulating deltas.
@@ -719,24 +699,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
         return withStream
       })
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'useConversations.ts:703',
-          message: 'snapshot processed',
-          data: {
-            snapMsgCount: snap.length,
-            snapMsgs: snap.map((m: any) => ({ id: m.id, role: m.role, streaming: m.streaming, contentLen: m.content?.length || 0, contentPreview: m.content?.substring(0, 50) })),
-            streamPlaceholderId: turn?.turnId ? `stream-${turn.turnId}` : null,
-          },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          hypothesisId: 'A,E',
-        }),
-      }).catch(() => {})
-      // #endregion
 
       // Merge snapshot with existing messages carefully:
       // - Snapshot is authoritative for any given message id.
@@ -759,20 +721,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           keptFromAcc++
         }
       }
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'useConversations.ts:726',
-          message: 'snapshot merged',
-          data: { mergedLen: merged.length, keptFromAcc: keptFromAcc, mergedIds: merged.map((m: any) => m.id) },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          hypothesisId: 'B',
-        }),
-      }).catch(() => {})
-      // #endregion
 
       return merged
     }
@@ -792,27 +740,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       // This avoids duplicate ids, which can cause streaming deltas to "attach" to an older copy.
       const existingIdxById = messages.findIndex(m => m.id === msg.id)
       if (existingIdxById !== -1) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'useConversations.ts:737',
-            message: 'message.append replaces existing',
-            data: {
-              msgId: msg.id,
-              idx: existingIdxById,
-              existingContentLen: messages[existingIdxById].content?.length || 0,
-              newContentLen: msg.content?.length || 0,
-              msgRole: msg.role,
-              msgTurnId: msg.turnId,
-            },
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            hypothesisId: 'B',
-          }),
-        }).catch(() => {})
-        // #endregion
         const existing = messages[existingIdxById] as ClientMessage
         // Merge toolCalls if both have them (preserve whichever is more complete).
         const nextToolCalls = (() => {
@@ -921,31 +848,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const at = (chunk as any)?.data?.at
       const now = typeof at === 'string' && at.trim().length > 0 ? at : new Date().toISOString()
       if (idx === -1) {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'useConversations.ts:846',
-            message: 'delta creates new shell',
-            data: {
-              messageId: messageId,
-              chunkType: chunk.type,
-              deltaLen: delta.length,
-              deltaPreview: delta.substring(0, 50),
-              existingMsgCount: messages.length,
-              existingMsgIds: messages.map((m: any) => m.id),
-              existingMsgContentLens: messages.map((m: any) => m.content?.length || 0),
-              existingContentPreviews: messages.map((m: any) => m.content?.substring(0, 40)||''),
-              turnId: (chunk as any)?.data?.turnId,
-            },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'post-fix-5',
-          hypothesisId: 'SNAPSHOT_STALE_FIX',
-          }),
-        }).catch(() => {})
-        // #endregion
         const shell: ClientMessage = {
           id: messageId,
           role: 'assistant',
@@ -958,31 +860,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           ...(typeof (chunk as any)?.data?.turnId === 'string' ? { turnId: String((chunk as any).data.turnId) } : null),
           streaming: true,
         } as ClientMessage
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            location: 'useConversations.ts:875',
-            message: 'delta shell created',
-            data: { messageId: messageId, shellContent: shell.content, shellContentLen: shell.content?.length || 0, shellContentPreview: shell.content?.substring(0,50)||'', shellReasoning: shell.reasoning, shellReasoningLen: shell.reasoning?.length || 0 },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'post-fix-5',
-          hypothesisId: 'SNAPSHOT_STALE_FIX',
-          }),
-        }).catch(() => {})
-        // #endregion
         return [...messages, shell]
       }
       const cur: ClientMessage = { ...(messages[idx] as ClientMessage) }
       const oldContentLen = String(cur.content || '').length
       const oldReasoningLen = String(cur.reasoning || '').length
       const isFromSnapshot = cur.fromSnapshot === true
-      
+
       cur.updatedAt = now
       cur.streaming = true
-      
+
       // If this message came from a snapshot and this is the first delta, REPLACE content instead of appending
       // to avoid stale content from snapshot. Clear the flag after first delta.
       if (isFromSnapshot && chunk.type === 'assistant.delta') {
@@ -995,37 +882,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
         else cur.reasoning = String(cur.reasoning || '') + delta
       }
-      
+
       const newContentLen = String(cur.content || '').length
       const newReasoningLen = String(cur.reasoning || '').length
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'useConversations.ts:888',
-          message: isFromSnapshot ? 'delta REPLACED snapshot content' : 'delta appended to existing',
-          data: {
-            messageId: messageId,
-            idx: idx,
-            chunkType: chunk.type,
-            wasFromSnapshot: isFromSnapshot,
-            oldContentLen: oldContentLen,
-            oldReasoningLen: oldReasoningLen,
-            newContentLen: newContentLen,
-            newReasoningLen: newReasoningLen,
-            deltaLen: delta.length,
-            deltaPreview: delta.substring(0, 30),
-            contentTailPreview: cur.content?.substring(Math.max(0, newContentLen - 50), newContentLen) || '',
-            reasoningTailPreview: cur.reasoning?.substring(Math.max(0, newReasoningLen - 50), newReasoningLen) || '',
-          },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'post-fix-5',
-          hypothesisId: 'SNAPSHOT_STALE_FIX',
-        }),
-      }).catch(() => {})
-      // #endregion
       messages[idx] = cur
       return messages
     }
@@ -1167,42 +1026,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const lastProcessedCount = lastReducedChunkCountRef.current // Use SEPARATE ref!
     const currentCount = filteredChunks.length
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'useConversations.ts:1029',
-        message: 'FIXED: computedMessages entry',
-        data: { convId: conversationId, lastProcessedCount, currentCount, diff: currentCount - lastProcessedCount },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'post-fix-5',
-        hypothesisId: 'SNAPSHOT_STALE_FIX',
-      }),
-    }).catch(() => {})
-    // #endregion
-
     // If count decreased (query reset) or is zero, start from scratch
     if (currentCount < lastProcessedCount || currentCount === 0) {
       const result = filteredChunks.reduce(reduceMessages, [] as ClientMessage[])
       lastComputedMessagesRef.current = result
       lastReducedChunkCountRef.current = currentCount
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'useConversations.ts:1042',
-          message: 'FIXED: Full reduction (reset)',
-          data: { convId: conversationId, chunkCount: currentCount, msgIds: result.map(m => m.id), msgContentLens: result.map(m => m.content?.length || 0), fromSnapshotFlags: result.map(m => m.fromSnapshot || false) },
-          timestamp: Date.now(),
-          sessionId: 'debug-session',
-          runId: 'post-fix-5',
-          hypothesisId: 'SNAPSHOT_STALE_FIX',
-        }),
-      }).catch(() => {})
-      // #endregion
       return result
     }
 
@@ -1210,21 +1038,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const newChunks = filteredChunks.slice(lastProcessedCount)
 
     if (newChunks.length === 0) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          location: 'useConversations.ts:1053',
-          message: 'FIXED: No new chunks, returning cached',
-        data: { convId: conversationId, cachedMsgCount: lastComputedMessagesRef.current.length },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'post-fix-5',
-        hypothesisId: 'SNAPSHOT_STALE_FIX',
-        }),
-      }).catch(() => {})
-      // #endregion
       return lastComputedMessagesRef.current
     }
 
@@ -1237,50 +1050,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       fromSnapshot: msg.fromSnapshot,
     }))
 
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'useConversations.ts:1069',
-        message: 'FIXED: Before incremental reduction',
-        data: {
-          convId: conversationId,
-          prevMsgIds: previousMessagesCopy.map(m => m.id),
-          prevContentLens: previousMessagesCopy.map(m => m.content?.length || 0),
-          prevContentPreviews: previousMessagesCopy.map(m => m.content?.substring(0,50)||''),
-          prevFromSnapshot: previousMessagesCopy.map(m => m.fromSnapshot || false),
-          newChunkTypes: newChunks.map((c: any) => c.type),
-          newChunkCount: newChunks.length,
-        },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'post-fix-5',
-        hypothesisId: 'SNAPSHOT_STALE_FIX',
-      }),
-    }).catch(() => {})
-    // #endregion
-
     // Apply only new chunks to previous result (incremental)
     const result = newChunks.reduce(reduceMessages, previousMessagesCopy)
     lastComputedMessagesRef.current = result
     lastReducedChunkCountRef.current = currentCount // Update the count!
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        location: 'useConversations.ts:1082',
-        message: 'FIXED: After incremental reduction',
-        data: { convId: conversationId, resultMsgIds: result.map(m => m.id), resultContentLens: result.map(m => m.content?.length || 0), resultContentPreviews: result.map(m => m.content?.substring(0,50)||''), resultStreamingFlags: result.map(m => m.streaming), resultFromSnapshot: result.map(m => m.fromSnapshot || false) },
-        timestamp: Date.now(),
-        sessionId: 'debug-session',
-        runId: 'post-fix-5',
-        hypothesisId: 'SNAPSHOT_STALE_FIX',
-      }),
-    }).catch(() => {})
-    // #endregion
 
     return result
   }, [filteredChunks, conversationId])

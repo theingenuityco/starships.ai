@@ -677,6 +677,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
 
     if (chunk.type === 'snapshot') {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:679',message:'snapshot received',data:{accLen:acc.length,snapshotMsgCount:Array.isArray(chunk.data.messages)?chunk.data.messages.length:0,turnId:chunk.data.turn?.turnId,turnStatus:chunk.data.turn?.status,accMsgIds:acc.map((m:any)=>({id:m.id,role:m.role,contentLen:m.content?.length||0}))},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,B,D'})}).catch(()=>{});
+      // #endregion
       const msgs = Array.isArray(chunk.data.messages) ? (chunk.data.messages as ClientMessage[]) : []
       // Preserve streaming state for assistant messages in active turns - they may have been
       // derived from Redis stream replay and should continue accumulating deltas.
@@ -694,6 +697,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && isStreamPlaceholder)
         return withStreaming(m, shouldStream)
       })
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:703',message:'snapshot processed',data:{snapMsgCount:snap.length,snapMsgs:snap.map((m:any)=>({id:m.id,role:m.role,streaming:m.streaming,contentLen:m.content?.length||0,contentPreview:m.content?.substring(0,50)})),streamPlaceholderId:turn?.turnId?`stream-${turn.turnId}`:null},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,E'})}).catch(()=>{});
+      // #endregion
 
       // Merge snapshot with existing messages carefully:
       // - Snapshot is authoritative for any given message id.
@@ -716,6 +722,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           keptFromAcc++
         }
       }
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:726',message:'snapshot merged',data:{mergedLen:merged.length,keptFromAcc:keptFromAcc,mergedIds:merged.map((m:any)=>m.id)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
 
       return merged
     }
@@ -735,6 +744,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       // This avoids duplicate ids, which can cause streaming deltas to "attach" to an older copy.
       const existingIdxById = messages.findIndex(m => m.id === msg.id)
       if (existingIdxById !== -1) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:737',message:'message.append replaces existing',data:{msgId:msg.id,idx:existingIdxById,existingContentLen:messages[existingIdxById].content?.length||0,newContentLen:msg.content?.length||0,msgRole:msg.role,msgTurnId:msg.turnId},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         const existing = messages[existingIdxById] as ClientMessage
         // Merge toolCalls if both have them (preserve whichever is more complete).
         const nextToolCalls = (() => {
@@ -843,6 +855,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const at = (chunk as any)?.data?.at
       const now = typeof at === 'string' && at.trim().length > 0 ? at : new Date().toISOString()
       if (idx === -1) {
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:846',message:'delta creates new shell',data:{messageId:messageId,chunkType:chunk.type,deltaLen:delta.length,deltaPreview:delta.substring(0,50),existingMsgCount:messages.length,existingMsgIds:messages.map((m:any)=>m.id),existingMsgContentLens:messages.map((m:any)=>m.content?.length||0),turnId:(chunk as any)?.data?.turnId},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-2',hypothesisId:'MUTATION'})}).catch(()=>{});
+        // #endregion
         const shell: ClientMessage = {
           id: messageId,
           role: 'assistant',
@@ -855,13 +870,23 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           ...(typeof (chunk as any)?.data?.turnId === 'string' ? { turnId: String((chunk as any).data.turnId) } : null),
           streaming: true,
         } as ClientMessage
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:875',message:'delta shell created',data:{messageId:messageId,shellContent:shell.content,shellContentLen:shell.content?.length||0,shellReasoning:shell.reasoning,shellReasoningLen:shell.reasoning?.length||0},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-2',hypothesisId:'MUTATION'})}).catch(()=>{});
+        // #endregion
         return [...messages, shell]
       }
       const cur: ClientMessage = { ...(messages[idx] as ClientMessage) }
+      const oldContentLen = String(cur.content || '').length
+      const oldReasoningLen = String(cur.reasoning || '').length
       cur.updatedAt = now
       cur.streaming = true
       if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
       else cur.reasoning = String(cur.reasoning || '') + delta
+      const newContentLen = String(cur.content || '').length
+      const newReasoningLen = String(cur.reasoning || '').length
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:888',message:'delta appended to existing',data:{messageId:messageId,idx:idx,chunkType:chunk.type,oldContentLen:oldContentLen,oldReasoningLen:oldReasoningLen,newContentLen:newContentLen,newReasoningLen:newReasoningLen,deltaLen:delta.length,deltaPreview:delta.substring(0,30),contentTailPreview:cur.content?.substring(Math.max(0,newContentLen-50),newContentLen)||'',reasoningTailPreview:cur.reasoning?.substring(Math.max(0,newReasoningLen-50),newReasoningLen)||''},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-2',hypothesisId:'MUTATION'})}).catch(()=>{});
+      // #endregion
       messages[idx] = cur
       return messages
     }
@@ -915,12 +940,16 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Queue for message.append chunks that are delayed due to animation
   const queuedAppendChunksRef = useRef<StreamedChunk[]>([])
   const processedChunksRef = useRef<StreamedChunk[]>([])
+  // Track last computed messages to use in animation check (avoids re-reducing all chunks)
+  const lastComputedMessagesRef = useRef<ClientMessage[]>([])
+  // Track how many filteredChunks we've processed in computedMessages (separate from processedChunksRef!)
+  const lastReducedChunkCountRef = useRef<number>(0)
 
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {
     const processed: StreamedChunk[] = []
     const queued: StreamedChunk[] = []
-
+    
     for (const chunk of chunks) {
       if (chunk.type === 'message.append') {
         const msg = (chunk as any).data?.message
@@ -928,8 +957,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
           if (!hasToolCalls) {
             // Check if previous assistant message animation is complete
-            const currentMessages = processed.reduce(reduceMessages, [] as ClientMessage[])
-            const lastAssistantId = getLastAssistantMessageId(currentMessages)
+            // Use LAST computed messages (from previous render) to avoid re-reduction
+            const lastAssistantId = getLastAssistantMessageId(lastComputedMessagesRef.current)
             if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
               // Queue this chunk for later processing
               queued.push(chunk)
@@ -993,7 +1022,61 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
   }, [filteredChunks, conversationId, queryClient])
 
-  const computedMessages = useMemo(() => filteredChunks.reduce(reduceMessages, [] as ClientMessage[]), [filteredChunks])
+  // CRITICAL FIX: Incremental message reduction - only process NEW filtered chunks
+  // IMPORTANT: Deep copy previous messages to prevent mutation
+  const computedMessages = useMemo(() => {
+    const lastProcessedCount = lastReducedChunkCountRef.current  // Use SEPARATE ref!
+    const currentCount = filteredChunks.length
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:1029',message:'FIXED: computedMessages entry',data:{convId:conversationId,lastProcessedCount,currentCount,diff:currentCount-lastProcessedCount},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-3',hypothesisId:'LOGIC_BUG'})}).catch(()=>{});
+    // #endregion
+    
+    // If count decreased (query reset) or is zero, start from scratch
+    if (currentCount < lastProcessedCount || currentCount === 0) {
+      const result = filteredChunks.reduce(reduceMessages, [] as ClientMessage[])
+      lastComputedMessagesRef.current = result
+      lastReducedChunkCountRef.current = currentCount
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:1042',message:'FIXED: Full reduction (reset)',data:{convId:conversationId,chunkCount:currentCount,msgIds:result.map(m=>m.id),msgContentLens:result.map(m=>m.content?.length||0)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-3',hypothesisId:'LOGIC_BUG'})}).catch(()=>{});
+      // #endregion
+      return result
+    }
+    
+    // Get only NEW chunks that haven't been processed yet  
+    const newChunks = filteredChunks.slice(lastProcessedCount)
+    
+    if (newChunks.length === 0) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:1053',message:'FIXED: No new chunks, returning cached',data:{convId:conversationId,cachedMsgCount:lastComputedMessagesRef.current.length},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-3',hypothesisId:'LOGIC_BUG'})}).catch(()=>{});
+      // #endregion
+      return lastComputedMessagesRef.current
+    }
+    
+    // CRITICAL: Deep copy previous messages to prevent reducer from mutating them
+    const previousMessagesCopy = lastComputedMessagesRef.current.map(msg => ({
+      ...msg,
+      content: msg.content,
+      reasoning: msg.reasoning,
+      toolCalls: msg.toolCalls ? [...msg.toolCalls] : undefined,
+    }))
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:1069',message:'FIXED: Before incremental reduction',data:{convId:conversationId,prevMsgIds:previousMessagesCopy.map(m=>m.id),prevContentLens:previousMessagesCopy.map(m=>m.content?.length||0),newChunkTypes:newChunks.map((c:any)=>c.type),newChunkCount:newChunks.length},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-3',hypothesisId:'LOGIC_BUG'})}).catch(()=>{});
+    // #endregion
+    
+    // Apply only new chunks to previous result (incremental)
+    const result = newChunks.reduce(reduceMessages, previousMessagesCopy)
+    lastComputedMessagesRef.current = result
+    lastReducedChunkCountRef.current = currentCount  // Update the count!
+    
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'useConversations.ts:1082',message:'FIXED: After incremental reduction',data:{convId:conversationId,resultMsgIds:result.map(m=>m.id),resultContentLens:result.map(m=>m.content?.length||0),resultStreamingFlags:result.map(m=>m.streaming)},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix-3',hypothesisId:'LOGIC_BUG'})}).catch(()=>{});
+    // #endregion
+    
+    return result
+  }, [filteredChunks, conversationId])
+  
   const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
   const isAwaitingToolResults = turnState.status === 'waiting_for_tools'

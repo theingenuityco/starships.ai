@@ -142,6 +142,9 @@ function useSlabTypewriterText({
   useEffect(() => {
     // Update target length ref whenever fullText changes
     targetLengthRef.current = fullText.length
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConversationMessageContent.tsx:143',message:'fullText changed',data:{resetKey:resetKey,fullTextLen:fullText.length,isStreaming:isStreaming,displayedLength:displayedLengthRef.current,fullTextPreview:fullText.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'C'})}).catch(()=>{});
+    // #endregion
 
     // If not streaming and we haven't started typewriting, sync the displayedLength
     // This ensures state is correct even though displayText handles the rendering
@@ -397,6 +400,9 @@ export function ConversationMessageContent({
   // Build full aggregated content from chunks
   const fullContent = useMemo(() => {
     const hasChunks = Array.isArray(chunks) && chunks.length > 0
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'ConversationMessageContent.tsx:399',message:'fullContent calculation',data:{messageId:messageId,hasChunks:hasChunks,chunkCount:chunks?.length||0,contentLen:content?.length||0,isStreaming:isStreaming,contentPreview:content?.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'A,C'})}).catch(()=>{});
+    // #endregion
     if (!hasChunks) {
       return content
     }
@@ -408,7 +414,7 @@ export function ConversationMessageContent({
 
     // After completion, prefer server-finalized content; if missing, fall back to aggregated chunks
     return content && content.trim().length > 0 ? content : aggregated
-  }, [content, chunks, isStreaming])
+  }, [content, chunks, isStreaming, messageId])
 
   const displayReasoningFull = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0

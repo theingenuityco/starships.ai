@@ -15,24 +15,10 @@ export default function ForgotPasswordPage() {
         {/* Centered Form */}
         <div className="w-full flex items-center justify-center px-6 py-16 relative z-10">
           <div className="w-full max-w-md">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-              className="mb-8 text-center"
-            >
-              <motion.div
-                initial={{ scale: 0.8 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
-                className="mb-6"
-              >
-                <h1 className="text-3xl font-bold text-primary">
-                  Reset Your Password
-                </h1>
-                <p className="text-muted-foreground mt-2">
-                  Get back to your starship journey
-                </p>
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 text-center">
+              <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-6">
+                <h1 className="text-3xl font-bold text-primary">Reset Your Password</h1>
+                <p className="text-muted-foreground mt-2">Get back to your starship journey</p>
               </motion.div>
             </motion.div>
 

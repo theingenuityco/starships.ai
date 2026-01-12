@@ -168,7 +168,9 @@ export const agentOpenTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const resp = ctx.input || {};
+              // Mirror open-tool: do not rely on ctx.input wiring; explicitly pick the
+              // connector response produced by the executed branch.
+              const resp = ctx.lastOutputOf('create_agent') || ctx.lastOutputOf('get_agent') || {};
               const body = resp && typeof resp === 'object' ? resp.body : undefined;
 
               if (body && typeof body === 'object') {
@@ -267,7 +269,7 @@ export const agentOpenToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentOpenTool.blueprint,
 
   slug: 'open-agent',
-  version: '1.0.4',
+  version: '1.0.5',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent" } // open existing\n{ "name": "Support Agent", "description": "Helps users", "model": "provider/model-id", "systemPrompt": "You are a helpful support agent", "previewPrompts": ["How do I reset my password?", "Where can I find my invoice?"] } // create draft (use List Models to find best match)\n{ "name": "Code Assistant", "model": "provider/code-optimized-model", "temperature": 0.3, "maxTokens": 4000, "systemPrompt": "You are an expert coding assistant" } // coding agent (select from List Models based on description keywords)',

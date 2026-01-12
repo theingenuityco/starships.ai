@@ -9,7 +9,7 @@ export const agentAssignToolTool: ToolParams = {
   name: 'Assign Agent Tool',
   slug: 'assign-agent-tool',
   description:
-    'Assign a tool to an agent by slug on the current starship (creates an Agent→Tool relationship). Returns the updated agent or server response.',
+    'Assign a tool to an agent by slug on the current starship (creates an Agent→Tool relationship). Returns { ok: true } on success.',
   parameters: {
     type: 'object',
     properties: {
@@ -116,12 +116,27 @@ export const agentAssignToolTool: ToolParams = {
         },
       },
       {
+        ref: 'lean',
+        type: 'code',
+        name: 'Lean Result',
+        description: 'Return minimal success payload',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              // If we reached here, connector_action succeeded (failOnNon2xx would have failed the run).
+              return { ok: true };
+            }
+          `,
+          timeout: 1000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
-        description: 'Return updated agent',
+        description: 'Return { ok: true }',
         parameters: {
-          output: '{{ lastOutputOf("http_update") }}',
+          output: '{{ lastOutputOf("lean") }}',
         },
       },
     ],
@@ -130,7 +145,8 @@ export const agentAssignToolTool: ToolParams = {
       { ref: 'e2', from: 'prepare', to: 'fetch_agent' },
       { ref: 'e3', from: 'fetch_agent', to: 'update_tools' },
       { ref: 'e4', from: 'update_tools', to: 'http_update' },
-      { ref: 'e5', from: 'http_update', to: 'end_1' },
+      { ref: 'e5', from: 'http_update', to: 'lean' },
+      { ref: 'e6', from: 'lean', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -146,7 +162,7 @@ export const agentAssignToolToolTemplate: Omit<ToolTemplateModel, 'id' | 'create
   blueprint: agentAssignToolTool.blueprint,
 
   slug: 'assign-agent-tool',
-  version: '1.0.3',
+  version: '1.0.4',
   category: 'automation',
   exampleUsage: '{ "agentSlug": "support-agent", "toolSlug": "wikipedia" } // assign wikipedia tool to support agent',
   requiresApiKey: false,

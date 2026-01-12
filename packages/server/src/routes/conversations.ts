@@ -430,15 +430,17 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
               if (!alreadyPersisted) {
                 const now = new Date().toISOString();
                 const at = buf.lastAt || buf.firstAt || now;
+                // CRITICAL FIX: Send empty streaming placeholder instead of replayed content
+                // to avoid showing stale deltas from previous turns. The live stream will
+                // populate it with fresh content.
                 const derivedAssistantMsg: MessageModel = {
                   id: bestId,
                   role: 'assistant',
-                  content: buf.content || '',
+                  content: '', // Empty - let live stream populate it
                   messageType: 'agent_response',
                   createdAt: buf.firstAt || at,
                   updatedAt: at,
                   turnId: activeTurnId,
-                  ...(buf.reasoning && { reasoning: buf.reasoning }),
                 };
                 snapshotMessages = [...snapshotMessages, derivedAssistantMsg];
               }

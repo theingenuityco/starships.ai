@@ -49,6 +49,8 @@ interface ClientMessage extends MessageModel {
     position: number
     timestamp: number
   }>
+  // Flag indicating this message came from a snapshot and may have stale content
+  fromSnapshot?: boolean
   // Derived/grouped tool results (not part of DB MessageModel)
   toolResults?: Array<{
     toolName?: string
@@ -129,14 +131,12 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
   return useQuery({
     queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId),
     queryFn: async (): Promise<{ conversations: Array<ConversationModel & { agents: AgentModel[] }> }> => {
-      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(
-        `/api/v1/starships/${starshipId}/conversations`
-      )
+      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(`/api/v1/starships/${starshipId}/conversations`)
       return { conversations: response.data.data }
     },
     enabled: !!starshipId && enabled,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000, // No cache in dev, 10 minutes in prod
   })
 }
 
@@ -155,8 +155,8 @@ export function usePendingToolApprovals(conversationId: string | null, enabled: 
       const response: FetchResponse<ApiResponse<PendingToolCallApproval[]>> = await api.get(`/api/v1/conversations/${id}/tool-approvals/pending`)
       return response.data.data || []
     },
-    staleTime: 5_000,
-    gcTime: 60_000,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5_000, // No cache in dev
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000, // No cache in dev
     refetchOnWindowFocus: true,
   })
 }
@@ -306,8 +306,8 @@ export function useConversationAgents(conversationId: string | null) {
       return response.data.data.agents || []
     },
     enabled: !!conversationId,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000, // No cache in dev, 10 minutes in prod
   })
 }
 
@@ -355,7 +355,7 @@ export function useConversationDetail(conversationId: string | null) {
       return response.data.data
     },
     enabled: !!conversationId,
-    staleTime: 30 * 1000, // 30 seconds
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 30 * 1000, // No cache in dev, 30 seconds in prod
   })
 }
 
@@ -704,25 +704,40 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const turn = chunk.data.turn
       const isActiveTurn = turn && (turn.status === 'active' || turn.status === 'waiting_for_tools')
       const snap = msgs.map(m => {
-        // If this is an assistant message for an active turn, keep it as streaming so deltas can accumulate
-        const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && typeof m.turnId === 'string' && m.turnId === turn?.turnId)
-        return withStreaming(m, shouldStream)
+        // Only mark the *stream placeholder* as streaming on snapshot.
+        //
+        // Why:
+        // The server emits deltas targeting a single messageId (usually `stream-${turnId}`).
+        // Marking *all* assistant messages in the active turn as `streaming=true` makes the UI
+        // think multiple messages are "actively streaming", which can move the caret and confuse
+        // which bubble should visually "continue" after refresh.
+        const isStreamPlaceholder = typeof (m as any)?.id === 'string' && typeof turn?.turnId === 'string' && String((m as any).id) === `stream-${turn.turnId}`
+        const shouldStream = Boolean(isActiveTurn && m.role === 'assistant' && isStreamPlaceholder)
+        const withStream = withStreaming(m, shouldStream)
+        // Mark streaming placeholders from snapshots so we can detect stale deltas later
+        if (shouldStream) {
+          return { ...withStream, fromSnapshot: true }
+        }
+        return withStream
       })
 
-      // Merge snapshot with existing messages using composite keys.
-      // Rationale: server snapshots may collapse multiple assistant tool-call messages into a single `id`,
-      // so a pure replacement would drop valid assistant tool-call messages and leave tool results orphaned.
-      const snapMap = new Map<string, ClientMessage>()
+      // Merge snapshot with existing messages carefully:
+      // - Snapshot is authoritative for any given message id.
+      // - We only keep "extra" messages from acc when their id is NOT present in the snapshot.
+      //
+      // Why: allowing multiple entries with the same `id` (even when toolCalls differ) breaks
+      // `assistant.delta` routing (findIndex hits the first match), which is exactly how streaming
+      // can appear to "resume" on an older bubble after refresh/tool-call phases.
+      const snapIds = new Set<string>()
       for (const m of snap) {
-        const k = toolCallKey(m)
-        if (k) snapMap.set(k, m)
+        if (m?.id != null) snapIds.add(String(m.id))
       }
       const merged: ClientMessage[] = [...snap]
       let keptFromAcc = 0
       for (const m of acc) {
-        const k = toolCallKey(m)
-        if (!k) continue
-        if (!snapMap.has(k)) {
+        const id = m?.id != null ? String(m.id) : ''
+        if (!id) continue
+        if (!snapIds.has(id)) {
           merged.push(m)
           keptFromAcc++
         }
@@ -743,30 +758,40 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const msg = chunk.data?.message
       const messages = clone(acc)
       if (!msg || !msg.id) return messages
-      // For assistant messages with tool calls, check for duplicates using composite key (id + toolCallIds)
-      // to allow multiple assistant messages with the same id but different tool calls
-      if (msg.role === 'assistant' && Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0) {
-        const msgToolCallIds = msg.toolCalls
-          .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
-          .filter(Boolean)
-          .join(',')
-        const isDuplicate = messages.some(m => {
-          if (m.id !== msg.id) return false
-          if (m.role !== 'assistant' || !Array.isArray(m.toolCalls) || m.toolCalls.length === 0) return true
-          const mToolCallIds = m.toolCalls
-            .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
-            .filter(Boolean)
-            .join(',')
-          return mToolCallIds === msgToolCallIds
-        })
-        if (isDuplicate) {
-          return messages
-        }
-      } else {
-        // For non-assistant messages or assistant messages without tool calls, use simple ID check
-        if (messages.some(m => m.id === msg.id)) {
-          return messages
-        }
+      // If a message with the same id already exists, treat this as an update rather than a new message.
+      // This avoids duplicate ids, which can cause streaming deltas to "attach" to an older copy.
+      const existingIdxById = messages.findIndex(m => m.id === msg.id)
+      if (existingIdxById !== -1) {
+        const existing = messages[existingIdxById] as ClientMessage
+        // Merge toolCalls if both have them (preserve whichever is more complete).
+        const nextToolCalls = (() => {
+          const a = Array.isArray((existing as any)?.toolCalls) ? ((existing as any).toolCalls as any[]) : []
+          const b = Array.isArray((msg as any)?.toolCalls) ? ((msg as any).toolCalls as any[]) : []
+          if (a.length === 0) return b
+          if (b.length === 0) return a
+          const out: any[] = []
+          const seen = new Set<string>()
+          const add = (tc: any) => {
+            const id = tc?.id ?? tc?.call_id ?? tc?.toolCallId
+            const key = id != null ? String(id) : `no-id-${out.length}`
+            if (seen.has(key)) return
+            seen.add(key)
+            out.push(tc)
+          }
+          // Prefer the newer message's toolCalls first, then fill with any missing from existing.
+          b.forEach(add)
+          a.forEach(add)
+          return out
+        })()
+        messages[existingIdxById] = withStreaming(
+          {
+            ...existing,
+            ...msg,
+            ...(Array.isArray(nextToolCalls) ? { toolCalls: nextToolCalls as any } : null),
+          } as ClientMessage,
+          false
+        )
+        return messages
       }
 
       // Replace the streaming placeholder message for this turn (stream-<turnId>) if present.
@@ -775,8 +800,20 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const streamId = `stream-${msgTurnId}`
         const idx = messages.findIndex(m => m.id === streamId)
         if (idx !== -1) {
-          messages[idx] = withStreaming(msg, false)
-          return messages
+          const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0
+          const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
+          const willReplaceStreamPlaceholder = !(hasToolCalls && !hasContent)
+
+          // IMPORTANT:
+          // During a turn with tool calls, the server can append an assistant "tool-call message"
+          // (toolCalls present, content often empty) while *still* streaming deltas into `stream-<turnId>`.
+          // If we replace the stream placeholder with the tool-call message, subsequent deltas no longer
+          // find `stream-<turnId>` and we recreate shells → duplicated/out-of-order chunks until the final append.
+          if (willReplaceStreamPlaceholder) {
+            messages[idx] = withStreaming(msg, false)
+            return messages
+          }
+          // Keep the stream placeholder; allow this tool-call message to be appended separately below.
         }
 
         // Check if there's already an assistant message with the same turnId
@@ -821,8 +858,17 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const delta = chunk.data.delta
       if (!messageId || !delta) return messages
 
-      const idx = messages.findIndex(m => m.id === messageId)
-      const now = new Date().toISOString()
+      // If there are duplicates (should be prevented, but can occur during edge-case merges),
+      // always apply deltas to the LAST occurrence so streaming continues at the tail.
+      let idx = -1
+      for (let i = messages.length - 1; i >= 0; i--) {
+        if (messages[i]?.id === messageId) {
+          idx = i
+          break
+        }
+      }
+      const at = (chunk as any)?.data?.at
+      const now = typeof at === 'string' && at.trim().length > 0 ? at : new Date().toISOString()
       if (idx === -1) {
         const shell: ClientMessage = {
           id: messageId,
@@ -830,17 +876,37 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           content: chunk.type === 'assistant.delta' ? delta : '',
           reasoning: chunk.type === 'assistant.reasoning_delta' ? delta : undefined,
           messageType: 'agent_response',
+          // Use the server event timestamp when available to keep ordering stable across refreshes.
           createdAt: now,
           updatedAt: now,
+          ...(typeof (chunk as any)?.data?.turnId === 'string' ? { turnId: String((chunk as any).data.turnId) } : null),
           streaming: true,
         }
         return [...messages, shell]
       }
       const cur: ClientMessage = { ...messages[idx] }
+      const oldContentLen = String(cur.content || '').length
+      const oldReasoningLen = String(cur.reasoning || '').length
+      const isFromSnapshot = cur.fromSnapshot === true
+
       cur.updatedAt = now
       cur.streaming = true
-      if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
-      else cur.reasoning = String(cur.reasoning || '') + delta
+
+      // If this message came from a snapshot and this is the first delta, REPLACE content instead of appending
+      // to avoid stale content from snapshot. Clear the flag after first delta.
+      if (isFromSnapshot && chunk.type === 'assistant.delta') {
+        cur.content = delta
+        cur.fromSnapshot = false
+      } else if (isFromSnapshot && chunk.type === 'assistant.reasoning_delta') {
+        cur.reasoning = delta
+        cur.fromSnapshot = false
+      } else {
+        if (chunk.type === 'assistant.delta') cur.content = String(cur.content || '') + delta
+        else cur.reasoning = String(cur.reasoning || '') + delta
+      }
+
+      const newContentLen = String(cur.content || '').length
+      const newReasoningLen = String(cur.reasoning || '').length
       messages[idx] = cur
       return messages
     }
@@ -963,6 +1029,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   // Queue for message.append chunks that are delayed due to animation
   const queuedAppendChunksRef = useRef<StreamedChunk[]>([])
   const processedChunksRef = useRef<StreamedChunk[]>([])
+  // Track last computed messages to use in animation check (avoids re-reducing all chunks)
+  const lastComputedMessagesRef = useRef<ClientMessage[]>([])
+  // Track how many filteredChunks we've processed in computedMessages (separate from processedChunksRef!)
+  const lastReducedChunkCountRef = useRef<number>(0)
 
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {
@@ -976,8 +1046,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
           if (!hasToolCalls) {
             // Check if previous assistant message animation is complete
-            const currentMessages = processed.reduce(reduceMessages, emptyMessages)
-            const lastAssistantId = getLastAssistantMessageId(currentMessages)
+            // Use LAST computed messages (from previous render) to avoid re-reduction
+            const lastAssistantId = getLastAssistantMessageId(lastComputedMessagesRef.current)
             if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
               // Queue this chunk for later processing
               queued.push(chunk)
@@ -1041,7 +1111,44 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     }
   }, [filteredChunks, conversationId, queryClient])
 
-  const computedMessages = useMemo(() => filteredChunks.reduce(reduceMessages, emptyMessages), [filteredChunks])
+  // CRITICAL FIX: Incremental message reduction - only process NEW filtered chunks
+  // IMPORTANT: Deep copy previous messages to prevent mutation
+  const computedMessages = useMemo(() => {
+    const lastProcessedCount = lastReducedChunkCountRef.current // Use SEPARATE ref!
+    const currentCount = filteredChunks.length
+
+    // If count decreased (query reset) or is zero, start from scratch
+    if (currentCount < lastProcessedCount || currentCount === 0) {
+      const result = filteredChunks.reduce(reduceMessages, [] as ClientMessage[])
+      lastComputedMessagesRef.current = result
+      lastReducedChunkCountRef.current = currentCount
+      return result
+    }
+
+    // Get only NEW chunks that haven't been processed yet
+    const newChunks = filteredChunks.slice(lastProcessedCount)
+
+    if (newChunks.length === 0) {
+      return lastComputedMessagesRef.current
+    }
+
+    // CRITICAL: Deep copy previous messages to prevent reducer from mutating them
+    const previousMessagesCopy = lastComputedMessagesRef.current.map(msg => ({
+      ...msg,
+      content: msg.content,
+      reasoning: msg.reasoning,
+      toolCalls: msg.toolCalls ? [...msg.toolCalls] : undefined,
+      fromSnapshot: msg.fromSnapshot,
+    }))
+
+    // Apply only new chunks to previous result (incremental)
+    const result = newChunks.reduce(reduceMessages, previousMessagesCopy)
+    lastComputedMessagesRef.current = result
+    lastReducedChunkCountRef.current = currentCount // Update the count!
+
+    return result
+  }, [filteredChunks, conversationId])
+
   const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
   const isAwaitingToolResults = turnState.status === 'waiting_for_tools'

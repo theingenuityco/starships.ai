@@ -8,35 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentEditTool: ToolParams = {
   name: 'Edit Agent',
   slug: 'edit-agent',
-  description: `Updates an existing agent by slug with partial changes. Designed for incremental agent development and refinement.
-
-## Purpose
-Apply partial updates to any agent by providing its slug. Supports updating individual fields without needing to provide complete agent data.
-
-## Required Parameters
-- **slug**: Agent slug to update (kebab-case identifier)
-
-## Optional Parameters
-- **name**: Update agent name
-- **role**: Update agent role (separate field from systemPrompt). If you change role, consider updating the systemPrompt identity/header to match.
-- **description**: Update agent description
-- **model**: Update LLM model
-- **systemPrompt**: Update system instructions. Must begin with <character name="AGENT_NAME">ROLE</character> as the first line and preserve this header unless explicitly changing name/role.
-- **temperature**: Update temperature (0-2)
-- **maxTokens**: Update max tokens
-- **blueprint**: Update Autopilot blueprint
-- **timeout**: Update execution timeout
-- **previewPrompts**: Update preview/example prompts (max 10)
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-
-## Response & Behavior
-- **Output**: Updated agent model
-- **Workflow**: 1) Resolve agent by slug, 2) Apply partial updates, 3) Return updated agent
-- **Timeouts**: Preparation (3s), Fetch (5s), Update (10s)
-- **Common failures**: Missing slug, agent not found (404 error), validation errors`,
+  description:
+    'Update an existing agent by slug with partial fields (name, role, description, model, systemPrompt, temperature, maxTokens, blueprint, timeout, previewPrompts). Returns the updated agent model.',
   parameters: {
     type: 'object',
     properties: {

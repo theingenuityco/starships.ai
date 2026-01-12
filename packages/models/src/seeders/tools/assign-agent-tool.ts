@@ -8,31 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentAssignToolTool: ToolParams = {
   name: 'Assign Agent Tool',
   slug: 'assign-agent-tool',
-  description: `Assign a tool to an agent by creating an Agent→Tool relationship.
-
-## Purpose
-Grant an agent access to a specific tool by its slug. The tool must exist on the starship before assignment.
-
-## Required Parameters
-- **agentSlug**: Agent slug to update
-- **toolSlug**: Tool slug to assign
-
-## Behavior
-1. Fetches current agent by slug
-2. Calls POST /agents/:id/tools/:toolSlug with { starshipId } to create relationship
-3. Returns server response
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-
-## Response
-Returns server response indicating success.
-
-## Common Failures
-- Agent or Tool not found (404)
-- Missing environment variables
-- Invalid slugs`,
+  description:
+    'Assign a tool to an agent by slug on the current starship (creates an Agent→Tool relationship). Returns the updated agent or server response.',
   parameters: {
     type: 'object',
     properties: {

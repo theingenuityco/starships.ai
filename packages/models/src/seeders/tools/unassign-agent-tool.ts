@@ -8,31 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentUnassignToolTool: ToolParams = {
   name: 'Unassign Agent Tool',
   slug: 'unassign-agent-tool',
-  description: `Remove a tool from an agent by deleting the Agent→Tool relationship.
-
-## Purpose
-Revoke an agent's access to a specific tool by its slug.
-
-## Required Parameters
-- **agentSlug**: Agent slug to update
-- **toolSlug**: Tool slug to remove
-
-## Behavior
-1. Fetches current agent by slug
-2. Calls DELETE /agents/:id/tools/:toolSlug?starshipId=... to remove relationship
-3. Returns server response
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-
-## Response
-Returns server response.
-
-## Common Failures
-- Agent not found (404)
-- Missing environment variables
-- Invalid slugs`,
+  description:
+    'Unassign a tool from an agent by slug on the current starship (deletes the Agent→Tool relationship). Returns the updated agent or server response.',
   parameters: {
     type: 'object',
     properties: {

@@ -12,53 +12,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentCallTool: ToolParams = {
   name: 'Call Agent',
   slug: 'call-agent',
-  description: `Call another agent on this starship in a linked child conversation.
-
-## Purpose
-Use this tool to delegate work to another agent while preserving a parent/child
-relationship between conversations. The child conversation records the
-delegated agent's turns and usage separately, while remaining attached to the
-current conversation for navigation and auditing.
-
-## Parameters
-- **slug**: Agent slug to call (required)
-- **content**: Text content to send as the user's message (required)
-- **childConversationId**: Optional existing child conversation to continue in
-- **parentConversationId**: Optional parent conversation id. Defaults to the current conversation when available.
-
-## Input Formats
-Example:
-\`\`\`json
-{
-  "slug": "support-agent",
-  "content": "Please handle this customer support request"
-}
-\`\`\`
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-- **CONVERSATION_ID**: Current parent conversation identifier
-
-## Behavior
-Mode A: Create new child conversation
-- When childConversationId is NOT provided:
-  - Creates a new child conversation with parentConversationId = current conversation id
-  - Assigns the target agent (by slug) to that conversation
-  - Sends the provided content as the first user message in the child conversation
-
-Mode B: Post into existing child conversation
-- When childConversationId IS provided:
-  - Sends the provided content as a new user message in that child conversation
-
-In both modes, the tool returns the childConversationId and the HTTP response
-from the message send endpoint. To keep tool outputs small and focused, the
-tool returns only the **last message** from the delegated conversation.
-
-## Response & Behavior
-- **Output**: { childConversationId, success, status, lastMessage, message }
-- **Timeout**: 60 seconds for agent execution
-- **Common failures**: Agent not found (404), invalid configuration, execution timeout, tool errors`,
+  description:
+    'Delegate a message to another agent by slug using a linked child conversation (create a new child or continue an existing childConversationId). Returns the child conversation/message result.',
   parameters: {
     type: 'object',
     properties: {

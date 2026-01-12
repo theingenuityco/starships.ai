@@ -8,24 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentListTool: ToolParams = {
   name: 'List Agents',
   slug: 'list-agents',
-  description: `List all agents on the current starship via the Starships API.
-
-When to use:
-- Inventory, discovery, or to find an agent id/slug before creation/update/testing.
-
-Inputs:
-- {} (no arguments)
-
-Implicit environment (do not pass as arguments):
-- STARSHIP_ID: derived from agent.state.starshipId
-
-Output:
-- Array of { slug, name, description, category } (deliberately lean; heavy fields like blueprint are omitted)
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing env, 401/403, network errors, server unavailability`,
+  description:
+    'List all agents on the current starship for discovery. Returns a lean array (slug, name, description, category) without heavy fields like blueprint.',
   parameters: {
     type: 'object',
     properties: {},

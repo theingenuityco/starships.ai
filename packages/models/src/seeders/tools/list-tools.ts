@@ -8,26 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const toolListTool: ToolParams = {
   name: 'List Tools',
   slug: 'list-tools',
-  description: `List all tools deployed on the current starship. This is a discovery list; it does not indicate which tools this agent can call.
-
-When to use:
-- Inventory and discovery of starship tools, e.g. to find a tool id/slug before creation/update/test.
-- Note: This returns tools available on the starship, not the subset assigned to the calling agent.
-- Note: Listing a tool does not grant permission to call it; only tools present in your available function list for this turn are callable.
-
-Inputs:
-- {} (no arguments)
-
-Implicit environment (do not pass as arguments):
-- STARSHIP_ID: derived from the current starship context
-
-Output:
-- Array of { slug, name, description, category } (deliberately lean; heavy fields like blueprint are omitted)
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing env, 401/403, network errors, server unavailability`,
+  description:
+    'List all tools deployed on the current starship for discovery (not a permission list). Returns a lean array (slug, name, description, category) without heavy fields like blueprint.',
   parameters: {
     type: 'object',
     properties: {},

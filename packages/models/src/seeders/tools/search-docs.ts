@@ -8,19 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const docsSearchTool: ToolParams = {
   name: 'Search Docs',
   slug: 'search-docs',
-  description: `Search Starships documentation and return a ranked list of matching docs.
-
-Inputs:
-- q: string (search query; empty returns a lightweight listing)
-- limit?: number (max items to return; default 20)
-
-Output:
-- { query: string, count: number, results: Array<{ slug, title, excerpt? }>, sourceDir: string }
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing baseUrl, network errors, server unavailability`,
+  description:
+    'Search Starships documentation by query and return a ranked list of matching pages (supports limit; empty query returns a lightweight listing).',
   parameters: {
     type: 'object',
     properties: {

@@ -12,31 +12,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const createWidgetTool: ToolParams = {
   name: 'Create Widget',
   slug: 'create-widget',
-  description: `Create a new widget by specifying widget type and props, or search for components first.
-
-Inputs (Search Mode):
-- name: string (widget display name)
-- description: string (widget purpose)
-- query: string (component search query, e.g., "pie chart", "stat card")
-
-Inputs (Create Mode):
-- name: string (widget display name)
-- description: string (widget purpose)
-- widgetType: string (component type, e.g., "PieChart", "StatCard")
-- props: object (component props with data extracted from user prompt)
-
-Output (Search Mode):
-- { results: Array<{ slug, title, excerpt }> }
-
-Output (Create Mode):
-- { id: string, slug: string, name: string, widgetType: string, props: object }
-
-Behavior:
-- Search mode: Use when you need to find which component type to use
-- Create mode: Use after finding the widget type, with props from the user's request
-- Props must include all data values from the user prompt
-- Widget is immediately ready to render
-- Timeouts: validate 3s, search 5s, save 5s`,
+  description:
+    'Create a widget by either searching component docs (query) or creating directly (widgetType + props). Always include name + description; returns search results or the created widget record.',
   parameters: {
     type: 'object',
     properties: {

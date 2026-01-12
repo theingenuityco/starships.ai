@@ -8,26 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const agentGetTool: ToolParams = {
   name: 'Get Agent',
   slug: 'get-agent',
-  description: `Fetch complete agent details by slug from the current starship.
-
-When to use:
-- Inspect agent configuration before modification
-- Retrieve full agent details including blueprint, system prompt, assigned tools
-- Validate agent existence before operations
-
-Inputs:
-- slug (required): Agent slug to fetch
-
-Implicit environment (do not pass as arguments):
-- STARSHIP_ID: derived from agent.state.starshipId
-
-Output:
-- Complete agent object with all fields (id, name, slug, description, model, systemPrompt, temperature, maxTokens, blueprint, assignedToolSlugs, status, etc.)
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing env, 401/403, 404 (agent not found), network errors`,
+  description:
+    'Fetch complete agent details by slug from the current starship (includes blueprint, systemPrompt, assignedToolSlugs, and other configuration).',
   parameters: {
     type: 'object',
     properties: {

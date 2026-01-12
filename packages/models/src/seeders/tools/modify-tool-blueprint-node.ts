@@ -8,28 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const blueprintModifyNodeTool: ToolParams = {
   name: 'Modify Tool Blueprint Node',
   slug: 'modify-tool-blueprint-node',
-  description: `Adds, edits, or removes a node in an existing tool's blueprint using a single unified interface.
-
-## Purpose
-Unify node-level blueprint operations (add, edit, remove) behind a single tool so Daedalus and other agents don't need to juggle multiple tool variants.
-
-## Required Parameters
-- **toolSlug**: Slug of the tool to modify
-- **op**: Operation to perform: "add", "edit", or "remove"
-
-## Operation-specific Parameters
-- **op = "add"**
-  - **node**: Full node definition to add (ref, type, name, description?, parameters?)
-
-- **op = "edit"**
-  - **nodeRef**: Reference of the existing node to edit
-  - **updates**: Partial node definition with properties to update
-
-- **op = "remove"**
-  - **nodeRef**: Reference of the existing node to remove (all connected edges are also removed)
-
-## Response
-Returns the updated tool (with modified blueprint) or validation errors if the operation fails.`,
+  description:
+    'Add, edit, or remove a blueprint node in an existing tool by slug using a single interface (op=add/edit/remove). Returns the updated tool or validation errors.',
   parameters: {
     type: 'object',
     properties: {

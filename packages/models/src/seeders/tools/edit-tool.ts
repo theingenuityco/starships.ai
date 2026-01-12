@@ -8,29 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const toolEditTool: ToolParams = {
   name: 'Edit Tool',
   slug: 'edit-tool',
-  description: `Updates an existing tool by slug with partial changes. Designed for incremental tool development and refinement.
-
-## Purpose
-Apply partial updates to any tool by providing its slug. Supports updating individual fields without needing to provide complete tool data.
-
-## Required Parameters
-- **slug**: Tool slug to update (kebab-case identifier)
-
-## Optional Parameters
-- **name**: Update tool name
-- **description**: Update tool description
-- **parameters**: Update JSON schema for tool parameters
-- **blueprint**: Update Autopilot blueprint
-
-## Environment Dependencies
-Automatically inferred from agent state (do not pass manually):
-- **STARSHIP_ID**: Current starship identifier
-
-## Response & Behavior
-- **Output**: Updated tool model
-- **Workflow**: 1) Resolve tool by slug, 2) Apply partial updates, 3) Return updated tool
-- **Timeouts**: Preparation (3s), Fetch (5s), Update (10s)
-- **Common failures**: Missing slug, tool not found (404 error), validation errors`,
+  description:
+    'Update an existing tool by slug with partial fields (name, description, parameters, blueprint) on the current starship. Returns the updated tool model.',
   parameters: {
     type: 'object',
     properties: {

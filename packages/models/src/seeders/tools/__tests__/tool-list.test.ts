@@ -6,6 +6,7 @@
 import { toolListTool, toolListToolTemplate } from '../list-tools';
 import { Tool, ExecutionItemUtils } from '@starships/autopilot';
 import type { ExecutionItem, NodeHandlerOptions, Edge, HostRuntime } from '@starships/autopilot';
+import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
 
 // Helper to create a realistic HttpResponse-like object for our HttpRequest node
 function createMockResponse(
@@ -38,8 +39,9 @@ describe('Tool List Tool', () => {
   describe('Tool Structure Validation', () => {
     it('should have valid tool structure', () => {
       expect(toolListTool.name).toBe('List Tools');
-      expect(toolListTool.description).toContain('List all tools');
+      expect(toolListTool.description).toContain('List all tools deployed');
       expect(toolListTool.description.length).toBeGreaterThan(10);
+      expect(toolListTool.description.length).toBeLessThanOrEqual(TOOL_DESCRIPTION_MAX_LENGTH);
       expect(toolListTool.parameters).toBeDefined();
       expect(toolListTool.blueprint).toBeDefined();
     });
@@ -114,7 +116,6 @@ describe('Tool List Tool', () => {
         expect(params.code).toContain('slug');
         expect(params.code).toContain('name');
         expect(params.code).toContain('description');
-        expect(params.code).toContain('isEnabled');
       }
     });
 
@@ -200,7 +201,7 @@ describe('Tool.execute return value - list-tools', () => {
       slug: t.slug,
       name: t.name,
       description: t.description,
-      isEnabled: t.isEnabled,
+      category: (t as { category?: string }).category,
     }));
     expect(item.json).toEqual(expected);
   });

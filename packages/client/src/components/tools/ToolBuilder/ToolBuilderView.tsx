@@ -3,14 +3,23 @@
 import Icon from '@/components/primitives/Icon'
 
 import React, { forwardRef, useImperativeHandle, useMemo } from 'react'
+import dynamic from 'next/dynamic'
 
 import type { Blueprint } from '@starships/autopilot'
-import { BlueprintVisualization } from '@/components/blueprint/BlueprintVisualization'
 import type { ToolBuilderViewProps, ToolBuilderViewRef } from './types'
 import { useToolForm } from './hooks/useToolForm'
 import { ToolInfoPanel } from './components/ToolInfoPanel'
 import { ParametersPanel } from './components/ParametersPanel'
 import { ToolSettingsPanel } from './components/ToolSettingsPanel'
+
+// Lazy-load to avoid pulling ELK/WebWorker code into SSR evaluation.
+const BlueprintVisualization = dynamic(
+  () => import('@/components/blueprint/BlueprintVisualization').then(m => m.BlueprintVisualization),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full bg-muted/20" />,
+  }
+)
 
 export const ToolBuilderView = forwardRef<ToolBuilderViewRef, ToolBuilderViewProps>(({ onSave, toolId, templateId }, ref) => {
   const { formData, errors, handleFieldChange, resetForm, updateField } = useToolForm({ onSave })

@@ -9,21 +9,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const toolTestTool: ToolParams = {
   name: 'Test Tool',
   slug: 'test-tool',
-  description: `Execute another tool by slug and report pass/fail with timing.
-
-  Fetch a tool by slug via the Starships HTTP API and execute its blueprint with provided arguments, reporting pass/fail and duration.
-
-  Inputs:
-  - targetSlug: string (required)
-  - arguments: object (optional; passed as initial input to the target blueprint)
-  - timeoutMs: number (optional; default 60000 for the nested run)
-
-  Output:
-  - { ok: boolean, durationMs: number, result: any }
-
-  Notes:
-  - Running a tool may cause side effects defined by its blueprint
-  - Use safe, non-destructive test inputs`,
+  description:
+    'Execute another tool by slug with optional arguments and report ok/fail plus duration. Fetches the tool definition first, then runs its blueprint (may have side effects).',
   parameters: {
     type: 'object',
     properties: {
@@ -84,6 +71,7 @@ export const toolTestTool: ToolParams = {
         parameters: {
           connector: 'starships',
           action: 'get-tool',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ lastOutputOf("prepare").slug }}',
@@ -191,7 +179,7 @@ export const toolTestToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 
   blueprint: toolTestTool.blueprint,
 
   slug: 'test-tool',
-  version: '1.0.2',
+  version: '1.0.3',
   category: 'automation',
   exampleUsage: '{ "targetSlug": "my-tool", "arguments": { ... } } // returns { ok, durationMs, result } (env inferred)',
   requiresApiKey: false,

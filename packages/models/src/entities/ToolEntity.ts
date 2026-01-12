@@ -8,7 +8,9 @@
 import type { ToolModel } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
-import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean, IsArray, IsIn } from 'class-validator';
+import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError as ClassValidatorValidationError, IsBoolean, IsArray, IsIn } from 'class-validator';
+import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
+import { ValidationError } from '@starships/errors';
 
 export class ToolEntity implements ToolModel {
   // Core database fields
@@ -57,7 +59,7 @@ export class ToolEntity implements ToolModel {
 
   @Expose()
   @IsString()
-  @Length(0, 4000)
+  @Length(0, TOOL_DESCRIPTION_MAX_LENGTH)
   description!: string;
 
   @Expose()
@@ -174,7 +176,7 @@ export class ToolEntity implements ToolModel {
    */
   static async validate(data: unknown, operation: 'create' | 'update' = 'create'): Promise<void> {
     if (!data || typeof data !== 'object') {
-      throw new Error('Data must be an object');
+      throw new ValidationError('Data must be an object');
     }
     const dataRecord = data as Record<string, unknown>;
     const entity = new ToolEntity();
@@ -187,7 +189,7 @@ export class ToolEntity implements ToolModel {
       const hasParams = !!dataRecord.parameters;
       const hasBlueprint = !!dataRecord.blueprint;
       if ((hasParams && !hasBlueprint) || (!hasParams && hasBlueprint)) {
-        throw new Error('Validation failed: Parameters and blueprint must both be provided together when setting either one');
+        throw new ValidationError('Parameters and blueprint must both be provided together when setting either one', 'parameters');
       }
 
       Object.assign(entity, {
@@ -226,8 +228,12 @@ export class ToolEntity implements ToolModel {
     });
 
     if (errors.length > 0) {
-      const errorMessages = errors.map((error: ValidationError) => Object.values(error.constraints || {}).join(', ')).join('; ');
-      throw new Error(`Validation failed: ${errorMessages}`);
+      const fieldErrors = errors.map((e: ClassValidatorValidationError) => ({
+        field: e.property || 'unknown',
+        message: Object.values(e.constraints || {}).join(', '),
+      }));
+      const message = `Validation failed: ${fieldErrors.map((e) => `${e.field}: ${e.message}`).join('; ')}`;
+      throw new ValidationError(message, fieldErrors[0]?.field, { fieldErrors });
     }
   }
 }

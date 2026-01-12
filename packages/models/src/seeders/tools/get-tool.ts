@@ -8,18 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const toolGetTool: ToolParams = {
   name: 'Get Tool',
   slug: 'get-tool',
-  description: `Get full details for a tool on the current starship by slug.
-
-Inputs:
-- slug: string (tool slug on this starship)
-
-Output:
-- Full tool model as returned by the server (includes blueprint)
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: validation 2s, connector call handled server-side
-- Typical failures: missing slug, connector/transport errors, tool not found`,
+  description: 'Fetch full tool details by slug from the current starship (includes blueprint and parameters).',
   parameters: {
     type: 'object',
     properties: {
@@ -57,6 +46,7 @@ Behavior and limits:
         parameters: {
           connector: 'starships',
           action: 'get-tool',
+          failOnNon2xx: true,
           args: {
             starshipId: '{{ env("STARSHIP_ID") }}',
             slug: '{{ (lastOutputOf("prepare") || {}).slug }}',
@@ -85,12 +75,52 @@ Behavior and limits:
         },
       },
       {
+        ref: 'slim',
+        type: 'code',
+        name: 'Slim Tool',
+        description: 'Return full tool details but omit noisy/unneeded metadata (keep blueprint)',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const tool = ctx.input;
+
+              // If this is already an error-like payload, pass through unchanged.
+              if (tool && typeof tool === 'object') {
+                const t = tool;
+                if (typeof t.code === 'string' && typeof t.message === 'string') {
+                  return t;
+                }
+              }
+
+              if (!tool || typeof tool !== 'object') return tool;
+
+              const t = tool;
+              const out = {};
+
+              if (typeof t.slug === 'string') out.slug = t.slug;
+              if (typeof t.name === 'string') out.name = t.name;
+              if (typeof t.description === 'string') out.description = t.description;
+              if (typeof t.category === 'string') out.category = t.category;
+
+              if (typeof t.status === 'string') out.status = t.status;
+              if (typeof t.version === 'string') out.version = t.version;
+
+              if (t.parameters && typeof t.parameters === 'object') out.parameters = t.parameters;
+              if (t.blueprint && typeof t.blueprint === 'object') out.blueprint = t.blueprint;
+
+              return out;
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ lastOutputOf("extract") }}',
+          output: '{{ lastOutputOf("slim") }}',
         },
       },
     ],
@@ -98,7 +128,8 @@ Behavior and limits:
       { ref: 'e1', from: 'start_1', to: 'prepare' },
       { ref: 'e2', from: 'prepare', to: 'http_get' },
       { ref: 'e3', from: 'http_get', to: 'extract' },
-      { ref: 'e4', from: 'extract', to: 'end_1' },
+      { ref: 'e4', from: 'extract', to: 'slim' },
+      { ref: 'e5', from: 'slim', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -111,9 +142,9 @@ export const toolGetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | '
   blueprint: toolGetTool.blueprint,
 
   slug: 'get-tool',
-  version: '1.0.2',
+  version: '1.0.5',
   category: 'automation',
-  exampleUsage: '{ "slug": "calc" } // returns full tool model; connector infers starship context',
+  exampleUsage: '{ "slug": "calc" } // returns full tool details including blueprint; connector infers starship context',
   requiresApiKey: false,
   configurationFields: [],
 };

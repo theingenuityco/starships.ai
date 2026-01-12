@@ -185,10 +185,31 @@ export function DeployedAgentCard({
       className="h-full"
     >
       <Card
-        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg bg-card/50 backdrop-blur-sm border border-border/60 shadow-md transition-all duration-200 hover:border-[rgba(245,158,11,0.4)] hover:bg-card/70 hover:bg-gradient-to-br hover:from-[rgba(245,158,11,0.05)] hover:to-[rgba(251,191,36,0.02)] hover:shadow-lg"
+        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg backdrop-blur-sm border border-border/60 transition-all duration-200"
         style={{
           transform: 'translateZ(0)',
-          boxShadow: '0 1px 3px rgba(0,0,0,0.1)',
+          background: isAlreadyDeployed ? 'linear-gradient(135deg, hsl(var(--card)), color-mix(in hsl, hsl(var(--card)) 96%, hsl(142 76% 36% / 0.05)))' : 'hsl(var(--card))',
+          boxShadow: '0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px hsl(var(--border) / 0.5)',
+        }}
+        onMouseEnter={e => {
+          const card = e.currentTarget
+          if (isAlreadyDeployed) {
+            card.style.background = 'linear-gradient(135deg, color-mix(in hsl, hsl(var(--card)) 70%, hsl(0 0% 0% / 0.30)), color-mix(in hsl, hsl(var(--card)) 75%, hsl(142 76% 36% / 0.05)))'
+            card.style.boxShadow = '0 6px 20px rgba(0,0,0,0.20), 0 0 0 1px hsl(var(--border) / 0.6)'
+          } else {
+            card.style.background = 'color-mix(in hsl, hsl(var(--card)) 70%, hsl(0 0% 0% / 0.30))'
+            card.style.boxShadow = '0 6px 20px rgba(0,0,0,0.20), 0 0 0 1px hsl(var(--border) / 0.6)'
+          }
+        }}
+        onMouseLeave={e => {
+          const card = e.currentTarget
+          if (isAlreadyDeployed) {
+            card.style.background = 'linear-gradient(135deg, hsl(var(--card)), color-mix(in hsl, hsl(var(--card)) 96%, hsl(142 76% 36% / 0.05)))'
+            card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px hsl(var(--border) / 0.5)'
+          } else {
+            card.style.background = 'hsl(var(--card))'
+            card.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px hsl(var(--border) / 0.5)'
+          }
         }}
         onClick={onClick}
       >
@@ -262,6 +283,10 @@ export function DeployedAgentCard({
                 <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
                   <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
                 </div>
+              ) : null}
+              {/* Deployed indicator - green dot */}
+              {isAlreadyDeployed && !showStatusIndicator ? (
+                <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card shadow-md z-20" />
               ) : null}
             </div>
 
@@ -347,23 +372,28 @@ export function DeployedAgentCard({
 
             {/* Primary action (optional override) */}
             {primaryAction ? (
-              <Button
-                size="sm"
-                variant={primaryAction.variant ?? 'default'}
-                disabled={primaryAction.disabled}
-                className={primaryAction.className ?? (primaryAction.variant === 'ghost' ? CHAT_CTA_BUTTON_CLASS : '')}
-                onClick={e => {
-                  e.stopPropagation()
-                  primaryAction.onAction(agent)
-                }}
-              >
-                {isAlreadyDeployed && primaryAction.label === 'Deployed' ? (
-                  <Icon name="check-circle" className="w-4 h-4 text-emerald-500 mr-1.5" />
-                ) : primaryAction.iconName ? (
-                  <Icon name={primaryAction.iconName} className={primaryAction.iconClassName ?? (primaryAction.variant === 'ghost' ? CHAT_CTA_ICON_CLASS : 'mr-1.5 h-4 w-4')} />
-                ) : null}
-                {primaryAction.label}
-              </Button>
+              isAlreadyDeployed && primaryAction.label === 'Deployed' ? (
+                <div className="relative flex items-center justify-center gap-1.5 h-8 px-3 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
+                  <Icon name="check-circle" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  variant={primaryAction.variant ?? 'default'}
+                  disabled={primaryAction.disabled}
+                  className={primaryAction.className ?? (primaryAction.variant === 'ghost' ? CHAT_CTA_BUTTON_CLASS : '')}
+                  onClick={e => {
+                    e.stopPropagation()
+                    primaryAction.onAction(agent)
+                  }}
+                >
+                  {primaryAction.iconName ? (
+                    <Icon name={primaryAction.iconName} className={primaryAction.iconClassName ?? (primaryAction.variant === 'ghost' ? CHAT_CTA_ICON_CLASS : 'mr-1.5 h-4 w-4')} />
+                  ) : null}
+                  {primaryAction.label}
+                </Button>
+              )
             ) : onChat ? (
               <Button
                 size="sm"

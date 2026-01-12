@@ -8,28 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const blueprintModifyEdgeTool: ToolParams = {
   name: 'Modify Tool Blueprint Edge',
   slug: 'modify-tool-blueprint-edge',
-  description: `Adds, edits, or removes an edge in an existing tool's blueprint using a single unified interface.
-
-## Purpose
-Unify edge-level blueprint operations (add, edit, remove) behind a single tool so Daedalus and other agents don't need to juggle multiple tool variants.
-
-## Required Parameters
-- **toolSlug**: Slug of the tool to modify
-- **op**: Operation to perform: "add", "edit", or "remove"
-
-## Operation-specific Parameters
-- **op = "add"**
-  - **edge**: Full edge definition to add (ref, from, to, condition?, label?, metadata?)
-
-- **op = "edit"**
-  - **edgeRef**: Reference of the existing edge to edit
-  - **updates**: Partial edge definition with properties to update
-
-- **op = "remove"**
-  - **edgeRef**: Reference of the existing edge to remove
-
-## Response
-Returns the updated tool (with modified blueprint) or validation errors if the operation fails.`,
+  description:
+    'Add, edit, or remove a blueprint edge in an existing tool by slug using a single interface (op=add/edit/remove). Returns the updated tool or validation errors.',
   parameters: {
     type: 'object',
     properties: {

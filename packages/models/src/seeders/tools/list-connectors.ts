@@ -8,27 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const connectorsListTool: ToolParams = {
   name: 'List Connectors',
   slug: 'list-connectors',
-  description: `List all connectors configured (or available) for the current starship, including their connection status and OAuth scopes (where applicable).
-
-When to use:
-- Before creating or editing tools that rely on third-party services (LinkedIn, Discord, Starships API)
-- To verify which connectors are connected, pending, or disconnected
-- To inspect which managed environment keys are present or missing for each connector
-
-Inputs:
-- {} (no arguments)
-
-Implicit environment (do not pass as arguments):
-- STARSHIP_ID: derived from the current starship context
-
-Output:
-- HTTP response payload (ConnectorListResponse) from the Starships API:
-  - { connectors: ConnectorListItem[] }
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: prepare 3s, HTTP 5s
-- Typical failures: missing env, 401/403, network errors, server unavailability`,
+  description:
+    'List connectors available/configured for the current starship, including connection status and scopes/keys where applicable. Useful before building tools that rely on third-party services.',
   parameters: {
     type: 'object',
     properties: {},

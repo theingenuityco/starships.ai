@@ -8,25 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const updateWidgetTool: ToolParams = {
   name: 'Update Widget',
   slug: 'update-widget',
-  description: `Update an existing widget's props. Props are merged with existing props.
-
-Inputs:
-- widgetId: string (widget ID)
-- props: object (props to merge with existing props)
-
-Optional:
-- name: string (update widget name)
-- description: string (update widget description)
-
-Output:
-- { id: string, slug: string, name: string, widgetType: string, props: object }
-
-Behavior and limits:
-- Props are merged with existing props (not replaced)
-- Use this when user wants to edit widget after creation
-- Example: User says "change title to Q4 Sales" -> { widgetId: "...", props: { title: "Q4 Sales" } }
-- Timeouts: validate 3s, update 5s
-- Typical failures: widget not found, invalid props`,
+  description:
+    "Update an existing widget by id with partial changes (props are merged, not replaced; optional name/description). Returns the updated widget record.",
   parameters: {
     type: 'object',
     properties: {

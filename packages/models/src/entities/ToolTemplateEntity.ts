@@ -20,6 +20,7 @@ import {
   IsBoolean,
   IsArray,
 } from 'class-validator';
+import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
 
 export class ToolTemplateEntity implements ToolTemplateModel {
   // Core database fields
@@ -49,7 +50,7 @@ export class ToolTemplateEntity implements ToolTemplateModel {
 
   @Expose()
   @IsString()
-  @Length(0, 4000) // Increased to allow richly documented tool descriptions used by management tools
+  @Length(0, TOOL_DESCRIPTION_MAX_LENGTH)
   description!: string;
 
   @Expose()

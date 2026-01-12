@@ -9,6 +9,7 @@ import type { ToolModel } from '@starships/protocol';
 import type { ToolParameterSchema, TransformOperation, Blueprint } from '@starships/autopilot';
 import { Expose } from 'class-transformer';
 import { IsISO8601, IsObject, IsOptional, IsString, Length, validate, ValidationError, IsBoolean, IsArray, IsIn } from 'class-validator';
+import { TOOL_DESCRIPTION_MAX_LENGTH } from '@/constants/toolValidation';
 
 export class ToolEntity implements ToolModel {
   // Core database fields
@@ -57,7 +58,7 @@ export class ToolEntity implements ToolModel {
 
   @Expose()
   @IsString()
-  @Length(0, 4000)
+  @Length(0, TOOL_DESCRIPTION_MAX_LENGTH)
   description!: string;
 
   @Expose()

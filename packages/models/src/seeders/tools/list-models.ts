@@ -8,31 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const modelsListTool: ToolParams = {
   name: 'List Models',
   slug: 'list-models',
-  description: `List all available LLM models.
-
-When to use:
-- Before creating or editing an agent to choose the most appropriate model
-- To check which canonical models are enabled on this instance
-
-Inputs:
-- {} (no arguments)
-
-Output:
-  - Array of strings: model IDs (provider/model), e.g., "anthropic/claude-sonnet-4.5"
-  - Returns only identifiers to minimize payload size and be directly usable
-
-Model Selection Guidelines:
-- For coding tasks: Look for models with "code" or "coding" in description
-- For creative tasks: Use models with higher context windows and creative capabilities
-- For fast responses: Choose smaller models (lower pricing usually indicates smaller size)
-- For complex reasoning: Use frontier models like Claude Opus, GPT-4o, or o1-preview
-- For cost efficiency: Compare pricing.prompt and pricing.completion fields
-
-Behavior and limits:
-- Read-only and idempotent
-- Backed by the instance model catalog (DB)
-- Timeouts: prepare 3s, HTTP 10s
-- Typical failures: 401/403, network errors`,
+  description:
+    'List available LLM models from the Starships model catalog (provider/model IDs plus metadata like pricing/context). Use this to choose a model before creating or editing agents.',
   parameters: {
     type: 'object',
     properties: {},

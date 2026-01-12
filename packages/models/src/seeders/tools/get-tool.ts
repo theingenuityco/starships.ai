@@ -8,18 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const toolGetTool: ToolParams = {
   name: 'Get Tool',
   slug: 'get-tool',
-  description: `Get full details for a tool on the current starship by slug.
-
-Inputs:
-- slug: string (tool slug on this starship)
-
-Output:
-- Full tool model as returned by the server (includes blueprint)
-
-Behavior and limits:
-- Read-only and idempotent
-- Timeouts: validation 2s, connector call handled server-side
-- Typical failures: missing slug, connector/transport errors, tool not found`,
+  description: 'Fetch full tool details by slug from the current starship (includes blueprint and parameters).',
   parameters: {
     type: 'object',
     properties: {

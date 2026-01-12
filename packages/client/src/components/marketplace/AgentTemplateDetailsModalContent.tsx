@@ -85,7 +85,7 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
           <div className="space-y-3">
             {template.previewPrompts.map((p, idx) => (
               <div key={idx} className="rounded-lg border border-muted-foreground/20 bg-muted/20 px-4 py-3 text-sm">
-                "{p}"
+                &quot;{p}&quot;
               </div>
             ))}
           </div>

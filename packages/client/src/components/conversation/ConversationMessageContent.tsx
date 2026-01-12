@@ -78,13 +78,30 @@ function aggregateStreamChunks(chunks: StreamChunk[]): string {
   return agg
 }
 
-function useSlabTypewriterText({ fullText, isStreaming, resetKey, onComplete }: { fullText: string; isStreaming: boolean; resetKey: string; onComplete?: () => void }) {
+function useSlabTypewriterText({
+  fullText,
+  isStreaming,
+  resetKey,
+  onComplete,
+  /**
+   * When true, and we mount with a non-empty fullText while streaming (e.g. page refresh mid-stream),
+   * start from the current tail so we don't "re-type" already streamed content.
+   */
+  hydrateFromExistingOnMount = false,
+}: {
+  fullText: string
+  isStreaming: boolean
+  resetKey: string
+  onComplete?: () => void
+  hydrateFromExistingOnMount?: boolean
+}) {
   // Slab-based typewriter effect: reveal chunks of text at a time
   const [displayedLength, setDisplayedLength] = useState(0)
   const timeoutRef = useRef<NodeJS.Timeout | null>(null)
   const displayedLengthRef = useRef<number>(0)
   const targetLengthRef = useRef<number>(0)
   const onCompleteRef = useRef<typeof onComplete>(onComplete)
+  const didHydrateOnMountRef = useRef(false)
 
   // Avoid re-running the animation effect on every render due to unstable callback identities.
   useEffect(() => {
@@ -101,11 +118,31 @@ function useSlabTypewriterText({ fullText, isStreaming, resetKey, onComplete }: 
     setDisplayedLength(0)
     displayedLengthRef.current = 0
     targetLengthRef.current = 0
+    didHydrateOnMountRef.current = false
     if (timeoutRef.current !== null) {
       clearTimeout(timeoutRef.current)
       timeoutRef.current = null
     }
   }, [resetKey])
+
+  // #region agent log
+  // On refresh mid-stream, mount can have a large non-empty `fullText`.
+  // Hydrate the typewriter to the current tail so we don't replay already streamed tokens.
+  useEffect(() => {
+    try {
+      if (didHydrateOnMountRef.current) return
+      if (!hydrateFromExistingOnMount) return
+      if (!isStreaming) return
+      if (!fullText || fullText.length === 0) return
+      didHydrateOnMountRef.current = true
+      setDisplayedLength(fullText.length)
+      displayedLengthRef.current = fullText.length
+      targetLengthRef.current = fullText.length
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'post-fix-3',hypothesisId:'G',location:'ConversationMessageContent.tsx:useSlabTypewriterText:hydrate',message:'Hydrated typewriter to existing stream tail on mount',data:{resetKey,fullTextLen:fullText.length},timestamp:Date.now()})}).catch(()=>{});
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hydrateFromExistingOnMount, isStreaming, fullText, resetKey])
+  // #endregion
 
   useEffect(() => {
     // Update target length ref whenever fullText changes
@@ -390,12 +427,14 @@ export function ConversationMessageContent({
     isStreaming,
     resetKey: messageId,
     onComplete: () => markAnimationComplete(messageId),
+    hydrateFromExistingOnMount: true,
   })
 
   const { displayText: displayReasoning } = useSlabTypewriterText({
     fullText: displayReasoningFull,
     isStreaming,
     resetKey: `${messageId}-reasoning`,
+    hydrateFromExistingOnMount: true,
   })
 
   // Determine whether reasoning panel should auto-open.

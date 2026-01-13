@@ -88,7 +88,14 @@ export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
   maxTokens: 3000,
 
   // Tool assignment – agent management and delegation tools
-  assignedToolSlugs: ['list-agents', 'list-agents-from-marketplace', 'call-agent', 'list-tools', 'list-connectors'],
+  assignedToolSlugs: [
+    'list-agents',
+    'list-agents-from-marketplace',
+    'deploy-agents-from-marketplace',
+    'call-agent',
+    'list-tools',
+    'list-connectors',
+  ],
 
   icon: '🎼',
   previewPrompts: [

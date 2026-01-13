@@ -3,7 +3,7 @@ import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
-import { IdSchema, PaginationSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema, SlugSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentTemplateRepository } from '@starships/models';
 import { generatePresignedUrlInline } from '@/utils/s3-helper';
@@ -72,7 +72,11 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
     const repo = new AgentTemplateRepository();
 
     const templateIds = paginatedTemplates
-      .map((t) => (t as any)?.id)
+      .map((t): string | undefined => {
+        if (!t || typeof t !== 'object') return undefined;
+        const rec = t as unknown as Record<string, unknown>;
+        return typeof rec.id === 'string' ? rec.id : undefined;
+      })
       .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
     // Only creators can see sensitive fields. Everyone else gets the public-stripped model.
@@ -87,7 +91,9 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
         ? templateIds.filter((id) => creatorIdsByTemplateId.get(id) === requesterUserId)
         : [];
     const internalsByTemplateId =
-      creatorTemplateIds.length > 0 ? await repo.findInternalByIds(creatorTemplateIds) : new Map<string, any>();
+      creatorTemplateIds.length > 0
+        ? await repo.findInternalByIds(creatorTemplateIds)
+        : new Map<string, import('@starships/protocol').AgentTemplateModel>();
 
     const hydrated = await Promise.all(
       paginatedTemplates.map(async (t) => {
@@ -222,6 +228,7 @@ router.get('/agent-templates/:id/avatar', async (req: Request, res: Response): P
 });
 
 // POST /agent-templates/:templateId/agents - Create agent from template (OpenAPI pattern)
+// NOTE: Despite the param name, this route supports passing either an internal id OR a template slug.
 router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { templateId } = req.params;
@@ -232,8 +239,8 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
       return;
     }
 
-    // Validate templateId format
-    const paramValidation = validateData(z.object({ templateId: IdSchema }), req.params, res, 'template parameter');
+    // Support either internal id or public slug in the path param.
+    const paramValidation = validateData(z.object({ templateId: z.union([IdSchema, SlugSchema]) }), req.params, res, 'template parameter');
     if (!paramValidation) return;
 
     // Validate request body using the schema
@@ -248,12 +255,15 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
       return;
     }
 
-    // Check if template exists first
-    const template = await templateService.getTemplateById(templateId);
+    const templateRepo = new AgentTemplateRepository();
+    const isId = IdSchema.safeParse(templateId).success;
+    const template = isId ? await templateService.getTemplateById(templateId) : await templateRepo.findBySlug(templateId);
+    const resolvedTemplateId = template?.id;
+
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, {
         resource: 'agent-template',
-        id: templateId,
+        ...(isId ? { id: templateId } : { slug: templateId }),
       });
       return;
     }
@@ -262,21 +272,25 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     try {
       const starship = await templateService.validateStarshipAccess(starshipId, userId);
       console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${starshipId}) for agent creation`);
-    } catch (starshipError: any) {
+    } catch (starshipError: unknown) {
+      const err = starshipError && typeof starshipError === 'object' ? (starshipError as Record<string, unknown>) : {};
+      const errName = typeof err.name === 'string' ? err.name : undefined;
+      const errMessage = typeof err.message === 'string' ? err.message : undefined;
+
       console.error('[TEMPLATE] Error validating starship access:', {
         starshipId: starshipId,
-        errorName: starshipError?.name,
-        errorMessage: starshipError?.message,
+        errorName: errName,
+        errorMessage: errMessage,
         fullError: starshipError,
       });
 
-      if (starshipError?.name === 'NotFoundError') {
-        sendError(res, 'RESOURCE_NOT_FOUND', starshipError.message || 'Starship not found', 404, {
+      if (errName === 'NotFoundError') {
+        sendError(res, 'RESOURCE_NOT_FOUND', errMessage || 'Starship not found', 404, {
           resource: 'starship',
           id: starshipId,
           hint: 'Please ensure you have access to a starship before creating agents',
         });
-      } else if (starshipError?.name === 'ValidationError') {
+      } else if (errName === 'ValidationError') {
         sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
           details: 'You do not have permission to create agents on this starship',
         });
@@ -289,7 +303,15 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     }
 
     // Create agent from template with validated starship ID
-    const agent = await templateService.createAgentFromTemplate(templateId, starshipId);
+    if (!resolvedTemplateId) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Template resolution failed', 500, {
+        templateId,
+        hint: 'Resolved template id is missing',
+      });
+      return;
+    }
+
+    const agent = await templateService.createAgentFromTemplate(resolvedTemplateId, starshipId);
 
     // Log the creation for audit purposes
     console.log(`[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${userId} on starship ${starshipId}`);

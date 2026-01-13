@@ -97,11 +97,11 @@ export function useCreateAgentFromTemplate() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async ({ templateId, starshipId }: { templateId: string; starshipId: string }) => {
+    mutationFn: async ({ templateId, starshipId, starshipSlug }: { templateId: string; starshipId: string; starshipSlug?: string }) => {
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/agent-templates/${templateId}/agents`, {
         starshipId,
       })
-      return response.data.data
+      return { ...response.data.data, _starshipSlug: starshipSlug }
     },
     onSuccess: (agent, variables) => {
       // Invalidate agent queries to refresh lists
@@ -119,9 +119,17 @@ export function useCreateAgentFromTemplate() {
         queryKey: TEMPLATE_QUERY_KEYS.agentTemplate(variables.templateId),
       })
 
-      toast.success('Agent deployed successfully!', {
-        description: `${formatAgentDisplayName(agent)} has been created and deployed to your starship.`,
-      })
+      // Redirect to connectors page with agent info in URL params
+      const starshipSlug = (agent as any)?._starshipSlug || variables.starshipSlug
+      if (starshipSlug && typeof window !== 'undefined') {
+        const agentSlug = (agent as any)?.slug || ''
+        const params = new URLSearchParams({ agentId: agent.id, agentSlug, agentName: agent.name || '', agentRole: agent.role || '' })
+        window.location.href = `/ship/${starshipSlug}/connectors?${params.toString()}`
+      } else {
+        toast.success('Agent deployed successfully!', {
+          description: `${formatAgentDisplayName(agent)} has been created and deployed to your starship.`,
+        })
+      }
     },
     onError: (error: any) => {
       // Extract error message with better handling for ValidationError

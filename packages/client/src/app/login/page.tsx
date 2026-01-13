@@ -130,7 +130,6 @@ function LoginContent() {
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-4 text-center">
               <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-3">
                 <h1 className="text-3xl font-bold text-primary">{activeTab === 'login' ? 'Sign in' : 'Sign up'}</h1>
-                <p className="text-muted-foreground mt-1">{activeTab === 'login' ? 'Continue your starship journey' : 'Start your starship journey'}</p>
               </motion.div>
             </motion.div>
 

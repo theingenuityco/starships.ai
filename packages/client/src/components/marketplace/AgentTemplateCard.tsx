@@ -107,6 +107,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
+        starshipSlug: primaryStarship.slug,
       })
       onDeploy?.(template)
     } catch {

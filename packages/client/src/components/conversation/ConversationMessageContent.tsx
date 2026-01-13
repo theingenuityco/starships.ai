@@ -1064,7 +1064,7 @@ export function ConversationMessageContent({
               </span>
             </CollapsibleTrigger>
             <CollapsibleContent>
-              <blockquote className="border-l-4 border-primary/20 px-4 py-2 bg-muted/20 rounded-r-lg my-1">
+              <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 py-2 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
                 <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
                     {String(displayReasoning ?? '')}

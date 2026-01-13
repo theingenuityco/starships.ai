@@ -270,14 +270,17 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     }
 
     const templateRepo = new AgentTemplateRepository();
-    const isId = IdSchema.safeParse(templateId).success;
-    const template = isId ? await templateService.getTemplateById(templateId) : await templateRepo.findBySlug(templateId);
+    // NOTE:
+    // Template slugs (e.g. `data-analyst-3ie8`) can match our broad IdSchema.
+    // To avoid mis-classifying slugs as ids, always try slug lookup first, then fall back to id.
+    const templateBySlug = await templateRepo.findBySlug(templateId);
+    const template = templateBySlug ?? (await templateService.getTemplateById(templateId));
     const resolvedTemplateId = template?.id;
 
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, {
         resource: 'agent-template',
-        ...(isId ? { id: templateId } : { slug: templateId }),
+        templateId,
       });
       return;
     }

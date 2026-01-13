@@ -222,7 +222,10 @@ describe('AgentTemplateRepository', () => {
         slug: 'test-template',
         name: 'Test Template',
       });
-      expect(mockConnection.queryOne).toHaveBeenCalledWith('SELECT * FROM agent_templates WHERE slug = $1', ['test-template']);
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('OR slug LIKE ($2 || \'-____\')'),
+        ['test-template', 'test-template']
+      );
     });
 
     it('should return null when template not found by slug', async () => {
@@ -444,7 +447,9 @@ describe('AgentTemplateRepository', () => {
   describe('findByCategory', () => {
     it('should return public templates by category', async () => {
       const mockRawTemplates = [createMockRawTemplate({ category: 'general' })];
-      mockConnection.query.mockResolvedValue(mockRawTemplates);
+      mockConnection.query.mockResolvedValueOnce(mockRawTemplates);
+      // Second query: load assigned tool slugs via junction table helper
+      mockConnection.query.mockResolvedValueOnce([]);
 
       const result = await repository.findByCategory('general');
 
@@ -466,7 +471,9 @@ describe('AgentTemplateRepository', () => {
   describe('searchTemplates', () => {
     it('should search templates by query', async () => {
       const mockRawTemplates = [createMockRawTemplate()];
-      mockConnection.query.mockResolvedValue(mockRawTemplates);
+      mockConnection.query.mockResolvedValueOnce(mockRawTemplates);
+      // Second query: load assigned tool slugs via junction table helper
+      mockConnection.query.mockResolvedValueOnce([]);
 
       const result = await repository.searchTemplates('assistant');
 

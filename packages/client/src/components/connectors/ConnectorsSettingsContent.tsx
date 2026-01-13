@@ -4,7 +4,11 @@ import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { PageLayout } from '@/components/layout/PageLayout'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
+import { AgentDeploymentModal } from '@/components/connectors/AgentDeploymentModal'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useAgent } from '@/hooks/useAgents'
+import { useSearchParams, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 
 interface ConnectorsSettingsContentProps {
   slug: string
@@ -12,6 +16,40 @@ interface ConnectorsSettingsContentProps {
 
 export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentProps) {
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug)
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  
+  // Get agent info from URL params
+  const agentId = searchParams?.get('agentId') || ''
+  const agentSlug = searchParams?.get('agentSlug') || ''
+  const agentName = searchParams?.get('agentName') || ''
+  const agentRole = searchParams?.get('agentRole') || ''
+  const [showDeploymentModal, setShowDeploymentModal] = useState(false)
+  
+  // Fetch agent details if agentId is provided (for avatar)
+  const { data: agent } = useAgent(agentId, !!agentId)
+  
+  // Show modal when agent params are present
+  useEffect(() => {
+    if (agentId && agentSlug && agentName && agentRole) {
+      setShowDeploymentModal(true)
+    }
+  }, [agentId, agentSlug, agentName, agentRole])
+  
+  // Clean up URL params when modal closes
+  const handleModalClose = (open: boolean) => {
+    setShowDeploymentModal(open)
+    if (!open && typeof window !== 'undefined') {
+      // Remove agent params from URL
+      const params = new URLSearchParams(window.location.search)
+      params.delete('agentId')
+      params.delete('agentSlug')
+      params.delete('agentName')
+      params.delete('agentRole')
+      const newUrl = params.toString() ? `${window.location.pathname}?${params.toString()}` : window.location.pathname
+      router.replace(newUrl)
+    }
+  }
 
   if (starshipLoading) {
     return (
@@ -66,6 +104,20 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
           </div>
         </div>
       </div>
+      
+      {/* Agent Deployment Modal */}
+      {agentId && agentSlug && agentName && agentRole && (
+        <AgentDeploymentModal
+          open={showDeploymentModal}
+          onOpenChange={handleModalClose}
+          agentName={agentName}
+          agentRole={agentRole}
+          agentSlug={agentSlug}
+          agentId={agentId}
+          starshipSlug={slug}
+          agent={agent}
+        />
+      )}
     </PageLayout>
   )
 }

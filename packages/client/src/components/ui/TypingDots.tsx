@@ -3,15 +3,7 @@
 import React from 'react'
 import { cn } from '@/lib/utils'
 
-export function TypingDots({
-  className,
-  dotClassName,
-  dotSizePx = 7,
-}: {
-  className?: string
-  dotClassName?: string
-  dotSizePx?: number
-}) {
+export function TypingDots({ className, dotClassName, dotSizePx = 7 }: { className?: string; dotClassName?: string; dotSizePx?: number }) {
   // Match the size + softness of our StatusDots (tool/thought badges).
   const dotBase = cn('ss-typing-dot inline-block rounded-full bg-muted-foreground/60', dotClassName)
 
@@ -44,4 +36,3 @@ export function TypingDots({
     </span>
   )
 }
-

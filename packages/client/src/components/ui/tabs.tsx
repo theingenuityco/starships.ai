@@ -75,13 +75,20 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ cla
 
   const isActive = context.value === value
 
+  // Check if className includes padding classes - if so, don't apply full-width/full-height
+  const hasCustomPadding = className?.includes('px-') || className?.includes('py-') || className?.includes('p-')
+
   return (
     <button
       ref={ref}
       className={cn(
         // Make triggers behave like navigation list items (hover + selected)
-        'inline-flex items-center justify-center whitespace-nowrap rounded-lg px-2.5 py-1 text-[13px] font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
-        isActive ? 'text-primary bg-primary/10' : 'text-muted-foreground hover:text-foreground hover:bg-muted',
+        'inline-flex items-center justify-center whitespace-nowrap text-[13px] font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
+        isActive
+          ? hasCustomPadding
+            ? 'text-primary bg-primary/10 rounded-lg'
+            : 'text-primary bg-primary/10 h-full w-full rounded-lg'
+          : 'text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2.5 py-1',
         className
       )}
       onClick={() => context.onValueChange(value)}

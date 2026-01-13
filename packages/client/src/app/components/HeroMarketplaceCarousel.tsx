@@ -4,9 +4,9 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious, type CarouselApi } from '@/components/ui/carousel'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useAgentTemplates } from '@/hooks/useTemplates'
-import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
+import { AgentDetailsModal } from '@/components/marketplace/AgentDetailsModal'
 
 function normalize(s: unknown) {
   return String(s ?? '')
@@ -15,7 +15,6 @@ function normalize(s: unknown) {
 }
 
 export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
-  const router = useRouter()
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const useServerInitial = initialAgentTemplates.length > 0
   const { data, isLoading } = useAgentTemplates(undefined, !useServerInitial)
@@ -24,6 +23,8 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
+  const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
+  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false)
 
   // Fixed card widths (avoid percentage-based stretching on small screens)
   const CARD_W = 136
@@ -100,7 +101,15 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
     return () => clearInterval(id)
   }, [carouselApi, isHovering])
 
-  const goToMarketplace = () => router.push('/marketplace?from=public')
+  const handleAgentClick = (template: AgentTemplateModel) => {
+    setSelectedAgent(template)
+    setIsAgentModalOpen(true)
+  }
+
+  const handleAgentModalOpenChange = (open: boolean) => {
+    setIsAgentModalOpen(open)
+    if (!open) setSelectedAgent(null)
+  }
 
   return (
     <div ref={containerRef} className="w-full max-w-6xl mx-auto mt-4 sm:mt-6 mb-14 sm:mb-16">
@@ -141,9 +150,9 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
                   <CarouselItem key={`${template.id}-${idx}`} className="basis-auto w-[136px] sm:w-[152px] md:w-[176px] !pl-1 sm:!pl-2">
                     <button
                       type="button"
-                      onClick={goToMarketplace}
+                      onClick={() => handleAgentClick(template)}
                       className="group w-full rounded-2xl border border-border/50 bg-muted/10 hover:bg-muted/20 transition-colors text-left p-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      aria-label={`View ${name}${primaryLabel ? ` (${primaryLabel})` : ''} in Marketplace`}
+                      aria-label={`View ${name}${primaryLabel ? ` (${primaryLabel})` : ''} details`}
                     >
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-full aspect-square rounded-2xl ring-1 ring-border/50 bg-background/40 overflow-hidden">
@@ -162,6 +171,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
         <CarouselPrevious className="hidden md:inline-flex" />
         <CarouselNext className="hidden md:inline-flex" />
       </Carousel>
+      <AgentDetailsModal template={selectedAgent} open={isAgentModalOpen} onOpenChange={handleAgentModalOpenChange} />
     </div>
   )
 }

@@ -26,9 +26,6 @@ import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
 import { StatusDots } from '@/components/ui/StatusDots'
-import { replaceConnectorError } from '@/lib/connectorErrorUtils'
-import { useRouter } from 'next/navigation'
-import { useParams } from 'next/navigation'
 
 interface StreamChunk {
   content: string
@@ -592,19 +589,6 @@ export function ConversationMessageContent({
     hydrateFromExistingOnMount: true,
   })
 
-  // Detect and replace connector errors
-  const router = useRouter()
-  const params = useParams()
-  const starshipSlug = params?.slug as string | undefined
-  
-  const { text: processedContent, hasConnectorError } = useMemo(() => {
-    // Only process when message is complete (not streaming)
-    if (isStreaming) {
-      return { text: displayContent, hasConnectorError: false }
-    }
-    return replaceConnectorError(displayContent)
-  }, [displayContent, isStreaming])
-
   // Determine whether reasoning panel should auto-open.
   // Keep it open only while reasoning-only is streaming; collapse once content OR toolCalls start (and on reload).
   const hasTextChunksNow = Array.isArray(chunks) && chunks.length > 0
@@ -1000,7 +984,7 @@ export function ConversationMessageContent({
     messageType !== 'tool_result' ? (
       <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {String(processedContent ?? '')}
+          {String(displayContent ?? '')}
         </ReactMarkdown>
         {toolPanelNode}
       </div>
@@ -1043,26 +1027,9 @@ export function ConversationMessageContent({
     return (
       <div className={cn('relative group', className)}>
         <div className="text-sm leading-relaxed whitespace-pre-wrap">
-          {String(processedContent ?? '')}
+          {String(displayContent ?? '')}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
-        {/* Connector error CTA for non-markdown content */}
-        {hasConnectorError && starshipSlug && !isStreaming && (
-          <div className="mt-4 flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-            <Icon name="plug" className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-            <div className="flex-1 text-sm text-yellow-800 dark:text-yellow-200">
-              Connect your app to enable this feature
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => router.push(`/ship/${starshipSlug}/connectors`)}
-              className="flex-shrink-0 border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900"
-            >
-              Go to Connectors
-            </Button>
-          </div>
-        )}
       </div>
     )
   }
@@ -1112,24 +1079,6 @@ export function ConversationMessageContent({
 
       {/* Unified markdown rendering - message content at normal size */}
       {markdownWithToolsNode as any}
-      
-      {/* Connector error CTA */}
-      {hasConnectorError && starshipSlug && !isStreaming && (
-        <div className="mt-4 flex items-center gap-3 p-3 bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
-          <Icon name="plug" className="h-4 w-4 text-yellow-600 dark:text-yellow-400 flex-shrink-0" />
-          <div className="flex-1 text-sm text-yellow-800 dark:text-yellow-200">
-            Connect your app to enable this feature
-          </div>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => router.push(`/ship/${starshipSlug}/connectors`)}
-            className="flex-shrink-0 border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-100 dark:hover:bg-yellow-900"
-          >
-            Go to Connectors
-          </Button>
-        </div>
-      )}
 
       {/* Widget rendering: Display widgets inline when created/updated */}
       {widgetResults.length > 0 && messageType !== 'tool_result' && (

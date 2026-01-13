@@ -256,6 +256,7 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     // Support either internal id or public slug in the path param.
     const paramValidation = validateData(z.object({ templateId: z.union([IdSchema, SlugSchema]) }), req.params, res, 'template parameter');
     if (!paramValidation) return;
+    const validatedTemplateId = paramValidation.templateId;
 
     // Validate request body using the schema
     const bodyValidation = validateData(CreateAgentFromTemplateSchema, req.body, res, 'request body');
@@ -273,14 +274,14 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     // NOTE:
     // Template slugs (e.g. `data-analyst-3ie8`) can match our broad IdSchema.
     // To avoid mis-classifying slugs as ids, always try slug lookup first, then fall back to id.
-    const templateBySlug = await templateRepo.findBySlug(templateId);
-    const template = templateBySlug ?? (await templateService.getTemplateById(templateId));
+    const templateBySlug = await templateRepo.findBySlug(validatedTemplateId);
+    const template = templateBySlug ?? (await templateService.getTemplateById(validatedTemplateId));
     const resolvedTemplateId = template?.id;
 
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, {
         resource: 'agent-template',
-        templateId,
+        templateId: validatedTemplateId,
       });
       return;
     }

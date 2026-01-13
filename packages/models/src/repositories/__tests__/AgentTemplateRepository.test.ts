@@ -223,8 +223,8 @@ describe('AgentTemplateRepository', () => {
         name: 'Test Template',
       });
       expect(mockConnection.queryOne).toHaveBeenCalledWith(
-        expect.stringContaining('WHERE slug = $1 OR slug = $2 OR slug ~ $3'),
-        ['test-template', 'test-template', '^test\\-template-[a-z0-9]{4}$']
+        expect.stringContaining('OR slug LIKE ($2 || \'-____\')'),
+        ['test-template', 'test-template']
       );
     });
 

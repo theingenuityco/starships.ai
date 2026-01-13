@@ -6,20 +6,41 @@ import { cn } from '@/lib/utils'
 export function TypingDots({
   className,
   dotClassName,
-  dotSizePx = 5,
+  dotSizePx = 7,
 }: {
   className?: string
   dotClassName?: string
   dotSizePx?: number
 }) {
-  const dotBase = cn('inline-block rounded-full bg-muted-foreground/70', dotClassName)
+  // Match the size + softness of our StatusDots (tool/thought badges).
+  const dotBase = cn('ss-typing-dot inline-block rounded-full bg-muted-foreground/60', dotClassName)
 
   // Classic 3-dot "typing" bounce with staggered delays.
   return (
-    <span className={cn('inline-flex items-center gap-1', className)} aria-hidden="true">
-      <span className={cn(dotBase, 'animate-bounce')} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '0ms', animationDuration: '900ms' }} />
-      <span className={cn(dotBase, 'animate-bounce')} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '150ms', animationDuration: '900ms' }} />
-      <span className={cn(dotBase, 'animate-bounce')} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '300ms', animationDuration: '900ms' }} />
+    <span className={cn('inline-flex items-center gap-[2px]', className)} aria-hidden="true">
+      <span className={dotBase} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '0ms' }} />
+      <span className={dotBase} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '140ms' }} />
+      <span className={dotBase} style={{ width: dotSizePx, height: dotSizePx, animationDelay: '280ms' }} />
+      <style jsx>{`
+        .ss-typing-dot {
+          animation: ssTypingDot 900ms ease-in-out infinite;
+          opacity: 0.45;
+          transform: translateY(0);
+          will-change: transform, opacity;
+        }
+        @keyframes ssTypingDot {
+          0%,
+          80%,
+          100% {
+            transform: translateY(0);
+            opacity: 0.45;
+          }
+          40% {
+            transform: translateY(-4px);
+            opacity: 0.95;
+          }
+        }
+      `}</style>
     </span>
   )
 }

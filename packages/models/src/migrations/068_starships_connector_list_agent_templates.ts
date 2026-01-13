@@ -44,11 +44,13 @@ export async function up(client: Client): Promise<void> {
       throw new Error('Starships connector template not found');
     }
 
-    const { id, endpoints_json } = result.rows[0];
-    const currentEndpoints = endpoints_json || [];
+    const { id, endpoints_json } = result.rows[0] as { id: string; endpoints_json: unknown };
+    const currentEndpoints: Array<Record<string, unknown>> = Array.isArray(endpoints_json)
+      ? (endpoints_json as Array<Record<string, unknown>>)
+      : [];
 
     // Check if endpoint already exists
-    const existingIndex = currentEndpoints.findIndex((e: any) => e.name === 'list-agents-from-marketplace');
+    const existingIndex = currentEndpoints.findIndex((e) => e?.name === 'list-agents-from-marketplace');
 
     let updatedEndpoints;
     if (existingIndex >= 0) {
@@ -90,11 +92,13 @@ export async function down(client: Client): Promise<void> {
       throw new Error('Starships connector template not found');
     }
 
-    const { id, endpoints_json } = result.rows[0];
-    const currentEndpoints = endpoints_json || [];
+    const { id, endpoints_json } = result.rows[0] as { id: string; endpoints_json: unknown };
+    const currentEndpoints: Array<Record<string, unknown>> = Array.isArray(endpoints_json)
+      ? (endpoints_json as Array<Record<string, unknown>>)
+      : [];
 
     // Remove the list-agents-from-marketplace endpoint
-    const updatedEndpoints = currentEndpoints.filter((e: any) => e.name !== 'list-agents-from-marketplace');
+    const updatedEndpoints = currentEndpoints.filter((e) => e?.name !== 'list-agents-from-marketplace');
 
     // Update the connector template
     await client.query(

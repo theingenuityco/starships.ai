@@ -288,7 +288,6 @@ if (require.main === module) {
       process.exit(0);
     } catch (err) {
       // Keep a direct stderr log for CLI users; structured logs already emitted via logger.
-      // eslint-disable-next-line no-console
       console.error('❌ Backfill failed:', err);
       process.exit(1);
     } finally {

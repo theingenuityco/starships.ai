@@ -287,4 +287,94 @@ describe('Agent default blueprint - multiple tool calls (sequential)', () => {
       data: { status: 400, body: { success: false, error: { code: 'VALIDATION_ERROR', message: 'bad' } } },
     });
   });
+
+  it('resumes a pending tool-call batch without re-calling the LLM for tool selection', async () => {
+    const toolA = makeTool('tool_a', 'A');
+
+    let llmCallCount = 0;
+    const hostRuntime: HostRuntime = {
+      http: async () => {
+        throw new Error('http not used in this test');
+      },
+      connectorAction: async ({ connector, action, args, timeoutMs }) => {
+        const objArgs = (args && typeof args === 'object' ? (args as Record<string, unknown>) : {}) as Record<string, unknown>;
+        const toolSlug = String(objArgs.toolSlug ?? '');
+        const toolCallId = String(objArgs.toolCallId ?? '');
+        const toolInput = (objArgs.args && typeof objArgs.args === 'object' ? (objArgs.args as Record<string, unknown>) : {}) as Record<
+          string,
+          unknown
+        >;
+
+        const label = toolSlug === 'tool_a' ? 'A' : 'UNKNOWN';
+
+        return {
+          status: 200,
+          statusText: 'OK',
+          headers: {},
+          body: {
+            success: true,
+            data: {
+              toolCallId,
+              result: { label, input: toolInput },
+            },
+          },
+          url: `connector://${String(connector)}/${String(action)}`,
+          timeoutMs,
+        };
+      },
+      llm: async () => {
+        llmCallCount++;
+        // On resume, we should NOT call the LLM to generate tool calls again.
+        // The only LLM call should be the post-tools continuation.
+        async function* stream() {
+          yield { id: 'resp_resume', model: 'test-model', created: 0, choices: [{ index: 0, delta: { content: 'done' } }] };
+          yield { id: 'resp_resume', model: 'test-model', created: 0, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] };
+        }
+        return stream();
+      },
+    };
+
+    const agent = new Agent({
+      name: 'TestAgent',
+      model: 'test-model',
+      state: {
+        messages: [{ role: 'user', content: 'hi' }],
+        tools: [toolA],
+      },
+    });
+
+    const blueprint = agent.getCurrentBlueprint();
+    const execution = ExecutionItemUtils.createExecution();
+    // Simulate a persisted mid-batch resume:
+    // - assistant message already contains toolCalls
+    // - pendingToolCalls/pendingToolCallIndex indicate which tool call to execute next
+    execution.state = {
+      model: 'test-model',
+      messages: [
+        { role: 'user', content: 'hi' },
+        {
+          role: 'assistant',
+          content: '',
+          toolCalls: [{ id: 'call_1', type: 'function', function: { name: 'tool_a', arguments: { value: 'one' } } }],
+        },
+      ],
+      tools: [toolA],
+      pendingToolCalls: [{ id: 'call_1', type: 'function', function: { name: 'tool_a', arguments: { value: 'one' } } }],
+      pendingToolCallIndex: 0,
+    };
+
+    const engine = new Engine({ hostRuntime, failOnNodeError: false });
+    await engine.executeBlueprint(blueprint, execution);
+
+    // Tool executed, then LLM called once to continue.
+    expect(llmCallCount).toBe(1);
+
+    const state = execution.state as Record<string, unknown>;
+    const msgs = state.messages as Array<Record<string, unknown>>;
+    // user, assistant(toolCalls), tool(call_1), assistant(final)
+    expect(msgs).toHaveLength(4);
+    expect(msgs[2]).toMatchObject({ role: 'tool', toolCallId: 'call_1' });
+    expect(JSON.parse(String(msgs[2]?.content))).toMatchObject({ success: true, data: { label: 'A', input: { value: 'one' } } });
+    expect(msgs[3]).toMatchObject({ role: 'assistant', content: 'done' });
+  });
 });

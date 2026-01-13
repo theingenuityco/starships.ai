@@ -635,9 +635,7 @@ export class AgentTemplateRepository extends BaseRepository {
           [category]
         );
         const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
-        const templateIds = templates
-          .map((t) => String(t.id))
-          .filter((id) => typeof id === 'string' && id.trim().length > 0);
+        const templateIds = templates.map((t) => String(t.id)).filter((id) => typeof id === 'string' && id.trim().length > 0);
         const assignedToolSlugsByTemplateId = await this.getAssignedToolSlugsByTemplateIds(templateIds);
 
         return templates.map((t) =>
@@ -734,8 +732,7 @@ export class AgentTemplateRepository extends BaseRepository {
                 )
                 .join(' + ')
             : '0';
-        const sql =
-          `SELECT *,
+        const sql = `SELECT *,
             (
               (CASE WHEN name ILIKE ${pFull} THEN 100 ELSE 0 END) +
               (CASE WHEN slug ILIKE ${pFull} THEN 80 ELSE 0 END) +
@@ -750,9 +747,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const result = await connection.query<Record<string, unknown>>(sql, params);
 
         const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
-        const templateIds = templates
-          .map((t) => String(t.id))
-          .filter((id) => typeof id === 'string' && id.trim().length > 0);
+        const templateIds = templates.map((t) => String(t.id)).filter((id) => typeof id === 'string' && id.trim().length > 0);
         const assignedToolSlugsByTemplateId = await this.getAssignedToolSlugsByTemplateIds(templateIds);
 
         return templates.map((t) =>

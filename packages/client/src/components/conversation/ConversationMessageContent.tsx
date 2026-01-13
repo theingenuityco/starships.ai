@@ -682,8 +682,12 @@ export function ConversationMessageContent({
         // Tool calls are always expandable (no expert-mode gating).
         const toolQuoteClass = cn(
           // Base quote container style (match Thought container)
-          'relative border-l-4 px-4 py-2 rounded-r-lg my-1',
-          !isDone ? 'border-amber-500/30 dark:border-amber-400/30 bg-amber-500/5 dark:bg-amber-400/5' : successFlag === false ? 'border-red-500/30 dark:border-red-400/30 bg-red-500/5 dark:bg-red-400/5' : 'border-emerald-500/30 dark:border-emerald-400/30 bg-emerald-500/5 dark:bg-emerald-400/5'
+          'relative border-l-4 px-4 pt-2 pb-3 rounded-r-lg my-1',
+          !isDone
+            ? 'border-amber-500/30 dark:border-amber-400/30 bg-amber-500/5 dark:bg-amber-400/5'
+            : successFlag === false
+              ? 'border-red-500/30 dark:border-red-400/30 bg-red-500/5 dark:bg-red-400/5'
+              : 'border-emerald-500/30 dark:border-emerald-400/30 bg-emerald-500/5 dark:bg-emerald-400/5'
         )
         return (
           <Collapsible key={`${toolCallId || idx}`} defaultOpen={false}>
@@ -695,7 +699,8 @@ export function ConversationMessageContent({
             </p>
             {/* Avoid typography/prose rules affecting the expanded card */}
             <CollapsibleContent className="not-prose">
-              <blockquote className={toolQuoteClass}>
+              <div className="pb-2">
+                <blockquote className={toolQuoteClass}>
                 <div className="absolute top-2 right-2">
                   <Button
                     variant="ghost"
@@ -796,7 +801,8 @@ export function ConversationMessageContent({
                     </>
                   )}
                 </div>
-              </blockquote>
+                </blockquote>
+              </div>
             </CollapsibleContent>
           </Collapsible>
         )
@@ -1046,13 +1052,15 @@ export function ConversationMessageContent({
               </CollapsibleTrigger>
             </p>
             <CollapsibleContent>
-              <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 py-2 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
-                <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                    {String(displayReasoning ?? '')}
-                  </ReactMarkdown>
-                </div>
-              </blockquote>
+              <div className="pb-2">
+                <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
+                  <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                      {String(displayReasoning ?? '')}
+                    </ReactMarkdown>
+                  </div>
+                </blockquote>
+              </div>
             </CollapsibleContent>
           </Collapsible>
         </>

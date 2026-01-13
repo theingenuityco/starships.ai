@@ -747,8 +747,8 @@ export function ConversationMessageList({
                 <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                    <span className="text-sm leading-relaxed">Typing</span>
                     <TypingDots />
+                    <span className="text-sm leading-relaxed">Typing...</span>
                   </div>
                 </div>
               </div>

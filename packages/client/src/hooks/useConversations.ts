@@ -10,7 +10,7 @@ import type {
   MessageModel,
   ToolCallApprovalModel,
 } from '@starships/protocol'
-import { experimental_streamedQuery as streamedQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { experimental_streamedQuery as streamedQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
@@ -84,6 +84,7 @@ export const CONVERSATION_QUERY_KEYS = {
   lists: () => [...CONVERSATION_QUERY_KEYS.all, 'list'] as const,
   byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (id: string) => [...CONVERSATION_QUERY_KEYS.all, 'detail', id] as const,
+  children: (parentConversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children'] as const,
   messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
   toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
@@ -140,6 +141,22 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
   })
 }
 
+export function useChildConversations(parentConversationId: string | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.children(parentConversationId) : (['__noop__'] as const),
+    enabled: Boolean(parentConversationId && enabled),
+    queryFn: async (): Promise<Array<ConversationModel & { agents: AgentModel[] }>> => {
+      const id = String(parentConversationId || '')
+      if (!id) return []
+      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(`/api/v1/conversations/${id}/children`)
+      return response.data.data || []
+    },
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 10_000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+    refetchOnWindowFocus: true,
+  })
+}
+
 /**
  * Pending ask-first tool approvals for a conversation.
  *
@@ -159,6 +176,44 @@ export function usePendingToolApprovals(conversationId: string | null, enabled: 
     gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000, // No cache in dev
     refetchOnWindowFocus: true,
   })
+}
+
+/**
+ * Pending ask-first tool approvals for multiple conversations (e.g. child conversations).
+ *
+ * Returns a stable map keyed by conversationId.
+ */
+export function usePendingToolApprovalsMulti(conversationIds: string[], enabled: boolean = true) {
+  const ids = Array.isArray(conversationIds) ? conversationIds.filter(Boolean).map(String) : []
+  const uniqueIds = useMemo(() => Array.from(new Set(ids)), [ids.join('|')])
+
+  const results = useQueries({
+    queries: uniqueIds.map(conversationId => ({
+      queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(conversationId),
+      enabled: Boolean(enabled && conversationId),
+      queryFn: async (): Promise<PendingToolCallApproval[]> => {
+        const response: FetchResponse<ApiResponse<PendingToolCallApproval[]>> = await api.get(`/api/v1/conversations/${conversationId}/tool-approvals/pending`)
+        return response.data.data || []
+      },
+      staleTime: process.env.NODE_ENV === 'development' ? 0 : 5_000,
+      gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+      refetchOnWindowFocus: true,
+    })),
+  })
+
+  const byConversationId = useMemo(() => {
+    const map: Record<string, PendingToolCallApproval[]> = {}
+    uniqueIds.forEach((id, idx) => {
+      map[id] = (results[idx]?.data as PendingToolCallApproval[] | undefined) || []
+    })
+    return map
+  }, [results, uniqueIds.join('|')])
+
+  const isLoading = results.some(r => r.isLoading)
+  const isFetching = results.some(r => r.fetchStatus === 'fetching')
+  const isError = results.some(r => r.isError)
+
+  return { byConversationId, isLoading, isFetching, isError }
 }
 
 // Delete conversation

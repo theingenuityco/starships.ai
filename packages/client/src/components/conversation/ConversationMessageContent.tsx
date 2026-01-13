@@ -329,6 +329,28 @@ function tryParseJSON(value: any): any {
   return value
 }
 
+function extractToolResultSuccess(toolResultMessage: any): boolean | undefined {
+  try {
+    const raw = toolResultMessage?.content ?? toolResultMessage?.result
+    const parsed = tryParseJSON(raw)
+    const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+    if (!isRecord(parsed)) return undefined
+
+    const s = parsed['success']
+    if (typeof s === 'boolean') return s
+
+    // Defensive: some envelopes may nest success.
+    const data = parsed['data']
+    if (isRecord(data) && typeof data['success'] === 'boolean') return data['success'] as boolean
+    const result = parsed['result']
+    if (isRecord(result) && typeof result['success'] === 'boolean') return result['success'] as boolean
+
+    return undefined
+  } catch {
+    return undefined
+  }
+}
+
 function extractWidgetLike(payload: unknown): Record<string, unknown> | null {
   const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
   const get = (v: unknown, key: string): unknown => (isRecord(v) ? v[key] : undefined)
@@ -648,10 +670,12 @@ export function ConversationMessageContent({
         })
 
         const isDone = Boolean(matchingResult)
+        const successFlag = matchingResult ? extractToolResultSuccess(matchingResult) : undefined
+        const statusVariant = !isDone ? 'running' : successFlag === false ? 'error' : 'success'
         // Tool name badge (matches normal UI font) with an embedded status dot.
         const Chip = ({ children }: { children: ReactNode }) => (
-          <span className="inline-flex items-center gap-1.5 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
-            <StatusDots variant={!isDone ? 'running' : 'success'} sizePx={6} />
+          <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+            <StatusDots variant={statusVariant} sizePx={7} />
             <span className="truncate">{children}</span>
           </span>
         )
@@ -670,6 +694,7 @@ export function ConversationMessageContent({
         }
 
         // Expert mode: allow expanding/collapsing args + results.
+        const accentBorderClass = successFlag === false ? 'border-l-4 border-l-red-500' : isDone ? 'border-l-4 border-l-green-500' : ''
         return (
           <Collapsible key={`${toolCallId || idx}`} defaultOpen={false}>
             {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
@@ -680,7 +705,7 @@ export function ConversationMessageContent({
             </p>
             {/* Avoid typography/prose rules affecting the expanded card */}
             <CollapsibleContent className="not-prose">
-              <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
+              <Card className={cn('border bg-muted/20', accentBorderClass)}>
                 <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
                   <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="text-xs text-muted-foreground flex-shrink-0">Tool</span>

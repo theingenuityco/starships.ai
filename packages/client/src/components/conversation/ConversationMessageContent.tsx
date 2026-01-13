@@ -24,6 +24,9 @@ import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachmen
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
+import { toolAPI } from '@/lib/api'
+import { useUserPreferencesStore } from '@/store/user-preferences-store'
+import { StatusDots } from '@/components/ui/StatusDots'
 
 interface StreamChunk {
   content: string
@@ -310,6 +313,10 @@ type ToolResultLike = {
 // Known widget types from public-docs
 const KNOWN_WIDGET_TYPES = new Set(['StatCard', 'DataTable', 'MetricGrid', 'BarChart', 'LineChart', 'AreaChart', 'PieChart', 'DonutChart', 'RadarChart', 'RadialChart'])
 
+// Cache tool display names so we don't refetch per-message/per-render.
+// Keyed by `${starshipId}:${toolSlug}` -> tool display name.
+const TOOL_NAME_CACHE = new Map<string, string>()
+
 // Helper to safely parse JSON
 function tryParseJSON(value: any): any {
   if (typeof value === 'string') {
@@ -383,6 +390,8 @@ export function ConversationMessageContent({
 }: MessageContentProps) {
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
+  const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
+  const expertMode = useUserPreferencesStore(s => s.expertMode)
 
   // Fetch attachments metadata
   const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(attachmentIds, starshipId)
@@ -415,6 +424,87 @@ export function ConversationMessageContent({
   // once the matching tool_result messages arrive, the tool panel should stop spinning immediately.
   const hasPendingToolCalls = totalToolCalls > 0 && completedToolResults < totalToolCalls
   const hasAnyToolCalls = totalToolCalls > 0
+
+  // Resolve tool display names for tool slugs (function.name) so the UI can show human-friendly names.
+  // Tool calls need to keep using the slug for execution, but the conversation header should show the tool's name.
+  useEffect(() => {
+    if (!starshipId) return
+    if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return
+
+    const slugs = Array.from(
+      new Set(
+        normalizedToolCalls
+          .map(tc => tc.function?.name)
+          .filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
+          .map(s => s.trim())
+      )
+    )
+    if (slugs.length === 0) return
+
+    // Hydrate from cache first (no state update if already present)
+    const hydrated: Record<string, string> = {}
+    for (const slug of slugs) {
+      const cached = TOOL_NAME_CACHE.get(`${starshipId}:${slug}`)
+      if (cached) {
+        hydrated[slug] = cached
+      }
+    }
+    if (Object.keys(hydrated).length > 0) {
+      setToolNameBySlug(prev => {
+        let changed = false
+        for (const [slug, name] of Object.entries(hydrated)) {
+          if (prev[slug] !== name) {
+            changed = true
+            break
+          }
+        }
+        return changed ? { ...prev, ...hydrated } : prev
+      })
+    }
+
+    const missing = slugs.filter(slug => {
+      if (TOOL_NAME_CACHE.has(`${starshipId}:${slug}`)) return false
+      return true
+    })
+    if (missing.length === 0) return
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const results = await Promise.all(
+          missing.map(async slug => {
+            try {
+              const tool = await toolAPI.getBySlug(starshipId, slug)
+              const name = typeof (tool as any)?.name === 'string' ? String((tool as any).name).trim() : ''
+              return { slug, name }
+            } catch {
+              return { slug, name: '' }
+            }
+          })
+        )
+
+        if (cancelled) return
+
+        const updates: Record<string, string> = {}
+        for (const r of results) {
+          if (r.name) {
+            TOOL_NAME_CACHE.set(`${starshipId}:${r.slug}`, r.name)
+            updates[r.slug] = r.name
+          }
+        }
+
+        if (Object.keys(updates).length > 0) {
+          setToolNameBySlug(prev => ({ ...prev, ...updates }))
+        }
+      } catch {
+        // ignore tool name resolution failures; we fall back to slug
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [normalizedToolCalls, starshipId])
 
   const [showCompletionTick, setShowCompletionTick] = useState(false)
   const prevCompletedRef = useRef<number>(completedToolResults)
@@ -500,231 +590,215 @@ export function ConversationMessageContent({
 
   // Collapsible should always start closed; users can expand manually
 
-  // Natural language header with tense and inline code chips for tool names (no 'tool' word):
-  // Ongoing: "<agent> is using `X`[, `Y`] [& some others...]"
-  // Completed: "<agent> used `X`[, `Y`] [& some others...]"
-  const toolCallHeaderLabel = useMemo<ReactNode | null>(() => {
-    if (!Array.isArray(normalizedToolCalls) || normalizedToolCalls.length === 0) return null
-    const names = normalizedToolCalls.map(tc => tc.function?.name).filter((n): n is string => typeof n === 'string' && n.trim().length > 0)
-    const unique = Array.from(new Set(names))
-    const agent = agentName || 'Agent'
-
-    const isOngoing = hasPendingToolCalls || (isStreaming && hasAnyToolCalls && !allToolCallsDone)
-    const verb = isOngoing ? 'is using' : 'used'
-
-    const Chip = ({ children }: { children: ReactNode }) => <code className="bg-muted px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>
-
-    if (unique.length === 0) {
-      return (
-        <>
-          {agent} {verb}
-        </>
-      )
-    }
-    if (unique.length === 1) {
-      return (
-        <>
-          {agent} {verb} <Chip>{unique[0]}</Chip>
-        </>
-      )
-    }
-    const visible = unique.slice(0, 2)
-    if (unique.length > 2) {
-      return (
-        <>
-          {agent} {verb} <Chip>{visible[0]}</Chip>, <Chip>{visible[1]}</Chip> & some others...
-        </>
-      )
-    }
-    return (
-      <>
-        {agent} {verb} <Chip>{visible[0]}</Chip> & <Chip>{visible[1]}</Chip>
-      </>
-    )
-  }, [normalizedToolCalls, agentName, hasPendingToolCalls, allToolCallsDone, isStreaming, hasAnyToolCalls])
-
   const shouldRenderToolPanel: boolean = normalizedToolCalls.length > 0 && messageType !== 'tool_result'
-  const toolPanelNode: any = shouldRenderToolPanel ? (
-    <div className="my-2.5">
-      {/* Tools panel: keep collapsed by default and preserve user toggle state */}
-      <Collapsible defaultOpen={false}>
-        <CollapsibleTrigger className="w-full p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-          {hasAnyToolCalls && hasPendingToolCalls ? (
-            <Icon name="loading" className="w-3 h-3 animate-spin" />
-          ) : allToolCallsDone && showCompletionTick ? (
-            <Icon name="check" className="w-3 h-3 text-green-600 dark:text-green-400" />
-          ) : (
-            <Icon name="wrench" className="w-3 h-3" />
-          )}
-          {toolCallHeaderLabel ?? `Tool Calls (${normalizedToolCalls.length})`}
-        </CollapsibleTrigger>
-        <CollapsibleContent>
-          <div className="space-y-1.5">
-            {normalizedToolCalls.map((tc, idx) => {
-              const rawArgsAny = tc.function?.arguments ?? ''
-              let prettyArgs = ''
-              try {
-                // Handle case where arguments might already be an object
-                if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                  prettyArgs = JSON.stringify(rawArgsAny, null, 2)
-                } else {
-                  const asStr = String(rawArgsAny)
-                  prettyArgs = JSON.stringify(JSON.parse(asStr), null, 2)
-                }
-              } catch {
-                prettyArgs = String(rawArgsAny)
-              }
-              const hasArgs = (() => {
-                // Handle case where arguments might already be an object
-                if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                  return Array.isArray(rawArgsAny) ? rawArgsAny.length > 0 : Object.keys(rawArgsAny).length > 0
-                }
+  const toolPanelNode: ReactNode = shouldRenderToolPanel ? (
+    <>
+      {normalizedToolCalls.map((tc, idx) => {
+        const rawArgsAny = tc.function?.arguments ?? ''
+        let prettyArgs = ''
+        try {
+          // Handle case where arguments might already be an object
+          if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+            prettyArgs = JSON.stringify(rawArgsAny, null, 2)
+          } else {
+            const asStr = String(rawArgsAny)
+            prettyArgs = JSON.stringify(JSON.parse(asStr), null, 2)
+          }
+        } catch {
+          prettyArgs = String(rawArgsAny)
+        }
+        const hasArgs = (() => {
+          // Handle case where arguments might already be an object
+          if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+            return Array.isArray(rawArgsAny) ? rawArgsAny.length > 0 : Object.keys(rawArgsAny).length > 0
+          }
 
-                const raw = typeof rawArgsAny === 'string' ? rawArgsAny.trim() : ''
-                if (!raw) return false
-                try {
-                  const parsed = JSON.parse(raw)
-                  if (parsed && typeof parsed === 'object') {
-                    return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
-                  }
-                  return String(parsed).trim().length > 0
-                } catch {
-                  return raw.length > 0
-                }
-              })()
-              const funcName = typeof tc.function?.name === 'string' && tc.function.name.trim() ? tc.function.name : 'unknown'
+          const raw = typeof rawArgsAny === 'string' ? rawArgsAny.trim() : ''
+          if (!raw) return false
+          try {
+            const parsed = JSON.parse(raw)
+            if (parsed && typeof parsed === 'object') {
+              return Array.isArray(parsed) ? parsed.length > 0 : Object.keys(parsed).length > 0
+            }
+            return String(parsed).trim().length > 0
+          } catch {
+            return raw.length > 0
+          }
+        })()
+        // `function.name` is our tool identifier (slug) used for execution.
+        // For UI, prefer the human-friendly tool name when available.
+        const toolSlug = typeof tc.function?.name === 'string' && tc.function.name.trim() ? tc.function.name.trim() : ''
+        const toolDisplayName = (() => {
+          if (!toolSlug) return 'unknown'
+          const resolved = toolNameBySlug?.[toolSlug]
+          return typeof resolved === 'string' && resolved.trim().length > 0 ? resolved.trim() : toolSlug
+        })()
 
-              // Normalize tool call id from multiple potential fields to be resilient across providers
-              const rawCallId = tc.id ?? null
+        // Normalize tool call id from multiple potential fields to be resilient across providers
+        const rawCallId = tc.id ?? null
 
-              const toolCallId = rawCallId != null ? String(rawCallId) : ''
-              const combinedBlockId = `${messageId}-tool-all-${idx}`
+        const toolCallId = rawCallId != null ? String(rawCallId) : ''
+        const combinedBlockId = `${messageId}-tool-all-${idx}`
 
-              // Find matching tool result using multiple possible id fields, normalized to strings
-              const matchingResult = toolResults?.find((result: any) => {
-                const rid = result?.toolCallId ?? result?.call_id ?? result?.id
-                if (rid == null) return false
-                return String(rid) === toolCallId
-              })
+        // Find matching tool result using multiple possible id fields, normalized to strings
+        const matchingResult = toolResults?.find((result: any) => {
+          const rid = result?.toolCallId ?? result?.call_id ?? result?.id
+          if (rid == null) return false
+          return String(rid) === toolCallId
+        })
 
-              return (
-                <div key={idx}>
-                  <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
-                    <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="text-xs text-muted-foreground flex-shrink-0">Function</span>
-                        <span className="text-xs font-mono px-2 py-0.5 rounded bg-muted truncate">{funcName}</span>
-                        {/* ID removed from header */}
-                      </div>
-                      <div className="flex items-center gap-1 flex-shrink-0">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-6 w-6"
-                          onClick={() => {
-                            // Build a single payload that includes function, id, arguments and (optional) result
-                            let argsParsed: any
-                            if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                              argsParsed = rawArgsAny
+        const isDone = Boolean(matchingResult)
+        // Tool name badge (matches normal UI font) with an embedded status dot.
+        const Chip = ({ children }: { children: ReactNode }) => (
+          <span className="inline-flex items-center gap-1.5 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+            <StatusDots variant={!isDone ? 'running' : 'success'} sizePx={6} />
+            <span className="truncate">{children}</span>
+          </span>
+        )
+        // Match markdown paragraph spacing; keep consistent even for the last tool call.
+        const pSpacingClass = 'mb-2'
+
+        // Non-expert mode: show a compact, non-interactive status line only.
+        if (!expertMode) {
+          return (
+            <p key={`${toolCallId || idx}`} className={`${pSpacingClass} leading-relaxed`}>
+              <span className="inline-flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
+                <Chip>{toolDisplayName}</Chip>
+              </span>
+            </p>
+          )
+        }
+
+        // Expert mode: allow expanding/collapsing args + results.
+        return (
+          <Collapsible key={`${toolCallId || idx}`} defaultOpen={false}>
+            {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
+            <p className={`${pSpacingClass} leading-relaxed`}>
+              <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                <Chip>{toolDisplayName}</Chip>
+              </CollapsibleTrigger>
+            </p>
+            {/* Avoid typography/prose rules affecting the expanded card */}
+            <CollapsibleContent className="not-prose">
+              <Card className={cn('border bg-muted/20', matchingResult && 'border-l-4 border-l-green-500')}>
+                <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="text-xs text-muted-foreground flex-shrink-0">Tool</span>
+                    <span className="text-sm font-medium px-2 py-0.5 rounded bg-muted truncate">{toolDisplayName}</span>
+                    {toolSlug && toolDisplayName !== toolSlug ? (
+                      <span className="text-[10px] text-muted-foreground truncate" title={toolSlug}>
+                        ({toolSlug})
+                      </span>
+                    ) : null}
+                    {/* ID removed from header */}
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => {
+                        // Build a single payload that includes function, id, arguments and (optional) result
+                        let argsParsed: any
+                        if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                          argsParsed = rawArgsAny
+                        } else {
+                          try {
+                            argsParsed = JSON.parse(String(rawArgsAny))
+                          } catch {
+                            // Fallback to the prettified string for non-JSON args
+                            argsParsed = prettyArgs
+                          }
+                        }
+
+                        let resultParsed: any = undefined
+                        if (matchingResult) {
+                          const resultContent = (() => {
+                            const raw = matchingResult.content ?? matchingResult.result ?? ''
+                            if (typeof raw === 'string') return raw
+                            try {
+                              return JSON.stringify(raw)
+                            } catch {
+                              return String(raw)
+                            }
+                          })()
+                          try {
+                            const t = (resultContent || '').trim()
+                            if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                              resultParsed = JSON.parse(t)
                             } else {
-                              try {
-                                argsParsed = JSON.parse(String(rawArgsAny))
-                              } catch {
-                                // Fallback to the prettified string for non-JSON args
-                                argsParsed = prettyArgs
-                              }
+                              resultParsed = resultContent
                             }
+                          } catch {
+                            resultParsed = resultContent
+                          }
+                        }
 
-                            let resultParsed: any = undefined
-                            if (matchingResult) {
-                              const resultContent = (() => {
-                                const raw = matchingResult.content ?? matchingResult.result ?? ''
-                                if (typeof raw === 'string') return raw
-                                try {
-                                  return JSON.stringify(raw)
-                                } catch {
-                                  return String(raw)
-                                }
-                              })()
-                              try {
-                                const t = (resultContent || '').trim()
-                                if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                  resultParsed = JSON.parse(t)
-                                } else {
-                                  resultParsed = resultContent
-                                }
-                              } catch {
-                                resultParsed = resultContent
-                              }
-                            }
+                        const payload: any = {
+                          function: toolSlug || undefined,
+                          id: toolCallId || undefined,
+                          arguments: argsParsed,
+                          ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
+                        }
 
-                            const payload: any = {
-                              function: funcName,
-                              id: toolCallId || undefined,
-                              arguments: argsParsed,
-                              ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
-                            }
-
-                            handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
-                          }}
-                        >
-                          {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-                        </Button>
-                      </div>
-                    </div>
-
-                    <div>
-                      {hasArgs && (
-                        <>
-                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
-                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
-                            <code>{prettyArgs}</code>
-                          </pre>
-                        </>
-                      )}
-
-                      {matchingResult && (
-                        <>
-                          <div className="border-t border-border/50" />
-                          <div className="flex items-center justify-between px-3 pt-2">
-                            <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
-                              <Icon name="check" className="w-3 h-3" />
-                              Result
-                            </div>
-                          </div>
-                          <pre className="text-xs p-3 pt-1 overflow-x-auto">
-                            <code>
-                              {(() => {
-                                const resultContent = (() => {
-                                  const raw = matchingResult.content ?? matchingResult.result ?? ''
-                                  if (typeof raw === 'string') return raw
-                                  try {
-                                    return JSON.stringify(raw, null, 2)
-                                  } catch {
-                                    return String(raw)
-                                  }
-                                })()
-                                try {
-                                  const t = (resultContent || '').trim()
-                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                    return JSON.stringify(JSON.parse(t), null, 2)
-                                  }
-                                } catch {}
-                                return resultContent
-                              })()}
-                            </code>
-                          </pre>
-                        </>
-                      )}
-                    </div>
-                  </Card>
+                        handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
+                      }}
+                    >
+                      {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
+                    </Button>
+                  </div>
                 </div>
-              )
-            })}
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
-    </div>
+
+                <div>
+                  {hasArgs && (
+                    <>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
+                      <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                        <code>{prettyArgs}</code>
+                      </pre>
+                    </>
+                  )}
+
+                  {matchingResult && (
+                    <>
+                      <div className="border-t border-border/50" />
+                      <div className="flex items-center justify-between px-3 pt-2">
+                        <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
+                          <Icon name="check" className="w-3 h-3" />
+                          Result
+                        </div>
+                      </div>
+                      <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                        <code>
+                          {(() => {
+                            const resultContent = (() => {
+                              const raw = matchingResult.content ?? matchingResult.result ?? ''
+                              if (typeof raw === 'string') return raw
+                              try {
+                                return JSON.stringify(raw, null, 2)
+                              } catch {
+                                return String(raw)
+                              }
+                            })()
+                            try {
+                              const t = (resultContent || '').trim()
+                              if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                return JSON.stringify(JSON.parse(t), null, 2)
+                              }
+                            } catch {}
+                            return resultContent
+                          })()}
+                        </code>
+                      </pre>
+                    </>
+                  )}
+                </div>
+              </Card>
+            </CollapsibleContent>
+          </Collapsible>
+        )
+      })}
+    </>
   ) : null
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
@@ -896,6 +970,17 @@ export function ConversationMessageContent({
     [theme, enableLinkPreview, messageId, copiedStates]
   )
 
+  // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
+  const markdownWithToolsNode: ReactNode =
+    messageType !== 'tool_result' ? (
+      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content">
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          {String(displayContent ?? '')}
+        </ReactMarkdown>
+        {toolPanelNode}
+      </div>
+    ) : null
+
   // Widget detection: Extract widgets from tool results
   const widgetResults = useMemo(() => {
     if (!Array.isArray(toolResults) || toolResults.length === 0) return []
@@ -933,7 +1018,7 @@ export function ConversationMessageContent({
     return (
       <div className={cn('relative group', className)}>
         <div className="text-sm leading-relaxed whitespace-pre-wrap">
-          {displayContent}
+          {String(displayContent ?? '')}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
       </div>
@@ -956,7 +1041,7 @@ export function ConversationMessageContent({
               <blockquote className="border-l-4 border-primary/20 px-4 py-2 bg-muted/20 rounded-r-lg my-1">
                 <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
                   <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                    {displayReasoning}
+                    {String(displayReasoning ?? '')}
                   </ReactMarkdown>
                 </div>
               </blockquote>
@@ -977,16 +1062,7 @@ export function ConversationMessageContent({
       )}
 
       {/* Unified markdown rendering - message content at normal size */}
-      {messageType !== 'tool_result' && (
-        <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content">
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {displayContent}
-          </ReactMarkdown>
-        </div>
-      )}
-
-      {/* Tool calls and results rendering for assistant messages */}
-      {toolPanelNode}
+      {markdownWithToolsNode as any}
 
       {/* Widget rendering: Display widgets inline when created/updated */}
       {widgetResults.length > 0 && messageType !== 'tool_result' && (
@@ -1053,12 +1129,17 @@ export function ConversationMessageContent({
                 Tool Result (Standalone)
               </div>
             </div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent, `${messageId}-tool-result`)}>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6"
+              onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : String(displayContent ?? ''), `${messageId}-tool-result`)}
+            >
               {copiedStates[`${messageId}-tool-result`] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
             </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
-            <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : displayContent}</code>
+            <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : String(displayContent ?? '')}</code>
           </pre>
         </Card>
       )}

@@ -690,15 +690,19 @@ export class AgentTemplateRepository extends BaseRepository {
           i++;
         }
 
-        // "Aggressive" keyword search: require every token to match *some* field.
-        // Also allow phrase-like match via the full query for better UX.
-        const tokenClauses: string[] = [];
+        // "Aggressive" keyword search:
+        // - Split into tokens
+        // - Match ANY token across (name/slug/description/tags)
+        // - Rank higher when more tokens match, and when they match stronger fields
+        const tokenAnyClauses: string[] = [];
+        const tokenPlaceholders: string[] = [];
         for (const tok of tokens) {
           const like = `%${tok}%`;
           params.push(like);
           const p = `$${i}`;
           i++;
-          tokenClauses.push(
+          tokenPlaceholders.push(p);
+          tokenAnyClauses.push(
             `(name ILIKE ${p} OR slug ILIKE ${p} OR description ILIKE ${p} OR EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${p}))`
           );
         }
@@ -710,20 +714,34 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const phraseClause = `(name ILIKE ${pFull} OR slug ILIKE ${pFull} OR description ILIKE ${pFull} OR EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${pFull}))`;
 
-        // Require either: all tokens match OR phrase matches.
-        // This keeps multi-word searches strong without making "weird" queries return 0 results too easily.
-        const mainClause = tokenClauses.length > 0 ? `((${tokenClauses.join(' AND ')}) OR ${phraseClause})` : phraseClause;
-        where.push(mainClause);
+        // Require either: phrase matches OR at least one token matches.
+        // This makes multi-keyword searches behave like users expect (broad match, then rank).
+        const tokenAny = tokenAnyClauses.length > 0 ? `(${tokenAnyClauses.join(' OR ')})` : 'FALSE';
+        where.push(`(${phraseClause} OR ${tokenAny})`);
 
         // Relevance scoring (higher is better).
-        // We score phrase matches heavily; token matching is already enforced by the WHERE clause.
+        // We score phrase matches heavily, and add per-token matches.
+        const tokenScore =
+          tokenPlaceholders.length > 0
+            ? tokenPlaceholders
+                .map(
+                  (p) => `(
+                    (CASE WHEN name ILIKE ${p} THEN 15 ELSE 0 END) +
+                    (CASE WHEN slug ILIKE ${p} THEN 12 ELSE 0 END) +
+                    (CASE WHEN description ILIKE ${p} THEN 6 ELSE 0 END) +
+                    (CASE WHEN EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${p}) THEN 4 ELSE 0 END)
+                  )`
+                )
+                .join(' + ')
+            : '0';
         const sql =
           `SELECT *,
             (
               (CASE WHEN name ILIKE ${pFull} THEN 100 ELSE 0 END) +
               (CASE WHEN slug ILIKE ${pFull} THEN 80 ELSE 0 END) +
               (CASE WHEN description ILIKE ${pFull} THEN 40 ELSE 0 END) +
-              (CASE WHEN EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${pFull}) THEN 30 ELSE 0 END)
+              (CASE WHEN EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${pFull}) THEN 30 ELSE 0 END) +
+              (${tokenScore})
             ) AS relevance
            FROM agent_templates
            ${where.length ? `WHERE ${where.join(' AND ')}` : ''}

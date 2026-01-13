@@ -50,23 +50,37 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
 
     // Validate pagination and search parameters
     const QuerySchema = PaginationSchema.extend({
+      // Client code commonly uses `search`; legacy callers may use `query`.
+      search: z.string().optional(),
       query: z.string().optional(),
+      category: z
+        .enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
+        .optional(),
     });
     const queryValidation = validateData(QuerySchema, req.query, res, 'pagination query');
     if (!queryValidation) return;
 
-    const { page, limit, query: searchQuery } = queryValidation;
+    const { page, limit } = queryValidation;
+    const searchQuery = (queryValidation.search || queryValidation.query || '').trim();
+    const category = queryValidation.category;
 
     // Use search if query provided, otherwise get all templates
-    const allTemplates = searchQuery
+    const baseTemplates = searchQuery
       ? await templateService.searchTemplates(searchQuery)
-      : await templateService.getAllTemplates();
+      : category
+        ? await templateService.getTemplatesByCategory(category)
+        : await templateService.getAllTemplates();
+
+    // If both search + category are provided, filter search results client-side.
+    // (We keep the service signature stable; repository can still do DB-level filtering later.)
+    const allTemplates =
+      searchQuery && category ? baseTemplates.filter((t) => t?.category === category) : baseTemplates;
 
     // Apply pagination
     const startIndex = (page - 1) * limit;
     const paginatedTemplates = allTemplates.slice(startIndex, startIndex + limit);
 
-    const paginationMeta = createPaginationMeta(page, limit, paginatedTemplates.length);
+    const paginationMeta = createPaginationMeta(page, limit, allTemplates.length);
 
     const requesterUserId = req.user?.id;
     const repo = new AgentTemplateRepository();

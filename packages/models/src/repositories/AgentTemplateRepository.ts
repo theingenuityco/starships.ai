@@ -178,9 +178,7 @@ export class AgentTemplateRepository extends BaseRepository {
   async findInternalByIds(ids: string[]): Promise<Map<string, AgentTemplateModel>> {
     return this.executeWithErrorHandling(
       async () => {
-        const uniqueIds = Array.from(
-          new Set((ids || []).map((t) => String(t)).filter((t) => t.trim().length > 0))
-        );
+        const uniqueIds = Array.from(new Set((ids || []).map((t) => String(t)).filter((t) => t.trim().length > 0)));
         if (uniqueIds.length === 0) return new Map();
 
         const connection = this.getConnection();
@@ -338,6 +336,32 @@ export class AgentTemplateRepository extends BaseRepository {
       ...(avatarUrl ? { avatarUrl } : {}),
       ...(avatarUpdatedAt ? { avatarUpdatedAt } : {}),
     };
+  }
+
+  private async getAssignedToolSlugsByTemplateIds(templateIds: string[]): Promise<Map<string, string[]>> {
+    const ids = (templateIds || []).map((t) => String(t)).filter((t) => t.trim().length > 0);
+    const map = new Map<string, string[]>();
+    if (ids.length === 0) return map;
+
+    const connection = this.getConnection();
+    const rows = await connection.query<{ agent_template_id: string; slug: string }>(
+      `SELECT attt.agent_template_id, tt.slug
+       FROM agent_template_tool_templates attt
+       JOIN tool_templates tt ON tt.id = attt.tool_template_id
+       WHERE attt.agent_template_id = ANY($1)
+       ORDER BY attt.agent_template_id, tt.name`,
+      [ids]
+    );
+
+    for (const row of rows || []) {
+      if (!row?.agent_template_id || !row?.slug) continue;
+      const key = String(row.agent_template_id);
+      const list = map.get(key) ?? [];
+      list.push(row.slug);
+      map.set(key, list);
+    }
+
+    return map;
   }
 
   async findAll(): Promise<AgentTemplateModel[]> {
@@ -610,14 +634,25 @@ export class AgentTemplateRepository extends BaseRepository {
           'SELECT * FROM agent_templates WHERE category = $1 AND is_public = true ORDER BY usage_count DESC',
           [category]
         );
-        return fromDatabaseArray(AgentTemplateEntity, result);
+        const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
+        const templateIds = templates
+          .map((t) => String(t.id))
+          .filter((id) => typeof id === 'string' && id.trim().length > 0);
+        const assignedToolSlugsByTemplateId = await this.getAssignedToolSlugsByTemplateIds(templateIds);
+
+        return templates.map((t) =>
+          this.toPublicModel({
+            ...t,
+            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
+          } as AgentTemplateModel & Record<string, unknown>)
+        );
       },
       'findByCategory',
       'AgentTemplate'
     );
   }
 
-  async searchTemplates(query: string): Promise<AgentTemplateModel[]> {
+  async searchTemplates(query: string, opts?: { category?: string }): Promise<AgentTemplateModel[]> {
     return this.executeWithErrorHandling(
       async () => {
         if (!query?.trim()) {
@@ -629,19 +664,85 @@ export class AgentTemplateRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const result = await connection.query<Record<string, unknown>>(
-          `SELECT *,
-           CASE
-             WHEN LOWER(name) LIKE LOWER($1) THEN 3
-             WHEN LOWER(description) LIKE LOWER($1) THEN 2
-             ELSE 1
-           END as relevance
-           FROM agent_templates
-           WHERE LOWER(name) LIKE LOWER($1) OR LOWER(description) LIKE LOWER($1)
-           ORDER BY relevance DESC, usage_count DESC`,
-          [`%${query}%`]
+        const q = String(query).trim();
+        const tokens = Array.from(
+          new Set(
+            q
+              .toLowerCase()
+              .split(/[\s/,_-]+/g)
+              .map((t) => t.trim())
+              .filter(Boolean)
+              .slice(0, 8)
+          )
         );
-        return fromDatabaseArray(AgentTemplateEntity, result);
+
+        // Always include the full query as a search term too (phrase-like match)
+        const fullLike = `%${q}%`;
+
+        const where: string[] = [];
+        const params: unknown[] = [];
+        let i = 1;
+
+        // Keep category filtering consistent with other list APIs (optional).
+        if (opts?.category) {
+          where.push(`category = $${i}`);
+          params.push(opts.category);
+          i++;
+        }
+
+        // "Aggressive" keyword search: require every token to match *some* field.
+        // Also allow phrase-like match via the full query for better UX.
+        const tokenClauses: string[] = [];
+        for (const tok of tokens) {
+          const like = `%${tok}%`;
+          params.push(like);
+          const p = `$${i}`;
+          i++;
+          tokenClauses.push(
+            `(name ILIKE ${p} OR slug ILIKE ${p} OR description ILIKE ${p} OR EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${p}))`
+          );
+        }
+
+        // If the user typed something that tokenizes to nothing (shouldn't happen), fall back to phrase match.
+        params.push(fullLike);
+        const pFull = `$${i}`;
+        i++;
+
+        const phraseClause = `(name ILIKE ${pFull} OR slug ILIKE ${pFull} OR description ILIKE ${pFull} OR EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${pFull}))`;
+
+        // Require either: all tokens match OR phrase matches.
+        // This keeps multi-word searches strong without making "weird" queries return 0 results too easily.
+        const mainClause = tokenClauses.length > 0 ? `((${tokenClauses.join(' AND ')}) OR ${phraseClause})` : phraseClause;
+        where.push(mainClause);
+
+        // Relevance scoring (higher is better).
+        // We score phrase matches heavily; token matching is already enforced by the WHERE clause.
+        const sql =
+          `SELECT *,
+            (
+              (CASE WHEN name ILIKE ${pFull} THEN 100 ELSE 0 END) +
+              (CASE WHEN slug ILIKE ${pFull} THEN 80 ELSE 0 END) +
+              (CASE WHEN description ILIKE ${pFull} THEN 40 ELSE 0 END) +
+              (CASE WHEN EXISTS (SELECT 1 FROM unnest(tags) t WHERE t ILIKE ${pFull}) THEN 30 ELSE 0 END)
+            ) AS relevance
+           FROM agent_templates
+           ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+           ORDER BY relevance DESC, usage_count DESC, created_at DESC`;
+
+        const result = await connection.query<Record<string, unknown>>(sql, params);
+
+        const templates = fromDatabaseArray(AgentTemplateEntity, result) as Array<AgentTemplateModel & Record<string, unknown>>;
+        const templateIds = templates
+          .map((t) => String(t.id))
+          .filter((id) => typeof id === 'string' && id.trim().length > 0);
+        const assignedToolSlugsByTemplateId = await this.getAssignedToolSlugsByTemplateIds(templateIds);
+
+        return templates.map((t) =>
+          this.toPublicModel({
+            ...t,
+            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
+          } as AgentTemplateModel & Record<string, unknown>)
+        );
       },
       'searchTemplates',
       'AgentTemplate'

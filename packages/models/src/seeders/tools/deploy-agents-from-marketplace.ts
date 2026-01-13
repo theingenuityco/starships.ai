@@ -8,8 +8,7 @@ import type { ToolTemplateModel } from '@starships/protocol';
 export const deployAgentsFromMarketplaceTool: ToolParams = {
   name: 'Deploy Agents From Marketplace',
   slug: 'deploy-agents-from-marketplace',
-  description:
-    'Deploy an agent template from the marketplace onto this starship. Creates a new agent instance from a template slug.',
+  description: 'Deploy an agent template from the marketplace onto this starship. Creates a new agent instance from a template slug.',
   parameters: {
     type: 'object',
     required: ['templateSlug'],
@@ -112,10 +111,7 @@ export const deployAgentsFromMarketplaceTool: ToolParams = {
   },
 };
 
-export const deployAgentsFromMarketplaceToolTemplate: Omit<
-  ToolTemplateModel,
-  'id' | 'createdAt' | 'updatedAt' | 'usageCount'
-> = {
+export const deployAgentsFromMarketplaceToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' | 'updatedAt' | 'usageCount'> = {
   name: deployAgentsFromMarketplaceTool.name,
   description: deployAgentsFromMarketplaceTool.description,
   parameters: deployAgentsFromMarketplaceTool.parameters,
@@ -128,4 +124,3 @@ export const deployAgentsFromMarketplaceToolTemplate: Omit<
   requiresApiKey: false,
   configurationFields: [],
 };
-

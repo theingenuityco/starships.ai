@@ -368,20 +368,34 @@ describe('ToolRepository', () => {
       const mockCreatedTool = {
         id: 'tool-1',
         name: 'Template Tool',
-        slug: 'template-slug',
+        slug: 'template-tool',
         starship_id: 'starship-123',
         is_enabled: true,
         created_at: '2024-01-01T00:00:00.000Z',
         updated_at: '2024-01-01T00:00:00.000Z',
       };
 
-      testHelper.mockConnection.queryOne.mockResolvedValue(mockTemplate);
-      testHelper.mockConnection.query.mockResolvedValueOnce([mockCreatedTool]).mockResolvedValueOnce([]);
+      // createFromTemplate flow:
+      // 1) resolveTemplateIdForAssignedSlug() => queryOne on tool_templates
+      // 2) findById(templateId) => query SELECT tool_templates
+      // 3) create(toolData) => query INSERT tools RETURNING *
+      // 4) increment usage_count => query UPDATE tool_templates
+      testHelper.mockConnection.queryOne.mockImplementation(async (query: string) => {
+        if (query.includes('FROM tool_templates')) return { id: 'template-1' };
+        if (query.includes('FROM tools')) return null; // slug uniqueness checks
+        return null;
+      });
+      testHelper.mockConnection.query.mockImplementation(async (query: string) => {
+        if (query.includes('SELECT * FROM tool_templates WHERE id = $1')) return [mockTemplate];
+        if (query.includes('INSERT INTO tools')) return [mockCreatedTool];
+        if (query.includes('UPDATE tool_templates SET usage_count')) return [];
+        return [];
+      });
 
       const result = await repository.createFromTemplate('template-slug', 'starship-123');
 
       expect(result.name).toBe('Template Tool');
-      expect(result.slug).toBe('template-slug');
+      expect(result.slug).toBe('template-tool');
     });
 
     it('should throw error when template not found', async () => {

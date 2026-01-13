@@ -15,6 +15,7 @@
     "migrate:seeded-templates": "tsx src/scripts/migrate-seeded-templates.ts",
     "migrate:tool-blueprints": "tsx src/scripts/migrate-tool-blueprints.ts",
     "seed:update-instances": "tsx src/scripts/seed-update-deployed-instances.ts",
+    "backfill:missing-agent-tools": "tsx src/scripts/backfill-missing-agent-tools.ts",
     "migrate:doc-tools": "tsx src/scripts/migrate-doc-tools.ts",
     "backup:create": "tsx src/scripts/backup-cli.ts create",
     "backup:restore": "tsx src/scripts/backup-cli.ts restore",

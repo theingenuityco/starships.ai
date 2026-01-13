@@ -28,7 +28,7 @@ export class AgentTemplateRepository extends BaseRepository {
    * with a fixed random suffix (`[a-z0-9]{4}`), we can (and should) match that exact shape:
    * `^${baseSlug}-[a-z0-9]{4}$`.
    */
-  private async resolveToolTemplateIdForAssignedSlug(assignedSlug: string): Promise<string | null> {
+  async resolveToolTemplateIdForAssignedSlug(assignedSlug: string): Promise<string | null> {
     const base = generateSlug(String(assignedSlug || ''));
     if (!base) return null;
 

@@ -48,13 +48,19 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
       return;
     }
 
-    // Validate pagination parameters
-    const queryValidation = validateData(PaginationSchema, req.query, res, 'pagination query');
+    // Validate pagination and search parameters
+    const QuerySchema = PaginationSchema.extend({
+      query: z.string().optional(),
+    });
+    const queryValidation = validateData(QuerySchema, req.query, res, 'pagination query');
     if (!queryValidation) return;
 
-    const { page, limit } = queryValidation;
+    const { page, limit, query: searchQuery } = queryValidation;
 
-    const allTemplates = await templateService.getAllTemplates();
+    // Use search if query provided, otherwise get all templates
+    const allTemplates = searchQuery
+      ? await templateService.searchTemplates(searchQuery)
+      : await templateService.getAllTemplates();
 
     // Apply pagination
     const startIndex = (page - 1) * limit;

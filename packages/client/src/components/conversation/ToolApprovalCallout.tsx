@@ -26,7 +26,8 @@ export function ToolApprovalCallout({ approval, isSubmitting = false, onApproveO
   const toolLabel = useMemo(() => {
     const slug = approval.toolSlug && String(approval.toolSlug).trim() ? String(approval.toolSlug).trim() : ''
     const name = approval.toolName && String(approval.toolName).trim() ? String(approval.toolName).trim() : ''
-    return slug || name || 'a tool'
+    // Prefer human-friendly name; fall back to slug when name is unavailable.
+    return name || slug || 'a tool'
   }, [approval.toolSlug, approval.toolName])
 
   const canAlwaysAllow = Boolean(approval.toolSlug && String(approval.toolSlug).trim().length > 0)

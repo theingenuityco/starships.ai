@@ -166,13 +166,20 @@ export const agentCallTool: ToolParams = {
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
 
+              // When the delegated agent hits an ask-first tool, the server will pause the turn with
+              // status=waiting_for_tools and return from the sync call. Surface this so callers
+              // don't interpret it as "completed".
+              const turn = (data && typeof data === 'object' && data.turn && typeof data.turn === 'object') ? data.turn : null;
+              const turnStatus = turn && typeof turn.status === 'string' ? turn.status : null;
+
               return {
                 childConversationId,
-                success,
-                status,
                 lastMessage,
-                message: success
-                  ? 'Agent call in new child conversation completed successfully'
+                // Renamed from "message" -> "status", preserving the human-readable text values.
+                status: success
+                  ? (turnStatus === 'waiting_for_tools'
+                      ? 'Delegated agent is awaiting tool approval'
+                      : 'Agent call in new child conversation completed successfully')
                   : 'Agent call in new child conversation failed',
               };
             }
@@ -235,14 +242,17 @@ export const agentCallTool: ToolParams = {
               const status = (http && typeof http === 'object' && http.status) ? http.status : 0;
               const success = status >= 200 && status < 300;
 
+              const turn = (data && typeof data === 'object' && data.turn && typeof data.turn === 'object') ? data.turn : null;
+              const turnStatus = turn && typeof turn.status === 'string' ? turn.status : null;
+
               return {
                 childConversationId,
-                success,
-                status,
                 lastMessage,
-                message: success
-                  ? 'Agent call in existing child conversation completed successfully'
-                  : 'Agent call in existing child conversation failed'
+                status: success
+                  ? (turnStatus === 'waiting_for_tools'
+                      ? 'Delegated agent is awaiting tool approval'
+                      : 'Agent call in existing child conversation completed successfully')
+                  : 'Agent call in existing child conversation failed',
               };
             }
           `,
@@ -284,7 +294,7 @@ export const agentCallToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt' |
   blueprint: agentCallTool.blueprint,
 
   slug: 'call-agent',
-  version: '1.0.8',
+  version: '1.0.16',
   category: 'automation',
   exampleUsage:
     '{ "slug": "support-agent", "input": [{ "role": "user", "content": "Handle this request" }] } // delegate with messages\n{ "slug": "analyzer", "input": "Analyze this data in a child conversation" } // delegate with simple text',

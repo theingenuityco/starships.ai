@@ -11,7 +11,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useStarshipConversations, CONVERSATION_QUERY_KEYS } from '@/hooks/useConversations'
+import { useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversations, usePendingToolApprovalsMulti } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -27,6 +27,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
+import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -165,6 +166,32 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
   const storedConversationAgentId = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId]?.agentId : undefined))
+  const conversationAgentNameById = useStarshipUIStore(s => s.conversations)
+
+  // Child conversation approvals: if any child conversation is awaiting tool approval,
+  // show a compact callout above the parent composer.
+  const { data: childConversations = [] } = useChildConversations(currentConversationId, Boolean(currentConversationId))
+  const childConversationIds = useMemo(() => (Array.isArray(childConversations) ? childConversations.map((c: any) => String(c.id)).filter(Boolean) : []), [childConversations])
+  const { byConversationId: pendingApprovalsByChildId } = usePendingToolApprovalsMulti(childConversationIds, Boolean(currentConversationId && childConversationIds.length > 0))
+  const childWithPendingApproval = useMemo(() => {
+    if (!Array.isArray(childConversations) || childConversations.length === 0) return null
+    const withPending = childConversations
+      .map((c: any) => {
+        const id = String(c?.id || '')
+        const pending = (pendingApprovalsByChildId[id] || []) as any[]
+        const updatedAt = typeof c?.updatedAt === 'string' ? c.updatedAt : typeof c?.createdAt === 'string' ? c.createdAt : ''
+        const agentFromList = Array.isArray(c?.agents) && c.agents.length > 0 ? c.agents[0] : null
+        const agentName =
+          (agentFromList ? formatAgentDisplayName(agentFromList) : '') ||
+          (conversationAgentNameById && conversationAgentNameById[id]?.agentName ? String(conversationAgentNameById[id]?.agentName) : '') ||
+          'A child agent'
+        return { conversation: c, id, pendingCount: pending.length, updatedAt, agentName }
+      })
+      .filter(x => x.id && x.pendingCount > 0)
+    if (withPending.length === 0) return null
+    withPending.sort((a, b) => Date.parse(b.updatedAt || '0') - Date.parse(a.updatedAt || '0'))
+    return withPending[0]
+  }, [childConversations, pendingApprovalsByChildId, conversationAgentNameById])
 
   // Build suggestion cards from the selected agent's preview/example prompts
   const agentSuggestionCards = useMemo(() => {
@@ -637,9 +664,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
           case 'child_conversation_created': {
             try {
+              const parentId = String((payload as any)?.parentConversationId || '')
               const sid = (payload as any)?.starshipId || starshipId
               if (sid) {
                 queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
+              }
+              // We fetch children via the dedicated endpoint; invalidate it so the parent UI can
+              // pick up the newly created child without reload.
+              if (parentId) {
+                queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.children(parentId) })
               }
             } catch {}
             break
@@ -835,6 +868,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
 
               <div key="message-input">
+              {childWithPendingApproval && (
+                <ChildConversationApprovalCallout
+                  title={String((childWithPendingApproval as any)?.agentName || 'A child agent')}
+                  pendingCount={childWithPendingApproval.pendingCount}
+                  disabled={!starshipSlug}
+                  onOpenChildConversation={() => {
+                    if (!starshipSlug) return
+                    router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(childWithPendingApproval.id)}`)
+                  }}
+                />
+              )}
                 <ConversationMessageInput
                   key={inputKey}
                   ref={messageInputRef}
@@ -889,7 +933,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                             messageInputRef.current?.focusInput?.()
                           } catch {}
                         }}
-                        className="group flex w-full rounded-2xl bg-card/60 backdrop-blur-sm border border-border/50 shadow-md px-3 py-2.5 text-left transition-all duration-200 hover:bg-card/80 hover:border-primary/30 hover:shadow-lg hover:-translate-y-0.5"
+                        className="group flex w-full rounded-2xl bg-card/60 backdrop-blur-sm border border-border/50 shadow-sm px-3 py-2.5 text-left transition-all duration-200 hover:bg-card/80 hover:border-primary/30 hover:shadow-sm hover:-translate-y-0.5"
                       >
                         <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
                           <span className="mr-1 text-base align-top text-primary/70">“</span>

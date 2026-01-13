@@ -194,11 +194,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
       `Tell me the goal.`,
       `Give me a task.`,
       `Pick one thing to finish.`,
-      `What’s the next step?`,
-      `Let’s make progress.`,
-      `Let’s ship a quick win.`,
+      `What's the next step?`,
+      `Let's make progress.`,
+      `Let's ship a quick win.`,
       `What needs to get done?`,
       `Start with the outcome.`,
+      `What's on the agenda today?`,
+      `Ready when you are.`,
     ],
     [displayName]
   )
@@ -224,33 +226,27 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const stream = useConversationStreamContextOptional()
   const streamMessagesLen = Array.isArray((stream as any)?.messages) ? Number(((stream as any).messages as any[]).length) : 0
   const streamIsResponding = Boolean((stream as any)?.isResponding)
-  
+
   // Check if current conversation exists in the conversations list (existing conversation, not newly created)
   const isExistingConversation = useMemo(() => {
     if (!currentConversationId || !starshipConversationsData?.conversations) return false
     return starshipConversationsData.conversations.some(c => c.id === currentConversationId)
   }, [currentConversationId, starshipConversationsData])
-  
+
   // Show messages area if:
   // 1. We have a conversation ID AND
   // 2. (We initially had a conversation OR we've ever shown messages OR it's an existing conversation OR we have stream messages OR stream is responding)
   const shouldShowMessages = Boolean(
-    currentConversationId && (
-      initialHadConversationRef.current || 
-      hasEverShownMessagesRef.current || 
-      isExistingConversation || 
-      streamMessagesLen > 0 || 
-      streamIsResponding
-    )
+    currentConversationId && (initialHadConversationRef.current || hasEverShownMessagesRef.current || isExistingConversation || streamMessagesLen > 0 || streamIsResponding)
   )
-  
+
   // Track that we've shown messages area at least once
   useEffect(() => {
     if (shouldShowMessages) {
       hasEverShownMessagesRef.current = true
     }
   }, [shouldShowMessages])
-  
+
   const showMessagesArea = shouldShowMessages
 
   // Start docking immediately when messages area appears; allow welcome to fade concurrently
@@ -747,10 +743,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
     // Removed UI action channel consumption
 
-    return (
-      <>
-      </>
-    )
+    return <></>
   }
 
   // Removed overlay UI effects
@@ -826,8 +819,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           <div className={cn('w-full max-w-2xl mx-auto pointer-events-auto opacity-100 relative', !showMessagesArea && 'mt-16 sm:mt-24 lg:mt-40')} data-message-input>
             {/* Keep the input mounted across the welcome -> conversation transition to avoid losing focus. */}
             <div className={cn('mb-8 text-center opacity-100', showMessagesArea && 'hidden')} key="welcome-header">
-              <h1 className="text-3xl font-normal mb-2 text-foreground">{`Welcome to your starship, ${starshipName}`}</h1>
-              <p className="text-base text-muted-foreground">{starterSlogan}</p>
+              <h1 className="text-3xl font-normal mb-2 text-foreground">{starterSlogan}</h1>
             </div>
 
             <div className={cn('mb-6', (!shouldShowWelcomeCard || showMessagesArea) && 'hidden')} key="welcome-card">
@@ -837,18 +829,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             {/* Starter layout: Agent select, Message input, Suggested prompts — stable mount (use CSS to show/hide). */}
             <div className={cn('flex flex-col gap-6')} key="composer-stack">
               <div className={cn(showMessagesArea && 'hidden')} key="agent-selector">
-                <div className="mb-1">
-                  <p className="text-xs font-medium text-muted-foreground">Select an agent</p>
-                </div>
                 <div className="flex items-center justify-start gap-3">
                   <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={handleAgentChange as any} starshipId={starshipId} compact={false} />
                 </div>
               </div>
 
               <div key="message-input">
-                <div className={cn('mb-1', showMessagesArea && 'hidden')}>
-                  <p className="text-xs font-medium text-muted-foreground">and give instructions</p>
-                </div>
                 <ConversationMessageInput
                   key={inputKey}
                   ref={messageInputRef}
@@ -872,11 +858,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
 
               <div className={cn((showMessagesArea || agentSuggestionCards.length < 3) && 'hidden')} key="suggestions">
-                <div className="mb-1 flex items-center justify-between">
-                  <div className="text-left">
-                    <p className="text-xs font-medium text-muted-foreground">or select an example</p>
-                  </div>
-                  {agentSuggestionCards.length > 3 && (
+                <div className="mb-1 flex items-center justify-start">
+                  {agentSuggestionCards.length > 3 ? (
                     <button type="button" onClick={() => setShowAllSuggestions(v => !v)} className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline">
                       {showAllSuggestions ? (
                         <>
@@ -885,11 +868,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                         </>
                       ) : (
                         <>
-                          Explore all
+                          Example Prompts
                           <Icon name="chevron-down" className="h-3 w-3" />
                         </>
                       )}
                     </button>
+                  ) : (
+                    <p className="text-xs font-medium text-primary">Example Prompts</p>
                   )}
                 </div>
                 <ul className="space-y-3">
@@ -904,7 +889,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                             messageInputRef.current?.focusInput?.()
                           } catch {}
                         }}
-                        className="group flex w-full rounded-2xl bg-card border border-border/40 shadow-sm px-3 py-2 text-left transition-all duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md hover:-translate-y-1"
+                        className="group flex w-full rounded-2xl bg-card/60 backdrop-blur-sm border border-border/50 shadow-md px-3 py-2.5 text-left transition-all duration-200 hover:bg-card/80 hover:border-primary/30 hover:shadow-lg hover:-translate-y-0.5"
                       >
                         <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
                           <span className="mr-1 text-base align-top text-primary/70">“</span>

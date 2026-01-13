@@ -77,6 +77,8 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
         justifyContent: 'flex-start',
         transition: 'background-color 0.15s ease',
         cursor: 'pointer',
+        minHeight: '32px',
+        fontSize: '14px',
       }}
     >
       {StableIcon}
@@ -87,8 +89,8 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
-            className="whitespace-nowrap pointer-events-none text-[13px] font-medium"
-            style={{ marginLeft: '0.375rem' }}
+            className="whitespace-nowrap pointer-events-none font-medium"
+            style={{ fontSize: '14px', marginLeft: '0.375rem' }}
           >
             {label}
           </motion.span>

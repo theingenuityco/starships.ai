@@ -1,4 +1,8 @@
+'use client'
+
+import { useState } from 'react'
 import { Card } from '@/components/ui/card'
+import Icon from '@/components/primitives/Icon'
 
 const QA = [
   {
@@ -19,11 +23,11 @@ const QA = [
   },
   {
     q: 'Do I need to bring my own model keys?',
-    a: 'No. Starships is a managed service; you don’t bring your own model keys.',
+    a: "No. Starships is a managed service; you don't bring your own model keys.",
   },
   {
     q: 'Can my AI teammates use my tools and data?',
-    a: 'Yes. You can connect skills (tools) so teammates can take actions and fetch information, and you stay in control of what’s enabled in each workspace.',
+    a: "Yes. You can connect skills (tools) so teammates can take actions and fetch information, and you stay in control of what's enabled in each workspace.",
   },
   {
     q: 'How does Starships handle security and privacy?',
@@ -36,17 +40,33 @@ const QA = [
 ]
 
 export default function FAQ() {
+  const [openIndex, setOpenIndex] = useState<number | null>(null)
+
+  const toggle = (index: number) => {
+    setOpenIndex(openIndex === index ? null : index)
+  }
+
   return (
     <section className="py-14 px-4">
       <div className="max-w-6xl mx-auto">
         <h2 className="text-2xl sm:text-3xl md:text-4xl font-semibold mb-6 text-center">FAQs</h2>
         <div className="grid sm:grid-cols-2 gap-4">
-          {QA.map((item, i) => (
-            <Card key={i} className="p-5 bg-white/5 border-white/10">
-              <div className="font-medium mb-2">{item.q}</div>
-              <div className="text-sm text-muted-foreground">{item.a}</div>
-            </Card>
-          ))}
+          {QA.map((item, i) => {
+            const isOpen = openIndex === i
+            return (
+              <Card key={i} className="bg-white/5 border-white/10 overflow-hidden">
+                <button onClick={() => toggle(i)} className="w-full p-5 text-left hover:bg-white/5 transition-colors flex items-center justify-between gap-2">
+                  <span className="font-medium flex-1">{item.q}</span>
+                  <Icon name={isOpen ? 'chevron-down' : 'chevron-right'} className="w-4 h-4 text-muted-foreground flex-shrink-0 transition-transform" />
+                </button>
+                <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'}`}>
+                  <div className="px-5 pb-5 pt-0">
+                    <div className="text-sm text-muted-foreground">{item.a}</div>
+                  </div>
+                </div>
+              </Card>
+            )
+          })}
         </div>
       </div>
     </section>

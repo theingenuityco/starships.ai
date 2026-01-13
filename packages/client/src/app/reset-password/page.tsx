@@ -16,7 +16,7 @@ function ResetPasswordContent() {
 
   useEffect(() => {
     const tokenParam = searchParams?.get('token')
-    
+
     if (!tokenParam) {
       // No token provided, redirect to forgot password page
       router.push('/forgot-password')
@@ -44,30 +44,18 @@ function ResetPasswordContent() {
         {/* Full-screen background - same as login page */}
         <AuthMarketingPanel className="absolute inset-0" />
 
-        <div className="relative z-10 w-full max-w-md px-6">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} 
-            animate={{ opacity: 1, y: 0 }} 
-            transition={{ duration: 0.6 }} 
-            className="mb-8 text-center"
-          >
-            <motion.div 
-              initial={{ scale: 0.8 }} 
-              animate={{ scale: 1 }} 
-              transition={{ delay: 0.2, duration: 0.5 }} 
-              className="mb-6"
-            >
-              <h1 className="text-3xl font-bold text-primary">
-                New Password
-              </h1>
-              <p className="text-muted-foreground mt-2">
-                Choose a secure password for your account
-              </p>
+        {/* Centered Form */}
+        <div className="w-full flex items-center justify-center px-6 py-16 relative z-10">
+          <div className="w-full max-w-md">
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.6 }} className="mb-8 text-center">
+              <motion.div initial={{ scale: 0.8 }} animate={{ scale: 1 }} transition={{ delay: 0.2, duration: 0.5 }} className="mb-6">
+                <h1 className="text-3xl font-bold text-primary">New Password</h1>
+                <p className="text-muted-foreground mt-2">Choose a secure password for your account</p>
+              </motion.div>
             </motion.div>
-          </motion.div>
 
-          <ResetPasswordForm token={token} />
-
+            <ResetPasswordForm token={token} />
+          </div>
         </div>
       </div>
     </StarTheme>

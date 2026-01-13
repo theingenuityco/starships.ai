@@ -350,8 +350,8 @@ export function AgentSelector({ selectedAgent, onAgentSelect, showCreateButton =
                 agent={agent}
                 avatarUrl={avatarUrlById.get((agent as any).avatarAttachmentId)}
                 isGeneratingAvatar={generateAvatarMutation.isPending && generatingAvatarAgentId === agent.id}
-                onClick={() => onAgentSelect(agent)}
-                onChat={() => handleChatWithAgent(agent)}
+                onClick={() => handleChatWithAgent(agent)}
+                onChat={() => onAgentSelect(agent)}
                 onDelete={handleDeleteAgent}
                 onGenerateAvatar={async (a, options) => {
                   if (generateAvatarMutation.isPending) return

@@ -41,7 +41,7 @@ function CompactConversationAgents({ starshipId, agents }: { starshipId: string;
   if (!agents.length) return null
 
   return (
-    <div className="mt-0.5 flex items-center gap-1 text-[10px] text-muted-foreground group-hover:text-foreground">
+    <div className="mt-1 flex items-center gap-1 text-muted-foreground group-hover:text-foreground" style={{ fontSize: '12px' }}>
       {visibleAgents.map(agent => (
         <div key={agent.id} className="flex items-center gap-1 max-w-[6rem]">
           <Avatar className="h-3.5 w-3.5 ring-1 ring-border/40">
@@ -50,7 +50,11 @@ function CompactConversationAgents({ starshipId, agents }: { starshipId: string;
           <span className="truncate">{formatAgentDisplayName(agent)}</span>
         </div>
       ))}
-      {remaining > 0 && <span className="text-[10px] text-muted-foreground/70 group-hover:text-foreground/80">+{remaining}</span>}
+      {remaining > 0 && (
+        <span className="text-muted-foreground/70 group-hover:text-foreground/80" style={{ fontSize: '12px' }}>
+          +{remaining}
+        </span>
+      )}
     </div>
   )
 }
@@ -130,7 +134,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       <div
         key={conversation.id}
         className={cn(
-          'group flex items-center gap-1.5 py-1.5 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
+          'group flex items-center gap-1.5 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
           isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
         )}
         style={isChild ? { paddingLeft: '1.5rem' } : undefined}

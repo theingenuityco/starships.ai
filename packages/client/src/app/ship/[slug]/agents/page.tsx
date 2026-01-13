@@ -8,7 +8,7 @@ import { PageLayout } from '@/components/layout/PageLayout'
 import { AgentSelector } from '@/components/agents/AgentSelector'
 import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Badge } from '@/components/ui/badge'
-import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useStarshipBySlug, useStarshipAgents } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
 
@@ -17,6 +17,7 @@ export default function StarshipAgentsPage(): React.JSX.Element {
   const { slug } = useParams<{ slug: string }>()
   const { data: starship } = useStarshipBySlug(slug, true)
   const starshipId = starship?.id || ''
+  const { data: agents = [] } = useStarshipAgents(starshipId, !!starshipId)
   const [selectedAgent, setSelectedAgent] = useState<any>(null)
   const { isInstanceAdmin } = useAuth()
 
@@ -28,28 +29,10 @@ export default function StarshipAgentsPage(): React.JSX.Element {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="head-circuit" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Agents</h1>
-              </div>
-              <div className="flex items-center justify-center gap-2">
-                <Breadcrumb>
-                  <BreadcrumbList>
-                    <BreadcrumbItem>
-                      <BreadcrumbLink href={`/ship/${slug}/conversations`} className="font-mono">
-                        <Badge variant="outline" className="font-mono text-muted-foreground border-muted-foreground/30 hover:text-foreground">
-                          {slug}
-                        </Badge>
-                      </BreadcrumbLink>
-                    </BreadcrumbItem>
-                    <BreadcrumbSeparator />
-                    <BreadcrumbItem>
-                      <BreadcrumbPage>
-                        <Badge variant="outline" className="text-foreground">
-                          Agents
-                        </Badge>
-                      </BreadcrumbPage>
-                    </BreadcrumbItem>
-                  </BreadcrumbList>
-                </Breadcrumb>
+                <h1 className="text-2xl font-bold">My Agents</h1>
+                <Badge variant="outline" className="ml-2 text-base px-3 py-1">
+                  {agents.length}
+                </Badge>
               </div>
               <p className="text-muted-foreground mt-2">Manage and view all agents in this starship</p>
             </div>

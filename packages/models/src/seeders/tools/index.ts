@@ -18,6 +18,7 @@ export { toolTestToolTemplate } from './test-tool';
 export { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-node';
 export { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 export { agentListToolTemplate } from './list-agents';
+export { agentTemplateListToolTemplate } from './list-agents-from-marketplace';
 export { agentGetToolTemplate } from './get-agent';
 export { agentOpenToolTemplate } from './open-agent';
 export { agentEditToolTemplate } from './edit-agent';
@@ -45,6 +46,7 @@ import { toolTestToolTemplate } from './test-tool';
 import { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-node';
 import { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 import { agentListToolTemplate } from './list-agents';
+import { agentTemplateListToolTemplate } from './list-agents-from-marketplace';
 import { agentGetToolTemplate } from './get-agent';
 import { agentOpenToolTemplate } from './open-agent';
 import { agentEditToolTemplate } from './edit-agent';
@@ -72,6 +74,7 @@ export const ALL_TOOL_TEMPLATES = [
   toolModifyBlueprintNodeToolTemplate,
   toolModifyBlueprintEdgeToolTemplate,
   agentListToolTemplate,
+  agentTemplateListToolTemplate,
   agentGetToolTemplate,
   agentOpenToolTemplate,
   agentEditToolTemplate,

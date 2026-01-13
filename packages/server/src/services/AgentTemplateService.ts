@@ -1,5 +1,5 @@
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { AgentRepository, AgentTemplateRepository, ToolRepository, StarshipRepository } from '@starships/models';
+import { AgentRepository, AgentTemplateRepository, ToolRepository, ToolTemplateRepository, StarshipRepository } from '@starships/models';
 import type {
   AgentModel,
   AgentTemplateModel,
@@ -13,12 +13,14 @@ export class AgentTemplateService {
   private starshipRepository: StarshipRepository;
   private agentRepository: AgentRepository;
   private toolRepository: ToolRepository;
+  private toolTemplateRepository: ToolTemplateRepository;
 
   constructor() {
     this.templateRepository = new AgentTemplateRepository();
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
     this.toolRepository = new ToolRepository();
+    this.toolTemplateRepository = new ToolTemplateRepository();
   }
 
   /**
@@ -99,11 +101,21 @@ export class AgentTemplateService {
 
       for (const toolSlug of template.assignedToolSlugs) {
         try {
-          // Check if any tool from this template is already deployed to this starship
-          let existingTool = await this.toolRepository.findByTemplateSlugAndStarship(toolSlug, starshipId);
+          // `assignedToolSlugs` here comes from the junction table selecting `tool_templates.slug`,
+          // so this should be an EXACT template slug. Use a direct slug lookup and then operate by template id.
+          const toolTemplate = await this.toolTemplateRepository.findBySlug(toolSlug);
+          if (!toolTemplate) {
+            console.error(`[AGENT-TEMPLATE-SERVICE] Tool template not found for slug '${toolSlug}'`);
+            continue;
+          }
+
+          // Check if starship already has a tool from this template (by source_template_id).
+          // If it does, we reuse that deployed tool instance (and its slug).
+          let existingTool = await this.toolRepository.findByTemplateIdAndStarship(toolTemplate.id, starshipId);
+          
           if (!existingTool) {
-            // Deploy tool from template (slug will be suffixed for uniqueness)
-            existingTool = await this.toolRepository.createFromTemplate(toolSlug, starshipId);
+            // Create tool instance directly from template id
+            existingTool = await this.toolRepository.createFromTemplateId(toolTemplate.id, starshipId);
             console.log(`[AGENT-TEMPLATE-SERVICE] Deployed tool from template '${toolSlug}' to starship ${starshipId}`);
           } else {
             console.log(`[AGENT-TEMPLATE-SERVICE] Tool from template '${toolSlug}' already deployed to starship ${starshipId}`);

@@ -309,30 +309,42 @@ export class ToolRepository extends BaseRepository {
   }
 
   /**
-   * Find an existing tool for a starship that was created from a given tool template slug
+   * Find an existing tool for a starship that was created from a given tool template ID
    */
-  async findByTemplateSlugAndStarship(templateSlug: string, starshipId: string): Promise<ToolModel | null> {
+  async findByTemplateIdAndStarship(templateId: string, starshipId: string): Promise<ToolModel | null> {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-
-        // Resolve template id from slug
-        const template = await connection.queryOne<{ id: string }>('SELECT id FROM tool_templates WHERE slug = $1', [templateSlug]);
-
-        if (!template) {
-          return null;
-        }
-
         const result = await connection.queryOne<Record<string, unknown>>(
           'SELECT * FROM tools WHERE source_template_id = $1 AND starship_id = $2 ORDER BY created_at DESC LIMIT 1',
-          [template.id, starshipId]
+          [templateId, starshipId]
         );
 
         return result ? fromDatabase(ToolEntity, result) : null;
       },
+      'findByTemplateIdAndStarship',
+      'Tool',
+      `${templateId}@${starshipId}`
+    );
+  }
+
+  /**
+   * Find an existing tool for a starship that was created from a given tool template slug
+   */
+  async findByTemplateSlugAndStarship(templateSlugOrName: string, starshipId: string): Promise<ToolModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const templateRepository = new ToolTemplateRepository();
+        const templateId = await templateRepository.resolveTemplateIdForAssignedSlug(templateSlugOrName);
+        if (!templateId) {
+          return null;
+        }
+
+        return this.findByTemplateIdAndStarship(templateId, starshipId);
+      },
       'findByTemplateSlugAndStarship',
       'Tool',
-      `${templateSlug}@${starshipId}`
+      `${templateSlugOrName}@${starshipId}`
     );
   }
 
@@ -526,22 +538,17 @@ export class ToolRepository extends BaseRepository {
     );
   }
 
-  async createFromTemplate(templateSlug: string, starshipId: string, configuration?: Record<string, unknown>): Promise<ToolModel> {
+  /**
+   * Create a tool instance from a template id (preferred internal API).
+   */
+  async createFromTemplateId(templateId: string, starshipId: string, configuration?: Record<string, unknown>): Promise<ToolModel> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-
-        // Find the template
-        const templateResult = await connection.queryOne<Record<string, unknown>>('SELECT * FROM tool_templates WHERE slug = $1', [
-          templateSlug,
-        ]);
-
-        if (!templateResult) {
-          this.handleNotFound('ToolTemplate', templateSlug);
+        const templateRepository = new ToolTemplateRepository();
+        const template = await templateRepository.findById(templateId);
+        if (!template) {
+          this.handleNotFound('ToolTemplate', templateId);
         }
-
-        // Properly deserialize template data using ToolTemplateEntity
-        const template = fromDatabase(ToolTemplateEntity, templateResult);
 
         // Create tool from template
         const now = new Date().toISOString();
@@ -564,12 +571,37 @@ export class ToolRepository extends BaseRepository {
         const tool = await this.create(toolData, starshipId);
 
         // Record the template relationship and increment usage count
-        await connection.query('UPDATE tool_templates SET usage_count = usage_count + 1, updated_at = $2 WHERE slug = $1', [
-          templateSlug,
+        const connection = this.getConnection();
+        await connection.query('UPDATE tool_templates SET usage_count = usage_count + 1, updated_at = $2 WHERE id = $1', [
+          template.id,
           new Date().toISOString(),
         ]);
 
         return tool;
+      },
+      'createFromTemplateId',
+      'Tool'
+    );
+  }
+
+  /**
+   * Create a tool instance from a tool template slug-like identifier.
+   *
+   * Supports:
+   * - Exact template slugs (e.g. `edit-tool-igm5`)
+   * - Base slugs used by seeders/clients (e.g. `edit-tool`)
+   *
+   * This resolves the template id first, then creates the tool from that id.
+   */
+  async createFromTemplate(templateSlugOrBase: string, starshipId: string, configuration?: Record<string, unknown>): Promise<ToolModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const templateRepository = new ToolTemplateRepository();
+        const templateId = await templateRepository.resolveTemplateIdForAssignedSlug(templateSlugOrBase);
+        if (!templateId) {
+          this.handleNotFound('ToolTemplate', templateSlugOrBase);
+        }
+        return await this.createFromTemplateId(templateId, starshipId, configuration);
       },
       'createFromTemplate',
       'Tool'

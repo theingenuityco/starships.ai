@@ -680,7 +680,11 @@ export function ConversationMessageContent({
         const pSpacingClass = 'mb-2'
 
         // Tool calls are always expandable (no expert-mode gating).
-        const accentBorderClass = successFlag === false ? 'border-l-4 border-l-red-500' : isDone ? 'border-l-4 border-l-green-500' : ''
+        const toolQuoteClass = cn(
+          // Base quote container style (match Thought container)
+          'relative border-l-4 px-4 py-2 rounded-r-lg my-1',
+          !isDone ? 'border-amber-500/30 dark:border-amber-400/30 bg-amber-500/5 dark:bg-amber-400/5' : successFlag === false ? 'border-red-500/30 dark:border-red-400/30 bg-red-500/5 dark:bg-red-400/5' : 'border-emerald-500/30 dark:border-emerald-400/30 bg-emerald-500/5 dark:bg-emerald-400/5'
+        )
         return (
           <Collapsible key={`${toolCallId || idx}`} defaultOpen={false}>
             {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
@@ -691,80 +695,74 @@ export function ConversationMessageContent({
             </p>
             {/* Avoid typography/prose rules affecting the expanded card */}
             <CollapsibleContent className="not-prose">
-              <Card className={cn('border bg-muted/20', accentBorderClass)}>
-                <div className="flex items-center justify-between px-3 py-2 border-b gap-2">
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="text-xs text-muted-foreground flex-shrink-0">Tool</span>
-                    <span className="text-sm font-medium px-2 py-0.5 rounded bg-muted truncate">{toolDisplayName}</span>
-                    {toolSlug && toolDisplayName !== toolSlug ? (
-                      <span className="text-[10px] text-muted-foreground truncate" title={toolSlug}>
-                        ({toolSlug})
-                      </span>
-                    ) : null}
-                    {/* ID removed from header */}
-                  </div>
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => {
-                        // Build a single payload that includes function, id, arguments and (optional) result
-                        let argsParsed: any
-                        if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                          argsParsed = rawArgsAny
-                        } else {
-                          try {
-                            argsParsed = JSON.parse(String(rawArgsAny))
-                          } catch {
-                            // Fallback to the prettified string for non-JSON args
-                            argsParsed = prettyArgs
-                          }
+              <blockquote className={toolQuoteClass}>
+                <div className="absolute top-2 right-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => {
+                      // Build a single payload that includes function, id, arguments and (optional) result
+                      let argsParsed: any
+                      if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                        argsParsed = rawArgsAny
+                      } else {
+                        try {
+                          argsParsed = JSON.parse(String(rawArgsAny))
+                        } catch {
+                          // Fallback to the prettified string for non-JSON args
+                          argsParsed = prettyArgs
                         }
+                      }
 
-                        let resultParsed: any = undefined
-                        if (matchingResult) {
-                          const resultContent = (() => {
-                            const raw = matchingResult.content ?? matchingResult.result ?? ''
-                            if (typeof raw === 'string') return raw
-                            try {
-                              return JSON.stringify(raw)
-                            } catch {
-                              return String(raw)
-                            }
-                          })()
+                      let resultParsed: any = undefined
+                      if (matchingResult) {
+                        const resultContent = (() => {
+                          const raw = matchingResult.content ?? matchingResult.result ?? ''
+                          if (typeof raw === 'string') return raw
                           try {
-                            const t = (resultContent || '').trim()
-                            if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                              resultParsed = JSON.parse(t)
-                            } else {
-                              resultParsed = resultContent
-                            }
+                            return JSON.stringify(raw)
                           } catch {
+                            return String(raw)
+                          }
+                        })()
+                        try {
+                          const t = (resultContent || '').trim()
+                          if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                            resultParsed = JSON.parse(t)
+                          } else {
                             resultParsed = resultContent
                           }
+                        } catch {
+                          resultParsed = resultContent
                         }
+                      }
 
-                        const payload: any = {
-                          function: toolSlug || undefined,
-                          id: toolCallId || undefined,
-                          arguments: argsParsed,
-                          ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
-                        }
+                      const payload: any = {
+                        function: toolSlug || undefined,
+                        id: toolCallId || undefined,
+                        arguments: argsParsed,
+                        ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
+                      }
 
-                        handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
-                      }}
-                    >
-                      {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-                    </Button>
-                  </div>
+                      handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
+                    }}
+                  >
+                    {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
+                  </Button>
                 </div>
 
-                <div>
+                {/* Match Thought quote content sizing + color */}
+                <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
+                  <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
+                    <code>{toolSlug || 'unknown'}</code>
+                  </pre>
+
                   {hasArgs && (
                     <>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground px-3 pt-2">Arguments</div>
-                      <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
+                      <pre className="mt-1 whitespace-pre-wrap break-words">
                         <code>{prettyArgs}</code>
                       </pre>
                     </>
@@ -772,14 +770,8 @@ export function ConversationMessageContent({
 
                   {matchingResult && (
                     <>
-                      <div className="border-t border-border/50" />
-                      <div className="flex items-center justify-between px-3 pt-2">
-                        <div className="text-[10px] uppercase tracking-wide text-green-700 dark:text-green-300 font-medium flex items-center gap-2">
-                          <Icon name="check" className="w-3 h-3" />
-                          Result
-                        </div>
-                      </div>
-                      <pre className="text-xs p-3 pt-1 overflow-x-auto">
+                      <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
+                      <pre className="mt-1 whitespace-pre-wrap break-words">
                         <code>
                           {(() => {
                             const resultContent = (() => {
@@ -804,7 +796,7 @@ export function ConversationMessageContent({
                     </>
                   )}
                 </div>
-              </Card>
+              </blockquote>
             </CollapsibleContent>
           </Collapsible>
         )

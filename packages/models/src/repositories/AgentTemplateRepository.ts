@@ -12,6 +12,54 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Resolve a template slug to an existing row, tolerating legacy vs new slug formats.
+   *
+   * Why:
+   * - Template slugs are now generated with an always-on random suffix (e.g. `data-analyst-3ie8`).
+   * - Older databases / seeded rows may still have the "base" slug (e.g. `data-analyst`).
+   * - Some callers may pass either form; this resolver makes lookups robust.
+   *
+   * Behavior (in order):
+   * - Prefer exact match on the incoming slug
+   * - If incoming slug has a random suffix, also try the base slug (strip `-[a-z0-9]{4}`)
+   * - If still not found, try `${base}-<suffix>` pattern match for the base slug
+   */
+  private async resolveTemplateRowBySlug(slug: string): Promise<Record<string, unknown> | null> {
+    const raw = String(slug || '').trim();
+    if (!raw) return null;
+
+    const normalized = generateSlug(raw);
+    if (!normalized) return null;
+
+    // If the incoming slug already has a random suffix, try the base form too.
+    const suffixMatch = normalized.match(/^(.*?)-([a-z0-9]{4})$/);
+    const base = suffixMatch?.[1] ? suffixMatch[1] : normalized;
+
+    // Escape for Postgres regex usage (defensive; base is already slugified).
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+    const baseRegex = `^${escapeRegex(base)}-[a-z0-9]{4}$`;
+
+    const connection = this.getConnection();
+
+    // We keep the query simple and deterministic:
+    // - exact input wins
+    // - exact base wins next (legacy rows)
+    // - otherwise pick the newest matching suffixed slug
+    const row = await connection.queryOne<Record<string, unknown>>(
+      `
+        SELECT *
+        FROM agent_templates
+        WHERE slug = $1 OR slug = $2 OR slug ~ $3
+        ORDER BY (slug = $1) DESC, (slug = $2) DESC, created_at DESC
+        LIMIT 1
+      `,
+      [normalized, base, baseRegex]
+    );
+
+    return row ?? null;
+  }
+
+  /**
    * Resolve a tool template id from an assignedToolSlugs entry.
    *
    * Why:
@@ -238,11 +286,10 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('Slug is required for findInternalBySlug operation');
         }
 
-        const connection = this.getConnection();
-        const row = await connection.queryOne<{ id: string }>('SELECT id FROM agent_templates WHERE slug = $1', [slug]);
-        if (!row?.id) return null;
-
-        return await this.findInternalById(row.id);
+        const resolved = await this.resolveTemplateRowBySlug(slug);
+        const id = resolved && typeof resolved['id'] === 'string' ? (resolved['id'] as string) : undefined;
+        if (!id) return null;
+        return await this.findInternalById(id);
       },
       'findInternalBySlug',
       'AgentTemplate',
@@ -451,8 +498,7 @@ export class AgentTemplateRepository extends BaseRepository {
           throw new Error('Slug is required for findBySlug operation');
         }
 
-        const connection = this.getConnection();
-        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM agent_templates WHERE slug = $1', [slug]);
+        const result = await this.resolveTemplateRowBySlug(slug);
         if (!result) return null;
         const template = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
         return this.toPublicModel(template);

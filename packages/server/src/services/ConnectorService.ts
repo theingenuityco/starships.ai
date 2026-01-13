@@ -701,11 +701,6 @@ export class ConnectorService {
    * Disconnect a provider for a starship and clean up related env vars.
    */
   async disconnect(starshipId: string, provider: ConnectorProvider) {
-    const template = await this.connectorTemplateRepository.findByProvider(provider);
-    if (!template) {
-      throw new Error(`Connector template not found for provider: ${provider}`);
-    }
-
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
     if (!existing) {
       // Nothing else to do
@@ -715,22 +710,8 @@ export class ConnectorService {
     // Remove env vars managed by this connector (connector_id linkage).
     await this.connectorSecretRepository.deleteByConnectorId(existing.id);
 
-    let newMetadata = existing.metadata || {};
-
-    // For GitHub, also clear per-starship GitHub App configuration stored in metadata.
-    if (provider === 'github') {
-      const current = (newMetadata || {}) as Record<string, unknown>;
-      delete current.githubInstallationId;
-      delete current.defaultOwner;
-      delete current.defaultRepo;
-      newMetadata = current;
-    }
-
-    await this.connectorRepository.update(existing.id, {
-      status: 'disconnected',
-      metadata: newMetadata,
-      lastError: null,
-    });
+    // Remove the connector record itself. (Revocation can be added later.)
+    await this.connectorRepository.delete(existing.id);
 
     return true;
   }

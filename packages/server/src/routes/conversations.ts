@@ -707,10 +707,22 @@ router.post(
       const agentRepo = new AgentRepository();
       const permCacheKey = `${conversation.starshipId}:${agentId}:${toolSlug}`;
       const cachedPerm = getCachedPermission(permCacheKey);
-      const permission =
+      // NOTE: We keep a small in-memory cache for hot tool-call loops, but permissions can be
+      // changed out-of-band by the UI (e.g. "Always allow"). If we blindly trust a cached
+      // 'ask'/'deny' value, we can incorrectly prompt again for a tool the user just allowed.
+      //
+      // So:
+      // - Cache misses → read from DB and cache.
+      // - Cache hits for 'allow' → trust (fast path).
+      // - Cache hits for 'ask'/'deny' → re-check DB to pick up recent changes, then update cache.
+      let permission =
         cachedPerm !== undefined ? cachedPerm : await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
       if (cachedPerm === undefined) {
         setCachedPermission(permCacheKey, permission);
+      } else if (cachedPerm === 'ask' || cachedPerm === 'deny') {
+        const fresh = await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+        permission = fresh;
+        setCachedPermission(permCacheKey, fresh);
       }
       if (!permission) {
         sendError(res, 'FORBIDDEN', 'Tool is not assigned to agent', 200, { agentId, toolSlug, toolCallId });
@@ -731,6 +743,77 @@ router.post(
         }
 
         const approvals = new ToolCallApprovalRepository();
+        // Idempotency: tool-call loops may retry the same toolCallId.
+        // If an approval already exists, honor its status rather than creating a duplicate.
+        const existing = await approvals.findByConversationAndToolCallId(conversationId, toolCallId).catch(() => null);
+        if (existing) {
+          // Starship/agent guardrails: approvals are scoped to a starship + conversation.
+          if (existing.starshipId !== conversation.starshipId) {
+            sendError(res, 'FORBIDDEN', 'Tool approval does not belong to this starship', 200, {
+              approvalId: existing.id,
+              agentId,
+              toolSlug,
+              toolCallId,
+            });
+            return;
+          }
+          if (existing.agentId !== agentId) {
+            sendError(res, 'FORBIDDEN', 'Tool approval does not belong to this agent', 200, {
+              approvalId: existing.id,
+              agentId,
+              toolSlug,
+              toolCallId,
+            });
+            return;
+          }
+
+          if (existing.status === 'pending') {
+            sendError(res, 'TOOL_APPROVAL_REQUIRED', 'Tool requires approval', 200, {
+              approvalId: existing.id,
+              agentId,
+              toolSlug,
+              toolCallId,
+            });
+            return;
+          }
+
+          if (existing.status === 'denied' || existing.status === 'expired') {
+            // NOTE: This error is consumed by the agent tool-loop wrapper; keep as a distinct code.
+            // Some build setups may not pick up newly added protocol union members immediately, so cast defensively.
+            sendError(res, 'TOOL_APPROVAL_DENIED' as unknown as StandardErrorCode, 'Tool approval denied', 200, {
+              approvalId: existing.id,
+              agentId,
+              toolSlug,
+              toolCallId,
+            });
+            return;
+          }
+
+          // status === 'approved' → execute tool using the approved tool_id + args_json
+          const toolById = await toolRepo.findById(existing.toolId);
+          if (!toolById || toolById.starshipId !== conversation.starshipId) {
+            sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 200, { toolSlug, toolCallId, toolId: existing.toolId });
+            return;
+          }
+          if (toolById.status === 'draft' || !toolById.blueprint) {
+            sendError(res, 'VALIDATION_ERROR', 'Tool is not ready for execution', 200, { toolSlug, toolCallId, toolId: existing.toolId });
+            return;
+          }
+
+          const runtimeEnv = buildAutopilotRuntimeEnv({ starshipId: conversation.starshipId, conversationId, agentId });
+          const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
+          const result = await executeToolBlueprint({
+            blueprint: toolById.blueprint,
+            toolConfig: (toolById.configuration || {}) as Record<string, unknown>,
+            toolArgs: existing.argsJson || {},
+            runnerConfig: engineConfig,
+          });
+
+          sendSuccess(res, { toolCallId, result }, 200);
+          return;
+        }
+
+        // First time we see this ask-first toolCallId: create the approval + notify UI.
         let approvalId: string;
         try {
           const approval = await approvals.createPending({
@@ -855,21 +938,8 @@ router.post(
         return;
       }
 
-      // Execute tool (server-side) and update the placeholder tool message
-      const toolRepo = new ToolRepository();
-      const tool = await toolRepo.findById(approval.toolId);
-      if (tool && tool.starshipId !== conversation.starshipId) {
-        sendError(res, 'FORBIDDEN', 'Tool approval tool does not belong to this starship', 403, { toolId: approval.toolId });
-        return;
-      }
-      if (!tool || tool.status === 'draft' || !tool.blueprint) {
-        sendError(res, 'VALIDATION_ERROR', 'Tool is not available for execution', 400, { toolId: approval.toolId });
-        return;
-      }
-
-      // Mark approved ONLY after all preflight checks pass, so we can't end up with
-      // status='approved' for a request that never had a chance to execute.
-      // Also ensure only one concurrent request proceeds to execution.
+      // Mark approved (idempotent). Tool execution happens inside the agent tool-call loop
+      // when the conversation is resumed, which preserves correct multi-tool-call ordering.
       const { approval: decided, updated } = await approvals.markApprovedIfPending(approvalId);
       if (!updated) {
         // Another request already decided this approval (approved/denied). Do not execute twice.
@@ -877,53 +947,8 @@ router.post(
         return;
       }
 
-      const runtimeEnv = buildAutopilotRuntimeEnv({
-        starshipId: conversation.starshipId,
-        conversationId,
-        agentId: approval.agentId,
-      });
-      const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
-
-      const result = await executeToolBlueprint({
-        blueprint: tool.blueprint,
-        toolConfig: (tool.configuration || {}) as Record<string, unknown>,
-        toolArgs: approval.argsJson || {},
-        runnerConfig: engineConfig,
-      });
-
-      const messageService = new MessageService();
-      const content = JSON.stringify({
-        success: true,
-        data: { result, approvalId, toolId: approval.toolId, toolCallId: approval.toolCallId },
-      });
-
-      // Do NOT persist any interim tool result before approval; this message is the first persisted tool result for this call.
-      // Persist into the current DB-backed turn so ordering remains stable across refreshes and subsequent turns.
-      const latestTurn = await new TurnRepository().findLatestByConversationId(conversationId);
-      const turnId = latestTurn?.id ? String(latestTurn.id) : '';
-      const turnSeq = turnId ? (await messageService.getMaxTurnSeq(turnId)) + 1 : 0;
-      const created = turnId
-        ? await messageService.upsertMessageByTurnSlot({
-            conversationId,
-            turnId,
-            turnSeq: Math.max(0, turnSeq),
-            role: 'tool',
-            content,
-            messageType: 'tool_result',
-            toolCallId: approval.toolCallId,
-          })
-        : await messageService.createMessage({
-            conversationId,
-            role: 'tool',
-            content,
-            messageType: 'tool_result',
-            toolCallId: approval.toolCallId,
-          });
-
-      // Best-effort broadcast: update last message (after client supports replace for non-assistant)
       try {
         const bus = ConversationStreamBus.getInstance();
-        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: created } });
         await bus.publish(conversationId, {
           type: 'ui_action',
           data: {
@@ -1080,40 +1105,8 @@ router.post(
 
       await approvals.markDenied(approvalId);
 
-      const messageService = new MessageService();
-      const content = JSON.stringify({
-        success: false,
-        error: {
-          code: 'TOOL_APPROVAL_DENIED',
-          message: 'Tool approval denied',
-          details: { approvalId, toolId: approval.toolId, toolCallId: approval.toolCallId },
-        },
-      });
-
-      const latestTurn = await new TurnRepository().findLatestByConversationId(conversationId);
-      const turnId = latestTurn?.id ? String(latestTurn.id) : '';
-      const turnSeq = turnId ? (await messageService.getMaxTurnSeq(turnId)) + 1 : 0;
-      const created = turnId
-        ? await messageService.upsertMessageByTurnSlot({
-            conversationId,
-            turnId,
-            turnSeq: Math.max(0, turnSeq),
-            role: 'tool',
-            content,
-            messageType: 'tool_result',
-            toolCallId: approval.toolCallId,
-          })
-        : await messageService.createMessage({
-            conversationId,
-            role: 'tool',
-            content,
-            messageType: 'tool_result',
-            toolCallId: approval.toolCallId,
-          });
-
       try {
         const bus = ConversationStreamBus.getInstance();
-        await bus.publish(conversationId, { type: 'message.append', data: { conversationId, message: created } });
         await bus.publish(conversationId, {
           type: 'ui_action',
           data: {

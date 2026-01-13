@@ -88,16 +88,13 @@ export const agentTemplateListTool: ToolParams = {
 
               // Return a lean summary with public fields only
               return data.map((template) => ({
-                id: template && template.id,
                 slug: template && template.slug,
                 name: template && template.name,
                 description: template && template.description,
                 category: template && template.category,
                 role: template && template.role,
                 version: template && template.version,
-                icon: template && template.icon,
                 previewPrompts: template && template.previewPrompts,
-                usageCount: template && template.usageCount,
               }));
             }
           `,

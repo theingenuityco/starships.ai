@@ -800,20 +800,19 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const streamId = `stream-${msgTurnId}`
         const idx = messages.findIndex(m => m.id === streamId)
         if (idx !== -1) {
-          const hasToolCalls = Array.isArray((msg as any)?.toolCalls) && (msg as any).toolCalls.length > 0
-          const hasContent = typeof msg.content === 'string' && msg.content.trim().length > 0
-          const willReplaceStreamPlaceholder = !(hasToolCalls && !hasContent)
-
           // IMPORTANT:
-          // During a turn with tool calls, the server can append an assistant "tool-call message"
-          // (toolCalls present, content often empty) while *still* streaming deltas into `stream-<turnId>`.
-          // If we replace the stream placeholder with the tool-call message, subsequent deltas no longer
-          // find `stream-<turnId>` and we recreate shells → duplicated/out-of-order chunks until the final append.
-          if (willReplaceStreamPlaceholder) {
-            messages[idx] = withStreaming(msg, false)
-            return messages
-          }
-          // Keep the stream placeholder; allow this tool-call message to be appended separately below.
+          // We always replace the stream placeholder when the server appends a persisted assistant message
+          // for this turn (including tool-call-only messages with empty content).
+          //
+          // Why:
+          // - Tool-call assistant messages can include `reasoning` while `content` is empty.
+          //   If we keep the placeholder AND append the persisted tool-call message, the UI renders
+          //   the same reasoning twice (once on the placeholder, once on the persisted message).
+          // - After a persisted assistant message is appended, any subsequent assistant output in the same
+          //   turn will resume streaming into `stream-<turnId>`; if we've replaced it, the next delta will
+          //   simply create a fresh `stream-<turnId>` shell (see assistant.delta reducer), which is fine.
+          messages[idx] = withStreaming(msg, false)
+          return messages
         }
 
         // Check if there's already an assistant message with the same turnId

@@ -10,7 +10,7 @@ import type {
   MessageModel,
   ToolCallApprovalModel,
 } from '@starships/protocol'
-import { experimental_streamedQuery as streamedQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { experimental_streamedQuery as streamedQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
@@ -84,6 +84,7 @@ export const CONVERSATION_QUERY_KEYS = {
   lists: () => [...CONVERSATION_QUERY_KEYS.all, 'list'] as const,
   byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (id: string) => [...CONVERSATION_QUERY_KEYS.all, 'detail', id] as const,
+  children: (parentConversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children'] as const,
   messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
   toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
@@ -140,6 +141,22 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
   })
 }
 
+export function useChildConversations(parentConversationId: string | null, enabled: boolean = true) {
+  return useQuery({
+    queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.children(parentConversationId) : (['__noop__'] as const),
+    enabled: Boolean(parentConversationId && enabled),
+    queryFn: async (): Promise<Array<ConversationModel & { agents: AgentModel[] }>> => {
+      const id = String(parentConversationId || '')
+      if (!id) return []
+      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(`/api/v1/conversations/${id}/children`)
+      return response.data.data || []
+    },
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 10_000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+    refetchOnWindowFocus: true,
+  })
+}
+
 /**
  * Pending ask-first tool approvals for a conversation.
  *
@@ -159,6 +176,49 @@ export function usePendingToolApprovals(conversationId: string | null, enabled: 
     gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000, // No cache in dev
     refetchOnWindowFocus: true,
   })
+}
+
+/**
+ * Pending ask-first tool approvals for multiple conversations (e.g. child conversations).
+ *
+ * Returns a stable map keyed by conversationId.
+ */
+export function usePendingToolApprovalsMulti(conversationIds: string[], enabled: boolean = true) {
+  const ids = Array.isArray(conversationIds) ? conversationIds.filter(Boolean).map(String) : []
+  const uniqueIds = useMemo(() => Array.from(new Set(ids)), [ids.join('|')])
+
+  const results = useQueries({
+    queries: uniqueIds.map(conversationId => ({
+      queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(conversationId),
+      enabled: Boolean(enabled && conversationId),
+      queryFn: async (): Promise<PendingToolCallApproval[]> => {
+        const response: FetchResponse<ApiResponse<PendingToolCallApproval[]>> = await api.get(`/api/v1/conversations/${conversationId}/tool-approvals/pending`)
+        return response.data.data || []
+      },
+      staleTime: process.env.NODE_ENV === 'development' ? 0 : 5_000,
+      gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+      refetchOnWindowFocus: true,
+      // Keep parent UI in sync with child approvals without requiring reload.
+      // Child conversations publish tool-approval UI actions on their own stream, not the parent’s.
+      // So the parent must poll these lightweight endpoints while it’s open.
+      refetchInterval: enabled ? 2_000 : false,
+      refetchIntervalInBackground: true,
+    })),
+  })
+
+  const byConversationId = useMemo(() => {
+    const map: Record<string, PendingToolCallApproval[]> = {}
+    uniqueIds.forEach((id, idx) => {
+      map[id] = (results[idx]?.data as PendingToolCallApproval[] | undefined) || []
+    })
+    return map
+  }, [results, uniqueIds.join('|')])
+
+  const isLoading = results.some(r => r.isLoading)
+  const isFetching = results.some(r => r.fetchStatus === 'fetching')
+  const isError = results.some(r => r.isError)
+
+  return { byConversationId, isLoading, isFetching, isError }
 }
 
 // Delete conversation
@@ -1023,7 +1083,25 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const chunksLen = Array.isArray(chunks) ? chunks.length : 0
   const lastChunk = chunksLen > 0 ? chunks[chunksLen - 1] : null
   const lastChunkSig = lastChunk?.type ? String(lastChunk.type) : 'none'
-  const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
+  // IMPORTANT:
+  // This key intentionally avoids depending on the entire `chunks` array for perf,
+  // but it MUST be unique across conversation switches to avoid stale memoization
+  // (which can surface as "mixed" messages when navigating between conversations).
+  const lastChunkDataSig = (() => {
+    const c: any = lastChunk as any
+    if (!c) return ''
+    const d: any = c?.data
+    if (d?.turnId) return String(d.turnId)
+    if (d?.messageId) return String(d.messageId)
+    if (d?.message?.id) return String(d.message.id)
+    if (d?.at) return String(d.at)
+    if (c?.type === 'snapshot') {
+      if (d?.turn?.turnId) return String(d.turn.turnId)
+      if (d?.turn?.status) return String(d.turn.status)
+    }
+    return ''
+  })()
+  const chunksRevisionKey = `${conversationId ?? 'none'}|${chunksLen}|${lastChunkSig}|${lastChunkDataSig}`
 
   // Queue for message.append chunks that are delayed due to animation
   const queuedAppendChunksRef = useRef<StreamedChunk[]>([])
@@ -1032,6 +1110,18 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastComputedMessagesRef = useRef<ClientMessage[]>([])
   // Track how many filteredChunks we've processed in computedMessages (separate from processedChunksRef!)
   const lastReducedChunkCountRef = useRef<number>(0)
+
+  // CRITICAL: Reset all cross-render refs when switching conversations.
+  //
+  // Without this, queued `message.append` chunks from conversation A (held back by animation gating)
+  // can be appended into conversation B when the gating condition later resolves, which manifests as
+  // "mixed messages from a different conversation/agent" after navigation.
+  useEffect(() => {
+    queuedAppendChunksRef.current = []
+    processedChunksRef.current = []
+    lastComputedMessagesRef.current = []
+    lastReducedChunkCountRef.current = 0
+  }, [conversationId])
 
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {

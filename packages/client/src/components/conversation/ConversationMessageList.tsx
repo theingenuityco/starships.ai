@@ -22,6 +22,7 @@ import { staggerContainer, staggerItem } from '@/lib/animations'
 import { toast } from 'sonner'
 import { tableToMarkdown } from '@/components/markdown/markdownComponents'
 import { isAnimationComplete } from '@/hooks/useMessageAnimationState'
+import { TypingDots } from '@/components/ui/TypingDots'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -742,13 +743,12 @@ export function ConversationMessageList({
           {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 w-full">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                  <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
-                </div>
+                {/* No avatar for typing indicator; keep spacer for alignment */}
+                <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                    <LoadingSpinner className="w-4 h-4 text-muted-foreground" />
-                    <span>{(agentName || 'Agent') + ' is typing...'}</span>
+                    <TypingDots />
+                    <span className="text-sm leading-relaxed">Typing...</span>
                   </div>
                 </div>
               </div>

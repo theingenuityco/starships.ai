@@ -1436,6 +1436,48 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
 });
 
 /**
+ * GET /conversations/:conversationId/children - Get child conversations for a parent
+ *
+ * Used by the client to detect pending tool approvals in child conversations after reload,
+ * without relying on paginated starship conversation lists.
+ */
+router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+
+    const { conversationId } = paramValidation;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+      return;
+    }
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+
+    // IMPORTANT:
+    // Do NOT rely on paginated starship conversation lists here; this endpoint must work on reload
+    // even when the child conversation is not in the first page.
+    //
+    // Also IMPORTANT:
+    // Keep this implemented purely in the server package so it does not depend on freshly-built
+    // `@starships/models` dist typings.
+    const all = await conversationService.getConversationsByStarshipWithAgents(conversation.starshipId);
+    const children = (all ?? []).filter((c) => c.parentConversationId === conversationId);
+    sendSuccess(res, children, 200);
+  } catch (error) {
+    handleError(error, res, 'fetching child conversations');
+  }
+});
+
+/**
  * GET /starships/:starshipId/conversations - Get conversations by starship
  */
 router.get('/starships/:starshipId/conversations', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

@@ -74,6 +74,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
+        starshipSlug: primaryStarship.slug,
       })
       onDeploy?.(template)
       onOpenChange(false)

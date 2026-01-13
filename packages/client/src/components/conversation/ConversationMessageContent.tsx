@@ -701,106 +701,106 @@ export function ConversationMessageContent({
             <CollapsibleContent className="not-prose">
               <div className="pb-2">
                 <blockquote className={toolQuoteClass}>
-                <div className="absolute top-2 right-2">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-6 w-6"
-                    onClick={() => {
-                      // Build a single payload that includes function, id, arguments and (optional) result
-                      let argsParsed: any
-                      if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                        argsParsed = rawArgsAny
-                      } else {
-                        try {
-                          argsParsed = JSON.parse(String(rawArgsAny))
-                        } catch {
-                          // Fallback to the prettified string for non-JSON args
-                          argsParsed = prettyArgs
-                        }
-                      }
-
-                      let resultParsed: any = undefined
-                      if (matchingResult) {
-                        const resultContent = (() => {
-                          const raw = matchingResult.content ?? matchingResult.result ?? ''
-                          if (typeof raw === 'string') return raw
+                  <div className="absolute top-2 right-2">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-6 w-6"
+                      onClick={() => {
+                        // Build a single payload that includes function, id, arguments and (optional) result
+                        let argsParsed: any
+                        if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
+                          argsParsed = rawArgsAny
+                        } else {
                           try {
-                            return JSON.stringify(raw)
+                            argsParsed = JSON.parse(String(rawArgsAny))
                           } catch {
-                            return String(raw)
+                            // Fallback to the prettified string for non-JSON args
+                            argsParsed = prettyArgs
                           }
-                        })()
-                        try {
-                          const t = (resultContent || '').trim()
-                          if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                            resultParsed = JSON.parse(t)
-                          } else {
+                        }
+
+                        let resultParsed: any = undefined
+                        if (matchingResult) {
+                          const resultContent = (() => {
+                            const raw = matchingResult.content ?? matchingResult.result ?? ''
+                            if (typeof raw === 'string') return raw
+                            try {
+                              return JSON.stringify(raw)
+                            } catch {
+                              return String(raw)
+                            }
+                          })()
+                          try {
+                            const t = (resultContent || '').trim()
+                            if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                              resultParsed = JSON.parse(t)
+                            } else {
+                              resultParsed = resultContent
+                            }
+                          } catch {
                             resultParsed = resultContent
                           }
-                        } catch {
-                          resultParsed = resultContent
                         }
-                      }
 
-                      const payload: any = {
-                        function: toolSlug || undefined,
-                        id: toolCallId || undefined,
-                        arguments: argsParsed,
-                        ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
-                      }
+                        const payload: any = {
+                          function: toolSlug || undefined,
+                          id: toolCallId || undefined,
+                          arguments: argsParsed,
+                          ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
+                        }
 
-                      handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
-                    }}
-                  >
-                    {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-                  </Button>
-                </div>
+                        handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
+                      }}
+                    >
+                      {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
+                    </Button>
+                  </div>
 
-                {/* Match Thought quote content sizing + color */}
-                <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                  <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
-                  <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
-                    <code>{toolSlug || 'unknown'}</code>
-                  </pre>
+                  {/* Match Thought quote content sizing + color */}
+                  <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
+                    <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
+                      <code>{toolSlug || 'unknown'}</code>
+                    </pre>
 
-                  {hasArgs && (
-                    <>
-                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
-                      <pre className="mt-1 whitespace-pre-wrap break-words">
-                        <code>{prettyArgs}</code>
-                      </pre>
-                    </>
-                  )}
+                    {hasArgs && (
+                      <>
+                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
+                        <pre className="mt-1 whitespace-pre-wrap break-words">
+                          <code>{prettyArgs}</code>
+                        </pre>
+                      </>
+                    )}
 
-                  {matchingResult && (
-                    <>
-                      <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
-                      <pre className="mt-1 whitespace-pre-wrap break-words">
-                        <code>
-                          {(() => {
-                            const resultContent = (() => {
-                              const raw = matchingResult.content ?? matchingResult.result ?? ''
-                              if (typeof raw === 'string') return raw
+                    {matchingResult && (
+                      <>
+                        <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
+                        <pre className="mt-1 whitespace-pre-wrap break-words">
+                          <code>
+                            {(() => {
+                              const resultContent = (() => {
+                                const raw = matchingResult.content ?? matchingResult.result ?? ''
+                                if (typeof raw === 'string') return raw
+                                try {
+                                  return JSON.stringify(raw, null, 2)
+                                } catch {
+                                  return String(raw)
+                                }
+                              })()
                               try {
-                                return JSON.stringify(raw, null, 2)
-                              } catch {
-                                return String(raw)
-                              }
-                            })()
-                            try {
-                              const t = (resultContent || '').trim()
-                              if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                return JSON.stringify(JSON.parse(t), null, 2)
-                              }
-                            } catch {}
-                            return resultContent
-                          })()}
-                        </code>
-                      </pre>
-                    </>
-                  )}
-                </div>
+                                const t = (resultContent || '').trim()
+                                if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                  return JSON.stringify(JSON.parse(t), null, 2)
+                                }
+                              } catch {}
+                              return resultContent
+                            })()}
+                          </code>
+                        </pre>
+                      </>
+                    )}
+                  </div>
                 </blockquote>
               </div>
             </CollapsibleContent>

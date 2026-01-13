@@ -1,7 +1,5 @@
 'use client'
 
-import Icon from '@/components/primitives/Icon'
-
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
@@ -81,7 +79,6 @@ const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTrigge
       {...props}
     >
       <div className="flex items-center gap-2">
-        {isOpen ? <Icon name="chevron-down" className="w-4 h-4 text-muted-foreground" /> : <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground" />}
         {children}
       </div>
     </button>

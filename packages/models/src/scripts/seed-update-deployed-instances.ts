@@ -8,6 +8,7 @@
  * - Only updates instances that have a sourceTemplateId (template-based instances)
  * - Compares current instance version with template version using semver
  * - Only updates when template has a newer version
+ * - Update order: agents first, then tools attached to those agents (deduped per starship)
  * - Can target specific starships or all starships
  * - Safe to run multiple times (idempotent)
  */
@@ -48,57 +49,122 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
   const agentTemplateRepo = new AgentTemplateRepository();
   const toolTemplateRepo = new ToolTemplateRepository();
 
-  // Process agents
+  // Process agents first, then update tools attached to those agents.
+  // This ensures agent template sync (including tool relationship changes) happens before tool updates.
+  const seenToolIds = new Set<string>();
+
   try {
     const agents = await agentRepo.findByStarship(starshipId);
     const templateAgents = agents.filter((agent) => agent.sourceTemplateId);
-
     stats.agentsChecked = templateAgents.length;
 
-    for (const agent of templateAgents) {
+    // Traverse all agents (template-based or not) so tool updates follow actual relationships.
+    for (const agent of agents) {
       try {
-        if (!agent.sourceTemplateId) continue;
+        // Only update agent when template version is newer (template.version > agent.version).
+        if (agent.sourceTemplateId) {
+          const template = await agentTemplateRepo.findById(agent.sourceTemplateId);
+          if (!template) {
+            logger.warn(`Agent template not found for agent ${agent.id} (sourceTemplateId: ${agent.sourceTemplateId})`);
+          } else {
+            let comparison: number;
+            try {
+              comparison = compareVersions(String(agent.version ?? ''), String(template.version ?? ''));
+            } catch (e) {
+              stats.agentErrors++;
+              logger.warn(
+                `Skipping agent "${agent.name}" (${agent.slug}) due to invalid version(s): agent=${String(agent.version)} template=${String(
+                  template.version
+                )}`,
+                {
+                  component: 'seed-update-deployed-instances',
+                  operation: 'compareAgentVersion',
+                  metadata: { agentId: agent.id, templateId: agent.sourceTemplateId, starshipId, starshipSlug },
+                },
+                e as Error
+              );
+              comparison = 0;
+            }
 
-        // Fetch the template to compare versions
-        const template = await agentTemplateRepo.findById(agent.sourceTemplateId);
-
-        if (!template) {
-          logger.warn(`Agent template not found for agent ${agent.id} (sourceTemplateId: ${agent.sourceTemplateId})`);
-          continue;
+            if (comparison < 0) {
+              logger.info(
+                `Updating agent "${agent.name}" (${agent.slug}) from v${agent.version} to v${template.version} in starship ${starshipSlug}`
+              );
+              await agentRepo.updateFromTemplate(agent.id);
+              stats.agentsUpdated++;
+              logger.info(`✅ Agent "${agent.name}" updated successfully to v${template.version}`);
+            } else if (comparison === 0) {
+              logger.debug(`Agent "${agent.name}" (${agent.slug}) is already up-to-date (v${agent.version})`);
+            } else {
+              logger.warn(
+                `Agent "${agent.name}" (${agent.slug}) version (v${agent.version}) is newer than template (v${template.version})`
+              );
+            }
+          }
         }
 
-        // Compare versions - only update if template is newer
-        let comparison: number;
-        try {
-          comparison = compareVersions(String(agent.version ?? ''), String(template.version ?? ''));
-        } catch (e) {
-          stats.agentErrors++;
-          logger.warn(
-            `Skipping agent "${agent.name}" (${agent.slug}) due to invalid version(s): agent=${String(agent.version)} template=${String(template.version)}`,
-            {
-              component: 'seed-update-deployed-instances',
-              operation: 'compareAgentVersion',
-              metadata: { agentId: agent.id, templateId: agent.sourceTemplateId, starshipId, starshipSlug },
-            },
-            e as Error
-          );
-          continue;
-        }
+        // After potential agent update, refresh tool relationships and update attached tools.
+        // We only process tools currently attached to this agent (post-sync) and dedupe across agents.
+        const attachedTools = await agentRepo.getAgentToolsByRelationships(agent.id);
+        for (const tool of attachedTools) {
+          try {
+            if (!tool.sourceTemplateId) continue;
+            if (seenToolIds.has(tool.id)) continue;
+            seenToolIds.add(tool.id);
 
-        if (comparison < 0) {
-          // Agent version is older than template version - update needed
-          logger.info(
-            `Updating agent "${agent.name}" (${agent.slug}) from v${agent.version} to v${template.version} in starship ${starshipSlug}`
-          );
+            stats.toolsChecked++;
 
-          await agentRepo.updateFromTemplate(agent.id);
-          stats.agentsUpdated++;
+            const toolTemplate = await toolTemplateRepo.findById(tool.sourceTemplateId);
+            if (!toolTemplate) {
+              logger.warn(`Tool template not found for tool ${tool.id} (sourceTemplateId: ${tool.sourceTemplateId})`);
+              continue;
+            }
 
-          logger.info(`✅ Agent "${agent.name}" updated successfully to v${template.version}`);
-        } else if (comparison === 0) {
-          logger.debug(`Agent "${agent.name}" (${agent.slug}) is already up-to-date (v${agent.version})`);
-        } else {
-          logger.warn(`Agent "${agent.name}" (${agent.slug}) version (v${agent.version}) is newer than template (v${template.version})`);
+            let toolComparison: number;
+            try {
+              toolComparison = compareVersions(String(tool.version ?? ''), String(toolTemplate.version ?? ''));
+            } catch (e) {
+              stats.toolErrors++;
+              logger.warn(
+                `Skipping tool "${tool.name}" (${tool.slug}) due to invalid version(s): tool=${String(tool.version)} template=${String(
+                  toolTemplate.version
+                )}`,
+                {
+                  component: 'seed-update-deployed-instances',
+                  operation: 'compareToolVersion',
+                  metadata: { toolId: tool.id, templateId: tool.sourceTemplateId, starshipId, starshipSlug },
+                },
+                e as Error
+              );
+              continue;
+            }
+
+            if (toolComparison < 0) {
+              logger.info(
+                `Updating tool "${tool.name}" (${tool.slug}) from v${tool.version} to v${toolTemplate.version} in starship ${starshipSlug}`
+              );
+              await toolRepo.updateFromTemplate(tool.id);
+              stats.toolsUpdated++;
+              logger.info(`✅ Tool "${tool.name}" updated successfully to v${toolTemplate.version}`);
+            } else if (toolComparison === 0) {
+              logger.debug(`Tool "${tool.name}" (${tool.slug}) is already up-to-date (v${tool.version})`);
+            } else {
+              logger.warn(
+                `Tool "${tool.name}" (${tool.slug}) version (v${tool.version}) is newer than template (v${toolTemplate.version})`
+              );
+            }
+          } catch (error) {
+            stats.toolErrors++;
+            logger.warn(
+              `Failed to update tool ${tool.name} (${tool.id})`,
+              {
+                component: 'seed-update-deployed-instances',
+                operation: 'updateToolFromAgentScan',
+                metadata: { toolId: tool.id, starshipId, starshipSlug, agentId: agent.id },
+              },
+              error as Error
+            );
+          }
         }
       } catch (error) {
         stats.agentErrors++;
@@ -117,79 +183,6 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
     logger.error(
       `Failed to process agents for starship ${starshipSlug}`,
       { component: 'seed-update-deployed-instances', operation: 'processAgents' },
-      error as Error
-    );
-  }
-
-  // Process tools
-  try {
-    const tools = await toolRepo.findByStarship(starshipId);
-    const templateTools = tools.filter((tool) => tool.sourceTemplateId);
-
-    stats.toolsChecked = templateTools.length;
-
-    for (const tool of templateTools) {
-      try {
-        if (!tool.sourceTemplateId) continue;
-
-        // Fetch the template to compare versions
-        const template = await toolTemplateRepo.findById(tool.sourceTemplateId);
-
-        if (!template) {
-          logger.warn(`Tool template not found for tool ${tool.id} (sourceTemplateId: ${tool.sourceTemplateId})`);
-          continue;
-        }
-
-        // Compare versions - only update if template is newer
-        let comparison: number;
-        try {
-          comparison = compareVersions(String(tool.version ?? ''), String(template.version ?? ''));
-        } catch (e) {
-          stats.toolErrors++;
-          logger.warn(
-            `Skipping tool "${tool.name}" (${tool.slug}) due to invalid version(s): tool=${String(tool.version)} template=${String(template.version)}`,
-            {
-              component: 'seed-update-deployed-instances',
-              operation: 'compareToolVersion',
-              metadata: { toolId: tool.id, templateId: tool.sourceTemplateId, starshipId, starshipSlug },
-            },
-            e as Error
-          );
-          continue;
-        }
-
-        if (comparison < 0) {
-          // Tool version is older than template version - update needed
-          logger.info(
-            `Updating tool "${tool.name}" (${tool.slug}) from v${tool.version} to v${template.version} in starship ${starshipSlug}`
-          );
-
-          await toolRepo.updateFromTemplate(tool.id);
-          stats.toolsUpdated++;
-
-          logger.info(`✅ Tool "${tool.name}" updated successfully to v${template.version}`);
-        } else if (comparison === 0) {
-          logger.debug(`Tool "${tool.name}" (${tool.slug}) is already up-to-date (v${tool.version})`);
-        } else {
-          logger.warn(`Tool "${tool.name}" (${tool.slug}) version (v${tool.version}) is newer than template (v${template.version})`);
-        }
-      } catch (error) {
-        stats.toolErrors++;
-        logger.warn(
-          `Failed to update tool ${tool.name} (${tool.id})`,
-          {
-            component: 'seed-update-deployed-instances',
-            operation: 'updateTool',
-            metadata: { toolId: tool.id, starshipId, starshipSlug },
-          },
-          error as Error
-        );
-      }
-    }
-  } catch (error) {
-    logger.error(
-      `Failed to process tools for starship ${starshipSlug}`,
-      { component: 'seed-update-deployed-instances', operation: 'processTools' },
       error as Error
     );
   }

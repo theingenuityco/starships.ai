@@ -400,6 +400,32 @@ export class Agent implements NodeHandler {
       parameters: {},
     });
 
+    // -------------------------------------------------------------------------
+    // Resume support: if a previous run paused mid-batch awaiting a tool approval,
+    // the server persists execution.state into conversation.state (excluding messages/tools).
+    //
+    // That persisted state includes:
+    // - pendingToolCalls: ToolCall[]
+    // - pendingToolCallIndex: number
+    //
+    // On resume, we MUST NOT call the LLM again (it would re-emit tool calls and/or
+    // diverge from the original batch). Instead, jump directly into the tool loop.
+    // -------------------------------------------------------------------------
+    const startConditionalRef = builder.addNode({
+      type: 'conditional',
+      name: 'Start / Resume Tool Calls',
+      description: 'If pendingToolCalls exist, resume tool loop; otherwise call LLM',
+      parameters: {
+        condition: `{{(() => {
+          const pending = Array.isArray(state?.pendingToolCalls) ? state.pendingToolCalls : [];
+          const rawIdx = state?.pendingToolCallIndex;
+          const idx = Number.isFinite(Number(rawIdx)) ? Number(rawIdx) : 0;
+          if (pending.length > 0 && idx >= 0 && idx < pending.length) return "resume_tools";
+          return "llm";
+        })()}}`,
+      },
+    });
+
     builder.addNode({
       type: 'llm',
       name: 'AI Assistant',
@@ -646,7 +672,9 @@ export class Agent implements NodeHandler {
 
     return (
       builder
-        .addEdge(startRef, llmNodeRef)
+        .addEdge(startRef, startConditionalRef)
+        .addEdge(startConditionalRef, llmNodeRef, 'llm')
+        .addEdge(startConditionalRef, toolLoopConditionalRef, 'resume_tools')
         .addEdge(llmNodeRef, conditionalNodeRef)
         .addEdge(conditionalNodeRef, llmNodeRef, 'continue')
         .addEdge(conditionalNodeRef, initToolCallsNodeRef, 'init_tool_calls')

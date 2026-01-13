@@ -55,7 +55,7 @@ const TabsList = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     ref={ref}
     className={cn(
       // Card-like surface to match /agents deployed agent cards
-      'inline-flex min-h-8 items-center justify-center rounded-lg bg-card border border-border/40 p-0 text-muted-foreground shadow-sm',
+      'inline-flex min-h-8 items-center justify-center rounded-lg bg-card border border-border/40 p-1 text-muted-foreground shadow-sm',
       className
     )}
     {...props}
@@ -75,6 +75,9 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ cla
 
   const isActive = context.value === value
 
+  // Check if className includes padding classes - if so, don't apply full-width/full-height
+  const hasCustomPadding = className?.includes('px-') || className?.includes('py-') || className?.includes('p-')
+
   return (
     <button
       ref={ref}
@@ -82,7 +85,9 @@ const TabsTrigger = React.forwardRef<HTMLButtonElement, TabsTriggerProps>(({ cla
         // Make triggers behave like navigation list items (hover + selected)
         'inline-flex items-center justify-center whitespace-nowrap text-[13px] font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50',
         isActive
-          ? 'text-primary bg-primary/10 h-full w-full rounded-lg'
+          ? hasCustomPadding
+            ? 'text-primary bg-primary/10 rounded-lg'
+            : 'text-primary bg-primary/10 h-full w-full rounded-lg'
           : 'text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg px-2.5 py-1',
         className
       )}

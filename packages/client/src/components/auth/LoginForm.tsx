@@ -291,7 +291,7 @@ export function LoginForm({
               setFormError(null) // Clear form errors when switching tabs
             }}
           >
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 p-0">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Sign Up</TabsTrigger>
             </TabsList>

@@ -1078,7 +1078,25 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const chunksLen = Array.isArray(chunks) ? chunks.length : 0
   const lastChunk = chunksLen > 0 ? chunks[chunksLen - 1] : null
   const lastChunkSig = lastChunk?.type ? String(lastChunk.type) : 'none'
-  const chunksRevisionKey = `${chunksLen}|${lastChunkSig}`
+  // IMPORTANT:
+  // This key intentionally avoids depending on the entire `chunks` array for perf,
+  // but it MUST be unique across conversation switches to avoid stale memoization
+  // (which can surface as "mixed" messages when navigating between conversations).
+  const lastChunkDataSig = (() => {
+    const c: any = lastChunk as any
+    if (!c) return ''
+    const d: any = c?.data
+    if (d?.turnId) return String(d.turnId)
+    if (d?.messageId) return String(d.messageId)
+    if (d?.message?.id) return String(d.message.id)
+    if (d?.at) return String(d.at)
+    if (c?.type === 'snapshot') {
+      if (d?.turn?.turnId) return String(d.turn.turnId)
+      if (d?.turn?.status) return String(d.turn.status)
+    }
+    return ''
+  })()
+  const chunksRevisionKey = `${conversationId ?? 'none'}|${chunksLen}|${lastChunkSig}|${lastChunkDataSig}`
 
   // Queue for message.append chunks that are delayed due to animation
   const queuedAppendChunksRef = useRef<StreamedChunk[]>([])
@@ -1087,6 +1105,18 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastComputedMessagesRef = useRef<ClientMessage[]>([])
   // Track how many filteredChunks we've processed in computedMessages (separate from processedChunksRef!)
   const lastReducedChunkCountRef = useRef<number>(0)
+
+  // CRITICAL: Reset all cross-render refs when switching conversations.
+  //
+  // Without this, queued `message.append` chunks from conversation A (held back by animation gating)
+  // can be appended into conversation B when the gating condition later resolves, which manifests as
+  // "mixed messages from a different conversation/agent" after navigation.
+  useEffect(() => {
+    queuedAppendChunksRef.current = []
+    processedChunksRef.current = []
+    lastComputedMessagesRef.current = []
+    lastReducedChunkCountRef.current = 0
+  }, [conversationId])
 
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {

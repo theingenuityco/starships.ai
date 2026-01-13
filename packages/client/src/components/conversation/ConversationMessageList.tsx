@@ -743,13 +743,12 @@ export function ConversationMessageList({
           {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 w-full">
-                <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                  <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
-                </div>
+                {/* No avatar for typing indicator; keep spacer for alignment */}
+                <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                    <TypingDots />
                     <span className="text-sm leading-relaxed">Typing</span>
+                    <TypingDots />
                   </div>
                 </div>
               </div>

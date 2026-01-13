@@ -10,6 +10,28 @@ export class ToolCallApprovalRepository extends BaseRepository {
     super('ToolCallApprovalRepository');
   }
 
+  async findByConversationAndToolCallId(conversationId: string, toolCallId: string): Promise<ToolCallApprovalModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const res = await connection.queryWithResult(
+          `
+          SELECT *
+          FROM tool_call_approvals
+          WHERE conversation_id = $1 AND tool_call_id = $2
+          LIMIT 1
+          `,
+          [conversationId, toolCallId]
+        );
+        const row = res.rows?.[0] as Record<string, unknown> | undefined;
+        return row ? fromDatabase(ToolCallApprovalEntity, row) : null;
+      },
+      'findByConversationAndToolCallId',
+      'ToolCallApproval',
+      `${conversationId}:${toolCallId}`
+    );
+  }
+
   async createPending(input: {
     starshipId: string;
     conversationId: string;

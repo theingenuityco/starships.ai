@@ -101,6 +101,7 @@ export type StandardErrorCode =
   | 'OAUTH_ACCOUNT_LINKING_FAILED'
   // Tool approval (agent tool permissions)
   | 'TOOL_APPROVAL_REQUIRED'
+  | 'TOOL_APPROVAL_DENIED'
   // Promo specific
   | 'PROMO_CODE_INVALID'
   | 'PROMO_CODE_EXPIRED'

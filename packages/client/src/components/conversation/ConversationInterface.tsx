@@ -664,9 +664,15 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
           case 'child_conversation_created': {
             try {
+              const parentId = String((payload as any)?.parentConversationId || '')
               const sid = (payload as any)?.starshipId || starshipId
               if (sid) {
                 queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
+              }
+              // We fetch children via the dedicated endpoint; invalidate it so the parent UI can
+              // pick up the newly created child without reload.
+              if (parentId) {
+                queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.children(parentId) })
               }
             } catch {}
             break
@@ -927,7 +933,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                             messageInputRef.current?.focusInput?.()
                           } catch {}
                         }}
-                        className="group flex w-full rounded-2xl bg-card/60 backdrop-blur-sm border border-border/50 shadow-md px-3 py-2.5 text-left transition-all duration-200 hover:bg-card/80 hover:border-primary/30 hover:shadow-lg hover:-translate-y-0.5"
+                        className="group flex w-full rounded-2xl bg-card/60 backdrop-blur-sm border border-border/50 shadow-sm px-3 py-2.5 text-left transition-all duration-200 hover:bg-card/80 hover:border-primary/30 hover:shadow-sm hover:-translate-y-0.5"
                       >
                         <p className="text-sm leading-relaxed text-foreground/95 group-hover:text-foreground break-words">
                           <span className="mr-1 text-base align-top text-primary/70">“</span>

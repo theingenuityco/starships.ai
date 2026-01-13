@@ -198,6 +198,11 @@ export function usePendingToolApprovalsMulti(conversationIds: string[], enabled:
       staleTime: process.env.NODE_ENV === 'development' ? 0 : 5_000,
       gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
       refetchOnWindowFocus: true,
+      // Keep parent UI in sync with child approvals without requiring reload.
+      // Child conversations publish tool-approval UI actions on their own stream, not the parent’s.
+      // So the parent must poll these lightweight endpoints while it’s open.
+      refetchInterval: enabled ? 2_000 : false,
+      refetchIntervalInBackground: true,
     })),
   })
 

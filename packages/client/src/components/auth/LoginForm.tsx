@@ -291,7 +291,7 @@ export function LoginForm({
               setFormError(null) // Clear form errors when switching tabs
             }}
           >
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2 p-0">
               <TabsTrigger value="login">Sign In</TabsTrigger>
               <TabsTrigger value="register">Sign Up</TabsTrigger>
             </TabsList>
@@ -379,7 +379,7 @@ export function LoginForm({
                   <Link
                     href="/forgot-password"
                     onClick={() => track({ type: 'auth_forgot_password_clicked' })}
-                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors mt-8 block"
                   >
                     Forgot your password?
                   </Link>

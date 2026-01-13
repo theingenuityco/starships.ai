@@ -73,8 +73,7 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
 
     // If both search + category are provided, filter search results client-side.
     // (We keep the service signature stable; repository can still do DB-level filtering later.)
-    const allTemplates =
-      searchQuery && category ? baseTemplates.filter((t) => t?.category === category) : baseTemplates;
+    const allTemplates = searchQuery && category ? baseTemplates.filter((t) => t?.category === category) : baseTemplates;
 
     // Apply pagination
     const startIndex = (page - 1) * limit;
@@ -95,15 +94,11 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
 
     // Only creators can see sensitive fields. Everyone else gets the public-stripped model.
     const creatorIdsByTemplateId =
-      requesterUserId && templateIds.length > 0
-        ? await repo.getCreatorUserIdsByTemplateIds(templateIds)
-        : new Map<string, string>();
+      requesterUserId && templateIds.length > 0 ? await repo.getCreatorUserIdsByTemplateIds(templateIds) : new Map<string, string>();
 
     // Batch-load internals only for templates that belong to the requester.
     const creatorTemplateIds =
-      requesterUserId && templateIds.length > 0
-        ? templateIds.filter((id) => creatorIdsByTemplateId.get(id) === requesterUserId)
-        : [];
+      requesterUserId && templateIds.length > 0 ? templateIds.filter((id) => creatorIdsByTemplateId.get(id) === requesterUserId) : [];
     const internalsByTemplateId =
       creatorTemplateIds.length > 0
         ? await repo.findInternalByIds(creatorTemplateIds)

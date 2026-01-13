@@ -1072,29 +1072,6 @@ export class AgentRepository extends BaseRepository {
             }
           }
           
-          // Add missing tools
-          for (const toolSlug of requiredToolSlugs) {
-            if (!currentToolsByTemplateSlug.has(toolSlug)) {
-              try {
-                // Check if tool is already deployed to this starship
-                let deployedTool = await toolRepo.findByTemplateSlugAndStarship(toolSlug, agent.starshipId);
-                
-                if (!deployedTool) {
-                  // Deploy tool from template to starship
-                  deployedTool = await toolRepo.createFromTemplate(toolSlug, agent.starshipId);
-                  console.log(`[AgentRepository] Deployed tool '${toolSlug}' to starship ${agent.starshipId} during agent update`);
-                }
-                
-                // Link tool to agent
-                await this.addToolRelationship(agentId, deployedTool.id);
-                console.log(`[AgentRepository] Linked tool '${toolSlug}' to agent ${agentId} during template sync`);
-              } catch (error) {
-                console.error(`[AgentRepository] Failed to deploy/link tool '${toolSlug}' during agent update:`, error);
-                // Continue with other tools instead of failing completely
-              }
-            }
-          }
-          
           // Remove tools that are no longer in the template (only template-sourced tools)
           const toolsToRemove: Array<{ slug: string; id: string }> = [];
           for (const [templateSlug, toolId] of currentToolsByTemplateSlug.entries()) {
@@ -1120,15 +1097,21 @@ export class AgentRepository extends BaseRepository {
                     `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
                   );
                 } else if (agentCount === 1) {
-                  // This is the only agent using this tool
-                  await this.removeToolRelationship(agentId, toolId);
-                  console.log(
-                    `[AgentRepository] Removed tool '${templateSlug}' from agent ${agentId} (no longer in template). ` +
-                    `Tool is now unused in starship but kept for potential manual reuse.`
-                  );
-                  // Note: We keep the tool in the starship even if unused.
-                  // Admins can manually delete unused tools if desired.
-                  // This prevents accidental deletion of tools that might have custom configuration.
+                  // This is the only agent using this tool. Since it is no longer in the template,
+                  // remove it entirely from the starship (deletes the agent_tools join row via cascade).
+                  const deleted = await toolRepo.delete(toolId);
+                  if (deleted) {
+                    console.log(
+                      `[AgentRepository] Deleted tool '${templateSlug}' (${toolId}) from starship ${agent.starshipId} ` +
+                      `because it was no longer in template and had no other agent users`
+                    );
+                  } else {
+                    // Defensive: if delete reports false, fall back to just unlinking.
+                    await this.removeToolRelationship(agentId, toolId);
+                    console.warn(
+                      `[AgentRepository] Failed to delete tool '${templateSlug}' (${toolId}); unlinked from agent ${agentId} instead`
+                    );
+                  }
                 } else {
                   // agentCount is 0 or unexpected - tool might not be linked
                   console.warn(
@@ -1141,8 +1124,32 @@ export class AgentRepository extends BaseRepository {
               }
             }
           }
+
+          // Add missing tools (after cleanup so we don't temporarily over-assign tools)
+          for (const toolSlug of requiredToolSlugs) {
+            if (!currentToolsByTemplateSlug.has(toolSlug)) {
+              try {
+                // Check if tool is already deployed to this starship
+                let deployedTool = await toolRepo.findByTemplateSlugAndStarship(toolSlug, agent.starshipId);
+
+                if (!deployedTool) {
+                  // Deploy tool from template to starship
+                  deployedTool = await toolRepo.createFromTemplate(toolSlug, agent.starshipId);
+                  console.log(`[AgentRepository] Deployed tool '${toolSlug}' to starship ${agent.starshipId} during agent update`);
+                }
+
+                // Link tool to agent
+                await this.addToolRelationship(agentId, deployedTool.id);
+                console.log(`[AgentRepository] Linked tool '${toolSlug}' to agent ${agentId} during template sync`);
+              } catch (error) {
+                console.error(`[AgentRepository] Failed to deploy/link tool '${toolSlug}' during agent update:`, error);
+                // Continue with other tools instead of failing completely
+              }
+            }
+          }
         } else {
           // Template has no assigned tools - remove all template-sourced tools from agent
+          const toolRepo = new ToolRepository();
           const currentTools = await this.getAgentTools(agentId, agent.starshipId);
           const templateSourcedTools = currentTools.filter(t => t.sourceTemplateId);
           
@@ -1162,11 +1169,21 @@ export class AgentRepository extends BaseRepository {
                     `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
                   );
                 } else if (agentCount === 1) {
-                  await this.removeToolRelationship(agentId, tool.id);
-                  console.log(
-                    `[AgentRepository] Removed template-sourced tool '${tool.name}' from agent ${agentId} (template has no tools). ` +
-                    `Tool is now unused in starship but kept for potential manual reuse.`
-                  );
+                  // This is the only agent using this template-sourced tool. Since the template has no tools,
+                  // remove it entirely from the starship (deletes the agent_tools join row via cascade).
+                  const deleted = await toolRepo.delete(tool.id);
+                  if (deleted) {
+                    console.log(
+                      `[AgentRepository] Deleted template-sourced tool '${tool.name}' (${tool.id}) from starship ${agent.starshipId} ` +
+                      `because template has no tools and it had no other agent users`
+                    );
+                  } else {
+                    // Defensive: if delete reports false, fall back to just unlinking.
+                    await this.removeToolRelationship(agentId, tool.id);
+                    console.warn(
+                      `[AgentRepository] Failed to delete template-sourced tool '${tool.name}' (${tool.id}); unlinked from agent ${agentId} instead`
+                    );
+                  }
                 } else {
                   console.warn(
                     `[AgentRepository] Tool '${tool.name}' (${tool.id}) has unexpected agent count: ${agentCount}`

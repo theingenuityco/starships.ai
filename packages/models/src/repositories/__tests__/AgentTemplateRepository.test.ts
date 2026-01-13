@@ -222,7 +222,10 @@ describe('AgentTemplateRepository', () => {
         slug: 'test-template',
         name: 'Test Template',
       });
-      expect(mockConnection.queryOne).toHaveBeenCalledWith('SELECT * FROM agent_templates WHERE slug = $1', ['test-template']);
+      expect(mockConnection.queryOne).toHaveBeenCalledWith(
+        expect.stringContaining('WHERE slug = $1 OR slug = $2 OR slug ~ $3'),
+        ['test-template', 'test-template', '^test\\-template-[a-z0-9]{4}$']
+      );
     });
 
     it('should return null when template not found by slug', async () => {

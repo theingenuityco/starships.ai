@@ -105,13 +105,7 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
           </div>
 
           {canCollapseTools ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground"
-              onClick={() => setIsToolsExpanded(v => !v)}
-            >
+            <Button type="button" variant="ghost" size="sm" className="h-8 px-2 text-xs text-muted-foreground hover:text-foreground" onClick={() => setIsToolsExpanded(v => !v)}>
               {isToolsExpanded ? 'Show fewer tools' : `Show all ${toolSlugs.length} tools`}
               <Icon name="chevron-down" className={`w-3.5 h-3.5 ml-1 transition-transform ${isToolsExpanded ? 'rotate-180' : ''}`} />
             </Button>

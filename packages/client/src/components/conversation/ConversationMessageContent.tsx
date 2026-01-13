@@ -597,8 +597,7 @@ export function ConversationMessageContent({
   const hasFinalTextNow = typeof content === 'string' && content.trim().length > 0
   const hasToolCallsNow = Array.isArray(toolCalls) && toolCalls.length > 0
   const openReasoning = Boolean(isStreaming && displayReasoningFull && displayReasoningFull.trim().length > 0 && !(hasTextChunksNow || hasFinalTextNow || hasToolCallsNow))
-  const agentLabel = agentName && agentName.trim().length > 0 ? agentName : 'Agent'
-  const reasoningHeaderLabel = isStreaming && openReasoning ? `${agentLabel} is thinking` : `${agentLabel} had a thought`
+  const reasoningHeaderLabel = isStreaming && openReasoning ? 'Thinking...' : 'Thought'
 
   const parsedJson = useMemo<unknown | null>(() => {
     try {
@@ -1059,8 +1058,10 @@ export function ConversationMessageContent({
           {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
             <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              {isStreaming && openReasoning ? <Icon name="loading" className="w-3 h-3 animate-spin" /> : <Icon name="message-circle-more" className="w-3 h-3" />}
-              <span>{reasoningHeaderLabel}</span>
+              <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+                {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
+                <span className="truncate">{reasoningHeaderLabel}</span>
+              </span>
             </CollapsibleTrigger>
             <CollapsibleContent>
               <blockquote className="border-l-4 border-primary/20 px-4 py-2 bg-muted/20 rounded-r-lg my-1">

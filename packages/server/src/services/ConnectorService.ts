@@ -218,15 +218,14 @@ export class ConnectorService {
     const templates = await this.connectorTemplateRepository.list();
     return templates
       .filter((tpl) => tpl.isEnabled !== false)
-      .map(
-        (tpl): ConnectorCatalogItem => {
-          const authType = ((tpl.authJson as unknown as { type?: string })?.type || 'none') as ConnectorCatalogItem['auth']['type'];
-          return {
-            provider: tpl.provider as ConnectorProvider,
-            name: tpl.name,
-            description: tpl.description,
-            auth: { type: authType },
-            ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
+      .map((tpl): ConnectorCatalogItem => {
+        const authType = ((tpl.authJson as unknown as { type?: string })?.type || 'none') as ConnectorCatalogItem['auth']['type'];
+        return {
+          provider: tpl.provider as ConnectorProvider,
+          name: tpl.name,
+          description: tpl.description,
+          auth: { type: authType },
+          ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
             ? {
                 oauthRequiredMetadataKeys: Array.from(
                   new Set([
@@ -237,9 +236,8 @@ export class ConnectorService {
                 metadataSchema: tpl.metadataSchemaJson ?? undefined,
               }
             : {}),
-          };
-        }
-      );
+        };
+      });
   }
 
   /**
@@ -647,12 +645,7 @@ export class ConnectorService {
    *
    * Stores username/password into connector_secrets based on template SecretRefs.
    */
-  async connectWithBasicAuth(
-    starshipId: string,
-    provider: ConnectorProvider,
-    payload: ConnectWithBasicAuthRequest,
-    userId: string
-  ) {
+  async connectWithBasicAuth(starshipId: string, provider: ConnectorProvider, payload: ConnectWithBasicAuthRequest, userId: string) {
     const template = await this.loadTemplateOrThrow(provider);
     if (template.isEnabled === false) {
       throw new Error(`Connector ${provider} is disabled by the instance admin`);
@@ -701,11 +694,6 @@ export class ConnectorService {
    * Disconnect a provider for a starship and clean up related env vars.
    */
   async disconnect(starshipId: string, provider: ConnectorProvider) {
-    const template = await this.connectorTemplateRepository.findByProvider(provider);
-    if (!template) {
-      throw new Error(`Connector template not found for provider: ${provider}`);
-    }
-
     const existing = await this.connectorRepository.findByStarshipAndProvider(starshipId, provider);
     if (!existing) {
       // Nothing else to do
@@ -715,22 +703,8 @@ export class ConnectorService {
     // Remove env vars managed by this connector (connector_id linkage).
     await this.connectorSecretRepository.deleteByConnectorId(existing.id);
 
-    let newMetadata = existing.metadata || {};
-
-    // For GitHub, also clear per-starship GitHub App configuration stored in metadata.
-    if (provider === 'github') {
-      const current = (newMetadata || {}) as Record<string, unknown>;
-      delete current.githubInstallationId;
-      delete current.defaultOwner;
-      delete current.defaultRepo;
-      newMetadata = current;
-    }
-
-    await this.connectorRepository.update(existing.id, {
-      status: 'disconnected',
-      metadata: newMetadata,
-      lastError: null,
-    });
+    // Remove the connector record itself. (Revocation can be added later.)
+    await this.connectorRepository.delete(existing.id);
 
     return true;
   }

@@ -119,7 +119,7 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                     'w-full text-left px-3 py-2 rounded-lg transition-colors focus-visible-ring',
                     selectedAgent?.id === agent.id
                       ? 'text-primary bg-primary/10 border-transparent'
-                      : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/15 hover:shadow-sm'
+                      : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/5 hover:shadow-sm'
                   )}
                 >
                   <div className="flex items-center gap-3">

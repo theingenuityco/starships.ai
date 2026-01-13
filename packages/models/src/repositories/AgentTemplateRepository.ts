@@ -35,25 +35,26 @@ export class AgentTemplateRepository extends BaseRepository {
     const suffixMatch = normalized.match(/^(.*?)-([a-z0-9]{4})$/);
     const base = suffixMatch?.[1] ? suffixMatch[1] : normalized;
 
-    // Escape for Postgres regex usage (defensive; base is already slugified).
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
-    const baseRegex = `^${escapeRegex(base)}-[a-z0-9]{4}$`;
-
     const connection = this.getConnection();
 
     // We keep the query simple and deterministic:
     // - exact input wins
     // - exact base wins next (legacy rows)
     // - otherwise pick the newest matching suffixed slug
+    //
+    // Security: avoid the Postgres regex operator (~) entirely here.
+    // We rely on a fixed-shape LIKE pattern: `${base}-____` (exactly 4 chars).
     const row = await connection.queryOne<Record<string, unknown>>(
       `
         SELECT *
         FROM agent_templates
-        WHERE slug = $1 OR slug = $2 OR slug ~ $3
+        WHERE slug = $1
+           OR slug = $2
+           OR slug LIKE ($2 || '-____')
         ORDER BY (slug = $1) DESC, (slug = $2) DESC, created_at DESC
         LIMIT 1
       `,
-      [normalized, base, baseRegex]
+      [normalized, base]
     );
 
     return row ?? null;

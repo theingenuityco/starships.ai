@@ -379,7 +379,7 @@ export function LoginForm({
                   <Link
                     href="/forgot-password"
                     onClick={() => track({ type: 'auth_forgot_password_clicked' })}
-                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors"
+                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors mt-8 block"
                   >
                     Forgot your password?
                   </Link>

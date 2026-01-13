@@ -43,9 +43,8 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
             <div className="text-center">
               <div className="flex items-center justify-center gap-2 mb-2">
                 <Icon name="rocket" className="h-6 w-6 text-primary" />
-                <h1 className="text-2xl font-bold">Ship Management</h1>
+                <h1 className="text-2xl font-bold">Settings</h1>
               </div>
-              <p className="text-muted-foreground">Monitor your starship&apos;s usage, performance metrics, and manage billing.</p>
             </div>
 
             {/* Sections using shared Tabs UI with improved alignment */}
@@ -58,7 +57,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                   </TabsTrigger>
                   <TabsTrigger value="my-starship" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="rocket" className="h-4 w-4" />
-                    <span>My starship</span>
+                    <span>My Subscription</span>
                   </TabsTrigger>
                   <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="credit-card" className="h-4 w-4" />

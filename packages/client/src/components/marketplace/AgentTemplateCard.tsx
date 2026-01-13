@@ -83,24 +83,6 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
     onClick?.(template)
   }
 
-  const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s => typeof s === 'string' && s.trim().length > 0) : []
-  const visibleToolSlugs = toolSlugs.slice(0, 4)
-  const hiddenToolsCount = Math.max(0, toolSlugs.length - visibleToolSlugs.length)
-
-  const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
-
-  const toolTemplateNameBySlug = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const t of toolTemplates) {
-      const slug = (t as any)?.slug
-      const name = (t as any)?.name
-      if (typeof slug === 'string' && slug.trim() && typeof name === 'string' && name.trim()) {
-        map.set(slug, name)
-      }
-    }
-    return map
-  }, [toolTemplates])
-
   const agentLike: AgentModel = {
     // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
     id: template.id,
@@ -145,34 +127,15 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         hideChatControl={true}
         showActions={false}
         disableEntranceMotion={true}
-        belowDescription={
-          toolSlugs.length > 0 ? (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground mr-1">
-                <Icon name="wrench" className="w-3.5 h-3.5" />
-                Tools:
-              </span>
-              {visibleToolSlugs.map(slug => (
-                <Badge key={slug} variant="secondary" className="text-[10px] px-1.5 py-0.5" title={slug}>
-                  {toolTemplateNameBySlug.get(slug) ?? slug}
-                </Badge>
-              ))}
-              {hiddenToolsCount > 0 ? (
-                <Badge variant="outline" className="text-[10px] px-1.5 py-0.5 font-medium">
-                  +{hiddenToolsCount} more
-                </Badge>
-              ) : null}
-            </div>
-          ) : null
-        }
+        isAlreadyDeployed={isAlreadyDeployed || isPublishedFromThisStarship}
         primaryAction={
           showDeployCta
             ? {
-                label: isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
+                label: isAlreadyDeployed ? 'Deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
                 iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
                 disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
-                // Match the Chat CTA style from DeployedAgentCard
-                variant: 'ghost',
+                variant: isAlreadyDeployed || isPublishedFromThisStarship ? 'ghost' : 'default',
+                className: isAlreadyDeployed || isPublishedFromThisStarship ? undefined : 'bg-primary text-primary-foreground hover:bg-primary/90',
                 onAction: () => requestDeploy(),
               }
             : undefined

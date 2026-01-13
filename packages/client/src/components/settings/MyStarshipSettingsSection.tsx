@@ -132,7 +132,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
         <CardHeader className="pb-4">
           <CardTitle className="text-base flex items-center gap-2">
             <Icon name="rocket" className="h-4 w-4 text-primary" />
-            My starship
+            My Subscription
           </CardTitle>
           <CardDescription className="text-sm">Loading starship…</CardDescription>
         </CardHeader>
@@ -157,11 +157,8 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
           <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
             <Icon name="rocket" className="h-5 w-5 text-primary" />
           </div>
-          <div>
-            <h2 className="text-lg font-semibold">My starship</h2>
-            <p className="text-sm text-muted-foreground">Manage your starship’s identity and limits.</p>
-          </div>
-          <div className="ml-auto flex items-center gap-2">
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold">My Subscription</h2>
             {dirty ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-600">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Unsaved changes
@@ -171,6 +168,8 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                 <Icon name="check-circle" className="h-3.5 w-3.5" /> Up to date
               </span>
             )}
+          </div>
+          <div className="ml-auto flex items-center gap-2">
             <Button type="button" variant="ghost" size="sm" onClick={resetForm} disabled={!dirty || !canEdit}>
               Reset
             </Button>
@@ -199,7 +198,6 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
               <div className="flex items-start justify-between gap-4">
                 <div className="space-y-1">
                   <div className="text-lg font-semibold leading-tight">{starship.name}</div>
-                  <div className="text-xs text-muted-foreground font-mono">/{starship.slug}</div>
                 </div>
               </div>
 
@@ -313,11 +311,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                         After you save, your starship URL will be <span className="font-mono">/ship/{generatedSlug}-xxxxxx</span>.
                       </p>
                     </>
-                  ) : (
-                    <p className="text-[11px] text-muted-foreground">
-                      Your starship URL is <span className="font-mono">/ship/{starship.slug}</span>
-                    </p>
-                  )}
+                  ) : null}
                 </div>
               </div>
             </CardContent>

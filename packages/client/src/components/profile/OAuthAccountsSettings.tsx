@@ -238,7 +238,7 @@ export function OAuthAccountsSettings() {
           <Icon name="globe" className="h-4 w-4 text-primary" />
           Connected Accounts
         </CardTitle>
-        <CardDescription className="text-sm">Link accounts for authentication only - we don&apos;t access your account data or perform actions on your behalf</CardDescription>
+        <CardDescription className="text-sm">Linked accounts are for authentication only</CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col gap-4">
@@ -247,12 +247,7 @@ export function OAuthAccountsSettings() {
           const account = getProviderAccount(provider)
 
           return (
-            <motion.div
-              key={provider}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="flex items-center justify-between p-4 border rounded-lg"
-            >
+            <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center justify-between p-4 border rounded-lg">
               <div className="flex items-center gap-3">
                 <div className="relative flex h-9 w-9 items-center justify-center rounded-full bg-muted/30">
                   {isLinked && (

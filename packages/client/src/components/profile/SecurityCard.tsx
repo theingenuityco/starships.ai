@@ -59,7 +59,6 @@ export default function SecurityCard({
           <Icon name="shield" className="h-4 w-4 text-primary" />
           Account Security
         </CardTitle>
-        <CardDescription className="text-sm">Manage your authentication methods and security settings.</CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-1 flex-col gap-6">
@@ -68,12 +67,8 @@ export default function SecurityCard({
           <div className="space-y-4">
             {!showPassword ? (
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Icon name="lock" className="h-4 w-4 text-primary" />
-                  <div>
-                    <p className="text-sm font-medium">Password</p>
-                    <p className="text-xs text-muted-foreground">Change your password when necessary</p>
-                  </div>
+                <div>
+                  <p className="text-sm font-medium">Password</p>
                 </div>
                 <Button type="button" variant="outline" onClick={() => setShowPassword(true)} disabled={saving}>
                   Change password

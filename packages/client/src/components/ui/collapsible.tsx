@@ -23,6 +23,8 @@ interface CollapsibleContentProps extends React.HTMLAttributes<HTMLDivElement> {
 interface CollapsibleContextValue {
   isOpen: boolean
   toggle: () => void
+  contentId: string
+  triggerId: string
 }
 
 const CollapsibleContext = React.createContext<CollapsibleContextValue | undefined>(undefined)
@@ -37,6 +39,9 @@ const useCollapsible = () => {
 
 const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(({ children, className, defaultOpen = false, ...props }, ref) => {
   const [isOpen, setIsOpen] = React.useState(defaultOpen)
+  const baseId = React.useId()
+  const contentId = `${baseId}-content`
+  const triggerId = `${baseId}-trigger`
 
   const toggle = React.useCallback(() => {
     setIsOpen(prev => !prev)
@@ -46,8 +51,10 @@ const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(({ childr
     () => ({
       isOpen,
       toggle,
+      contentId,
+      triggerId,
     }),
-    [isOpen, toggle]
+    [isOpen, toggle, contentId, triggerId]
   )
 
   return (
@@ -61,10 +68,18 @@ const Collapsible = React.forwardRef<HTMLDivElement, CollapsibleProps>(({ childr
 Collapsible.displayName = 'Collapsible'
 
 const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTriggerProps>(({ children, className, ...props }, ref) => {
-  const { isOpen, toggle } = useCollapsible()
+  const { isOpen, toggle, contentId, triggerId } = useCollapsible()
 
   return (
-    <button ref={ref} className={cn('flex items-center justify-between w-full text-left transition-colors hover:bg-muted/50 rounded-md p-2', className)} onClick={toggle} {...props}>
+    <button
+      ref={ref}
+      id={triggerId}
+      aria-expanded={isOpen}
+      aria-controls={contentId}
+      className={cn('flex items-center justify-between w-full text-left transition-colors hover:bg-muted/50 rounded-md p-2', className)}
+      onClick={toggle}
+      {...props}
+    >
       <div className="flex items-center gap-2">
         {isOpen ? <Icon name="chevron-down" className="w-4 h-4 text-muted-foreground" /> : <Icon name="chevron-right" className="w-4 h-4 text-muted-foreground" />}
         {children}
@@ -75,15 +90,25 @@ const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTrigge
 CollapsibleTrigger.displayName = 'CollapsibleTrigger'
 
 const CollapsibleContent = React.forwardRef<HTMLDivElement, CollapsibleContentProps>(({ children, className, ...props }, ref) => {
-  const { isOpen } = useCollapsible()
-
-  if (!isOpen) {
-    return null
-  }
+  const { isOpen, contentId, triggerId } = useCollapsible()
 
   return (
-    <div ref={ref} className={cn('animate-in slide-in-from-top-2 duration-200', className)} {...props}>
-      {children}
+    <div
+      ref={ref}
+      id={contentId}
+      role="region"
+      aria-labelledby={triggerId}
+      className={cn('transition-all duration-300 ease-out', className)}
+      style={{
+        display: 'grid',
+        gridTemplateRows: isOpen ? '1fr' : '0fr',
+        visibility: isOpen ? 'visible' : 'hidden',
+      }}
+      {...props}
+    >
+      <div className="overflow-hidden min-h-0">
+        {children}
+      </div>
     </div>
   )
 })

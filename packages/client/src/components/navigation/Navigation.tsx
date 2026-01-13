@@ -7,7 +7,6 @@ import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { ThemeToggle } from '@/components/theme-toggle'
 import { useDeleteConversation } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
@@ -205,11 +204,11 @@ export function Navigation(props: NavigationProps) {
   const mainNavigationItems = useMemo(
     () => [
       ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
+      { href: `/marketplace`, label: 'Explore Agents', icon: 'store', isActive: pathname === '/marketplace' },
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }] : []),
-      { href: `/marketplace`, label: 'Marketplace', icon: 'store', isActive: pathname === '/marketplace' },
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && isInstanceAdmin
         ? [
             {
@@ -391,47 +390,21 @@ export function Navigation(props: NavigationProps) {
                   >
                     <Icon name="history" className="w-4 h-4" />
                   </div>
-                  <span className="text-[13px] font-medium">Recents</span>
+                  <span className="font-medium" style={{ fontSize: '14px' }}>
+                    Recents
+                  </span>
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="pb-2 space-y-0">
+                <div className="pb-2 space-y-1">
                   <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
                 </div>
               </div>
             </div>
           )}
 
-          {/* Spacer to push theme toggle + user profile toward bottom when needed */}
+          {/* Spacer to push content toward bottom when needed */}
           {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
-
-          {/* Theme toggle above profile section - styled like a nav item (expanded only) */}
-          {isExpanded && (
-            <div className="flex-shrink-0 px-2 pb-1">
-              <div className="group relative rounded-lg flex items-center justify-between border w-full h-8 px-2 text-sm text-muted-foreground border-transparent hover:text-foreground hover:bg-muted transition-colors">
-                <div className="flex items-center min-w-0">
-                  <div
-                    className="flex-shrink-0"
-                    style={{
-                      width: '1.25rem',
-                      height: '1.25rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: 0,
-                      pointerEvents: 'none',
-                    }}
-                  >
-                    <Icon name="palette" className="w-4 h-4" />
-                  </div>
-                  <span className="whitespace-nowrap pointer-events-none text-[13px] font-medium" style={{ marginLeft: '0.375rem' }}>
-                    Appearance
-                  </span>
-                </div>
-                <ThemeToggle size="sm" />
-              </div>
-            </div>
-          )}
 
           {/* Profile moved to global top-right header (see `TopRightUserProfile`) */}
         </div>

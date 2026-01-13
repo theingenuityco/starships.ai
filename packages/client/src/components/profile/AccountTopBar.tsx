@@ -6,7 +6,6 @@ import React from 'react'
 import { Button } from '@/components/ui/button'
 import { PROFILE_SECTION_CARD_CLASS } from './profileCardClasses'
 
-
 type AccountTopBarProps = {
   dirty: boolean
   saving: boolean
@@ -21,11 +20,8 @@ export default function AccountTopBar({ dirty, saving, onReset, formId = 'accoun
         <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
           <Icon name="shield" className="h-5 w-5 text-primary" />
         </div>
-        <div>
+        <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">My Profile</h2>
-          <p className="text-sm text-muted-foreground">Manage your profile and security.</p>
-        </div>
-        <div className="ml-auto flex items-center gap-2">
           {dirty ? (
             <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-600">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Unsaved changes
@@ -35,6 +31,8 @@ export default function AccountTopBar({ dirty, saving, onReset, formId = 'accoun
               <Icon name="check-circle" className="h-3.5 w-3.5" /> Up to date
             </span>
           )}
+        </div>
+        <div className="ml-auto flex items-center gap-2">
           <Button type="button" variant="ghost" size="sm" onClick={onReset} disabled={!dirty}>
             Reset
           </Button>

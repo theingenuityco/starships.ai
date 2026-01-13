@@ -92,7 +92,8 @@ export class Agent implements NodeHandler {
         val.every((m) => {
           if (typeof m !== 'object' || m === null) return false;
           const obj = m as Record<string, unknown>;
-          return typeof obj.role === 'string' && typeof obj.content === 'string';
+          // Content can be string (text only) or array (multimodal ContentBlock[] for images, PDFs, etc.)
+          return typeof obj.role === 'string' && (typeof obj.content === 'string' || Array.isArray(obj.content));
         })
       );
     };

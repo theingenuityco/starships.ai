@@ -17,6 +17,39 @@ export class ToolTemplateRepository extends BaseRepository {
     super('ToolTemplateRepository');
   }
 
+  /**
+   * Resolve a tool template id from a slug-like identifier.
+   *
+   * Supports:
+   * - Exact template slugs (e.g. `edit-tool-igm5`)
+   * - Base slugs used by seeders/clients (e.g. `edit-tool`)
+   *
+   * Tool template slugs are generated with an always-on random 4-char suffix, so
+   * base slugs must be resolved to the current stored slug shape.
+   */
+  async resolveTemplateIdForAssignedSlug(assignedSlug: string): Promise<string | null> {
+    const base = generateSlug(String(assignedSlug || ''));
+    if (!base) return null;
+
+    // Escape for use inside a Postgres regex pattern (defensive; base is already slugified).
+    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\]\\-]/g, '\\$&');
+    const baseRegex = `^${escapeRegex(base)}-[a-z0-9]{4}$`;
+
+    const connection = this.getConnection();
+    const result = await connection.queryOne<{ id: string }>(
+      `
+        SELECT id
+        FROM tool_templates
+        WHERE slug = $1 OR slug ~ $2
+        ORDER BY (slug = $1) DESC, created_at DESC
+        LIMIT 1
+      `,
+      [base, baseRegex]
+    );
+
+    return result?.id ?? null;
+  }
+
   private async generateUniqueTemplateSlug(baseSlug: string): Promise<string> {
     const connection = this.getConnection();
     const base = generateSlug((baseSlug || '').toString()) || 'tool-template';

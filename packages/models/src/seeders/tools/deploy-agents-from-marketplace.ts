@@ -9,14 +9,14 @@ export const deployAgentsFromMarketplaceTool: ToolParams = {
   name: 'Deploy Agents From Marketplace',
   slug: 'deploy-agents-from-marketplace',
   description:
-    'Deploy an agent template from the marketplace onto this starship. Creates a new agent instance from a template ID.',
+    'Deploy an agent template from the marketplace onto this starship. Creates a new agent instance from a template slug.',
   parameters: {
     type: 'object',
-    required: ['templateId'],
+    required: ['templateSlug'],
     properties: {
-      templateId: {
+      templateSlug: {
         type: 'string',
-        description: 'Agent template ID from the marketplace (e.g., returned by list-agents-from-marketplace)',
+        description: 'Agent template slug from the marketplace (returned by list-agents-from-marketplace)',
       },
       starshipId: {
         type: 'string',
@@ -35,13 +35,15 @@ export const deployAgentsFromMarketplaceTool: ToolParams = {
         parameters: {
           code: `
             async function main(ctx) {
-              const templateId = String(ctx.input?.templateId ?? '').trim();
-              if (!templateId) throw new Error('templateId is required');
+              const templateSlug = String(ctx.input?.templateSlug ?? '').trim();
+              if (!templateSlug) throw new Error('templateSlug is required');
 
               const starshipIdRaw = ctx.input?.starshipId;
               const starshipId = typeof starshipIdRaw === 'string' ? starshipIdRaw.trim() : '';
 
-              return { templateId, starshipId, ok: true };
+              // The connector endpoint still uses {templateId} in the path; passing a slug string works
+              // because the API route accepts either id OR slug in that path param.
+              return { templateId: templateSlug, starshipId, ok: true };
             }
           `,
           timeout: 3000,
@@ -51,7 +53,7 @@ export const deployAgentsFromMarketplaceTool: ToolParams = {
         ref: 'http_deploy',
         type: 'connector_action',
         name: 'Deploy Agent Template',
-        description: 'POST /agent-templates/:templateId/agents',
+        description: 'POST /agent-templates/:templateId/agents (accepts slug)',
         parameters: {
           connector: 'starships',
           action: 'deploy-agents-from-marketplace',
@@ -122,7 +124,7 @@ export const deployAgentsFromMarketplaceToolTemplate: Omit<
   slug: 'deploy-agents-from-marketplace',
   version: '1.0.0',
   category: 'automation',
-  exampleUsage: '{ "templateId": "tpl_123" } // creates a new agent on the current starship from a marketplace template',
+  exampleUsage: '{ "templateSlug": "aria-x7k9" } // creates a new agent on the current starship from a marketplace template slug',
   requiresApiKey: false,
   configurationFields: [],
 };

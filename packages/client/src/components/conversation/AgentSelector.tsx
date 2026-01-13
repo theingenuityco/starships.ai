@@ -123,11 +123,14 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
                   )}
                 >
                   <div className="flex items-center gap-3">
-                    <Avatar className={cn('h-9 w-9 ring-1 ring-border/40 rounded-full flex-shrink-0')}>
-                      <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={36} rounded />
+                    <Avatar className={cn('h-11 w-11 ring-1 ring-border/40 rounded-full flex-shrink-0')}>
+                      <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={44} rounded />
                     </Avatar>
-                    <div className="min-w-0 flex items-center">
-                      <div className="font-medium leading-5">{formatAgentDisplayName(agent)}</div>
+                    <div className="min-w-0 flex flex-col">
+                      <div className="font-medium leading-5 text-foreground">{formatAgentDisplayName(agent)}</div>
+                      <div className="mt-0.5 text-xs leading-4 text-muted-foreground line-clamp-2">
+                        {typeof (agent as any)?.description === 'string' && (agent as any).description.trim().length > 0 ? (agent as any).description.trim() : 'No description'}
+                      </div>
                     </div>
                   </div>
                 </button>

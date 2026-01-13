@@ -1,4 +1,12 @@
-import type { Client } from 'pg';
+type DbClient = {
+  query: (text: string, params?: unknown[]) => Promise<unknown>;
+};
+
+function toRows<T>(res: unknown): T[] {
+  if (Array.isArray(res)) return res as T[];
+  if (res && typeof res === 'object' && Array.isArray((res as { rows?: unknown[] }).rows)) return (res as { rows: T[] }).rows;
+  return [];
+}
 
 /**
  * Migration 068: Add list-agents-from-marketplace endpoint to Starships connector
@@ -6,7 +14,7 @@ import type { Client } from 'pg';
  * Adds an endpoint to list all available agent templates from the marketplace.
  * This allows agents like Aria to discover and recommend agent templates to users.
  */
-export async function up(client: Client): Promise<void> {
+export async function up(client: DbClient): Promise<void> {
   await client.query('BEGIN');
   try {
     // Define the new endpoint for listing agent templates
@@ -36,15 +44,14 @@ export async function up(client: Client): Promise<void> {
     };
 
     // Fetch the current starships connector template
-    const result = await client.query(
-      `SELECT id, endpoints_json FROM connector_templates WHERE slug = 'starships' LIMIT 1`
-    );
+    const res = await client.query(`SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`);
+    const rows = toRows<{ id: string; endpoints_json: unknown }>(res);
 
-    if (result.rows.length === 0) {
+    if (!rows.length) {
       throw new Error('Starships connector template not found');
     }
 
-    const { id, endpoints_json } = result.rows[0] as { id: string; endpoints_json: unknown };
+    const { id, endpoints_json } = rows[0];
     const currentEndpoints: Array<Record<string, unknown>> = Array.isArray(endpoints_json)
       ? (endpoints_json as Array<Record<string, unknown>>)
       : [];
@@ -66,7 +73,7 @@ export async function up(client: Client): Promise<void> {
 
     // Update the connector template with the new endpoints
     await client.query(
-      `UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2`,
+      `UPDATE connector_templates SET endpoints_json = $1::jsonb WHERE id = $2;`,
       [JSON.stringify(updatedEndpoints), id]
     );
 
@@ -80,19 +87,18 @@ export async function up(client: Client): Promise<void> {
   }
 }
 
-export async function down(client: Client): Promise<void> {
+export async function down(client: DbClient): Promise<void> {
   await client.query('BEGIN');
   try {
     // Fetch the current starships connector template
-    const result = await client.query(
-      `SELECT id, endpoints_json FROM connector_templates WHERE slug = 'starships' LIMIT 1`
-    );
+    const res = await client.query(`SELECT id, endpoints_json FROM connector_templates WHERE provider = 'starships' LIMIT 1;`);
+    const rows = toRows<{ id: string; endpoints_json: unknown }>(res);
 
-    if (result.rows.length === 0) {
+    if (!rows.length) {
       throw new Error('Starships connector template not found');
     }
 
-    const { id, endpoints_json } = result.rows[0] as { id: string; endpoints_json: unknown };
+    const { id, endpoints_json } = rows[0];
     const currentEndpoints: Array<Record<string, unknown>> = Array.isArray(endpoints_json)
       ? (endpoints_json as Array<Record<string, unknown>>)
       : [];
@@ -102,7 +108,7 @@ export async function down(client: Client): Promise<void> {
 
     // Update the connector template
     await client.query(
-      `UPDATE connector_templates SET endpoints_json = $1 WHERE id = $2`,
+      `UPDATE connector_templates SET endpoints_json = $1::jsonb WHERE id = $2;`,
       [JSON.stringify(updatedEndpoints), id]
     );
 

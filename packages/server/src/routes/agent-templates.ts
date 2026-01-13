@@ -3,7 +3,7 @@ import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { Request, Response, Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
-import { IdSchema, PaginationSchema } from '@/schemas/common';
+import { IdSchema, PaginationSchema, SlugSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentTemplateRepository } from '@starships/models';
 import { generatePresignedUrlInline } from '@/utils/s3-helper';
@@ -50,44 +50,59 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
 
     // Validate pagination and search parameters
     const QuerySchema = PaginationSchema.extend({
+      // Client code commonly uses `search`; legacy callers may use `query`.
+      search: z.string().optional(),
       query: z.string().optional(),
+      category: z
+        .enum(['general', 'coding', 'creative', 'analysis', 'support', 'utility', 'data', 'communication', 'automation'])
+        .optional(),
     });
     const queryValidation = validateData(QuerySchema, req.query, res, 'pagination query');
     if (!queryValidation) return;
 
-    const { page, limit, query: searchQuery } = queryValidation;
+    const { page, limit } = queryValidation;
+    const searchQuery = (queryValidation.search || queryValidation.query || '').trim();
+    const category = queryValidation.category;
 
     // Use search if query provided, otherwise get all templates
-    const allTemplates = searchQuery
+    const baseTemplates = searchQuery
       ? await templateService.searchTemplates(searchQuery)
-      : await templateService.getAllTemplates();
+      : category
+        ? await templateService.getTemplatesByCategory(category)
+        : await templateService.getAllTemplates();
+
+    // If both search + category are provided, filter search results client-side.
+    // (We keep the service signature stable; repository can still do DB-level filtering later.)
+    const allTemplates = searchQuery && category ? baseTemplates.filter((t) => t?.category === category) : baseTemplates;
 
     // Apply pagination
     const startIndex = (page - 1) * limit;
     const paginatedTemplates = allTemplates.slice(startIndex, startIndex + limit);
 
-    const paginationMeta = createPaginationMeta(page, limit, paginatedTemplates.length);
+    const paginationMeta = createPaginationMeta(page, limit, allTemplates.length);
 
     const requesterUserId = req.user?.id;
     const repo = new AgentTemplateRepository();
 
     const templateIds = paginatedTemplates
-      .map((t) => (t as any)?.id)
+      .map((t): string | undefined => {
+        if (!t || typeof t !== 'object') return undefined;
+        const rec = t as unknown as Record<string, unknown>;
+        return typeof rec.id === 'string' ? rec.id : undefined;
+      })
       .filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
     // Only creators can see sensitive fields. Everyone else gets the public-stripped model.
     const creatorIdsByTemplateId =
-      requesterUserId && templateIds.length > 0
-        ? await repo.getCreatorUserIdsByTemplateIds(templateIds)
-        : new Map<string, string>();
+      requesterUserId && templateIds.length > 0 ? await repo.getCreatorUserIdsByTemplateIds(templateIds) : new Map<string, string>();
 
     // Batch-load internals only for templates that belong to the requester.
     const creatorTemplateIds =
-      requesterUserId && templateIds.length > 0
-        ? templateIds.filter((id) => creatorIdsByTemplateId.get(id) === requesterUserId)
-        : [];
+      requesterUserId && templateIds.length > 0 ? templateIds.filter((id) => creatorIdsByTemplateId.get(id) === requesterUserId) : [];
     const internalsByTemplateId =
-      creatorTemplateIds.length > 0 ? await repo.findInternalByIds(creatorTemplateIds) : new Map<string, any>();
+      creatorTemplateIds.length > 0
+        ? await repo.findInternalByIds(creatorTemplateIds)
+        : new Map<string, import('@starships/protocol').AgentTemplateModel>();
 
     const hydrated = await Promise.all(
       paginatedTemplates.map(async (t) => {
@@ -222,6 +237,7 @@ router.get('/agent-templates/:id/avatar', async (req: Request, res: Response): P
 });
 
 // POST /agent-templates/:templateId/agents - Create agent from template (OpenAPI pattern)
+// NOTE: Despite the param name, this route supports passing either an internal id OR a template slug.
 router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const { templateId } = req.params;
@@ -232,9 +248,10 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
       return;
     }
 
-    // Validate templateId format
-    const paramValidation = validateData(z.object({ templateId: IdSchema }), req.params, res, 'template parameter');
+    // Support either internal id or public slug in the path param.
+    const paramValidation = validateData(z.object({ templateId: z.union([IdSchema, SlugSchema]) }), req.params, res, 'template parameter');
     if (!paramValidation) return;
+    const validatedTemplateId = paramValidation.templateId;
 
     // Validate request body using the schema
     const bodyValidation = validateData(CreateAgentFromTemplateSchema, req.body, res, 'request body');
@@ -248,12 +265,18 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
       return;
     }
 
-    // Check if template exists first
-    const template = await templateService.getTemplateById(templateId);
+    const templateRepo = new AgentTemplateRepository();
+    // NOTE:
+    // Template slugs (e.g. `data-analyst-3ie8`) can match our broad IdSchema.
+    // To avoid mis-classifying slugs as ids, always try slug lookup first, then fall back to id.
+    const templateBySlug = await templateRepo.findBySlug(validatedTemplateId);
+    const template = templateBySlug ?? (await templateService.getTemplateById(validatedTemplateId));
+    const resolvedTemplateId = template?.id;
+
     if (!template) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Template not found', 404, {
         resource: 'agent-template',
-        id: templateId,
+        templateId: validatedTemplateId,
       });
       return;
     }
@@ -262,21 +285,25 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     try {
       const starship = await templateService.validateStarshipAccess(starshipId, userId);
       console.log(`[TEMPLATE] Using specified starship "${starship.name}" (${starshipId}) for agent creation`);
-    } catch (starshipError: any) {
+    } catch (starshipError: unknown) {
+      const err = starshipError && typeof starshipError === 'object' ? (starshipError as Record<string, unknown>) : {};
+      const errName = typeof err.name === 'string' ? err.name : undefined;
+      const errMessage = typeof err.message === 'string' ? err.message : undefined;
+
       console.error('[TEMPLATE] Error validating starship access:', {
         starshipId: starshipId,
-        errorName: starshipError?.name,
-        errorMessage: starshipError?.message,
+        errorName: errName,
+        errorMessage: errMessage,
         fullError: starshipError,
       });
 
-      if (starshipError?.name === 'NotFoundError') {
-        sendError(res, 'RESOURCE_NOT_FOUND', starshipError.message || 'Starship not found', 404, {
+      if (errName === 'NotFoundError') {
+        sendError(res, 'RESOURCE_NOT_FOUND', errMessage || 'Starship not found', 404, {
           resource: 'starship',
           id: starshipId,
           hint: 'Please ensure you have access to a starship before creating agents',
         });
-      } else if (starshipError?.name === 'ValidationError') {
+      } else if (errName === 'ValidationError') {
         sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
           details: 'You do not have permission to create agents on this starship',
         });
@@ -289,7 +316,15 @@ router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req
     }
 
     // Create agent from template with validated starship ID
-    const agent = await templateService.createAgentFromTemplate(templateId, starshipId);
+    if (!resolvedTemplateId) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Template resolution failed', 500, {
+        templateId,
+        hint: 'Resolved template id is missing',
+      });
+      return;
+    }
+
+    const agent = await templateService.createAgentFromTemplate(resolvedTemplateId, starshipId);
 
     // Log the creation for audit purposes
     console.log(`[TEMPLATE] Agent "${agent.name}" created from template "${template.name}" by user ${userId} on starship ${starshipId}`);

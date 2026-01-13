@@ -1331,14 +1331,31 @@ router.post(
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
           const messages = await conversationService.getConversationMessages(conversationId);
+          // Include the server-authoritative turn status in the sync response.
+          // This is critical for delegated conversations (call-agent) where execution can "complete"
+          // early because the run is awaiting out-of-band tool approval (turn.status = waiting_for_tools).
+          const turnRepo = new TurnRepository();
+          const latestTurn = await turnRepo.findLatestByConversationId(conversationId).catch(() => null);
+          const turn =
+            latestTurn && typeof latestTurn.id === 'string'
+              ? {
+                  turnId: latestTurn.id,
+                  status: (latestTurn.status as StreamTurnStatus) || 'completed',
+                  startedAt: latestTurn.startedAt,
+                  completedAt: latestTurn.completedAt,
+                }
+              : null;
+          const awaitingToolApproval = turn?.status === 'waiting_for_tools';
 
           sendSuccess(
             res,
             {
-              status: 'completed',
+              status: turn?.status || 'completed',
               streaming: false,
               conversationId,
               conversation: conversationWithFinalState ? { ...conversationWithFinalState, messages } : null,
+              turn,
+              awaitingToolApproval,
             },
             200
           );

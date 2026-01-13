@@ -25,7 +25,6 @@ import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
-import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { StatusDots } from '@/components/ui/StatusDots'
 
 interface StreamChunk {
@@ -413,7 +412,6 @@ export function ConversationMessageContent({
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
-  const expertMode = useUserPreferencesStore(s => s.expertMode)
 
   // Fetch attachments metadata
   const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(attachmentIds, starshipId)
@@ -681,18 +679,7 @@ export function ConversationMessageContent({
         // Match markdown paragraph spacing; keep consistent even for the last tool call.
         const pSpacingClass = 'mb-2'
 
-        // Non-expert mode: show a compact, non-interactive status line only.
-        if (!expertMode) {
-          return (
-            <p key={`${toolCallId || idx}`} className={`${pSpacingClass} leading-relaxed`}>
-              <span className="inline-flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                <Chip>{toolDisplayName}</Chip>
-              </span>
-            </p>
-          )
-        }
-
-        // Expert mode: allow expanding/collapsing args + results.
+        // Tool calls are always expandable (no expert-mode gating).
         const accentBorderClass = successFlag === false ? 'border-l-4 border-l-red-500' : isDone ? 'border-l-4 border-l-green-500' : ''
         return (
           <Collapsible key={`${toolCallId || idx}`} defaultOpen={false}>

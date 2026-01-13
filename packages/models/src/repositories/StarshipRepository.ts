@@ -50,6 +50,29 @@ export class StarshipRepository extends BaseRepository {
     );
   }
 
+  /**
+   * INTERNAL/ADMIN: Find a starship by slug regardless of owner.
+   *
+   * Why:
+   * - Operational scripts often only have the human-friendly starship slug.
+   * - Starship slugs are generated with a random suffix, so they are typically globally unique.
+   *
+   * Note:
+   * - This should not be exposed via public APIs. Prefer findBySlug(slug, ownerId) in request paths.
+   */
+  async findBySlugAnyOwner(slug: string): Promise<StarshipModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>('SELECT * FROM starships WHERE slug = $1 LIMIT 1', [slug]);
+        return result ? fromDatabase(StarshipEntity, result) : null;
+      },
+      'findBySlugAnyOwner',
+      'Starship',
+      slug
+    );
+  }
+
   async findByOwner(ownerId: string): Promise<StarshipModel[]> {
     return this.executeWithErrorHandling(
       async () => {

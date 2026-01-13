@@ -1041,15 +1041,18 @@ export function ConversationMessageContent({
     <div ref={messageContainerRef} className={cn('relative group w-full', className)}>
       {/* Reasoning (thinking) collapsible */}
       {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
-        <div className="mb-2">
+        <>
           {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
           <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
-            <CollapsibleTrigger className="p-0 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors mb-1 font-medium">
-              <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
-                {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
-                <span className="truncate">{reasoningHeaderLabel}</span>
-              </span>
-            </CollapsibleTrigger>
+            {/* Match tool-call collapsed row spacing + trigger styling */}
+            <p className="mb-2 leading-relaxed">
+              <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+                  {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
+                  <span className="truncate">{reasoningHeaderLabel}</span>
+                </span>
+              </CollapsibleTrigger>
+            </p>
             <CollapsibleContent>
               <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 py-2 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
                 <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
@@ -1060,7 +1063,7 @@ export function ConversationMessageContent({
               </blockquote>
             </CollapsibleContent>
           </Collapsible>
-        </div>
+        </>
       )}
 
       {/* Attachments */}

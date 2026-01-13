@@ -2662,10 +2662,11 @@ export class ConversationService {
             const lastIndex = this.lastPersistedIndex.get(conversationId) ?? -1;
 
             // Type guard for state messages coming from Autopilot mutations
+            // Content can be string (text only) or array (multimodal ContentBlock[] for images, PDFs, etc.)
             const isStateMsg = (m: unknown): m is LlmMessage => {
               if (!m || typeof m !== 'object') return false;
               const rec = m as Record<string, unknown>;
-              return typeof rec.role === 'string' && typeof rec.content === 'string';
+              return typeof rec.role === 'string' && (typeof rec.content === 'string' || Array.isArray(rec.content));
             };
 
             // Only process messages added since last persistence

@@ -180,164 +180,163 @@ export function ConnectorInstallPage() {
             >
               <Card>
                 <CardHeader className="space-y-4 text-center">
-                {/* Connection preview (top of card) */}
-                <div className="flex items-center justify-center py-1">
-                  <div className="h-[84px] w-[84px] rounded-full bg-black/40 border-2 border-white/15 shadow-sm flex items-center justify-center">
-                    <StarshipsLogo width={48} height={48} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
-                  </div>
+                  {/* Connection preview (top of card) */}
+                  <div className="flex items-center justify-center py-1">
+                    <div className="h-[84px] w-[84px] rounded-full bg-black/40 border-2 border-white/15 shadow-sm flex items-center justify-center">
+                      <StarshipsLogo width={48} height={48} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
+                    </div>
 
-                  <div
-                    className="-mx-px h-[3px] w-16"
-                    aria-hidden="true"
-                    style={{
-                      backgroundImage: 'repeating-linear-gradient(to right, rgba(255,255,255,0.15) 0 3px, transparent 3px 7px)',
-                    }}
-                  />
-
-                  <div className="h-[84px] w-[84px] rounded-full bg-black/40 border-2 border-white/15 shadow-sm flex items-center justify-center overflow-hidden">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={providerIconSrc}
-                      alt={`${providerLabel} logo`}
-                      className="h-12 w-12 object-contain"
-                      onError={e => {
-                        ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                    <div
+                      className="-mx-px h-[3px] w-16"
+                      aria-hidden="true"
+                      style={{
+                        backgroundImage: 'repeating-linear-gradient(to right, rgba(255,255,255,0.15) 0 3px, transparent 3px 7px)',
                       }}
                     />
+
+                    <div className="h-[84px] w-[84px] rounded-full bg-black/40 border-2 border-white/15 shadow-sm flex items-center justify-center overflow-hidden">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={providerIconSrc}
+                        alt={`${providerLabel} logo`}
+                        className="h-12 w-12 object-contain"
+                        onError={e => {
+                          ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                        }}
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-1">
-                  <CardTitle className="text-xl">Connect Starships.ai to {providerLabel}</CardTitle>
-                  <CardDescription>{!isAuthenticated ? 'Sign in to Starships.ai to continue.' : `Select a starship, then continue to ${providerLabel}.`}</CardDescription>
-                </div>
-              </CardHeader>
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl">Connect Starships.ai to {providerLabel}</CardTitle>
+                    <CardDescription>{!isAuthenticated ? 'Sign in to Starships.ai to continue.' : `Select a starship, then continue to ${providerLabel}.`}</CardDescription>
+                  </div>
+                </CardHeader>
 
-              <CardContent className="space-y-4">
-                <motion.div
-                  layout
-                  transition={{
-                    layout: { duration: 0.35 },
-                  }}
-                  className="space-y-4"
-                >
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    {shouldShowLoader && (
-                      <motion.div
-                        key="install-loader"
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                        className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
-                      >
-                        <Icon name="loader-2" className="h-4 w-4 animate-spin" />
-                        Validating install…
-                      </motion.div>
-                    )}
+                <CardContent className="space-y-4">
+                  <motion.div
+                    layout
+                    transition={{
+                      layout: { duration: 0.35 },
+                    }}
+                    className="space-y-4"
+                  >
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {shouldShowLoader && (
+                        <motion.div
+                          key="install-loader"
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                          className="flex items-center justify-center gap-2 text-sm text-muted-foreground"
+                        >
+                          <Icon name="loader-2" className="h-4 w-4 animate-spin" />
+                          Validating install…
+                        </motion.div>
+                      )}
 
-                    {validateError && (
-                      <motion.div
-                        key="install-error"
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Alert>
-                          <Icon name="info" className="h-4 w-4" />
-                          <AlertDescription>{validateError}</AlertDescription>
-                        </Alert>
-                      </motion.div>
-                    )}
-
-                    {shouldShowMissingContext && (
-                      <motion.div
-                        key="install-missing-context"
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <Alert>
-                          <Icon name="info" className="h-4 w-4" />
-                          <AlertDescription>Unable to load install context.</AlertDescription>
-                        </Alert>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  <AnimatePresence mode="popLayout" initial={false}>
-                    {shouldShowConfirm && (
-                      <motion.div
-                        key="install-confirm"
-                        layout
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.25 }}
-                        className="space-y-4"
-                      >
-                        {starshipsLoading && (
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Icon name="loader-2" className="h-4 w-4 animate-spin" />
-                            Loading your starships…
-                          </div>
-                        )}
-
-                        {!starshipsLoading && (!starships || starships.length === 0) && (
+                      {validateError && (
+                        <motion.div
+                          key="install-error"
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
                           <Alert>
                             <Icon name="info" className="h-4 w-4" />
-                            <AlertDescription>You don’t have any starships yet. Create one in your profile to connect apps.</AlertDescription>
+                            <AlertDescription>{validateError}</AlertDescription>
                           </Alert>
-                        )}
+                        </motion.div>
+                      )}
 
-                        {!starshipsLoading && starships && starships.length > 0 && (
-                          <>
-                            <div className="space-y-2">
-                              <Label>Starship</Label>
-                              <Select value={selectedStarshipId} onValueChange={setSelectedStarshipId}>
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select a starship" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {starships.map(s => (
-                                    <SelectItem key={s.id} value={s.id}>
-                                      {s.name}
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
+                      {shouldShowMissingContext && (
+                        <motion.div
+                          key="install-missing-context"
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <Alert>
+                            <Icon name="info" className="h-4 w-4" />
+                            <AlertDescription>Unable to load install context.</AlertDescription>
+                          </Alert>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+
+                    <AnimatePresence mode="popLayout" initial={false}>
+                      {shouldShowConfirm && (
+                        <motion.div
+                          key="install-confirm"
+                          layout
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          transition={{ duration: 0.25 }}
+                          className="space-y-4"
+                        >
+                          {starshipsLoading && (
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                              <Icon name="loader-2" className="h-4 w-4 animate-spin" />
+                              Loading your starships…
                             </div>
+                          )}
 
-                            <Button className="w-full" disabled={!selectedStarshipId || isStarting || startOAuth.isPending} onClick={onStart}>
-                              {isStarting || startOAuth.isPending ? 'Starting…' : `Continue to ${providerLabel}`}
-                            </Button>
-                          </>
-                        )}
-                      </motion.div>
-                    )}
+                          {!starshipsLoading && (!starships || starships.length === 0) && (
+                            <Alert>
+                              <Icon name="info" className="h-4 w-4" />
+                              <AlertDescription>You don’t have any starships yet. Create one in your profile to connect apps.</AlertDescription>
+                            </Alert>
+                          )}
 
-                    {shouldShowLogin && (
-                      <motion.div
-                        key="install-login"
-                        // Expand/collapse like an accordion (no slide-in).
-                        initial={{ height: 0, opacity: 0 }}
-                        animate={{ height: 'auto', opacity: 1 }}
-                        exit={{ height: 0, opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        onAnimationComplete={() => setLoginOverflowVisible(true)}
-                        style={{ overflow: loginOverflowVisible ? 'visible' : 'hidden' }}
-                      >
-                        <LoginForm embedded />
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </motion.div>
-              </CardContent>
+                          {!starshipsLoading && starships && starships.length > 0 && (
+                            <>
+                              <div className="space-y-2">
+                                <Label>Starship</Label>
+                                <Select value={selectedStarshipId} onValueChange={setSelectedStarshipId}>
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select a starship" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {starships.map(s => (
+                                      <SelectItem key={s.id} value={s.id}>
+                                        {s.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+
+                              <Button className="w-full" disabled={!selectedStarshipId || isStarting || startOAuth.isPending} onClick={onStart}>
+                                {isStarting || startOAuth.isPending ? 'Starting…' : `Continue to ${providerLabel}`}
+                              </Button>
+                            </>
+                          )}
+                        </motion.div>
+                      )}
+
+                      {shouldShowLogin && (
+                        <motion.div
+                          key="install-login"
+                          initial={{ height: 0, opacity: 0 }}
+                          animate={{ height: 'auto', opacity: 1 }}
+                          exit={{ height: 0, opacity: 0 }}
+                          transition={{ duration: 0.3 }}
+                          onAnimationComplete={() => setLoginOverflowVisible(true)}
+                          style={{ overflow: loginOverflowVisible ? 'visible' : 'hidden' }}
+                        >
+                          <LoginForm embedded />
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </motion.div>
+                </CardContent>
               </Card>
             </motion.div>
           </div>

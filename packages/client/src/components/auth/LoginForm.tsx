@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/useAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
-import { motion } from 'motion/react'
+import { AnimatePresence, motion } from 'motion/react'
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -277,7 +277,7 @@ export function LoginForm({
     </p>
   )
 
-  const card = (
+  const cardInner = (
     <Card className={embedded ? 'border-0 bg-transparent shadow-none' : undefined}>
       <CardContent className={embedded ? 'p-0 pt-0' : 'pt-6'}>
         {emailVerificationStatus && (
@@ -322,176 +322,194 @@ export function LoginForm({
             <TabsTrigger value="register">Sign Up</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="login" className="space-y-4">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <Input
-                  id="login-email"
-                  type="email"
-                  value={loginData.email}
-                  onChange={e => setLoginData(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="captain@starships.ai"
-                  disabled={isLoading}
-                  required
-                  className="h-12"
-                />
-              </div>
+          <motion.div layout transition={{ layout: { duration: 0.25 } }} className="mt-2">
+            <AnimatePresence mode="wait" initial={false}>
+              {activeTab === 'login' ? (
+                <motion.div
+                  key="tab-login"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <form onSubmit={handleLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="login-email">Email</Label>
+                      <Input
+                        id="login-email"
+                        type="email"
+                        value={loginData.email}
+                        onChange={e => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="captain@starships.ai"
+                        disabled={isLoading}
+                        required
+                        className="h-12"
+                      />
+                    </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={loginData.password}
-                    onChange={e => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder="Enter your password"
-                    disabled={isLoading}
-                    required
-                    className="h-12"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
-                  >
-                    {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="login-password">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="login-password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={loginData.password}
+                          onChange={e => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Enter your password"
+                          disabled={isLoading}
+                          required
+                          className="h-12"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isLoading}
+                        >
+                          {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
 
-              {formError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{formError}</AlertDescription>
-                </Alert>
+                    {formError && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{formError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <Button type="submit" className="w-full h-12" disabled={isLoading}>
+                      {isLoading ? (
+                        <>Signing in...</>
+                      ) : (
+                        <>
+                          <Icon name="log-in" className="h-4 w-4 mr-2" />
+                          Sign In
+                        </>
+                      )}
+                    </Button>
+
+                    <div className="text-center space-y-2">
+                      <Button variant="ghost" className="w-full hover:bg-accent/60" asChild>
+                        <Link href="/forgot-password" onClick={() => track({ type: 'auth_forgot_password_clicked' })}>
+                          Forgot your password?
+                        </Link>
+                      </Button>
+                    </div>
+                  </form>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="tab-register"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <form onSubmit={handleRegister} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="register-name">Full Name</Label>
+                      <Input
+                        id="register-name"
+                        type="text"
+                        value={registerData.name}
+                        onChange={e => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Captain Starship"
+                        disabled={isLoading}
+                        required
+                        className="h-12"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="register-email">Email</Label>
+                      <Input
+                        id="register-email"
+                        type="email"
+                        value={registerData.email}
+                        onChange={e => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                        placeholder="captain@starships.ai"
+                        disabled={isLoading}
+                        required
+                        className="h-12"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <PasswordLabelWithTooltip htmlFor="register-password" password={registerData.password} />
+                      <div className="relative">
+                        <Input
+                          id="register-password"
+                          type={showPassword ? 'text' : 'password'}
+                          value={registerData.password}
+                          onChange={e => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                          placeholder="Create a strong password"
+                          disabled={isLoading}
+                          required
+                          className="h-12"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowPassword(!showPassword)}
+                          disabled={isLoading}
+                        >
+                          {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                      {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="register-confirm-password">Confirm Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="register-confirm-password"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={registerData.confirmPassword}
+                          onChange={e => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                          placeholder="Confirm your password"
+                          disabled={isLoading}
+                          required
+                          className="h-12"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          disabled={isLoading}
+                        >
+                          {showConfirmPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {formError && (
+                      <Alert variant="destructive">
+                        <AlertDescription>{formError}</AlertDescription>
+                      </Alert>
+                    )}
+
+                    <Button type="submit" className="w-full h-12" disabled={isLoading}>
+                      {isLoading ? (
+                        <>Creating account...</>
+                      ) : (
+                        <>
+                          <Icon name="user-plus" className="h-4 w-4 mr-2" />
+                          Create Account
+                        </>
+                      )}
+                    </Button>
+                  </form>
+                </motion.div>
               )}
-
-              <Button type="submit" className="w-full h-12" disabled={isLoading}>
-                {isLoading ? (
-                  <>Signing in...</>
-                ) : (
-                  <>
-                    <Icon name="log-in" className="h-4 w-4 mr-2" />
-                    Sign In
-                  </>
-                )}
-              </Button>
-
-              <div className="text-center space-y-2">
-                <Button variant="ghost" className="w-full hover:bg-accent/60" asChild>
-                  <Link href="/forgot-password" onClick={() => track({ type: 'auth_forgot_password_clicked' })}>
-                    Forgot your password?
-                  </Link>
-                </Button>
-              </div>
-            </form>
-          </TabsContent>
-
-          <TabsContent value="register" className="space-y-4">
-            <form onSubmit={handleRegister} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="register-name">Full Name</Label>
-                <Input
-                  id="register-name"
-                  type="text"
-                  value={registerData.name}
-                  onChange={e => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Captain Starship"
-                  disabled={isLoading}
-                  required
-                  className="h-12"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-email">Email</Label>
-                <Input
-                  id="register-email"
-                  type="email"
-                  value={registerData.email}
-                  onChange={e => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="captain@starships.ai"
-                  disabled={isLoading}
-                  required
-                  className="h-12"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <PasswordLabelWithTooltip htmlFor="register-password" password={registerData.password} />
-                <div className="relative">
-                  <Input
-                    id="register-password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={registerData.password}
-                    onChange={e => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
-                    placeholder="Create a strong password"
-                    disabled={isLoading}
-                    required
-                    className="h-12"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
-                  >
-                    {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
-                  </Button>
-                </div>
-                {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="register-confirm-password">Confirm Password</Label>
-                <div className="relative">
-                  <Input
-                    id="register-confirm-password"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    value={registerData.confirmPassword}
-                    onChange={e => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                    placeholder="Confirm your password"
-                    disabled={isLoading}
-                    required
-                    className="h-12"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    disabled={isLoading}
-                  >
-                    {showConfirmPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
-                  </Button>
-                </div>
-              </div>
-
-              {formError && (
-                <Alert variant="destructive">
-                  <AlertDescription>{formError}</AlertDescription>
-                </Alert>
-              )}
-
-              <Button type="submit" className="w-full h-12" disabled={isLoading}>
-                {isLoading ? (
-                  <>Creating account...</>
-                ) : (
-                  <>
-                    <Icon name="user-plus" className="h-4 w-4 mr-2" />
-                    Create Account
-                  </>
-                )}
-              </Button>
-            </form>
-          </TabsContent>
+            </AnimatePresence>
+          </motion.div>
         </Tabs>
 
         {/* OAuth buttons BELOW email forms */}
@@ -504,13 +522,31 @@ export function LoginForm({
     </Card>
   )
 
+  // Animate card height changes (login <-> signup) smoothly.
+  const card = (
+    <motion.div layout transition={{ layout: { duration: 0.25 } }}>
+      {cardInner}
+    </motion.div>
+  )
+
   // Embedded mode should not animate independently (parent flow controls transitions).
   if (embedded) {
-    return <div className="w-full">{card}</div>
+    // Still allow layout-driven height easing without “fly-in” animations.
+    return (
+      <motion.div layout transition={{ layout: { duration: 0.25 } }} className="w-full">
+        {cardInner}
+      </motion.div>
+    )
   }
 
   return (
-    <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
+    <motion.div
+      layout
+      transition={{ layout: { duration: 0.25 }, delay: 0.3, duration: 0.4 }}
+      className="w-full max-w-md"
+      initial={{ opacity: 0, scale: 0.95 }}
+      animate={{ opacity: 1, scale: 1 }}
+    >
       {card}
     </motion.div>
   )

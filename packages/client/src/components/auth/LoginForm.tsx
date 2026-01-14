@@ -48,9 +48,15 @@ function isAuthTab(value: string): value is AuthTab {
 export function LoginForm({
   onTabChange,
   defaultTab = 'login',
+  embedded = false,
 }: {
   onTabChange?: (tab: AuthTab) => void
   defaultTab?: AuthTab
+  /**
+   * When true, renders the form without visible Card chrome.
+   * Useful for embedding in other flows (e.g. connector install).
+   */
+  embedded?: boolean
 }) {
   const { login, register, oauthLogin, resendVerification, isLoading } = useAuth()
   const searchParams = useSearchParams()
@@ -248,9 +254,14 @@ export function LoginForm({
   }
 
   return (
-    <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
-      <Card>
-        <CardContent className="pt-6">
+    <motion.div
+      className={embedded ? 'w-full' : 'w-full max-w-md'}
+      initial={embedded ? { opacity: 0, y: 6 } : { opacity: 0, scale: 0.95 }}
+      animate={embedded ? { opacity: 1, y: 0 } : { opacity: 1, scale: 1 }}
+      transition={embedded ? { delay: 0.05, duration: 0.25 } : { delay: 0.3, duration: 0.4 }}
+    >
+      <Card className={embedded ? 'border-0 bg-transparent shadow-none' : undefined}>
+        <CardContent className={embedded ? 'p-0 pt-0' : 'pt-6'}>
           {/* OAuth buttons ABOVE existing tabs */}
           <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
 

@@ -145,17 +145,10 @@ export function ConnectorInstallPage() {
         {/* Header with logo (match /login look) */}
         <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
           <div className="px-4 sm:px-8 flex items-center justify-between h-8">
-            <button
-              className="cursor-pointer select-none h-8 flex items-center"
-              onClick={() => router.push('/')}
-              title="Go to home"
-              type="button"
-            >
+            <button className="cursor-pointer select-none h-8 flex items-center" onClick={() => router.push('/')} title="Go to home" type="button">
               <span className="flex items-center gap-2">
                 <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
-                <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none`}>
-                  starships.ai
-                </span>
+                <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none`}>starships.ai</span>
               </span>
             </button>
           </div>
@@ -194,9 +187,7 @@ export function ConnectorInstallPage() {
 
                 <div className="space-y-1">
                   <CardTitle className="text-xl">Connect Starships.ai to {providerLabel}</CardTitle>
-                  <CardDescription>
-                    {!isAuthenticated ? 'Sign in to Starships.ai to continue.' : `Select a starship, then continue to ${providerLabel}.`}
-                  </CardDescription>
+                  <CardDescription>{!isAuthenticated ? 'Sign in to Starships.ai to continue.' : `Select a starship, then continue to ${providerLabel}.`}</CardDescription>
                 </div>
               </CardHeader>
 

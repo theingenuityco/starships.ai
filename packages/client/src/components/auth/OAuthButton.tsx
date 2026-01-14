@@ -85,9 +85,33 @@ interface OAuthButtonsProps {
   onGitHubClick: () => void
   disabled?: boolean
   className?: string
+  /**
+   * Controls whether OAuth buttons appear above (default) or below the email form.
+   */
+  position?: 'top' | 'bottom'
 }
 
-export function OAuthButtons({ onGoogleClick, onGitHubClick, disabled, className }: OAuthButtonsProps) {
+export function OAuthButtons({ onGoogleClick, onGitHubClick, disabled, className, position = 'top' }: OAuthButtonsProps) {
+  if (position === 'bottom') {
+    return (
+      <div className={cn('space-y-3', className)}>
+        <div className="relative">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+          </div>
+        </div>
+
+        <div className="flex gap-2">
+          <OAuthButton provider="google" onClick={onGoogleClick} disabled={disabled} className="flex-1" />
+          <OAuthButton provider="github" onClick={onGitHubClick} disabled={disabled} className="flex-1" />
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className={cn('space-y-3 mb-4', className)}>
       <div className="flex gap-2">

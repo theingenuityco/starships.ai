@@ -253,6 +253,30 @@ export function LoginForm({
     await resendVerification(email)
   }
 
+  const termsAndPrivacy = (
+    <p className="text-xs text-muted-foreground/80 text-center">
+      By continuing, you agree to our{' '}
+      <a
+        href="/terms"
+        target="_blank"
+        className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
+        onClick={() => track({ type: 'auth_terms_clicked' })}
+      >
+        Terms of Service
+      </a>{' '}
+      and{' '}
+      <a
+        href="/privacy"
+        target="_blank"
+        className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
+        onClick={() => track({ type: 'auth_privacy_clicked' })}
+      >
+        Privacy Policy
+      </a>
+      .
+    </p>
+  )
+
   return (
     <motion.div
       className={embedded ? 'w-full' : 'w-full max-w-md'}
@@ -262,9 +286,6 @@ export function LoginForm({
     >
       <Card className={embedded ? 'border-0 bg-transparent shadow-none' : undefined}>
         <CardContent className={embedded ? 'p-0 pt-0' : 'pt-6'}>
-          {/* OAuth buttons ABOVE existing tabs */}
-          <OAuthButtons onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
-
           {emailVerificationStatus && (
             <Alert className="mb-3 border-emerald-500/50 bg-emerald-900/20 backdrop-blur-sm text-center">
               <div className="w-full space-y-2">
@@ -367,33 +388,11 @@ export function LoginForm({
                 </Button>
 
                 <div className="text-center space-y-2">
-                  <p className="text-xs text-muted-foreground/80">
-                    By signing in, you agree to our{' '}
-                    <a
-                      href="/terms"
-                      target="_blank"
-                      className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
-                      onClick={() => track({ type: 'auth_terms_clicked' })}
-                    >
-                      Terms of Service
-                    </a>{' '}
-                    and{' '}
-                    <a
-                      href="/privacy"
-                      target="_blank"
-                      className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
-                      onClick={() => track({ type: 'auth_privacy_clicked' })}
-                    >
-                      Privacy Policy
-                    </a>
-                  </p>
-                  <Link
-                    href="/forgot-password"
-                    onClick={() => track({ type: 'auth_forgot_password_clicked' })}
-                    className="text-sm text-blue-600 hover:text-blue-800 transition-colors mt-8 block"
-                  >
-                    Forgot your password?
-                  </Link>
+                  <Button variant="ghost" className="w-full hover:bg-accent/60" asChild>
+                    <Link href="/forgot-password" onClick={() => track({ type: 'auth_forgot_password_clicked' })}>
+                      Forgot your password?
+                    </Link>
+                  </Button>
                 </div>
               </form>
             </TabsContent>
@@ -497,30 +496,16 @@ export function LoginForm({
                     </>
                   )}
                 </Button>
-
-                <p className="text-xs text-muted-foreground/80 text-center">
-                  By signing up, you agree to our{' '}
-                  <a
-                    href="/terms"
-                    target="_blank"
-                    className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
-                    onClick={() => track({ type: 'auth_terms_clicked' })}
-                  >
-                    Terms of Service
-                  </a>{' '}
-                  and{' '}
-                  <a
-                    href="/privacy"
-                    target="_blank"
-                    className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
-                    onClick={() => track({ type: 'auth_privacy_clicked' })}
-                  >
-                    Privacy Policy
-                  </a>
-                </p>
               </form>
             </TabsContent>
           </Tabs>
+
+          {/* OAuth buttons BELOW email forms */}
+          <div className="mt-4">
+            <OAuthButtons position="bottom" onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
+          </div>
+
+          <div className="mt-4">{termsAndPrivacy}</div>
         </CardContent>
       </Card>
     </motion.div>

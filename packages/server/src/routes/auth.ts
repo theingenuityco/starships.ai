@@ -28,6 +28,17 @@ import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 const router: Router = Router();
 const env = getEnvConfig();
 
+function isValidRedirectUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  if (!url.startsWith('/')) return false;
+  if (url.startsWith('//')) return false;
+  // Prevent backslash-based protocol-relative tricks like "/\\evil.com"
+  if (url.includes('\\')) return false;
+  if (/^(javascript|data):/i.test(url)) return false;
+  if (url.includes('@')) return false;
+  return true;
+}
+
 // Zod schemas for validation
 const RegisterSchema = z.object({
   email: EmailSchema,
@@ -558,7 +569,10 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
       return res.redirect(`${env.PUBLIC_URL}/profile?oauth_link=error&message=unauthorized_linking`);
     }
 
-    const state = await generateOAuthState(isLinking);
+    // Optional: carry a safe returnUrl through OAuth via state context.
+    const returnUrlRaw = typeof req.query.returnUrl === 'string' ? req.query.returnUrl : undefined;
+    const returnUrl = returnUrlRaw && isValidRedirectUrl(returnUrlRaw) ? returnUrlRaw : undefined;
+    const state = await generateOAuthState(isLinking, undefined, returnUrl ? { returnUrl } : undefined);
 
     let authUrl: string;
     if (provider === 'google') {
@@ -614,7 +628,9 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
       return res.redirect(`${env.PUBLIC_URL}/login?oauth_error=invalid_state`);
     }
 
-    const { isLinking, userId } = stateValidation;
+    const { isLinking, userId, context } = stateValidation;
+    const returnUrlFromState = context && typeof (context as any).returnUrl === 'string' ? ((context as any).returnUrl as string) : undefined;
+    const safeReturnUrl = returnUrlFromState && isValidRedirectUrl(returnUrlFromState) ? returnUrlFromState : undefined;
 
     // If this is account linking, handle differently
     if (isLinking) {
@@ -701,6 +717,9 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     const authCode = await generateAuthCode(result.user.id, result.user.email!);
 
     // Redirect with secure authorization code (short-lived, single-use)
+    if (safeReturnUrl) {
+      return res.redirect(`${env.PUBLIC_URL}/login?auth_code=${authCode}&returnUrl=${encodeURIComponent(safeReturnUrl)}`);
+    }
     return res.redirect(`${env.PUBLIC_URL}/login?auth_code=${authCode}`);
   } catch (error) {
     logger.error('[AUTH] OAuth callback error:', {

@@ -282,6 +282,11 @@ export function LoginForm({
   const [measuredHeight, setMeasuredHeight] = useState<number | null>(null)
   const [overflowVisible, setOverflowVisible] = useState(false)
 
+  // Ensure we never show overflow during a tab switch (prevents brief "content outside" flashes).
+  useLayoutEffect(() => {
+    setOverflowVisible(false)
+  }, [activeTab])
+
   useLayoutEffect(() => {
     const el = measureRef.current
     if (!el) return

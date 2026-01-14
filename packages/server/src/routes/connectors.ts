@@ -18,6 +18,12 @@ import { z } from 'zod';
 import { getEnvConfig } from '@starships/env';
 import { validateOAuthState } from '@/utils/jwt';
 import type { ConnectorProvider } from '@starships/protocol';
+import { ConnectorTemplateRepository } from '@starships/models';
+import { PlatformSecretService } from '@/services/PlatformSecretService';
+import {
+  parseExternalLaunchConfigFromAuthJson,
+  verifyExternalLaunchQuery,
+} from '@/utils/external-launch';
 
 const env = getEnvConfig();
 
@@ -61,6 +67,63 @@ router.get('/connectors/catalog', async (req: Request, res: Response): Promise<v
     handleError(error, res, 'fetching connector catalog');
   }
 });
+
+// Shared handler for provider-initiated external install/launch requests.
+// This route is intentionally unauthenticated: it must work before the user logs in.
+// External entry is opt-in per connector_template via auth_json.launch.
+async function connectorExternalEntryValidateHandler(req: Request, res: Response): Promise<void> {
+  try {
+    const params = validateData(z.object({ provider: z.string().min(1) }), req.params, res, 'connector provider');
+    if (!params) return;
+
+    const { provider } = params;
+
+    const templateRepo = new ConnectorTemplateRepository();
+    const template = await templateRepo.findByProvider(provider as ConnectorProvider);
+    if (!template) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Connector template not found', 404, { provider });
+      return;
+    }
+    if (template.isEnabled === false) {
+      sendError(res, 'FORBIDDEN', 'Connector is disabled', 403, { provider });
+      return;
+    }
+
+    const launchConfig = parseExternalLaunchConfigFromAuthJson(template.authJson);
+    if (!launchConfig) {
+      sendError(res, 'FORBIDDEN', 'External launch is not enabled for this connector', 403, { provider });
+      return;
+    }
+
+    const secretSvc = new PlatformSecretService();
+    const secret = await secretSvc.getSecret(launchConfig.secretRef.key);
+    if (!secret) {
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'External launch secret not configured', 500, {
+        provider,
+        secretKey: launchConfig.secretRef.key,
+      });
+      return;
+    }
+
+    const result = verifyExternalLaunchQuery(launchConfig, secret, req.query as Record<string, unknown>);
+    if (!result.ok) {
+      const code = result.status === 400 ? 'VALIDATION_ERROR' : result.status === 401 ? 'AUTHENTICATION_REQUIRED' : 'FORBIDDEN';
+      sendError(res, code, result.message, result.status, { provider });
+      return;
+    }
+
+    sendSuccess(res, {
+      ok: true,
+      provider,
+      verifiedLaunchMetadata: result.verifiedLaunchMetadata,
+    });
+  } catch (error) {
+    handleError(error, res, 'validating external connector launch');
+  }
+}
+
+// Preferred route name: /install
+router.get('/connectors/:provider/install/validate', connectorExternalEntryValidateHandler);
 
 // GET /starships/:id/connectors - List connectors for a starship
 router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
@@ -354,6 +417,52 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
     if (!queryValidation) return;
 
     const { code, state, error } = queryValidation;
+
+    // Optional: verify provider-signed callback query when the connector template opts in.
+    // This is used by providers like Shopify that sign callback params with an HMAC.
+    try {
+      const templateRepo = new ConnectorTemplateRepository();
+      const template = await templateRepo.findByProvider(provider as ConnectorProvider);
+      const launchConfig = template ? parseExternalLaunchConfigFromAuthJson(template.authJson) : null;
+
+      if (launchConfig) {
+        const signatureKey = launchConfig.signatureKey || 'hmac';
+        const hasSignature = req.query?.[signatureKey] !== undefined;
+
+        // Only enforce verification when a signature is actually present on the callback.
+        if (hasSignature) {
+          const secretSvc = new PlatformSecretService();
+          const secret = await secretSvc.getSecret(launchConfig.secretRef.key);
+          if (!secret) {
+            throw new Error(`External launch secret not configured (${launchConfig.secretRef.key})`);
+          }
+
+          const verify = verifyExternalLaunchQuery(launchConfig, secret, req.query as Record<string, unknown>);
+          if (!verify.ok) {
+            const redirectParams = new URLSearchParams({
+              connector: provider,
+              status: 'error',
+            });
+            const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
+            res.redirect(redirectUrl);
+            return;
+          }
+        }
+      }
+    } catch (verifyError) {
+      console.error('[CONNECTOR_CALLBACK] External callback signature verification failed', {
+        provider,
+        errorMessage: (verifyError as Error | undefined)?.message,
+        errorName: (verifyError as Error | undefined)?.name,
+      });
+      const redirectParams = new URLSearchParams({
+        connector: provider,
+        status: 'error',
+      });
+      const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
+      res.redirect(redirectUrl);
+      return;
+    }
 
     const connectorService = new ConnectorService();
 

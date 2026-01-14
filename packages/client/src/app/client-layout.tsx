@@ -48,7 +48,15 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const { isAuthenticated } = useAuth()
   const isDashboard = pathname === '/'
   const isMarketplace = pathname === '/marketplace'
-  const isPublicSimplePage = pathname === '/' || pathname === '/login' || pathname === '/forgot-password' || pathname === '/reset-password' || pathname === '/terms' || pathname === '/privacy'
+  const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
+  const isPublicSimplePage =
+    pathname === '/' ||
+    pathname === '/login' ||
+    pathname === '/forgot-password' ||
+    pathname === '/reset-password' ||
+    pathname === '/terms' ||
+    pathname === '/privacy' ||
+    isConnectorInstallPage
 
   useEffect(() => {
     if (!pathname) return
@@ -63,6 +71,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       if (path === '/terms') return 'Terms of Service | Starships.ai'
       if (path === '/privacy') return 'Privacy Policy | Starships.ai'
       if (path === '/profile') return 'Profile | Starships.ai'
+      if (path.startsWith('/connectors/') && path.endsWith('/install')) return 'Connectors | Starships.ai'
 
       // Admin
       if (path === '/admin/connector-templates') return 'Admin: Connector Templates | Starships.ai'

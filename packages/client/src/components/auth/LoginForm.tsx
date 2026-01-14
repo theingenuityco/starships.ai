@@ -139,7 +139,6 @@ export function LoginForm({
         toast.success('Email verified successfully! You can now log in to your account.')
       }
 
-
       // Prevent duplicate handling (synchronous check with ref)
       if (oauthHandledRef.current) {
         return
@@ -256,21 +255,11 @@ export function LoginForm({
   const termsAndPrivacy = (
     <p className="text-xs text-muted-foreground/80 text-center">
       By continuing, you agree to our{' '}
-      <a
-        href="/terms"
-        target="_blank"
-        className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
-        onClick={() => track({ type: 'auth_terms_clicked' })}
-      >
+      <a href="/terms" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2" onClick={() => track({ type: 'auth_terms_clicked' })}>
         Terms of Service
       </a>{' '}
       and{' '}
-      <a
-        href="/privacy"
-        target="_blank"
-        className="text-primary/90 hover:text-primary hover:underline underline-offset-2"
-        onClick={() => track({ type: 'auth_privacy_clicked' })}
-      >
+      <a href="/privacy" target="_blank" className="text-primary/90 hover:text-primary hover:underline underline-offset-2" onClick={() => track({ type: 'auth_privacy_clicked' })}>
         Privacy Policy
       </a>
       .
@@ -355,13 +344,7 @@ export function LoginForm({
           <motion.div layout transition={{ layout: { duration: 0.25 } }} className="mt-2">
             <AnimatePresence mode="wait" initial={false}>
               {activeTab === 'login' ? (
-                <motion.div
-                  key="tab-login"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                >
+                <motion.div key="tab-login" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
                   <form onSubmit={handleLogin} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="login-email">Email</Label>
@@ -430,13 +413,7 @@ export function LoginForm({
                   </form>
                 </motion.div>
               ) : (
-                <motion.div
-                  key="tab-register"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.18 }}
-                >
+                <motion.div key="tab-register" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.18 }}>
                   <form onSubmit={handleRegister} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="register-name">Full Name</Label>

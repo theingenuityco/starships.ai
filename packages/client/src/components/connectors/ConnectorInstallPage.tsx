@@ -98,7 +98,13 @@ export function ConnectorInstallPage() {
   }, [provider, queryObject])
 
   const providerLabel = titleCase(provider || 'connector')
-  const providerIconSrc = `/connectors/${provider}.svg`
+  const providerSlug = useMemo(() => {
+    const p = String(provider || '').trim()
+    // Restrict to a safe path segment for static assets.
+    // (Avoids traversal/backslash/etc. and keeps src predictable.)
+    return /^[a-z0-9][a-z0-9_-]*$/i.test(p) ? p : ''
+  }, [provider])
+  const providerIconSrc = providerSlug ? `/connectors/${encodeURIComponent(providerSlug)}.svg` : null
 
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
   const [selectedStarshipId, setSelectedStarshipId] = useState<string>('')
@@ -229,15 +235,19 @@ export function ConnectorInstallPage() {
                     />
 
                     <div className="h-[84px] w-[84px] rounded-full bg-black/40 border-2 border-white/15 shadow-sm flex items-center justify-center overflow-hidden">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={providerIconSrc}
-                        alt={`${providerLabel} logo`}
-                        className="h-12 w-12 object-contain"
-                        onError={e => {
-                          ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                        }}
-                      />
+                      {providerIconSrc ? (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={providerIconSrc}
+                            alt={`${providerLabel} logo`}
+                            className="h-12 w-12 object-contain"
+                            onError={e => {
+                              ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                            }}
+                          />
+                        </>
+                      ) : null}
                     </div>
                   </div>
 

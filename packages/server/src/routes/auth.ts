@@ -32,6 +32,8 @@ function isValidRedirectUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
   if (!url.startsWith('/')) return false;
   if (url.startsWith('//')) return false;
+  // Prevent backslash-based protocol-relative tricks like "/\\evil.com"
+  if (url.includes('\\')) return false;
   if (/^(javascript|data):/i.test(url)) return false;
   if (url.includes('@')) return false;
   return true;

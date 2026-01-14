@@ -160,7 +160,23 @@ export function LoginForm({
       if (authCode) {
         oauthHandledRef.current = true
         // ✅ SECURE: Exchange authorization code for JWT via POST request
-        oauthLogin(authCode)
+        ;(async () => {
+          try {
+            const result = await oauthLogin(authCode)
+            if (!result.success) {
+              setFormError(result.error || 'Login failed. Please try again.')
+            }
+          } finally {
+            // Prevent re-running OAuth exchange on refresh/back navigation.
+            if (typeof window !== 'undefined') {
+              const params = new URLSearchParams(window.location.search)
+              params.delete('auth_code')
+              const query = params.toString()
+              const newUrl = `${window.location.pathname}${query ? `?${query}` : ''}`
+              window.history.replaceState(null, '', newUrl)
+            }
+          }
+        })()
       } else if (oauthError) {
         setFormError(getOAuthErrorMessage(oauthError))
       } else if (verification === 'error') {

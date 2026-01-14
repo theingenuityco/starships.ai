@@ -9,18 +9,25 @@ import { useUserStarships } from '@/hooks/useStarships'
 import { useStartOAuthConnector } from '@/hooks/useConnectors'
 
 import { LoginForm } from '@/components/auth/LoginForm'
+import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
+import { StarTheme } from '@/components/theme-context'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import Icon from '@/components/primitives/Icon'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
+import { Orbitron } from 'next/font/google'
+import { useRouter } from 'next/navigation'
 
 type InstallValidateResponse = {
   ok: true
   provider: string
   verifiedLaunchMetadata: Record<string, unknown>
 }
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 function titleCase(input: string): string {
   const s = String(input || '').trim()
@@ -29,6 +36,7 @@ function titleCase(input: string): string {
 }
 
 export function ConnectorInstallPage() {
+  const router = useRouter()
   const params = useParams<{ provider: string }>()
   const searchParams = useSearchParams()
   const provider = (params?.provider || '').trim()
@@ -74,11 +82,7 @@ export function ConnectorInstallPage() {
           setLaunchMetadata(payload.verifiedLaunchMetadata || {})
         }
       } catch (err: any) {
-        const msg =
-          err?.response?.data?.error?.message ||
-          err?.response?.data?.error ||
-          err?.message ||
-          'Failed to validate install request.'
+        const msg = err?.response?.data?.error?.message || err?.response?.data?.error || err?.message || 'Failed to validate install request.'
         if (!cancelled) {
           setValidateError(String(msg))
         }
@@ -97,6 +101,7 @@ export function ConnectorInstallPage() {
 
   const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
   const [selectedStarshipId, setSelectedStarshipId] = useState<string>('')
+  const selectedStarship = useMemo(() => starships?.find(s => s.id === selectedStarshipId), [starships, selectedStarshipId])
 
   // Auto-select if there is exactly one starship.
   useEffect(() => {
@@ -130,119 +135,150 @@ export function ConnectorInstallPage() {
     }
   }
 
+  const shouldShowLogin = !validateError && !isValidating && launchMetadata && !isAuthenticated
+
   return (
-    <div className="min-h-[100dvh] bg-background flex items-center justify-center px-6 py-10">
-      <div className="w-full max-w-lg space-y-4">
-        <Card>
-          <CardHeader className="space-y-2">
-            <div className="flex items-center gap-3">
-              {/* Provider icon (optional) */}
-              <div className="h-10 w-10 rounded-md bg-muted flex items-center justify-center overflow-hidden">
-                {/* Use img to avoid Next Image restrictions for dynamic public assets */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={providerIconSrc}
-                  alt={`${providerLabel} logo`}
-                  className="h-10 w-10 object-contain"
-                  onError={(e) => {
-                    // Hide broken icon (fallback to generic glyph below).
-                    ;(e.currentTarget as HTMLImageElement).style.display = 'none'
-                  }}
-                />
-                <Icon name="plug" className="h-5 w-5 text-muted-foreground" />
-              </div>
-              <div className="min-w-0">
-                <CardTitle className="text-xl">Connect {providerLabel}</CardTitle>
-                <CardDescription>
-                  This connection was initiated by {providerLabel}. Sign in to Starships to continue.
-                </CardDescription>
-              </div>
-            </div>
-          </CardHeader>
+    <StarTheme theme="dark">
+      <div className="min-h-[100dvh] bg-black relative overflow-hidden flex items-center justify-center">
+        <AuthMarketingPanel className="fixed inset-0" />
 
-          <CardContent className="space-y-4">
-            {(isValidating || authLoading) && (
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Icon name="loader-2" className="h-4 w-4 animate-spin" />
-                Validating install…
-              </div>
-            )}
+        {/* Header with logo (match /login look) */}
+        <header className="fixed top-4 sm:top-8 left-0 right-0 z-50">
+          <div className="px-4 sm:px-8 flex items-center justify-between h-8">
+            <button
+              className="cursor-pointer select-none h-8 flex items-center"
+              onClick={() => router.push('/')}
+              title="Go to home"
+              type="button"
+            >
+              <span className="flex items-center gap-2">
+                <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
+                <span className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none`}>
+                  starships.ai
+                </span>
+              </span>
+            </button>
+          </div>
+        </header>
 
-            {validateError && (
-              <Alert>
-                <Icon name="info" className="h-4 w-4" />
-                <AlertDescription>{validateError}</AlertDescription>
-              </Alert>
-            )}
+        <div className="w-full flex items-center justify-center px-6 py-16 relative z-10">
+          <div className="w-full max-w-md space-y-4">
+            <Card>
+              <CardHeader className="space-y-4 text-center">
+                {/* Connection preview (top of card) */}
+                <div className="flex items-center justify-center py-1">
+                  <div className="h-[84px] w-[84px] rounded-full bg-black/40 border-2 border-white/15 shadow-sm flex items-center justify-center">
+                    <StarshipsLogo width={48} height={48} className="text-foreground" idleLoop={false} playOnMountOnce={false} />
+                  </div>
 
-            {!validateError && !isValidating && !launchMetadata && (
-              <Alert>
-                <Icon name="info" className="h-4 w-4" />
-                <AlertDescription>Unable to load install context.</AlertDescription>
-              </Alert>
-            )}
+                  <div
+                    className="-mx-px h-[3px] w-16"
+                    aria-hidden="true"
+                    style={{
+                      backgroundImage: 'repeating-linear-gradient(to right, rgba(255,255,255,0.15) 0 3px, transparent 3px 7px)',
+                    }}
+                  />
 
-            {/* Step 1: Login */}
-            {!validateError && !isValidating && launchMetadata && !isAuthenticated && (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">Sign in or create an account to continue.</p>
-                <LoginForm />
-              </div>
-            )}
+                  <div className="h-[84px] w-[84px] rounded-full bg-black/40 border-2 border-white/15 shadow-sm flex items-center justify-center overflow-hidden">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={providerIconSrc}
+                      alt={`${providerLabel} logo`}
+                      className="h-12 w-12 object-contain"
+                      onError={e => {
+                        ;(e.currentTarget as HTMLImageElement).style.display = 'none'
+                      }}
+                    />
+                  </div>
+                </div>
 
-            {/* Step 2: Confirm */}
-            {!validateError && !isValidating && launchMetadata && isAuthenticated && (
-              <div className="space-y-4">
-                {starshipsLoading && (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                <div className="space-y-1">
+                  <CardTitle className="text-xl">Connect Starships.ai to {providerLabel}</CardTitle>
+                  <CardDescription>
+                    {!isAuthenticated ? 'Sign in to Starships.ai to continue.' : `Select a starship, then continue to ${providerLabel}.`}
+                  </CardDescription>
+                </div>
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                {(isValidating || authLoading) && (
+                  <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
                     <Icon name="loader-2" className="h-4 w-4 animate-spin" />
-                    Loading your starships…
+                    Validating install…
                   </div>
                 )}
 
-                {!starshipsLoading && (!starships || starships.length === 0) && (
+                {validateError && (
                   <Alert>
                     <Icon name="info" className="h-4 w-4" />
-                    <AlertDescription>You don’t have any starships yet. Create one in your profile to connect apps.</AlertDescription>
+                    <AlertDescription>{validateError}</AlertDescription>
                   </Alert>
                 )}
 
-                {!starshipsLoading && starships && starships.length > 0 && (
-                  <>
-                    <div className="space-y-2">
-                      <Label>Starship</Label>
-                      <Select value={selectedStarshipId} onValueChange={setSelectedStarshipId}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a starship" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {starships.map((s) => (
-                            <SelectItem key={s.id} value={s.id}>
-                              {s.name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <Alert>
-                      <Icon name="info" className="h-4 w-4" />
-                      <AlertDescription>
-                        You’re about to connect <strong>{providerLabel}</strong> to the selected starship.
-                      </AlertDescription>
-                    </Alert>
-
-                    <Button className="w-full" disabled={!selectedStarshipId || isStarting || startOAuth.isPending} onClick={onStart}>
-                      {isStarting || startOAuth.isPending ? 'Starting…' : `Continue to ${providerLabel}`}
-                    </Button>
-                  </>
+                {!validateError && !isValidating && !launchMetadata && (
+                  <Alert>
+                    <Icon name="info" className="h-4 w-4" />
+                    <AlertDescription>Unable to load install context.</AlertDescription>
+                  </Alert>
                 )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+
+                {/* Step 2: Confirm */}
+                {!validateError && !isValidating && launchMetadata && isAuthenticated && (
+                  <div className="space-y-4">
+                    {starshipsLoading && (
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Icon name="loader-2" className="h-4 w-4 animate-spin" />
+                        Loading your starships…
+                      </div>
+                    )}
+
+                    {!starshipsLoading && (!starships || starships.length === 0) && (
+                      <Alert>
+                        <Icon name="info" className="h-4 w-4" />
+                        <AlertDescription>You don’t have any starships yet. Create one in your profile to connect apps.</AlertDescription>
+                      </Alert>
+                    )}
+
+                    {!starshipsLoading && starships && starships.length > 0 && (
+                      <>
+                        <div className="space-y-2">
+                          <Label>Starship</Label>
+                          <Select value={selectedStarshipId} onValueChange={setSelectedStarshipId}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a starship" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {starships.map(s => (
+                                <SelectItem key={s.id} value={s.id}>
+                                  {s.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <Alert>
+                          <Icon name="info" className="h-4 w-4" />
+                          <AlertDescription>
+                            You’re about to connect <strong>{providerLabel}</strong> to the selected starship.
+                          </AlertDescription>
+                        </Alert>
+
+                        <Button className="w-full" disabled={!selectedStarshipId || isStarting || startOAuth.isPending} onClick={onStart}>
+                          {isStarting || startOAuth.isPending ? 'Starting…' : `Continue to ${providerLabel}`}
+                        </Button>
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Step 1: Login (embedded inside this card) */}
+                {!validateError && !isValidating && launchMetadata && !isAuthenticated && <LoginForm embedded />}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
-    </div>
+    </StarTheme>
   )
 }
-

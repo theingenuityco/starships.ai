@@ -159,6 +159,11 @@ export function ConnectorInstallPage() {
   const [bodyHeight, setBodyHeight] = useState<number | null>(null)
   const [bodyOverflowVisible, setBodyOverflowVisible] = useState(false)
 
+  // Ensure we never show overflow during a state swap (prevents brief "content outside" flashes).
+  useLayoutEffect(() => {
+    setBodyOverflowVisible(false)
+  }, [contentKey])
+
   useLayoutEffect(() => {
     const el = bodyRef.current
     if (!el) return
@@ -280,7 +285,7 @@ export function ConnectorInstallPage() {
                           </Alert>
                         )}
 
-                        {contentKey === 'login' && <LoginForm embedded />}
+                        {contentKey === 'login' && <LoginForm embedded onTabChange={() => setBodyOverflowVisible(false)} />}
 
                         {contentKey === 'confirm' && (
                           <>

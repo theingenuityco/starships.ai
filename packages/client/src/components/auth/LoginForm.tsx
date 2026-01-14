@@ -64,7 +64,20 @@ export function LoginForm({
   // OAuth initiation function - uses relative URL like regular auth
   const initiateOAuth = (provider: 'google' | 'github') => {
     track({ type: 'auth_oauth_clicked', provider })
-    window.location.href = `/api/v1/auth/${provider}`
+    if (typeof window === 'undefined') return
+
+    // Prefer an explicit returnUrl if present (e.g. /login?returnUrl=...),
+    // otherwise, only set returnUrl automatically for connector install flows.
+    const params = new URLSearchParams(window.location.search)
+    const explicitReturnUrl = params.get('returnUrl')
+    const isConnectorInstall = window.location.pathname.startsWith('/connectors/') && window.location.pathname.includes('/install')
+    const returnUrl = explicitReturnUrl || (isConnectorInstall ? `${window.location.pathname}${window.location.search}` : null)
+
+    const authUrl = new URL(`/api/v1/auth/${provider}`, window.location.origin)
+    if (returnUrl) {
+      authUrl.searchParams.set('returnUrl', returnUrl)
+    }
+    window.location.href = `${authUrl.pathname}${authUrl.search}`
   }
 
   const [loginData, setLoginData] = useState({

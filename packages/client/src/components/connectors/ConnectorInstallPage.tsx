@@ -321,7 +321,7 @@ export function ConnectorInstallPage() {
                                   </Select>
                                 </div>
 
-                                <Button className="w-full" disabled={!selectedStarshipId || isStarting || startOAuth.isPending} onClick={onStart}>
+                                <Button className="w-full mt-6" disabled={!selectedStarshipId || isStarting || startOAuth.isPending} onClick={onStart}>
                                   {isStarting || startOAuth.isPending ? 'Starting…' : `Continue to ${providerLabel}`}
                                 </Button>
                               </>

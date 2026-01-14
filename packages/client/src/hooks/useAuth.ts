@@ -150,6 +150,18 @@ export function useAuthUser() {
   })
 }
 
+function getPostAuthRedirectTarget(): string | null {
+  if (typeof window === 'undefined') return null
+  const searchParams = new URLSearchParams(window.location.search)
+  const returnUrl = searchParams.get('returnUrl')
+  return returnUrl && isValidRedirectUrl(returnUrl) ? returnUrl : null
+}
+
+function isConnectorInstallPath(pathname: string | null | undefined): boolean {
+  const p = (pathname || '').trim()
+  return p.startsWith('/connectors/') && p.includes('/install')
+}
+
 // Login mutation
 export function useLogin() {
   const queryClient = useQueryClient()
@@ -188,12 +200,15 @@ export function useLogin() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Handle redirect with returnUrl pattern
-      const searchParams = new URLSearchParams(window.location.search)
-      const returnUrl = searchParams.get('returnUrl')
+      // Embedded connector install flow should remain on the install page and let the UI advance.
+      if (isConnectorInstallPath(typeof window !== 'undefined' ? window.location.pathname : null)) {
+        queryClient.invalidateQueries()
+        return
+      }
 
-      if (returnUrl && isValidRedirectUrl(returnUrl)) {
-        router.push(isFirstLogin ? addWelcomeParamToPath(returnUrl) : returnUrl)
+      const redirectTarget = getPostAuthRedirectTarget()
+      if (redirectTarget) {
+        router.push(isFirstLogin ? addWelcomeParamToPath(redirectTarget) : redirectTarget)
       } else if (starship) {
         const path = `/ship/${starship.slug}/conversations`
         router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)
@@ -256,8 +271,16 @@ export function useRegister() {
       // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Redirect to starship's conversation if available
-      if (starship) {
+      // Embedded connector install flow should remain on the install page and let the UI advance.
+      if (isConnectorInstallPath(typeof window !== 'undefined' ? window.location.pathname : null)) {
+        queryClient.invalidateQueries()
+        return
+      }
+
+      const redirectTarget = getPostAuthRedirectTarget()
+      if (redirectTarget) {
+        router.push(addWelcomeParamToPath(redirectTarget))
+      } else if (starship) {
         router.push(addWelcomeParamToPath(`/ship/${starship.slug}/conversations`))
       }
 
@@ -309,12 +332,16 @@ export function useOAuthLogin() {
       // Update auth user cache (same as regular login)
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Handle redirect with returnUrl pattern (same as regular login)
-      const searchParams = new URLSearchParams(window.location.search)
-      const returnUrl = searchParams.get('returnUrl')
+      // If OAuth exchange is happening on an install flow, the /login page should redirect via returnUrl.
+      // If we still somehow land on /connectors/*/install, stay put and let the UI advance.
+      if (isConnectorInstallPath(typeof window !== 'undefined' ? window.location.pathname : null)) {
+        queryClient.invalidateQueries()
+        return
+      }
 
-      if (returnUrl && isValidRedirectUrl(returnUrl)) {
-        router.push(isFirstLogin ? addWelcomeParamToPath(returnUrl) : returnUrl)
+      const redirectTarget = getPostAuthRedirectTarget()
+      if (redirectTarget) {
+        router.push(isFirstLogin ? addWelcomeParamToPath(redirectTarget) : redirectTarget)
       } else if (starship) {
         const path = `/ship/${starship.slug}/conversations`
         router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)

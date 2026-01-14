@@ -277,237 +277,241 @@ export function LoginForm({
     </p>
   )
 
-  return (
-    <motion.div
-      className={embedded ? 'w-full' : 'w-full max-w-md'}
-      initial={embedded ? { opacity: 0, y: 6 } : { opacity: 0, scale: 0.95 }}
-      animate={embedded ? { opacity: 1, y: 0 } : { opacity: 1, scale: 1 }}
-      transition={embedded ? { delay: 0.05, duration: 0.25 } : { delay: 0.3, duration: 0.4 }}
-    >
-      <Card className={embedded ? 'border-0 bg-transparent shadow-none' : undefined}>
-        <CardContent className={embedded ? 'p-0 pt-0' : 'pt-6'}>
-          {emailVerificationStatus && (
-            <Alert className="mb-3 border-emerald-500/50 bg-emerald-900/20 backdrop-blur-sm text-center">
-              <div className="w-full space-y-2">
-                <div className="flex items-center justify-center space-x-2 flex-wrap">
-                  <Icon name="check-circle" className="h-4 w-4 text-emerald-400" />
-                  <span className="text-white font-semibold text-sm">We&apos;ve sent a verification email to:</span>
-                  <span className="font-semibold text-emerald-200 text-sm break-all">{emailVerificationStatus.email}</span>
-                </div>
-                <AlertDescription>
-                  <div className="flex justify-center">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleResendVerification(emailVerificationStatus.email)}
-                      disabled={isLoading}
-                      className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors"
-                    >
-                      <Icon name="mail" className="h-4 w-4 mr-2" />
-                      {isLoading ? 'Sending...' : 'Resend Email'}
-                    </Button>
-                  </div>
-                </AlertDescription>
+  const card = (
+    <Card className={embedded ? 'border-0 bg-transparent shadow-none' : undefined}>
+      <CardContent className={embedded ? 'p-0 pt-0' : 'pt-6'}>
+        {emailVerificationStatus && (
+          <Alert className="mb-3 border-emerald-500/50 bg-emerald-900/20 backdrop-blur-sm text-center">
+            <div className="w-full space-y-2">
+              <div className="flex items-center justify-center space-x-2 flex-wrap">
+                <Icon name="check-circle" className="h-4 w-4 text-emerald-400" />
+                <span className="text-white font-semibold text-sm">We&apos;ve sent a verification email to:</span>
+                <span className="font-semibold text-emerald-200 text-sm break-all">{emailVerificationStatus.email}</span>
               </div>
-            </Alert>
-          )}
-
-          <Tabs
-            value={activeTab}
-            onValueChange={value => {
-              if (!isAuthTab(value)) return
-              setActiveTab(value)
-              track({ type: 'auth_tab_changed', tab: value })
-              onTabChange?.(value) // Notify parent of tab change
-              setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
-              setFormError(null) // Clear form errors when switching tabs
-            }}
-          >
-            <TabsList className="grid w-full grid-cols-2 p-0">
-              <TabsTrigger value="login">Sign In</TabsTrigger>
-              <TabsTrigger value="register">Sign Up</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="login" className="space-y-4">
-              <form onSubmit={handleLogin} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="login-email">Email</Label>
-                  <Input
-                    id="login-email"
-                    type="email"
-                    value={loginData.email}
-                    onChange={e => setLoginData(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="captain@starships.ai"
+              <AlertDescription>
+                <div className="flex justify-center">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleResendVerification(emailVerificationStatus.email)}
                     disabled={isLoading}
-                    required
-                    className="h-12"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="login-password">Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="login-password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={loginData.password}
-                      onChange={e => setLoginData(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="Enter your password"
-                      disabled={isLoading}
-                      required
-                      className="h-12"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
-                    >
-                      {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                {formError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{formError}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button type="submit" className="w-full h-12" disabled={isLoading}>
-                  {isLoading ? (
-                    <>Signing in...</>
-                  ) : (
-                    <>
-                      <Icon name="log-in" className="h-4 w-4 mr-2" />
-                      Sign In
-                    </>
-                  )}
-                </Button>
-
-                <div className="text-center space-y-2">
-                  <Button variant="ghost" className="w-full hover:bg-accent/60" asChild>
-                    <Link href="/forgot-password" onClick={() => track({ type: 'auth_forgot_password_clicked' })}>
-                      Forgot your password?
-                    </Link>
+                    className="border-emerald-300 text-emerald-700 hover:bg-emerald-100 transition-colors"
+                  >
+                    <Icon name="mail" className="h-4 w-4 mr-2" />
+                    {isLoading ? 'Sending...' : 'Resend Email'}
                   </Button>
                 </div>
-              </form>
-            </TabsContent>
+              </AlertDescription>
+            </div>
+          </Alert>
+        )}
 
-            <TabsContent value="register" className="space-y-4">
-              <form onSubmit={handleRegister} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="register-name">Full Name</Label>
+        <Tabs
+          value={activeTab}
+          onValueChange={value => {
+            if (!isAuthTab(value)) return
+            setActiveTab(value)
+            track({ type: 'auth_tab_changed', tab: value })
+            onTabChange?.(value) // Notify parent of tab change
+            setAutoSwitchedToRegister(false) // Clear flag when user manually switches tabs
+            setFormError(null) // Clear form errors when switching tabs
+          }}
+        >
+          <TabsList className="grid w-full grid-cols-2 p-0">
+            <TabsTrigger value="login">Sign In</TabsTrigger>
+            <TabsTrigger value="register">Sign Up</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="login" className="space-y-4">
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="login-email">Email</Label>
+                <Input
+                  id="login-email"
+                  type="email"
+                  value={loginData.email}
+                  onChange={e => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="captain@starships.ai"
+                  disabled={isLoading}
+                  required
+                  className="h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="login-password">Password</Label>
+                <div className="relative">
                   <Input
-                    id="register-name"
-                    type="text"
-                    value={registerData.name}
-                    onChange={e => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
-                    placeholder="Captain Starship"
+                    id="login-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={loginData.password}
+                    onChange={e => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Enter your password"
                     disabled={isLoading}
                     required
                     className="h-12"
                   />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="register-email">Email</Label>
-                  <Input
-                    id="register-email"
-                    type="email"
-                    value={registerData.email}
-                    onChange={e => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
-                    placeholder="captain@starships.ai"
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
-                    required
-                    className="h-12"
-                  />
+                  >
+                    {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                  </Button>
                 </div>
+              </div>
 
-                <div className="space-y-2">
-                  <PasswordLabelWithTooltip htmlFor="register-password" password={registerData.password} />
-                  <div className="relative">
-                    <Input
-                      id="register-password"
-                      type={showPassword ? 'text' : 'password'}
-                      value={registerData.password}
-                      onChange={e => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
-                      placeholder="Create a strong password"
-                      disabled={isLoading}
-                      required
-                      className="h-12"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowPassword(!showPassword)}
-                      disabled={isLoading}
-                    >
-                      {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                  {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
-                </div>
+              {formError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{formError}</AlertDescription>
+                </Alert>
+              )}
 
-                <div className="space-y-2">
-                  <Label htmlFor="register-confirm-password">Confirm Password</Label>
-                  <div className="relative">
-                    <Input
-                      id="register-confirm-password"
-                      type={showConfirmPassword ? 'text' : 'password'}
-                      value={registerData.confirmPassword}
-                      onChange={e => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                      placeholder="Confirm your password"
-                      disabled={isLoading}
-                      required
-                      className="h-12"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                      disabled={isLoading}
-                    >
-                      {showConfirmPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
-                    </Button>
-                  </div>
-                </div>
-
-                {formError && (
-                  <Alert variant="destructive">
-                    <AlertDescription>{formError}</AlertDescription>
-                  </Alert>
+              <Button type="submit" className="w-full h-12" disabled={isLoading}>
+                {isLoading ? (
+                  <>Signing in...</>
+                ) : (
+                  <>
+                    <Icon name="log-in" className="h-4 w-4 mr-2" />
+                    Sign In
+                  </>
                 )}
+              </Button>
 
-                <Button type="submit" className="w-full h-12" disabled={isLoading}>
-                  {isLoading ? (
-                    <>Creating account...</>
-                  ) : (
-                    <>
-                      <Icon name="user-plus" className="h-4 w-4 mr-2" />
-                      Create Account
-                    </>
-                  )}
+              <div className="text-center space-y-2">
+                <Button variant="ghost" className="w-full hover:bg-accent/60" asChild>
+                  <Link href="/forgot-password" onClick={() => track({ type: 'auth_forgot_password_clicked' })}>
+                    Forgot your password?
+                  </Link>
                 </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+              </div>
+            </form>
+          </TabsContent>
 
-          {/* OAuth buttons BELOW email forms */}
-          <div className="mt-4">
-            <OAuthButtons position="bottom" onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
-          </div>
+          <TabsContent value="register" className="space-y-4">
+            <form onSubmit={handleRegister} className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="register-name">Full Name</Label>
+                <Input
+                  id="register-name"
+                  type="text"
+                  value={registerData.name}
+                  onChange={e => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Captain Starship"
+                  disabled={isLoading}
+                  required
+                  className="h-12"
+                />
+              </div>
 
-          <div className="mt-4">{termsAndPrivacy}</div>
-        </CardContent>
-      </Card>
+              <div className="space-y-2">
+                <Label htmlFor="register-email">Email</Label>
+                <Input
+                  id="register-email"
+                  type="email"
+                  value={registerData.email}
+                  onChange={e => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                  placeholder="captain@starships.ai"
+                  disabled={isLoading}
+                  required
+                  className="h-12"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <PasswordLabelWithTooltip htmlFor="register-password" password={registerData.password} />
+                <div className="relative">
+                  <Input
+                    id="register-password"
+                    type={showPassword ? 'text' : 'password'}
+                    value={registerData.password}
+                    onChange={e => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                    placeholder="Create a strong password"
+                    disabled={isLoading}
+                    required
+                    className="h-12"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowPassword(!showPassword)}
+                    disabled={isLoading}
+                  >
+                    {showPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                  </Button>
+                </div>
+                {registerData.password && <PasswordStrengthMeter password={registerData.password} />}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="register-confirm-password">Confirm Password</Label>
+                <div className="relative">
+                  <Input
+                    id="register-confirm-password"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    value={registerData.confirmPassword}
+                    onChange={e => setRegisterData(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    placeholder="Confirm your password"
+                    disabled={isLoading}
+                    required
+                    className="h-12"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    disabled={isLoading}
+                  >
+                    {showConfirmPassword ? <Icon name="eye-off" className="h-4 w-4" /> : <Icon name="eye" className="h-4 w-4" />}
+                  </Button>
+                </div>
+              </div>
+
+              {formError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{formError}</AlertDescription>
+                </Alert>
+              )}
+
+              <Button type="submit" className="w-full h-12" disabled={isLoading}>
+                {isLoading ? (
+                  <>Creating account...</>
+                ) : (
+                  <>
+                    <Icon name="user-plus" className="h-4 w-4 mr-2" />
+                    Create Account
+                  </>
+                )}
+              </Button>
+            </form>
+          </TabsContent>
+        </Tabs>
+
+        {/* OAuth buttons BELOW email forms */}
+        <div className="mt-4">
+          <OAuthButtons position="bottom" onGoogleClick={() => initiateOAuth('google')} onGitHubClick={() => initiateOAuth('github')} disabled={isLoading} />
+        </div>
+
+        <div className="mt-4">{termsAndPrivacy}</div>
+      </CardContent>
+    </Card>
+  )
+
+  // Embedded mode should not animate independently (parent flow controls transitions).
+  if (embedded) {
+    return <div className="w-full">{card}</div>
+  }
+
+  return (
+    <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
+      {card}
     </motion.div>
   )
 }

@@ -53,6 +53,13 @@ function LoginContent() {
       return
     }
     if (isAuthenticated) {
+      // OAuth flow lands on /login?auth_code=... and the LoginForm/useOAuthLogin hook
+      // will handle redirecting after exchanging the code. Avoid racing it here.
+      const authCode = searchParams?.get('auth_code')
+      if (authCode) {
+        return
+      }
+
       if ((logoutParam === 'true' || expectedEmail) && !forcedLogoutRef.current) {
         forcedLogoutRef.current = true
         ;(async () => {

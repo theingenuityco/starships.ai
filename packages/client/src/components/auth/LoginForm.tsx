@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useAuth } from '@/hooks/useAuth'
 import { OAuthButtons } from '@/components/auth/OAuthButton'
 import { AnimatePresence, motion } from 'motion/react'
-import { useState, useEffect, useRef } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { toast } from 'sonner'
@@ -277,6 +277,31 @@ export function LoginForm({
     </p>
   )
 
+  // Smoothly animate the card height (sign-in <-> sign-up) without layout transforms.
+  const measureRef = useRef<HTMLDivElement | null>(null)
+  const [measuredHeight, setMeasuredHeight] = useState<number | null>(null)
+  const [overflowVisible, setOverflowVisible] = useState(false)
+
+  useLayoutEffect(() => {
+    const el = measureRef.current
+    if (!el) return
+
+    const measure = () => {
+      const next = el.getBoundingClientRect().height
+      if (Number.isFinite(next) && next >= 0) setMeasuredHeight(next)
+    }
+
+    measure()
+
+    const ro = new ResizeObserver(() => {
+      setOverflowVisible(false)
+      measure()
+    })
+    ro.observe(el)
+
+    return () => ro.disconnect()
+  }, [])
+
   const cardInner = (
     <Card className={embedded ? 'border-0 bg-transparent shadow-none' : undefined}>
       <CardContent className={embedded ? 'p-0 pt-0' : 'pt-6'}>
@@ -522,32 +547,21 @@ export function LoginForm({
     </Card>
   )
 
-  // Animate card height changes (login <-> signup) smoothly.
-  const card = (
-    <motion.div layout transition={{ layout: { duration: 0.25 } }}>
-      {cardInner}
-    </motion.div>
-  )
-
   // Embedded mode should not animate independently (parent flow controls transitions).
   if (embedded) {
-    // Still allow layout-driven height easing without “fly-in” animations.
-    return (
-      <motion.div layout transition={{ layout: { duration: 0.25 } }} className="w-full">
-        {cardInner}
-      </motion.div>
-    )
+    return <div className="w-full">{cardInner}</div>
   }
 
   return (
-    <motion.div
-      layout
-      transition={{ layout: { duration: 0.25 }, delay: 0.3, duration: 0.4 }}
-      className="w-full max-w-md"
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-    >
-      {card}
+    <motion.div className="w-full max-w-md" initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} transition={{ delay: 0.3, duration: 0.4 }}>
+      <motion.div
+        animate={measuredHeight === null ? {} : { height: measuredHeight }}
+        transition={{ duration: 0.28 }}
+        onAnimationComplete={() => setOverflowVisible(true)}
+        style={{ overflow: overflowVisible ? 'visible' : 'hidden' }}
+      >
+        <div ref={measureRef}>{cardInner}</div>
+      </motion.div>
     </motion.div>
   )
 }

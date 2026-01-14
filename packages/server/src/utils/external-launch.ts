@@ -145,7 +145,10 @@ export function verifyExternalLaunchQuery(
   }
 
   const nowSeconds = Math.floor(nowMs / 1000);
-  const ageSeconds = Math.abs(nowSeconds - ts);
+  if (ts > nowSeconds) {
+    return { ok: false, status: 401, message: 'Launch timestamp is in the future' };
+  }
+  const ageSeconds = nowSeconds - ts;
   const maxAgeSeconds = config.maxAgeSeconds ?? 300;
   if (ageSeconds > maxAgeSeconds) {
     return { ok: false, status: 401, message: 'Launch request expired' };

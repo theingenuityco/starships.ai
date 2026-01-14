@@ -569,7 +569,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
     }
 
     const redirectParams = new URLSearchParams({
-      connector: req.params.provider || 'linkedin',
+      connector: req.params.provider || 'unknown',
       status: 'error',
     });
     const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;

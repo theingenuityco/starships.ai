@@ -3,7 +3,7 @@
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'
-import { useCreateAgentFromTemplate, useToolTemplates } from '@/hooks/useTemplates'
+import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
@@ -11,7 +11,7 @@ import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
 import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 
 import { useMemo, useState } from 'react'
-import type { AgentModel, AgentTemplateModel } from '@starships/protocol'
+import type { AgentModel, AgentParamsWithoutMetadata, AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
 
@@ -57,7 +57,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       type: 'marketplace_agent_deploy_clicked',
       templateId: template.id,
       templateName: template.name,
-      category: (template as any)?.category,
+      category: template.category,
       authenticated: !!isAuthenticated,
     })
     if (!isAuthenticated) {
@@ -78,24 +78,31 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       type: 'marketplace_agent_template_opened',
       templateId: template.id,
       templateName: template.name,
-      category: (template as any)?.category,
+      category: template.category,
     })
     onClick?.(template)
   }
 
+  const baseParams: AgentParamsWithoutMetadata = template
   const agentLike: AgentModel = {
-    // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
+    ...baseParams,
+    // DeployedAgentCard expects an AgentModel; we model templates as "marketplace agents"
     id: template.id,
-    name: template.name,
-    role: template.role,
     slug: template.slug,
-    description: template.description,
-    model: template.model,
-    version: template.version as any,
-    category: (template as any).category as any,
-  } as unknown as AgentModel
+    role: template.role,
+    createdAt: template.createdAt,
+    updatedAt: template.updatedAt,
+    version: template.version,
+    category: template.category,
+    starshipId: 'marketplace',
+    publicationStatus: 'published',
+    // Mark as template-backed so the UI shows "From Marketplace"
+    sourceTemplateId: template.id,
+    previewPrompts: template.previewPrompts,
+    assignedToolSlugs: template.assignedToolSlugs,
+  }
 
-  const avatarUrl = (template as any).avatarUrl as string | undefined
+  const avatarUrl = template.avatarUrl
 
   const handleConfirmDeploy = async () => {
     if (!primaryStarship) {

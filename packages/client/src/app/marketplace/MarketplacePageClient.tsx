@@ -3,7 +3,6 @@
 import Icon from '@/components/primitives/Icon'
 
 import { AgentTemplateCard } from '@/components/marketplace/AgentTemplateCard'
-import { AgentDetailsModal } from '@/components/marketplace/AgentDetailsModal'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -34,9 +33,6 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
   useEffect(() => {
     setSelectedCategory(categoryFromUrl)
   }, [categoryFromUrl])
-
-  const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
-  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false)
 
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const useServerInitial = initialAgentTemplates.length > 0
@@ -73,47 +69,23 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
       templateName: template.name,
       category: template.category,
     })
-    setSelectedAgent(template)
-    setIsAgentModalOpen(true)
-
-    // Keep modal open state in the URL so links/back-button work.
-    const params = new URLSearchParams(searchParams?.toString() ?? '')
-    params.set('agent', template.slug)
-    const qs = params.toString()
-    router.push(qs ? `${pathname}?${qs}` : pathname)
+    router.push(`/marketplace/agents/${encodeURIComponent(template.slug)}`)
   }
 
-  const handleAgentModalOpenChange = (open: boolean) => {
-    setIsAgentModalOpen(open)
-    if (!open) {
-      setSelectedAgent(null)
-      const params = new URLSearchParams(searchParams?.toString() ?? '')
-      params.delete('agent')
-      const qs = params.toString()
-      router.replace(qs ? `${pathname}?${qs}` : pathname)
-    }
-  }
-
-  // Open/close the modal based on URL (supports direct links and browser back/forward).
+  // Back-compat: old links used `?agent=<id|slug>` to open a modal.
+  // Redirect them to the dedicated agent page.
   useEffect(() => {
-    if (!agentFromUrl) {
-      if (isAgentModalOpen || selectedAgent) {
-        setIsAgentModalOpen(false)
-        setSelectedAgent(null)
-      }
-      return
-    }
+    if (!agentFromUrl) return
+    if (agentTemplatesLoading) return
+    if (!Array.isArray(agentTemplates) || agentTemplates.length === 0) return
 
-    const found =
-      agentTemplates.find(t => t.id === agentFromUrl) ??
-      agentTemplates.find(t => t.slug === agentFromUrl) ??
-      null
+    const found = agentTemplates.find(t => t.slug === agentFromUrl) ?? agentTemplates.find(t => t.id === agentFromUrl) ?? null
+    if (!found) return
 
-    if (found) {
-      setSelectedAgent(found)
-      setIsAgentModalOpen(true)
-    }
-  }, [agentFromUrl, agentTemplates, isAgentModalOpen, selectedAgent])
+    // Preserve other query params (e.g. category) by leaving `/marketplace` alone in history
+    // and pushing the canonical details route.
+    router.replace(`/marketplace/agents/${encodeURIComponent(found.slug)}`)
+  }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
 
   return (
     <>
@@ -211,8 +183,6 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
             </div>
           </div>
         </div>
-
-        <AgentDetailsModal template={selectedAgent} open={isAgentModalOpen} onOpenChange={handleAgentModalOpenChange} onDeploy={handleAgentDeploy} />
       </PageLayout>
     </>
   )

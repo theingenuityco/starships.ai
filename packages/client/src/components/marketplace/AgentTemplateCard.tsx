@@ -136,7 +136,11 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         <div className="relative w-full aspect-[4/3] overflow-hidden bg-muted/30">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={avatarUrl} alt="" className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
+            <img
+              src={avatarUrl}
+              alt={`${displayName || 'Agent'} avatar`}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
               <div className="h-14 w-14 rounded-2xl bg-background/40 border border-border/60 backdrop-blur-sm flex items-center justify-center">

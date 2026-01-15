@@ -23,6 +23,23 @@ function normalizeSlug(value: unknown): string {
   return String(value ?? '').trim()
 }
 
+function safeSocialImageUrl(value: unknown, fallback: string): string {
+  const raw = String(value ?? '').trim()
+  if (!raw) return fallback
+
+  // Allow same-origin relative paths.
+  if (raw.startsWith('/')) return raw
+
+  // Only allow http(s) absolute URLs. (Avoid javascript:, data:, etc.)
+  try {
+    const u = new URL(raw)
+    if (u.protocol === 'https:' || u.protocol === 'http:') return u.toString()
+  } catch {
+    // ignore
+  }
+  return fallback
+}
+
 function categoryBadgeClass(category: AgentTemplateModel['category']): string {
   const colors: Record<string, string> = {
     general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
@@ -59,7 +76,7 @@ export async function generateMetadata(props: PageProps): Promise<Metadata> {
   const title = `${template.name} | Marketplace | Starships.ai`
   const description = template.description || `Learn more about ${template.name} on the Starships.ai Marketplace.`
   const url = `https://starships.ai/marketplace/agents/${encodeURIComponent(template.slug)}`
-  const imageUrl = template.avatarUrl || '/static-assets/og.jpg'
+  const imageUrl = safeSocialImageUrl(template.avatarUrl, '/static-assets/og.jpg')
 
   return {
     title,
@@ -110,7 +127,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
   return (
     <>
-      {/* Hide public chrome when auth token exists (logged-in experience). */}
+      {/* Cosmetic only: hide public chrome when a token exists (not authz). */}
       <script
         // eslint-disable-next-line react/no-danger
         dangerouslySetInnerHTML={{
@@ -119,8 +136,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
               try {
                 var cls = 'has-auth-token';
                 var t = localStorage.getItem('starships_auth_token') || '';
-                var looksLikeJwt = /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(t);
-                document.documentElement.classList.toggle(cls, !!t && t !== 'null' && t !== 'undefined' && looksLikeJwt);
+                document.documentElement.classList.toggle(cls, !!t && t !== 'null' && t !== 'undefined');
               } catch (e) {}
             })();
           `,
@@ -170,7 +186,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg">
                     {template.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img src={template.avatarUrl} alt="" width={112} height={112} className="h-full w-full object-cover" />
+                      <img
+                        src={template.avatarUrl}
+                        alt={`${template.name || 'Agent'} avatar`}
+                        width={112}
+                        height={112}
+                        className="h-full w-full object-cover"
+                      />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center">
                         <span className="text-lg sm:text-xl font-semibold text-muted-foreground">{initials || 'AI'}</span>

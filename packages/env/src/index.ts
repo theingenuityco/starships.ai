@@ -86,6 +86,9 @@ export function getEnvConfig(): EnvironmentConfig {
     // JWT Authentication Configuration
     JWT_SECRET: requiredEnvVars.JWT_SECRET!,
 
+    // Next.js ISR revalidation (optional)
+    REVALIDATE_TOKEN: process.env.REVALIDATE_TOKEN,
+
     // OAuth Provider Configuration
     GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID,
     GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET,

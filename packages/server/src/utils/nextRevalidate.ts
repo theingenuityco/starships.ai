@@ -1,6 +1,17 @@
-function getToken(): string {
-  // Keep backwards compatible: prefer dedicated token, else reuse JWT secret.
-  return String(process.env.REVALIDATE_TOKEN || process.env.JWT_SECRET || '').trim()
+import { getEnvConfig } from '@starships/env'
+
+function normalizeBaseUrl(value: string): string {
+  return String(value || '').replace(/\/+$/, '')
+}
+
+function getRevalidateConfig(): { token: string; baseUrl: string } {
+  // Use the canonical env system (packages/env).
+  const env = getEnvConfig()
+  return {
+    token: String(env.REVALIDATE_TOKEN || '').trim(),
+    // `CLIENT_URL` is the canonical origin for the Next app.
+    baseUrl: normalizeBaseUrl(env.CLIENT_URL),
+  }
 }
 
 /**
@@ -14,9 +25,12 @@ function getToken(): string {
  */
 export async function triggerNextRevalidate(args: { tags?: string[]; paths?: string[] }) {
   try {
-    const token = getToken()
+    const { token, baseUrl } = getRevalidateConfig()
     if (!token) {
-      // No token configured; skip silently (time-based ISR will still work).
+      if (process.env.NODE_ENV === 'development') {
+        // eslint-disable-next-line no-console
+        console.warn('[nextRevalidate] REVALIDATE_TOKEN is not set; skipping on-demand revalidation')
+      }
       return
     }
 
@@ -27,7 +41,8 @@ export async function triggerNextRevalidate(args: { tags?: string[]; paths?: str
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 1500)
     try {
-      await fetch('http://127.0.0.1:3000/__revalidate', {
+      const url = `${baseUrl}/__revalidate`
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'content-type': 'application/json',
@@ -35,7 +50,17 @@ export async function triggerNextRevalidate(args: { tags?: string[]; paths?: str
         },
         body: JSON.stringify({ tags, paths }),
         signal: controller.signal,
-      }).catch(() => {})
+      }).catch(() => null)
+
+      if (process.env.NODE_ENV === 'development') {
+        if (!res) {
+          // eslint-disable-next-line no-console
+          console.warn('[nextRevalidate] Request failed (no response)', { url, tags, paths })
+        } else if (!res.ok) {
+          // eslint-disable-next-line no-console
+          console.warn('[nextRevalidate] Request failed', { url, status: res.status, tags, paths })
+        }
+      }
     } finally {
       clearTimeout(timeout)
     }

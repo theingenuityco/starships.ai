@@ -35,7 +35,15 @@ export function useAgentTemplates(filters?: TemplateFilters, enabled: boolean = 
       return response.data.data
     },
     enabled,
-    ...(opts?.initialData ? { initialData: opts.initialData, refetchOnMount: 'always' as const } : {}),
+    ...(opts?.initialData
+      ? {
+          initialData: opts.initialData,
+          // Treat server-provided HTML snapshot as stale so we refetch once after hydration.
+          initialDataUpdatedAt: 0,
+          // Respect staleTime (won’t refetch again until stale).
+          refetchOnMount: true,
+        }
+      : {}),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   })

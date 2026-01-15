@@ -59,7 +59,7 @@ export function MarketplaceShareLinkCard({ shareUrl }: { shareUrl: string }) {
   }
 
   return (
-    <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-5">
+    <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-5">
       <div className="text-sm font-semibold text-foreground">Share this agent</div>
       <div className="mt-1 text-xs text-muted-foreground leading-relaxed">
         Send this agent to your team so everyone can review it before you deploy.

@@ -5,8 +5,9 @@ import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 
 import { fetchPublicAgentTemplates, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 import PublicHeader from '@/components/navigation/PublicHeader'
+import Icon from '@/components/primitives/Icon'
 
-import { MarketplaceAgentDeployCta } from './deploy-cta-client'
+import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
@@ -107,9 +108,41 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
   return (
     <>
-      <PublicHeader />
+      {/* Hide public chrome when auth token exists (logged-in experience). */}
+      <script
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function () {
+              try {
+                var cls = 'has-auth-token';
+                var t = localStorage.getItem('starships_auth_token') || '';
+                var looksLikeJwt = /^[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+\\.[A-Za-z0-9_-]+$/.test(t);
+                document.documentElement.classList.toggle(cls, !!t && t !== 'null' && t !== 'undefined' && looksLikeJwt);
+              } catch (e) {}
+            })();
+          `,
+        }}
+      />
+      <style>{`
+        .has-auth-token .marketplace-public-chrome {
+          display: none !important;
+        }
+        .has-auth-token .marketplace-agent-main {
+          padding-top: 1.5rem !important;
+        }
+        @media (min-width: 640px) {
+          .has-auth-token .marketplace-agent-main {
+            padding-top: 2rem !important;
+          }
+        }
+      `}</style>
 
-      <main className="pt-20 sm:pt-28">
+      <div className="marketplace-public-chrome">
+        <PublicHeader />
+      </div>
+
+      <main className="marketplace-agent-main pt-20 sm:pt-28">
         {/* Decorative hero background */}
         <div className="relative">
           <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">
@@ -119,12 +152,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             {/* Breadcrumb */}
-            <div className="pt-2 sm:pt-0 text-xs text-muted-foreground">
-              <a href="/marketplace" className="hover:text-foreground transition-colors">
-                Marketplace
+            <div className="marketplace-public-chrome pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
+              <a href="/marketplace" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
+                <Icon name="arrow-left" className="h-3.5 w-3.5" iconOverride={{ type: 'phosphor', component: 'ArrowLeft' }} />
+                <span>Marketplace</span>
               </a>
-              <span className="mx-2 opacity-60">/</span>
-              <span className="text-foreground/80">{template.name}</span>
+              <span className="opacity-60">/</span>
+              <span className="text-foreground/80 truncate max-w-[40ch]">{template.name}</span>
             </div>
 
             {/* Hero header */}
@@ -164,12 +198,6 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   </div>
 
                   <div className="flex items-center gap-2 lg:justify-end">
-                    <a
-                      href="/marketplace"
-                      className="inline-flex items-center justify-center h-10 px-4 rounded-xl text-sm font-medium border border-border/60 bg-background/40 hover:bg-accent/60 transition-colors"
-                    >
-                      Back to marketplace
-                    </a>
                     <MarketplaceAgentDeployCta template={template} />
                   </div>
                 </div>

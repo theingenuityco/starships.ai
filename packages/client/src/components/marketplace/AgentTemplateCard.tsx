@@ -146,15 +146,6 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
           )}
           {/* Soft overlay for readability */}
           <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/70 via-background/15 to-transparent" />
-
-          {/* Status chip */}
-          {(isAlreadyDeployed || isPublishedFromThisStarship) && (
-            <div className="absolute top-3 right-3">
-              <Badge variant="outline" className="border-border/60 bg-background/70 backdrop-blur text-xs">
-                {isAlreadyDeployed ? 'Deployed' : 'Published'}
-              </Badge>
-            </div>
-          )}
         </div>
 
         {/* Body */}

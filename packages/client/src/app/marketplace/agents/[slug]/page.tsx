@@ -154,7 +154,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
           <div className="max-w-6xl mx-auto px-4 sm:px-6">
             {/* Breadcrumb */}
-            <div className="marketplace-public-chrome pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
+            <div className="pt-2 sm:pt-0 flex items-center gap-2 text-xs text-muted-foreground">
               <a href="/marketplace" className="inline-flex items-center gap-1.5 hover:text-foreground transition-colors">
                 <Icon name="arrow-left" className="h-3.5 w-3.5" iconOverride={{ type: 'phosphor', component: 'ArrowLeft' }} />
                 <span>Marketplace</span>

@@ -10,6 +10,14 @@ export function MarketplaceShareLinkCard({ shareUrl }: { shareUrl: string }) {
   const normalized = useMemo(() => String(shareUrl || '').trim(), [shareUrl])
   const canCopy = normalized.length > 0
 
+  const canNativeShare = (): boolean => {
+    try {
+      return typeof navigator !== 'undefined' && 'share' in navigator && typeof navigator.share === 'function'
+    } catch {
+      return false
+    }
+  }
+
   const isProbablyMobile = (): boolean => {
     try {
       // Prefer capability-based detection over UA sniffing.
@@ -27,9 +35,8 @@ export function MarketplaceShareLinkCard({ shareUrl }: { shareUrl: string }) {
 
     // Prefer native share sheet when available.
     try {
-      const navAny = navigator as any
-      if (isProbablyMobile() && typeof navAny?.share === 'function') {
-        await navAny.share({ url: normalized })
+      if (isProbablyMobile() && canNativeShare()) {
+        await navigator.share({ url: normalized })
         setStatus('shared')
         window.setTimeout(() => setStatus('idle'), 1500)
         return
@@ -39,18 +46,17 @@ export function MarketplaceShareLinkCard({ shareUrl }: { shareUrl: string }) {
     }
 
     try {
-      await navigator.clipboard.writeText(normalized)
+      if (typeof navigator !== 'undefined' && navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(normalized)
+      } else {
+        throw new Error('Clipboard API unavailable')
+      }
     } catch {
-      // Fallback for older browsers / permission issues
-      const ta = document.createElement('textarea')
-      ta.value = normalized
-      ta.setAttribute('readonly', 'true')
-      ta.style.position = 'fixed'
-      ta.style.left = '-9999px'
-      document.body.appendChild(ta)
-      ta.select()
-      document.execCommand('copy')
-      document.body.removeChild(ta)
+      // Non-deprecated fallback: prompt user to copy manually.
+      // (Avoids `document.execCommand('copy')`, which is deprecated/unreliable.)
+      window.prompt('Copy this link:', normalized)
+      toast.message('Copy the link from the prompt')
+      return
     }
 
     setStatus('copied')

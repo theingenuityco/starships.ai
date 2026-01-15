@@ -110,10 +110,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
             <div className="flex flex-col gap-5 sm:gap-6">
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="inline-flex items-center gap-2">
-                    <Icon name="store" className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-                    <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">Marketplace</h1>
-                  </div>
+                  <h1 className="text-3xl sm:text-4xl font-semibold tracking-tight leading-tight">Marketplace</h1>
                   <p className="mt-2 text-sm sm:text-base text-muted-foreground max-w-[72ch]">
                     Hire ready‑made AI teammates. Deploy in one click.
                   </p>

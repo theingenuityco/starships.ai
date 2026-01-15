@@ -3,15 +3,15 @@
 import Icon from '@/components/primitives/Icon'
 
 import { Badge } from '@/components/ui/badge'
-import { useCreateAgentFromTemplate, useToolTemplates } from '@/hooks/useTemplates'
+import { Button } from '@/components/ui/button'
+import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
-import { DeployedAgentCard } from '@/components/agents/DeployedAgentCard'
 
 import { useMemo, useState } from 'react'
-import type { AgentModel, AgentTemplateModel } from '@starships/protocol'
+import type { AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
 
@@ -57,7 +57,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       type: 'marketplace_agent_deploy_clicked',
       templateId: template.id,
       templateName: template.name,
-      category: (template as any)?.category,
+      category: template.category,
       authenticated: !!isAuthenticated,
     })
     if (!isAuthenticated) {
@@ -78,24 +78,25 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       type: 'marketplace_agent_template_opened',
       templateId: template.id,
       templateName: template.name,
-      category: (template as any)?.category,
+      category: template.category,
     })
     onClick?.(template)
   }
 
-  const agentLike: AgentModel = {
-    // minimal fields used by DeployedAgentCard; the rest are irrelevant for Marketplace UI
-    id: template.id,
-    name: template.name,
-    role: template.role,
-    slug: template.slug,
-    description: template.description,
-    model: template.model,
-    version: template.version as any,
-    category: (template as any).category as any,
-  } as unknown as AgentModel
+  const avatarUrl = template.avatarUrl
+  const displayName = String(template.name || '').trim()
+  const displayRole = String(template.role || '').trim()
+  const displayDescription = String(template.description || '').trim()
+  const initials = displayName
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p[0]?.toUpperCase())
+    .join('')
 
-  const avatarUrl = (template as any).avatarUrl as string | undefined
+  const deployLabel = isAlreadyDeployed ? 'Deployed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Deploying…' : 'Deploy'
+  const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
+  const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
 
   const handleConfirmDeploy = async () => {
     if (!primaryStarship) {
@@ -119,29 +120,87 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
   return (
     <>
-      <DeployedAgentCard
-        agent={agentLike}
-        avatarUrl={avatarUrl}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={handleCardClick}
-        showStatusIndicator={false}
-        showPublicationBadge={false}
-        hideChatControl={true}
-        showActions={false}
-        disableEntranceMotion={true}
-        isAlreadyDeployed={isAlreadyDeployed || isPublishedFromThisStarship}
-        primaryAction={
-          showDeployCta
-            ? {
-                label: isAlreadyDeployed ? 'Deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy',
-                iconName: isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles',
-                disabled: isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship),
-                variant: isAlreadyDeployed || isPublishedFromThisStarship ? 'ghost' : 'default',
-                className: isAlreadyDeployed || isPublishedFromThisStarship ? undefined : 'bg-primary text-primary-foreground hover:bg-primary/90',
-                onAction: () => requestDeploy(),
-              }
-            : undefined
-        }
-      />
+        onKeyDown={e => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            handleCardClick()
+          }
+        }}
+        className="group relative overflow-hidden cursor-pointer h-full flex flex-col rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm transition-all duration-200 hover:shadow-md"
+      >
+        {/* Thumbnail */}
+        <div className="relative w-full aspect-[4/3] overflow-hidden bg-muted/30">
+          {avatarUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={avatarUrl}
+              alt={`${displayName || 'Agent'} avatar`}
+              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+            />
+          ) : (
+            <div className="h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
+              <div className="h-14 w-14 rounded-2xl bg-background/40 border border-border/60 backdrop-blur-sm flex items-center justify-center">
+                <span className="text-lg font-semibold text-muted-foreground">{initials || 'AI'}</span>
+              </div>
+            </div>
+          )}
+          {/* Soft overlay for readability */}
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-background/70 via-background/15 to-transparent" />
+        </div>
+
+        {/* Body */}
+        <div className="p-5 flex-1 flex flex-col">
+          <div className="min-w-0">
+            <div className="text-lg font-semibold leading-tight truncate">{displayName || 'Unnamed agent'}</div>
+            {displayRole ? <div className="mt-1 text-sm text-muted-foreground truncate">{displayRole}</div> : null}
+          </div>
+
+          <div className="mt-3 flex items-center gap-2 flex-wrap">
+            {template.category ? (
+              <Badge variant="outline" className="capitalize border-border/60 bg-background/40">
+                {template.category}
+              </Badge>
+            ) : null}
+            {template.version ? (
+              <Badge variant="outline" className="font-mono text-xs border-border/60 bg-background/40">
+                v{template.version}
+              </Badge>
+            ) : null}
+          </div>
+
+          {displayDescription ? <div className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{displayDescription}</div> : null}
+
+          {/* Footer */}
+          <div className="mt-auto pt-4 flex items-center justify-end">
+            {showDeployCta ? (
+              isAlreadyDeployed ? (
+                <div className="relative flex items-center justify-center gap-1.5 h-9 px-3 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-sm">
+                  <Icon name="check-circle" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+                </div>
+              ) : (
+                <Button
+                  size="sm"
+                  onClick={e => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    requestDeploy()
+                  }}
+                  disabled={deployDisabled}
+                  className="h-9 bg-primary text-primary-foreground hover:bg-primary/90"
+                >
+                  <Icon name={deployIconName} className="w-4 h-4 mr-2" />
+                  {deployLabel}
+                </Button>
+              )
+            ) : null}
+          </div>
+        </div>
+      </div>
 
       {/* Confirmation Modal */}
       <DeploymentConfirmationModal

@@ -53,7 +53,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       type: 'marketplace_agent_deploy_clicked',
       templateId: template.id,
       templateName: template.name,
-      category: (template as any)?.category,
+      category: template.category,
       authenticated: !!isAuthenticated,
     })
     if (!isAuthenticated) {
@@ -86,7 +86,7 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
   }
 
   if (!template) return null
-  const avatarUrl = (template as any)?.avatarUrl as string | undefined
+  const avatarUrl = template.avatarUrl
 
   // Match Marketplace card CTA semantics
   const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'

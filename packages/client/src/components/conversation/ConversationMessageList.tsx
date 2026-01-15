@@ -876,7 +876,7 @@ const MemoizedMessageBubble = memo(
       return (
         <div className="flex justify-end">
           <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
-            <div className="flex flex-1 flex-col gap-2 items-end">
+            <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
               {/* Attachments outside bubble */}
               {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
               {/* Message bubble (match navigation/sidebar background color) */}

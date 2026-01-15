@@ -982,7 +982,7 @@ export function ConversationMessageContent({
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
-      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content">
+      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message">
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {String(displayContent ?? '')}
         </ReactMarkdown>
@@ -1026,7 +1026,7 @@ export function ConversationMessageContent({
   if (!enableMarkdown) {
     return (
       <div className={cn('relative group', className)}>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap">
+        <div className="text-sm leading-relaxed whitespace-pre-wrap ph-mask-chat-message">
           {String(displayContent ?? '')}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
@@ -1036,7 +1036,7 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div ref={messageContainerRef} className={cn('relative group w-full', className)}>
+    <div ref={messageContainerRef} className={cn('relative group w-full ph-mask-chat-message', className)}>
       {/* Reasoning (thinking) collapsible */}
       {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
         <>

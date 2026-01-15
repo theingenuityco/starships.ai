@@ -71,14 +71,14 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
       type: 'marketplace_agent_template_opened',
       templateId: template.id,
       templateName: template.name,
-      category: (template as any)?.category,
+      category: template.category,
     })
     setSelectedAgent(template)
     setIsAgentModalOpen(true)
 
     // Keep modal open state in the URL so links/back-button work.
     const params = new URLSearchParams(searchParams?.toString() ?? '')
-    params.set('agent', template.id)
+    params.set('agent', template.slug)
     const qs = params.toString()
     router.push(qs ? `${pathname}?${qs}` : pathname)
   }
@@ -106,7 +106,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
 
     const found =
       agentTemplates.find(t => t.id === agentFromUrl) ??
-      agentTemplates.find(t => String((t as any)?.slug ?? '') === agentFromUrl) ??
+      agentTemplates.find(t => t.slug === agentFromUrl) ??
       null
 
     if (found) {

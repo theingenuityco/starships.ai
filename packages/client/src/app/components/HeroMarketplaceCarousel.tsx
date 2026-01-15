@@ -67,7 +67,7 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
 
     for (const name of wanted) {
       const n = normalize(name)
-      const found = agentTemplates.find(t => normalize(t.name) === n) ?? agentTemplates.find(t => normalize((t as any).slug) === n) ?? agentTemplates.find(t => normalize(t.name).includes(n))
+      const found = agentTemplates.find(t => normalize(t.name) === n) ?? agentTemplates.find(t => normalize(t.slug) === n) ?? agentTemplates.find(t => normalize(t.name).includes(n))
       if (found && !picked.some(p => p.id === found.id)) picked.push(found)
     }
 
@@ -106,10 +106,10 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
       type: 'marketplace_agent_template_opened',
       templateId: template.id,
       templateName: template.name,
-      category: (template as any)?.category,
+      category: template.category,
       source: 'landing_hero_carousel',
     })
-    const params = new URLSearchParams({ agent: template.id })
+    const params = new URLSearchParams({ agent: template.slug })
     router.push(`/marketplace?${params.toString()}`)
   }
 
@@ -144,9 +144,9 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
             : Array.from({ length: featuredAgents.slideCount }, (_, idx) => {
                 const template = featuredAgents.templates[idx % featuredAgents.templates.length]!
                 const name = String(template.name ?? '').trim()
-                const role = String((template as any)?.role ?? '').trim()
-                const primaryLabel = role || String((template as any)?.category ?? '').trim() || String((template as any)?.slug ?? '').trim() || name
-                const avatarUrl = (template as any)?.avatarUrl as string | undefined
+                const role = String(template.role ?? '').trim()
+                const primaryLabel = role || String(template.category ?? '').trim() || String(template.slug ?? '').trim() || name
+                const avatarUrl = template.avatarUrl
 
                 return (
                   <CarouselItem key={`${template.id}-${idx}`} className="basis-auto w-[136px] sm:w-[152px] md:w-[176px] !pl-1 sm:!pl-2">

@@ -25,7 +25,7 @@ export const TEMPLATE_QUERY_KEYS = {
 /**
  * Get all agent templates
  */
-export function useAgentTemplates(filters?: TemplateFilters, enabled: boolean = true) {
+export function useAgentTemplates(filters?: TemplateFilters, enabled: boolean = true, opts?: { initialData?: AgentTemplateModel[] }) {
   return useQuery({
     queryKey: TEMPLATE_QUERY_KEYS.agentTemplatesList(filters),
     queryFn: async (): Promise<AgentTemplateModel[]> => {
@@ -35,6 +35,7 @@ export function useAgentTemplates(filters?: TemplateFilters, enabled: boolean = 
       return response.data.data
     },
     enabled,
+    ...(opts?.initialData ? { initialData: opts.initialData, refetchOnMount: 'always' as const } : {}),
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   })

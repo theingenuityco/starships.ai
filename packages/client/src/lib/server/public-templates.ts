@@ -53,7 +53,7 @@ export async function fetchPublicAgentTemplates(args?: {
 
     const json = await fetchJson<ApiResponse<AgentTemplateModel[]>>(u.toString(), {
       // Match our page ISR window by default.
-      next: { revalidate: args?.revalidateSeconds ?? 3600 },
+      next: { revalidate: args?.revalidateSeconds ?? 3600, tags: ['public-agent-templates'] },
       headers: { Accept: 'application/json' },
     })
     const list = Array.isArray(json.data) ? json.data : []
@@ -84,7 +84,7 @@ export async function fetchPublicToolTemplates(args?: {
     if (args?.search) u.searchParams.set('search', args.search)
 
     const json = await fetchJson<ApiResponse<ToolTemplateModel[]>>(u.toString(), {
-      next: { revalidate: args?.revalidateSeconds ?? 3600 },
+      next: { revalidate: args?.revalidateSeconds ?? 3600, tags: ['public-tool-templates'] },
       headers: { Accept: 'application/json' },
     })
     return Array.isArray(json.data) ? json.data : []

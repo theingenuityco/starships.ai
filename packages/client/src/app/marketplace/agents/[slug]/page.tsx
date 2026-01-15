@@ -8,6 +8,7 @@ import PublicHeader from '@/components/navigation/PublicHeader'
 import Icon from '@/components/primitives/Icon'
 
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
+import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
@@ -97,6 +98,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
   }
 
   const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s => typeof s === 'string' && s.trim().length > 0) : []
+  const shareUrl = `https://starships.ai/marketplace/agents/${encodeURIComponent(template.slug)}`
 
   const initials = String(template.name || '')
     .trim()
@@ -162,43 +164,37 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             </div>
 
             {/* Hero header */}
-            <section className="mt-4 sm:mt-6 rounded-3xl border border-border/50 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40 shadow-[0_10px_30px_rgba(0,0,0,0.25)] overflow-hidden">
-              <div className="p-6 sm:p-8">
-                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                  <div className="flex items-start gap-4 min-w-0">
-                    <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg">
-                      {template.avatarUrl ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={template.avatarUrl} alt="" width={80} height={80} className="h-full w-full object-cover" />
-                      ) : (
-                        <div className="h-full w-full flex items-center justify-center">
-                          <span className="text-lg sm:text-xl font-semibold text-muted-foreground">{initials || 'AI'}</span>
-                        </div>
-                      )}
-                      <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
-                    </div>
-
-                    <div className="min-w-0">
-                      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
-                      {template.role ? <div className="mt-1 text-sm sm:text-base text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
-
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {template.category ? (
-                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
-                        ) : null}
-                        {template.version ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span> : null}
-                        {typeof template.usageCount === 'number' ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
-                            {template.usageCount.toLocaleString()} deployments
-                          </span>
-                        ) : null}
-                        {template.model ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span> : null}
+            <section className="mt-4 sm:mt-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                <div className="flex items-start gap-4 min-w-0">
+                  <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg">
+                    {template.avatarUrl ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={template.avatarUrl} alt="" width={112} height={112} className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="h-full w-full flex items-center justify-center">
+                        <span className="text-lg sm:text-xl font-semibold text-muted-foreground">{initials || 'AI'}</span>
                       </div>
-                    </div>
+                    )}
+                    <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
                   </div>
 
-                  <div className="flex items-center gap-2 lg:justify-end">
-                    <MarketplaceAgentDeployCta template={template} />
+                  <div className="min-w-0">
+                    <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
+                    {template.role ? <div className="mt-1 text-sm sm:text-base text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {template.category ? (
+                        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
+                      ) : null}
+                      {template.version ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span> : null}
+                      {typeof template.usageCount === 'number' ? (
+                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                          {template.usageCount.toLocaleString()} deployments
+                        </span>
+                      ) : null}
+                      {template.model ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span> : null}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -267,7 +263,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
                     <div className="text-sm font-semibold">Deploy this agent</div>
                     <div className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                      Add this agent to your starship in one click. You can customize tools and guardrails after deployment.
+                      Add this agent to your starship in one click. Connect apps from your starship’s Connectors page after deployment.
                     </div>
                     <div className="mt-4">
                       <MarketplaceAgentDeployCta template={template} />
@@ -275,11 +271,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     <div className="mt-4 border-t border-border/50 pt-4 space-y-2 text-xs text-muted-foreground">
                       <div className="flex items-start gap-2">
                         <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
-                        <span>Private by default (you control publication)</span>
+                        <span>Private by default (you control what it can access)</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
-                        <span>Works with your existing connectors & tools</span>
+                        <span>Works with your existing connectors</span>
                       </div>
                       <div className="flex items-start gap-2">
                         <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
@@ -288,9 +284,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     </div>
                   </div>
 
-                  <div className="rounded-2xl border border-border/50 bg-background/30 p-4 text-xs text-muted-foreground">
-                    Tip: Share this page with teammates to review the agent before deploying.
-                  </div>
+                  <MarketplaceShareLinkCard shareUrl={shareUrl} />
                 </aside>
               </div>
             </section>

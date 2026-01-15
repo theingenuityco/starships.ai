@@ -187,13 +187,17 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       {template.category ? (
                         <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
                       ) : null}
-                      {template.version ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span> : null}
+                      {template.version ? (
+                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span>
+                      ) : null}
                       {typeof template.usageCount === 'number' ? (
                         <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
                           {template.usageCount.toLocaleString()} deployments
                         </span>
                       ) : null}
-                      {template.model ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span> : null}
+                      {template.model ? (
+                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span>
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -206,14 +210,14 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                 {/* Left column */}
                 <div className="space-y-8">
                   {template.description ? (
-                    <section className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                    <section className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
                       <h2 className="text-sm font-semibold tracking-wide text-foreground">About</h2>
                       <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{template.description}</p>
                     </section>
                   ) : null}
 
                   {toolSlugs.length > 0 ? (
-                    <section className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                    <section className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
                       <div className="flex items-center justify-between gap-3">
                         <h2 className="text-sm font-semibold tracking-wide text-foreground">Capabilities</h2>
                         <span className="inline-flex items-center rounded-full border border-border/60 bg-background/40 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
@@ -226,10 +230,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           const title = info?.name?.trim() || slug
                           const desc = info?.description?.trim() || ''
                           return (
-                            <div
-                              key={slug}
-                              className="group rounded-xl border border-border/50 bg-background/30 hover:bg-background/40 transition-colors p-4"
-                            >
+                            <div key={slug} className="group rounded-xl border border-border/50 bg-background/30 hover:bg-background/40 transition-colors p-4">
                               <div className="text-sm font-medium leading-5 truncate">{title}</div>
                               {desc ? <div className="mt-1 text-xs leading-4 text-muted-foreground line-clamp-3">{desc}</div> : null}
                             </div>
@@ -240,14 +241,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   ) : null}
 
                   {Array.isArray(template.previewPrompts) && template.previewPrompts.length > 0 ? (
-                    <section className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                    <section className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
                       <h2 className="text-sm font-semibold tracking-wide text-foreground">Try these prompts</h2>
                       <div className="mt-4 grid grid-cols-1 gap-3">
                         {template.previewPrompts.map((p, idx) => (
-                          <div
-                            key={idx}
-                            className="rounded-xl border border-border/50 bg-background/30 p-4 text-sm leading-relaxed"
-                          >
+                          <div key={idx} className="rounded-xl border border-border/50 bg-background/30 p-4 text-sm leading-relaxed">
                             <span className="text-muted-foreground">&quot;</span>
                             <span className="text-foreground/90">{p}</span>
                             <span className="text-muted-foreground">&quot;</span>
@@ -260,7 +258,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
                 {/* Right column */}
                 <aside className="lg:sticky lg:top-28 space-y-4">
-                  <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                  <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
                     <div className="text-sm font-semibold">Deploy this agent</div>
                     <div className="mt-2 text-xs text-muted-foreground leading-relaxed">
                       Add this agent to your starship in one click. Connect apps from your starship’s Connectors page after deployment.
@@ -294,4 +292,3 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
     </>
   )
 }
-

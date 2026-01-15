@@ -186,13 +186,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg">
                     {template.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        src={template.avatarUrl}
-                        alt={`${template.name || 'Agent'} avatar`}
-                        width={112}
-                        height={112}
-                        className="h-full w-full object-cover"
-                      />
+                      <img src={template.avatarUrl} alt={`${template.name || 'Agent'} avatar`} width={112} height={112} className="h-full w-full object-cover" />
                     ) : (
                       <div className="h-full w-full flex items-center justify-center">
                         <span className="text-lg sm:text-xl font-semibold text-muted-foreground">{initials || 'AI'}</span>

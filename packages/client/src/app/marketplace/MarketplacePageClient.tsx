@@ -46,6 +46,8 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
   const agentTemplates = (agentData ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
   const agentTemplatesLoading = agentTemplatesLoadingRaw && !useServerInitial
 
+  const agentFromUrl = useMemo(() => searchParams?.get('agent') ?? null, [searchParams])
+
   // Agent categories
   const allCategories = ['all', 'general', 'coding', 'creative', 'analysis', 'support', 'integration', 'automation', 'data', 'communication']
 
@@ -73,12 +75,45 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
     })
     setSelectedAgent(template)
     setIsAgentModalOpen(true)
+
+    // Keep modal open state in the URL so links/back-button work.
+    const params = new URLSearchParams(searchParams?.toString() ?? '')
+    params.set('agent', template.id)
+    const qs = params.toString()
+    router.push(qs ? `${pathname}?${qs}` : pathname)
   }
 
   const handleAgentModalOpenChange = (open: boolean) => {
     setIsAgentModalOpen(open)
-    if (!open) setSelectedAgent(null)
+    if (!open) {
+      setSelectedAgent(null)
+      const params = new URLSearchParams(searchParams?.toString() ?? '')
+      params.delete('agent')
+      const qs = params.toString()
+      router.replace(qs ? `${pathname}?${qs}` : pathname)
+    }
   }
+
+  // Open/close the modal based on URL (supports direct links and browser back/forward).
+  useEffect(() => {
+    if (!agentFromUrl) {
+      if (isAgentModalOpen || selectedAgent) {
+        setIsAgentModalOpen(false)
+        setSelectedAgent(null)
+      }
+      return
+    }
+
+    const found =
+      agentTemplates.find(t => t.id === agentFromUrl) ??
+      agentTemplates.find(t => String((t as any)?.slug ?? '') === agentFromUrl) ??
+      null
+
+    if (found) {
+      setSelectedAgent(found)
+      setIsAgentModalOpen(true)
+    }
+  }, [agentFromUrl, agentTemplates, isAgentModalOpen, selectedAgent])
 
   return (
     <>
@@ -131,9 +166,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
                   >
                     <SelectTrigger className="w-full sm:w-[200px] frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent">
                       <div className="flex items-center gap-2">
-                        {selectedCategory && selectedCategory !== 'all' && (
-                          <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(selectedCategory as any)}`} />
-                        )}
+                        {selectedCategory && selectedCategory !== 'all' && <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(selectedCategory as any)}`} />}
                         <SelectValue placeholder="All Categories" />
                       </div>
                     </SelectTrigger>
@@ -141,9 +174,7 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
                       {allCategories.map(category => (
                         <SelectItem key={category} value={category} className="capitalize">
                           <div className="flex items-center gap-2">
-                            {category !== 'all' && (
-                              <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />
-                            )}
+                            {category !== 'all' && <span className={`h-2 w-2 rounded-full ${getCategoryDotColor(category as any)}`} />}
                             <span>{category === 'all' ? 'All Categories' : category}</span>
                           </div>
                         </SelectItem>

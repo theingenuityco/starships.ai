@@ -1,9 +1,8 @@
 import { revalidatePath, revalidateTag } from 'next/cache'
 
 function getToken(): string {
-  // Prefer a dedicated token, but fall back to JWT_SECRET so revalidation works
-  // in existing deployments without extra configuration.
-  return String(process.env.REVALIDATE_TOKEN || process.env.JWT_SECRET || '').trim()
+  // Require an explicit token. Do NOT fall back to auth secrets.
+  return String(process.env.REVALIDATE_TOKEN || '').trim()
 }
 
 function unauthorized() {
@@ -12,6 +11,13 @@ function unauthorized() {
 
 export async function POST(req: Request) {
   const token = getToken()
+  if (!token) {
+    if (process.env.NODE_ENV === 'development') {
+      // eslint-disable-next-line no-console
+      console.warn('[__revalidate] REVALIDATE_TOKEN is not set; refusing to revalidate')
+    }
+    return Response.json({ ok: false, error: 'Revalidation not configured' }, { status: 503 })
+  }
   const provided = String(req.headers.get('x-revalidate-token') || '').trim()
   if (!token || provided !== token) return unauthorized()
 

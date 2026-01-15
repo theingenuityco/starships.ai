@@ -77,12 +77,6 @@ const setStoredToken = (token: string | null) => {
   } else {
     localStorage.removeItem('starships_auth_token')
   }
-  // Notify any listeners (e.g., public chrome hider) without forcing a full reload.
-  try {
-    window.dispatchEvent(new Event('starships_auth_token_changed'))
-  } catch {
-    // ignore
-  }
 }
 
 // Validate token and get user info

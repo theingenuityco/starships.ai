@@ -7,7 +7,7 @@ const HTML_CLASS = 'has-auth-user'
 
 function setAuthUserClass(isAuthed: boolean) {
   try {
-    document.documentElement.classList.toggle(HTML_CLASS, !!isAuthed)
+    document.documentElement.classList.toggle(HTML_CLASS, isAuthed)
   } catch {
     // no-op
   }

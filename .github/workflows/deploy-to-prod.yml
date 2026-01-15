@@ -209,12 +209,34 @@ jobs:
       - name: Deploy new image
         run: |
           echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"
+          IMAGE_TAG="${{ steps.get-image.outputs.image_tag }}"
           kubectl set image deployment/starships-app \
-            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.image_tag }} \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
             -n ${{ env.NAMESPACE }}
-          # Force rollout restart to pull latest image (needed when using 'latest' tag)
+
+          # Keep schedule components in sync with the app image.
+          kubectl set image deployment/starships-schedule-scheduler \
+            schedule-scheduler=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
+          kubectl set image deployment/starships-schedule-worker \
+            schedule-worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
+
+          # Keep Autopilot Runner in sync with the same tag (built in the same pipeline).
+          kubectl set image deployment/autopilot-runner \
+            autopilot-runner=${{ env.REGISTRY }}/theingenuityco/autopilot-runner:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
+
+          # Force restarts so secrets/env updates apply immediately.
           kubectl rollout restart deployment/starships-app -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment/starships-schedule-scheduler -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment/starships-schedule-worker -n ${{ env.NAMESPACE }}
+          kubectl rollout restart deployment/autopilot-runner -n ${{ env.NAMESPACE }}
+
           kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-schedule-scheduler -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-schedule-worker -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/autopilot-runner -n ${{ env.NAMESPACE }} --timeout=600s
           echo "✅ Deployment rolled out successfully."
 
       - name: Verify deployment

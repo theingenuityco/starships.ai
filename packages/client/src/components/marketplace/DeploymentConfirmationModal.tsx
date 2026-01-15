@@ -24,7 +24,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
   const isAgent = type === 'agent'
   const actionText = isAgent ? 'deploy' : 'install'
   const ActionIconName = isAgent ? 'bot' : 'wrench'
-  const avatarUrl = isAgent ? ((template as any)?.avatarUrl as string | undefined) : undefined
+  const avatarUrl = isAgent ? (template as AgentTemplateModel).avatarUrl : undefined
 
   const handleConfirm = async () => {
     await onConfirm()

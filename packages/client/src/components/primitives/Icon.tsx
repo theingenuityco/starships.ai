@@ -1,4 +1,6 @@
 
+'use client'
+
 import React from 'react'
 import * as Radix from '@radix-ui/react-icons'
 import { Icon as Iconify } from '@iconify/react'

@@ -63,7 +63,7 @@ export function PublicHeader(): React.JSX.Element {
             Home
           </Link>
           <Link
-            href="/marketplace?from=public"
+            href="/marketplace"
             onClick={() => track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/marketplace', variant: 'desktop' })}
             className={`${pathname.startsWith('/marketplace') ? 'text-foreground font-medium' : 'text-muted-foreground hover:text-foreground transition-colors'}`}
             aria-current={pathname.startsWith('/marketplace') ? 'page' : undefined}
@@ -110,7 +110,7 @@ export function PublicHeader(): React.JSX.Element {
                 Home
               </Link>
               <Link
-                href="/marketplace?from=public"
+                href="/marketplace"
                 onClick={() => {
                   track({ type: 'public_header_nav_clicked', fromPath: pathname ?? '', destination: '/marketplace', variant: 'mobile' })
                   setMobileMenuOpen(false)

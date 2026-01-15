@@ -1,0 +1,105 @@
+'use client'
+
+import { useMemo, useState } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+
+import type { AgentTemplateModel } from '@starships/protocol'
+
+import { useAuth } from '@/hooks/useAuth'
+import { useUserStarships } from '@/hooks/useStarships'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
+import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
+import { Button } from '@/components/ui/button'
+import Icon from '@/components/primitives/Icon'
+import { track } from '@/lib/analytics'
+
+export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplateModel }) {
+  const router = useRouter()
+  const pathname = usePathname()
+
+  const { userId, isAuthenticated } = useAuth()
+  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
+  const primaryStarship = starships[0]
+
+  const templateId = template?.id ?? ''
+  const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
+
+  const isAlreadyDeployed = useMemo(() => {
+    if (!templateId) return false
+    return deployedAgents.some(agent => agent.sourceTemplateId === templateId)
+  }, [deployedAgents, templateId])
+
+  const isPublishedFromThisStarship = useMemo(() => {
+    if (!templateId) return false
+    return deployedAgents.some(agent => agent.publishedTemplateId === templateId)
+  }, [deployedAgents, templateId])
+
+  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
+  const [isDeploying, setIsDeploying] = useState(false)
+  const createAgentMutation = useCreateAgentFromTemplate()
+
+  const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
+  const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
+  const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
+
+  const handleDeployClick = () => {
+    track({
+      type: 'marketplace_agent_deploy_clicked',
+      templateId: template.id,
+      templateName: template.name,
+      category: template.category,
+      authenticated: !!isAuthenticated,
+    })
+
+    if (!isAuthenticated) {
+      const params = new URLSearchParams({ returnUrl: pathname })
+      router.push(`/login?${params.toString()}`)
+      return
+    }
+    if (!primaryStarship) return
+    setShowConfirmationModal(true)
+  }
+
+  const handleConfirmDeploy = async () => {
+    if (!primaryStarship) return
+    setIsDeploying(true)
+    try {
+      await createAgentMutation.mutateAsync({
+        templateId: template.id,
+        starshipId: primaryStarship.id,
+        starshipSlug: primaryStarship.slug,
+      })
+      setShowConfirmationModal(false)
+    } finally {
+      setIsDeploying(false)
+    }
+  }
+
+  return (
+    <>
+      {isAlreadyDeployed ? (
+        <div className="relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
+          <Icon name="check-circle" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+        </div>
+      ) : (
+        <Button onClick={handleDeployClick} disabled={deployDisabled} className="h-10">
+          <Icon name={deployIconName} className="w-4 h-4 mr-2" />
+          {deployLabel}
+        </Button>
+      )}
+
+      <DeploymentConfirmationModal
+        isOpen={showConfirmationModal}
+        onOpenChange={setShowConfirmationModal}
+        onConfirm={handleConfirmDeploy}
+        isProcessing={isDeploying}
+        type="agent"
+        template={template}
+        starshipName={primaryStarship?.name || 'Unknown Starship'}
+      />
+    </>
+  )
+}
+

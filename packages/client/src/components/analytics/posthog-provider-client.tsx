@@ -27,6 +27,8 @@ export function PostHogProviderClient({ apiKey, apiHost }: PostHogProviderClient
       session_recording: {
         // Enable Session Replay with privacy-safe defaults
         maskAllInputs: true,
+        // Mask sensitive conversation text (user + assistant messages) in session recordings
+        maskTextSelector: '.ph-mask-chat-message',
       },
     })
 

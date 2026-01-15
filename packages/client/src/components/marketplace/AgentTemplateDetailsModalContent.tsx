@@ -16,8 +16,8 @@ interface AgentTemplateDetailsModalContentProps {
 export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDetailsModalContentProps) {
   const [isToolsExpanded, setIsToolsExpanded] = useState(false)
 
-  const toolSlugs: string[] = Array.isArray((template as any)?.assignedToolSlugs)
-    ? ((template as any).assignedToolSlugs as unknown[]).filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+  const toolSlugs: string[] = Array.isArray(template.assignedToolSlugs)
+    ? template.assignedToolSlugs.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
     : []
   const canCollapseTools = toolSlugs.length > 3
   const visibleToolSlugs = isToolsExpanded ? toolSlugs : toolSlugs.slice(0, 3)
@@ -25,19 +25,13 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
   const { data: toolTemplates = [] } = useToolTemplates(undefined, toolSlugs.length > 0)
   const toolInfoBySlug = useMemo(() => {
     const map = new Map<string, { name: string; description: string; version?: string }>()
-    for (const t of toolTemplates as any[]) {
-      const slug = (t as any)?.slug
-      const name = (t as any)?.name
-      const description = (t as any)?.description
-      const versionRaw = (t as any)?.version
-      const version = typeof versionRaw === 'string' || typeof versionRaw === 'number' ? String(versionRaw) : undefined
-      if (typeof slug === 'string' && slug.trim()) {
-        map.set(slug, {
-          name: typeof name === 'string' && name.trim() ? name : slug,
-          description: typeof description === 'string' ? description : '',
-          version: version && version.trim().length > 0 ? version : undefined,
-        })
-      }
+    for (const t of toolTemplates) {
+      const slug = typeof t.slug === 'string' ? t.slug.trim() : ''
+      if (!slug) continue
+      const name = typeof t.name === 'string' && t.name.trim() ? t.name.trim() : slug
+      const description = typeof t.description === 'string' ? t.description : ''
+      const version = typeof t.version === 'string' && t.version.trim().length > 0 ? t.version.trim() : undefined
+      map.set(slug, { name, description, version })
     }
     return map
   }, [toolTemplates])
@@ -48,13 +42,13 @@ export function AgentTemplateDetailsModalContent({ template }: AgentTemplateDeta
       <div className="pt-4 space-y-4">
         <div className="flex flex-wrap items-center gap-2">
           {template.category ? (
-            <Badge variant="outline" className={`capitalize border font-medium ${getCategoryColor(template.category as any)}`}>
+            <Badge variant="outline" className={`capitalize border font-medium ${getCategoryColor(template.category)}`}>
               {template.category}
             </Badge>
           ) : null}
-          {(template as any)?.version ? (
+          {template.version ? (
             <Badge variant="outline" className="font-mono text-xs">
-              <Icon name="hash" className="w-3.5 h-3.5 mr-1.5" />v{String((template as any).version)}
+              <Icon name="hash" className="w-3.5 h-3.5 mr-1.5" />v{template.version}
             </Badge>
           ) : null}
           {template.model ? (

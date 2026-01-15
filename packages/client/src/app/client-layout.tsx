@@ -47,7 +47,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const pathname = usePathname()
   const { isAuthenticated } = useAuth()
   const isDashboard = pathname === '/'
-  const isMarketplace = pathname === '/marketplace'
+  const isMarketplace = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
   const isPublicSimplePage =
     pathname === '/' ||
@@ -65,6 +65,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       // Public pages
       if (path === '/') return 'Starships.ai | Hire your AI staff, brief them in plain language'
       if (path === '/marketplace') return 'Marketplace | Starships.ai'
+      if (path.startsWith('/marketplace/')) return 'Marketplace | Starships.ai'
       if (path === '/login') return 'Login | Starships.ai'
       if (path === '/forgot-password') return 'Forgot Password | Starships.ai'
       if (path === '/reset-password') return 'Reset Password | Starships.ai'

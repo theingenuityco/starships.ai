@@ -60,7 +60,7 @@ export async function fetchPublicAgentTemplates(args?: {
     // Ensure any avatar URLs embedded in the HTML are reachable from the public origin.
     return list.map(t => ({
       ...t,
-      avatarUrl: absolutizePublicUrl((t as any)?.avatarUrl, base),
+      avatarUrl: absolutizePublicUrl(t.avatarUrl, base),
     }))
   } catch (e) {
     console.warn('[public-templates] fetchPublicAgentTemplates failed', {

@@ -29,6 +29,12 @@ export interface EnvironmentConfig {
   // JWT Authentication Configuration
   JWT_SECRET: string;
 
+  /**
+   * Token used to authorize Next.js ISR tag/path revalidation requests.
+   * Keep this distinct from any auth secrets (e.g. JWT_SECRET).
+   */
+  REVALIDATE_TOKEN?: string;
+
   // OAuth Provider Configuration
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;

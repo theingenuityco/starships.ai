@@ -127,35 +127,6 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
   return (
     <>
-      {/* Cosmetic only: hide public chrome when a token exists (not authz). */}
-      <script
-        // eslint-disable-next-line react/no-danger
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function () {
-              try {
-                var cls = 'has-auth-token';
-                var t = localStorage.getItem('starships_auth_token') || '';
-                document.documentElement.classList.toggle(cls, !!t && t !== 'null' && t !== 'undefined');
-              } catch (e) {}
-            })();
-          `,
-        }}
-      />
-      <style>{`
-        .has-auth-token .marketplace-public-chrome {
-          display: none !important;
-        }
-        .has-auth-token .marketplace-agent-main {
-          padding-top: 1.5rem !important;
-        }
-        @media (min-width: 640px) {
-          .has-auth-token .marketplace-agent-main {
-            padding-top: 2rem !important;
-          }
-        }
-      `}</style>
-
       <div className="marketplace-public-chrome">
         <PublicHeader />
       </div>

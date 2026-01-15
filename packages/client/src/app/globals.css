@@ -4,6 +4,37 @@
 
 /* ReactFlow styles - Required for proper functionality */
 @import '@xyflow/react/dist/style.css';
+
+/* ============================================================================
+ * Public chrome toggling (client-only UX)
+ * ----------------------------------------------------------------------------
+ * We keep ISR/SSR markup stable for SEO + hydration, and use a client-set
+ * `<html class="has-auth-user">` to hide public-only chrome when logged in.
+ * ============================================================================
+ */
+.has-auth-user .marketplace-public-chrome {
+  display: none !important;
+}
+
+/* Marketplace listing page */
+.has-auth-user .marketplace-main {
+  padding-top: 2rem !important;
+}
+@media (min-width: 640px) {
+  .has-auth-user .marketplace-main {
+    padding-top: 2.5rem !important;
+  }
+}
+
+/* Marketplace agent details page */
+.has-auth-user .marketplace-agent-main {
+  padding-top: 1.5rem !important;
+}
+@media (min-width: 640px) {
+  .has-auth-user .marketplace-agent-main {
+    padding-top: 2rem !important;
+  }
+}
 /* Icon tokens */
 :root {
   --icon-size: 20px;

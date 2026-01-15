@@ -11,6 +11,7 @@ import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
+import { triggerNextRevalidate } from '@/utils/nextRevalidate';
 
 const router: Router = Router();
 
@@ -826,6 +827,9 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
       sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
       return;
     }
+
+    // Refresh marketing/marketplace ISR immediately (keep SEO, avoid staleness).
+    triggerNextRevalidate({ tags: ['public-tool-templates'] });
 
     sendSuccess(res, {
       message: 'Tool publication approved',

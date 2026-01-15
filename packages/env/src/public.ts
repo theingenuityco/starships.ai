@@ -34,8 +34,9 @@ export type PublicEnvConfig = {
  */
 export function getPublicEnvConfig(): PublicEnvConfig {
   return {
-    // Keep local/dev usable without forcing env injection.
-    PUBLIC_URL: process.env.PUBLIC_URL || 'https://starships.ai',
+    // IMPORTANT: must be explicitly configured per environment.
+    // Intentionally no default to avoid accidentally using production in dev/staging.
+    PUBLIC_URL: process.env.PUBLIC_URL || '',
     ENABLE_INDEXING: process.env.ENABLE_INDEXING || '',
     GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || '',
     USERBACK_TOKEN: process.env.USERBACK_TOKEN || '',

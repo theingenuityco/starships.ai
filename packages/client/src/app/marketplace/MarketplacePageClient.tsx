@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAgentTemplates } from '@/hooks/useTemplates'
-import { useAuth } from '@/hooks/useAuth'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import { getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
 
@@ -18,7 +17,6 @@ import type { AgentTemplateModel } from '@starships/protocol'
 import { track } from '@/lib/analytics'
 
 export default function MarketplacePageClient(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
-  const { isAuthenticated } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -33,12 +31,15 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
   }, [categoryFromUrl])
 
   const initialAgentTemplates = props.initialAgentTemplates ?? []
-  const useServerInitial = initialAgentTemplates.length > 0
-
-  // Fetch templates data (disabled when server provided initial data)
-  const { data: agentData, isLoading: agentTemplatesLoadingRaw } = useAgentTemplates(undefined, !useServerInitial)
+  // Fetch templates data on the client even when ISR provided initial HTML.
+  // Use ISR payload as initialData, then refetch once on mount to stay fresh.
+  const { data: agentData, isLoading: agentTemplatesLoadingRaw } = useAgentTemplates(
+    undefined,
+    true,
+    initialAgentTemplates.length > 0 ? { initialData: initialAgentTemplates } : undefined
+  )
   const agentTemplates = (agentData ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
-  const agentTemplatesLoading = agentTemplatesLoadingRaw && !useServerInitial
+  const agentTemplatesLoading = agentTemplatesLoadingRaw && agentTemplates.length === 0
 
   const agentFromUrl = useMemo(() => searchParams?.get('agent') ?? null, [searchParams])
 
@@ -92,12 +93,13 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
     router.replace(`/marketplace/agents/${encodeURIComponent(found.slug)}`)
   }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
 
-  const topPadClass = !isAuthenticated ? 'pt-20 sm:pt-28' : 'pt-8 sm:pt-10'
-
   return (
     <>
-      {!isAuthenticated && <PublicHeader />}
-      <main className={`${topPadClass} pb-12 sm:pb-16`}>
+      <div className="marketplace-public-chrome">
+        <PublicHeader />
+      </div>
+
+      <main className="marketplace-main pt-20 sm:pt-28 pb-12 sm:pb-16">
         <div className="relative">
           {/* Decorative hero background (match agent details) */}
           <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">

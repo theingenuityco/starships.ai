@@ -146,6 +146,7 @@ jobs:
           POSTGRES_DATABASE: ${{ secrets.POSTGRES_DATABASE }}
           POSTGRES_SSL: ${{ secrets.POSTGRES_SSL }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          REVALIDATE_TOKEN: ${{ secrets.REVALIDATE_TOKEN }}
           ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
           SERVER_URL: ${{ vars.SERVER_URL }}
           CLIENT_URL: ${{ vars.CLIENT_URL }}
@@ -204,6 +205,7 @@ jobs:
             --from-literal=POSTGRES_DATABASE="$POSTGRES_DATABASE" \
             --from-literal=POSTGRES_SSL="$POSTGRES_SSL" \
             --from-literal=JWT_SECRET="$JWT_SECRET" \
+            --from-literal=REVALIDATE_TOKEN="$REVALIDATE_TOKEN" \
             --from-literal=ENCRYPTION_KEY="$ENCRYPTION_KEY" \
             --from-literal=SERVER_URL="$SERVER_URL" \
             --from-literal=CLIENT_URL="$CLIENT_URL" \
@@ -246,14 +248,36 @@ jobs:
         if: steps.check-image.outputs.image_exists == 'true'
         run: |
           echo "Deploying image tag: ${{ steps.get-image.outputs.image_tag }}"
+          IMAGE_TAG="${{ steps.get-image.outputs.image_tag }}"
           kubectl set image deployment/starships-app \
-            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ steps.get-image.outputs.image_tag }} \
+            starships=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
             -n ${{ env.NAMESPACE }}
-            # Only force restart for 'latest' tag to avoid unnecessary downtime
-          if [ "${{ steps.get-image.outputs.image_tag }}" = "latest" ]; then
+
+          # Keep schedule components in sync with the app image.
+          kubectl set image deployment/starships-schedule-scheduler \
+            schedule-scheduler=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
+          kubectl set image deployment/starships-schedule-worker \
+            schedule-worker=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
+
+          # Keep Autopilot Runner in sync with the same tag (built in the same pipeline).
+          kubectl set image deployment/autopilot-runner \
+            autopilot-runner=${{ env.REGISTRY }}/theingenuityco/autopilot-runner:${IMAGE_TAG} \
+            -n ${{ env.NAMESPACE }}
+
+          # If deploying 'latest', images may not change, so force restarts to pick up env/secrets.
+          if [ "${IMAGE_TAG}" = "latest" ]; then
             kubectl rollout restart deployment/starships-app -n ${{ env.NAMESPACE }}
+            kubectl rollout restart deployment/starships-schedule-scheduler -n ${{ env.NAMESPACE }}
+            kubectl rollout restart deployment/starships-schedule-worker -n ${{ env.NAMESPACE }}
+            kubectl rollout restart deployment/autopilot-runner -n ${{ env.NAMESPACE }}
           fi
+
           kubectl rollout status deployment/starships-app -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-schedule-scheduler -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/starships-schedule-worker -n ${{ env.NAMESPACE }} --timeout=600s
+          kubectl rollout status deployment/autopilot-runner -n ${{ env.NAMESPACE }} --timeout=600s
           echo "✅ Deployment rolled out successfully."
 
       - name: Verify deployment

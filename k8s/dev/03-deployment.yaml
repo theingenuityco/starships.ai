@@ -96,6 +96,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: JWT_SECRET
+            - name: REVALIDATE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: REVALIDATE_TOKEN
             - name: POSTGRES_HOST
               valueFrom:
                 secretKeyRef:

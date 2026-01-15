@@ -14,6 +14,7 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { AvatarGenerationService } from '@/services/AvatarGenerationService';
 import { AttachmentService } from '@/services/AttachmentService';
 import { ImportExportService } from '@/services/ImportExportService';
+import { triggerNextRevalidate } from '@/utils/nextRevalidate';
 
 const router: Router = Router();
 
@@ -780,6 +781,9 @@ router.post('/admin/agents/:id/approve', async (req: Request, res: Response): Pr
 
     const agentService = new AgentService();
     const updated = await agentService.approvePublication(agentId, adminUserId);
+
+    // Refresh marketing/marketplace ISR immediately (keep SEO, avoid staleness).
+    triggerNextRevalidate({ tags: ['public-agent-templates'] });
 
     sendSuccess(res, {
       message: 'Agent publication approved',

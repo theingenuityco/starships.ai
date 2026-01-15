@@ -33,12 +33,15 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
   }, [categoryFromUrl])
 
   const initialAgentTemplates = props.initialAgentTemplates ?? []
-  const useServerInitial = initialAgentTemplates.length > 0
-
-  // Fetch templates data (disabled when server provided initial data)
-  const { data: agentData, isLoading: agentTemplatesLoadingRaw } = useAgentTemplates(undefined, !useServerInitial)
+  // Fetch templates data on the client even when ISR provided initial HTML.
+  // Use ISR payload as initialData, then refetch once on mount to stay fresh.
+  const { data: agentData, isLoading: agentTemplatesLoadingRaw } = useAgentTemplates(
+    undefined,
+    true,
+    initialAgentTemplates.length > 0 ? { initialData: initialAgentTemplates } : undefined
+  )
   const agentTemplates = (agentData ?? initialAgentTemplates ?? []) as AgentTemplateModel[]
-  const agentTemplatesLoading = agentTemplatesLoadingRaw && !useServerInitial
+  const agentTemplatesLoading = agentTemplatesLoadingRaw && agentTemplates.length === 0
 
   const agentFromUrl = useMemo(() => searchParams?.get('agent') ?? null, [searchParams])
 

@@ -1,207 +1,274 @@
-'use client'
+import type { Metadata } from 'next'
+import { notFound } from 'next/navigation'
 
-import { useMemo, useState } from 'react'
-import { usePathname, useRouter } from 'next/navigation'
+import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 
-import type { AgentTemplateModel } from '@starships/protocol'
-
+import { fetchPublicAgentTemplates, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 import PublicHeader from '@/components/navigation/PublicHeader'
-import { PageLayout } from '@/components/layout/PageLayout'
-import Icon from '@/components/primitives/Icon'
-import AgentAvatar from '@/components/animated/AgentAvatar'
-import { Avatar } from '@/components/ui/avatar'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 
-import { useAuth } from '@/hooks/useAuth'
-import { useAgentTemplates, useCreateAgentFromTemplate } from '@/hooks/useTemplates'
-import { useUserStarships } from '@/hooks/useStarships'
-import { useStarshipAgents } from '@/hooks/useAgents'
-import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
-import { AgentTemplateDetailsModalContent } from '@/components/marketplace/AgentTemplateDetailsModalContent'
-import { track } from '@/lib/analytics'
+import { MarketplaceAgentDeployCta } from './deploy-cta-client'
 
-export default function MarketplaceAgentDetailsPage(props: { params: { slug: string } }) {
-  const slug = String(props?.params?.slug ?? '').trim()
+// Public marketing page: cacheable at the edge with ISR.
+export const dynamic = 'force-static'
+export const dynamicParams = true
+export const revalidate = 3600 // 1 hour
 
-  const router = useRouter()
-  const pathname = usePathname()
+type PageProps = {
+  params: Promise<{ slug: string }>
+}
 
-  const { userId, isAuthenticated } = useAuth()
-  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
-  const primaryStarship = starships[0]
+function normalizeSlug(value: unknown): string {
+  return String(value ?? '').trim()
+}
 
-  const { data: agentTemplates = [], isLoading: isLoadingTemplates } = useAgentTemplates(undefined, true)
-  const template: AgentTemplateModel | null = useMemo(() => {
-    if (!slug) return null
-    return agentTemplates.find(t => t.slug === slug) ?? null
-  }, [agentTemplates, slug])
-
-  const templateId = template?.id ?? ''
-  const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship && !!templateId)
-  const isAlreadyDeployed = useMemo(() => {
-    if (!templateId) return false
-    return deployedAgents.some(agent => agent.sourceTemplateId === templateId)
-  }, [deployedAgents, templateId])
-  const isPublishedFromThisStarship = useMemo(() => {
-    if (!templateId) return false
-    return deployedAgents.some(agent => agent.publishedTemplateId === templateId)
-  }, [deployedAgents, templateId])
-
-  const [showConfirmationModal, setShowConfirmationModal] = useState(false)
-  const [isDeploying, setIsDeploying] = useState(false)
-  const createAgentMutation = useCreateAgentFromTemplate()
-
-  const deployLabel = isAlreadyDeployed ? 'Already deployed' : isPublishedFromThisStarship ? 'Published from this starship' : isDeploying ? 'Deploying...' : 'Deploy'
-  const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
-  const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
-
-  const handleDeployClick = () => {
-    if (!template) return
-    track({
-      type: 'marketplace_agent_deploy_clicked',
-      templateId: template.id,
-      templateName: template.name,
-      category: template.category,
-      authenticated: !!isAuthenticated,
-    })
-    if (!isAuthenticated) {
-      const params = new URLSearchParams({ returnUrl: pathname })
-      router.push(`/login?${params.toString()}`)
-      return
-    }
-    if (!primaryStarship) return
-    setShowConfirmationModal(true)
+function categoryBadgeClass(category: AgentTemplateModel['category']): string {
+  const colors: Record<string, string> = {
+    general: 'bg-gradient-to-r from-gray-500/10 to-gray-500/20 text-gray-700 dark:text-gray-300 border-gray-500/30',
+    automation: 'bg-gradient-to-r from-green-500/10 to-green-500/20 text-green-700 dark:text-green-300 border-green-500/30',
+    data: 'bg-gradient-to-r from-purple-500/10 to-purple-500/20 text-purple-700 dark:text-purple-300 border-purple-500/30',
+    communication: 'bg-gradient-to-r from-orange-500/10 to-orange-500/20 text-orange-700 dark:text-orange-300 border-orange-500/30',
+    coding: 'bg-gradient-to-r from-indigo-500/10 to-indigo-500/20 text-indigo-700 dark:text-indigo-300 border-indigo-500/30',
+    creative: 'bg-gradient-to-r from-pink-500/10 to-pink-500/20 text-pink-700 dark:text-pink-300 border-pink-500/30',
+    analysis: 'bg-gradient-to-r from-cyan-500/10 to-cyan-500/20 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
+    support: 'bg-gradient-to-r from-amber-500/10 to-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30',
+    utility: 'bg-gradient-to-r from-teal-500/10 to-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/30',
   }
+  return colors[String(category)] || colors.general
+}
 
-  const handleConfirmDeploy = async () => {
-    if (!template) return
-    if (!primaryStarship) return
-    setIsDeploying(true)
-    try {
-      await createAgentMutation.mutateAsync({
-        templateId: template.id,
-        starshipId: primaryStarship.id,
-        starshipSlug: primaryStarship.slug,
-      })
-      setShowConfirmationModal(false)
-    } finally {
-      setIsDeploying(false)
-    }
-  }
+async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
+  const templates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
+  return templates.find(t => t.slug === slug) ?? null
+}
 
-  if (!slug) {
-    router.replace('/marketplace')
-    return null
-  }
-
-  if (isLoadingTemplates) {
-    return (
-      <>
-        {!isAuthenticated && <PublicHeader />}
-        <PageLayout requireAuth={false}>
-          <div className={`bg-background ${!isAuthenticated ? 'pt-16 sm:pt-20' : ''}`}>
-            <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-              <div className="h-8 w-64 bg-muted rounded animate-pulse" />
-              <div className="mt-6 h-[60vh] bg-muted/50 rounded-xl animate-pulse" />
-            </div>
-          </div>
-        </PageLayout>
-      </>
-    )
-  }
+export async function generateMetadata(props: PageProps): Promise<Metadata> {
+  const { slug } = await props.params
+  const s = normalizeSlug(slug)
+  const template = s ? await getTemplateBySlug(s) : null
 
   if (!template) {
-    return (
-      <>
-        {!isAuthenticated && <PublicHeader />}
-        <PageLayout requireAuth={false}>
-          <div className={`bg-background ${!isAuthenticated ? 'pt-16 sm:pt-20' : ''}`}>
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 py-12">
-              <div className="rounded-xl border border-border/60 bg-card p-8">
-                <div className="flex items-center gap-3">
-                  <Icon name="help-circle" className="h-6 w-6 text-muted-foreground" />
-                  <div className="text-lg font-semibold">Agent not found</div>
-                </div>
-                <div className="mt-2 text-sm text-muted-foreground">This marketplace agent doesn’t exist (or is no longer published).</div>
-                <div className="mt-6">
-                  <Button variant="outline" onClick={() => router.push('/marketplace')}>
-                    <Icon name="arrow-left" className="h-4 w-4 mr-2" />
-                    Back to marketplace
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </div>
-        </PageLayout>
-      </>
-    )
+    return {
+      title: 'Agent not found | Marketplace | Starships.ai',
+      description: 'This marketplace agent doesn’t exist (or is no longer published).',
+      alternates: { canonical: 'https://starships.ai/marketplace' },
+    }
   }
+
+  const title = `${template.name} | Marketplace | Starships.ai`
+  const description = template.description || `Learn more about ${template.name} on the Starships.ai Marketplace.`
+  const url = `https://starships.ai/marketplace/agents/${encodeURIComponent(template.slug)}`
+  const imageUrl = template.avatarUrl || '/static-assets/og.jpg'
+
+  return {
+    title,
+    description,
+    alternates: { canonical: url },
+    openGraph: {
+      type: 'website',
+      siteName: 'Starships.ai',
+      title,
+      description,
+      url,
+      locale: 'en_US',
+      images: [{ url: imageUrl, width: 1200, height: 630, alt: template.name }],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title,
+      description,
+      images: [imageUrl],
+    },
+  }
+}
+
+export default async function MarketplaceAgentDetailsPage(props: PageProps) {
+  const { slug } = await props.params
+  const s = normalizeSlug(slug)
+  if (!s) notFound()
+
+  const template = await getTemplateBySlug(s)
+  if (!template) notFound()
+
+  const toolTemplates = await fetchPublicToolTemplates({ revalidateSeconds: revalidate })
+  const toolInfoBySlug = new Map<string, ToolTemplateModel>()
+  for (const t of toolTemplates) {
+    if (typeof t?.slug === 'string' && t.slug.trim()) toolInfoBySlug.set(t.slug, t)
+  }
+
+  const toolSlugs = Array.isArray(template.assignedToolSlugs) ? template.assignedToolSlugs.filter(s => typeof s === 'string' && s.trim().length > 0) : []
+
+  const initials = String(template.name || '')
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map(p => p[0]?.toUpperCase())
+    .join('')
 
   return (
     <>
-      {!isAuthenticated && <PublicHeader />}
-      <PageLayout requireAuth={false}>
-        <div className={`bg-background ${!isAuthenticated ? 'pt-16 sm:pt-20' : ''}`}>
-          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-4 min-w-0">
-                <Avatar className="h-14 w-14 rounded-full ring-1 ring-border/40 shadow-lg">
-                  <AgentAvatar seed={template.name} imageUrl={template.avatarUrl} size={56} rounded />
-                </Avatar>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h1 className="text-2xl font-bold leading-tight truncate max-w-[24ch]">{template.name}</h1>
-                    {template.category ? (
-                      <Badge variant="outline" className="capitalize">
-                        {template.category}
-                      </Badge>
-                    ) : null}
-                    {template.version ? (
-                      <Badge variant="outline" className="font-mono text-xs">
-                        <Icon name="hash" className="w-3.5 h-3.5 mr-1.5" />v{template.version}
-                      </Badge>
-                    ) : null}
+      <PublicHeader />
+
+      <main className="pt-20 sm:pt-28">
+        {/* Decorative hero background */}
+        <div className="relative">
+          <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">
+            <div className="absolute left-1/2 top-0 h-[420px] w-[900px] -translate-x-1/2 rounded-full bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.22),transparent_60%)] blur-2xl" />
+            <div className="absolute left-1/4 top-24 h-[280px] w-[520px] rounded-full bg-[radial-gradient(circle_at_center,rgba(59,130,246,0.18),transparent_60%)] blur-2xl" />
+          </div>
+
+          <div className="max-w-6xl mx-auto px-4 sm:px-6">
+            {/* Breadcrumb */}
+            <div className="pt-2 sm:pt-0 text-xs text-muted-foreground">
+              <a href="/marketplace" className="hover:text-foreground transition-colors">
+                Marketplace
+              </a>
+              <span className="mx-2 opacity-60">/</span>
+              <span className="text-foreground/80">{template.name}</span>
+            </div>
+
+            {/* Hero header */}
+            <section className="mt-4 sm:mt-6 rounded-3xl border border-border/50 bg-card/60 backdrop-blur supports-[backdrop-filter]:bg-card/40 shadow-[0_10px_30px_rgba(0,0,0,0.25)] overflow-hidden">
+              <div className="p-6 sm:p-8">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+                  <div className="flex items-start gap-4 min-w-0">
+                    <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg">
+                      {template.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={template.avatarUrl} alt="" width={80} height={80} className="h-full w-full object-cover" />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center">
+                          <span className="text-lg sm:text-xl font-semibold text-muted-foreground">{initials || 'AI'}</span>
+                        </div>
+                      )}
+                      <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
+                    </div>
+
+                    <div className="min-w-0">
+                      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
+                      {template.role ? <div className="mt-1 text-sm sm:text-base text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
+
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        {template.category ? (
+                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
+                        ) : null}
+                        {template.version ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span> : null}
+                        {typeof template.usageCount === 'number' ? (
+                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                            {template.usageCount.toLocaleString()} deployments
+                          </span>
+                        ) : null}
+                        {template.model ? <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span> : null}
+                      </div>
+                    </div>
                   </div>
-                  {template.role ? <div className="mt-1 text-sm text-muted-foreground truncate max-w-[72ch]">{template.role}</div> : null}
+
+                  <div className="flex items-center gap-2 lg:justify-end">
+                    <a
+                      href="/marketplace"
+                      className="inline-flex items-center justify-center h-10 px-4 rounded-xl text-sm font-medium border border-border/60 bg-background/40 hover:bg-accent/60 transition-colors"
+                    >
+                      Back to marketplace
+                    </a>
+                    <MarketplaceAgentDeployCta template={template} />
+                  </div>
                 </div>
               </div>
+            </section>
 
-              <div className="flex items-center gap-2">
-                <Button variant="outline" onClick={() => router.push('/marketplace')}>
-                  <Icon name="arrow-left" className="h-4 w-4 mr-2" />
-                  Back
-                </Button>
-                {isAlreadyDeployed ? (
-                  <div className="relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
-                    <Icon name="check-circle" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-                    <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+            {/* Main content grid */}
+            <section className="mt-8 pb-10 sm:pb-16">
+              <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 lg:gap-8 items-start">
+                {/* Left column */}
+                <div className="space-y-8">
+                  {template.description ? (
+                    <section className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                      <h2 className="text-sm font-semibold tracking-wide text-foreground">About</h2>
+                      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{template.description}</p>
+                    </section>
+                  ) : null}
+
+                  {toolSlugs.length > 0 ? (
+                    <section className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                      <div className="flex items-center justify-between gap-3">
+                        <h2 className="text-sm font-semibold tracking-wide text-foreground">Capabilities</h2>
+                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/40 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
+                          {toolSlugs.length} tools
+                        </span>
+                      </div>
+                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {toolSlugs.map(slug => {
+                          const info = toolInfoBySlug.get(slug)
+                          const title = info?.name?.trim() || slug
+                          const desc = info?.description?.trim() || ''
+                          return (
+                            <div
+                              key={slug}
+                              className="group rounded-xl border border-border/50 bg-background/30 hover:bg-background/40 transition-colors p-4"
+                            >
+                              <div className="text-sm font-medium leading-5 truncate">{title}</div>
+                              {desc ? <div className="mt-1 text-xs leading-4 text-muted-foreground line-clamp-3">{desc}</div> : null}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  ) : null}
+
+                  {Array.isArray(template.previewPrompts) && template.previewPrompts.length > 0 ? (
+                    <section className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                      <h2 className="text-sm font-semibold tracking-wide text-foreground">Try these prompts</h2>
+                      <div className="mt-4 grid grid-cols-1 gap-3">
+                        {template.previewPrompts.map((p, idx) => (
+                          <div
+                            key={idx}
+                            className="rounded-xl border border-border/50 bg-background/30 p-4 text-sm leading-relaxed"
+                          >
+                            <span className="text-muted-foreground">&quot;</span>
+                            <span className="text-foreground/90">{p}</span>
+                            <span className="text-muted-foreground">&quot;</span>
+                          </div>
+                        ))}
+                      </div>
+                    </section>
+                  ) : null}
+                </div>
+
+                {/* Right column */}
+                <aside className="lg:sticky lg:top-28 space-y-4">
+                  <div className="rounded-2xl border border-border/50 bg-card/40 backdrop-blur supports-[backdrop-filter]:bg-card/30 p-6">
+                    <div className="text-sm font-semibold">Deploy this agent</div>
+                    <div className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                      Add this agent to your starship in one click. You can customize tools and guardrails after deployment.
+                    </div>
+                    <div className="mt-4">
+                      <MarketplaceAgentDeployCta template={template} />
+                    </div>
+                    <div className="mt-4 border-t border-border/50 pt-4 space-y-2 text-xs text-muted-foreground">
+                      <div className="flex items-start gap-2">
+                        <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
+                        <span>Private by default (you control publication)</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
+                        <span>Works with your existing connectors & tools</span>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
+                        <span>Start chatting immediately after deploy</span>
+                      </div>
+                    </div>
                   </div>
-                ) : (
-                  <Button onClick={handleDeployClick} disabled={deployDisabled} className="h-10">
-                    <Icon name={deployIconName} className="w-4 h-4 mr-2" />
-                    {deployLabel}
-                  </Button>
-                )}
-              </div>
-            </div>
 
-            <div className="mt-6 rounded-xl border border-border/60 bg-card">
-              <AgentTemplateDetailsModalContent template={template} />
-            </div>
+                  <div className="rounded-2xl border border-border/50 bg-background/30 p-4 text-xs text-muted-foreground">
+                    Tip: Share this page with teammates to review the agent before deploying.
+                  </div>
+                </aside>
+              </div>
+            </section>
           </div>
         </div>
-
-        <DeploymentConfirmationModal
-          isOpen={showConfirmationModal}
-          onOpenChange={setShowConfirmationModal}
-          onConfirm={handleConfirmDeploy}
-          isProcessing={isDeploying}
-          type="agent"
-          template={template}
-          starshipName={primaryStarship?.name || 'Unknown Starship'}
-        />
-      </PageLayout>
+      </main>
     </>
   )
 }

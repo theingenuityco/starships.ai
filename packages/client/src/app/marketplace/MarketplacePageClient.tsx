@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAgentTemplates } from '@/hooks/useTemplates'
-import { useAuth } from '@/hooks/useAuth'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import { getCategoryDotColor } from '@/components/agents/AgentBuilder/utils/categoryHelpers'
 
@@ -18,7 +17,6 @@ import type { AgentTemplateModel } from '@starships/protocol'
 import { track } from '@/lib/analytics'
 
 export default function MarketplacePageClient(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
-  const { isAuthenticated } = useAuth()
   const [searchQuery, setSearchQuery] = useState('')
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -95,12 +93,42 @@ export default function MarketplacePageClient(props: { initialAgentTemplates?: A
     router.replace(`/marketplace/agents/${encodeURIComponent(found.slug)}`)
   }, [agentFromUrl, agentTemplates, agentTemplatesLoading, router])
 
-  const topPadClass = !isAuthenticated ? 'pt-20 sm:pt-28' : 'pt-8 sm:pt-10'
-
   return (
     <>
-      {!isAuthenticated && <PublicHeader />}
-      <main className={`${topPadClass} pb-12 sm:pb-16`}>
+      {/* Cosmetic only: hide public chrome when a token exists (not authz). */}
+      <script
+        // eslint-disable-next-line react/no-danger
+        dangerouslySetInnerHTML={{
+          __html: `
+            (function () {
+              try {
+                var cls = 'has-auth-token';
+                var t = localStorage.getItem('starships_auth_token') || '';
+                document.documentElement.classList.toggle(cls, !!t && t !== 'null' && t !== 'undefined');
+              } catch (e) {}
+            })();
+          `,
+        }}
+      />
+      <style>{`
+        .has-auth-token .marketplace-public-chrome {
+          display: none !important;
+        }
+        .has-auth-token .marketplace-main {
+          padding-top: 2rem !important;
+        }
+        @media (min-width: 640px) {
+          .has-auth-token .marketplace-main {
+            padding-top: 2.5rem !important;
+          }
+        }
+      `}</style>
+
+      <div className="marketplace-public-chrome">
+        <PublicHeader />
+      </div>
+
+      <main className="marketplace-main pt-20 sm:pt-28 pb-12 sm:pb-16">
         <div className="relative">
           {/* Decorative hero background (match agent details) */}
           <div className="pointer-events-none absolute inset-x-0 -top-10 -z-10 h-[360px] overflow-hidden">

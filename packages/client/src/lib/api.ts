@@ -307,6 +307,8 @@ api.interceptors.response.use(
       try {
         if (typeof window !== 'undefined') {
           window.localStorage.removeItem('starships_auth_token')
+          // Keep public chrome in sync (marketplace/header visibility).
+          window.dispatchEvent(new Event('starships_auth_token_changed'))
         }
       } catch {
         // ignore

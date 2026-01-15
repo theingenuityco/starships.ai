@@ -9,6 +9,7 @@ import { UserbackWrapper } from '@/components/userback-wrapper'
 import { UI_TEXT } from '@/constants/text'
 import { AuthProvider } from '@/providers/auth-provider'
 import { QueryProvider } from '@/providers/query-provider'
+import { AuthUserHtmlClassSync } from '@/components/auth/AuthUserHtmlClassSync'
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import { Toaster as SonnerToaster } from 'sonner'
@@ -99,6 +100,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           <QueryProvider>
             <AuthProvider>
+              <AuthUserHtmlClassSync />
               <UserbackWrapper>
                 <TooltipProvider>
                   <div className="min-h-[100dvh] bg-background">

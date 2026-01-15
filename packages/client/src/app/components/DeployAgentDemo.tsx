@@ -12,7 +12,7 @@ export default function DeployAgentDemo() {
   const router = useRouter()
   const { data: agentTemplates = [], isLoading } = useAgentTemplates()
 
-  const goToMarketplace = () => router.push('/marketplace?from=public')
+  const goToMarketplace = () => router.push('/marketplace')
 
   const normalize = (s: unknown) => String(s ?? '').trim().toLowerCase()
 

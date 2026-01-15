@@ -6,7 +6,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useAgentTemplates } from '@/hooks/useTemplates'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
-import { AgentDetailsModal } from '@/components/marketplace/AgentDetailsModal'
+import { useRouter } from 'next/navigation'
+import { track } from '@/lib/analytics'
 
 function normalize(s: unknown) {
   return String(s ?? '')
@@ -15,6 +16,7 @@ function normalize(s: unknown) {
 }
 
 export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?: AgentTemplateModel[] }) {
+  const router = useRouter()
   const initialAgentTemplates = props.initialAgentTemplates ?? []
   const useServerInitial = initialAgentTemplates.length > 0
   const { data, isLoading } = useAgentTemplates(undefined, !useServerInitial)
@@ -23,8 +25,6 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
   const containerRef = useRef<HTMLDivElement | null>(null)
   const [carouselApi, setCarouselApi] = useState<CarouselApi | null>(null)
   const [isHovering, setIsHovering] = useState(false)
-  const [selectedAgent, setSelectedAgent] = useState<AgentTemplateModel | null>(null)
-  const [isAgentModalOpen, setIsAgentModalOpen] = useState(false)
 
   // Fixed card widths (avoid percentage-based stretching on small screens)
   const CARD_W = 136
@@ -102,13 +102,15 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
   }, [carouselApi, isHovering])
 
   const handleAgentClick = (template: AgentTemplateModel) => {
-    setSelectedAgent(template)
-    setIsAgentModalOpen(true)
-  }
-
-  const handleAgentModalOpenChange = (open: boolean) => {
-    setIsAgentModalOpen(open)
-    if (!open) setSelectedAgent(null)
+    track({
+      type: 'marketplace_agent_template_opened',
+      templateId: template.id,
+      templateName: template.name,
+      category: (template as any)?.category,
+      source: 'landing_hero_carousel',
+    })
+    const params = new URLSearchParams({ agent: template.id })
+    router.push(`/marketplace?${params.toString()}`)
   }
 
   return (
@@ -171,7 +173,6 @@ export default function HeroMarketplaceCarousel(props: { initialAgentTemplates?:
         <CarouselPrevious className="hidden md:inline-flex" />
         <CarouselNext className="hidden md:inline-flex" />
       </Carousel>
-      <AgentDetailsModal template={selectedAgent} open={isAgentModalOpen} onOpenChange={handleAgentModalOpenChange} />
     </div>
   )
 }

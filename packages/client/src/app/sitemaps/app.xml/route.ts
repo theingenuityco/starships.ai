@@ -1,5 +1,6 @@
 import { isIndexingEnabled } from '@/lib/indexing'
 import { publicEnvConfig } from '@starships/env/public'
+import { fetchPublicAgentTemplates } from '@/lib/server/public-templates'
 
 function xmlEscape(value: string): string {
   return (
@@ -44,12 +45,24 @@ export async function GET() {
   const base = normalizeSiteUrl(publicEnvConfig.PUBLIC_URL)
   const now = new Date()
 
+  const agentTemplates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
+  const agentDetailUrls: UrlEntry[] = agentTemplates
+    .map(t => String(t?.slug || '').trim())
+    .filter(Boolean)
+    .map(slug => ({
+      path: `/marketplace/agents/${encodeURIComponent(slug)}`,
+      changefreq: 'weekly',
+      priority: 0.7,
+      lastmod: now,
+    }))
+
   const urls: UrlEntry[] = [
     { path: '/', changefreq: 'weekly', priority: 1.0, lastmod: now },
     { path: '/marketplace', changefreq: 'daily', priority: 0.8, lastmod: now },
     { path: '/docs', changefreq: 'weekly', priority: 0.6, lastmod: now },
     { path: '/privacy', changefreq: 'yearly', priority: 0.3, lastmod: now },
     { path: '/terms', changefreq: 'yearly', priority: 0.3, lastmod: now },
+    ...agentDetailUrls,
   ]
 
   const body =

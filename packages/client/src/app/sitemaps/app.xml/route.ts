@@ -2,6 +2,27 @@ import { isIndexingEnabled } from '@/lib/indexing'
 import { publicEnvConfig } from '@starships/env/public'
 import { fetchPublicAgentTemplates } from '@/lib/server/public-templates'
 
+function trimTrailingSlashes(value: string): string {
+  return value.replace(/\/+$/, '')
+}
+
+function firstHeaderValue(value: string | null): string {
+  return String(value || '')
+    .split(',')[0]
+    ?.trim()
+}
+
+function getBaseUrlFromRequest(req: Request): string {
+  const configured = trimTrailingSlashes(String(publicEnvConfig.PUBLIC_URL || '').trim())
+  if (configured) return configured
+
+  const host = firstHeaderValue(req.headers.get('x-forwarded-host')) || firstHeaderValue(req.headers.get('host'))
+  if (!host) return ''
+
+  const proto = firstHeaderValue(req.headers.get('x-forwarded-proto')) || 'https'
+  return trimTrailingSlashes(`${proto}://${host}`)
+}
+
 function xmlEscape(value: string): string {
   return (
     value
@@ -30,22 +51,24 @@ function joinUrl(base: string, path: string): string {
   return `${base}${p === '/' ? '' : p}`
 }
 
-export const revalidate = 3600 // 1 hour
+// Keep the app sitemap always fresh in container deployments.
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 /**
  * App sitemap (public-facing pages only).
  *
  * Note: authenticated app routes like `/ship/*` are intentionally excluded.
  */
-export async function GET() {
+export async function GET(req: Request) {
   if (!isIndexingEnabled()) {
     return new Response('Not Found', { status: 404 })
   }
 
-  const base = normalizeSiteUrl(publicEnvConfig.PUBLIC_URL)
+  const base = normalizeSiteUrl(getBaseUrlFromRequest(req))
   const now = new Date()
 
-  const agentTemplates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
+  const agentTemplates = await fetchPublicAgentTemplates({ revalidateSeconds: 0 })
   const agentDetailUrls: UrlEntry[] = agentTemplates
     .map(t => String(t?.slug || '').trim())
     .filter(Boolean)
@@ -87,7 +110,7 @@ export async function GET() {
   return new Response(body, {
     headers: {
       'Content-Type': 'application/xml; charset=utf-8',
-      'Cache-Control': 'public, max-age=0, s-maxage=3600, stale-while-revalidate=86400',
+      'Cache-Control': 'no-store',
     },
   })
 }

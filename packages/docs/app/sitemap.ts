@@ -4,6 +4,7 @@ import { isIndexingEnabled } from '@/lib/indexing'
 import { publicEnvConfig } from '@starships/env/public';
 
 export const revalidate = 3600 // 1 hour
+export const dynamic = 'force-dynamic'
 
 function normalizePublicUrl(value: string): string {
   return value.replace(/\/+$/, '')

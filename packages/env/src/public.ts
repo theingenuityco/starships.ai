@@ -25,6 +25,12 @@ export type PublicEnvConfig = {
   POSTHOG_HOST: string;
 };
 
+function readEnv(name: keyof PublicEnvConfig): string {
+  // K8s secrets and CI envs sometimes include trailing newlines/whitespace.
+  // Trimming here prevents subtle prod-only bugs (e.g. ENABLE_INDEXING="true\n").
+  return String(process.env[name] || '').trim();
+}
+
 /**
  * Edge-safe env accessor for Next.js apps/middleware.
  *
@@ -36,12 +42,12 @@ export function getPublicEnvConfig(): PublicEnvConfig {
   return {
     // IMPORTANT: must be explicitly configured per environment.
     // Intentionally no default to avoid accidentally using production in dev/staging.
-    PUBLIC_URL: process.env.PUBLIC_URL || '',
-    ENABLE_INDEXING: process.env.ENABLE_INDEXING || '',
-    GA_MEASUREMENT_ID: process.env.GA_MEASUREMENT_ID || '',
-    USERBACK_TOKEN: process.env.USERBACK_TOKEN || '',
-    POSTHOG_KEY: process.env.POSTHOG_KEY || '',
-    POSTHOG_HOST: process.env.POSTHOG_HOST || '',
+    PUBLIC_URL: readEnv('PUBLIC_URL'),
+    ENABLE_INDEXING: readEnv('ENABLE_INDEXING'),
+    GA_MEASUREMENT_ID: readEnv('GA_MEASUREMENT_ID'),
+    USERBACK_TOKEN: readEnv('USERBACK_TOKEN'),
+    POSTHOG_KEY: readEnv('POSTHOG_KEY'),
+    POSTHOG_HOST: readEnv('POSTHOG_HOST'),
   };
 }
 

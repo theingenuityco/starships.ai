@@ -14,7 +14,7 @@ export async function POST(req: Request) {
   if (!token) {
     if (process.env.NODE_ENV === 'development') {
       // eslint-disable-next-line no-console
-      console.warn('[__revalidate] REVALIDATE_TOKEN is not set; refusing to revalidate')
+      console.warn('[revalidate] REVALIDATE_TOKEN is not set; refusing to revalidate')
     }
     return Response.json({ ok: false, error: 'Revalidation not configured' }, { status: 503 })
   }

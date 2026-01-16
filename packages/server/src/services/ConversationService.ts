@@ -1130,7 +1130,7 @@ export class ConversationService {
     // Create a DB-backed turn record first. This is the idempotency boundary for this run.
     const turn = await this.turnRepository.createTurn({ conversationId: data.conversationId, status: 'active' });
     this.currentTurnId.set(data.conversationId, turn.id);
- 
+
     // Request-level enforcement:
     // Many image models default to multiple images. Enforce a single image unless the caller explicitly requests otherwise.
     try {
@@ -1138,11 +1138,7 @@ export class ConversationService {
       if (wantsImage) {
         const cfg = (data.imageConfig && typeof data.imageConfig === 'object' ? data.imageConfig : {}) as Record<string, unknown>;
         const hasExplicitCount =
-          cfg['num_images'] != null ||
-          cfg['numImages'] != null ||
-          cfg['n'] != null ||
-          cfg['count'] != null ||
-          cfg['images'] != null;
+          cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null || cfg['images'] != null;
         if (!hasExplicitCount) {
           // Prefer OpenRouter snake_case; runner passes imageConfig through as image_config.
           data.imageConfig = { ...cfg, num_images: 1 };

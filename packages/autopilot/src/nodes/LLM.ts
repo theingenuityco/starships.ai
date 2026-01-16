@@ -137,6 +137,12 @@ export class LLM extends BaseNode<LlmParams> {
       // Canonical messages for LLM execution
       const sourceMessages = this.coerceToLlmMessages(messages || params.messages);
 
+      // IMPORTANT:
+      // Tool results can contain extremely large payloads (notably base64 images embedded in JSON).
+      // Never send those verbatim to the upstream provider, or we'll hit prompt token limits.
+      // We sanitize ONLY the provider request (does not mutate state/messages).
+      const providerMessages = this.sanitizeMessagesForProvider(sourceMessages);
+
       // Condensed request log: essential params only, with truncated message previews
       // const truncate = (text: unknown, max = 160): string => {
       //   if (typeof text !== 'string') return typeof text === 'undefined' ? '' : '[non-text content]';
@@ -192,7 +198,7 @@ export class LLM extends BaseNode<LlmParams> {
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
       const stream = await hostRuntime.llm({
         model: params.model,
-        messages: this.convertMessagesToOpenAI(sourceMessages),
+        messages: this.convertMessagesToOpenAI(providerMessages),
         tools: Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined,
         temperature: typeof params.temperature === 'number' ? params.temperature : undefined,
         maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,
@@ -216,6 +222,60 @@ export class LLM extends BaseNode<LlmParams> {
   }
 
   /**
+   * Sanitize messages before sending to the upstream provider.
+   *
+   * - Does NOT mutate input state/messages (important for server-side persistence/debugging).
+   * - Primary goal is to avoid provider token overflow caused by huge tool_result payloads.
+   */
+  private sanitizeMessagesForProvider(messages: LlmMessage[]): LlmMessage[] {
+    const MAX_TOOL_TEXT_CHARS = 20_000;
+    const MAX_ANY_TEXT_CHARS = 60_000;
+
+    const out: LlmMessage[] = [];
+    for (const m of Array.isArray(messages) ? messages : []) {
+      if (!m || typeof m !== 'object') continue;
+
+      const role = (m as unknown as { role?: unknown }).role;
+      const content = (m as unknown as { content?: unknown }).content;
+
+      if (typeof content !== 'string') {
+        // Preserve multimodal blocks as-is; they are generally small and structured.
+        out.push(m);
+        continue;
+      }
+
+      const s = content;
+      const looksLikeEmbeddedImage = s.includes('data:image/') && s.includes(';base64,');
+
+      // Tool results are the primary culprit (often include raw provider responses with base64 images).
+      if (role === 'tool') {
+        if (looksLikeEmbeddedImage || s.length > MAX_TOOL_TEXT_CHARS) {
+          const prefix = s.slice(0, Math.min(MAX_TOOL_TEXT_CHARS, s.length));
+          out.push({
+            ...(m as unknown as Record<string, unknown>),
+            content: `${prefix}\n\n[tool_result truncated for provider: originalLength=${s.length} chars]\n`,
+          } as LlmMessage);
+          continue;
+        }
+      }
+
+      // Generic safety: never send multi-hundred KB blobs to providers.
+      if (s.length > MAX_ANY_TEXT_CHARS) {
+        const prefix = s.slice(0, MAX_ANY_TEXT_CHARS);
+        out.push({
+          ...(m as unknown as Record<string, unknown>),
+          content: `${prefix}\n\n[truncated for provider: originalLength=${s.length} chars]\n`,
+        } as LlmMessage);
+        continue;
+      }
+
+      out.push(m);
+    }
+
+    return out;
+  }
+
+  /**
    * Normalize OpenRouter usage response (snake_case) to our LLMUsage type (camelCase)
    */
   private normalizeUsage(usage: unknown): LLMUsage {
@@ -230,7 +290,8 @@ export class LLM extends BaseNode<LlmParams> {
     // Prefer BYOK upstream provider cost when available (OpenRouter usage accounting).
     // - cost_details.upstream_inference_cost: upstream USD cost (BYOK)
     // - cost: OpenRouter billed cost (credits/USD)
-    const costDetails = (usageObj.cost_details && typeof usageObj.cost_details === 'object') ? (usageObj.cost_details as Record<string, unknown>) : null;
+    const costDetails =
+      usageObj.cost_details && typeof usageObj.cost_details === 'object' ? (usageObj.cost_details as Record<string, unknown>) : null;
     const upstream = costDetails ? costDetails.upstream_inference_cost : undefined;
     const rawCost = typeof upstream === 'number' ? upstream : typeof usageObj.cost === 'number' ? usageObj.cost : 0;
     const cost = Number.isFinite(rawCost) ? rawCost : 0;
@@ -290,7 +351,27 @@ export class LLM extends BaseNode<LlmParams> {
 
     // Helper to get string content (for roles that require string)
     const getStringContent = (): string => {
-      return typeof contentVal === 'string' ? contentVal : contentVal[0]?.type === 'text' ? contentVal[0].text : '';
+      const raw = typeof contentVal === 'string' ? contentVal : contentVal[0]?.type === 'text' ? contentVal[0].text : '';
+      if (!raw) return '';
+
+      // LAST-LINE-OF-DEFENSE:
+      // Some workflows/tools can produce extremely large tool_result payloads (e.g. base64 images embedded in JSON).
+      // Even if upstream sanitization is missed for any reason, never send multi-MB strings to the provider.
+      const looksLikeEmbeddedImage = raw.includes('data:image/') && raw.includes(';base64,');
+      const maxToolChars = 20_000;
+      const maxAnyChars = 60_000;
+
+      if (role === 'tool' && (looksLikeEmbeddedImage || raw.length > maxToolChars)) {
+        const prefix = raw.slice(0, Math.min(maxToolChars, raw.length));
+        return `${prefix}\n\n[tool_result truncated for provider: originalLength=${raw.length} chars]\n`;
+      }
+
+      if (raw.length > maxAnyChars) {
+        const prefix = raw.slice(0, maxAnyChars);
+        return `${prefix}\n\n[truncated for provider: originalLength=${raw.length} chars]\n`;
+      }
+
+      return raw;
     };
 
     if (role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {

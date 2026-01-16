@@ -41,7 +41,9 @@ export async function triggerNextRevalidate(args: { tags?: string[]; paths?: str
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 1500)
     try {
-      const url = `${baseUrl}/__revalidate`
+      // NOTE: Next App Router ignores folders that start with "_" (private segments),
+      // so the route lives at `/revalidate`, not `/__revalidate`.
+      const url = `${baseUrl}/revalidate`
       const res = await fetch(url, {
         method: 'POST',
         headers: {

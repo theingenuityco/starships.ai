@@ -2256,6 +2256,7 @@ export class ConversationService {
             if (hasImages) {
               const all = [...imagesFromDelta, ...imagesFromMessage];
               const urls: string[] = [];
+              const allUrls: string[] = [];
               for (const raw of all) {
                 if (!raw || typeof raw !== 'object') continue;
                 const rec = raw as Record<string, unknown>;
@@ -2264,9 +2265,8 @@ export class ConversationService {
                   (rec.image_url && typeof rec.image_url === 'object' ? (rec.image_url as Record<string, unknown>) : null) ||
                   (rec.imageUrl && typeof rec.imageUrl === 'object' ? (rec.imageUrl as Record<string, unknown>) : null);
                 const u = imageUrlNode && typeof imageUrlNode.url === 'string' ? imageUrlNode.url : '';
-                if (u && u.startsWith('data:image/')) {
-                  urls.push(u);
-                }
+                if (u) allUrls.push(u);
+                if (u && u.startsWith('data:image/')) urls.push(u);
               }
 
               if (urls.length > 0) {

@@ -1004,9 +1004,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const existing = messages[existingIdx]
         const createdAtUnknown = widget['createdAt']
         const updatedAtUnknown = widget['updatedAt']
-        const createdAt =
-          (typeof existing?.createdAt === 'string' && existing.createdAt) ||
-          (typeof createdAtUnknown === 'string' ? createdAtUnknown : now)
+        const createdAt = (typeof existing?.createdAt === 'string' && existing.createdAt) || (typeof createdAtUnknown === 'string' ? createdAtUnknown : now)
 
         messages[existingIdx] = {
           ...existing,

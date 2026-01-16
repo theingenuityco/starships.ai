@@ -1004,9 +1004,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const existing = messages[existingIdx]
         const createdAtUnknown = widget['createdAt']
         const updatedAtUnknown = widget['updatedAt']
-        const createdAt =
-          (typeof existing?.createdAt === 'string' && existing.createdAt) ||
-          (typeof createdAtUnknown === 'string' ? createdAtUnknown : now)
+        const createdAt = (typeof existing?.createdAt === 'string' && existing.createdAt) || (typeof createdAtUnknown === 'string' ? createdAtUnknown : now)
 
         messages[existingIdx] = {
           ...existing,
@@ -1133,6 +1131,20 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const msg = chunk.data?.message
         if (msg?.role === 'assistant') {
           const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
+          const attachmentIdsUnknown = isRecord(msg) ? msg['attachmentIds'] : undefined
+          const hasAttachments = Array.isArray(attachmentIdsUnknown) && attachmentIdsUnknown.length > 0
+          // IMPORTANT:
+          // Do NOT delay assistant message.append events that contain attachments.
+          //
+          // Why (runtime evidence):
+          // - Image generation often yields attachment-only assistant messages (contentLength=0)
+          // - The "last assistant" is frequently the streaming placeholder `stream-<turnId>`
+          // - If that placeholder never reaches animationComplete, the attachment message.append is queued forever
+          //   (images only appear after full page reload/snapshot).
+          if (hasAttachments) {
+            processed.push(chunk)
+            continue
+          }
           if (!hasToolCalls) {
             // Check if previous assistant message animation is complete
             // Use LAST computed messages (from previous render) to avoid re-reduction

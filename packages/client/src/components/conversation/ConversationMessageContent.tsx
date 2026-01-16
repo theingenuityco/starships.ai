@@ -1068,7 +1068,7 @@ export function ConversationMessageContent({
 
       {/* Attachments */}
       {attachmentIds && attachmentIds.length > 0 && starshipId && (
-        <div className="mb-1 space-y-2">
+        <div className="mb-1 inline-flex flex-col gap-2">
           {isLoadingAttachments
             ? // Loading state
               attachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)

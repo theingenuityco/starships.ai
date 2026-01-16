@@ -118,6 +118,8 @@ export class ConversationService {
   // Track generated image attachments for the current streaming assistant placeholder
   private streamingGeneratedAttachmentIds: Map<string, string[]> = new Map();
   private streamingGeneratedImageUrlSeen: Map<string, Set<string>> = new Map();
+  // Desired number of images to persist for the current turn (defaults to 1 unless explicitly requested)
+  private streamingDesiredNumImages: Map<string, number> = new Map();
 
   // Track accumulated reasoning during streaming per conversation
   private streamingReasoning: Map<string, string> = new Map();
@@ -404,6 +406,7 @@ export class ConversationService {
     this.streamingReasoning.delete(conversationId);
     this.streamingGeneratedAttachmentIds.delete(conversationId);
     this.streamingGeneratedImageUrlSeen.delete(conversationId);
+    this.streamingDesiredNumImages.delete(conversationId);
     this.ringBuffer.delete(conversationId);
     this.latestStreamingUsage.delete(conversationId);
     this.streamSeq.delete(conversationId);
@@ -1130,6 +1133,24 @@ export class ConversationService {
     // Create a DB-backed turn record first. This is the idempotency boundary for this run.
     const turn = await this.turnRepository.createTurn({ conversationId: data.conversationId, status: 'active' });
     this.currentTurnId.set(data.conversationId, turn.id);
+
+    // Default image persistence policy:
+    // Many image-capable models return multiple images by default. For conversations we default to 1 image
+    // unless explicitly requested via imageConfig.num_images/numImages.
+    try {
+      const cfg = data.imageConfig && typeof data.imageConfig === 'object' ? (data.imageConfig as Record<string, unknown>) : null;
+      const raw =
+        cfg && (cfg['num_images'] ?? cfg['numImages'] ?? cfg['n'] ?? cfg['count'] ?? cfg['images']) != null
+          ? (cfg['num_images'] ?? cfg['numImages'] ?? cfg['n'] ?? cfg['count'] ?? cfg['images'])
+          : undefined;
+      const parsed = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN;
+      const n = Number.isFinite(parsed) ? Math.floor(parsed) : 1;
+      // Safety cap to avoid accidental huge outputs
+      const clamped = Math.max(1, Math.min(4, n));
+      this.streamingDesiredNumImages.set(data.conversationId, clamped);
+    } catch {
+      this.streamingDesiredNumImages.set(data.conversationId, 1);
+    }
 
     // Persist user message unless pre-created by the route (needed to charge credits before returning 202).
     // Ensure the user message is linked to the turn with turnSeq=0.
@@ -2277,14 +2298,17 @@ export class ConversationService {
 
                 const seen = this.streamingGeneratedImageUrlSeen.get(conversationId)!;
                 const acc = this.streamingGeneratedAttachmentIds.get(conversationId)!;
+                const desired = this.streamingDesiredNumImages.get(conversationId) ?? 1;
+                const remaining = Math.max(0, desired - acc.length);
 
                 // Resolve starship once for uploads
                 const starship = await this.getConversationStarship(conversationId);
                 if (starship) {
                   const attachmentService = new AttachmentService();
 
-                  for (let idx = 0; idx < urls.length; idx++) {
-                    const url = urls[idx];
+                  const urlsToProcess = remaining > 0 ? urls.slice(0, remaining) : [];
+                  for (let idx = 0; idx < urlsToProcess.length; idx++) {
+                    const url = urlsToProcess[idx];
                     if (seen.has(url)) continue;
                     seen.add(url);
 

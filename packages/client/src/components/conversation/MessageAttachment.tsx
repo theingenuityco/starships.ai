@@ -3,6 +3,7 @@ import type { Attachment } from '@starships/protocol'
 import { isTextFile } from '@starships/protocol'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
+import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 interface MessageAttachmentProps {
   attachment: Attachment
@@ -20,6 +21,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
   const isText = isTextFile(attachment.mimeType)
   const [imageError, setImageError] = useState(false)
   const [imageLoaded, setImageLoaded] = useState(false)
+  const [open, setOpen] = useState(false)
 
   // Helper to get file icon based on MIME type
   const getFileIcon = (mimeType: string): string => {
@@ -59,7 +61,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
     if (!attachment.previewUrl) {
       return (
         <div className={cn(
-          'flex items-center justify-center min-h-[200px] rounded-lg bg-muted/10',
+          'flex items-center justify-center min-h-[160px] rounded-lg bg-muted/10',
           className
         )}>
           <Icon name="file" className="w-8 h-8 text-muted-foreground" />
@@ -68,48 +70,73 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
     }
 
     return (
-      <a
-        href={attachment.previewUrl}
-        download={attachment.filename}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={cn(
-          'block rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity group relative',
-          className
-        )}
-      >
-        {imageError ? (
-          <div className="flex items-center justify-center min-h-[200px] p-4 bg-muted/10 rounded-lg">
-            <Icon name="file" className="w-8 h-8 text-muted-foreground" />
-          </div>
-        ) : (
-          <div className={cn(
-            "relative rounded-lg bg-muted/10",
-            !imageLoaded && "min-h-[200px]"
-          )}>
-            {!imageLoaded && (
-              <div className="absolute inset-0 flex items-center justify-center">
-                <Icon name="loading" className="w-6 h-6 text-muted-foreground" />
-              </div>
-            )}
-            <img
-              src={attachment.previewUrl}
-              alt="Attachment"
-              className={cn(
-                "max-w-full h-auto max-h-96 object-contain rounded-lg transition-opacity duration-300",
-                imageLoaded ? "opacity-100" : "opacity-0"
+      <Dialog open={open} onOpenChange={setOpen}>
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className={cn(
+            // Small preview that shrink-wraps to the rendered image.
+            'inline-block max-w-full rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity group relative text-left',
+            className
+          )}
+        >
+          {imageError ? (
+            <div className="flex items-center justify-center min-h-[160px] p-4 bg-muted/10 rounded-lg">
+              <Icon name="file" className="w-8 h-8 text-muted-foreground" />
+            </div>
+          ) : (
+            <div className={cn('relative inline-block max-w-full rounded-lg bg-muted/10', !imageLoaded && 'min-h-[160px]')}>
+              {!imageLoaded && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <Icon name="loading" className="w-6 h-6 text-muted-foreground" />
+                </div>
               )}
-              loading="lazy"
-              onLoad={() => setImageLoaded(true)}
-              onError={() => setImageError(true)}
-            />
-            {/* Download icon overlay on hover */}
-            <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-              <Icon name="download" className="w-4 h-4 text-foreground" />
+              <img
+                src={attachment.previewUrl}
+                alt={attachment.filename || 'Attachment'}
+                className={cn(
+                  // Thumbnail sizing: small preview in chat, but keep aspect ratio.
+                  'block w-auto h-auto max-w-[420px] max-h-[320px] object-contain rounded-lg transition-opacity duration-300',
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                )}
+                loading="lazy"
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageError(true)}
+              />
+              {/* Expand icon overlay on hover */}
+              <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Icon name="arrows-out" className="w-4 h-4 text-foreground" />
+              </div>
+            </div>
+          )}
+        </button>
+
+        <DialogContent className="max-w-[min(92vw,1100px)] p-0 overflow-hidden">
+          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/50">
+            <DialogTitle className="text-sm font-medium truncate">{attachment.filename || 'Image'}</DialogTitle>
+            <div className="flex items-center gap-2">
+              <a
+                href={attachment.previewUrl}
+                download={attachment.filename}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background px-3 py-1.5 text-xs hover:bg-muted/30"
+              >
+                <Icon name="download" className="w-4 h-4" />
+                Download
+              </a>
             </div>
           </div>
-        )}
-      </a>
+          <div className="bg-background">
+            <img
+              src={attachment.previewUrl}
+              alt={attachment.filename || 'Attachment'}
+              className="block w-auto h-auto max-w-[92vw] max-h-[80vh] object-contain mx-auto"
+              loading="eager"
+            />
+          </div>
+        </DialogContent>
+      </Dialog>
     )
   }
 

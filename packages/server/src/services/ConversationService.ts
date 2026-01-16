@@ -605,10 +605,7 @@ export class ConversationService {
    * We intentionally do not use regex over the whole string because tool results can contain multi-MB base64 payloads.
    * Instead we scan for the "data:image/" marker and read until the next double-quote (JSON string terminator).
    */
-  private static extractBase64ImageDataUrlsFromText(
-    text: string,
-    options?: { maxUrls?: number }
-  ): string[] {
+  private static extractBase64ImageDataUrlsFromText(text: string, options?: { maxUrls?: number }): string[] {
     const s = typeof text === 'string' ? text : '';
     if (!s) return [];
 
@@ -633,13 +630,6 @@ export class ConversationService {
     }
 
     return out;
-  }
-
-  /** Keep message.content under Postgres tsvector hard limit (~1MB) when idx_messages_search is present. */
-  private static clampMessageContentForSearchIndex(text: string, maxChars = 900_000): string {
-    const s = typeof text === 'string' ? text : '';
-    if (s.length <= maxChars) return s;
-    return `${s.slice(0, maxChars)}\n\n[truncated]\n`;
   }
 
   /**
@@ -1180,8 +1170,7 @@ export class ConversationService {
       const wantsImage = Array.isArray(data.modalities) && data.modalities.includes('image');
       if (wantsImage) {
         const cfg = (data.imageConfig && typeof data.imageConfig === 'object' ? data.imageConfig : {}) as Record<string, unknown>;
-        const hasExplicitCount =
-          cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null;
+        const hasExplicitCount = cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null;
         if (!hasExplicitCount) {
           // Prefer OpenRouter snake_case; runner passes imageConfig through as image_config.
           data.imageConfig = { ...cfg, num_images: 1 };
@@ -1189,12 +1178,7 @@ export class ConversationService {
           console.debug('[ConversationService] Defaulting num_images to 1 for image generation');
         } else {
           const rawCount = cfg['num_images'] ?? cfg['numImages'] ?? cfg['n'] ?? cfg['count'];
-          const count =
-            typeof rawCount === 'number'
-              ? rawCount
-              : typeof rawCount === 'string'
-                ? Number(rawCount)
-                : NaN;
+          const count = typeof rawCount === 'number' ? rawCount : typeof rawCount === 'string' ? Number(rawCount) : NaN;
 
           if (!Number.isFinite(count) || !Number.isInteger(count) || count < 1 || count > 4) {
             throw new ValidationError('num_images must be an integer between 1 and 4', 'num_images', {
@@ -2784,12 +2768,9 @@ export class ConversationService {
                 let contentToPersist = contentString;
                 let attachmentIdsToPersist = pendingAttachmentIds;
 
-                // Tool results can embed multi-MB image data URLs (base64) inside JSON (e.g. raw_response.images[0].image_url.url).
-                // Persisting that into messages.content will fail because we maintain a GIN FTS index:
-                //   idx_messages_search ON messages USING GIN(to_tsvector('english', content))
-                //
-                // For tool_result messages: extract any base64 data URLs, store them as optimized attachments, and replace
-                // the embedded data URLs with lightweight attachment references before saving.
+                // Option A: do NOT persist base64 image blobs in messages.content for tool_result messages.
+                // Instead, convert base64 data URLs to optimized attachments and replace the embedded URLs with
+                // lightweight references. The UI renders images from attachmentIds.
                 if (role === 'tool' && typeof contentToPersist === 'string' && contentToPersist.includes('data:image/')) {
                   const urls = ConversationService.extractBase64ImageDataUrlsFromText(contentToPersist, { maxUrls: 8 });
                   if (urls.length > 0) {
@@ -2824,12 +2805,11 @@ export class ConversationService {
 
                       if (createdIds.length > 0) {
                         // Replace each embedded data URL with a stable attachment reference.
-                        // The client renders attachments via attachmentIds, so the tool_result content can stay compact.
+                        // Keep it JSON-safe (still a string inside quotes).
                         let replaced = contentToPersist;
                         for (let idx = 0; idx < urls.length && idx < createdIds.length; idx++) {
                           const url = urls[idx];
                           const id = createdIds[idx];
-                          // Keep it JSON-safe (still a string)
                           const placeholder = `attachment://${id}`;
                           replaced = replaced.split(url).join(placeholder);
                         }
@@ -2839,9 +2819,6 @@ export class ConversationService {
                     }
                   }
                 }
-
-                // Always clamp persisted content to avoid failing the messages full-text search index.
-                contentToPersist = ConversationService.clampMessageContentForSearchIndex(contentToPersist);
 
                 const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || 'turn';
                 const baseIdx = this.currentTurnBaseIndex.get(conversationId) ?? this.lastPersistedIndex.get(conversationId) ?? -1;

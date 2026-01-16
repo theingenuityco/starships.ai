@@ -1131,7 +1131,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         const msg = chunk.data?.message
         if (msg?.role === 'assistant') {
           const hasToolCalls = Array.isArray(msg?.toolCalls) && msg.toolCalls.length > 0
-          const hasAttachments = Array.isArray((msg as any)?.attachmentIds) && (msg as any).attachmentIds.length > 0
+          const attachmentIdsUnknown = isRecord(msg) ? msg['attachmentIds'] : undefined
+          const hasAttachments = Array.isArray(attachmentIdsUnknown) && attachmentIdsUnknown.length > 0
           // IMPORTANT:
           // Do NOT delay assistant message.append events that contain attachments.
           //

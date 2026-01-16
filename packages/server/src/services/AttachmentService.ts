@@ -190,12 +190,21 @@ export class AttachmentService {
     mimeType: string;
     buffer: Buffer;
   }): Promise<Attachment> {
-    // Avoid pathological uploads (allow optimization to run first for typical model outputs).
+    // Allow up to 4x MAX_FILE_SIZE pre-optimization since image model outputs can be large
+    // but compress significantly when transcoded/resized. Optimization enforces the final limit.
     if (data.buffer.length > MAX_FILE_SIZE * 4) {
-      throw new Error(`Generated image exceeds ${((MAX_FILE_SIZE * 4) / 1024 / 1024).toFixed(0)}MB safety limit`);
+      throw new Error(
+        `Generated image exceeds ${((MAX_FILE_SIZE * 4) / 1024 / 1024).toFixed(0)}MB pre-optimization safety limit`
+      );
     }
 
     const optimized = await this.optimizeGeneratedImage({ buffer: data.buffer, mimeType: data.mimeType, maxDimensionPx: 1568 });
+    const optimizedMimeType = optimized.mimeType;
+
+    // Validate output MIME type immediately after optimization.
+    if (!ALLOWED_MIME_TYPES.includes(optimizedMimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
+      throw new Error(`File type '${optimizedMimeType}' not allowed. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`);
+    }
 
     // Enforce final size limit after optimization.
     if (optimized.buffer.length > MAX_FILE_SIZE) {
@@ -203,12 +212,24 @@ export class AttachmentService {
     }
 
     // Ensure stored metadata and S3 content-type match the optimized bytes.
-    const filename = `${data.filenameBase}.webp`;
-    const mimeType = optimized.mimeType;
-
-    if (!ALLOWED_MIME_TYPES.includes(mimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
-      throw new Error(`File type '${mimeType}' not allowed. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`);
-    }
+    const extension = (() => {
+      switch (optimizedMimeType) {
+        case 'image/webp':
+          return 'webp';
+        case 'image/jpeg':
+          return 'jpg';
+        case 'image/png':
+          return 'png';
+        case 'image/gif':
+          return 'gif';
+        default: {
+          const maybeExt = optimizedMimeType.includes('/') ? optimizedMimeType.split('/')[1] : '';
+          return maybeExt || 'bin';
+        }
+      }
+    })();
+    const filename = `${data.filenameBase}.${extension}`;
+    const mimeType = optimizedMimeType;
 
     const s3Key = await uploadToS3({
       starshipId: data.starshipId,

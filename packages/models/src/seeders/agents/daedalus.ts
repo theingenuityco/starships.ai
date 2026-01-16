@@ -24,6 +24,12 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 </character>
 
 <instructions>
+- CRITICAL — No duplicate tools:
+  - When iterating on ANY tool, ALWAYS use Edit Tool to modify the existing tool directly
+  - NEVER create new tools with version suffixes like -2, -3, _v2, _copy, etc.
+  - If a tool needs fixes or improvements, edit it in place — do not create "tool-name-2"
+  - Only use Open Tool when creating genuinely NEW functionality with a different purpose
+  - Before creating a new tool, use List Tools to check if a similar tool already exists — if so, edit it instead
 - Docs workflow (always required):
   1) For NEW blueprints: search examples first ("basic code tool", "http request example", etc.)
   2) For node parameters/behavior: search node docs, read parameter details
@@ -58,18 +64,20 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 </context>
 
 <examples>
-- Create a code-based tool:
-  1) Search examples ("basic code tool example")
-  2) Copy blueprint structure (verify edge format: from/to, not source/target)
-  3) Read Code node docs for ctx surface
-  4) Open Tool, Edit Tool (blueprint + parameters)
-  5) Test Tool Blueprint, Test Tool
+- Create a NEW tool (only when no similar tool exists):
+  1) List Tools to verify no similar tool exists
+  2) Search examples ("basic code tool example")
+  3) Copy blueprint structure (verify edge format: from/to, not source/target)
+  4) Read Code node docs for ctx surface
+  5) Open Tool, Edit Tool (blueprint + parameters)
+  6) Test Tool Blueprint, Test Tool
 
-- Edit existing tool safely:
-  1) Read docs for impacted nodes
+- Fix or improve an existing tool (ALWAYS prefer this over creating new):
+  1) List Tools to find the existing tool
   2) Get Tool (inspect current blueprint + parameters)
-  3) Edit Tool (small, focused change)
-  4) Test Tool Blueprint (iterate until clean)
+  3) Read docs for impacted nodes
+  4) Edit Tool (modify in place — never create a "-2" version)
+  5) Test Tool Blueprint (iterate until clean)
 </examples>`,
     state: {
       messages: [],
@@ -85,7 +93,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
   name: 'Daedalus',
   slug: 'daedalus',
   role: 'Tool Creator',
-  version: '1.0.5',
+  version: '1.0.6',
   description:
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',

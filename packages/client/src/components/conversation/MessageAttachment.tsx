@@ -76,16 +76,17 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
           onClick={() => setOpen(true)}
           className={cn(
             // Small preview that shrink-wraps to the rendered image.
-            'inline-block max-w-full rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity group relative text-left',
+            // Keep cursor neutral on the wrapper; show pointer only when hovering the image container itself.
+            'inline-block max-w-full rounded-lg overflow-hidden hover:opacity-95 transition-opacity group/attachment relative text-left cursor-default',
             className
           )}
         >
           {imageError ? (
-            <div className="flex items-center justify-center min-h-[160px] p-4 bg-muted/10 rounded-lg">
+            <div className="flex items-center justify-center min-h-[160px] p-4 bg-muted/10 rounded-lg cursor-pointer">
               <Icon name="file" className="w-8 h-8 text-muted-foreground" />
             </div>
           ) : (
-            <div className={cn('relative inline-block max-w-full rounded-lg bg-muted/10', !imageLoaded && 'min-h-[160px]')}>
+            <div className={cn('relative inline-block max-w-full rounded-lg bg-muted/10 cursor-pointer', !imageLoaded && 'min-h-[160px]')}>
               {!imageLoaded && (
                 <div className="absolute inset-0 flex items-center justify-center">
                   <Icon name="loading" className="w-6 h-6 text-muted-foreground" />
@@ -103,10 +104,22 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
                 onLoad={() => setImageLoaded(true)}
                 onError={() => setImageError(true)}
               />
-              {/* Expand icon overlay on hover */}
-              <div className="absolute top-2 right-2 bg-background/80 backdrop-blur-sm rounded-full p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Icon name="arrows-out" className="w-4 h-4 text-foreground" />
+              {/* Fullscreen affordance on hover (dark overlay + centered icon) */}
+              <div className="pointer-events-none absolute inset-0 bg-black/0 group-hover/attachment:bg-black/45 transition-colors" aria-hidden="true" />
+              <div
+                className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover/attachment:opacity-100 transition-opacity"
+                aria-hidden="true"
+              >
+                <div className="rounded-full bg-black/40 backdrop-blur-sm ring-1 ring-white/20 p-3">
+                  <Icon
+                    name="fullscreen"
+                    iconOverride={{ type: 'phosphor', component: 'ArrowsOut' }}
+                    weight="bold"
+                    className="h-6 w-6 text-white"
+                  />
+                </div>
               </div>
+              <span className="sr-only">Open fullscreen preview</span>
             </div>
           )}
         </button>

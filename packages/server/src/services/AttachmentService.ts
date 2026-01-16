@@ -19,6 +19,39 @@ export class AttachmentService {
   }
 
   /**
+   * Optimize generated images (model outputs) before storage:
+   * - Cap dimensions (images are displayed in chat; no need for massive originals)
+   * - Transcode to WebP for significant byte savings (similar to avatar pipeline)
+   */
+  private async optimizeGeneratedImage(input: {
+    buffer: Buffer;
+    mimeType: string;
+    maxDimensionPx?: number;
+  }): Promise<{ buffer: Buffer; mimeType: string; imageWidth?: number; imageHeight?: number }> {
+    const mimeType = String(input.mimeType || '');
+    if (!mimeType.startsWith('image/')) return { buffer: input.buffer, mimeType };
+    if (mimeType === 'image/gif') return { buffer: input.buffer, mimeType }; // avoid breaking animations
+
+    const maxDim = typeof input.maxDimensionPx === 'number' && input.maxDimensionPx > 0 ? input.maxDimensionPx : 1568;
+
+    try {
+      const out = await sharp(input.buffer)
+        .rotate()
+        .resize(maxDim, maxDim, { fit: 'inside', withoutEnlargement: true })
+        .webp({ quality: 82, effort: 4 })
+        .toBuffer();
+
+      const meta = await sharp(out).metadata().catch(() => null);
+      const imageWidth = meta && typeof meta.width === 'number' ? meta.width : undefined;
+      const imageHeight = meta && typeof meta.height === 'number' ? meta.height : undefined;
+
+      return { buffer: out, mimeType: 'image/webp', imageWidth, imageHeight };
+    } catch {
+      return { buffer: input.buffer, mimeType };
+    }
+  }
+
+  /**
    * Create an attachment record that references an existing S3 object.
    *
    * This avoids redundant S3 uploads (useful for reusing marketplace/template assets),
@@ -96,8 +129,8 @@ export class AttachmentService {
         const maxDimension = Math.max(metadata.width || 0, metadata.height || 0);
         if (maxDimension > 1568) {
           uploadBuffer = await sharp(data.buffer)
+            .rotate()
             .resize(1568, 1568, { fit: 'inside', withoutEnlargement: true })
-            .jpeg({ quality: 85 })
             .toBuffer();
 
           // Update dimensions after resize
@@ -133,6 +166,90 @@ export class AttachmentService {
     });
 
     // Return metadata only (no S3 URL to client)
+    return {
+      id: attachment.id,
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      sizeBytes: attachment.sizeBytes,
+      imageWidth: attachment.imageWidth,
+      imageHeight: attachment.imageHeight,
+      createdAt: attachment.createdAt,
+    };
+  }
+
+  /**
+   * Create an attachment from a generated image (e.g. OpenRouter image models).
+   *
+   * Unlike generic uploads, we aggressively optimize and transcode to WebP to reduce
+   * storage + bandwidth costs.
+   */
+  async createGeneratedImageAttachment(data: {
+    starshipId: string;
+    conversationId: string;
+    filenameBase: string; // without extension
+    mimeType: string;
+    buffer: Buffer;
+  }): Promise<Attachment> {
+    // Allow up to 4x MAX_FILE_SIZE pre-optimization since image model outputs can be large
+    // but compress significantly when transcoded/resized. Optimization enforces the final limit.
+    if (data.buffer.length > MAX_FILE_SIZE * 4) {
+      throw new Error(
+        `Generated image exceeds ${((MAX_FILE_SIZE * 4) / 1024 / 1024).toFixed(0)}MB pre-optimization safety limit`
+      );
+    }
+
+    const optimized = await this.optimizeGeneratedImage({ buffer: data.buffer, mimeType: data.mimeType, maxDimensionPx: 1568 });
+    const optimizedMimeType = optimized.mimeType;
+
+    // Validate output MIME type immediately after optimization.
+    if (!ALLOWED_MIME_TYPES.includes(optimizedMimeType as (typeof ALLOWED_MIME_TYPES)[number])) {
+      throw new Error(`File type '${optimizedMimeType}' not allowed. Allowed types: ${ALLOWED_MIME_TYPES.join(', ')}`);
+    }
+
+    // Enforce final size limit after optimization.
+    if (optimized.buffer.length > MAX_FILE_SIZE) {
+      throw new Error(`File size exceeds ${MAX_FILE_SIZE / 1024 / 1024}MB limit`);
+    }
+
+    // Ensure stored metadata and S3 content-type match the optimized bytes.
+    const extension = (() => {
+      switch (optimizedMimeType) {
+        case 'image/webp':
+          return 'webp';
+        case 'image/jpeg':
+          return 'jpg';
+        case 'image/png':
+          return 'png';
+        case 'image/gif':
+          return 'gif';
+        default: {
+          const maybeExt = optimizedMimeType.includes('/') ? optimizedMimeType.split('/')[1] : '';
+          return maybeExt || 'bin';
+        }
+      }
+    })();
+    const filename = `${data.filenameBase}.${extension}`;
+    const mimeType = optimizedMimeType;
+
+    const s3Key = await uploadToS3({
+      starshipId: data.starshipId,
+      conversationId: data.conversationId,
+      filename,
+      mimeType,
+      buffer: optimized.buffer,
+    });
+
+    const attachment = await this.repository.create({
+      starshipId: data.starshipId,
+      messageId: undefined,
+      filename,
+      mimeType,
+      sizeBytes: optimized.buffer.length,
+      s3Key,
+      imageWidth: optimized.imageWidth,
+      imageHeight: optimized.imageHeight,
+    });
+
     return {
       id: attachment.id,
       filename: attachment.filename,

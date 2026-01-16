@@ -14,7 +14,7 @@ import type {
   LlmMessage,
   EngineConfig,
 } from '@starships/autopilot';
-import { NotFoundError, ConflictError } from '@starships/errors';
+import { NotFoundError, ConflictError, ValidationError } from '@starships/errors';
 import { ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository } from '@starships/models';
 import {
   AgentModel,
@@ -1130,6 +1130,41 @@ export class ConversationService {
     // Create a DB-backed turn record first. This is the idempotency boundary for this run.
     const turn = await this.turnRepository.createTurn({ conversationId: data.conversationId, status: 'active' });
     this.currentTurnId.set(data.conversationId, turn.id);
+
+    // Request-level enforcement:
+    // Many image models default to multiple images. Enforce a single image unless the caller explicitly requests otherwise.
+    try {
+      const wantsImage = Array.isArray(data.modalities) && data.modalities.includes('image');
+      if (wantsImage) {
+        const cfg = (data.imageConfig && typeof data.imageConfig === 'object' ? data.imageConfig : {}) as Record<string, unknown>;
+        const hasExplicitCount =
+          cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null;
+        if (!hasExplicitCount) {
+          // Prefer OpenRouter snake_case; runner passes imageConfig through as image_config.
+          data.imageConfig = { ...cfg, num_images: 1 };
+          // Default to 1 image to control costs and response time.
+          console.debug('[ConversationService] Defaulting num_images to 1 for image generation');
+        } else {
+          const rawCount = cfg['num_images'] ?? cfg['numImages'] ?? cfg['n'] ?? cfg['count'];
+          const count =
+            typeof rawCount === 'number'
+              ? rawCount
+              : typeof rawCount === 'string'
+                ? Number(rawCount)
+                : NaN;
+
+          if (!Number.isFinite(count) || !Number.isInteger(count) || count < 1 || count > 4) {
+            throw new ValidationError('num_images must be an integer between 1 and 4', 'num_images', {
+              provided: rawCount,
+            });
+          }
+        }
+      }
+    } catch (err) {
+      // Validation should block the request; other failures are best-effort only.
+      if (err instanceof ValidationError) throw err;
+      /* best-effort only */
+    }
 
     // Persist user message unless pre-created by the route (needed to charge credits before returning 202).
     // Ensure the user message is linked to the turn with turnSeq=0.
@@ -2256,6 +2291,7 @@ export class ConversationService {
             if (hasImages) {
               const all = [...imagesFromDelta, ...imagesFromMessage];
               const urls: string[] = [];
+              const allUrls: string[] = [];
               for (const raw of all) {
                 if (!raw || typeof raw !== 'object') continue;
                 const rec = raw as Record<string, unknown>;
@@ -2264,9 +2300,8 @@ export class ConversationService {
                   (rec.image_url && typeof rec.image_url === 'object' ? (rec.image_url as Record<string, unknown>) : null) ||
                   (rec.imageUrl && typeof rec.imageUrl === 'object' ? (rec.imageUrl as Record<string, unknown>) : null);
                 const u = imageUrlNode && typeof imageUrlNode.url === 'string' ? imageUrlNode.url : '';
-                if (u && u.startsWith('data:image/')) {
-                  urls.push(u);
-                }
+                if (u) allUrls.push(u);
+                if (u && u.startsWith('data:image/')) urls.push(u);
               }
 
               if (urls.length > 0) {
@@ -2291,23 +2326,14 @@ export class ConversationService {
                     const parsed = ConversationService.parseBase64ImageDataUrl(url);
                     if (!parsed) continue;
 
-                    const ext =
-                      parsed.mimeType === 'image/png'
-                        ? 'png'
-                        : parsed.mimeType === 'image/jpeg'
-                          ? 'jpg'
-                          : parsed.mimeType === 'image/webp'
-                            ? 'webp'
-                            : 'png';
-                    const filename = `generated_${Date.now()}_${idx}.${ext}`;
-
                     try {
-                      const attachment = await attachmentService.createAttachment({
+                      const filenameBase = `generated_${Date.now()}_${idx}`;
+                      const attachment = await attachmentService.createGeneratedImageAttachment({
                         starshipId: starship.id,
                         conversationId,
-                        filename,
                         mimeType: parsed.mimeType,
                         buffer: parsed.buffer,
+                        filenameBase,
                       });
 
                       acc.push(attachment.id);

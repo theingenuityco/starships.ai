@@ -2291,23 +2291,14 @@ export class ConversationService {
                     const parsed = ConversationService.parseBase64ImageDataUrl(url);
                     if (!parsed) continue;
 
-                    const ext =
-                      parsed.mimeType === 'image/png'
-                        ? 'png'
-                        : parsed.mimeType === 'image/jpeg'
-                          ? 'jpg'
-                          : parsed.mimeType === 'image/webp'
-                            ? 'webp'
-                            : 'png';
-                    const filename = `generated_${Date.now()}_${idx}.${ext}`;
-
                     try {
-                      const attachment = await attachmentService.createAttachment({
+                      const filenameBase = `generated_${Date.now()}_${idx}`;
+                      const attachment = await attachmentService.createGeneratedImageAttachment({
                         starshipId: starship.id,
                         conversationId,
-                        filename,
                         mimeType: parsed.mimeType,
                         buffer: parsed.buffer,
+                        filenameBase,
                       });
 
                       acc.push(attachment.id);

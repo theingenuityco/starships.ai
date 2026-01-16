@@ -60,10 +60,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
   if (isImage) {
     if (!attachment.previewUrl) {
       return (
-        <div className={cn(
-          'flex items-center justify-center min-h-[160px] rounded-lg bg-muted/10',
-          className
-        )}>
+        <div className={cn('flex items-center justify-center min-h-[160px] rounded-lg bg-muted/10', className)}>
           <Icon name="file" className="w-8 h-8 text-muted-foreground" />
         </div>
       )
@@ -106,17 +103,9 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
               />
               {/* Fullscreen affordance on hover (dark overlay + centered icon) */}
               <div className="pointer-events-none absolute inset-0 rounded-lg bg-black/0 group-hover/attachment:bg-black/45 transition-colors" aria-hidden="true" />
-              <div
-                className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover/attachment:opacity-100 transition-opacity"
-                aria-hidden="true"
-              >
+              <div className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover/attachment:opacity-100 transition-opacity" aria-hidden="true">
                 <div className="rounded-full bg-black/40 backdrop-blur-sm ring-1 ring-white/20 p-3">
-                  <Icon
-                    name="fullscreen"
-                    iconOverride={{ type: 'phosphor', component: 'ArrowsOut' }}
-                    weight="bold"
-                    className="h-6 w-6 text-white"
-                  />
+                  <Icon name="fullscreen" iconOverride={{ type: 'phosphor', component: 'ArrowsOut' }} weight="bold" className="h-6 w-6 text-white" />
                 </div>
               </div>
               <span className="sr-only">Open fullscreen preview</span>
@@ -134,12 +123,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
         >
           <DialogTitle className="sr-only">{attachment.filename || 'Image preview'}</DialogTitle>
           <div className="relative inline-block">
-            <img
-              src={attachment.previewUrl}
-              alt={attachment.filename || 'Attachment'}
-              className="block w-auto h-auto max-w-[96vw] max-h-[90vh] object-contain mx-auto"
-              loading="eager"
-            />
+            <img src={attachment.previewUrl} alt={attachment.filename || 'Attachment'} className="block w-auto h-auto max-w-[96vw] max-h-[90vh] object-contain mx-auto" loading="eager" />
             <DialogClose
               className="absolute right-0 top-0 -translate-y-full -mt-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/90 hover:text-white bg-black/35 hover:bg-black/50 backdrop-blur-sm ring-1 ring-white/15 transition-colors"
               aria-label="Close image preview"
@@ -161,10 +145,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
 
     if (!attachment.previewUrl) {
       return (
-        <div className={cn(
-          'flex items-center gap-3 p-4 rounded-lg bg-muted/10 border border-border',
-          className
-        )}>
+        <div className={cn('flex items-center gap-3 p-4 rounded-lg bg-muted/10 border border-border', className)}>
           <Icon name={iconName} className={cn('w-10 h-10 flex-shrink-0', iconColor)} />
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium text-foreground truncate">{attachment.filename}</p>
@@ -180,10 +161,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
         download={attachment.filename}
         target="_blank"
         rel="noopener noreferrer"
-        className={cn(
-          'flex items-center gap-3 p-4 rounded-lg bg-muted/10 border border-border cursor-pointer hover:bg-muted/20 transition-all group',
-          className
-        )}
+        className={cn('flex items-center gap-3 p-4 rounded-lg bg-muted/10 border border-border cursor-pointer hover:bg-muted/20 transition-all group', className)}
       >
         <Icon name={iconName} className={cn('w-10 h-10 flex-shrink-0', iconColor)} />
         <div className="flex-1 min-w-0">
@@ -197,10 +175,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
 
   // Fallback for other file types
   return (
-    <div className={cn(
-      'flex items-center gap-3 p-4 rounded-lg bg-muted/10 border border-border',
-      className
-    )}>
+    <div className={cn('flex items-center gap-3 p-4 rounded-lg bg-muted/10 border border-border', className)}>
       <Icon name="file" className="w-10 h-10 flex-shrink-0 text-muted-foreground" />
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-foreground truncate">{attachment.filename}</p>

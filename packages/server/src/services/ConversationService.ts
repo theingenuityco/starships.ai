@@ -14,7 +14,7 @@ import type {
   LlmMessage,
   EngineConfig,
 } from '@starships/autopilot';
-import { NotFoundError, ConflictError } from '@starships/errors';
+import { NotFoundError, ConflictError, ValidationError } from '@starships/errors';
 import { ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository } from '@starships/models';
 import {
   AgentModel,
@@ -1138,13 +1138,31 @@ export class ConversationService {
       if (wantsImage) {
         const cfg = (data.imageConfig && typeof data.imageConfig === 'object' ? data.imageConfig : {}) as Record<string, unknown>;
         const hasExplicitCount =
-          cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null || cfg['images'] != null;
+          cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null;
         if (!hasExplicitCount) {
           // Prefer OpenRouter snake_case; runner passes imageConfig through as image_config.
           data.imageConfig = { ...cfg, num_images: 1 };
+          // Default to 1 image to control costs and response time.
+          console.debug('[ConversationService] Defaulting num_images to 1 for image generation');
+        } else {
+          const rawCount = cfg['num_images'] ?? cfg['numImages'] ?? cfg['n'] ?? cfg['count'];
+          const count =
+            typeof rawCount === 'number'
+              ? rawCount
+              : typeof rawCount === 'string'
+                ? Number(rawCount)
+                : NaN;
+
+          if (!Number.isFinite(count) || !Number.isInteger(count) || count < 1 || count > 4) {
+            throw new ValidationError('num_images must be an integer between 1 and 4', 'num_images', {
+              provided: rawCount,
+            });
+          }
         }
       }
-    } catch {
+    } catch (err) {
+      // Validation should block the request; other failures are best-effort only.
+      if (err instanceof ValidationError) throw err;
       /* best-effort only */
     }
 

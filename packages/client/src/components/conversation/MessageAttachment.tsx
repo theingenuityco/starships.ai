@@ -3,7 +3,7 @@ import type { Attachment } from '@starships/protocol'
 import { isTextFile } from '@starships/protocol'
 import { cn } from '@/lib/utils'
 import { useState } from 'react'
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogClose, DialogContent, DialogTitle } from '@/components/ui/dialog'
 
 interface MessageAttachmentProps {
   attachment: Attachment
@@ -105,7 +105,7 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
                 onError={() => setImageError(true)}
               />
               {/* Fullscreen affordance on hover (dark overlay + centered icon) */}
-              <div className="pointer-events-none absolute inset-0 bg-black/0 group-hover/attachment:bg-black/45 transition-colors" aria-hidden="true" />
+              <div className="pointer-events-none absolute inset-0 rounded-lg bg-black/0 group-hover/attachment:bg-black/45 transition-colors" aria-hidden="true" />
               <div
                 className="pointer-events-none absolute inset-0 flex items-center justify-center opacity-0 group-hover/attachment:opacity-100 transition-opacity"
                 aria-hidden="true"
@@ -124,29 +124,29 @@ export function MessageAttachment({ attachment, className }: MessageAttachmentPr
           )}
         </button>
 
-        <DialogContent className="max-w-[min(92vw,1100px)] p-0 overflow-hidden">
-          <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-border/50">
-            <DialogTitle className="text-sm font-medium truncate">{attachment.filename || 'Image'}</DialogTitle>
-            <div className="flex items-center gap-2">
-              <a
-                href={attachment.previewUrl}
-                download={attachment.filename}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md border border-border/60 bg-background px-3 py-1.5 text-xs hover:bg-muted/30"
-              >
-                <Icon name="download" className="w-4 h-4" />
-                Download
-              </a>
-            </div>
-          </div>
-          <div className="bg-background">
+        <DialogContent
+          className={cn(
+            // No "container": just the blurred overlay (DialogOverlay) + the centered image.
+            // Override default DialogContent card styles from `components/ui/dialog.tsx`.
+            // Also hide the default built-in close button from `DialogContent` so we can position our own.
+            'bg-transparent border-0 shadow-none p-0 w-auto max-w-[96vw] overflow-visible [&>button]:hidden'
+          )}
+        >
+          <DialogTitle className="sr-only">{attachment.filename || 'Image preview'}</DialogTitle>
+          <div className="relative inline-block">
             <img
               src={attachment.previewUrl}
               alt={attachment.filename || 'Attachment'}
-              className="block w-auto h-auto max-w-[92vw] max-h-[80vh] object-contain mx-auto"
+              className="block w-auto h-auto max-w-[96vw] max-h-[90vh] object-contain mx-auto"
               loading="eager"
             />
+            <DialogClose
+              className="absolute right-0 top-0 -translate-y-full -mt-2 inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm text-white/90 hover:text-white bg-black/35 hover:bg-black/50 backdrop-blur-sm ring-1 ring-white/15 transition-colors"
+              aria-label="Close image preview"
+            >
+              <Icon name="close" iconOverride={{ type: 'phosphor', component: 'X' }} weight="bold" className="h-4 w-4 text-white" />
+              <span>Close</span>
+            </DialogClose>
           </div>
         </DialogContent>
       </Dialog>

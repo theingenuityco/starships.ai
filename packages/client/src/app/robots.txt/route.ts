@@ -7,13 +7,30 @@ function trimTrailingSlashes(value: string): string {
   return value.replace(/\/+$/, '')
 }
 
+function firstHeaderValue(value: string | null): string {
+  return String(value || '')
+    .split(',')[0]
+    ?.trim()
+}
+
+function getBaseUrlFromRequest(req: Request, configuredPublicUrl: string): string {
+  const configured = trimTrailingSlashes(String(configuredPublicUrl || '').trim())
+  if (configured) return configured
+
+  const host = firstHeaderValue(req.headers.get('x-forwarded-host')) || firstHeaderValue(req.headers.get('host'))
+  if (!host) return ''
+
+  const proto = firstHeaderValue(req.headers.get('x-forwarded-proto')) || 'https'
+  return trimTrailingSlashes(`${proto}://${host}`)
+}
+
 function toRobotsTxt(lines: string[]): string {
   return `${lines.join('\n')}\n`
 }
 
-export async function GET(): Promise<Response> {
+export async function GET(req: Request): Promise<Response> {
   const { PUBLIC_URL } = getPublicEnvConfig()
-  const publicUrl = trimTrailingSlashes(PUBLIC_URL)
+  const publicUrl = getBaseUrlFromRequest(req, PUBLIC_URL)
   const indexingEnabled = isIndexingEnabled()
 
   // Default OFF for safety; enable explicitly per environment.

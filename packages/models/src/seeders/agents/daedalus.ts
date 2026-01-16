@@ -64,14 +64,6 @@ Master Toolwright. Builds production-ready Tool instances for this starship. Act
 </context>
 
 <examples>
-- Create a NEW tool (only when no similar tool exists):
-  1) List Tools to verify no similar tool exists
-  2) Search examples ("basic code tool example")
-  3) Copy blueprint structure (verify edge format: from/to, not source/target)
-  4) Read Code node docs for ctx surface
-  5) Open Tool, Edit Tool (blueprint + parameters)
-  6) Test Tool Blueprint, Test Tool
-
 - Fix or improve an existing tool (ALWAYS prefer this over creating new):
   1) List Tools to find the existing tool
   2) Get Tool (inspect current blueprint + parameters)

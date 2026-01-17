@@ -600,6 +600,39 @@ export class ConversationService {
   }
 
   /**
+   * Extract image data URLs from a large text payload (typically tool_result JSON).
+   *
+   * We intentionally do not use regex over the whole string because tool results can contain multi-MB base64 payloads.
+   * Instead we scan for the "data:image/" marker and read until the next double-quote (JSON string terminator).
+   */
+  private static extractBase64ImageDataUrlsFromText(text: string, options?: { maxUrls?: number }): string[] {
+    const s = typeof text === 'string' ? text : '';
+    if (!s) return [];
+
+    const maxUrls = Math.max(0, Math.min(20, Number(options?.maxUrls ?? 8)));
+    if (maxUrls === 0) return [];
+
+    const out: string[] = [];
+    let i = 0;
+    while (out.length < maxUrls) {
+      const start = s.indexOf('data:image/', i);
+      if (start < 0) break;
+
+      // Expect JSON string: "data:image/...;base64,...."
+      const endQuote = s.indexOf('"', start);
+      if (endQuote < 0) break;
+
+      const candidate = s.slice(start, endQuote);
+      if (candidate.includes(';base64,')) {
+        out.push(candidate);
+      }
+      i = endQuote + 1;
+    }
+
+    return out;
+  }
+
+  /**
    * Create a new conversation
    */
   async createConversation(
@@ -1137,8 +1170,7 @@ export class ConversationService {
       const wantsImage = Array.isArray(data.modalities) && data.modalities.includes('image');
       if (wantsImage) {
         const cfg = (data.imageConfig && typeof data.imageConfig === 'object' ? data.imageConfig : {}) as Record<string, unknown>;
-        const hasExplicitCount =
-          cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null;
+        const hasExplicitCount = cfg['num_images'] != null || cfg['numImages'] != null || cfg['n'] != null || cfg['count'] != null;
         if (!hasExplicitCount) {
           // Prefer OpenRouter snake_case; runner passes imageConfig through as image_config.
           data.imageConfig = { ...cfg, num_images: 1 };
@@ -1146,12 +1178,7 @@ export class ConversationService {
           console.debug('[ConversationService] Defaulting num_images to 1 for image generation');
         } else {
           const rawCount = cfg['num_images'] ?? cfg['numImages'] ?? cfg['n'] ?? cfg['count'];
-          const count =
-            typeof rawCount === 'number'
-              ? rawCount
-              : typeof rawCount === 'string'
-                ? Number(rawCount)
-                : NaN;
+          const count = typeof rawCount === 'number' ? rawCount : typeof rawCount === 'string' ? Number(rawCount) : NaN;
 
           if (!Number.isFinite(count) || !Number.isInteger(count) || count < 1 || count > 4) {
             throw new ValidationError('num_images must be an integer between 1 and 4', 'num_images', {
@@ -2733,11 +2760,65 @@ export class ConversationService {
                 const agent = role === 'assistant' ? this.currentAgentForConversation.get(conversationId) : undefined;
                 const pendingAttachmentIds =
                   role === 'assistant' ? this.streamingGeneratedAttachmentIds.get(conversationId) || [] : ([] as string[]);
-                const starship = pendingAttachmentIds.length > 0 ? await this.getConversationStarship(conversationId) : null;
+                let starship = pendingAttachmentIds.length > 0 ? await this.getConversationStarship(conversationId) : null;
 
                 // Extract string content (LLM responses are always string, not ContentBlock[])
                 const contentString =
                   typeof lm.content === 'string' ? lm.content : lm.content[0]?.type === 'text' ? lm.content[0].text : '';
+                let contentToPersist = contentString;
+                let attachmentIdsToPersist = pendingAttachmentIds;
+
+                // Option A: do NOT persist base64 image blobs in messages.content for tool_result messages.
+                // Instead, convert base64 data URLs to optimized attachments and replace the embedded URLs with
+                // lightweight references. The UI renders images from attachmentIds.
+                if (role === 'tool' && typeof contentToPersist === 'string' && contentToPersist.includes('data:image/')) {
+                  const urls = ConversationService.extractBase64ImageDataUrlsFromText(contentToPersist, { maxUrls: 8 });
+                  if (urls.length > 0) {
+                    if (!starship) {
+                      starship = await this.getConversationStarship(conversationId);
+                    }
+                    if (starship) {
+                      const attachmentService = new AttachmentService();
+                      const createdIds: string[] = [];
+
+                      for (let idx = 0; idx < urls.length; idx++) {
+                        const url = urls[idx];
+                        const parsed = ConversationService.parseBase64ImageDataUrl(url);
+                        if (!parsed) continue;
+                        try {
+                          const filenameBase = `generated_tool_${Date.now()}_${idx}`;
+                          const attachment = await attachmentService.createGeneratedImageAttachment({
+                            starshipId: starship.id,
+                            conversationId,
+                            mimeType: parsed.mimeType,
+                            buffer: parsed.buffer,
+                            filenameBase,
+                          });
+                          createdIds.push(attachment.id);
+                        } catch (err) {
+                          console.warn('[STREAMING] Failed to persist tool-generated image attachment', {
+                            conversationId,
+                            error: err instanceof Error ? err.message : String(err),
+                          });
+                        }
+                      }
+
+                      if (createdIds.length > 0) {
+                        // Replace each embedded data URL with a stable attachment reference.
+                        // Keep it JSON-safe (still a string inside quotes).
+                        let replaced = contentToPersist;
+                        for (let idx = 0; idx < urls.length && idx < createdIds.length; idx++) {
+                          const url = urls[idx];
+                          const id = createdIds[idx];
+                          const placeholder = `attachment://${id}`;
+                          replaced = replaced.split(url).join(placeholder);
+                        }
+                        contentToPersist = replaced;
+                        attachmentIdsToPersist = createdIds;
+                      }
+                    }
+                  }
+                }
 
                 const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || 'turn';
                 const baseIdx = this.currentTurnBaseIndex.get(conversationId) ?? this.lastPersistedIndex.get(conversationId) ?? -1;
@@ -2748,13 +2829,13 @@ export class ConversationService {
                   turnId,
                   turnSeq,
                   role,
-                  content: contentString,
+                  content: contentToPersist,
                   messageType,
                   ...(toolCallId ? { toolCallId } : {}),
                   ...(toolCalls && toolCalls.length > 0 ? { toolCalls } : {}),
                   ...(typeof lm.reasoning === 'string' && lm.reasoning.length > 0 ? { reasoning: lm.reasoning } : {}),
                   ...(agent ? { agentId: agent.id, agentName: agent.name } : {}),
-                  ...(pendingAttachmentIds.length > 0 ? { attachmentIds: pendingAttachmentIds } : {}),
+                  ...(attachmentIdsToPersist.length > 0 ? { attachmentIds: attachmentIdsToPersist } : {}),
                 });
 
                 // Link generated attachments to the persisted assistant message (best-effort)
@@ -3011,6 +3092,11 @@ export class ConversationService {
             } catch {
               /* ignore */
             }
+
+            // IMPORTANT:
+            // When a workflow pauses for ask-first tool approval, there is no active turn executing anymore.
+            // Ensure the in-memory guard is cleared so continueAfterToolApproval() can resume immediately.
+            ConversationService.activeCancellations.delete(conversationId);
 
             break;
           }

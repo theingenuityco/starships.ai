@@ -383,6 +383,89 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       },
     });
 
+    const summarizeProviderError = (err: unknown): Record<string, unknown> => {
+      const e = err as any;
+
+      // Best-effort extraction for openai@6 API errors (also used by OpenRouter).
+      const status = typeof e?.status === 'number' ? e.status : undefined;
+      const name = typeof e?.name === 'string' ? e.name : undefined;
+      const message = typeof e?.message === 'string' ? e.message : String(err);
+      const code = typeof e?.code === 'string' ? e.code : undefined;
+      const type = typeof e?.type === 'string' ? e.type : undefined;
+
+      // OpenAI SDK may attach the parsed JSON error body at e.error
+      const apiError = e?.error && typeof e.error === 'object' ? e.error : undefined;
+      const apiErrorMessage = typeof apiError?.message === 'string' ? apiError.message : undefined;
+      const apiErrorType = typeof apiError?.type === 'string' ? apiError.type : undefined;
+      const apiErrorCode = typeof apiError?.code === 'string' ? apiError.code : undefined;
+
+      // Request id can appear as request_id or in headers (OpenRouter sometimes uses x-request-id)
+      const requestId =
+        typeof e?.request_id === 'string'
+          ? e.request_id
+          : typeof e?.headers?.['x-request-id'] === 'string'
+            ? e.headers['x-request-id']
+            : typeof e?.headers?.['x-openrouter-request-id'] === 'string'
+              ? e.headers['x-openrouter-request-id']
+              : undefined;
+
+      // Provide a safe payload snippet (no prompts); OpenRouter often returns { error: { message, code, ... } }
+      let apiErrorSnippet: string | undefined;
+      try {
+        if (apiError) {
+          const s = JSON.stringify(apiError);
+          apiErrorSnippet = s.length > 1200 ? `${s.slice(0, 1200)}…` : s;
+        }
+      } catch {
+        apiErrorSnippet = undefined;
+      }
+
+      return {
+        status,
+        name,
+        message,
+        code,
+        type,
+        requestId,
+        apiErrorMessage,
+        apiErrorType,
+        apiErrorCode,
+        apiErrorSnippet,
+      };
+    };
+
+    const summarizeRequestForLogs = (): Record<string, unknown> => {
+      const safeTextLen = (v: unknown): number => (typeof v === 'string' ? v.length : 0);
+      const messages = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
+      let totalTextChars = 0;
+      for (const m of messages) {
+        if (!m || typeof m !== 'object') continue;
+        const rec = m as Record<string, unknown>;
+        const c = rec.content;
+        if (typeof c === 'string') {
+          totalTextChars += c.length;
+        } else if (Array.isArray(c)) {
+          // Only count text blocks; ignore image_url payload sizes.
+          for (const part of c as unknown[]) {
+            if (!part || typeof part !== 'object') continue;
+            const p = part as Record<string, unknown>;
+            if (p.type === 'text') totalTextChars += safeTextLen(p.text);
+          }
+        }
+      }
+
+      const toolsCount = Array.isArray(request.tools) ? request.tools.length : 0;
+      const modalities = Array.isArray(request.modalities) ? request.modalities : undefined;
+      return {
+        model: request.model,
+        wantsStream: typeof request.stream === 'boolean' ? request.stream : true,
+        modalities,
+        toolsCount,
+        messagesCount: messages.length,
+        totalTextChars,
+      };
+    };
+
     const modalities = request.modalities;
     const isImageRequest = Array.isArray(modalities) && modalities.includes('image');
     const wantsStream = typeof request.stream === 'boolean' ? request.stream : true;
@@ -521,6 +604,11 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         if (options.signal?.aborted) {
           throw new CancelledError('cancelled');
         }
+        // Log provider error details for diagnosis (do NOT log prompts or raw messages).
+        console.error('[RunnerHostRuntime.llm] Provider error (non-stream)', {
+          request: summarizeRequestForLogs(),
+          provider: summarizeProviderError(e),
+        });
         throw e;
       }
       return wrapNonStreamAsOneChunk(completion);
@@ -538,6 +626,11 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       if (options.signal?.aborted) {
         throw new CancelledError('cancelled');
       }
+      // Log provider error details for diagnosis (do NOT log prompts or raw messages).
+      console.error('[RunnerHostRuntime.llm] Provider error (stream)', {
+        request: summarizeRequestForLogs(),
+        provider: summarizeProviderError(e),
+      });
       throw e;
     }
     return stream as AsyncIterable<unknown>;

@@ -305,6 +305,7 @@ type ToolResultLike = {
   toolCallId?: string
   call_id?: string
   id?: string
+  attachmentIds?: string[]
   content?: unknown
   result?: unknown
 }
@@ -413,8 +414,44 @@ export function ConversationMessageContent({
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
 
+  const messageAttachmentIds = useMemo(() => (Array.isArray(attachmentIds) ? attachmentIds : []), [attachmentIds])
+
+  // Attachments can live on tool_result messages grouped into this message.
+  // Note: we intentionally do not render standalone tool_result messages in the list, so surface their attachments here.
+  const toolResultAttachmentIds = useMemo(() => {
+    const ids: string[] = []
+    if (Array.isArray(toolResults)) {
+      for (const tr of toolResults as ToolResultLike[]) {
+        if (Array.isArray(tr?.attachmentIds) && tr.attachmentIds.length > 0) ids.push(...tr.attachmentIds)
+      }
+    }
+    const seen = new Set<string>()
+    const uniq: string[] = []
+    for (const id of ids) {
+      if (typeof id !== 'string' || id.length === 0) continue
+      if (seen.has(id)) continue
+      seen.add(id)
+      uniq.push(id)
+    }
+    return uniq
+  }, [toolResults])
+
+  // Fetch attachments in one batch (message + tool-result) to avoid duplicate queries.
+  const combinedAttachmentIds = useMemo(() => {
+    const ids = [...messageAttachmentIds, ...toolResultAttachmentIds]
+    const seen = new Set<string>()
+    const uniq: string[] = []
+    for (const id of ids) {
+      if (typeof id !== 'string' || id.length === 0) continue
+      if (seen.has(id)) continue
+      seen.add(id)
+      uniq.push(id)
+    }
+    return uniq
+  }, [messageAttachmentIds, toolResultAttachmentIds])
+
   // Fetch attachments metadata
-  const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(attachmentIds, starshipId)
+  const { data: attachments, isLoading: isLoadingAttachments } = useMessageAttachments(combinedAttachmentIds, starshipId)
 
   // Normalize tool calls to retain early tool-first deltas:
   // keep entries if function.name exists OR id exists OR arguments exist
@@ -1066,19 +1103,34 @@ export function ConversationMessageContent({
         </>
       )}
 
-      {/* Attachments */}
-      {attachmentIds && attachmentIds.length > 0 && starshipId && (
+      {/*
+        Attachments created by USER uploads (message attachments) should stay near the top of the message.
+        Attachments produced by TOOL RESULTS should render *below* the tool panel (see below), so they feel
+        visually associated with the tool call that produced them.
+      */}
+
+      {/* Message attachments (top) */}
+      {messageAttachmentIds.length > 0 && starshipId && (
         <div className="mb-1 inline-flex flex-col gap-2">
           {isLoadingAttachments
             ? // Loading state
-              attachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+              messageAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
             : // Render attachments
-              attachments?.map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
+              attachments?.filter(a => messageAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
         </div>
       )}
 
       {/* Unified markdown rendering - message content at normal size */}
       {markdownWithToolsNode as any}
+
+      {/* Tool-result attachments (below tool panel) */}
+      {toolResultAttachmentIds.length > 0 && starshipId && (
+        <div className="mt-2 inline-flex flex-col gap-2">
+          {isLoadingAttachments
+            ? toolResultAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+            : attachments?.filter(a => toolResultAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
+        </div>
+      )}
 
       {/* Widget rendering: Display widgets inline when created/updated */}
       {widgetResults.length > 0 && messageType !== 'tool_result' && (

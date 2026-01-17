@@ -3093,6 +3093,11 @@ export class ConversationService {
               /* ignore */
             }
 
+            // IMPORTANT:
+            // When a workflow pauses for ask-first tool approval, there is no active turn executing anymore.
+            // Ensure the in-memory guard is cleared so continueAfterToolApproval() can resume immediately.
+            ConversationService.activeCancellations.delete(conversationId);
+
             break;
           }
         } catch {

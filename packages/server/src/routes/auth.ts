@@ -4,7 +4,6 @@
  * JWT-based authentication system for user registration, login, and token management
  */
 
-import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { ServiceFactory } from '@/services/ServiceFactory';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
@@ -158,46 +157,9 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       return sendSuccess(res, response, 200);
     }
 
-    // Get user's starships for redirect purpose
-    let firstStarship = null;
-    try {
-      const starshipRepo = new StarshipRepository();
-      const userStarships = await starshipRepo.findByOwner(user.id);
-      // Find the first active starship
-      firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0] || null;
-
-      // If user has no starship, create one now
-      if (!firstStarship) {
-        logger.info(`[AUTH] Creating starship for user ${user.email}`);
-        try {
-          firstStarship = await StarshipService.createDefaultStarship(user.id);
-
-          // Also create initial agents (Daedalus, Gaia) and host tools
-          if (firstStarship) {
-            try {
-              await StarshipService.createInitialAgents(user.id, firstStarship.id);
-              logger.info(`[AUTH] Created initial agents for user ${user.email}`);
-            } catch (agentError) {
-              logger.error('[AUTH] Failed to create initial agents', {
-                userId: user.id,
-                error: agentError instanceof Error ? agentError.message : 'Unknown error',
-              });
-            }
-          }
-        } catch (createError) {
-          logger.error('[AUTH] Failed to create default starship for newly approved user', {
-            userId: user.id,
-            error: createError instanceof Error ? createError.message : 'Unknown error',
-          });
-        }
-      }
-    } catch (error) {
-      logger.error('[AUTH] Failed to fetch starships for user', {
-        userId: user.id,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      // Continue with login even if starship fetch fails
-    }
+    // IMPORTANT:
+    // We do NOT provision starships/agents during login.
+    // Onboarding is mandatory and is the only place where a starship + default agent (Aria) are created.
 
     // Track first login (before updating lastLoginAt)
     const isFirstLogin = !user.lastLoginAt;
@@ -239,13 +201,7 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       token,
       isFirstLogin,
       onboardingRequired: !user.onboardingCompleted,
-      starship: firstStarship
-        ? {
-            id: firstStarship.id,
-            slug: firstStarship.slug,
-            name: firstStarship.name,
-          }
-        : null,
+      starship: null,
     });
   } catch (error) {
     handleError(error, res, 'user login');
@@ -890,16 +846,6 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    // Get user's first starship for redirect
-    let firstStarship = null;
-    try {
-      const starshipRepo = new StarshipRepository();
-      const userStarships = await starshipRepo.findByOwner(user.id);
-      firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0] || null;
-    } catch (error) {
-      console.error(`[OAUTH-EXCHANGE] Failed to fetch starships for user ${user.id}:`, error);
-    }
-
     // Return secure response with JWT in body
     sendSuccess(res, {
       user: {
@@ -910,17 +856,13 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         hasPassword: user.hasPassword || false,
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'oauth',
+        onboardingCompleted: user.onboardingCompleted,
         isInstanceAdmin: user.isInstanceAdmin || false,
       },
       token,
       isFirstLogin,
-      starship: firstStarship
-        ? {
-            id: firstStarship.id,
-            slug: firstStarship.slug,
-            name: firstStarship.name,
-          }
-        : null,
+      onboardingRequired: !user.onboardingCompleted,
+      starship: null,
     });
   } catch (error) {
     logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {

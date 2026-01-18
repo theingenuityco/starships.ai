@@ -11,7 +11,6 @@
  */
 
 import { ServiceFactory } from './ServiceFactory';
-import { StarshipService } from './StarshipService';
 import { logger } from '@starships/models';
 import { InvalidTokenError, EmailVerificationSendError, ConflictError } from '../errors';
 
@@ -105,8 +104,7 @@ export class RegistrationOrchestrator {
    *
    * Coordinates:
    * 1. Token validation and user verification
-   * 2. Starship creation for verified users
-   * 3. Redirect path determination
+   * 2. Redirect path determination
    */
   async completeEmailVerification(token: string): Promise<VerificationResult> {
     const userService = ServiceFactory.createUserService();
@@ -120,12 +118,11 @@ export class RegistrationOrchestrator {
 
     if (tokenInfo.userAlreadyVerified) {
       // User already verified - return result (redirect handled by endpoint)
-      const starshipCreated = await this.checkUserHasStarship(tokenInfo.tokenInfo.userId);
       return {
         userId: tokenInfo.tokenInfo.userId,
         email: tokenInfo.tokenInfo.email,
         verified: false, // Already verified before
-        starshipCreated,
+        starshipCreated: false,
         redirectPath: '', // Not used - redirect handled by endpoint
       };
     }
@@ -137,62 +134,12 @@ export class RegistrationOrchestrator {
     // Proceed with verification - this only handles user verification
     const verificationResult = await userService.verifyEmailAddress(token);
 
-    // Create starship for all verified users
-    const starshipCreated = await this.createStarshipForUser(verificationResult.userId);
-
     return {
       userId: verificationResult.userId,
       email: verificationResult.email,
       verified: true,
-      starshipCreated,
+      starshipCreated: false,
       redirectPath: '', // Not used - redirect handled by endpoint
     };
-  }
-
-  /**
-   * Create starship for verified user (private helper)
-   */
-  private async createStarshipForUser(userId: string): Promise<boolean> {
-    try {
-      const defaultStarship = await StarshipService.createDefaultStarship(userId);
-
-      if (defaultStarship) {
-        await StarshipService.createInitialAgents(userId, defaultStarship.id);
-
-        logger.info('[RegistrationOrchestrator] Starship created for verified user', {
-          userId,
-          starshipId: defaultStarship.id,
-          operation: 'email_verification',
-        });
-
-        return true;
-      }
-    } catch (error) {
-      logger.error('[RegistrationOrchestrator] Failed to create starship during verification', {
-        userId,
-        operation: 'starship_creation',
-        error: { message: error instanceof Error ? error.message : 'Unknown error' },
-      });
-      // Don't throw - user can create starship later
-    }
-
-    return false;
-  }
-
-  /**
-   * Check if user already has a starship (private helper)
-   */
-  private async checkUserHasStarship(userId: string): Promise<boolean> {
-    try {
-      const starshipService = ServiceFactory.createStarshipService();
-      const userStarships = await starshipService.getStarshipsByOwner(userId);
-      return userStarships.length > 0;
-    } catch (error) {
-      logger.error('[RegistrationOrchestrator] Failed to check user starships', {
-        userId,
-        error: { message: error instanceof Error ? error.message : 'Unknown error' },
-      });
-      return false;
-    }
   }
 }

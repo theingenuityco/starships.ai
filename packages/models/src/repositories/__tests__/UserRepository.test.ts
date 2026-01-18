@@ -135,6 +135,7 @@ describe('UserRepository', () => {
         email: 'test@example.com',
         displayName: 'Test User',
         avatar: 'avatar-url',
+        onboardingCompleted: false,
         hasPassword: false,
         authMethods: ['google' as const],
         primaryAuthMethod: 'oauth' as const
@@ -167,6 +168,7 @@ describe('UserRepository', () => {
       const userData = {
         email: 'updated@example.com',
         displayName: 'Updated Name',
+        onboardingCompleted: false,
         hasPassword: true,
         authMethods: ['password' as const],
         primaryAuthMethod: 'password' as const
@@ -323,6 +325,7 @@ describe('UserRepository', () => {
 
       const duplicateUser = {
         email: 'existing@example.com',
+        onboardingCompleted: false,
         hasPassword: false,
         authMethods: ['google' as const],
         primaryAuthMethod: 'oauth' as const
@@ -346,6 +349,7 @@ describe('UserRepository', () => {
       const userData = {
         email: 'new@example.com',
         displayName: 'New User',
+        onboardingCompleted: false,
         hasPassword: true,
         authMethods: ['password' as const],
         primaryAuthMethod: 'password' as const

@@ -15,26 +15,13 @@ export const renderWidgetTool: ToolParams = {
   name: 'Render Widget',
   slug: 'render-widget',
   description:
-    'Render a widget in the conversation UI by emitting a ui_action (render_widget). Accepts a widget payload (widgetType + props + optional metadata). Does not persist data.',
+    'Render an existing saved widget by slug in the conversation UI by emitting a ui_action (render_widget). Looks up the widget for the current STARSHIP_ID and renders it.',
   parameters: {
     type: 'object',
     properties: {
-      widget: {
-        type: 'object',
-        description: 'Widget payload to render (must include widgetType + props)',
-        properties: {
-          id: { type: 'string' },
-          name: { type: 'string' },
-          description: { type: 'string' },
-          widgetType: { type: 'string' },
-          props: { type: 'object' },
-        },
-        required: ['widgetType', 'props'],
-      },
-      // Optional: allow callers to pass a stable key for dedupe, or metadata like toolCallId
-      toolCallId: { type: 'string', description: 'Optional tool call id (for correlation/dedupe)' },
+      slug: { type: 'string', description: 'Widget slug to render (within current starship)' },
     },
-    required: ['widget'],
+    required: ['slug'],
   },
   blueprint: {
     nodes: [
@@ -43,22 +30,51 @@ export const renderWidgetTool: ToolParams = {
         ref: 'validate_input',
         type: 'code',
         name: 'Validate Input',
-        description: 'Validate widget payload shape',
+        description: 'Validate widget slug',
         parameters: {
           code: `
             async function main(ctx) {
               const input = ctx.input || {};
-              const widget = input.widget && typeof input.widget === 'object' ? input.widget : null;
-              if (!widget) throw new Error('widget is required');
-              const widgetType = typeof widget.widgetType === 'string' ? widget.widgetType.trim() : '';
-              const props = widget.props && typeof widget.props === 'object' ? widget.props : null;
-              if (!widgetType) throw new Error('widget.widgetType is required');
-              if (!props) throw new Error('widget.props is required');
-              const name = typeof widget.name === 'string' ? widget.name.trim() : undefined;
-              const description = typeof widget.description === 'string' ? widget.description : undefined;
-              const id = typeof widget.id === 'string' ? widget.id.trim() : undefined;
-              const toolCallId = typeof input.toolCallId === 'string' ? input.toolCallId.trim() : undefined;
-              return { widget: { ...(id ? { id } : {}), ...(name ? { name } : {}), ...(description ? { description } : {}), widgetType, props }, ...(toolCallId ? { toolCallId } : {}) };
+              const slug = typeof input.slug === 'string' ? input.slug.trim() : '';
+              if (!slug) throw new Error('slug is required');
+              const starshipId = ctx.env('STARSHIP_ID');
+              if (!starshipId || typeof starshipId !== 'string' || !starshipId.trim()) throw new Error('STARSHIP_ID is required');
+              return { slug, starshipId: starshipId.trim(), limit: 1 };
+            }
+          `,
+          timeout: 3000,
+        },
+      },
+      {
+        ref: 'fetch_widget',
+        type: 'connector_action',
+        name: 'Fetch Widget',
+        description: 'Find the widget by slug in the current starship',
+        parameters: {
+          connector: 'starships',
+          action: 'search-widgets',
+          failOnNon2xx: true,
+          args: '{{ lastOutputOf("validate_input") }}',
+          timeout: 5000,
+        },
+      },
+      {
+        ref: 'extract_widget',
+        type: 'code',
+        name: 'Extract Widget',
+        description: 'Extract the first widget from the API response',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const raw = ctx.input;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
+              const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;
+              const widgets = Array.isArray(data) ? data : (data && typeof data === 'object' && Array.isArray(data.widgets)) ? data.widgets : null;
+              if (!widgets || !Array.isArray(widgets) || widgets.length === 0) {
+                throw new Error('Widget not found for slug');
+              }
+              return widgets[0];
             }
           `,
           timeout: 3000,
@@ -72,8 +88,7 @@ export const renderWidgetTool: ToolParams = {
         parameters: {
           action: 'render_widget',
           payload: {
-            widget: '{{ (lastOutputOf("validate_input") || {}).widget }}',
-            toolCallId: '{{ (lastOutputOf("validate_input") || {}).toolCallId }}',
+            widget: '{{ lastOutputOf("extract_widget") }}',
           },
         },
       },
@@ -83,14 +98,16 @@ export const renderWidgetTool: ToolParams = {
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ lastOutputOf("validate_input") }}',
+          output: '{{ lastOutputOf("extract_widget") }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'validate_input' },
-      { ref: 'e2', from: 'validate_input', to: 'emit_ui_action' },
-      { ref: 'e3', from: 'emit_ui_action', to: 'end_1' },
+      { ref: 'e2', from: 'validate_input', to: 'fetch_widget' },
+      { ref: 'e3', from: 'fetch_widget', to: 'extract_widget' },
+      { ref: 'e4', from: 'extract_widget', to: 'emit_ui_action' },
+      { ref: 'e5', from: 'emit_ui_action', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -103,10 +120,10 @@ export const renderWidgetToolTemplate: Omit<ToolTemplateModel, 'id' | 'createdAt
   blueprint: renderWidgetTool.blueprint,
 
   slug: 'render-widget',
-  version: '1.0.0',
+  version: '1.1.0',
   category: 'utility',
   exampleUsage:
-    '{ "widget": { "name": "Revenue chart", "widgetType": "BarChart", "props": { "title": "Revenue", "data": [{ "name": "Jan", "value": 120 }] } } }',
+    '{ "slug": "revenue-by-month" }',
   requiresApiKey: false,
   configurationFields: [],
 };

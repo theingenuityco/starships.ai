@@ -69,7 +69,7 @@ export class OnboardingRecommendationService {
           queries.push('Research');
           break;
         case 'analytics':
-          queries.push('Data Analyst');
+          queries.push('Kepler');
           break;
         case 'tool_building':
           queries.push('Daedalus');

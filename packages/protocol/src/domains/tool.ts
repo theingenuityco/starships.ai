@@ -195,6 +195,14 @@ export type UpdateToolRequest = Partial<Omit<CreateToolRequest, 'slug'>> & {
   publishedTemplateId?: string;
   version?: string;
   templateSnapshotAt?: string;
+  // Publication workflow fields (for admin approval / publish flows)
+  publicationStatus?: 'draft' | 'pending_approval' | 'published' | 'rejected';
+  publicationRequestedBy?: string;
+  publicationApprovedBy?: string;
+  publicationApprovedAt?: string;
+  publicationVersionBump?: 'patch' | 'minor' | 'major';
+  publicationRequestedVersion?: string;
+  publicationChangelog?: string;
 };
 
 /**

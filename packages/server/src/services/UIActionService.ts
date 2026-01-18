@@ -3,6 +3,13 @@ import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 
 type UIActionPayload = ConversationStreamUIAction | { action: string; payload?: Record<string, unknown> };
 
+function getUIActionAction(payload: UIActionPayload): string | undefined {
+  if (!payload || typeof payload !== 'object') return undefined;
+  if (!('action' in payload)) return undefined;
+  const action = (payload as Record<string, unknown>)['action'];
+  return typeof action === 'string' ? action : undefined;
+}
+
 /**
  * UIActionService
  *
@@ -19,7 +26,7 @@ export class UIActionService {
   async publish(conversationId: string, payload: UIActionPayload): Promise<void> {
     if (!conversationId || typeof conversationId !== 'string') return;
     if (!payload || typeof payload !== 'object') return;
-    const action = (payload as any).action;
+    const action = getUIActionAction(payload);
     if (typeof action !== 'string' || action.trim().length === 0) return;
 
     try {
@@ -36,4 +43,3 @@ export class UIActionService {
     await this.publish(conversationId, { action: trimmed, ...(payload ? { payload } : null) });
   }
 }
-

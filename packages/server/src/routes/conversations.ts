@@ -227,12 +227,17 @@ async function executeToolBlueprint(args: {
   toolConfig: Record<string, unknown>;
   toolArgs: Record<string, unknown>;
   runnerConfig: Record<string, unknown>;
+  eventCallback?: EngineConfig['eventCallback'];
 }): Promise<unknown> {
   const execution = ExecutionItemUtils.createExecution();
   const initial = ExecutionItemUtils.wrapSingle({ ...args.toolArgs, config: args.toolConfig });
   execution.results.push({ nodeRef: '__initial__', items: initial });
   const runner = RunnerFactory.getTopLevelRunner(execution.depth ?? 0);
-  const items = await runner.run(args.blueprint, execution, { failOnNodeError: true, ...(args.runnerConfig as unknown as EngineConfig) });
+  const items = await runner.run(args.blueprint, execution, {
+    failOnNodeError: true,
+    eventCallback: args.eventCallback,
+    ...(args.runnerConfig as unknown as EngineConfig),
+  });
   return ExecutionItemUtils.unwrapSingle(items);
 }
 
@@ -869,11 +874,34 @@ router.post(
       const runtimeEnv = buildAutopilotRuntimeEnv({ starshipId: conversation.starshipId, conversationId, agentId });
       const { engineConfig } = await buildAutopilotExecutionBundle({ starshipId: conversation.starshipId, authUserId, runtimeEnv });
 
+      const bus = ConversationStreamBus.getInstance();
+      const uiActions = new UIActionService(bus);
+
       const result = await executeToolBlueprint({
         blueprint: tool.blueprint,
         toolConfig: (tool.configuration || {}) as Record<string, unknown>,
         toolArgs: args || {},
         runnerConfig: engineConfig,
+        eventCallback: async (evt: unknown) => {
+          try {
+            if (!evt || typeof evt !== 'object') return;
+            if (!('type' in evt) || !('data' in evt)) return;
+            const type = (evt as Record<string, unknown>)['type'];
+            if (type !== 'ui_action') return;
+            const data = (evt as Record<string, unknown>)['data'];
+            if (!data || typeof data !== 'object') return;
+            const dataRec = data as Record<string, unknown>;
+            const action = typeof dataRec.action === 'string' ? dataRec.action : '';
+            if (!action.trim()) return;
+            const payload =
+              dataRec.payload && typeof dataRec.payload === 'object' && !Array.isArray(dataRec.payload)
+                ? (dataRec.payload as Record<string, unknown>)
+                : undefined;
+            await uiActions.publish(conversationId, payload ? { action: action.trim(), payload } : { action: action.trim() });
+          } catch {
+            // best-effort: never fail tool execution because UI signaling failed
+          }
+        },
       });
 
       sendSuccess(res, { toolCallId, result }, 200);

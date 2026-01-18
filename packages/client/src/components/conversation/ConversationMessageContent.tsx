@@ -1036,7 +1036,7 @@ export function ConversationMessageContent({
     if (actions.length === 0) return []
 
     const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
-    return actions
+    const out = actions
       .map((ua, index) => {
         if (!ua || ua.action !== 'render_widget') return null
         const payload = ua.payload
@@ -1062,6 +1062,8 @@ export function ConversationMessageContent({
         }
       })
       .filter((w): w is NonNullable<typeof w> => w !== null)
+
+    return out
   }, [uiActions])
 
   // Fallback for non-markdown content (rare cases)

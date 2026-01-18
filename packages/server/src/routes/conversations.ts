@@ -15,7 +15,15 @@ import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
-import { AgentRepository, ToolCallApprovalRepository, ToolRepository, TurnRepository } from '@starships/models';
+import {
+  AgentRepository,
+  ConversationWidgetRepository,
+  MessageRepository,
+  ToolCallApprovalRepository,
+  ToolRepository,
+  TurnRepository,
+  WidgetRepository,
+} from '@starships/models';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { AppError } from '@starships/errors';
@@ -467,6 +475,33 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       res.write(`event: snapshot\n`);
       res.write(`data: ${JSON.stringify(snapshotEvt.data)}\n\n`);
 
+      // Replay persisted conversation widgets as ui_action events so they render after reload,
+      // anchored to an existing message (no blank synthetic message).
+      try {
+        const convWidgetRepo = new ConversationWidgetRepository();
+        const widgetRepo = new WidgetRepository();
+        const convWidgets = await convWidgetRepo.listByConversation(conversationId, { limit: 50 });
+        for (const cw of convWidgets) {
+          if (!cw.anchorMessageId) continue;
+          const widget = await widgetRepo.findById(cw.widgetId).catch(() => null);
+          if (!widget) continue;
+          res.write(`event: ui_action\n`);
+          res.write(
+            `data: ${JSON.stringify({
+              action: 'render_widget',
+              payload: {
+                widget,
+                anchorMessageId: cw.anchorMessageId,
+                ...(cw.turnId ? { turnId: cw.turnId } : null),
+                ...(cw.toolCallId ? { toolCallId: cw.toolCallId } : null),
+              },
+            })}\n\n`
+          );
+        }
+      } catch {
+        // best-effort only
+      }
+
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.
       try {
@@ -876,6 +911,8 @@ router.post(
 
       const bus = ConversationStreamBus.getInstance();
       const uiActions = new UIActionService(bus);
+      const messageRepo = new MessageRepository();
+      const conversationWidgetRepo = new ConversationWidgetRepository();
 
       const result = await executeToolBlueprint({
         blueprint: tool.blueprint,
@@ -897,6 +934,43 @@ router.post(
               dataRec.payload && typeof dataRec.payload === 'object' && !Array.isArray(dataRec.payload)
                 ? (dataRec.payload as Record<string, unknown>)
                 : undefined;
+
+            // Persist rendered widgets across reloads by anchoring to an existing message id.
+            // This is best-effort and must not affect tool execution.
+            if (action.trim() === 'render_widget' && payload) {
+              const widgetUnknown = payload.widget;
+              const widgetId =
+                widgetUnknown && typeof widgetUnknown === 'object' ? (widgetUnknown as Record<string, unknown>).id : undefined;
+              const widgetIdStr = typeof widgetId === 'string' ? widgetId : widgetId != null ? String(widgetId) : '';
+
+              if (widgetIdStr) {
+                const assistantMsg = await messageRepo.findLatestAssistantMessageByToolCallId(conversationId, toolCallId).catch(() => null);
+                const toolMsg = assistantMsg
+                  ? null
+                  : await messageRepo.findLatestToolMessageByToolCallId(conversationId, toolCallId).catch(() => null);
+                const anchorMessageId = assistantMsg?.id ?? toolMsg?.id ?? null;
+                const turnId = assistantMsg?.turnId ?? toolMsg?.turnId ?? null;
+
+                if (anchorMessageId) {
+                  void conversationWidgetRepo
+                    .createOrIgnore({
+                      starshipId: conversation.starshipId,
+                      conversationId,
+                      widgetId: widgetIdStr,
+                      turnId,
+                      anchorMessageId,
+                      toolCallId,
+                    })
+                    .catch(() => null);
+
+                  // Enrich live action for immediate attachment client-side.
+                  payload.anchorMessageId = anchorMessageId;
+                  if (turnId) payload.turnId = turnId;
+                  payload.toolCallId = toolCallId;
+                }
+              }
+            }
+
             await uiActions.publish(conversationId, payload ? { action: action.trim(), payload } : { action: action.trim() });
           } catch {
             // best-effort: never fail tool execution because UI signaling failed

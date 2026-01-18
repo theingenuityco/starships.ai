@@ -377,4 +377,33 @@ export class MessageRepository extends BaseRepository {
       'Message'
     );
   }
+
+  /**
+   * Find the latest assistant message for a conversation that contains a given toolCallId
+   * inside its persisted `tool_calls` JSONB array.
+   */
+  async findLatestAssistantMessageByToolCallId(conversationId: string, toolCallId: string): Promise<MessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const needle = JSON.stringify([{ id: toolCallId }]);
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `
+          SELECT *
+          FROM messages
+          WHERE conversation_id = $1
+            AND role = 'assistant'
+            AND tool_calls @> $2::jsonb
+          ORDER BY created_at DESC
+          LIMIT 1
+          `,
+          [conversationId, needle]
+        );
+        return row ? fromDatabase(MessageEntity, row) : null;
+      },
+      'findLatestAssistantMessageByToolCallId',
+      'Message',
+      `${conversationId}:${toolCallId}`
+    );
+  }
 }

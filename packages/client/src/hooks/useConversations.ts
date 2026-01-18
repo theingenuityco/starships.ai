@@ -994,16 +994,36 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const props = widget['props']
       if (!widgetType || !props || typeof props !== 'object') return messages
 
+      const anchorMessageIdUnknown = payload['anchorMessageId']
+      const anchorMessageId =
+        typeof anchorMessageIdUnknown === 'string' ? anchorMessageIdUnknown : anchorMessageIdUnknown != null ? String(anchorMessageIdUnknown) : ''
+
       const toolCallIdUnknown = payload['toolCallId']
       const toolCallId = typeof toolCallIdUnknown === 'string' ? toolCallIdUnknown : toolCallIdUnknown != null ? String(toolCallIdUnknown) : ''
       const widgetId = typeof widget['id'] === 'string' ? widget['id'] : widget['id'] != null ? String(widget['id']) : ''
 
+      const now = new Date().toISOString()
+      const uiAction = { action, payload } as const
+
+      // Preferred behavior: attach the ui_action to an existing persisted message (no blank synthetic message).
+      if (anchorMessageId) {
+        const idx = messages.findIndex(m => m.id === anchorMessageId)
+        if (idx !== -1) {
+          const existing = messages[idx]
+          const prev = Array.isArray((existing as any)?.uiActions) ? ((existing as any).uiActions as any[]) : []
+          const nextActions = [...prev, uiAction]
+          messages[idx] = {
+            ...existing,
+            updatedAt: now,
+            uiActions: nextActions,
+          } as any
+          return messages
+        }
+      }
+
       // Stable synthetic message id for render_widget events.
       const stableKey = widgetId || toolCallId || JSON.stringify(widget).slice(0, 128)
       const msgId = `ui-action:${action}:${stableKey}`
-      const now = new Date().toISOString()
-
-      const uiAction = { action, payload } as const
 
       const existingIdx = messages.findIndex(m => m.id === msgId)
       if (existingIdx !== -1) {

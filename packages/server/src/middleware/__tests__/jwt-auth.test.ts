@@ -74,6 +74,7 @@ describe('optionalJwtAuth', () => {
     mockedGetUserById.mockResolvedValue({
       id: 'user123',
       createdAt: new Date().toISOString(),
+      onboardingCompleted: false,
       hasPassword: false,
       authMethods: ['password'],
       primaryAuthMethod: 'password',

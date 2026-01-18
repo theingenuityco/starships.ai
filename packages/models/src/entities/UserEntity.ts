@@ -137,6 +137,10 @@ export class UserEntity implements UserModel {
   emailVerified?: boolean;
 
   @Expose()
+  @IsBoolean()
+  onboardingCompleted!: boolean;
+
+  @Expose()
   @IsOptional()
   @IsISO8601()
   lastLoginAt?: string;

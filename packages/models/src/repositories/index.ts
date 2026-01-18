@@ -14,3 +14,5 @@ export { UsageRepository } from './UsageRepository';
 export { UserRepository } from './UserRepository';
 export { WidgetRepository } from './WidgetRepository';
 export { LlmModelRepository } from './LlmModelRepository';
+
+export { OnboardingSessionRepository } from './OnboardingSessionRepository';

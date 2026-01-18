@@ -185,11 +185,11 @@ import { AgentTemplateRepository, AgentRepository } from '@starships/models';
 const templateRepo = new AgentTemplateRepository();
 // Create reusable template
 const template = await templateRepo.create({
-  name: 'Data Analyst',
-  category: 'analysis',
+  name: 'Kepler',
+  category: 'utility',
   isPublic: true,
   model: 'gpt-4',
-  systemPrompt: 'You are a data analysis expert',
+  systemPrompt: 'You are Kepler, a widget builder expert',
   blueprint: {},
 });
 

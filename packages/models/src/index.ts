@@ -56,6 +56,7 @@ export { TopupRepository } from './repositories/TopupRepository';
 export { LedgerRepository } from './repositories/LedgerRepository';
 export { PromoRedemptionRepository } from './repositories/PromoRedemptionRepository';
 export { WidgetRepository } from './repositories/WidgetRepository';
+export { ConversationWidgetRepository } from './repositories/ConversationWidgetRepository';
 export { ScheduleRepository } from './repositories/ScheduleRepository';
 export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepository';
 export { TurnRepository } from './repositories/TurnRepository';

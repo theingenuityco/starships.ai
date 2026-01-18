@@ -4,6 +4,10 @@ import { validateData } from '@/utils/validation';
 import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { OnboardingRecommendationService } from '@/services/OnboardingRecommendationService';
 import { StarshipService } from '@/services/StarshipService';
+import { ConversationService } from '@/services/ConversationService';
+import { MessageService } from '@/services/MessageService';
+import { ConversationStreamBus } from '@/services/ConversationStreamBus';
+import { ConnectorService } from '@/services/ConnectorService';
 import { UserRepository, AgentRepository, StarshipRepository, OnboardingSessionRepository } from '@starships/models';
 import type { AuthUser, StarshipModel, AgentModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
@@ -12,6 +16,8 @@ import { z } from 'zod';
 
 const router: Router = Router();
 const recommendationService = new OnboardingRecommendationService();
+
+type OnboardingChoice = { id: string; label: string; messageText: string };
 
 function getSourceTemplateId(agent: AgentModel): string | null {
   const rec = agent as unknown as Record<string, unknown>;
@@ -34,6 +40,153 @@ const CompleteOnboardingSchema = z.object({
 
 const StartOnboardingSchema = z.object({
   starshipName: z.string().trim().min(1).max(100).optional(),
+});
+
+/**
+ * POST /onboarding/chat/start
+ *
+ * Conversation-driven onboarding:
+ * - requires explicit user action (this endpoint call)
+ * - creates starship + deploys Aria
+ * - creates or reuses an "Onboarding" conversation
+ * - posts an initial assistant greeting + emits option chips via ui_action
+ */
+router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+
+    const body = validateData(StartOnboardingSchema, req.body, res, 'onboarding chat start payload');
+    if (!body) return;
+
+    // Ensure starship + Aria
+    const sessionRepo = new OnboardingSessionRepository();
+    const userRepo = new UserRepository();
+    const dbUser = await userRepo.findById(user.id);
+    if (!dbUser) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
+      return;
+    }
+
+    let session = await sessionRepo.findByUserId(user.id);
+    if (!session) {
+      session = await sessionRepo.upsertForUser(user.id, {
+        starshipId: null,
+        step: 'welcome',
+        goals: [],
+        selectedConnectorProviders: [],
+        selectedAgentTemplateIds: [],
+        primaryAgentTemplateId: null,
+        completedAt: null,
+      });
+    }
+
+    let starship: StarshipModel | null = null;
+    if (session.starshipId) {
+      const starshipRepo = new StarshipRepository();
+      starship = await starshipRepo.findById(session.starshipId);
+    }
+    if (!starship) {
+      starship = await ensureStarshipForUser(user.id, body.starshipName);
+    }
+
+    const aria = await ensureAriaOnStarship(starship.id);
+
+    // Upsert session with starship
+    session = await sessionRepo.upsertForUser(user.id, {
+      ...session,
+      starshipId: starship.id,
+      step: 'connectors',
+    });
+
+    // Create or reuse an "Onboarding" conversation (normal conversation labeled onboarding)
+    const conversationService = new ConversationService();
+    const existing = await conversationService.getConversationsByStarshipWithAgents(starship.id);
+    const onboardingConversation =
+      (Array.isArray(existing)
+        ? existing.find((c: any) => String(c?.title || '').trim().toLowerCase() === 'onboarding' && String(c?.status || '') === 'active')
+        : null) || null;
+
+    const conversation = onboardingConversation
+      ? onboardingConversation
+      : await conversationService.createConversation({
+          title: 'Onboarding',
+          status: 'active',
+          starshipId: starship.id,
+          agentId: aria.id,
+        });
+
+    // Build initial choices (connector selection) from live connector catalog.
+    const connectorService = new ConnectorService();
+    const catalog = await connectorService.getConnectorCatalog();
+    const choices: OnboardingChoice[] = (catalog || [])
+      .slice(0, 12) // keep it compact; the conversation can ask follow-ups
+      .map((c: any) => {
+        const provider = String(c?.provider || '').trim();
+        const name = String(c?.name || provider || '').trim();
+        return {
+          id: `connector_${provider}`,
+          label: name || provider,
+          messageText: `I want to connect ${name || provider}.`,
+        };
+      })
+      .filter((c) => c.id !== 'connector_' && c.label && c.messageText);
+
+    // Persist a lightweight onboarding UI state on the conversation for durability
+    try {
+      await conversationService.updateConversation(conversation.id, {
+        state: {
+          onboarding: {
+            mode: 'conversation',
+            step: 'connectors',
+            choices,
+          },
+        },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    // Create a greeting assistant message (durable) and publish + emit ui_action choices (live)
+    const bus = ConversationStreamBus.getInstance();
+    try {
+      const messageService = new MessageService();
+      const greeting = await messageService.createMessage({
+        conversationId: conversation.id,
+        role: 'assistant',
+        messageType: 'agent_response',
+        agentId: aria.id,
+        agentName: aria.name,
+        content:
+          `Welcome! Let’s start by connecting the apps you already use.\n\nPick one (or a few) connectors below — I’ll use live data to tailor the rest of onboarding.`,
+      });
+      await bus.publish(conversation.id, { type: 'message.append', data: { conversationId: conversation.id, message: greeting } });
+    } catch {
+      // non-fatal
+    }
+
+    try {
+      await bus.publish(conversation.id, {
+        type: 'ui_action',
+        data: {
+          __ui_action: 'onboarding_choices',
+          conversationId: conversation.id,
+          choices,
+        },
+      });
+    } catch {
+      // non-fatal
+    }
+
+    sendSuccess(res, {
+      session,
+      starship: { id: starship.id, slug: starship.slug, name: starship.name },
+      ariaAgent: { id: aria.id, slug: aria.slug, name: aria.name },
+      conversation: { id: conversation.id, title: conversation.title },
+    });
+  } catch (error) {
+    handleError(error, res, 'start onboarding chat');
+  }
 });
 
 const RecommendationsSchema = z.object({

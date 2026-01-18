@@ -49,6 +49,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isDashboard = pathname === '/'
   const isMarketplace = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
+  const isOnboarding = pathname === '/onboarding'
   const isPublicSimplePage =
     pathname === '/' ||
     pathname === '/login' ||
@@ -56,7 +57,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     pathname === '/reset-password' ||
     pathname === '/terms' ||
     pathname === '/privacy' ||
-    isConnectorInstallPage
+    isConnectorInstallPage ||
+    isOnboarding
 
   useEffect(() => {
     if (!pathname) return

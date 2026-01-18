@@ -152,6 +152,7 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         emailNotVerified: true,
         message: 'Please verify your email address before signing in.',
         canResendVerification: true,
+        onboardingRequired: true,
       };
 
       return sendSuccess(res, response, 200);
@@ -228,11 +229,16 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         email: user.email,
         name: user.displayName || user.email?.split('@')[0],
         avatar: user.avatar,
+        hasPassword: user.hasPassword || false,
+        authMethods: user.authMethods || [],
+        primaryAuthMethod: user.primaryAuthMethod || 'password',
+        onboardingCompleted: user.onboardingCompleted,
         // Surface instance admin flag without changing other login payload fields
         isInstanceAdmin: user.isInstanceAdmin || false,
       },
       token,
       isFirstLogin,
+      onboardingRequired: !user.onboardingCompleted,
       starship: firstStarship
         ? {
             id: firstStarship.id,
@@ -279,6 +285,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       hasPassword: user.hasPassword || false,
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password',
+      onboardingCompleted: user.onboardingCompleted,
       isInstanceAdmin: user.isInstanceAdmin || false,
     });
   } catch (error) {

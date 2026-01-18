@@ -23,6 +23,7 @@ export interface UserModel {
   avatar?: string;
   password?: string; // For local authentication
   emailVerified?: boolean; // OAuth email verification
+  onboardingCompleted: boolean; // Mandatory onboarding completion gate
   createdAt: string;
   lastLoginAt?: string; // Last successful login timestamp
 

@@ -27,10 +27,7 @@ export default function ProfilePage(): React.JSX.Element {
     if (starships && starships.length > 0) {
       router.replace(`/ship/${starships[0].slug}/conversations`)
     } else {
-      // No starships available - stay on this page or show onboarding
-      // For now, show a message that they need to create a starship
-      // TODO: Implement starship creation flow or onboarding
-      console.log('User has no starships - onboarding needed')
+      router.replace('/onboarding')
     }
   }, [authLoading, starshipsLoading, isAuthenticated, starships, router])
 
@@ -39,7 +36,7 @@ export default function ProfilePage(): React.JSX.Element {
     return <AuthLoadingScreen message="Loading your profile..." />
   }
 
-  // User has no starships - show message (temporary until onboarding is implemented)
+  // Should never be reached (we redirect to /onboarding when no starships exist)
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center space-y-4">

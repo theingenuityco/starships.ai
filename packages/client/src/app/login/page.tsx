@@ -10,7 +10,6 @@ import * as React from 'react'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { isValidRedirectUrl } from '@/lib/utils'
-import { useUserStarships } from '@/hooks/useStarships'
 import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Orbitron } from 'next/font/google'
@@ -28,8 +27,7 @@ function LoginContent() {
   const initialTab = tabParam === 'register' ? 'register' : 'login'
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab)
 
-  // Fetch user's starships when authenticated
-  const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
+  const starshipsLoading = false
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {
@@ -47,7 +45,7 @@ function LoginContent() {
   const expectedEmail = searchParams?.get('expectedEmail')
   const forcedLogoutRef = React.useRef(false)
 
-  // Redirect authenticated users to their starship (skip while forced logout is pending)
+  // Redirect authenticated users to onboarding (skip while forced logout is pending)
   React.useEffect(() => {
     if (!mounted || isLoading || starshipsLoading) {
       return
@@ -84,15 +82,11 @@ function LoginContent() {
 
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
         router.push(returnUrl)
-      } else if (starships && starships.length > 0) {
-        // Redirect to the first starship's conversations
-        router.push(`/ship/${starships[0].slug}/conversations`)
       } else {
-        // If no starship available, redirect to profile which handles starship creation
-        router.push('/profile')
+        router.push('/onboarding')
       }
     }
-  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout])
+  }, [mounted, isAuthenticated, isLoading, starshipsLoading, router, searchParams, logoutParam, expectedEmail, logout])
 
   // Show loading state while checking authentication or mounting
   if (!mounted || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {

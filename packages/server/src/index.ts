@@ -40,6 +40,7 @@ import scheduleRoutes from '@/routes/schedules';
 import platformSecretRoutes from '@/routes/platform-secrets';
 import connectorTemplateRoutes from '@/routes/connector-templates';
 import subscriptionRoutes from '@/routes/subscriptions';
+import onboardingRoutes from '@/routes/onboarding';
 // import expeditionRoutes from '@/routes/expeditions';
 
 // Import new error handling and health check routes
@@ -116,6 +117,7 @@ app.use('/api/v1', scheduleRoutes);
 app.use('/api/v1', platformSecretRoutes);
 app.use('/api/v1', connectorTemplateRoutes);
 app.use('/api/v1', subscriptionRoutes);
+app.use('/api/v1', onboardingRoutes);
 
 // Add 404 handler for unmatched routes
 app.use(notFoundHandler);

@@ -17,6 +17,7 @@ export interface AuthUser {
   hasPassword: boolean
   authMethods: AuthMethod[]
   primaryAuthMethod: 'password' | 'oauth'
+  onboardingCompleted: boolean
   /**
    * Instance-level admin flag from backend.
    * When true, user can access instance admin views (e.g. publish approvals).
@@ -28,9 +29,7 @@ export interface AuthUser {
 interface AuthLoginResponse {
   user?: AuthUser
   token?: string
-  starship?: {
-    slug: string
-  }
+  onboardingRequired: boolean
   message?: string
   // Email verification fields
   emailNotVerified?: boolean
@@ -187,7 +186,7 @@ export function useLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token, starship, isFirstLogin } = data
+      const { user, token } = data
 
       if (!user || !token) {
         handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useLogin')
@@ -206,16 +205,7 @@ export function useLogin() {
         return
       }
 
-      const redirectTarget = getPostAuthRedirectTarget()
-      if (redirectTarget) {
-        router.push(isFirstLogin ? addWelcomeParamToPath(redirectTarget) : redirectTarget)
-      } else if (starship) {
-        const path = `/ship/${starship.slug}/conversations`
-        router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)
-      } else {
-        // If no starship available, redirect to profile which handles starship routing
-        router.push('/profile')
-      }
+      router.push('/onboarding')
 
       // Invalidate all queries to refetch with new auth context
       queryClient.invalidateQueries()
@@ -319,7 +309,7 @@ export function useOAuthLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token, starship, isFirstLogin } = data
+      const { user, token } = data
 
       if (!user || !token) {
         handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useOAuthLogin')
@@ -339,15 +329,7 @@ export function useOAuthLogin() {
         return
       }
 
-      const redirectTarget = getPostAuthRedirectTarget()
-      if (redirectTarget) {
-        router.push(isFirstLogin ? addWelcomeParamToPath(redirectTarget) : redirectTarget)
-      } else if (starship) {
-        const path = `/ship/${starship.slug}/conversations`
-        router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)
-      } else {
-        router.push('/profile')
-      }
+      router.push('/onboarding')
 
       // Invalidate all queries to refetch with new auth context (same as regular login)
       queryClient.invalidateQueries()

@@ -18,6 +18,7 @@ import type {
   CreateUserRequest,
   UpdateUserRequest,
   UserModel,
+  StarshipModel,
   OAuthAccountModel,
   OAuthProfileModel,
   SetPasswordRequest,
@@ -26,7 +27,6 @@ import type {
 import { getEnvConfig } from '@starships/env';
 import { google } from 'googleapis';
 import bcrypt from 'bcrypt';
-import { StarshipService } from '@/services/StarshipService';
 import { logger } from '@/utils/logger';
 
 export interface UserOptions {
@@ -322,13 +322,11 @@ export class UserService {
     // PRIORITY 2: Check if user exists by email (for new OAuth account linking to existing email-based account)
     let user = await this.getUserByEmail(profile.email);
     let isNewUser = false;
-    let needsStarshipCreation = false;
 
     if (!user) {
       // ✅ FIXED: Use proper service method - NO REPOSITORY JUMPING
       user = await this.createUserFromOAuthProfile(profile);
       isNewUser = true;
-      needsStarshipCreation = true;
     } else {
       // User exists (from email/password registration)
       // If they're unverified, verify them now (OAuth providers verify emails)
@@ -342,36 +340,11 @@ export class UserService {
         // Verify the email (OAuth providers verify emails)
         await this.userRepository.update(user.id, { emailVerified: true });
         user.emailVerified = true;
-
-        // Check if they need a starship
-        const starshipRepo = new StarshipRepository();
-        const userStarships = await starshipRepo.findByOwner(user.id);
-        needsStarshipCreation = userStarships.length === 0;
       }
     }
 
     // Link OAuth account using business logic
     await this.linkOAuthAccount(user.id, profile);
-
-    // Create default starship for new users OR existing unverified users who got verified via OAuth
-    if (needsStarshipCreation) {
-      try {
-        const defaultStarship = await StarshipService.createDefaultStarship(user.id);
-
-        // Create initial agents for the starship (Daedalus, Gaia)
-        if (defaultStarship) {
-          try {
-            await StarshipService.createInitialAgents(user.id, defaultStarship.id);
-          } catch (agentError) {
-            console.error(`[OAUTH] Failed to create initial agents for user ${user.id}:`, agentError);
-            // Continue even if agent creation fails
-          }
-        }
-      } catch (starshipError) {
-        console.error(`[OAUTH] Failed to create default starship for user ${user.id}:`, starshipError);
-        // Continue even if starship creation fails - user can create one later
-      }
-    }
 
     return { user };
   }
@@ -1218,7 +1191,7 @@ export class UserService {
     try {
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(userId);
-      const firstStarship = userStarships.find((ship) => ship.status === 'active') || userStarships[0];
+      const firstStarship = userStarships.find((ship: StarshipModel) => ship.status === 'active') || userStarships[0];
       return firstStarship ? `/ship/${firstStarship.slug}/settings/profile` : '/profile';
     } catch (error) {
       logger.warn('[UserService] Failed to get starship for redirect', { userId, error });

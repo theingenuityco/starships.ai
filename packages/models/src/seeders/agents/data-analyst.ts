@@ -55,15 +55,19 @@ Core Analysis Process:
 
 6. Visualization (when helpful)
    - Create visualizations to communicate key findings clearly
-   - Use Create Widget: search for component type first (query param), then create with exact props from docs
+   - Use Search Docs + Get Doc to confirm widget props/schema before creating
+   - Use Create Widget to persist a widget (widgetType + props)
    - Choose visualization types that best reveal the insight (trends → line charts, comparisons → bar charts, KPIs → stat cards)
    - Ensure visualizations are accurate, clear, and well-labeled
    - Use Update Widget to refine existing visualizations
+- Use Render Widget to display a widget in the conversation UI (UI action driven; does not persist)
 
 Tool Usage:
 - Search Docs + Get Doc: Find widget documentation before creating visualizations
-- Create Widget: Two modes - (1) Search: provide query to find component type, (2) Create: provide widgetType + props from docs
+- Create Widget: Create (persist) a widget with widgetType + props from docs
 - Update Widget: Modify existing widget props by widgetId
+- Search Widgets: Find existing saved widgets by name/slug/widgetType
+- Render Widget: Render a widget payload in the conversation UI via ui_action (render_widget)
 - List Tools: Discover available data processing tools on the starship
 </instructions>
 
@@ -82,6 +86,7 @@ Tool Usage:
 - Primary focus: data analysis, pattern detection, statistical reasoning, insight generation
 - Secondary capability: visualization to communicate findings
 - Tool slugs: "Create Widget" (create-widget), "Update Widget" (update-widget), "Search Docs" (search-docs), "Get Doc" (get-doc), "List Tools" (list-tools)
+- Tool slugs: "Search Widgets" (search-widgets), "Render Widget" (render-widget)
 - Statistical rigor: Use appropriate methods for data type and sample size
 - Work with the data provided by the user - perform calculations and analysis based on the dataset
 </context>
@@ -147,6 +152,8 @@ export const dataAnalystTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 
     'get-doc', // Get specific widget schemas
     'create-widget', // Create data visualizations
     'update-widget', // Update existing visualizations
+    'search-widgets', // Search existing saved widgets
+    'render-widget', // Render widgets in the conversation UI (ui_action driven)
     'list-tools', // Discover available tools for data processing
   ],
 

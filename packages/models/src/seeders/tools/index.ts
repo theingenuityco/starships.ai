@@ -30,6 +30,8 @@ export { modelsListToolTemplate } from './list-models';
 export { connectorsListToolTemplate } from './list-connectors';
 export { createWidgetToolTemplate } from './create-widget';
 export { updateWidgetToolTemplate } from './update-widget';
+export { searchWidgetsToolTemplate } from './search-widgets';
+export { renderWidgetToolTemplate } from './render-widget';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -59,6 +61,8 @@ import { modelsListToolTemplate } from './list-models';
 import { connectorsListToolTemplate } from './list-connectors';
 import { createWidgetToolTemplate } from './create-widget';
 import { updateWidgetToolTemplate } from './update-widget';
+import { searchWidgetsToolTemplate } from './search-widgets';
+import { renderWidgetToolTemplate } from './render-widget';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -88,4 +92,6 @@ export const ALL_TOOL_TEMPLATES = [
   connectorsListToolTemplate,
   createWidgetToolTemplate,
   updateWidgetToolTemplate,
+  searchWidgetsToolTemplate,
+  renderWidgetToolTemplate,
 ];

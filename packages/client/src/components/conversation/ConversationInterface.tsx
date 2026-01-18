@@ -11,13 +11,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import {
-  useStarshipConversations,
-  CONVERSATION_QUERY_KEYS,
-  useChildConversations,
-  usePendingToolApprovalsMulti,
-  useConversationDetail,
-} from '@/hooks/useConversations'
+import { useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversations, usePendingToolApprovalsMulti, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -34,6 +28,8 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
+import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
+import type { ConversationStreamUIAction, OnboardingConnectorsUIAction } from '@starships/protocol'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -97,7 +93,16 @@ function pickDefaultAgent(agents: any[]): any | null {
   return aria ?? agents[0] ?? null
 }
 
-type OnboardingChoice = { id: string; label: string; messageText: string }
+function isUIAction(v: unknown): v is ConversationStreamUIAction {
+  return !!v && typeof v === 'object' && typeof (v as any).__ui_action === 'string'
+}
+
+function isOnboardingConnectorsUIAction(v: unknown): v is OnboardingConnectorsUIAction {
+  if (!isUIAction(v)) return false
+  if ((v as any).__ui_action !== 'onboarding_connectors') return false
+  const providers = (v as any).providers
+  return Array.isArray(providers) && providers.every(p => typeof p === 'string')
+}
 
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
@@ -149,8 +154,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Deduplicate UI action payloads across sources
   const lastUIActionKeyRef = useRef<string | null>(null)
 
-  // Onboarding option chips (conversation-driven onboarding)
-  const [onboardingChoices, setOnboardingChoices] = useState<OnboardingChoice[]>([])
+  // Onboarding connector suggestions (conversation-driven onboarding)
+  const [onboardingConnectorProviders, setOnboardingConnectorProviders] = useState<string[]>([])
 
   const queryClient = useQueryClient()
 
@@ -635,30 +640,22 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
   const handleUIPayload = useCallback(
-    (payload: any) => {
+    (payload: unknown) => {
       try {
-        if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
+        if (!isUIAction(payload)) return
         const key = JSON.stringify(payload)
         if (lastUIActionKeyRef.current === key) return
         lastUIActionKeyRef.current = key
 
-        const action = (payload as any).__ui_action as string
+        const action = payload.__ui_action
 
         // Builders are route-based now; no in-place form updates
 
         switch (action) {
-          case 'onboarding_choices': {
-            const choices = (payload as any)?.choices
-            if (Array.isArray(choices)) {
-              const normalized = choices
-                .map((c: any) => ({
-                  id: String(c?.id || ''),
-                  label: String(c?.label || ''),
-                  messageText: String(c?.messageText || ''),
-                }))
-                .filter((c: OnboardingChoice) => c.id && c.label && c.messageText)
-              setOnboardingChoices(normalized)
-            }
+          case 'onboarding_connectors': {
+            if (!isOnboardingConnectorsUIAction(payload)) break
+            const normalized = payload.providers.map(p => p.trim()).filter(p => p.length > 0)
+            setOnboardingConnectorProviders(normalized)
             break
           }
           case 'tool_approval_required': {
@@ -719,16 +716,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   useEffect(() => {
     try {
       const state: any = (currentConversationDetail as any)?.state
-      const choices = state?.onboarding?.choices
-      if (!Array.isArray(choices)) return
-      const normalized = choices
-        .map((c: any) => ({
-          id: String(c?.id || ''),
-          label: String(c?.label || ''),
-          messageText: String(c?.messageText || ''),
-        }))
-        .filter((c: OnboardingChoice) => c.id && c.label && c.messageText)
-      if (normalized.length > 0) setOnboardingChoices(normalized)
+      const providers = state?.onboarding?.providers
+      if (!Array.isArray(providers)) return
+      const normalized = providers.map((p: any) => String(p)).filter((p: string) => p.trim().length > 0)
+      if (normalized.length > 0) setOnboardingConnectorProviders(normalized)
     } catch {
       // ignore
     }
@@ -913,40 +904,27 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
 
               <div key="message-input">
-              {childWithPendingApproval && (
-                <ChildConversationApprovalCallout
-                  title={String((childWithPendingApproval as any)?.agentName || 'A child agent')}
-                  pendingCount={childWithPendingApproval.pendingCount}
-                  disabled={!starshipSlug}
-                  onOpenChildConversation={() => {
-                    if (!starshipSlug) return
-                    router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(childWithPendingApproval.id)}`)
-                  }}
-                />
-              )}
+                {childWithPendingApproval && (
+                  <ChildConversationApprovalCallout
+                    title={String((childWithPendingApproval as any)?.agentName || 'A child agent')}
+                    pendingCount={childWithPendingApproval.pendingCount}
+                    disabled={!starshipSlug}
+                    onOpenChildConversation={() => {
+                      if (!starshipSlug) return
+                      router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(childWithPendingApproval.id)}`)
+                    }}
+                  />
+                )}
 
-              {onboardingChoices.length > 0 && showMessagesArea ? (
-                <div className="mb-3 flex flex-wrap gap-2">
-                  {onboardingChoices.map(choice => (
-                    <button
-                      key={choice.id}
-                      type="button"
-                      onClick={async () => {
-                        try {
-                          setOnboardingChoices([]) // optimistic clear
-                          await messageInputRef.current?.handleSuggestionSubmit(choice.messageText)
-                        } catch {
-                          // restore on failure
-                          setOnboardingChoices(prev => (prev.length === 0 ? [choice] : prev))
-                        }
-                      }}
-                      className="inline-flex items-center rounded-full border border-border bg-card px-3 py-1.5 text-xs text-foreground hover:border-primary/40 hover:bg-muted/40 transition"
-                    >
-                      {choice.label}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+                {onboardingConnectorProviders.length > 0 && showMessagesArea ? (
+                  <div className="mb-4 rounded-2xl border border-border/50 bg-card/40 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="text-sm font-medium text-foreground">Suggested connectors</div>
+                      <div className="text-xs text-muted-foreground">Connect right here, then keep chatting</div>
+                    </div>
+                    <StarshipConnectorsPanel starshipId={starshipId} onlyProviders={onboardingConnectorProviders} hideSearch={true} hideDisconnect={true} />
+                  </div>
+                ) : null}
 
                 <ConversationMessageInput
                   key={inputKey}

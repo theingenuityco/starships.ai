@@ -9,7 +9,7 @@ import { MessageService } from '@/services/MessageService';
 import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { ConnectorService } from '@/services/ConnectorService';
 import { UserRepository, AgentRepository, StarshipRepository, OnboardingSessionRepository } from '@starships/models';
-import type { AuthUser, StarshipModel, AgentModel } from '@starships/protocol';
+import type { AuthUser, StarshipModel, AgentModel, OnboardingConnectorsUIAction } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -104,7 +104,12 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
     const existing = await conversationService.getConversationsByStarshipWithAgents(starship.id);
     const onboardingConversation =
       (Array.isArray(existing)
-        ? existing.find((c: any) => String(c?.title || '').trim().toLowerCase() === 'onboarding' && String(c?.status || '') === 'active')
+        ? existing.find(
+            (c: any) =>
+              String(c?.title || '')
+                .trim()
+                .toLowerCase() === 'onboarding' && String(c?.status || '') === 'active'
+          )
         : null) || null;
 
     const conversation = onboardingConversation
@@ -116,21 +121,13 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           agentId: aria.id,
         });
 
-    // Build initial choices (connector selection) from live connector catalog.
+    // Build initial connector suggestions from live connector catalog.
     const connectorService = new ConnectorService();
     const catalog = await connectorService.getConnectorCatalog();
-    const choices: OnboardingChoice[] = (catalog || [])
-      .slice(0, 12) // keep it compact; the conversation can ask follow-ups
-      .map((c: any) => {
-        const provider = String(c?.provider || '').trim();
-        const name = String(c?.name || provider || '').trim();
-        return {
-          id: `connector_${provider}`,
-          label: name || provider,
-          messageText: `I want to connect ${name || provider}.`,
-        };
-      })
-      .filter((c) => c.id !== 'connector_' && c.label && c.messageText);
+    const providers: string[] = (catalog || [])
+      .slice(0, 12)
+      .map((c: any) => String(c?.provider || '').trim())
+      .filter((p) => p.length > 0 && p !== 'starships');
 
     // Persist a lightweight onboarding UI state on the conversation for durability
     try {
@@ -139,7 +136,7 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           onboarding: {
             mode: 'conversation',
             step: 'connectors',
-            choices,
+            providers,
           },
         },
       });
@@ -157,8 +154,7 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
         messageType: 'agent_response',
         agentId: aria.id,
         agentName: aria.name,
-        content:
-          `Welcome! Let’s start by connecting the apps you already use.\n\nPick one (or a few) connectors below — I’ll use live data to tailor the rest of onboarding.`,
+        content: `Welcome! Let’s start by connecting the apps you already use.\n\nPick one (or a few) connectors below — I’ll use live data to tailor the rest of onboarding.`,
       });
       await bus.publish(conversation.id, { type: 'message.append', data: { conversationId: conversation.id, message: greeting } });
     } catch {
@@ -166,14 +162,12 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
     }
 
     try {
-      await bus.publish(conversation.id, {
-        type: 'ui_action',
-        data: {
-          __ui_action: 'onboarding_choices',
-          conversationId: conversation.id,
-          choices,
-        },
-      });
+      const payload: OnboardingConnectorsUIAction = {
+        __ui_action: 'onboarding_connectors',
+        conversationId: conversation.id,
+        providers,
+      };
+      await bus.publish(conversation.id, { type: 'ui_action', data: payload });
     } catch {
       // non-fatal
     }

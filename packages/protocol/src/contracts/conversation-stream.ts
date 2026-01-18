@@ -58,7 +58,60 @@ export type ConversationStreamMessageAppend = {
   message: MessageModel;
 };
 
-export type ConversationStreamUIAction = Record<string, unknown> & { __ui_action: string };
+// ----------------------------------------------------------------------------
+// UI Actions (server → client hints over SSE)
+// ----------------------------------------------------------------------------
+
+export type ToolApprovalRequiredUIAction = {
+  __ui_action: 'tool_approval_required';
+  approvalId: string;
+  conversationId: string;
+  starshipId: string;
+  agentId?: string;
+  agentName?: string;
+  toolId?: string;
+  toolSlug?: string;
+  toolCallId?: string;
+  args?: Record<string, unknown>;
+};
+
+export type ToolApprovalResolvedUIAction = {
+  __ui_action: 'tool_approval_resolved';
+  approvalId: string;
+  conversationId: string;
+  starshipId?: string;
+};
+
+export type ConversationTitleUpdatedUIAction = {
+  __ui_action: 'conversation_title_updated';
+  conversationId: string;
+  starshipId?: string;
+  title?: string;
+};
+
+export type ChildConversationCreatedUIAction = {
+  __ui_action: 'child_conversation_created';
+  parentConversationId: string;
+  childConversationId: string;
+  starshipId: string;
+};
+
+export type OnboardingConnectorsUIAction = {
+  __ui_action: 'onboarding_connectors';
+  conversationId: string;
+  providers: string[];
+};
+
+/**
+ * Union of known UI actions, plus a forward-compatible fallback.
+ */
+export type ConversationStreamUIAction =
+  | ToolApprovalRequiredUIAction
+  | ToolApprovalResolvedUIAction
+  | ConversationTitleUpdatedUIAction
+  | ChildConversationCreatedUIAction
+  | OnboardingConnectorsUIAction
+  | ({ __ui_action: string } & Record<string, unknown>);
 
 export type ConversationStreamEvent =
   | { type: 'snapshot'; data: ConversationStreamSnapshot }
@@ -68,5 +121,3 @@ export type ConversationStreamEvent =
   | { type: 'assistant.reasoning_delta'; data: ConversationStreamAssistantReasoningDelta }
   | { type: 'message.append'; data: ConversationStreamMessageAppend }
   | { type: 'ui_action'; data: ConversationStreamUIAction };
-
-

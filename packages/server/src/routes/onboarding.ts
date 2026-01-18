@@ -8,6 +8,7 @@ import { ConversationService } from '@/services/ConversationService';
 import { MessageService } from '@/services/MessageService';
 import { ConversationStreamBus } from '@/services/ConversationStreamBus';
 import { ConnectorService } from '@/services/ConnectorService';
+import { UIActionService } from '@/services/UIActionService';
 import { UserRepository, AgentRepository, StarshipRepository, OnboardingSessionRepository } from '@starships/models';
 import type { AuthUser, StarshipModel, AgentModel, OnboardingConnectorsUIAction } from '@starships/protocol';
 import type { Request, Response } from 'express';
@@ -146,6 +147,7 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
 
     // Create a greeting assistant message (durable) and publish + emit ui_action choices (live)
     const bus = ConversationStreamBus.getInstance();
+    const uiActions = new UIActionService(bus);
     try {
       const messageService = new MessageService();
       const greeting = await messageService.createMessage({
@@ -162,12 +164,8 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
     }
 
     try {
-      const payload: OnboardingConnectorsUIAction = {
-        __ui_action: 'onboarding_connectors',
-        conversationId: conversation.id,
-        providers,
-      };
-      await bus.publish(conversation.id, { type: 'ui_action', data: payload });
+      // NOTE: legacy UI action shape removed; UI actions are now { action, payload }.
+      await uiActions.publish(conversation.id, { action: 'onboarding_connectors', payload: { conversationId: conversation.id, providers } });
     } catch {
       // non-fatal
     }

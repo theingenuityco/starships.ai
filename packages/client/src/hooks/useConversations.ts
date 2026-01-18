@@ -972,8 +972,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     if (chunk.type === 'ui_action') {
       const messages = clone(acc)
-      const payload = chunk.data
-      const action = payload.__ui_action
+      const evt: any = chunk.data
+      const action = typeof evt?.action === 'string' ? evt.action : ''
+      const payload = (evt?.payload && typeof evt.payload === 'object' ? evt.payload : {}) as Record<string, unknown>
       if (action !== 'widget_created' && action !== 'widget_updated') {
         return messages
       }

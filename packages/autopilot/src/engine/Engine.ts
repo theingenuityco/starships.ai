@@ -18,6 +18,7 @@ import { CancelledError } from '@/errors/CancelledError';
 const HANDLER_MAP: Record<string, () => Promise<NodeHandlerConstructor>> = {
   start: () => import('@/nodes/Start').then((m) => m.Start as NodeHandlerConstructor),
   end: () => import('@/nodes/End').then((m) => m.End as NodeHandlerConstructor),
+  ui_action: () => import('@/nodes/UIAction').then((m) => m.UIAction as NodeHandlerConstructor),
   agent: () => import('@/nodes/Agent').then((m) => m.Agent as NodeHandlerConstructor),
   workflow: () => import('@/nodes/Workflow').then((m) => m.Workflow as NodeHandlerConstructor),
   http_request: () => import('@/nodes/HttpRequest').then((m) => m.HttpRequest as NodeHandlerConstructor),

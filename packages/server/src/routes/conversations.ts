@@ -22,6 +22,7 @@ import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { UIActionService } from '@/services/UIActionService';
 import type {
   ToolModel,
   ConversationStreamSnapshot,
@@ -833,10 +834,9 @@ router.post(
 
         // Emit out-of-band UI action so the client can show an Approve/Deny prompt.
         const bus = ConversationStreamBus.getInstance();
-        await bus.publish(conversationId, {
-          type: 'ui_action',
-          data: {
-            __ui_action: 'tool_approval_required',
+        await new UIActionService(bus).publish(conversationId, {
+          action: 'tool_approval_required',
+          payload: {
             approvalId,
             conversationId,
             starshipId: conversation.starshipId,
@@ -949,14 +949,9 @@ router.post(
 
       try {
         const bus = ConversationStreamBus.getInstance();
-        await bus.publish(conversationId, {
-          type: 'ui_action',
-          data: {
-            __ui_action: 'tool_approval_resolved',
-            approvalId,
-            conversationId,
-            status: 'approved',
-          },
+        await new UIActionService(bus).publish(conversationId, {
+          action: 'tool_approval_resolved',
+          payload: { approvalId, conversationId, status: 'approved' },
         });
       } catch {
         // ignore broadcast failures
@@ -1107,14 +1102,9 @@ router.post(
 
       try {
         const bus = ConversationStreamBus.getInstance();
-        await bus.publish(conversationId, {
-          type: 'ui_action',
-          data: {
-            __ui_action: 'tool_approval_resolved',
-            approvalId,
-            conversationId,
-            status: 'denied',
-          },
+        await new UIActionService(bus).publish(conversationId, {
+          action: 'tool_approval_resolved',
+          payload: { approvalId, conversationId, status: 'denied' },
         });
       } catch {
         /* ignore broadcast failures */

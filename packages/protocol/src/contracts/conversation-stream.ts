@@ -63,43 +63,54 @@ export type ConversationStreamMessageAppend = {
 // ----------------------------------------------------------------------------
 
 export type ToolApprovalRequiredUIAction = {
-  __ui_action: 'tool_approval_required';
-  approvalId: string;
-  conversationId: string;
-  starshipId: string;
-  agentId?: string;
-  agentName?: string;
-  toolId?: string;
-  toolSlug?: string;
-  toolCallId?: string;
-  args?: Record<string, unknown>;
+  action: 'tool_approval_required';
+  payload: {
+    approvalId: string;
+    conversationId: string;
+    starshipId: string;
+    agentId?: string;
+    agentName?: string;
+    toolId?: string;
+    toolSlug?: string;
+    toolCallId?: string;
+    args?: Record<string, unknown>;
+  };
 };
 
 export type ToolApprovalResolvedUIAction = {
-  __ui_action: 'tool_approval_resolved';
-  approvalId: string;
-  conversationId: string;
-  starshipId?: string;
+  action: 'tool_approval_resolved';
+  payload: {
+    approvalId: string;
+    conversationId: string;
+    starshipId?: string;
+    status?: 'approved' | 'denied';
+  };
 };
 
 export type ConversationTitleUpdatedUIAction = {
-  __ui_action: 'conversation_title_updated';
-  conversationId: string;
-  starshipId?: string;
-  title?: string;
+  action: 'conversation_title_updated';
+  payload: {
+    conversationId: string;
+    starshipId?: string;
+    title?: string;
+  };
 };
 
 export type ChildConversationCreatedUIAction = {
-  __ui_action: 'child_conversation_created';
-  parentConversationId: string;
-  childConversationId: string;
-  starshipId: string;
+  action: 'child_conversation_created';
+  payload: {
+    parentConversationId: string;
+    childConversationId: string;
+    starshipId: string;
+  };
 };
 
 export type OnboardingConnectorsUIAction = {
-  __ui_action: 'onboarding_connectors';
-  conversationId: string;
-  providers: string[];
+  action: 'onboarding_connectors';
+  payload: {
+    conversationId: string;
+    providers: string[];
+  };
 };
 
 /**
@@ -111,7 +122,7 @@ export type ConversationStreamUIAction =
   | ConversationTitleUpdatedUIAction
   | ChildConversationCreatedUIAction
   | OnboardingConnectorsUIAction
-  | ({ __ui_action: string } & Record<string, unknown>);
+  | { action: string; payload?: Record<string, unknown> };
 
 export type ConversationStreamEvent =
   | { type: 'snapshot'; data: ConversationStreamSnapshot }

@@ -94,13 +94,14 @@ function pickDefaultAgent(agents: any[]): any | null {
 }
 
 function isUIAction(v: unknown): v is ConversationStreamUIAction {
-  return !!v && typeof v === 'object' && typeof (v as any).__ui_action === 'string'
+  return !!v && typeof v === 'object' && typeof (v as any).action === 'string'
 }
 
 function isOnboardingConnectorsUIAction(v: unknown): v is OnboardingConnectorsUIAction {
   if (!isUIAction(v)) return false
-  if ((v as any).__ui_action !== 'onboarding_connectors') return false
-  const providers = (v as any).providers
+  if ((v as any).action !== 'onboarding_connectors') return false
+  const payload = (v as any).payload
+  const providers = payload?.providers
   return Array.isArray(providers) && providers.every(p => typeof p === 'string')
 }
 
@@ -647,19 +648,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         if (lastUIActionKeyRef.current === key) return
         lastUIActionKeyRef.current = key
 
-        const action = payload.__ui_action
+        const action = (payload as any).action
 
         // Builders are route-based now; no in-place form updates
 
         switch (action) {
           case 'onboarding_connectors': {
             if (!isOnboardingConnectorsUIAction(payload)) break
-            const normalized = payload.providers.map(p => p.trim()).filter(p => p.length > 0)
+            const normalized = payload.payload.providers.map(p => p.trim()).filter(p => p.length > 0)
             setOnboardingConnectorProviders(normalized)
             break
           }
           case 'tool_approval_required': {
-            const cid = (payload as any)?.conversationId
+            const cid = (payload as any)?.payload?.conversationId
             if (cid) {
               // Pull durable DB-backed pending approvals (covers refresh/deeplinks too)
               queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(String(cid)) })
@@ -667,14 +668,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             break
           }
           case 'tool_approval_resolved': {
-            const cid = (payload as any)?.conversationId
+            const cid = (payload as any)?.payload?.conversationId
             if (cid) {
               queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(String(cid)) })
             }
             break
           }
           case 'conversation_title_updated': {
-            const cid = (payload as any)?.conversationId
+            const cid = (payload as any)?.payload?.conversationId
             try {
               if (starshipId) {
                 queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
@@ -687,8 +688,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
           case 'child_conversation_created': {
             try {
-              const parentId = String((payload as any)?.parentConversationId || '')
-              const sid = (payload as any)?.starshipId || starshipId
+              const parentId = String((payload as any)?.payload?.parentConversationId || '')
+              const sid = (payload as any)?.payload?.starshipId || starshipId
               if (sid) {
                 queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
               }

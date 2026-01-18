@@ -21,6 +21,7 @@ export type NodeType =
   | 'output'
   | 'start'
   | 'end'
+  | 'ui_action'
   | 'http_request'
   | 'connector_action'
   | 'llm'

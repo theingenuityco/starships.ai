@@ -359,6 +359,18 @@ export interface CodeParams extends BaseParams {
 }
 
 /**
+ * UIAction node parameters for emitting UI actions (declarative UI hints).
+ *
+ * `action` and `payload` are template-resolved at runtime using Eval/Execution context.
+ *
+ * The node emits { action, payload } through the Autopilot event channel.
+ */
+export interface UIActionParams extends BaseParams {
+  action: string;
+  payload?: Record<string, unknown>;
+}
+
+/**
  * Union type for all workflow node parameters
  */
 export type NodeParameters =
@@ -371,6 +383,7 @@ export type NodeParameters =
   | ToolParams
   | StartParams
   | EndParams
+  | UIActionParams
   | ConditionalParams
   | TransformParams
   | MutateParams

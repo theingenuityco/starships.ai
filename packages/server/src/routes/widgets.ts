@@ -65,7 +65,21 @@ router.get('/starships/:starshipId/widgets', jwtAuthMiddleware, async (req: Requ
     if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
 
     const widgetRepo = new WidgetRepository();
-    const widgets = await widgetRepo.findByStarshipId(starshipId);
+    // Optional search filters via query params (backwards compatible: no params => list all)
+    const qName = typeof req.query?.name === 'string' ? req.query.name : undefined;
+    const qSlug = typeof req.query?.slug === 'string' ? req.query.slug : undefined;
+    const qWidgetType = typeof req.query?.widgetType === 'string' ? req.query.widgetType : undefined;
+    const qLimit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : undefined;
+    const qOffset = typeof req.query?.offset === 'string' ? Number(req.query.offset) : undefined;
+
+    const widgets = await widgetRepo.search({
+      starshipId,
+      ...(qName ? { name: qName } : null),
+      ...(qSlug ? { slug: qSlug } : null),
+      ...(qWidgetType ? { widgetType: qWidgetType } : null),
+      ...(Number.isFinite(qLimit) ? { limit: qLimit } : null),
+      ...(Number.isFinite(qOffset) ? { offset: qOffset } : null),
+    });
 
     return sendSuccess(res, widgets);
   } catch (error) {

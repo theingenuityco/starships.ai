@@ -290,6 +290,8 @@ interface MessageContentProps {
   agentName?: string
   toolCalls?: LlmToolCall[]
   toolResults?: ToolResultLike[]
+  // UI actions emitted over SSE (preferred, tool-name agnostic)
+  uiActions?: Array<{ action: string; payload?: Record<string, unknown> }>
   messageType?: MessageModel['messageType']
   // Attachments
   attachmentIds?: string[]
@@ -404,6 +406,7 @@ export function ConversationMessageContent({
   agentName,
   toolCalls,
   toolResults = [],
+  uiActions = [],
   messageType,
   attachmentIds,
   starshipId,
@@ -1027,37 +1030,39 @@ export function ConversationMessageContent({
       </div>
     ) : null
 
-  // Widget detection: Extract widgets from tool results
+  // Widget rendering: driven by ui_action payloads (tool-name agnostic)
   const widgetResults = useMemo(() => {
-    if (!Array.isArray(toolResults) || toolResults.length === 0) return []
+    const actions = Array.isArray(uiActions) ? uiActions : []
+    if (actions.length === 0) return []
 
-    return toolResults
-      .map((toolResult, index) => {
-        // Parse result (might be string or object)
-        const parsed = tryParseJSON(toolResult.content ?? toolResult.result)
-        const data = extractWidgetLike(parsed)
+    const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+    return actions
+      .map((ua, index) => {
+        if (!ua || ua.action !== 'render_widget') return null
+        const payload = ua.payload
+        if (!payload || !isRecord(payload)) return null
+        const widget = payload['widget']
+        if (!isRecord(widget)) return null
 
-        // Check if it's a widget result
-        if (!data) return null
-        const widgetType = typeof data['widgetType'] === 'string' ? data['widgetType'] : ''
-        const props = data['props']
+        const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
+        const props = widget['props']
         if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
         if (!props || typeof props !== 'object') return null
 
-        // Extract widget info
         return {
-          id: typeof data['id'] === 'string' && data['id'].trim().length > 0 ? data['id'] : `widget-${index}`,
+          id:
+            (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
+            (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
+            `ui-widget-${index}`,
           widgetType,
           props,
-          name: typeof data['name'] === 'string' && data['name'].trim().length > 0 ? data['name'] : 'Untitled Widget',
-          description: typeof data['description'] === 'string' ? data['description'] : undefined,
-          toolName: toolResult.toolName,
-          toolCallId: toolResult.toolCallId,
+          name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
+          description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
           index,
         }
       })
       .filter((w): w is NonNullable<typeof w> => w !== null)
-  }, [toolResults])
+  }, [uiActions])
 
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
@@ -1132,30 +1137,17 @@ export function ConversationMessageContent({
         </div>
       )}
 
-      {/* Widget rendering: Display widgets inline when created/updated */}
+      {/* Widget rendering: Display widgets inline when requested by ui_action */}
       {widgetResults.length > 0 && messageType !== 'tool_result' && (
         <div className="space-y-4 mt-3 w-full max-w-none">
           {widgetResults.map(widget => {
-            // Check if widget creation is pending (tool called but no result yet)
-            const matchingToolCall = normalizedToolCalls.find((tc: any) => {
-              const callId = tc?.id ?? tc?.call_id ?? tc?.toolCallId
-              return callId && String(callId) === widget.toolCallId
-            })
-            const isPending =
-              matchingToolCall &&
-              !toolResults?.some((r: any) => {
-                const rid = r?.toolCallId ?? r?.call_id ?? r?.id
-                return rid && String(rid) === widget.toolCallId
-              })
-
-            const isUpdate = widget.toolName?.toLowerCase().includes('update')
+            const isPending = false
 
             return (
               <div key={widget.id} className="w-full max-w-none mb-4">
                 {/* Conversational widget header - looks like text */}
                 <div className="text-sm w-full mb-4">
                   <div className="flex items-baseline gap-1">
-                    <span className="text-muted-foreground">{isUpdate ? 'Updated' : 'Created'}</span>
                     <span className="font-medium">{widget.name}</span>
                   </div>
                   {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
@@ -1167,7 +1159,7 @@ export function ConversationMessageContent({
                     <div className="h-[420px] flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2">
                         <LoadingSpinner className="w-5 h-5" />
-                        <span className="text-xs text-muted-foreground">{isUpdate ? 'Updating...' : 'Creating...'}</span>
+                        <span className="text-xs text-muted-foreground">Rendering...</span>
                       </div>
                     </div>
                   ) : (

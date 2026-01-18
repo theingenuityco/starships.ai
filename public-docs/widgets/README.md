@@ -5,11 +5,11 @@ Widgets are **structured UI components** that starships.ai can render inside the
 ## Where widgets show up
 
 - **API**: widgets are managed via `@starships/server` routes (for example `GET /api/v1/starships/:starshipId/widgets`, `POST /api/v1/widgets`).
-- **Client**: the chat UI detects widget-shaped tool results and renders them inline using a known widget type + props.
+- **Client**: the chat UI renders widgets from conversation stream `ui_action` events (specifically `action: "render_widget"`) using a known widget type + props.
 
 ## Widget payload shape (conceptual)
 
-When a tool wants the UI to render a widget, return an object with:
+When a tool wants the UI to render a widget, emit a `ui_action` with a payload containing:
 
 - `widgetType`: the widget component name (see supported types below)
 - `props`: the widget props object (must be JSON)

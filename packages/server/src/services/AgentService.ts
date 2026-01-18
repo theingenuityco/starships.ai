@@ -875,13 +875,25 @@ export class AgentService {
             requestedToolVersion = '1.0.0';
           }
 
-          await toolRepo.requestPublicationAtomic(tool.id, {
-            publicationStatus: 'pending_approval',
-            publicationRequestedBy: userId,
-            publicationVersionBump: override.versionBump,
-            publicationRequestedVersion: requestedToolVersion,
-            publicationChangelog: override.changelog,
-          });
+          // If the tool is already pending approval, update metadata directly rather than
+          // failing with "already pending" error. This handles re-publication requests
+          // and tools that got stuck in pending_approval from previous flows.
+          if (tool.publicationStatus === 'pending_approval') {
+            await toolRepo.update(tool.id, {
+              publicationRequestedBy: userId,
+              publicationVersionBump: override.versionBump,
+              publicationRequestedVersion: requestedToolVersion,
+              publicationChangelog: override.changelog,
+            });
+          } else {
+            await toolRepo.requestPublicationAtomic(tool.id, {
+              publicationStatus: 'pending_approval',
+              publicationRequestedBy: userId,
+              publicationVersionBump: override.versionBump,
+              publicationRequestedVersion: requestedToolVersion,
+              publicationChangelog: override.changelog,
+            });
+          }
         } catch (err) {
           // Tool override failures should not block agent publication request; just log.
           console.error('[AGENT-PUBLICATION] Failed to record tool override for publish request:', err);
@@ -1111,6 +1123,10 @@ export class AgentService {
           await toolRepo.update(tool.id, {
             version: nextToolVersion,
             publishedTemplateId: templateId,
+            // Clear publication workflow state so tool is no longer "pending"
+            publicationStatus: 'published',
+            publicationApprovedBy: adminUserId,
+            publicationApprovedAt: new Date().toISOString(),
           });
 
           if (templateSlug && !toolTemplateSlugs.includes(templateSlug)) {

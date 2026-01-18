@@ -46,13 +46,8 @@ export function useOnboardingStart() {
 
 export function useOnboardingRecommendations() {
   return useMutation({
-    mutationFn: async (
-      payload: OnboardingRecommendationsRequest
-    ): Promise<{ session: OnboardingSessionModel } & OnboardingRecommendationsResponse> => {
-      const res = await api.post<ApiResponse<{ session: OnboardingSessionModel } & OnboardingRecommendationsResponse>>(
-        '/api/v1/onboarding/recommendations',
-        payload
-      )
+    mutationFn: async (payload: OnboardingRecommendationsRequest): Promise<{ session: OnboardingSessionModel } & OnboardingRecommendationsResponse> => {
+      const res = await api.post<ApiResponse<{ session: OnboardingSessionModel } & OnboardingRecommendationsResponse>>('/api/v1/onboarding/recommendations', payload)
       return extractData(res)
     },
   })
@@ -84,4 +79,3 @@ export function useOnboardingFinish() {
     },
   })
 }
-

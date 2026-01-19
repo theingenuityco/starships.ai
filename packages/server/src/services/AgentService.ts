@@ -29,6 +29,7 @@ import type {
   AgentModel,
   CreateAgentRequest,
   UpdateAgentRequest,
+  ToolModel,
 } from '@starships/protocol';
 import { MessageService } from './MessageService';
 import { ConnectorSecretService } from './ConnectorSecretService';
@@ -1055,9 +1056,9 @@ export class AgentService {
         // Load all tools currently assigned to this agent for its starship
         const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
 
-        const toolTemplateSlugs: string[] = [];
+        const toolTemplateIds: string[] = [];
 
-        for (const tool of agentTools) {
+        for (const tool of agentTools as ToolModel[]) {
           // Only consider non-draft tools with a complete definition
           const hasParams =
             // Tools can be valid/publishable even with **no parameters**.
@@ -1071,8 +1072,7 @@ export class AgentService {
 
           if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
 
-          let templateId = (tool as unknown as { publishedTemplateId?: string }).publishedTemplateId;
-          let templateSlug: string | undefined;
+          let templateId = tool.publishedTemplateId;
 
           // Determine next tool version, honoring any publicationRequestedVersion from the request flow
           const nextToolVersion = tool.publicationRequestedVersion || tool.version || '1.0.0';
@@ -1082,6 +1082,7 @@ export class AgentService {
             if (existingTemplate) {
               // Update existing template from this tool
               await toolTemplateRepo.update(templateId, {
+                name: tool.name,
                 description: tool.description,
                 parameters: tool.parameters,
                 blueprint: tool.blueprint,
@@ -1090,7 +1091,6 @@ export class AgentService {
                 condition: tool.condition,
                 version: nextToolVersion,
               });
-              templateSlug = existingTemplate.slug;
             } else {
               // Stale reference – drop it and treat as new template
               templateId = undefined;
@@ -1116,7 +1116,6 @@ export class AgentService {
             });
 
             templateId = createdTemplate.id;
-            templateSlug = createdTemplate.slug;
           }
 
           // Link tool back to its template, bump version and clear publication metadata
@@ -1129,15 +1128,14 @@ export class AgentService {
             publicationApprovedAt: new Date().toISOString(),
           });
 
-          if (templateSlug && !toolTemplateSlugs.includes(templateSlug)) {
-            toolTemplateSlugs.push(templateSlug);
+          if (templateId && !toolTemplateIds.includes(templateId)) {
+            toolTemplateIds.push(templateId);
           }
         }
 
         // Always synchronize tool assignments onto the AgentTemplate, even when empty.
-        // Otherwise, removing all publishable tools can never "clear" the template baseline,
-        // which makes the builder perpetually think tools have changed after publishing.
-        await templateRepo.update(targetTemplateId, { assignedToolSlugs: toolTemplateSlugs });
+        // Canonical truth is the junction table; write relations by tool_template_id (slug-free).
+        await templateRepo.setToolTemplateRelationshipsByIds(targetTemplateId, toolTemplateIds);
       } catch (err) {
         // Tool synchronization should never block agent publication; log and continue.
         console.error('[AGENT-PUBLICATION] Failed to synchronize tools for agent template:', err);

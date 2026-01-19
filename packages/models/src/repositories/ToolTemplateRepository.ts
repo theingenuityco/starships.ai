@@ -225,13 +225,29 @@ export class ToolTemplateRepository extends BaseRepository {
 
         const cleanedUpdates: UpdateToolTemplateRequest = { ...updates };
 
+        // Defensive: callers should never be able to set template slugs directly.
+        // (Public UpdateToolTemplateRequest forbids `slug`, but runtime payloads may still include it.)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ('slug' in (cleanedUpdates as any)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (cleanedUpdates as any).slug;
+        }
+
         // Note: public UpdateToolTemplateRequest forbids `slug`, but the repository may set it internally.
         const internalUpdates: Partial<ToolTemplateModel> = { ...cleanedUpdates };
 
         // Auto-regenerate slug on name updates
         if (cleanedUpdates.name !== undefined && cleanedUpdates.name !== null) {
-          const baseSlug = generateSlug(String(cleanedUpdates.name)) || 'tool-template';
-          internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          // Only regenerate the slug when the name actually changes.
+          // This keeps marketplace slugs stable across re-approvals / re-publishes.
+          const existing = await this.findById(id);
+          const nextName = String(cleanedUpdates.name).trim();
+          const currentName = String(existing?.name ?? '').trim();
+
+          if (!existing || nextName.toLowerCase() !== currentName.toLowerCase()) {
+            const baseSlug = generateSlug(nextName) || 'tool-template';
+            internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          }
         }
 
         await ToolTemplateEntity.validate(internalUpdates, 'update');

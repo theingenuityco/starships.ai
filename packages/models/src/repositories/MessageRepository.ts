@@ -22,7 +22,10 @@ export class MessageRepository extends BaseRepository {
         const id = String(turnId || '').trim();
         if (!id) return -1;
         const connection = this.getConnection();
-        const row = await connection.queryOne<{ max_seq: number | null }>('SELECT MAX(turn_seq) as max_seq FROM messages WHERE turn_id = $1', [id]);
+        const row = await connection.queryOne<{ max_seq: number | null }>(
+          'SELECT MAX(turn_seq) as max_seq FROM messages WHERE turn_id = $1',
+          [id]
+        );
         const n = row?.max_seq;
         return typeof n === 'number' && Number.isFinite(n) ? n : -1;
       },

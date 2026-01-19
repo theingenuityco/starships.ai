@@ -1,14 +1,13 @@
 /**
  * Update Deployed Agent and Tool Instances
  *
- * This script updates deployed agents and tools in starships when their templates have newer versions.
- * It should be run after template seeding to ensure instances stay in sync with their templates.
+ * This script reconciles deployed agents and tools in starships against their templates.
+ * It is run on server startup after migrations/seeding to ensure instances stay in sync.
  *
  * Features:
- * - Only updates instances that have a sourceTemplateId (template-based instances)
- * - Compares current instance version with template version using semver
- * - Only updates when template has a newer version
- * - Update order: agents first, then tools attached to those agents (deduped per starship)
+ * - Only reconciles instances that have a sourceTemplateId (template-based instances)
+ * - Always runs agent reconciliation (cleanup → deploy/link) even when versions are equal
+ * - Updates attached tool instances from their templates after agent reconciliation (deduped per starship)
  * - Can target specific starships or all starships
  * - Safe to run multiple times (idempotent)
  */
@@ -18,7 +17,6 @@ import { StarshipRepository } from '@/repositories/StarshipRepository';
 import { AgentRepository } from '@/repositories/AgentRepository';
 import { ToolRepository } from '@/repositories/ToolRepository';
 import { AgentTemplateRepository } from '@/repositories/AgentTemplateRepository';
-import { ToolTemplateRepository } from '@/repositories/ToolTemplateRepository';
 import { compareVersions } from '@/utils/version';
 
 interface UpdateStats {
@@ -47,7 +45,6 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
   const agentRepo = new AgentRepository();
   const toolRepo = new ToolRepository();
   const agentTemplateRepo = new AgentTemplateRepository();
-  const toolTemplateRepo = new ToolTemplateRepository();
 
   // Process agents first, then update tools attached to those agents.
   // This ensures agent template sync (including tool relationship changes) happens before tool updates.
@@ -61,13 +58,15 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
     // Traverse all agents (template-based or not) so tool updates follow actual relationships.
     for (const agent of agents) {
       try {
-        // Only update agent when template version is newer (template.version > agent.version).
+        // Version gating is for agents (not tools):
+        // Only reconcile agent when template.version is newer than agent.version.
+        let didUpdateAgent = false;
         if (agent.sourceTemplateId) {
           const template = await agentTemplateRepo.findById(agent.sourceTemplateId);
           if (!template) {
             logger.warn(`Agent template not found for agent ${agent.id} (sourceTemplateId: ${agent.sourceTemplateId})`);
           } else {
-            let comparison: number;
+            let comparison = 0;
             try {
               comparison = compareVersions(String(agent.version ?? ''), String(template.version ?? ''));
             } catch (e) {
@@ -92,6 +91,7 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
               );
               await agentRepo.updateFromTemplate(agent.id);
               stats.agentsUpdated++;
+              didUpdateAgent = true;
               logger.info(`✅ Agent "${agent.name}" updated successfully to v${template.version}`);
             } else if (comparison === 0) {
               logger.debug(`Agent "${agent.name}" (${agent.slug}) is already up-to-date (v${agent.version})`);
@@ -103,7 +103,10 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
           }
         }
 
-        // After potential agent update, refresh tool relationships and update attached tools.
+        // Tool reconciliation is NOT version-gated:
+        // only run it for tools attached to agents that were actually updated in this startup pass.
+        if (didUpdateAgent) {
+        // After agent reconciliation, refresh tool relationships and update attached tools.
         // We only process tools currently attached to this agent (post-sync) and dedupe across agents.
         const attachedTools = await agentRepo.getAgentToolsByRelationships(agent.id);
         for (const tool of attachedTools) {
@@ -113,46 +116,9 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
             seenToolIds.add(tool.id);
 
             stats.toolsChecked++;
-
-            const toolTemplate = await toolTemplateRepo.findById(tool.sourceTemplateId);
-            if (!toolTemplate) {
-              logger.warn(`Tool template not found for tool ${tool.id} (sourceTemplateId: ${tool.sourceTemplateId})`);
-              continue;
-            }
-
-            let toolComparison: number;
-            try {
-              toolComparison = compareVersions(String(tool.version ?? ''), String(toolTemplate.version ?? ''));
-            } catch (e) {
-              stats.toolErrors++;
-              logger.warn(
-                `Skipping tool "${tool.name}" (${tool.slug}) due to invalid version(s): tool=${String(tool.version)} template=${String(
-                  toolTemplate.version
-                )}`,
-                {
-                  component: 'seed-update-deployed-instances',
-                  operation: 'compareToolVersion',
-                  metadata: { toolId: tool.id, templateId: tool.sourceTemplateId, starshipId, starshipSlug },
-                },
-                e as Error
-              );
-              continue;
-            }
-
-            if (toolComparison < 0) {
-              logger.info(
-                `Updating tool "${tool.name}" (${tool.slug}) from v${tool.version} to v${toolTemplate.version} in starship ${starshipSlug}`
-              );
+              // Mirror manual update behavior: always update tool instances from their templates.
               await toolRepo.updateFromTemplate(tool.id);
-              stats.toolsUpdated++;
-              logger.info(`✅ Tool "${tool.name}" updated successfully to v${toolTemplate.version}`);
-            } else if (toolComparison === 0) {
-              logger.debug(`Tool "${tool.name}" (${tool.slug}) is already up-to-date (v${tool.version})`);
-            } else {
-              logger.warn(
-                `Tool "${tool.name}" (${tool.slug}) version (v${tool.version}) is newer than template (v${toolTemplate.version})`
-              );
-            }
+            stats.toolsUpdated++;
           } catch (error) {
             stats.toolErrors++;
             logger.warn(
@@ -166,6 +132,7 @@ async function updateStarshipInstances(starshipId: string, starshipSlug: string)
             );
           }
         }
+      }
       } catch (error) {
         stats.agentErrors++;
         logger.warn(

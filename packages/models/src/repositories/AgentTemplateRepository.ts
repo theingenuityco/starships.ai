@@ -595,12 +595,28 @@ export class AgentTemplateRepository extends BaseRepository {
       async () => {
         const cleanedUpdates: UpdateAgentTemplateRequest = { ...updates };
 
+        // Defensive: callers should never be able to set template slugs directly.
+        // (Public UpdateAgentTemplateRequest forbids `slug`, but runtime payloads may still include it.)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ('slug' in (cleanedUpdates as any)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (cleanedUpdates as any).slug;
+        }
+
         // Auto-regenerate slug on name updates
         // Note: public UpdateAgentTemplateRequest forbids `slug`, but the repository may set it internally.
         const internalUpdates: Partial<AgentTemplateModel> = { ...cleanedUpdates };
         if (cleanedUpdates.name !== undefined && cleanedUpdates.name !== null) {
-          const baseSlug = generateSlug(String(cleanedUpdates.name)) || 'agent-template';
-          internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          // Only regenerate the slug when the name actually changes.
+          // This keeps marketplace slugs stable across re-approvals / re-publishes.
+          const existing = await this.findById(id);
+          const nextName = String(cleanedUpdates.name).trim();
+          const currentName = String(existing?.name ?? '').trim();
+
+          if (!existing || nextName.toLowerCase() !== currentName.toLowerCase()) {
+            const baseSlug = generateSlug(nextName) || 'agent-template';
+            internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          }
         }
 
         await AgentTemplateEntity.validate(internalUpdates, 'update');
@@ -853,6 +869,42 @@ export class AgentTemplateRepository extends BaseRepository {
         );
       },
       'addToolTemplateRelationship',
+      'AgentTemplate',
+      agentTemplateId
+    );
+  }
+
+  /**
+   * Replace the full set of ToolTemplate relationships for an AgentTemplate using tool_template ids.
+   *
+   * This is the canonical, slug-free way to manage the relationship.
+   * `assignedToolSlugs` should be treated as a derived/convenience field populated by joins.
+   */
+  async setToolTemplateRelationshipsByIds(agentTemplateId: string, toolTemplateIds: string[]): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const id = String(agentTemplateId || '').trim();
+        if (!id) throw new Error('agentTemplateId is required');
+
+        const uniqueToolTemplateIds = Array.from(new Set((toolTemplateIds || []).map((t) => String(t).trim()).filter(Boolean)));
+        const connection = this.getConnection();
+
+        // Replace the set atomically-ish (within the connection's transaction behavior, if any).
+        await connection.query('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1', [id]);
+
+        if (uniqueToolTemplateIds.length === 0) return;
+
+        for (const toolTemplateId of uniqueToolTemplateIds) {
+          await this.addToolTemplateRelationship(id, toolTemplateId);
+        }
+
+        // IMPORTANT:
+        // Relationship changes live in the junction table, but we still need a cheap "has this template changed?"
+        // signal for startup/manual reconciliation logic. Bump the parent template `updated_at` so agents can
+        // compare `template.updatedAt` vs `agent.templateSnapshotAt` to decide if reconciliation is needed.
+        await connection.query('UPDATE agent_templates SET updated_at = $2 WHERE id = $1', [id, new Date().toISOString()]);
+      },
+      'setToolTemplateRelationshipsByIds',
       'AgentTemplate',
       agentTemplateId
     );

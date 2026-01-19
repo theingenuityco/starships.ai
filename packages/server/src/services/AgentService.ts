@@ -774,7 +774,22 @@ export class AgentService {
       throw new ForbiddenError('You do not have permission to update this agent');
     }
 
-    return await this.agentRepository.updateFromTemplate(agentId);
+    // 1) Sync the agent itself (including tool relationships + tool instance create/delete)
+    const updatedAgent = await this.agentRepository.updateFromTemplate(agentId);
+
+    // 2) Mirror startup behavior: update attached tool *instances* from their templates.
+    // This is NOT best-effort for manual updates: if tool updates fail, surface the error
+    // so the caller knows the agent is not fully reconciled.
+    const toolRepo = new ToolRepository();
+    const attachedTools = await this.agentRepository.getAgentToolsByRelationships(agentId);
+
+    for (const tool of attachedTools) {
+      if (!tool?.sourceTemplateId) continue;
+      // Idempotent: ToolRepository.updateFromTemplate only syncs template-owned fields.
+      await toolRepo.updateFromTemplate(tool.id);
+    }
+
+    return updatedAgent;
   }
 
   // ============================================================================

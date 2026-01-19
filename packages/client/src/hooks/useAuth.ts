@@ -29,6 +29,11 @@ export interface AuthUser {
 interface AuthLoginResponse {
   user?: AuthUser
   token?: string
+  starship?: {
+    slug: string
+    id?: string
+    name?: string
+  }
   onboardingRequired: boolean
   message?: string
   // Email verification fields

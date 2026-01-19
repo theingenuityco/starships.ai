@@ -6,21 +6,8 @@ jest.mock('@/services/UserService', () => ({
   },
 }));
 
-jest.mock('@/utils/responseHelpers', () => ({
-  sendError: jest.fn(),
-}));
-
-jest.mock('jose', () => ({
-  jwtVerify: jest.fn(),
-}));
-
-import { jwtVerify } from 'jose';
 import { optionalJwtAuth } from '@/middleware/jwt-auth';
 import { UserService } from '@/services/UserService';
-import { sendError } from '@/utils/responseHelpers';
-
-const mockSendError = jest.mocked(sendError);
-const mockJwtVerify = jest.mocked(jwtVerify);
 
 const createMockReq = (authorization?: string): Request => {
   const headers: Request['headers'] = authorization ? { authorization } : {};
@@ -56,22 +43,21 @@ describe('optionalJwtAuth', () => {
 
     expect(next).toHaveBeenCalledTimes(1);
     expect(req.user).toBeUndefined();
-    expect(mockSendError).not.toHaveBeenCalled();
   });
 
   it('attaches user when token is valid', async () => {
-    const token = 'valid-test-token';
+    const { SignJWT } = await (new Function('m', 'return import(m)') as (m: string) => Promise<typeof import('jose')>)('jose');
+    const secret = new TextEncoder().encode(process.env.JWT_SECRET || '');
+    const token = await new SignJWT({ agentId: 'agent-1', starshipId: 'ship-1' })
+      .setProtectedHeader({ alg: 'HS256' })
+      .setIssuedAt()
+      .setIssuer('starships.ai')
+      .setAudience('starships-users')
+      .setSubject('user123')
+      .setExpirationTime('2h')
+      .sign(secret);
 
-    mockJwtVerify.mockResolvedValue({
-      payload: {
-        sub: 'user123',
-        agentId: 'agent-1',
-        starshipId: 'ship-1',
-      },
-    } as unknown as Awaited<ReturnType<typeof jwtVerify>>);
-
-    const mockedGetUserById = jest.mocked(UserService.getUserById);
-    mockedGetUserById.mockResolvedValue({
+    jest.mocked(UserService.getUserById).mockResolvedValue({
       id: 'user123',
       createdAt: new Date().toISOString(),
       onboardingCompleted: false,
@@ -87,10 +73,8 @@ describe('optionalJwtAuth', () => {
     await optionalJwtAuth(req, res as unknown as Response, next);
 
     expect(next).toHaveBeenCalledTimes(1);
-    expect(jwtVerify).toHaveBeenCalledTimes(1);
     expect(UserService.getUserById).toHaveBeenCalledWith('user123');
     expect(req.user?.id).toBe('user123');
     expect(req.authContext).toEqual({ userId: 'user123', agentId: 'agent-1', starshipId: 'ship-1' });
-    expect(mockSendError).not.toHaveBeenCalled();
   });
 });

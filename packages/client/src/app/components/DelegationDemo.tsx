@@ -64,7 +64,7 @@ function chunkTextForStreaming(text: string) {
   return parts.length > 0 ? parts : [text]
 }
 
-type DemoConvoId = 'main' | 'gaia' | 'daedalus'
+type DemoConvoId = 'main' | 'dean' | 'clara'
 
 const DEMO_CONVERSATIONS: Record<
   DemoConvoId,
@@ -80,12 +80,20 @@ const DEMO_CONVERSATIONS: Record<
   }
 > = {
   main: { id: 'main', label: 'You ↔ Aria', leftAgentName: 'Aria', leftAgentSeed: 'Aria', rightUserLabel: 'You', rightUserSeed: 'You', userIsAgent: false },
-  gaia: { id: 'gaia', label: 'Aria ↔ Gaia', leftAgentName: 'Gaia', leftAgentSeed: 'Gaia', rightUserLabel: 'Aria', rightUserSeed: 'Aria', userIsAgent: true },
-  daedalus: {
-    id: 'daedalus',
-    label: 'Aria ↔ Daedalus',
-    leftAgentName: 'Daedalus',
-    leftAgentSeed: 'Daedalus',
+  dean: {
+    id: 'dean',
+    label: 'Aria ↔ Dean',
+    leftAgentName: 'Dean',
+    leftAgentSeed: 'Dean',
+    rightUserLabel: 'Aria',
+    rightUserSeed: 'Aria',
+    userIsAgent: true,
+  },
+  clara: {
+    id: 'clara',
+    label: 'Aria ↔ Clara',
+    leftAgentName: 'Clara',
+    leftAgentSeed: 'Clara',
     rightUserLabel: 'Aria',
     rightUserSeed: 'Aria',
     userIsAgent: true,
@@ -106,13 +114,14 @@ type DemoStep = {
   noStream?: boolean
 }
 
-// Orchestrated multi-chat demo: Aria delegates to Gaia (agent creation) and Daedalus (tool creation),
+// Orchestrated multi-chat demo: Aria delegates to Dean (Google Drive) and Clara (Gmail),
 // switching the visible conversation as work happens.
 const DEMO_TIMELINE: DemoStep[] = [
   {
     convoId: 'main',
     role: 'user',
-    content: 'Aria, can you set up a Weekly Ship Update that posts our GitHub changelog to Discord every Friday?',
+    content:
+      "Aria, can you set up a Monday Digest that pulls last week's project briefs from our Google Drive folder, summarizes them, and emails the summary to the team via Gmail?",
   },
   {
     convoId: 'main',
@@ -121,242 +130,197 @@ const DEMO_TIMELINE: DemoStep[] = [
     // Delegation is also a tool call in Starships: show the handoff explicitly.
     toolCalls: [
       {
-        id: 'tc_demo_delegate_gaia',
+        id: 'tc_demo_delegate_dean',
         type: 'function',
         function: {
           name: 'call-agent',
-          arguments: '{ "agent": "Gaia", "task": "Create the Weekly Ship Update agent (voice + rules)", "conversationTitle": "Weekly Ship Update - Agent" }',
+          arguments:
+            '{ "agent": "Dean", "task": "Pull last week\'s project briefs from our Google Drive folder and summarize them into a one-pager", "conversationTitle": "Monday Digest - Drive" }',
         },
       },
     ],
     noStream: false,
-    content: "Absolutely. First I’ll call **Gaia** to define the agent (voice + rules).\n\nCreating the child chat now…",
+    content: "Sure. I'll call **Dean** to get the briefs from Drive and summarize them.\n\nCreating the child chat now…",
   },
   {
     convoId: 'main',
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_demo_delegate_gaia',
+    toolCallId: 'tc_demo_delegate_dean',
     noStream: true,
     content: JSON.stringify(
       {
         status: 'ok',
-        delegatedTo: 'Gaia',
-        conversation: { id: 'c_demo_gaia', route: '/ship/uuu/conversations/c_demo_gaia' },
+        delegatedTo: 'Dean',
+        conversation: { id: 'c_demo_dean', route: '/ship/uuu/conversations/c_demo_dean' },
       },
       null,
       2
     ),
   },
-  { convoId: 'main', role: 'assistant', agentName: 'Aria', noStream: true, content: 'Switching to Gaia…' },
-  { convoId: 'gaia', role: 'user', content: 'Create the “Weekly Ship Update” agent. Tone: clear, customer-friendly. Keep it to 5 bullets.' },
+  { convoId: 'main', role: 'assistant', agentName: 'Aria', noStream: true, content: 'Switching to Dean…' },
   {
-    convoId: 'gaia',
-    role: 'assistant',
-    agentName: 'Gaia',
-    content:
-      "Agent spec:\n\n- **Goal**: turn weekly GitHub activity into a reader-friendly update\n- **Voice**: upbeat, concise, non-technical when possible\n- **Rules**:\n  - prefer outcomes over implementation details\n  - include at most 5 bullets\n  - never leak secrets/stack traces\n  - ask for approval before posting",
-  },
-  {
-    convoId: 'gaia',
-    role: 'assistant',
-    agentName: 'Gaia',
-    toolCalls: [
-      {
-        id: 'tc_demo_open_agent',
-        type: 'function',
-        function: {
-          name: 'open-agent',
-          // Intentionally omit slug to represent "create new agent" in the builder.
-          arguments: '{ "slug": null }',
-        },
-      },
-    ],
-    noStream: true,
-    content: 'Opening the agent builder…',
-  },
-  {
-    convoId: 'gaia',
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_demo_open_agent',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        action: 'open-agent',
-        route: '/ship/uuu/agent/new?conversationId=c_demo_gaia',
-      },
-      null,
-      2
-    ),
-  },
-  {
-    convoId: 'gaia',
-    role: 'assistant',
-    agentName: 'Gaia',
-    content:
-      "✅ Created agent: **Weekly Ship Update**\n\n- Default voice: customer-friendly\n- Output format: 5 bullets\n- Guardrails: approval required before posting\n\nReturning to Aria.",
-  },
-  {
-    convoId: 'main',
-    role: 'assistant',
-    agentName: 'Aria',
-    toolCalls: [
-      {
-        id: 'tc_demo_delegate_daedalus',
-        type: 'function',
-        function: {
-          name: 'call-agent',
-          arguments: '{ "agent": "Daedalus", "task": "Create the Weekly Ship Update tool (GitHub → summarize → Discord + schedule)", "conversationTitle": "Weekly Ship Update - Tool" }',
-        },
-      },
-    ],
-    noStream: false,
-    content: "Great, the agent is ready. Now I’m calling **Daedalus** to build the tool and wiring.",
-  },
-  {
-    convoId: 'main',
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_demo_delegate_daedalus',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        delegatedTo: 'Daedalus',
-        conversation: { id: 'c_demo_daedalus', route: '/ship/uuu/conversations/c_demo_daedalus' },
-      },
-      null,
-      2
-    ),
-  },
-  { convoId: 'main', role: 'assistant', agentName: 'Aria', noStream: true, content: 'Switching to Daedalus…' },
-  {
-    convoId: 'daedalus',
+    convoId: 'dean',
     role: 'user',
-    content: 'Build the tool flow: fetch GitHub PRs/issues since last Friday → summarize → post to Discord #announcements.',
-  },
-  {
-    convoId: 'daedalus',
-    role: 'assistant',
-    agentName: 'Daedalus',
     content:
-      "Specs (so we build the right tool):\n\n- **Name**: Weekly Ship Update\n- **Inputs**: `repo`, `discordChannel`, `since` (default: last Friday)\n- **Output**: a 5‑bullet changelog draft (customer‑friendly)\n- **Rules**: dedupe PRs/issues, highlight **features + fixes**, keep links minimal, require approval before posting\n\nI’ll open the tool builder and wire the flow now.",
+      "Pull last week's project briefs from our Google Drive folder and summarize them into a one-pager.",
   },
   {
-    convoId: 'daedalus',
+    convoId: 'dean',
     role: 'assistant',
-    agentName: 'Daedalus',
-    // Show tool calls panel (mocked) like the real app
+    agentName: 'Dean',
+    content:
+      "I'll list files in the Project Briefs folder, filter by last week, and summarize the key points into one page.",
+  },
+  {
+    convoId: 'dean',
+    role: 'assistant',
+    agentName: 'Dean',
     toolCalls: [
-      { id: 'tc_demo_list_connectors', type: 'function', function: { name: 'list-connectors', arguments: '{}' } },
-      { id: 'tc_demo_open_tool', type: 'function', function: { name: 'open-tool', arguments: '{ "slug": null }' } },
-      { id: 'tc_demo_github_changes', type: 'function', function: { name: 'github.fetch_weekly_changes', arguments: '{ "repo": "theingenuityco/starships.ai", "since": "last_friday" }' } },
-      { id: 'tc_demo_summarize_changelog', type: 'function', function: { name: 'summarize.weekly_changelog', arguments: '{ "maxBullets": 5, "tone": "customer_friendly" }' } },
-      { id: 'tc_demo_discord_draft', type: 'function', function: { name: 'discord.post_draft', arguments: '{ "channel": "#announcements" }' } },
+      { id: 'tc_demo_list_drive', type: 'function', function: { name: 'list-google-drive-files', arguments: '{ "folderName": "Project Briefs", "modifiedAfter": "last_week" }' } },
+      { id: 'tc_demo_get_drive_info', type: 'function', function: { name: 'get-google-drive-file-info', arguments: '{}' } },
     ],
-    content: 'Running tool steps…',
+    content: 'Fetching files from Drive…',
   },
   {
-    convoId: 'daedalus',
+    convoId: 'dean',
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_demo_list_connectors',
-    noStream: true,
-    content: JSON.stringify({ connector: 'list-connectors', status: 'ok', connected: ['github', 'discord'] }, null, 2),
-  },
-  {
-    convoId: 'daedalus',
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_demo_open_tool',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', action: 'open-tool', route: '/ship/uuu/tool/new?conversationId=c_demo_daedalus' }, null, 2),
-  },
-  {
-    convoId: 'daedalus',
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_demo_github_changes',
-    noStream: true,
-    content: JSON.stringify({ repo: 'theingenuityco/starships.ai', mergedPRs: 14, closedIssues: 7, highlights: ['Faster streaming UI', 'Improved connector runtime', 'Landing refresh'] }, null, 2),
-  },
-  {
-    convoId: 'daedalus',
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_demo_summarize_changelog',
+    toolCallId: 'tc_demo_list_drive',
     noStream: true,
     content: JSON.stringify(
-      { bullets: ['Faster streaming + cleaner response states', 'Improved connector runtime + auth handling', 'Landing refresh + updated demo experience', 'Stability fixes and performance improvements', 'More shipping next week - stay tuned'] },
+      { files: ['Q1 Brief.pdf', 'Product Roadmap.docx', 'Sprint Summary.docx'], count: 3 },
       null,
       2
     ),
   },
   {
-    convoId: 'daedalus',
+    convoId: 'dean',
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_demo_discord_draft',
+    toolCallId: 'tc_demo_get_drive_info',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', summaries: ['Q1 goals and milestones', 'Roadmap through Q3', 'Last sprint deliverables'] }, null, 2),
+  },
+  {
+    convoId: 'dean',
+    role: 'assistant',
+    agentName: 'Dean',
+    content:
+      "✅ Summarized **3 briefs** from Drive into a one-pager.\n\n- Q1 goals and key milestones\n- Roadmap through Q3\n- Sprint deliverables and next steps\n\nReturning to Aria.",
+  },
+  {
+    convoId: 'main',
+    role: 'assistant',
+    agentName: 'Aria',
+    toolCalls: [
+      {
+        id: 'tc_demo_delegate_clara',
+        type: 'function',
+        function: {
+          name: 'call-agent',
+          arguments:
+            '{ "agent": "Clara", "task": "Email the Monday Digest summary to the team distribution list in Gmail", "conversationTitle": "Monday Digest - Gmail" }',
+        },
+      },
+    ],
+    noStream: false,
+    content: "Good, the summary is ready. Now I'm calling **Clara** to send it via Gmail.",
+  },
+  {
+    convoId: 'main',
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_demo_delegate_clara',
     noStream: true,
     content: JSON.stringify(
       {
-        channel: '#announcements',
-        status: 'draft_ready',
-        preview: [
-          'Shipped faster streaming + cleaner loaders',
-          'Improved connector runtime + auth handling',
-          'Landing refresh + updated demo',
-          'Bug fixes and stability improvements',
-          'More coming next week - stay tuned',
-        ],
+        status: 'ok',
+        delegatedTo: 'Clara',
+        conversation: { id: 'c_demo_clara', route: '/ship/uuu/conversations/c_demo_clara' },
       },
       null,
       2
     ),
   },
+  { convoId: 'main', role: 'assistant', agentName: 'Aria', noStream: true, content: 'Switching to Clara…' },
   {
-    convoId: 'daedalus',
+    convoId: 'clara',
+    role: 'user',
+    content: 'Email the Monday Digest summary to the team distribution list in Gmail.',
+  },
+  {
+    convoId: 'clara',
     role: 'assistant',
-    agentName: 'Daedalus',
+    agentName: 'Clara',
+    content: "I'll compose a draft with the summary and send it to the team list.",
+  },
+  {
+    convoId: 'clara',
+    role: 'assistant',
+    agentName: 'Clara',
+    toolCalls: [
+      { id: 'tc_demo_compose_draft', type: 'function', function: { name: 'compose-gmail-draft', arguments: '{ "to": "team@company.com", "subject": "Monday Digest – Project Briefs Summary" }' } },
+      { id: 'tc_demo_send_gmail', type: 'function', function: { name: 'send-gmail-message', arguments: '{}' } },
+    ],
+    content: 'Composing and sending…',
+  },
+  {
+    convoId: 'clara',
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_demo_compose_draft',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', draftId: 'draft_abc', subject: 'Monday Digest – Project Briefs Summary' }, null, 2),
+  },
+  {
+    convoId: 'clara',
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_demo_send_gmail',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', messageId: 'msg_xyz', to: ['team@company.com'] }, null, 2),
+  },
+  {
+    convoId: 'clara',
+    role: 'assistant',
+    agentName: 'Clara',
     content:
-      "✅ Created tool: **Weekly Ship Update**\n\nInputs:\n- repo: `theingenuityco/starships.ai`\n- discordChannel: `#announcements`\n- since: last Friday\n\nReady to deploy + schedule.",
+      "✅ Draft created and sent to the team list.\n\n- **To**: team@company.com\n- **Subject**: Monday Digest – Project Briefs Summary\n\nReturning to Aria.",
   },
   {
     convoId: 'main',
     role: 'assistant',
     agentName: 'Aria',
     content:
-      "Completed.\n\n- **Agent**: Weekly Ship Update (Gaia)\n- **Tool**: GitHub → summarize → Discord (Daedalus)\n- **Connectors**: GitHub + Discord\n\nTwo quick choices before I deploy:\n1) Highlight **features**, **fixes**, or **both**?\n2) Keep **approve-before-posting** on?",
+      "Completed.\n\n- **Drive**: Dean pulled and summarized 3 briefs from the project folder\n- **Gmail**: Clara sent the Monday Digest to the team\n\nWant this to run every Monday automatically?",
   },
-  { convoId: 'main', role: 'user', content: 'Both. And yes, keep approval on.' },
+  { convoId: 'main', role: 'user', content: 'Yes, every Monday at 9am.' },
   {
     convoId: 'main',
     role: 'assistant',
     agentName: 'Aria',
     toolCalls: [
       {
-        id: 'tc_demo_schedule_agent',
+        id: 'tc_demo_schedule_digest',
         type: 'function',
         function: {
           name: 'schedule-agent',
-          arguments:
-            '{ "agent": "Weekly Ship Update", "schedule": { "cron": "0 9 * * FRI", "timezone": "UTC" }, "approvalRequired": true, "highlights": ["features","fixes"], "destination": { "connector": "discord", "channel": "#announcements" } }',
+          arguments: '{ "agent": "Monday Digest", "schedule": { "cron": "0 9 * * MON", "timezone": "UTC" } }',
         },
       },
     ],
     noStream: false,
-    content: 'Perfect, scheduling it now…',
+    content: 'Scheduling it now…',
   },
   {
     convoId: 'main',
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_demo_schedule_agent',
+    toolCallId: 'tc_demo_schedule_digest',
     noStream: true,
     content: JSON.stringify(
-      { status: 'ok', action: 'schedule-agent', schedule: { cron: '0 9 * * FRI', timezone: 'UTC' }, approvalRequired: true, destination: { connector: 'discord', channel: '#announcements' } },
+      { status: 'ok', action: 'schedule-agent', schedule: { cron: '0 9 * * MON', timezone: 'UTC' } },
       null,
       2
     ),
@@ -367,7 +331,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     agentName: 'Aria',
     noStream: true,
     content:
-      "- ✅ Scheduled **every Friday**\n- ✅ Posts **features + fixes** to **#announcements**\n- ✅ **Approval required** before publishing\n\nNext step: connect GitHub + Discord, then click **Deploy**.",
+      "- ✅ Scheduled **every Monday at 9am**\n- ✅ **Drive** (Dean) + **Gmail** (Clara)\n\nNext: connect Google Drive and Gmail in Connectors, then you're set.",
   },
 ]
 
@@ -378,30 +342,30 @@ export default function DelegationDemo() {
     return aria?.avatarUrl
   }, [ariaTemplates])
 
-  const { data: gaiaTemplates = [] } = useAgentTemplates({ search: 'gaia' })
-  const gaiaAvatarUrl = useMemo(() => {
-    const gaia = gaiaTemplates.find(
-      t => t.slug === 'gaia' || t.name === 'Gaia' || String(t.slug ?? '').toLowerCase().startsWith('gaia') || String(t.name ?? '').toLowerCase() === 'gaia'
+  const { data: deanTemplates = [] } = useAgentTemplates({ search: 'dean' })
+  const deanAvatarUrl = useMemo(() => {
+    const dean = deanTemplates.find(
+      t => t.slug === 'dean' || t.name === 'Dean' || String(t.slug ?? '').toLowerCase().startsWith('dean') || String(t.name ?? '').toLowerCase() === 'dean'
     )
-    return gaia?.avatarUrl
-  }, [gaiaTemplates])
+    return dean?.avatarUrl
+  }, [deanTemplates])
 
-  const { data: daedalusTemplates = [] } = useAgentTemplates({ search: 'daedalus' })
-  const daedalusAvatarUrl = useMemo(() => {
-    const daedalus = daedalusTemplates.find(
+  const { data: claraTemplates = [] } = useAgentTemplates({ search: 'clara' })
+  const claraAvatarUrl = useMemo(() => {
+    const clara = claraTemplates.find(
       t =>
-        t.slug === 'daedalus' ||
-        t.name === 'Daedalus' ||
-        String(t.slug ?? '').toLowerCase().startsWith('daedalus') ||
-        String(t.name ?? '').toLowerCase() === 'daedalus'
+        t.slug === 'clara' ||
+        t.name === 'Clara' ||
+        String(t.slug ?? '').toLowerCase().startsWith('clara') ||
+        String(t.name ?? '').toLowerCase() === 'clara'
     )
-    return daedalus?.avatarUrl
-  }, [daedalusTemplates])
+    return clara?.avatarUrl
+  }, [claraTemplates])
 
   const [activeDemoConvoId, setActiveDemoConvoId] = useState<DemoConvoId>('main')
-  const [demoByConvo, setDemoByConvo] = useState<Record<DemoConvoId, DemoMessage[]>>({ main: [], gaia: [], daedalus: [] })
-  const [respondingByConvo, setRespondingByConvo] = useState<Record<DemoConvoId, boolean>>({ main: false, gaia: false, daedalus: false })
-  const [awaitingToolsByConvo, setAwaitingToolsByConvo] = useState<Record<DemoConvoId, boolean>>({ main: false, gaia: false, daedalus: false })
+  const [demoByConvo, setDemoByConvo] = useState<Record<DemoConvoId, DemoMessage[]>>({ main: [], dean: [], clara: [] })
+  const [respondingByConvo, setRespondingByConvo] = useState<Record<DemoConvoId, boolean>>({ main: false, dean: false, clara: false })
+  const [awaitingToolsByConvo, setAwaitingToolsByConvo] = useState<Record<DemoConvoId, boolean>>({ main: false, dean: false, clara: false })
 
   const containerRef = useRef<HTMLDivElement>(null)
   const leftRef = useRef<HTMLDivElement>(null)
@@ -409,7 +373,7 @@ export default function DelegationDemo() {
   const rightBottomRef = useRef<HTMLDivElement>(null)
 
   const [svgSize, setSvgSize] = useState<{ w: number; h: number }>({ w: 0, h: 0 })
-  const [paths, setPaths] = useState<{ toGaia: string; toDaedalus: string }>({ toGaia: '', toDaedalus: '' })
+  const [paths, setPaths] = useState<{ toDean: string; toClara: string }>({ toDean: '', toClara: '' })
 
   // Mock streaming effect for the landing conversation demo (multi-chat with switching).
   useEffect(() => {
@@ -432,9 +396,9 @@ export default function DelegationDemo() {
     const run = async () => {
       // Loop forever (until unmount) so the demo stays "alive".
       while (!cancelled && !abortController.signal.aborted) {
-        setRespondingByConvo({ main: false, gaia: false, daedalus: false })
-        setAwaitingToolsByConvo({ main: false, gaia: false, daedalus: false })
-        setDemoByConvo({ main: [], gaia: [], daedalus: [] })
+        setRespondingByConvo({ main: false, dean: false, clara: false })
+        setAwaitingToolsByConvo({ main: false, dean: false, clara: false })
+        setDemoByConvo({ main: [], dean: [], clara: [] })
         setActiveDemoConvoId('main')
         // IMPORTANT: Do not rely on React state for switching decisions inside this async loop
         // (it will be stale inside the closure). Track the active convo locally.
@@ -442,9 +406,9 @@ export default function DelegationDemo() {
         await sleep(350)
 
         let now = Date.now()
-        const seqByConvo: Record<DemoConvoId, number> = { main: 0, gaia: 0, daedalus: 0 }
-        const lastToolRunnerId: Record<DemoConvoId, string | null> = { main: null, gaia: null, daedalus: null }
-        const pendingToolIds: Record<DemoConvoId, Set<string>> = { main: new Set(), gaia: new Set(), daedalus: new Set() }
+        const seqByConvo: Record<DemoConvoId, number> = { main: 0, dean: 0, clara: 0 }
+        const lastToolRunnerId: Record<DemoConvoId, string | null> = { main: null, dean: null, clara: null }
+        const pendingToolIds: Record<DemoConvoId, Set<string>> = { main: new Set(), dean: new Set(), clara: new Set() }
 
         for (const step of DEMO_TIMELINE) {
           if (cancelled || abortController.signal.aborted) return
@@ -599,19 +563,19 @@ export default function DelegationDemo() {
         x: l.right - c.left,
         y: l.top - c.top + l.height * 0.5,
       }
-      const toGaia = {
+      const toDean = {
         x: t.left - c.left,
         y: t.top - c.top + t.height * 0.5,
       }
-      const toDaedalus = {
+      const toClara = {
         x: b.left - c.left,
         y: b.top - c.top + b.height * 0.5,
       }
 
       setSvgSize(prev => (prev.w === w && prev.h === h ? prev : { w, h }))
       setPaths(prev => {
-        const next = { toGaia: makePath(from, toGaia), toDaedalus: makePath(from, toDaedalus) }
-        return prev.toGaia === next.toGaia && prev.toDaedalus === next.toDaedalus ? prev : next
+        const next = { toDean: makePath(from, toDean), toClara: makePath(from, toClara) }
+        return prev.toDean === next.toDean && prev.toClara === next.toClara ? prev : next
       })
     }
 
@@ -640,8 +604,8 @@ export default function DelegationDemo() {
     }
   }, [demoByConvo, respondingByConvo, awaitingToolsByConvo])
 
-  const isGaiaActive = activeDemoConvoId === 'gaia'
-  const isDaedalusActive = activeDemoConvoId === 'daedalus'
+  const isDeanActive = activeDemoConvoId === 'dean'
+  const isClaraActive = activeDemoConvoId === 'clara'
 
   return (
     <div ref={containerRef} className="relative isolate w-full overflow-visible text-left">
@@ -654,8 +618,8 @@ export default function DelegationDemo() {
         preserveAspectRatio="none"
         aria-hidden
       >
-        {paths.toGaia ? <path d={paths.toGaia} className={['delegation-edge', isGaiaActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
-        {paths.toDaedalus ? <path d={paths.toDaedalus} className={['delegation-edge', isDaedalusActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
+        {paths.toDean ? <path d={paths.toDean} className={['delegation-edge', isDeanActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
+        {paths.toClara ? <path d={paths.toClara} className={['delegation-edge', isClaraActive ? 'delegation-edge--active' : ''].join(' ')} /> : null}
       </svg>
 
       <div className="relative z-10">
@@ -723,21 +687,21 @@ export default function DelegationDemo() {
 
           {/* Right: two delegated chats */}
           <div className="md:w-[52%] flex flex-col gap-8 md:gap-10">
-            {/* Top: Gaia */}
+            {/* Top: Dean (Google Drive) */}
             <div ref={rightTopRef}>
               <div className="relative isolate overflow-visible">
                 {/* Glow per-window (only when active) */}
                 <div
                   className={[
                     'absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500',
-                    activeDemoConvoId === 'gaia' ? 'opacity-70' : 'opacity-0',
+                    activeDemoConvoId === 'dean' ? 'opacity-70' : 'opacity-0',
                   ].join(' ')}
                   aria-hidden
                 />
                 <div
                   className={[
                     'absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500',
-                    activeDemoConvoId === 'gaia' ? 'opacity-55' : 'opacity-0',
+                    activeDemoConvoId === 'dean' ? 'opacity-55' : 'opacity-0',
                   ].join(' ')}
                   aria-hidden
                 />
@@ -745,20 +709,20 @@ export default function DelegationDemo() {
                 <div
                   className={[
                     'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
-                    activeDemoConvoId === 'gaia' ? 'border-amber-300/55' : 'border-white/20',
+                    activeDemoConvoId === 'dean' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
                   <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.gaia.label}</div>
+                        <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.dean.label}</div>
                         <div className="mt-1 flex items-center gap-2 min-w-0">
                           <div className="text-xs text-muted-foreground truncate">
-                            {DEMO_CONVERSATIONS.gaia.leftAgentName}, {DEMO_CONVERSATIONS.gaia.rightUserLabel} · Agent creation
+                            {DEMO_CONVERSATIONS.dean.leftAgentName}, {DEMO_CONVERSATIONS.dean.rightUserLabel} · Google Drive
                           </div>
                         </div>
                       </div>
-                      {activeDemoConvoId === 'gaia' ? (
+                      {activeDemoConvoId === 'dean' ? (
                         <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>
                       ) : null}
                     </div>
@@ -767,16 +731,16 @@ export default function DelegationDemo() {
                     <div className="flex-1 overflow-hidden">
                       <ConversationMessageList
                         conversationId={null}
-                        messagesOverride={(demoByConvo.gaia || []) as any}
-                        agentNameOverride={DEMO_CONVERSATIONS.gaia.leftAgentName}
-                        agentAvatarUrlOverride={gaiaAvatarUrl}
-                        isRespondingOverride={(respondingByConvo.gaia || false) || (awaitingToolsByConvo.gaia || false)}
-                        isAssistantStreamingOverride={respondingByConvo.gaia || false}
-                        isAwaitingToolResultsOverride={awaitingToolsByConvo.gaia || false}
+                        messagesOverride={(demoByConvo.dean || []) as any}
+                        agentNameOverride={DEMO_CONVERSATIONS.dean.leftAgentName}
+                        agentAvatarUrlOverride={deanAvatarUrl}
+                        isRespondingOverride={(respondingByConvo.dean || false) || (awaitingToolsByConvo.dean || false)}
+                        isAssistantStreamingOverride={respondingByConvo.dean || false}
+                        isAwaitingToolResultsOverride={awaitingToolsByConvo.dean || false}
                         bottomPaddingPx={90}
-                        userNameOverride={DEMO_CONVERSATIONS.gaia.rightUserLabel}
-                      userAvatarUrlOverride={ariaAvatarUrl}
-                        userAvatarSeedOverride={DEMO_CONVERSATIONS.gaia.rightUserSeed}
+                        userNameOverride={DEMO_CONVERSATIONS.dean.rightUserLabel}
+                        userAvatarUrlOverride={ariaAvatarUrl}
+                        userAvatarSeedOverride={DEMO_CONVERSATIONS.dean.rightUserSeed}
                       />
                     </div>
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />
@@ -785,21 +749,21 @@ export default function DelegationDemo() {
               </div>
             </div>
 
-            {/* Bottom: Daedalus */}
+            {/* Bottom: Clara (Gmail) */}
             <div ref={rightBottomRef}>
               <div className="relative isolate overflow-visible">
                 {/* Glow per-window (only when active) */}
                 <div
                   className={[
                     'absolute inset-0 -z-10 rounded-2xl delegation-active-glow pointer-events-none transition-opacity duration-500',
-                    activeDemoConvoId === 'daedalus' ? 'opacity-70' : 'opacity-0',
+                    activeDemoConvoId === 'clara' ? 'opacity-70' : 'opacity-0',
                   ].join(' ')}
                   aria-hidden
                 />
                 <div
                   className={[
                     'absolute inset-0 -z-10 rounded-2xl delegation-active-border pointer-events-none transition-opacity duration-500',
-                    activeDemoConvoId === 'daedalus' ? 'opacity-55' : 'opacity-0',
+                    activeDemoConvoId === 'clara' ? 'opacity-55' : 'opacity-0',
                   ].join(' ')}
                   aria-hidden
                 />
@@ -807,20 +771,20 @@ export default function DelegationDemo() {
                 <div
                   className={[
                     'relative z-10 rounded-2xl overflow-hidden border bg-background shadow-md shadow-black/30',
-                    activeDemoConvoId === 'daedalus' ? 'border-amber-300/55' : 'border-white/20',
+                    activeDemoConvoId === 'clara' ? 'border-amber-300/55' : 'border-white/20',
                   ].join(' ')}
                 >
                   <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.daedalus.label}</div>
+                        <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.clara.label}</div>
                         <div className="mt-1 flex items-center gap-2 min-w-0">
                           <div className="text-xs text-muted-foreground truncate">
-                            {DEMO_CONVERSATIONS.daedalus.leftAgentName}, {DEMO_CONVERSATIONS.daedalus.rightUserLabel} · Tool creation
+                            {DEMO_CONVERSATIONS.clara.leftAgentName}, {DEMO_CONVERSATIONS.clara.rightUserLabel} · Gmail
                           </div>
                         </div>
                       </div>
-                      {activeDemoConvoId === 'daedalus' ? (
+                      {activeDemoConvoId === 'clara' ? (
                         <div className="text-[11px] px-2 py-0.5 rounded-full border border-amber-400/30 text-amber-300 bg-amber-500/10">active</div>
                       ) : null}
                     </div>
@@ -829,16 +793,16 @@ export default function DelegationDemo() {
                     <div className="flex-1 overflow-hidden">
                       <ConversationMessageList
                         conversationId={null}
-                        messagesOverride={(demoByConvo.daedalus || []) as any}
-                        agentNameOverride={DEMO_CONVERSATIONS.daedalus.leftAgentName}
-                        agentAvatarUrlOverride={daedalusAvatarUrl}
-                        isRespondingOverride={(respondingByConvo.daedalus || false) || (awaitingToolsByConvo.daedalus || false)}
-                        isAssistantStreamingOverride={respondingByConvo.daedalus || false}
-                        isAwaitingToolResultsOverride={awaitingToolsByConvo.daedalus || false}
+                        messagesOverride={(demoByConvo.clara || []) as any}
+                        agentNameOverride={DEMO_CONVERSATIONS.clara.leftAgentName}
+                        agentAvatarUrlOverride={claraAvatarUrl}
+                        isRespondingOverride={(respondingByConvo.clara || false) || (awaitingToolsByConvo.clara || false)}
+                        isAssistantStreamingOverride={respondingByConvo.clara || false}
+                        isAwaitingToolResultsOverride={awaitingToolsByConvo.clara || false}
                         bottomPaddingPx={90}
-                        userNameOverride={DEMO_CONVERSATIONS.daedalus.rightUserLabel}
-                      userAvatarUrlOverride={ariaAvatarUrl}
-                        userAvatarSeedOverride={DEMO_CONVERSATIONS.daedalus.rightUserSeed}
+                        userNameOverride={DEMO_CONVERSATIONS.clara.rightUserLabel}
+                        userAvatarUrlOverride={ariaAvatarUrl}
+                        userAvatarSeedOverride={DEMO_CONVERSATIONS.clara.rightUserSeed}
                       />
                     </div>
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-14 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />

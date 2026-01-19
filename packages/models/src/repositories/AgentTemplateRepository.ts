@@ -859,6 +859,36 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Replace the full set of ToolTemplate relationships for an AgentTemplate using tool_template ids.
+   *
+   * This is the canonical, slug-free way to manage the relationship.
+   * `assignedToolSlugs` should be treated as a derived/convenience field populated by joins.
+   */
+  async setToolTemplateRelationshipsByIds(agentTemplateId: string, toolTemplateIds: string[]): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const id = String(agentTemplateId || '').trim();
+        if (!id) throw new Error('agentTemplateId is required');
+
+        const uniqueToolTemplateIds = Array.from(new Set((toolTemplateIds || []).map((t) => String(t).trim()).filter(Boolean)));
+        const connection = this.getConnection();
+
+        // Replace the set atomically-ish (within the connection's transaction behavior, if any).
+        await connection.query('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1', [id]);
+
+        if (uniqueToolTemplateIds.length === 0) return;
+
+        for (const toolTemplateId of uniqueToolTemplateIds) {
+          await this.addToolTemplateRelationship(id, toolTemplateId);
+        }
+      },
+      'setToolTemplateRelationshipsByIds',
+      'AgentTemplate',
+      agentTemplateId
+    );
+  }
+
+  /**
    * Remove a USES_TOOL_TEMPLATE relationship between AgentTemplate and ToolTemplate
    */
   async removeToolTemplateRelationship(agentTemplateId: string, toolTemplateId: string): Promise<void> {

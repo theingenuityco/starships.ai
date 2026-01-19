@@ -69,18 +69,8 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       return;
     }
 
-    let session = await sessionRepo.findByUserId(user.id);
-    if (!session) {
-      session = await sessionRepo.upsertForUser(user.id, {
-        starshipId: null,
-        step: 'welcome',
-        goals: [],
-        selectedConnectorProviders: [],
-        selectedAgentTemplateIds: [],
-        primaryAgentTemplateId: null,
-        completedAt: null,
-      });
-    }
+    // Ensure session exists atomically without resetting existing state.
+    let session = await sessionRepo.ensureForUser(user.id);
 
     let starship: StarshipModel | null = null;
     if (session.starshipId) {
@@ -165,7 +155,10 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
 
     try {
       // NOTE: legacy UI action shape removed; UI actions are now { action, payload }.
-      await uiActions.publish(conversation.id, { action: 'onboarding_connectors', payload: { conversationId: conversation.id, providers } });
+      await uiActions.publish(conversation.id, {
+        action: 'onboarding_connectors',
+        payload: { conversationId: conversation.id, providers },
+      });
     } catch {
       // non-fatal
     }

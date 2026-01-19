@@ -32,13 +32,23 @@ export class ConversationWidgetRepository extends BaseRepository {
         const now = new Date().toISOString();
         const id = nanoid();
 
+        // Be explicit about which unique rule we're deduping against.
+        // This table has multiple partial unique indexes; a bare "ON CONFLICT DO NOTHING"
+        // can silently ignore inserts for the wrong uniqueness rule.
+        const conflictClause =
+          args.toolCallId != null
+            ? `ON CONFLICT (conversation_id, tool_call_id) WHERE tool_call_id IS NOT NULL DO NOTHING`
+            : args.anchorMessageId != null
+              ? `ON CONFLICT (conversation_id, anchor_message_id, widget_id) WHERE anchor_message_id IS NOT NULL DO NOTHING`
+              : '';
+
         const row = await connection.queryOne<Record<string, unknown>>(
           `
           INSERT INTO conversation_widgets (
             id, starship_id, conversation_id, widget_id, turn_id, anchor_message_id, tool_call_id, created_at, updated_at
           )
           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
-          ON CONFLICT DO NOTHING
+          ${conflictClause}
           RETURNING
             id,
             starship_id,

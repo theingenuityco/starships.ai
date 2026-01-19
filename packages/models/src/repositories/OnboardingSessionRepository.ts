@@ -113,5 +113,72 @@ export class OnboardingSessionRepository extends BaseRepository {
       userId
     );
   }
+
+  /**
+   * Ensure an onboarding session exists for a user without overwriting any existing session state.
+   *
+   * This avoids a check-then-insert race and prevents accidentally resetting step/goals when the
+   * session already exists.
+   */
+  async ensureForUser(userId: string): Promise<OnboardingSessionModel> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const now = new Date().toISOString();
+        const payload: OnboardingSessionModel = {
+          userId,
+          starshipId: null,
+          step: 'welcome',
+          goals: [],
+          selectedConnectorProviders: [],
+          selectedAgentTemplateIds: [],
+          primaryAgentTemplateId: null,
+          completedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        };
+
+        await OnboardingSessionEntity.validate(payload, 'create');
+
+        const entity = toEntityInstance(OnboardingSessionEntity, payload as unknown as Record<string, unknown>);
+        const db = toDatabase(entity);
+
+        const goalsJson = JSON.stringify(db.goals ?? []);
+        const selectedConnectorProvidersJson = JSON.stringify(db.selected_connector_providers ?? []);
+        const selectedAgentTemplateIdsJson = JSON.stringify(db.selected_agent_template_ids ?? []);
+
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>(
+          `
+          INSERT INTO onboarding_sessions (
+            user_id, starship_id, step, goals, selected_connector_providers, selected_agent_template_ids,
+            primary_agent_template_id, completed_at, created_at, updated_at
+          )
+          VALUES ($1,$2,$3,$4::jsonb,$5::jsonb,$6::jsonb,$7,$8,$9,$10)
+          ON CONFLICT (user_id) DO UPDATE SET
+            updated_at = EXCLUDED.updated_at
+          RETURNING *
+          `,
+          [
+            db.user_id,
+            db.starship_id,
+            db.step,
+            goalsJson,
+            selectedConnectorProvidersJson,
+            selectedAgentTemplateIdsJson,
+            db.primary_agent_template_id,
+            db.completed_at,
+            db.created_at,
+            db.updated_at,
+          ]
+        );
+
+        if (!result) throw new Error('Failed to ensure onboarding session');
+        return fromDatabase(OnboardingSessionEntity, result) as unknown as OnboardingSessionModel;
+      },
+      'ensureForUser',
+      'OnboardingSession',
+      userId
+    );
+  }
 }
 

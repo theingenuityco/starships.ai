@@ -40,6 +40,13 @@ export async function up(client: DbClient): Promise<void> {
       WHERE tool_call_id IS NOT NULL;
     `);
 
+    // Prevent duplicates when the same widget is attached to the same anchor message.
+    await client.query(`
+      CREATE UNIQUE INDEX IF NOT EXISTS uq_conversation_widgets_conversation_anchor_widget
+      ON conversation_widgets(conversation_id, anchor_message_id, widget_id)
+      WHERE anchor_message_id IS NOT NULL;
+    `);
+
     await client.query('COMMIT');
   } catch (error) {
     await client.query('ROLLBACK');

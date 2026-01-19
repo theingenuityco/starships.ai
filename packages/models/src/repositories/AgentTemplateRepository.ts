@@ -881,6 +881,12 @@ export class AgentTemplateRepository extends BaseRepository {
         for (const toolTemplateId of uniqueToolTemplateIds) {
           await this.addToolTemplateRelationship(id, toolTemplateId);
         }
+
+        // IMPORTANT:
+        // Relationship changes live in the junction table, but we still need a cheap "has this template changed?"
+        // signal for startup/manual reconciliation logic. Bump the parent template `updated_at` so agents can
+        // compare `template.updatedAt` vs `agent.templateSnapshotAt` to decide if reconciliation is needed.
+        await connection.query('UPDATE agent_templates SET updated_at = $2 WHERE id = $1', [id, new Date().toISOString()]);
       },
       'setToolTemplateRelationshipsByIds',
       'AgentTemplate',

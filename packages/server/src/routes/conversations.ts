@@ -469,38 +469,46 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         }
       }
 
-      const snapshotEvt = { type: 'snapshot', data: { conversationId, messages: snapshotMessages, turn } };
       // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
       res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
-      res.write(`data: ${JSON.stringify(snapshotEvt.data)}\n\n`);
-
-      // Replay persisted conversation widgets as ui_action events so they render after reload,
-      // anchored to an existing message (no blank synthetic message).
+      // Attach persisted widgets directly onto the snapshot messages as uiActions.
+      // This avoids duplication caused by emitting "replay" ui_action events on reconnect.
       try {
         const convWidgetRepo = new ConversationWidgetRepository();
         const widgetRepo = new WidgetRepository();
         const convWidgets = await convWidgetRepo.listByConversation(conversationId, { limit: 50 });
+        const byAnchor = new Map<string, Array<{ action: string; payload: Record<string, unknown> }>>();
         for (const cw of convWidgets) {
           if (!cw.anchorMessageId) continue;
           const widget = await widgetRepo.findById(cw.widgetId).catch(() => null);
           if (!widget) continue;
-          res.write(`event: ui_action\n`);
-          res.write(
-            `data: ${JSON.stringify({
-              action: 'render_widget',
-              payload: {
-                widget,
-                anchorMessageId: cw.anchorMessageId,
-                ...(cw.turnId ? { turnId: cw.turnId } : null),
-                ...(cw.toolCallId ? { toolCallId: cw.toolCallId } : null),
-              },
-            })}\n\n`
-          );
+          const action = 'render_widget';
+          const payload: Record<string, unknown> = {
+            widget,
+            anchorMessageId: cw.anchorMessageId,
+            ...(cw.turnId ? { turnId: cw.turnId } : null),
+            ...(cw.toolCallId ? { toolCallId: cw.toolCallId } : null),
+          };
+          const prev = byAnchor.get(cw.anchorMessageId) ?? [];
+          prev.push({ action, payload });
+          byAnchor.set(cw.anchorMessageId, prev);
+        }
+        if (byAnchor.size > 0 && Array.isArray(snapshotMessages)) {
+          snapshotMessages = snapshotMessages.map((m: MessageModel & { uiActions?: unknown[] }) => {
+            const mid = typeof m?.id === 'string' ? m.id : '';
+            if (!mid) return m;
+            const actions = byAnchor.get(mid);
+            if (!actions || actions.length === 0) return m;
+            const existing = Array.isArray(m.uiActions) ? m.uiActions : [];
+            return { ...m, uiActions: [...existing, ...actions] };
+          });
         }
       } catch {
         // best-effort only
       }
+
+      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn })}\n\n`);
 
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.
@@ -952,7 +960,9 @@ router.post(
                 const turnId = assistantMsg?.turnId ?? toolMsg?.turnId ?? null;
 
                 if (anchorMessageId) {
-                  void conversationWidgetRepo
+                  // Upstream dedupe: if this widget is already associated to the same anchor message,
+                  // don't re-publish the same render_widget again.
+                  const persisted = await conversationWidgetRepo
                     .createOrIgnore({
                       starshipId: conversation.starshipId,
                       conversationId,
@@ -962,6 +972,7 @@ router.post(
                       toolCallId,
                     })
                     .catch(() => null);
+                  if (!persisted) return;
 
                   // Enrich live action for immediate attachment client-side.
                   payload.anchorMessageId = anchorMessageId;

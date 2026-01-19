@@ -989,14 +989,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const widgetUnknown = payload['widget']
       if (!isRecord(widgetUnknown)) return messages
       const widget = widgetUnknown
-      const widgetType =
-        typeof widget['widgetType'] === 'string' ? widget['widgetType'] : widget['widgetType'] != null ? String(widget['widgetType']) : ''
+      const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : widget['widgetType'] != null ? String(widget['widgetType']) : ''
       const props = widget['props']
       if (!widgetType || !props || typeof props !== 'object') return messages
 
       const anchorMessageIdUnknown = payload['anchorMessageId']
-      const anchorMessageId =
-        typeof anchorMessageIdUnknown === 'string' ? anchorMessageIdUnknown : anchorMessageIdUnknown != null ? String(anchorMessageIdUnknown) : ''
+      const anchorMessageId = typeof anchorMessageIdUnknown === 'string' ? anchorMessageIdUnknown : anchorMessageIdUnknown != null ? String(anchorMessageIdUnknown) : ''
 
       const toolCallIdUnknown = payload['toolCallId']
       const toolCallId = typeof toolCallIdUnknown === 'string' ? toolCallIdUnknown : toolCallIdUnknown != null ? String(toolCallIdUnknown) : ''
@@ -1011,6 +1009,32 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         if (idx !== -1) {
           const existing = messages[idx]
           const prev = Array.isArray((existing as any)?.uiActions) ? ((existing as any).uiActions as any[]) : []
+          // Dedup: replay-on-reconnect + live stream can deliver the same render_widget twice.
+          // If we've already attached an equivalent widget render to this message, skip.
+          try {
+            const alreadyHas = prev.some(ua => {
+              if (!ua || ua.action !== 'render_widget') return false
+              const p = ua.payload
+              if (!p || typeof p !== 'object') return false
+              const w = (p as any).widget
+              if (!w || typeof w !== 'object') return false
+              const wid = (w as any).id
+              const tcid = (p as any).toolCallId
+              const widStr = String(wid ?? '')
+              const tcidStr = String(tcid ?? '')
+              if (widStr && widStr === String(widgetId ?? '')) {
+                // If toolCallId is present, require it to match; otherwise widgetId match is enough.
+                if (toolCallId) return tcidStr === String(toolCallId)
+                return true
+              }
+              return false
+            })
+            if (alreadyHas) {
+              return messages
+            }
+          } catch {
+            /* ignore */
+          }
           const nextActions = [...prev, uiAction]
           messages[idx] = {
             ...existing,

@@ -1063,7 +1063,19 @@ export function ConversationMessageContent({
       })
       .filter((w): w is NonNullable<typeof w> => w !== null)
 
-    return out
+    // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
+    const deduped = (() => {
+      const seen = new Set<string>()
+      const next: typeof out = []
+      for (const w of out) {
+        if (seen.has(w.id)) continue
+        seen.add(w.id)
+        next.push(w)
+      }
+      return next
+    })()
+
+    return deduped
   }, [uiActions])
 
   // Fallback for non-markdown content (rare cases)

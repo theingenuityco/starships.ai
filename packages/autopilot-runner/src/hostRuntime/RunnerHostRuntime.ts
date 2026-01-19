@@ -92,6 +92,83 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   const runtimeEnv = options.runtimeEnv ?? {};
 
   const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
+    const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
+      const out: Record<string, unknown> = {};
+      const sensitive = new Set([
+        'authorization',
+        'proxy-authorization',
+        'cookie',
+        'set-cookie',
+        'x-api-key',
+        'api-key',
+        'apikey',
+        'x-auth-token',
+      ]);
+      for (const [k, v] of Object.entries(h)) {
+        const lk = k.toLowerCase();
+        out[k] = sensitive.has(lk) ? '[REDACTED]' : v;
+      }
+      return out;
+    };
+
+    const redactUrlForLogs = (rawUrl: string): string => {
+      try {
+        const u = new URL(rawUrl);
+        const sensitiveParams = new Set([
+          'token',
+          'access_token',
+          'auth',
+          'authorization',
+          'api_key',
+          'apikey',
+          'key',
+          'secret',
+          'signature',
+        ]);
+        for (const [k] of u.searchParams) {
+          if (sensitiveParams.has(k.toLowerCase())) {
+            u.searchParams.set(k, '[REDACTED]');
+          }
+        }
+        return u.toString();
+      } catch {
+        return rawUrl;
+      }
+    };
+
+    const summarizeFetchError = (err: unknown): Record<string, unknown> => {
+      const e = err as any;
+      const cause = e?.cause;
+      const pick = (x: any): Record<string, unknown> => {
+        if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
+        return {
+          name: typeof x.name === 'string' ? x.name : undefined,
+          message: typeof x.message === 'string' ? x.message : undefined,
+          code: typeof x.code === 'string' ? x.code : undefined,
+          errno: typeof x.errno === 'number' ? x.errno : undefined,
+          syscall: typeof x.syscall === 'string' ? x.syscall : undefined,
+          address: typeof x.address === 'string' ? x.address : undefined,
+          port: typeof x.port === 'number' ? x.port : undefined,
+          hostname: typeof x.hostname === 'string' ? x.hostname : undefined,
+        };
+      };
+
+      const primary = pick(e);
+      const underlying = pick(cause);
+      const code = (underlying.code ?? primary.code) as string | undefined;
+      const msg = (underlying.message ?? primary.message) as string | undefined;
+
+      // A compact one-liner that is safe to embed in Error.message.
+      const summary =
+        code && msg ? `${code}: ${msg}` : code ? code : msg ? msg : typeof err === 'string' ? err : 'fetch failed';
+
+      return {
+        summary,
+        error: primary,
+        cause: underlying,
+      };
+    };
+
     const timeoutController = new AbortController();
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 30000;
     const timeoutId = setTimeout(() => timeoutController.abort(), timeout);
@@ -142,7 +219,47 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         if (options.signal?.aborted) {
           throw new CancelledError('cancelled');
         }
-        throw e;
+        if (timeoutController.signal.aborted) {
+          const safeUrl = redactUrlForLogs(finalUrl);
+          const err = new Error(`HTTP fetch timed out after ${timeout}ms: ${finalMethod} ${safeUrl}`);
+          console.error('[RunnerHostRuntime.http] fetch_timeout', {
+            method: finalMethod,
+            url: safeUrl,
+            timeoutMs: timeout,
+          });
+          throw err;
+        }
+
+        const safeUrl = redactUrlForLogs(finalUrl);
+        const safeHeaders = redactHeadersForLogs(finalHeaders);
+        const bodyInfo =
+          body === undefined
+            ? { hasBody: false }
+            : typeof body === 'string'
+              ? { hasBody: true, bodyType: 'string', bodyLength: body.length }
+              : body instanceof ArrayBuffer
+                ? { hasBody: true, bodyType: 'ArrayBuffer', bodyByteLength: body.byteLength }
+                : ArrayBuffer.isView(body as ArrayBufferLike)
+                  ? { hasBody: true, bodyType: 'ArrayBufferView', bodyByteLength: (body as ArrayBufferView).byteLength }
+                  : typeof body === 'object'
+                    ? { hasBody: true, bodyType: 'object' }
+                    : { hasBody: true, bodyType: typeof body };
+
+        const summary = summarizeFetchError(e);
+        console.error('[RunnerHostRuntime.http] fetch_failed', {
+          method: finalMethod,
+          url: safeUrl,
+          timeoutMs: timeout,
+          headers: safeHeaders,
+          ...bodyInfo,
+          error: summary,
+        });
+
+        const wrapped = new Error(`HTTP fetch failed: ${finalMethod} ${safeUrl} (${summary.summary})`) as Error & {
+          cause?: unknown;
+        };
+        wrapped.cause = e;
+        throw wrapped;
       }
       const contentType = resp.headers.get('content-type') || '';
       let responseBody: unknown;

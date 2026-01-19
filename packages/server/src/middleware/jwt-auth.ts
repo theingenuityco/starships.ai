@@ -5,11 +5,11 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { jwtVerify } from 'jose';
 import { UserService } from '@/services/UserService';
 import { getEnvConfig } from '@starships/env';
 import { sendError } from '@/utils/responseHelpers';
 import { logger } from '@/utils/logger';
+import { dynamicImport } from '@/utils/dynamicImport';
 
 const env = getEnvConfig();
 
@@ -40,6 +40,7 @@ export const jwtAuthMiddleware = async (req: Request, res: Response, next: NextF
     }
 
     // Verify JWT token
+    const { jwtVerify } = await dynamicImport<typeof import('jose')>('jose');
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
@@ -135,6 +136,7 @@ export const optionalJwtAuth = async (req: Request, res: Response, next: NextFun
   }
 
   try {
+    const { jwtVerify } = await dynamicImport<typeof import('jose')>('jose');
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,

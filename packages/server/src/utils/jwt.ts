@@ -5,10 +5,10 @@
  * Extracted from duplicate code in auth routes to eliminate technical debt
  */
 
-import { SignJWT, jwtVerify } from 'jose';
 import { getEnvConfig } from '@starships/env';
 import crypto from 'crypto';
 import { OAuthAuthCodeRepository } from '@starships/models';
+import { dynamicImport } from '@/utils/dynamicImport';
 
 const env = getEnvConfig();
 const JWT_SECRET = new TextEncoder().encode(env.JWT_SECRET);
@@ -36,6 +36,7 @@ export interface JWTUser {
  * Generate JWT token for authenticated user (EXTRACTED FROM DUPLICATE CODE)
  */
 export async function generateJWT(user: JWTUser): Promise<string> {
+  const { SignJWT } = await dynamicImport<typeof import('jose')>('jose');
   const payload: Record<string, unknown> = {
     sub: user.id,
     email: user.email,
@@ -62,7 +63,16 @@ export async function generateJWT(user: JWTUser): Promise<string> {
  * Generate OAuth state token for CSRF protection
  */
 export async function generateOAuthState(isLinking: boolean = false, userId?: string, context?: Record<string, unknown>): Promise<string> {
-  const payload: any = {
+  const { SignJWT } = await dynamicImport<typeof import('jose')>('jose');
+  type OAuthStateClaims = {
+    purpose: 'oauth_state';
+    nonce: string;
+    isLinking: boolean;
+    userId?: string;
+    context?: Record<string, unknown>;
+  };
+
+  const payload: OAuthStateClaims = {
     purpose: 'oauth_state',
     nonce: crypto.randomBytes(16).toString('hex'),
     isLinking,
@@ -92,13 +102,18 @@ export async function validateOAuthState(
   state: string
 ): Promise<{ valid: boolean; isLinking?: boolean; userId?: string; context?: Record<string, unknown> }> {
   try {
+    const { jwtVerify } = await dynamicImport<typeof import('jose')>('jose');
     const { payload } = await jwtVerify(state, JWT_SECRET, { issuer: JWT_ISSUER });
-    if (payload.purpose === 'oauth_state') {
+    const rec = payload as unknown as Record<string, unknown>;
+    if (rec['purpose'] === 'oauth_state') {
       return {
         valid: true,
-        isLinking: payload.isLinking as boolean,
-        userId: payload.userId as string | undefined,
-        context: (payload as any).context as Record<string, unknown> | undefined,
+        isLinking: rec['isLinking'] === true,
+        userId: typeof rec['userId'] === 'string' ? rec['userId'] : undefined,
+        context:
+          rec['context'] && typeof rec['context'] === 'object' && !Array.isArray(rec['context'])
+            ? (rec['context'] as Record<string, unknown>)
+            : undefined,
       };
     }
     return { valid: false };
@@ -111,6 +126,7 @@ export async function validateOAuthState(
  * Verify JWT token (for middleware use)
  */
 export async function verifyJWT(token: string) {
+  const { jwtVerify } = await dynamicImport<typeof import('jose')>('jose');
   return await jwtVerify(token, JWT_SECRET, {
     issuer: JWT_ISSUER,
     audience: JWT_AUDIENCE,
@@ -118,14 +134,16 @@ export async function verifyJWT(token: string) {
 }
 
 // Initialize repository for OAuth auth codes
-const oauthCodeRepo = new OAuthAuthCodeRepository();
+function getOAuthAuthCodeRepo(): OAuthAuthCodeRepository {
+  return new OAuthAuthCodeRepository();
+}
 
 /**
  * Generate secure authorization code for OAuth token exchange
  * Database-backed, production-ready implementation
  */
 export async function generateAuthCode(userId: string, email: string): Promise<string> {
-  return await oauthCodeRepo.generateCode(userId, email);
+  return await getOAuthAuthCodeRepo().generateCode(userId, email);
 }
 
 /**
@@ -136,7 +154,7 @@ export async function validateAndConsumeAuthCode(authCode: string): Promise<{
   userId: string;
   email: string;
 } | null> {
-  return await oauthCodeRepo.validateAndConsumeCode(authCode);
+  return await getOAuthAuthCodeRepo().validateAndConsumeCode(authCode);
 }
 
 // Database automatically handles cleanup via expires_at constraint - no manual cleanup needed

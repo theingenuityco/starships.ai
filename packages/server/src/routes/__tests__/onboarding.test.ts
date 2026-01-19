@@ -91,7 +91,8 @@ describe('onboarding routes', () => {
       updatedAt: new Date().toISOString(),
     } as any);
 
-    const req = { user: { id: 'u1' }, body: { starshipName: 'My Ship' } } as unknown as Request;
+    // Omit starshipName so the route uses StarshipService.createDefaultStarship (mocked below)
+    const req = { user: { id: 'u1' }, body: {} } as unknown as Request;
     const res = createMockRes();
 
     const handler = getHandler('/onboarding/start');
@@ -137,8 +138,11 @@ describe('onboarding routes', () => {
     (StarshipRepository as unknown as jest.Mock).mockImplementation(() => mockStarshipRepo);
     mockStarshipRepo.getDeployedAgents.mockResolvedValue([]);
 
-    const templateSvc = new (AgentTemplateService as any)();
-    templateSvc.createAgentFromTemplate.mockResolvedValue({ id: 'a2', slug: 'agent-1', name: 'Agent 1', sourceTemplateId: 't1' });
+    const templateSvc = {
+      searchTemplates: jest.fn(),
+      createAgentFromTemplate: jest.fn().mockResolvedValue({ id: 'a2', slug: 'agent-1', name: 'Agent 1', sourceTemplateId: 't1' }),
+    };
+    (AgentTemplateService as unknown as jest.Mock).mockImplementation(() => templateSvc);
 
     const req = { user: { id: 'u1' }, body: { selectedAgentTemplateIds: ['t1'], primaryAgentTemplateId: 't1' } } as unknown as Request;
     const res = createMockRes();

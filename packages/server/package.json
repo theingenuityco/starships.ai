@@ -13,7 +13,7 @@
     "avatars:optimize-existing": "NODE_OPTIONS=--no-node-snapshot tsx src/scripts/optimize-existing-avatars.ts",
     "type-check": "tsc --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "jest"
+    "test": "NODE_OPTIONS=--experimental-vm-modules jest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.56.0",

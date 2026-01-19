@@ -11,7 +11,7 @@ import { validateData } from '@/utils/validation';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { EmailSchema, PasswordSchema, OAuthProviderSchema, DisplayNameSchema, IdSchema } from '@/schemas/common';
 import { getEnvConfig } from '@starships/env';
-import { StarshipRepository, UserRepository } from '@starships/models';
+import { AgentRepository, StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
 import type { UserModel } from '@starships/protocol';
 import bcrypt from 'bcrypt';
@@ -22,10 +22,46 @@ import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
 import { AgentService } from '@/services/AgentService';
+import { AgentTemplateService } from '@/services/AgentTemplateService';
+import { StarshipService } from '@/services/StarshipService';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 
 const router: Router = Router();
 const env = getEnvConfig();
+
+async function ensureDefaultStarshipAndAria(
+  userId: string
+): Promise<{ starship: { id: string; slug: string; name: string } | null }> {
+  const starshipRepo = new StarshipRepository();
+  const ships = await starshipRepo.findByOwner(userId);
+  const existing = ships.find((s) => s.status === 'active') || ships[0] || null;
+
+  const starship = existing ? existing : await StarshipService.createDefaultStarship(userId);
+
+  // Ensure Aria is deployed
+  try {
+    const deployed = await starshipRepo.getDeployedAgents(starship.id);
+    const hasAria = deployed.some((a) => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria'));
+    if (!hasAria) {
+      const templateService = new AgentTemplateService();
+      const ariaCandidates = await templateService.searchTemplates('Aria');
+      const ariaTemplate = ariaCandidates.find((t) => t.name === 'Aria') || null;
+      if (ariaTemplate) {
+        const ariaAgent = await templateService.createAgentFromTemplate(ariaTemplate.id, starship.id);
+        try {
+          const agentRepo = new AgentRepository();
+          await agentRepo.setAllAssignedToolPermissionsForAgent(ariaAgent.id, 'allow');
+        } catch {
+          // non-fatal
+        }
+      }
+    }
+  } catch {
+    // non-fatal
+  }
+
+  return { starship: { id: starship.id, slug: starship.slug, name: starship.name } };
+}
 
 function isValidRedirectUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
@@ -151,7 +187,7 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         emailNotVerified: true,
         message: 'Please verify your email address before signing in.',
         canResendVerification: true,
-        onboardingRequired: true,
+        onboardingRequired: env.ONBOARDING_ENABLED ? true : false,
       };
 
       return sendSuccess(res, response, 200);
@@ -185,6 +221,25 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       name: user.displayName || user.email?.split('@')[0],
     });
 
+    // When onboarding is disabled, provision the default starship + Aria automatically.
+    let starship: { id: string; slug: string; name: string } | null = null;
+    let onboardingCompleted = user.onboardingCompleted;
+    if (!env.ONBOARDING_ENABLED) {
+      const provisioned = await ensureDefaultStarshipAndAria(user.id);
+      starship = provisioned.starship;
+      if (!user.onboardingCompleted) {
+        try {
+          const userRepo = new UserRepository();
+          await userRepo.update(user.id, { onboardingCompleted: true });
+          onboardingCompleted = true;
+        } catch {
+          // non-fatal
+        }
+      } else {
+        onboardingCompleted = true;
+      }
+    }
+
     sendSuccess(res, {
       user: {
         id: user.id,
@@ -194,14 +249,14 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         hasPassword: user.hasPassword || false,
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'password',
-        onboardingCompleted: user.onboardingCompleted,
+        onboardingCompleted,
         // Surface instance admin flag without changing other login payload fields
         isInstanceAdmin: user.isInstanceAdmin || false,
       },
       token,
       isFirstLogin,
-      onboardingRequired: !user.onboardingCompleted,
-      starship: null,
+      onboardingRequired: env.ONBOARDING_ENABLED ? !user.onboardingCompleted : false,
+      starship,
     });
   } catch (error) {
     handleError(error, res, 'user login');
@@ -846,6 +901,25 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
+    // When onboarding is disabled, provision the default starship + Aria automatically.
+    let starship: { id: string; slug: string; name: string } | null = null;
+    let onboardingCompleted = user.onboardingCompleted;
+    if (!env.ONBOARDING_ENABLED) {
+      const provisioned = await ensureDefaultStarshipAndAria(user.id);
+      starship = provisioned.starship;
+      if (!user.onboardingCompleted) {
+        try {
+          const userRepo = new UserRepository();
+          await userRepo.update(user.id, { onboardingCompleted: true });
+          onboardingCompleted = true;
+        } catch {
+          // non-fatal
+        }
+      } else {
+        onboardingCompleted = true;
+      }
+    }
+
     // Return secure response with JWT in body
     sendSuccess(res, {
       user: {
@@ -856,13 +930,13 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         hasPassword: user.hasPassword || false,
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'oauth',
-        onboardingCompleted: user.onboardingCompleted,
+        onboardingCompleted,
         isInstanceAdmin: user.isInstanceAdmin || false,
       },
       token,
       isFirstLogin,
-      onboardingRequired: !user.onboardingCompleted,
-      starship: null,
+      onboardingRequired: env.ONBOARDING_ENABLED ? !user.onboardingCompleted : false,
+      starship,
     });
   } catch (error) {
     logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {

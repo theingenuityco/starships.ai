@@ -205,7 +205,14 @@ export function useLogin() {
         return
       }
 
-      router.push('/onboarding')
+      const redirectTarget = getPostAuthRedirectTarget()
+      if (redirectTarget) {
+        router.push(addWelcomeParamToPath(redirectTarget))
+      } else if (data.starship?.slug) {
+        router.push(addWelcomeParamToPath(`/ship/${data.starship.slug}/conversations`))
+      } else {
+        router.push('/profile')
+      }
 
       // Invalidate all queries to refetch with new auth context
       queryClient.invalidateQueries()
@@ -329,7 +336,14 @@ export function useOAuthLogin() {
         return
       }
 
-      router.push('/onboarding')
+      const redirectTarget = getPostAuthRedirectTarget()
+      if (redirectTarget) {
+        router.push(addWelcomeParamToPath(redirectTarget))
+      } else if (data.starship?.slug) {
+        router.push(addWelcomeParamToPath(`/ship/${data.starship.slug}/conversations`))
+      } else {
+        router.push('/profile')
+      }
 
       // Invalidate all queries to refetch with new auth context (same as regular login)
       queryClient.invalidateQueries()

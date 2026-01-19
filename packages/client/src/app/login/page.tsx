@@ -45,7 +45,7 @@ function LoginContent() {
   const expectedEmail = searchParams?.get('expectedEmail')
   const forcedLogoutRef = React.useRef(false)
 
-  // Redirect authenticated users to onboarding (skip while forced logout is pending)
+  // Redirect authenticated users into the app (skip while forced logout is pending)
   React.useEffect(() => {
     if (!mounted || isLoading || starshipsLoading) {
       return
@@ -83,7 +83,7 @@ function LoginContent() {
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
         router.push(returnUrl)
       } else {
-        router.push('/onboarding')
+        router.push('/profile')
       }
     }
   }, [mounted, isAuthenticated, isLoading, starshipsLoading, router, searchParams, logoutParam, expectedEmail, logout])

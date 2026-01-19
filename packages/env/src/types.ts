@@ -30,6 +30,12 @@ export interface EnvironmentConfig {
   JWT_SECRET: string;
 
   /**
+   * Feature flag for the onboarding flow.
+   * When false, the app should bypass onboarding and provision resources automatically.
+   */
+  ONBOARDING_ENABLED: boolean;
+
+  /**
    * Token used to authorize Next.js ISR tag/path revalidation requests.
    * Keep this distinct from any auth secrets (e.g. JWT_SECRET).
    */

@@ -27,7 +27,9 @@ export default function ProfilePage(): React.JSX.Element {
     if (starships && starships.length > 0) {
       router.replace(`/ship/${starships[0].slug}/conversations`)
     } else {
-      router.replace('/onboarding')
+      // No onboarding redirect; user should rarely hit this since we auto-provision on login when onboarding is disabled.
+      // Keep a safe fallback to home.
+      router.replace('/')
     }
   }, [authLoading, starshipsLoading, isAuthenticated, starships, router])
 
@@ -36,13 +38,13 @@ export default function ProfilePage(): React.JSX.Element {
     return <AuthLoadingScreen message="Loading your profile..." />
   }
 
-  // Should never be reached (we redirect to /onboarding when no starships exist)
+  // Should rarely be reached (we normally redirect once starships load)
   return (
     <div className="flex items-center justify-center min-h-screen">
       <div className="text-center space-y-4">
         <h1 className="text-2xl font-bold">Welcome to Starships.ai!</h1>
         <p className="text-muted-foreground">Your account is set up, but you don&apos;t have any starships yet.</p>
-        <p className="text-sm text-muted-foreground">Please contact support to get your first starship created.</p>
+        <p className="text-sm text-muted-foreground">If this persists, please contact support.</p>
       </div>
     </div>
   )

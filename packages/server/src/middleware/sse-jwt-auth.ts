@@ -9,8 +9,8 @@ import { UserService } from '@/services/UserService';
 import { sendError } from '@/utils/responseHelpers';
 import { getEnvConfig } from '@starships/env';
 import { NextFunction, Request, Response } from 'express';
-import { jwtVerify } from 'jose';
 import { logger } from '@/utils/logger';
+import { dynamicImport } from '@/utils/dynamicImport';
 
 const env = getEnvConfig();
 
@@ -51,6 +51,7 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
     }
 
     // Verify JWT token
+    const { jwtVerify } = await dynamicImport<typeof import('jose')>('jose');
     const { payload } = await jwtVerify(token, JWT_SECRET, {
       issuer: JWT_ISSUER,
       audience: JWT_AUDIENCE,
@@ -64,7 +65,7 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
       logger.error('[SSE-JWT-AUTH] Database error during user lookup', {
         userId: payload.sub,
         error: dbError?.message,
-        operation: 'user_lookup'
+        operation: 'user_lookup',
       });
       sendError(res, 'DATABASE_ERROR', 'Database error during authentication', 500);
       return;
@@ -82,7 +83,7 @@ export const sseJwtAuthMiddleware = async (req: Request, res: Response, next: Ne
   } catch (error: any) {
     logger.error('[SSE-JWT-AUTH] Token validation failed', {
       error: error?.message,
-      operation: 'token_validation'
+      operation: 'token_validation',
     });
 
     // Provide more specific error messages

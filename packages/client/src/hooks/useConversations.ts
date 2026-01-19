@@ -58,6 +58,11 @@ interface ClientMessage extends MessageModel {
     content?: string
     result?: unknown
   }>
+  // UI actions captured from SSE (not part of DB MessageModel)
+  uiActions?: Array<{
+    action: string
+    payload?: Record<string, unknown>
+  }>
 }
 
 // Create message request interface (local definition since it's not in protocol)
@@ -972,57 +977,97 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     if (chunk.type === 'ui_action') {
       const messages = clone(acc)
-      const payload = chunk.data
-      const action = payload.__ui_action
-      if (action !== 'widget_created' && action !== 'widget_updated') {
-        return messages
-      }
+      const evt: any = chunk.data
+      const action = typeof evt?.action === 'string' ? evt.action : ''
+      const payload = (evt?.payload && typeof evt.payload === 'object' ? evt.payload : {}) as Record<string, unknown>
 
+      // Widgets are rendered ONLY from explicit ui_action payloads.
+      // UI stays tool-name agnostic: we store the ui action itself, not a synthetic tool result.
+      if (action !== 'render_widget') return messages
+
+      // Validate minimal widget shape for renderability.
       const widgetUnknown = payload['widget']
       if (!isRecord(widgetUnknown)) return messages
       const widget = widgetUnknown
-      const widgetId = typeof widget['id'] === 'string' ? widget['id'] : widget['id'] != null ? String(widget['id']) : ''
       const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : widget['widgetType'] != null ? String(widget['widgetType']) : ''
       const props = widget['props']
-      if (!widgetId || !widgetType || !props || typeof props !== 'object') return messages
+      if (!widgetType || !props || typeof props !== 'object') return messages
+
+      const anchorMessageIdUnknown = payload['anchorMessageId']
+      const anchorMessageId = typeof anchorMessageIdUnknown === 'string' ? anchorMessageIdUnknown : anchorMessageIdUnknown != null ? String(anchorMessageIdUnknown) : ''
 
       const toolCallIdUnknown = payload['toolCallId']
       const toolCallId = typeof toolCallIdUnknown === 'string' ? toolCallIdUnknown : toolCallIdUnknown != null ? String(toolCallIdUnknown) : ''
-      const toolName = action === 'widget_updated' ? 'update-widget' : 'create-widget'
+      const widgetId = typeof widget['id'] === 'string' ? widget['id'] : widget['id'] != null ? String(widget['id']) : ''
 
-      const msgId = `ui-widget-${widgetId}`
       const now = new Date().toISOString()
+      const uiAction = { action, payload } as const
 
-      const toolResultLike = {
-        toolName,
-        toolCallId,
-        content: JSON.stringify(widget),
+      // Preferred behavior: attach the ui_action to an existing persisted message (no blank synthetic message).
+      if (anchorMessageId) {
+        const idx = messages.findIndex(m => m.id === anchorMessageId)
+        if (idx !== -1) {
+          const existing = messages[idx]
+          const prev = Array.isArray((existing as any)?.uiActions) ? ((existing as any).uiActions as any[]) : []
+          // Dedup: replay-on-reconnect + live stream can deliver the same render_widget twice.
+          // If we've already attached an equivalent widget render to this message, skip.
+          try {
+            const alreadyHas = prev.some(ua => {
+              if (!ua || ua.action !== 'render_widget') return false
+              const p = ua.payload
+              if (!p || typeof p !== 'object') return false
+              const w = (p as any).widget
+              if (!w || typeof w !== 'object') return false
+              const wid = (w as any).id
+              const tcid = (p as any).toolCallId
+              const widStr = String(wid ?? '')
+              const tcidStr = String(tcid ?? '')
+              if (widStr && widStr === String(widgetId ?? '')) {
+                // If toolCallId is present, require it to match; otherwise widgetId match is enough.
+                if (toolCallId) return tcidStr === String(toolCallId)
+                return true
+              }
+              return false
+            })
+            if (alreadyHas) {
+              return messages
+            }
+          } catch {
+            /* ignore */
+          }
+          const nextActions = [...prev, uiAction]
+          messages[idx] = {
+            ...existing,
+            updatedAt: now,
+            uiActions: nextActions,
+          } as any
+          return messages
+        }
       }
+
+      // Stable synthetic message id for render_widget events.
+      const stableKey = widgetId || toolCallId || JSON.stringify(widget).slice(0, 128)
+      const msgId = `ui-action:${action}:${stableKey}`
 
       const existingIdx = messages.findIndex(m => m.id === msgId)
       if (existingIdx !== -1) {
         const existing = messages[existingIdx]
-        const createdAtUnknown = widget['createdAt']
-        const updatedAtUnknown = widget['updatedAt']
-        const createdAt = (typeof existing?.createdAt === 'string' && existing.createdAt) || (typeof createdAtUnknown === 'string' ? createdAtUnknown : now)
-
+        const prev = Array.isArray((existing as any)?.uiActions) ? ((existing as any).uiActions as any[]) : []
+        const nextActions = [...prev, uiAction]
         messages[existingIdx] = {
           ...existing,
           id: msgId,
           role: 'assistant',
           messageType: 'agent_response',
           content: '',
-          createdAt,
-          updatedAt: typeof updatedAtUnknown === 'string' ? updatedAtUnknown : now,
+          createdAt: typeof existing?.createdAt === 'string' ? existing.createdAt : now,
+          updatedAt: now,
           streaming: false,
-          toolResults: [toolResultLike],
+          uiActions: nextActions,
         }
         return messages
       }
 
-      const createdAtUnknown = widget['createdAt']
-      const updatedAtUnknown = widget['updatedAt']
-      const createdAt = typeof createdAtUnknown === 'string' ? createdAtUnknown : now
       return [
         ...messages,
         {
@@ -1030,10 +1075,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           role: 'assistant',
           content: '',
           messageType: 'agent_response',
-          createdAt,
-          updatedAt: typeof updatedAtUnknown === 'string' ? updatedAtUnknown : now,
+          createdAt: now,
+          updatedAt: now,
           streaming: false,
-          toolResults: [toolResultLike],
+          uiActions: [uiAction],
         },
       ]
     }

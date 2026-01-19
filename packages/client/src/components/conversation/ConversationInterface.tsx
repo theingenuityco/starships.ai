@@ -11,7 +11,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversations, usePendingToolApprovalsMulti } from '@/hooks/useConversations'
+import { useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversations, usePendingToolApprovalsMulti, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -28,6 +28,8 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
+import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
+import type { ConversationStreamUIAction, OnboardingConnectorsUIAction } from '@starships/protocol'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -91,6 +93,18 @@ function pickDefaultAgent(agents: any[]): any | null {
   return aria ?? agents[0] ?? null
 }
 
+function isUIAction(v: unknown): v is ConversationStreamUIAction {
+  return !!v && typeof v === 'object' && typeof (v as any).action === 'string'
+}
+
+function isOnboardingConnectorsUIAction(v: unknown): v is OnboardingConnectorsUIAction {
+  if (!isUIAction(v)) return false
+  if ((v as any).action !== 'onboarding_connectors') return false
+  const payload = (v as any).payload
+  const providers = payload?.providers
+  return Array.isArray(providers) && providers.every(p => typeof p === 'string')
+}
+
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { data: authUser } = useAuthUser()
@@ -141,6 +155,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Deduplicate UI action payloads across sources
   const lastUIActionKeyRef = useRef<string | null>(null)
 
+  // Onboarding connector suggestions (conversation-driven onboarding)
+  const [onboardingConnectorProviders, setOnboardingConnectorProviders] = useState<string[]>([])
+
   const queryClient = useQueryClient()
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
@@ -162,6 +179,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const { data: starshipAgentAvatarAttachments = [] } = useMessageAttachments(starshipAgentAvatarAttachmentIds, starshipId)
   const starshipAgentAvatarUrlById = useMemo(() => new Map(starshipAgentAvatarAttachments.map(a => [a.id, a.previewUrl] as const)), [starshipAgentAvatarAttachments])
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
+  const { data: currentConversationDetail } = useConversationDetail(currentConversationId ?? null)
   const { data: starshipData } = useStarship(starshipId || '', !!starshipId)
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
@@ -623,20 +641,26 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Handle UI action payloads (dedup across SSE 'ui_action' and assistant message JSON)
   const handleUIPayload = useCallback(
-    (payload: any) => {
+    (payload: unknown) => {
       try {
-        if (!payload || typeof payload !== 'object' || typeof (payload as any).__ui_action !== 'string') return
+        if (!isUIAction(payload)) return
         const key = JSON.stringify(payload)
         if (lastUIActionKeyRef.current === key) return
         lastUIActionKeyRef.current = key
 
-        const action = (payload as any).__ui_action as string
+        const action = (payload as any).action
 
         // Builders are route-based now; no in-place form updates
 
         switch (action) {
+          case 'onboarding_connectors': {
+            if (!isOnboardingConnectorsUIAction(payload)) break
+            const normalized = payload.payload.providers.map(p => p.trim()).filter(p => p.length > 0)
+            setOnboardingConnectorProviders(normalized)
+            break
+          }
           case 'tool_approval_required': {
-            const cid = (payload as any)?.conversationId
+            const cid = (payload as any)?.payload?.conversationId
             if (cid) {
               // Pull durable DB-backed pending approvals (covers refresh/deeplinks too)
               queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(String(cid)) })
@@ -644,14 +668,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             break
           }
           case 'tool_approval_resolved': {
-            const cid = (payload as any)?.conversationId
+            const cid = (payload as any)?.payload?.conversationId
             if (cid) {
               queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(String(cid)) })
             }
             break
           }
           case 'conversation_title_updated': {
-            const cid = (payload as any)?.conversationId
+            const cid = (payload as any)?.payload?.conversationId
             try {
               if (starshipId) {
                 queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
@@ -664,8 +688,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
           case 'child_conversation_created': {
             try {
-              const parentId = String((payload as any)?.parentConversationId || '')
-              const sid = (payload as any)?.starshipId || starshipId
+              const parentId = String((payload as any)?.payload?.parentConversationId || '')
+              const sid = (payload as any)?.payload?.starshipId || starshipId
               if (sid) {
                 queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
               }
@@ -688,6 +712,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     },
     [queryClient, router, starshipId, starshipSlug, externalConversationId]
   )
+
+  // Also restore onboarding choices from conversation.state if present (durable)
+  useEffect(() => {
+    try {
+      const state: any = (currentConversationDetail as any)?.state
+      const providers = state?.onboarding?.providers
+      if (!Array.isArray(providers)) return
+      const normalized = providers.map((p: any) => String(p)).filter((p: string) => p.trim().length > 0)
+      if (normalized.length > 0) setOnboardingConnectorProviders(normalized)
+    } catch {
+      // ignore
+    }
+  }, [currentConversationDetail])
 
   // Stream-dependent side-effects are handled within the provider context to avoid duplicate SSE connections
   function StreamSideEffects() {
@@ -868,17 +905,28 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
 
               <div key="message-input">
-              {childWithPendingApproval && (
-                <ChildConversationApprovalCallout
-                  title={String((childWithPendingApproval as any)?.agentName || 'A child agent')}
-                  pendingCount={childWithPendingApproval.pendingCount}
-                  disabled={!starshipSlug}
-                  onOpenChildConversation={() => {
-                    if (!starshipSlug) return
-                    router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(childWithPendingApproval.id)}`)
-                  }}
-                />
-              )}
+                {childWithPendingApproval && (
+                  <ChildConversationApprovalCallout
+                    title={String((childWithPendingApproval as any)?.agentName || 'A child agent')}
+                    pendingCount={childWithPendingApproval.pendingCount}
+                    disabled={!starshipSlug}
+                    onOpenChildConversation={() => {
+                      if (!starshipSlug) return
+                      router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(childWithPendingApproval.id)}`)
+                    }}
+                  />
+                )}
+
+                {onboardingConnectorProviders.length > 0 && showMessagesArea ? (
+                  <div className="mb-4 rounded-2xl border border-border/50 bg-card/40 p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <div className="text-sm font-medium text-foreground">Suggested connectors</div>
+                      <div className="text-xs text-muted-foreground">Connect right here, then keep chatting</div>
+                    </div>
+                    <StarshipConnectorsPanel starshipId={starshipId} onlyProviders={onboardingConnectorProviders} hideSearch={true} hideDisconnect={true} />
+                  </div>
+                ) : null}
+
                 <ConversationMessageInput
                   key={inputKey}
                   ref={messageInputRef}

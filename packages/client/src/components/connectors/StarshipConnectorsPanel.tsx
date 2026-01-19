@@ -18,6 +18,18 @@ const CONNECTOR_CTA_ICON_CLASS = 'mr-1.5 h-4 w-4 text-[rgba(245,158,11,0.85)] gr
 
 interface StarshipConnectorsPanelProps {
   starshipId: string
+  /**
+   * Optional onboarding mode: show only a subset of connectors (by provider).
+   */
+  onlyProviders?: string[]
+  /**
+   * Hide the search bar (useful for embedded onboarding experiences).
+   */
+  hideSearch?: boolean
+  /**
+   * Hide disconnect UI (useful for onboarding).
+   */
+  hideDisconnect?: boolean
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -34,7 +46,7 @@ function getConnectorLogoSrc(provider: string): string {
   return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
 }
 
-export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelProps) {
+export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch = false, hideDisconnect = false }: StarshipConnectorsPanelProps) {
   const { data: catalog = [] } = useConnectorCatalog()
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
@@ -248,7 +260,14 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   )
 
   // Catalog is driven by connector_templates (enabled only). UI adapts actions based on auth.type.
-  const visibleCatalog = useMemo(() => catalog.filter(item => item.provider !== 'starships'), [catalog])
+  const visibleCatalog = useMemo(() => {
+    const base = catalog.filter(item => item.provider !== 'starships')
+    if (Array.isArray(onlyProviders) && onlyProviders.length > 0) {
+      const allow = new Set(onlyProviders.map(p => String(p)))
+      return base.filter(item => allow.has(String(item.provider)))
+    }
+    return base
+  }, [catalog, onlyProviders])
 
   const getProviderLabel = (provider: string | null | undefined) => {
     if (!provider) return ''
@@ -279,7 +298,7 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
     const label = catalogItem.name
     const logoSrc = getConnectorLogoSrc(provider)
     const authType = catalogItem.auth?.type
-    const canDisconnect = isConnected && authType !== 'platform_jwt'
+    const canDisconnect = !hideDisconnect && isConnected && authType !== 'platform_jwt'
     const isOauthConnectable = authType === 'oauth2'
     const isApiKeyConnectable = authType === 'api_key'
     const isBasicConnectable = authType === 'basic'
@@ -360,41 +379,45 @@ export function StarshipConnectorsPanel({ starshipId }: StarshipConnectorsPanelP
   return (
     <div className="space-y-6">
       {/* Search - match Environment page styling */}
-      <div className="mb-8 sticky top-6 z-30">
-        <div className="relative max-w-md mb-6 mx-auto">
-          <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
-          <Input
-            type="text"
-            placeholder="Search connectors..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-            className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent text-sm"
-          />
+      {!hideSearch ? (
+        <div className="mb-8 sticky top-6 z-30">
+          <div className="relative max-w-md mb-6 mx-auto">
+            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 z-10 pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search connectors..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="pl-10 pr-3 w-full frosted-glass-card shadow-frosted-lg rounded-2xl border border-border/40 bg-transparent text-sm"
+            />
+          </div>
         </div>
-      </div>
+      ) : null}
 
       {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
 
-      <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>
-        <DialogContent className="sm:max-w-md">
-          <DialogHeader>
-            <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
-            <DialogDescription>
-              {pendingDisconnect ? `If you disconnect ${getProviderLabel(pendingDisconnect)}, any tools that rely on this connector will stop working until you reconnect.` : null}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="flex gap-2 justify-end">
-            <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>
-              Cancel
-            </Button>
-            <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
-              Disconnect
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {!hideDisconnect ? (
+        <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitlePrimitive>Disconnect connector?</DialogTitlePrimitive>
+              <DialogDescription>
+                {pendingDisconnect ? `If you disconnect ${getProviderLabel(pendingDisconnect)}, any tools that rely on this connector will stop working until you reconnect.` : null}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="flex gap-2 justify-end">
+              <Button type="button" variant="ghost" onClick={() => setPendingDisconnect(null)} disabled={disconnectMutation.isPending}>
+                Cancel
+              </Button>
+              <Button type="button" variant="destructive" onClick={handleConfirmDisconnect} disabled={disconnectMutation.isPending}>
+                Disconnect
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      ) : null}
 
       <Dialog
         open={preOauthProvider !== null}

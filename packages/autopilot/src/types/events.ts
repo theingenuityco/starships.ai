@@ -39,6 +39,14 @@ export interface ToolEvent extends BaseEvent {
   };
 }
 
+export interface UIActionEvent extends BaseEvent {
+  type: 'ui_action';
+  data: {
+    action: string;
+    payload?: Record<string, unknown>;
+  };
+}
+
 export type ExecutionEventType =
   | 'workflow_started'
   | 'node_started'
@@ -59,7 +67,7 @@ export interface ExecutionEvent extends BaseEvent {
   };
 }
 
-export type AutopilotEvent = ExecutionEvent | LLMEvent | ToolEvent;
+export type AutopilotEvent = ExecutionEvent | LLMEvent | ToolEvent | UIActionEvent;
 
 export interface EventCallback {
   (event: AutopilotEvent): Promise<void>;

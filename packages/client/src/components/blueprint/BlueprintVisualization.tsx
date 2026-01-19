@@ -1109,6 +1109,7 @@ function BlueprintFlow({
   const [edges, setEdges] = useState<Edge[]>([])
   const layoutVersion = useRef(0)
   const reactFlowInstanceRef = useRef<ReactFlowInstance<FlowNode, Edge> | null>(null)
+  const containerRef = useRef<HTMLDivElement | null>(null)
 
   // Convert blueprint and apply layout (async)
   // Use serialized blueprint to detect changes during streaming
@@ -1163,15 +1164,50 @@ function BlueprintFlow({
   useEffect(() => {
     if (!reactFlowInstanceRef.current) return
     if (nodesWithSelection.length === 0) return
+    let cancelled = false
+
+    const tryFit = () => {
+      if (cancelled) return
+      const el = containerRef.current
+      const hasSize = !!el && el.clientWidth > 0 && el.clientHeight > 0
+      if (!hasSize) {
+        // Wait until layout/visibility settles (prevents invalid transforms that can crash d3 transitions inside @xyflow/system)
+        requestAnimationFrame(tryFit)
+        return
+      }
+
+      try {
+        // Avoid the animated transition codepath (d3-transition) which can throw when transform inputs are undefined during initial mount.
+        reactFlowInstanceRef.current?.fitView({
+          padding: 0.25,
+          includeHiddenNodes: true,
+          minZoom: fitViewMinZoom,
+          maxZoom: fitViewMaxZoom,
+          duration: 0,
+        })
+      } catch {
+        // If fitView fails due to transient DOM timing, retry once on next frame.
+        requestAnimationFrame(() => {
+          if (cancelled) return
+          try {
+            reactFlowInstanceRef.current?.fitView({
+              padding: 0.25,
+              includeHiddenNodes: true,
+              minZoom: fitViewMinZoom,
+              maxZoom: fitViewMaxZoom,
+              duration: 0,
+            })
+          } catch {}
+        })
+      }
+    }
+
     // Allow the DOM to paint nodes before fitting
-    requestAnimationFrame(() => {
-      reactFlowInstanceRef.current?.fitView({
-        padding: 0.25,
-        includeHiddenNodes: true,
-        minZoom: fitViewMinZoom,
-        maxZoom: fitViewMaxZoom,
-      })
-    })
+    requestAnimationFrame(tryFit)
+
+    return () => {
+      cancelled = true
+    }
   }, [nodesWithSelection.length, fitViewMaxZoom, fitViewMinZoom])
 
   // Default amber-suited gradient if no explicit background is provided and not transparent
@@ -1188,6 +1224,7 @@ function BlueprintFlow({
 
   return (
     <div
+      ref={containerRef}
       className={`h-full w-full ${borderless ? '' : 'border border-muted-foreground/20'} rounded-lg relative ${transparent ? 'bg-transparent' : 'blueprint-container-bg'} ${containerClassName}`}
       style={computedContainerStyle}
     >

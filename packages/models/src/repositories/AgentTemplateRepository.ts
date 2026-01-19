@@ -595,12 +595,28 @@ export class AgentTemplateRepository extends BaseRepository {
       async () => {
         const cleanedUpdates: UpdateAgentTemplateRequest = { ...updates };
 
+        // Defensive: callers should never be able to set template slugs directly.
+        // (Public UpdateAgentTemplateRequest forbids `slug`, but runtime payloads may still include it.)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        if ('slug' in (cleanedUpdates as any)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          delete (cleanedUpdates as any).slug;
+        }
+
         // Auto-regenerate slug on name updates
         // Note: public UpdateAgentTemplateRequest forbids `slug`, but the repository may set it internally.
         const internalUpdates: Partial<AgentTemplateModel> = { ...cleanedUpdates };
         if (cleanedUpdates.name !== undefined && cleanedUpdates.name !== null) {
-          const baseSlug = generateSlug(String(cleanedUpdates.name)) || 'agent-template';
-          internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          // Only regenerate the slug when the name actually changes.
+          // This keeps marketplace slugs stable across re-approvals / re-publishes.
+          const existing = await this.findById(id);
+          const nextName = String(cleanedUpdates.name).trim();
+          const currentName = String(existing?.name ?? '').trim();
+
+          if (!existing || nextName.toLowerCase() !== currentName.toLowerCase()) {
+            const baseSlug = generateSlug(nextName) || 'agent-template';
+            internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
+          }
         }
 
         await AgentTemplateEntity.validate(internalUpdates, 'update');

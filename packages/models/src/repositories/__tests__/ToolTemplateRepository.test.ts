@@ -279,12 +279,60 @@ describe('ToolTemplateRepository', () => {
         updated_at: '2024-01-02T00:00:00.000Z',
       };
 
-      testHelper.mockConnection.query.mockResolvedValue([mockUpdated]);
+      // update() now checks the current name to avoid regenerating slugs unnecessarily
+      testHelper.mockConnection.query
+        .mockResolvedValueOnce([
+          {
+            id: 'template-1',
+            name: 'Template 1',
+            slug: 'template-1',
+            category: 'api',
+            usage_count: 5,
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          },
+        ])
+        .mockResolvedValueOnce([mockUpdated]);
 
       const result = await repository.update('template-1', updates);
 
       expect(result).not.toBeNull();
       expect(result!.name).toBe('Updated Template');
+    });
+
+    it('should not regenerate slug when name is unchanged (even if payload includes slug)', async () => {
+      const slugSpy = jest.spyOn(
+        repository as unknown as { generateUniqueTemplateSlug: (base: string) => Promise<string> },
+        'generateUniqueTemplateSlug'
+      );
+
+      testHelper.mockConnection.query
+        .mockResolvedValueOnce([
+          {
+            id: 'template-1',
+            name: 'Weather Lookup',
+            slug: 'weather-lookup-abcd',
+            category: 'api',
+            usage_count: 5,
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-01T00:00:00.000Z',
+          },
+        ])
+        .mockResolvedValueOnce([
+          {
+            id: 'template-1',
+            name: 'weather lookup',
+            slug: 'weather-lookup-abcd',
+            category: 'api',
+            usage_count: 5,
+            created_at: '2024-01-01T00:00:00.000Z',
+            updated_at: '2024-01-02T00:00:00.000Z',
+          },
+        ]);
+
+      await repository.update('template-1', { name: 'weather lookup', slug: 'attempted-override' } as any);
+
+      expect(slugSpy).not.toHaveBeenCalled();
     });
 
     it('should return null when template not found', async () => {

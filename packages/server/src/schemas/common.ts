@@ -37,17 +37,14 @@ export const PaginationSchema = z.object({
  * Validation schema for email addresses
  * Ensures consistent email validation across all endpoints
  */
-export const EmailSchema = z
-  .string()
-  .email('Invalid email format')
-  .max(255, 'Email must be less than 255 characters');
+export const EmailSchema = z.string().email('Invalid email format').max(255, 'Email must be less than 255 characters');
 
 /**
  * Validation schema for passwords
  * Enforces strong password requirements:
  * - At least 8 characters
  * - At least one uppercase letter
- * - At least one lowercase letter  
+ * - At least one lowercase letter
  * - At least one number
  * - At least one special character
  */
@@ -107,18 +104,23 @@ export const SearchSchema = z.object({
  * Date range schema for filtering
  * Common date range filtering across endpoints
  */
-export const DateRangeSchema = z.object({
-  startDate: z.string().datetime().optional(),
-  endDate: z.string().datetime().optional(),
-}).refine((data) => {
-  if (data.startDate && data.endDate) {
-    return new Date(data.startDate) <= new Date(data.endDate);
-  }
-  return true;
-}, {
-  message: 'Start date must be before or equal to end date',
-  path: ['endDate'],
-});
+export const DateRangeSchema = z
+  .object({
+    startDate: z.string().datetime().optional(),
+    endDate: z.string().datetime().optional(),
+  })
+  .refine(
+    (data) => {
+      if (data.startDate && data.endDate) {
+        return new Date(data.startDate) <= new Date(data.endDate);
+      }
+      return true;
+    },
+    {
+      message: 'Start date must be before or equal to end date',
+      path: ['endDate'],
+    }
+  );
 
 /**
  * Filtering schema that combines search and date range
@@ -135,10 +137,8 @@ export const noXSS = (val: string): boolean => {
   if (/<[^>]*>/.test(val)) {
     return false;
   }
-  // Reject dangerous characters: <, >, &, ", ', /, {, }, \
-  if (/[<>&"'/\\{}]/.test(val)) {
-    return false;
-  }
+  // Also reject raw angle brackets even if not a full tag (defense in depth)
+  if (/[<>]/.test(val)) return false;
   // Reject control characters (except newlines and tabs)
   // eslint-disable-next-line no-control-regex
   if (/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/.test(val)) {

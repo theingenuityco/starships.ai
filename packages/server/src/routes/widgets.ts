@@ -11,6 +11,32 @@ import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 const router: Router = Router();
 
 // Zod schemas for validation
+const SearchWidgetsQuerySchema = z.object({
+  name: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100, 'name must be less than 100 characters')
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  slug: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100, 'slug must be less than 100 characters')
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  widgetType: z
+    .string()
+    .trim()
+    .min(1)
+    .max(100, 'widgetType must be less than 100 characters')
+    .optional()
+    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  limit: z.coerce.number().int().min(0).max(200).optional(),
+  offset: z.coerce.number().int().min(0).max(10_000).optional(),
+});
+
 const CreateWidgetSchema = z.object({
   name: z
     .string()
@@ -23,11 +49,7 @@ const CreateWidgetSchema = z.object({
     .max(100, 'Slug must be less than 100 characters')
     .optional()
     .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
-  description: z
-    .string()
-    .min(0)
-    .max(1000, 'Description must be less than 1000 characters')
-    .refine(noXSS, { message: XSS_ERROR_MESSAGE }),
+  description: z.string().min(0).max(1000, 'Description must be less than 1000 characters').refine(noXSS, { message: XSS_ERROR_MESSAGE }),
   widgetType: z
     .string()
     .min(1, 'Widget type is required')
@@ -66,19 +88,16 @@ router.get('/starships/:starshipId/widgets', jwtAuthMiddleware, async (req: Requ
 
     const widgetRepo = new WidgetRepository();
     // Optional search filters via query params (backwards compatible: no params => list all)
-    const qName = typeof req.query?.name === 'string' ? req.query.name : undefined;
-    const qSlug = typeof req.query?.slug === 'string' ? req.query.slug : undefined;
-    const qWidgetType = typeof req.query?.widgetType === 'string' ? req.query.widgetType : undefined;
-    const qLimit = typeof req.query?.limit === 'string' ? Number(req.query.limit) : undefined;
-    const qOffset = typeof req.query?.offset === 'string' ? Number(req.query.offset) : undefined;
+    const q = validateData(SearchWidgetsQuerySchema, req.query, res, 'widgets search query');
+    if (!q) return;
 
     const widgets = await widgetRepo.search({
       starshipId,
-      ...(qName ? { name: qName } : null),
-      ...(qSlug ? { slug: qSlug } : null),
-      ...(qWidgetType ? { widgetType: qWidgetType } : null),
-      ...(Number.isFinite(qLimit) ? { limit: qLimit } : null),
-      ...(Number.isFinite(qOffset) ? { offset: qOffset } : null),
+      ...(q.name ? { name: q.name } : null),
+      ...(q.slug ? { slug: q.slug } : null),
+      ...(q.widgetType ? { widgetType: q.widgetType } : null),
+      ...(typeof q.limit === 'number' ? { limit: q.limit } : null),
+      ...(typeof q.offset === 'number' ? { offset: q.offset } : null),
     });
 
     return sendSuccess(res, widgets);

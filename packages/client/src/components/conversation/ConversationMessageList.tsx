@@ -404,7 +404,8 @@ export function ConversationMessageList({
       const hasReasoning = typeof extendedMsg.reasoning === 'string' && extendedMsg.reasoning.trim().length > 0
       const hasToolCalls = Array.isArray(extendedMsg.toolCalls) && extendedMsg.toolCalls.length > 0
       const hasAttachments = Array.isArray(extendedMsg.attachmentIds) && extendedMsg.attachmentIds.length > 0
-      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments
+      const hasUIActions = Array.isArray(extendedMsg.uiActions) && extendedMsg.uiActions.length > 0
+      const shouldKeep = hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasAttachments || hasUIActions
       return shouldKeep
     })
 
@@ -441,7 +442,8 @@ export function ConversationMessageList({
       const hasToolCalls = Array.isArray(msg.toolCalls) && msg.toolCalls.length > 0
       const hasToolResults = Array.isArray(msg.toolResults) && msg.toolResults.length > 0
       const hasAttachments = Array.isArray(msg.attachmentIds) && msg.attachmentIds.length > 0
-      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments
+      const hasUIActions = Array.isArray(msg.uiActions) && msg.uiActions.length > 0
+      return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments || hasUIActions
     }
     const filtered = displayMessages.filter(canRenderAssistant)
     return filtered
@@ -778,6 +780,10 @@ interface ExtendedMessage extends MessageModel {
     toolCallId?: string
     content?: string
   }>
+  uiActions?: Array<{
+    action: string
+    payload?: Record<string, unknown>
+  }>
   attachmentIds?: string[]
 }
 
@@ -947,6 +953,7 @@ const MemoizedMessageBubble = memo(
                 agentName={agentName}
                 toolCalls={message.toolCalls}
                 toolResults={message.toolResults}
+                uiActions={message.uiActions}
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
@@ -1007,6 +1014,11 @@ const MemoizedMessageBubble = memo(
     const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0
     const nextToolResults = (nextProps.message as ExtendedMessage).toolResults?.length ?? 0
     if (prevToolResults !== nextToolResults) return false
+
+    // Re-render when uiActions attach later (render_widget and other UI-driven messages)
+    const prevUiActions = (prevProps.message as ExtendedMessage).uiActions?.length ?? 0
+    const nextUiActions = (nextProps.message as ExtendedMessage).uiActions?.length ?? 0
+    if (prevUiActions !== nextUiActions) return false
 
     return true
   }

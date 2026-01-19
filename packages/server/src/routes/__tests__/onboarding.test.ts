@@ -1,0 +1,160 @@
+import type { Request, Response } from 'express';
+
+jest.mock('@/services/StarshipService', () => ({
+  StarshipService: {
+    createDefaultStarship: jest.fn(),
+  },
+}));
+
+jest.mock('@/services/AgentTemplateService', () => ({
+  AgentTemplateService: jest.fn().mockImplementation(() => ({
+    searchTemplates: jest.fn(),
+    createAgentFromTemplate: jest.fn(),
+  })),
+}));
+
+jest.mock('@starships/models', () => ({
+  UserRepository: jest.fn(),
+  StarshipRepository: jest.fn(),
+  AgentRepository: jest.fn(),
+  OnboardingSessionRepository: jest.fn(),
+}));
+
+import onboardingRouter from '@/routes/onboarding';
+import { StarshipService } from '@/services/StarshipService';
+import { AgentTemplateService } from '@/services/AgentTemplateService';
+import { UserRepository, StarshipRepository, OnboardingSessionRepository } from '@starships/models';
+
+type MockRes = {
+  status: jest.Mock<Response, [number]>;
+  json: jest.Mock<Response, [unknown]>;
+};
+
+function createMockRes(): MockRes {
+  const res: MockRes = {
+    status: jest.fn<Response, [number]>(),
+    json: jest.fn<Response, [unknown]>(),
+  };
+  res.status.mockImplementation(() => res as unknown as Response);
+  res.json.mockImplementation(() => res as unknown as Response);
+  return res;
+}
+
+function getHandler(path: string): (req: Request, res: Response) => Promise<void> {
+  const layer = (onboardingRouter as any).stack.find((l: any) => l?.route?.path === path);
+  if (!layer) throw new Error(`Route not found: ${path}`);
+  const stack = layer.route.stack;
+  const handler = stack[stack.length - 1].handle;
+  return handler;
+}
+
+describe('onboarding routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('POST /onboarding/start creates starship, ensures Aria, upserts session', async () => {
+    const mockUserRepo = { findById: jest.fn() };
+    (UserRepository as unknown as jest.Mock).mockImplementation(() => mockUserRepo);
+    mockUserRepo.findById.mockResolvedValue({ id: 'u1', onboardingCompleted: false });
+
+    const mockSessionRepo = { findByUserId: jest.fn(), upsertForUser: jest.fn() };
+    (OnboardingSessionRepository as unknown as jest.Mock).mockImplementation(() => mockSessionRepo);
+    mockSessionRepo.findByUserId.mockResolvedValue(null);
+    mockSessionRepo.upsertForUser.mockResolvedValue({
+      userId: 'u1',
+      starshipId: 's1',
+      step: 'welcome',
+      goals: [],
+      selectedConnectorProviders: [],
+      selectedAgentTemplateIds: [],
+      primaryAgentTemplateId: null,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const mockStarshipRepo = { findById: jest.fn(), getDeployedAgents: jest.fn() };
+    (StarshipRepository as unknown as jest.Mock).mockImplementation(() => mockStarshipRepo);
+    mockStarshipRepo.getDeployedAgents.mockResolvedValue([
+      { id: 'a1', slug: 'aria', name: 'Aria' },
+    ]);
+
+    jest.mocked(StarshipService.createDefaultStarship).mockResolvedValue({
+      id: 's1',
+      slug: 'ship-1',
+      ownerId: 'u1',
+      name: 'Ship 1',
+      status: 'active',
+      maxAgents: 3,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as any);
+
+    // Omit starshipName so the route uses StarshipService.createDefaultStarship (mocked below)
+    const req = { user: { id: 'u1' }, body: {} } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/onboarding/start');
+    await handler(req, res as unknown as Response);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.session.userId).toBe('u1');
+    expect(payload.data.starship.slug).toBe('ship-1');
+    expect(payload.data.ariaAgent.slug).toBe('aria');
+  });
+
+  it('POST /onboarding/apply deploys selected templates and returns deployed agents', async () => {
+    const mockSessionRepo = { findByUserId: jest.fn(), upsertForUser: jest.fn() };
+    (OnboardingSessionRepository as unknown as jest.Mock).mockImplementation(() => mockSessionRepo);
+    mockSessionRepo.findByUserId.mockResolvedValue({
+      userId: 'u1',
+      starshipId: 's1',
+      step: 'agents',
+      goals: ['research'],
+      selectedConnectorProviders: [],
+      selectedAgentTemplateIds: [],
+      primaryAgentTemplateId: null,
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    mockSessionRepo.upsertForUser.mockResolvedValue({
+      userId: 'u1',
+      starshipId: 's1',
+      step: 'first_task',
+      goals: ['research'],
+      selectedConnectorProviders: [],
+      selectedAgentTemplateIds: ['t1'],
+      primaryAgentTemplateId: 't1',
+      completedAt: null,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+
+    const mockStarshipRepo = { getDeployedAgents: jest.fn() };
+    (StarshipRepository as unknown as jest.Mock).mockImplementation(() => mockStarshipRepo);
+    mockStarshipRepo.getDeployedAgents.mockResolvedValue([]);
+
+    const templateSvc = {
+      searchTemplates: jest.fn(),
+      createAgentFromTemplate: jest.fn().mockResolvedValue({ id: 'a2', slug: 'agent-1', name: 'Agent 1', sourceTemplateId: 't1' }),
+    };
+    (AgentTemplateService as unknown as jest.Mock).mockImplementation(() => templateSvc);
+
+    const req = { user: { id: 'u1' }, body: { selectedAgentTemplateIds: ['t1'], primaryAgentTemplateId: 't1' } } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/onboarding/apply');
+    await handler(req, res as unknown as Response);
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.session.step).toBe('first_task');
+    expect(payload.data.deployedAgents[0].slug).toBe('agent-1');
+  });
+});
+

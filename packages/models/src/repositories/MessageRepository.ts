@@ -22,7 +22,10 @@ export class MessageRepository extends BaseRepository {
         const id = String(turnId || '').trim();
         if (!id) return -1;
         const connection = this.getConnection();
-        const row = await connection.queryOne<{ max_seq: number | null }>('SELECT MAX(turn_seq) as max_seq FROM messages WHERE turn_id = $1', [id]);
+        const row = await connection.queryOne<{ max_seq: number | null }>(
+          'SELECT MAX(turn_seq) as max_seq FROM messages WHERE turn_id = $1',
+          [id]
+        );
         const n = row?.max_seq;
         return typeof n === 'number' && Number.isFinite(n) ? n : -1;
       },
@@ -375,6 +378,35 @@ export class MessageRepository extends BaseRepository {
       },
       'findLatestToolMessageByToolCallId',
       'Message'
+    );
+  }
+
+  /**
+   * Find the latest assistant message for a conversation that contains a given toolCallId
+   * inside its persisted `tool_calls` JSONB array.
+   */
+  async findLatestAssistantMessageByToolCallId(conversationId: string, toolCallId: string): Promise<MessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const needle = JSON.stringify([{ id: toolCallId }]);
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `
+          SELECT *
+          FROM messages
+          WHERE conversation_id = $1
+            AND role = 'assistant'
+            AND tool_calls @> $2::jsonb
+          ORDER BY created_at DESC
+          LIMIT 1
+          `,
+          [conversationId, needle]
+        );
+        return row ? fromDatabase(MessageEntity, row) : null;
+      },
+      'findLatestAssistantMessageByToolCallId',
+      'Message',
+      `${conversationId}:${toolCallId}`
     );
   }
 }

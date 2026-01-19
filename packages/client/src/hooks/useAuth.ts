@@ -17,6 +17,7 @@ export interface AuthUser {
   hasPassword: boolean
   authMethods: AuthMethod[]
   primaryAuthMethod: 'password' | 'oauth'
+  onboardingCompleted: boolean
   /**
    * Instance-level admin flag from backend.
    * When true, user can access instance admin views (e.g. publish approvals).
@@ -30,7 +31,10 @@ interface AuthLoginResponse {
   token?: string
   starship?: {
     slug: string
+    id?: string
+    name?: string
   }
+  onboardingRequired: boolean
   message?: string
   // Email verification fields
   emailNotVerified?: boolean
@@ -187,7 +191,7 @@ export function useLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token, starship, isFirstLogin } = data
+      const { user, token } = data
 
       if (!user || !token) {
         handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useLogin')
@@ -208,12 +212,10 @@ export function useLogin() {
 
       const redirectTarget = getPostAuthRedirectTarget()
       if (redirectTarget) {
-        router.push(isFirstLogin ? addWelcomeParamToPath(redirectTarget) : redirectTarget)
-      } else if (starship) {
-        const path = `/ship/${starship.slug}/conversations`
-        router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)
+        router.push(addWelcomeParamToPath(redirectTarget))
+      } else if (data.starship?.slug) {
+        router.push(addWelcomeParamToPath(`/ship/${data.starship.slug}/conversations`))
       } else {
-        // If no starship available, redirect to profile which handles starship routing
         router.push('/profile')
       }
 
@@ -319,7 +321,7 @@ export function useOAuthLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token, starship, isFirstLogin } = data
+      const { user, token } = data
 
       if (!user || !token) {
         handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useOAuthLogin')
@@ -341,10 +343,9 @@ export function useOAuthLogin() {
 
       const redirectTarget = getPostAuthRedirectTarget()
       if (redirectTarget) {
-        router.push(isFirstLogin ? addWelcomeParamToPath(redirectTarget) : redirectTarget)
-      } else if (starship) {
-        const path = `/ship/${starship.slug}/conversations`
-        router.push(isFirstLogin ? addWelcomeParamToPath(path) : path)
+        router.push(addWelcomeParamToPath(redirectTarget))
+      } else if (data.starship?.slug) {
+        router.push(addWelcomeParamToPath(`/ship/${data.starship.slug}/conversations`))
       } else {
         router.push('/profile')
       }

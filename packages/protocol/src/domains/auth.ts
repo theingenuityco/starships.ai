@@ -25,6 +25,7 @@ export interface AuthUser {
   hasPassword: boolean;
   authMethods: AuthMethod[];
   primaryAuthMethod: 'password' | 'oauth';
+  onboardingCompleted: boolean;
 
   /**
    * Instance-level admin flag.
@@ -70,6 +71,7 @@ export interface AuthLoginResponse {
     slug: string;
     name: string;
   };
+  onboardingRequired: boolean;
   message?: string;
   // Email verification fields
   emailNotVerified?: boolean;

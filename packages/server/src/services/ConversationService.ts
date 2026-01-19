@@ -24,7 +24,6 @@ import {
   MessageModel,
   StarshipModel,
   ConversationStreamEvent,
-  ConversationStreamUIAction,
 } from '@starships/protocol';
 import type { ContentBlock, MessageContent } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
@@ -36,6 +35,7 @@ import { BillingService } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
+import { UIActionService } from '@/services/UIActionService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
@@ -79,8 +79,9 @@ export class ConversationService {
   private messageService!: MessageService;
   private turnRepository!: TurnRepository;
   private streamBus!: ConversationStreamBus;
+  private uiActions!: UIActionService;
   // Best-effort mapping of toolCallId -> tool function name (per conversation).
-  // Used to derive richer UI actions (e.g., widget_created vs widget_updated) from tool results.
+  // Used to emit UI actions produced explicitly by Autopilot (event.type === 'ui_action').
   private lastToolCallNameByConversation: Map<string, Map<string, string>> = new Map();
   // Streaming assistant message id per conversation (per current turn)
   private streamingAssistantMessageId: Map<string, string> = new Map();
@@ -193,6 +194,7 @@ export class ConversationService {
     this.turnRepository = new TurnRepository();
     this.llmModelRepository = new LlmModelRepository();
     this.streamBus = ConversationStreamBus.getInstance();
+    this.uiActions = new UIActionService(this.streamBus);
     this.connectorSecretService = new ConnectorSecretService();
     this.usageService = new UsageService();
     this.billingService = new BillingService();
@@ -678,15 +680,13 @@ export class ConversationService {
     // If this is a child conversation linked to a parent, emit a UI action on the parent's stream
     try {
       if (conversation.parentConversationId) {
-        const payload: ConversationStreamUIAction = {
-          __ui_action: 'child_conversation_created',
-          parentConversationId: conversation.parentConversationId,
-          childConversationId: conversation.id,
-          starshipId: conversation.starshipId,
-        };
-        await this.streamBus.publish(conversation.parentConversationId, {
-          type: 'ui_action',
-          data: payload,
+        await this.uiActions.publish(conversation.parentConversationId, {
+          action: 'child_conversation_created',
+          payload: {
+            parentConversationId: conversation.parentConversationId,
+            childConversationId: conversation.id,
+            starshipId: conversation.starshipId,
+          },
         });
       }
     } catch (e) {
@@ -952,7 +952,7 @@ export class ConversationService {
           });
           try {
             await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: sys } });
-            await this.streamBus.publish(conversationId, { type: 'ui_action', data: { __ui_action: 'insufficient_balance' } });
+            await this.uiActions.publish(conversationId, { action: 'insufficient_balance' });
           } catch (err) {
             console.error('[ConversationService] Failed to publish insufficient balance messages', {
               error: err instanceof Error ? err.message : String(err),
@@ -1257,9 +1257,9 @@ export class ConversationService {
             if (gen && gen.trim()) {
               await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
               try {
-                await this.streamBus.publish(convo.id, {
-                  type: 'ui_action',
-                  data: { __ui_action: 'conversation_title_updated', conversationId: convo.id, title: gen.trim() },
+                await this.uiActions.publish(convo.id, {
+                  action: 'conversation_title_updated',
+                  payload: { conversationId: convo.id, title: gen.trim() },
                 });
               } catch (err) {
                 console.error('[ConversationService] Failed to publish conversation title update', {
@@ -2036,6 +2036,22 @@ export class ConversationService {
     }
 
     switch (event.type) {
+      case 'ui_action': {
+        try {
+          const anyEvt = event as unknown as { data?: { action?: unknown; payload?: unknown } };
+          const action = typeof anyEvt?.data?.action === 'string' ? anyEvt.data.action : '';
+          const payload =
+            anyEvt?.data?.payload && typeof anyEvt.data.payload === 'object' && !Array.isArray(anyEvt.data.payload)
+              ? (anyEvt.data.payload as Record<string, unknown>)
+              : undefined;
+          if (action && action.trim()) {
+            await this.uiActions.publish(conversationId, { action: action.trim(), ...(payload ? { payload } : null) });
+          }
+        } catch {
+          // best-effort only
+        }
+        break;
+      }
       case 'workflow_started': {
         // Defer placeholder creation until first content_chunk to avoid empty duplicate assistant messages.
         // streamingContent accumulator will be initialized on first chunk if needed.
@@ -2656,51 +2672,7 @@ export class ConversationService {
 
       case 'node_completed': {
         // Handle tool node completion - persist tool result messages
-        // Also detect UI actions emitted by code/end nodes and forward them to the client via SSE
-        try {
-          const execEvent = event as ExecutionEvent;
-          const execution: Execution | undefined = execEvent?.data?.execution;
-          const results = Array.isArray(execution?.results) ? execution.results : [];
-
-          // Walk results from the end to find a JSON payload that declares a UI action
-          type UIPayload = { __ui_action: string } & Record<string, unknown>;
-          let uiPayload: UIPayload | null = null;
-          for (let i = results.length - 1; i >= 0 && !uiPayload; i--) {
-            const items = Array.isArray(results[i]?.items) ? results[i].items : [];
-            for (let j = items.length - 1; j >= 0 && !uiPayload; j--) {
-              const json = items[j]?.json && typeof items[j].json === 'object' ? items[j].json : null;
-              if (!json) continue;
-              if (json && typeof (json as Record<string, unknown>).__ui_action === 'string') {
-                uiPayload = json as UIPayload;
-                break;
-              }
-              const maybeResult = (json as Record<string, unknown>)['result'] as unknown;
-              if (
-                maybeResult &&
-                typeof maybeResult === 'object' &&
-                typeof (maybeResult as Record<string, unknown>).__ui_action === 'string'
-              ) {
-                uiPayload = maybeResult as UIPayload;
-                break;
-              }
-            }
-          }
-
-          if (uiPayload && typeof uiPayload.__ui_action === 'string') {
-            // Emit structured UI event over SSE; modern clients should listen to 'ui_action'
-            // and no longer rely on back-compat assistant messages that duplicate tool_result JSON.
-            try {
-              await this.streamBus.publish(conversationId, { type: 'ui_action', data: uiPayload });
-            } catch (err) {
-              console.error('[ConversationService] Failed to publish UI action', {
-                error: err instanceof Error ? err.message : String(err),
-                conversationId,
-              });
-            }
-          }
-        } catch (e) {
-          console.warn('[STREAMING] UI action detection failed on node_completed:', e);
-        }
+        // NOTE: Legacy UI action inference removed. UI actions must be emitted explicitly via AutopilotEvent 'ui_action'.
 
         // Detect and persist new messages added to state via mutations
         try {
@@ -2912,70 +2884,8 @@ export class ConversationService {
                   console.warn('[STREAM] Failed to publish message.append', e);
                 }
 
-                // If this was a tool_result message that produced a widget, emit a structured ui_action so
-                // clients can render it immediately (and in a stable, tool-agnostic way).
-                try {
-                  if (role === 'tool') {
-                    const toolCallId = typeof persistedMsg.toolCallId === 'string' ? persistedMsg.toolCallId : '';
-                    const raw = typeof persistedMsg.content === 'string' ? persistedMsg.content : '';
-                    const t = raw.trim();
-                    if (toolCallId && t && (t.startsWith('{') || t.startsWith('['))) {
-                      const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
-                      const get = (v: unknown, key: string): unknown => (isRecord(v) ? v[key] : undefined);
-                      const getNested = (v: unknown, keys: string[]): unknown => {
-                        let cur: unknown = v;
-                        for (const k of keys) cur = get(cur, k);
-                        return cur;
-                      };
-
-                      let parsed: unknown = null;
-                      try {
-                        parsed = JSON.parse(t);
-                      } catch {
-                        parsed = null;
-                      }
-
-                      const candidate = isRecord(parsed) ? parsed : null;
-
-                      const maybeWidget: unknown =
-                        (candidate ? get(candidate, 'widget') : undefined) ??
-                        (candidate ? getNested(candidate, ['data', 'widget']) : undefined) ??
-                        (candidate ? getNested(candidate, ['data', 'result', 'widget']) : undefined) ??
-                        (candidate ? getNested(candidate, ['data', 'result']) : undefined) ??
-                        (candidate ? get(candidate, 'data') : undefined) ??
-                        (candidate ? get(candidate, 'result') : undefined) ??
-                        candidate;
-
-                      const hasRenderableShape =
-                        isRecord(maybeWidget) &&
-                        typeof maybeWidget['widgetType'] === 'string' &&
-                        maybeWidget['widgetType'].trim().length > 0 &&
-                        typeof maybeWidget['props'] === 'object' &&
-                        maybeWidget['props'] !== null;
-
-                      if (hasRenderableShape) {
-                        const toolName = this.lastToolCallNameByConversation.get(conversationId)?.get(toolCallId) || '';
-                        const action = toolName.includes('update-widget') ? 'widget_updated' : 'widget_created';
-
-                        await this.streamBus.publish(conversationId, {
-                          type: 'ui_action',
-                          data: {
-                            __ui_action: action,
-                            conversationId,
-                            toolCallId,
-                            widget: maybeWidget,
-                          },
-                        });
-                      }
-                    }
-                  }
-                } catch (e) {
-                  // Best-effort only; never fail the turn for UI emission issues
-                  console.warn('[STREAM] Failed to emit widget ui_action', {
-                    conversationId,
-                    error: e instanceof Error ? e.message : String(e),
-                  });
-                }
+                // NOTE: Widget rendering is now explicit via a dedicated tool (render-widget) that emits
+                // a ui_action directly. We intentionally do NOT infer widget UI actions from tool_result payloads.
               } catch (persistError) {
                 console.error('[STREAMING] Failed to persist state message:', persistError);
               }

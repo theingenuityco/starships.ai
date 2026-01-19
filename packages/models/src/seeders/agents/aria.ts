@@ -104,6 +104,7 @@ export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'call-agent',
     'list-tools',
     'list-connectors',
+    'suggest-connectors',
   ],
 
   icon: '🎼',
@@ -112,6 +113,7 @@ export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'For this research question, pick the best agent and run it for me.',
     'Choose between my agents and route this support request to the right one.',
     'Look at the agents on this starship and explain which ones you will use for ongoing data analysis.',
+    'Suggest connectors for Slack and Notion.',
   ],
   blueprint: createAriaDefaultBlueprint(),
   ...createAriaConfig(),

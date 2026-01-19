@@ -35,9 +35,7 @@ export function OnboardingPage(): React.JSX.Element {
       const trimmed = starshipName.trim()
       const res = await chatStart.mutateAsync(trimmed ? { starshipName: trimmed } : {})
       router.replace(
-        `/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(
-          res.ariaAgent.slug
-        )}`
+        `/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}&onboarding=1`
       )
     } catch (e: any) {
       toast.error('Could not start onboarding', { description: e?.message || 'Please try again.' })

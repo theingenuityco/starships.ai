@@ -43,13 +43,13 @@ function CompactConversationAgents({ starshipId, agents }: { starshipId: string;
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
-  if (!agents.length) return null
-
   const agentNamesText = useMemo(() => {
     const names = visibleAgents.map(a => formatAgentDisplayName(a)).filter(Boolean)
     const base = names.join(', ')
     return remaining > 0 ? `${base} +${remaining}` : base
   }, [visibleAgents, remaining])
+
+  if (!agents.length) return null
 
   return (
     <div className="mt-1 flex items-center gap-1 text-muted-foreground group-hover:text-foreground min-w-0" style={{ fontSize: '12px' }}>

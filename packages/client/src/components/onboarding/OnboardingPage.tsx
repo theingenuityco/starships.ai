@@ -18,10 +18,7 @@ export function OnboardingPage(): React.JSX.Element {
   const autoResumeRef = useRef(false)
   const [autoStartFailed, setAutoStartFailed] = useState(false)
 
-  const canAutoStart = useMemo(
-    () => isAuthenticated && !authLoading && !onboardingLoading && !chatStart.isPending,
-    [authLoading, chatStart.isPending, isAuthenticated]
-  )
+  const canAutoStart = useMemo(() => isAuthenticated && !authLoading && !onboardingLoading && !chatStart.isPending, [authLoading, chatStart.isPending, isAuthenticated])
 
   useEffect(() => {
     if (authLoading) return
@@ -46,11 +43,7 @@ export function OnboardingPage(): React.JSX.Element {
     ;(async () => {
       try {
         const res = await chatStart.mutateAsync({})
-        router.replace(
-          `/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(
-            res.ariaAgent.slug
-          )}&onboarding=1`
-        )
+        router.replace(`/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}&onboarding=1`)
       } catch (e: any) {
         autoResumeRef.current = false
         setAutoStartFailed(true)
@@ -65,9 +58,7 @@ export function OnboardingPage(): React.JSX.Element {
       autoResumeRef.current = true
       setAutoStartFailed(false)
       const res = await chatStart.mutateAsync({})
-      router.replace(
-        `/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}&onboarding=1`
-      )
+      router.replace(`/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}&onboarding=1`)
     } catch (e: any) {
       autoResumeRef.current = false
       setAutoStartFailed(true)
@@ -122,4 +113,3 @@ export function OnboardingPage(): React.JSX.Element {
     </div>
   )
 }
-

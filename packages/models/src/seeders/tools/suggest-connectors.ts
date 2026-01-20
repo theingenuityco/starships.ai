@@ -333,13 +333,26 @@ export const suggestConnectorsTool: ToolParams = {
         },
       },
       {
+        ref: 'ok_output',
+        type: 'code',
+        name: 'OK Output',
+        description: 'Return minimal tool output',
+        parameters: {
+          code: `
+            async function main() {
+              return { ok: true };
+            }
+          `,
+          timeout: 1000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
         description: '',
         parameters: {
-          output:
-            '{{ lastOutputOf("extract_updated_widget") ? lastOutputOf("extract_updated_widget") : lastOutputOf("extract_created_widget") }}',
+          output: '{{ lastOutputOf("ok_output") }}',
         },
       },
     ],
@@ -369,8 +382,9 @@ export const suggestConnectorsTool: ToolParams = {
       { ref: 'e_create', from: 'create_widget', to: 'extract_created_widget' },
       { ref: 'e_after_create', from: 'extract_created_widget', to: 'emit_created' },
 
-      { ref: 'e_end_existing', from: 'emit_existing', to: 'end_1' },
-      { ref: 'e_end_created', from: 'emit_created', to: 'end_1' },
+      { ref: 'e_after_emit_existing', from: 'emit_existing', to: 'ok_output' },
+      { ref: 'e_after_emit_created', from: 'emit_created', to: 'ok_output' },
+      { ref: 'e_end', from: 'ok_output', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -383,7 +397,7 @@ export const suggestConnectorsToolTemplate: Omit<ToolTemplateModel, 'id' | 'crea
   blueprint: suggestConnectorsTool.blueprint,
 
   slug: 'suggest-connectors',
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage: '{ "providers": ["slack", "notion"] }',
   requiresApiKey: false,

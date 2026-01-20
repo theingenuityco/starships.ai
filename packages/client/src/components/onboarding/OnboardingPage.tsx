@@ -7,15 +7,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuth } from '@/hooks/useAuth'
 import { useOnboardingChatStart } from '@/hooks/useOnboardingChatStart'
+import { useOnboardingSession } from '@/hooks/useOnboarding'
 import { useRouter } from 'next/navigation'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 
 export function OnboardingPage(): React.JSX.Element {
   const router = useRouter()
   const { user, isAuthenticated, isLoading: authLoading } = useAuth()
   const chatStart = useOnboardingChatStart()
+  const { data: onboardingData, isLoading: onboardingLoading } = useOnboardingSession()
   const [starshipName, setStarshipName] = useState('')
+  const autoResumeRef = useRef(false)
 
   const canSubmit = useMemo(
     () => isAuthenticated && !authLoading && !chatStart.isPending,
@@ -28,6 +31,33 @@ export function OnboardingPage(): React.JSX.Element {
       router.replace('/profile')
     }
   }, [authLoading, isAuthenticated, router, user?.onboardingCompleted])
+
+  // Resume onboarding automatically when the user already has an onboarding starship/session.
+  // This prevents users from getting stuck at "Create your starship" after they already created one.
+  useEffect(() => {
+    if (autoResumeRef.current) return
+    if (authLoading || onboardingLoading) return
+    if (!isAuthenticated) return
+    if (user?.onboardingCompleted) return
+
+    const session = onboardingData?.session
+    if (!session?.starshipId) return
+
+    autoResumeRef.current = true
+    ;(async () => {
+      try {
+        const res = await chatStart.mutateAsync({})
+        router.replace(
+          `/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(
+            res.ariaAgent.slug
+          )}&onboarding=1`
+        )
+      } catch (e: any) {
+        autoResumeRef.current = false
+        toast.error('Could not resume onboarding', { description: e?.message || 'Please try again.' })
+      }
+    })()
+  }, [authLoading, onboardingLoading, isAuthenticated, user?.onboardingCompleted, onboardingData?.session, chatStart, router])
 
   const handleCreate = async () => {
     if (!canSubmit) return
@@ -42,7 +72,7 @@ export function OnboardingPage(): React.JSX.Element {
     }
   }
 
-  if (authLoading) {
+  if (authLoading || onboardingLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center px-4">
         <div className="flex items-center gap-3 text-muted-foreground">

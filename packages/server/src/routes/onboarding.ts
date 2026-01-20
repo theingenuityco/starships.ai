@@ -40,7 +40,7 @@ const StartOnboardingSchema = z.object({
  * - requires explicit user action (this endpoint call)
  * - creates starship + deploys Aria
  * - creates or reuses an "Onboarding" conversation
- * - posts an initial assistant greeting + emits option chips via ui_action
+ * - fire-and-forget kickoff: schedules the initial assistant greeting in the background
  */
 router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -80,17 +80,6 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       step: 'connectors',
     });
 
-    // IMPORTANT:
-    // Once a starship exists, onboarding should become optional (user can skip and return later).
-    // Treat `onboardingCompleted` as "initial provisioning complete" rather than "finished every onboarding step".
-    try {
-      if (!dbUser.onboardingCompleted) {
-        await userRepo.update(user.id, { onboardingCompleted: true });
-      }
-    } catch {
-      // best-effort; do not block onboarding chat start
-    }
-
     // Create or reuse an "Onboarding" conversation (normal conversation labeled onboarding)
     const conversationService = new ConversationService();
     const existing = await conversationService.getConversationsByStarshipWithAgents(starship.id);
@@ -113,56 +102,64 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           agentId: aria.id,
         });
 
-    // Inject onboarding-only system prompt (conversation-scoped).
+    // Mark this conversation as onboarding + inject onboarding-only system prompt (conversation-scoped).
     // This keeps Aria's template prompt generic while customizing behavior for onboarding conversations.
     const onboardingSystemPrompt = [
       'You are starting a new onboarding conversation with a user for their starship.',
       '',
-      'Work one step at a time (turn-based):',
-      '- Do NOT ask clarifying questions and suggest connectors in the same message.',
-      '- If the task is vague, ask ONLY clarifying question(s) and stop. Wait for the user reply before suggesting connectors.',
+      'ONBOARDING PLAYBOOK (follow exactly, step-by-step):',
       '',
-      'First message:',
-      '- Warmly introduce yourself as Aria.',
-      '- Ask what task/outcome the user wants to get done (what success looks like).',
-      '- Include 3-5 examples of tasks (examples only; do not suggest connectors yet), like:',
-      '  - “Summarize and prioritize new Slack messages into a daily brief”',
-      '  - “Turn my Stripe revenue into weekly KPI charts”',
-      '  - “Answer questions about our Notion knowledge base”',
-      '  - “Track GitHub PRs/issues and report status updates”',
-      '  - “Automate recurring customer support triage”',
+      'Global rules:',
+      '- One step per turn. Do not chain steps in the same assistant turn.',
+      '- Do NOT suggest agents until the relevant connectors are actually connected (verified via List Connectors).',
       '',
-      'Clarifying questions (ONLY if the task is EXTREMELY vague):',
-      '- “Not vague” examples (do NOT ask clarifying questions; proceed to list-connectors next):',
-      '  - “Turn my Stripe revenue into weekly KPI charts”',
-      '  - “Track GitHub PRs and summarize status daily”',
-      '  - “Answer questions about our Notion knowledge base”',
-      '- “Extremely vague” examples (ask clarifying question(s) and stop):',
-      '  - “Create some UI”',
-      '  - “Help me with my business”',
-      '  - “Make this better”',
-      '- When you do ask clarifying questions:',
-      '  - Ask the minimum number of questions needed to make the task actionable.',
-      '  - Focus on: goal, apps/data involved, and any constraints (deadline/audience/format).',
-      '  - End the message after questions. Do not suggest connectors yet.',
+      'Step 0 — Render starship details (first message):',
+      '- Introduce yourself as Aria and welcome them.',
+      '- Tell them you will first collect starship details (name, description, website).',
+      '- Immediately call the Render Starship Details tool.',
+      '- STOP after rendering the widget. Do not ask additional questions in the same turn.',
       '',
-      'After the user answers (task is clear): suggest connectors:',
-      '- First call List Connectors (tool slug: list-connectors) to understand what connectors are available/connected and whether the task is feasible.',
-      '- If the task is not feasible due to missing connectors, say what is missing and ask the user whether they want to connect those apps.',
-      '- If the user mentions apps, then call Suggest Connectors (tool slug: suggest-connectors) with the relevant providers.',
-      '- If the user does not mention apps, ask one concise question listing a few common apps, then suggest connectors based on their answer.',
+      'Step 1 — Wait for user approval/response:',
+      '- Wait for the user to reply that they filled out the form (or to provide starship/company/org/project info in text).',
+      '- Do not proceed until you receive a user message.',
       '',
-      'After suggesting connectors: verify connection, then suggest agents:',
-      '- Do NOT suggest agents until the relevant connector(s) are actually connected.',
-      '- Ask the user to connect the suggested app(s), then confirm when done.',
-      '- When the user says they connected it, call List Connectors (list-connectors) again and verify the connector is connected.',
-      '- If still not connected, explain what is missing and ask them to complete the connection first.',
-      '- Once connected:',
-      '  - Call List Agents (tool slug: list-agents) to see if an already-deployed agent on the starship can handle the task.',
-      '  - If a relevant deployed agent exists, suggest using it (and offer to proceed).',
-      '  - If no relevant deployed agent exists, call List Agents From Marketplace (tool slug: list-agents-from-marketplace), pick 2–3 relevant templates, then call Suggest Agents (tool slug: suggest-agents) with templateSlugs.',
+      'Step 2 — Ask for the outcome (after Step 1):',
+      '- Ask what task/outcome they want to accomplish (what success looks like).',
+      '- Provide 3-5 example outcomes (examples only; do not suggest connectors yet).',
       '',
-      'Keep it warm, concise, and action-oriented.',
+      'Step 3 — Determine if the task is clear:',
+      '- If the user provided a clear outcome: proceed to Step 3.',
+      '- If the request is extremely vague: do Step 2.',
+      '',
+      'Step 4 — Clarify (ONLY when extremely vague):',
+      '- Ask the minimum number of questions needed to make it actionable.',
+      '- Focus on: goal, apps/data involved, constraints (deadline/audience/format).',
+      '- Stop after questions. Do not suggest connectors yet.',
+      '',
+      'Step 5 — Assess connectors (when task is clear):',
+      '- Call the List Connectors tool to see what is available/connected.',
+      '- Decide which connectors are required for the task.',
+      '- If required connectors are missing/unconnected:',
+      '  - Tell the user what needs to be connected.',
+      '  - Call the Suggest Connectors tool with relevant providers.',
+      '  - Ask the user to connect them and reply when done.',
+      '- If required connectors are already connected: proceed to Step 4.',
+      '',
+      'Step 6 — Verify connectors are connected:',
+      '- When the user says they connected apps, call the List Connectors tool again and confirm the status is connected.',
+      '- If not connected yet, ask them to finish connecting (no agent suggestions yet).',
+      '- If connected, proceed to Step 5.',
+      '',
+      'Step 7 — Suggest the right agent(s):',
+      '- Call the List Agents tool.',
+      '- If a deployed agent can do the job, propose using it and offer to proceed.',
+      '- If none fit, call List Agents From Marketplace, pick 2-3 relevant templates, then call Suggest Agents with templateSlugs.',
+      '- Ask the user to deploy, then wait.',
+      '',
+      'Step 8 — Execute:',
+      '- After the user deploys an agent (or chooses an existing one), call the Call Agent tool with a crisp brief and then summarize results.',
+      '',
+      'Tone: warm, concise, action-oriented. Ask one question at a time.',
     ].join('\\n');
 
     try {
@@ -172,26 +169,8 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           ? ((conversation as unknown as { state: Record<string, unknown> }).state as Record<string, unknown>)
           : {};
       await conversationService.updateConversation(conversation.id, {
-        state: { ...(prevState as Record<string, unknown>), onboardingSystemPrompt },
+        state: { ...(prevState as Record<string, unknown>), isOnboardingConversation: true, onboardingSystemPrompt },
       });
-    } catch {
-      // non-fatal
-    }
-
-    // Kick off the first assistant message so the user sees Aria immediately without any hardcoded greeting.
-    // IMPORTANT: best-effort only; never fail onboarding start if kickoff fails.
-    try {
-      // Avoid spamming: only kick off if there are no assistant messages yet.
-      const existingMessages = await conversationService.getConversationMessages(conversation.id).catch(() => []);
-      const hasAssistant =
-        Array.isArray(existingMessages) &&
-        existingMessages.some((m: unknown) => {
-          const rec = m as Record<string, unknown> | null;
-          return rec != null && rec['role'] === 'assistant';
-        });
-      if (!hasAssistant) {
-        await conversationService.continueAfterToolApproval(conversation.id, aria.id, { authContext: { userId: user.id } });
-      }
     } catch {
       // non-fatal
     }
@@ -201,6 +180,43 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       starship: { id: starship.id, slug: starship.slug, name: starship.name },
       ariaAgent: { id: aria.id, slug: aria.slug, name: aria.name },
       conversation: { id: conversation.id, title: conversation.title },
+    });
+
+    // -----------------------------
+    // Fire-and-forget background tasks (never block this request)
+    // -----------------------------
+
+    // IMPORTANT:
+    // Once a starship exists, onboarding should become optional (user can skip and return later).
+    // Treat `onboardingCompleted` as "initial provisioning complete" rather than "finished every onboarding step".
+    void Promise.resolve().then(async () => {
+      try {
+        if (!dbUser.onboardingCompleted) {
+          await userRepo.update(user.id, { onboardingCompleted: true });
+        }
+      } catch {
+        // best-effort; ignore
+      }
+    });
+
+    // Kick off the first assistant message so the user sees Aria immediately without any hardcoded greeting.
+    // IMPORTANT: best-effort only; never fail onboarding start if kickoff fails.
+    void Promise.resolve().then(async () => {
+      try {
+        // Avoid spamming: only kick off if there are no assistant messages yet.
+        const existingMessages = await conversationService.getConversationMessages(conversation.id).catch(() => []);
+        const hasAssistant =
+          Array.isArray(existingMessages) &&
+          existingMessages.some((m: unknown) => {
+            const rec = m as Record<string, unknown> | null;
+            return rec != null && rec['role'] === 'assistant';
+          });
+        if (!hasAssistant) {
+          await conversationService.continueAfterToolApproval(conversation.id, aria.id, { authContext: { userId: user.id } });
+        }
+      } catch (err) {
+        console.warn('[ONBOARDING] kickoff failed (non-fatal):', err);
+      }
     });
   } catch (error) {
     handleError(error, res, 'start onboarding chat');
@@ -240,7 +256,18 @@ async function ensureAriaOnStarship(starshipId: string): Promise<AgentModel> {
   const starshipRepo = new StarshipRepository();
   const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
   const existing = deployedAgents.find((a) => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria'));
-  if (existing) return existing;
+  if (existing) {
+    // Best-effort backfill: ensure all already-assigned tools are allowed.
+    // Keep onboarding route tool-agnostic (no hard-coded tool slugs).
+    try {
+      const agentRepo = new AgentRepository();
+      await agentRepo.setAllAssignedToolPermissionsForAgent(existing.id, 'allow');
+    } catch {
+      // non-fatal
+    }
+
+    return existing;
+  }
 
   const templateService = new AgentTemplateService();
   const ariaCandidates = await templateService.searchTemplates('Aria');

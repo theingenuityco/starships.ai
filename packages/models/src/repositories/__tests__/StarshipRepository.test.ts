@@ -190,6 +190,7 @@ describe('StarshipRepository', () => {
     it('should use provided slug if given', async () => {
       const createData = {
         name: 'Test Starship',
+        description: '',
         slug: 'custom-slug',
         ownerId: 'user-123',
         shipClass: 'scout' as const,
@@ -201,6 +202,8 @@ describe('StarshipRepository', () => {
       const mockCreatedStarship = {
         id: 'test-starship-id-123',
         name: 'Test Starship',
+        description: '',
+        website_url: '',
         slug: 'custom-slug',
         owner_id: 'user-123',
         ship_class: 'scout',
@@ -222,6 +225,18 @@ describe('StarshipRepository', () => {
   describe('update', () => {
     it('should update starship successfully', async () => {
       const updates = { name: 'Updated Name' };
+      const existing = {
+        id: 'starship-1',
+        name: 'Old Name',
+        slug: 'old-name',
+        owner_id: 'user-123',
+        ship_class: 'scout',
+        max_agents: 3,
+        max_concurrent_turns: 3,
+        status: 'active',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+      };
       const mockUpdated = {
         id: 'starship-1',
         name: 'Updated Name',
@@ -235,13 +250,49 @@ describe('StarshipRepository', () => {
         updated_at: '2024-01-02T00:00:00.000Z',
       };
 
-      testHelper.mockConnection.query.mockResolvedValue([mockUpdated]);
+      // 1) findById (to decide whether to regenerate slug)
+      testHelper.mockConnection.query.mockResolvedValueOnce([existing]);
+      // 2) updateEntity
+      testHelper.mockConnection.query.mockResolvedValueOnce([mockUpdated]);
 
       const result = await repository.update('starship-1', updates);
 
       expect(StarshipEntity.validate).toHaveBeenCalledWith(updates, 'update');
       expect(result).not.toBeNull();
       expect(result!.name).toBe('Updated Name');
+    });
+
+    it('should not regenerate slug when name is unchanged', async () => {
+      const updates = { name: 'Same Name' };
+      const existing = {
+        id: 'starship-1',
+        name: 'Same Name',
+        slug: 'same-name',
+        owner_id: 'user-123',
+        ship_class: 'scout',
+        max_agents: 3,
+        max_concurrent_turns: 3,
+        status: 'active',
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z',
+      };
+      const mockUpdated = {
+        ...existing,
+        updated_at: '2024-01-02T00:00:00.000Z',
+      };
+
+      const slugSpy = jest.spyOn(repository, 'generateUniqueSlug').mockResolvedValue('should-not-be-used');
+
+      // 1) findById (to decide whether to regenerate slug)
+      testHelper.mockConnection.query.mockResolvedValueOnce([existing]);
+      // 2) updateEntity
+      testHelper.mockConnection.query.mockResolvedValueOnce([mockUpdated]);
+
+      const result = await repository.update('starship-1', updates);
+
+      expect(result).not.toBeNull();
+      expect(result!.name).toBe('Same Name');
+      expect(slugSpy).not.toHaveBeenCalled();
     });
 
     it('should return null when starship not found', async () => {

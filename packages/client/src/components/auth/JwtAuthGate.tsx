@@ -6,7 +6,8 @@ import { useAuth } from '@/hooks/useAuth'
 
 import { motion } from 'motion/react'
 import { LoginForm } from '@/components/auth/LoginForm'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
+import { useConversationDetail } from '@/hooks/useConversations'
 import { useEffect } from 'react'
 
 interface JwtAuthGateProps {
@@ -21,8 +22,21 @@ export function JwtAuthGate({ children }: JwtAuthGateProps) {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
-  const isOnboardingFlow = searchParams?.get('onboarding') === '1'
+  const conversationIdFromPath = (() => {
+    const p = String(pathname || '')
+    // /ship/:slug/conversations/:conversationId
+    if (!p.startsWith('/ship/')) return null
+    const parts = p.split('/').filter(Boolean)
+    if (!(parts.length >= 4 && parts[2] === 'conversations' && Boolean(parts[3]))) return null
+    return String(parts[3])
+  })()
+  const { data: conversationForGate, isLoading: isConversationLoading } = useConversationDetail(conversationIdFromPath)
+  const isOnboardingConversation = (() => {
+    if (!conversationIdFromPath) return false
+    const rec = conversationForGate as any
+    const state = rec?.state && typeof rec.state === 'object' ? (rec.state as any) : null
+    return state?.isOnboardingConversation === true
+  })()
 
   // If a user is authenticated but has not completed onboarding, force them into /onboarding.
   // This prevents deep-links (e.g. /ship/*) from bypassing onboarding before initial provisioning.
@@ -33,12 +47,13 @@ export function JwtAuthGate({ children }: JwtAuthGateProps) {
     if (user.onboardingCompleted) return
     if (pathname === '/onboarding') return
     if (pathname === '/login') return
-    // Allow explicitly marked onboarding conversation routes to render while onboarding is incomplete.
-    if (isOnboardingFlow) return
+    // Allow onboarding conversations to render while onboarding is incomplete.
+    if (conversationIdFromPath && isConversationLoading) return
+    if (isOnboardingConversation) return
     // Avoid redirect loops on connector install flows (they are public + can authenticate later).
     if (typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.includes('/install')) return
     router.replace('/onboarding')
-  }, [isLoading, isAuthenticated, user, pathname, router, isOnboardingFlow])
+  }, [isLoading, isAuthenticated, user, pathname, router, isOnboardingConversation, conversationIdFromPath, isConversationLoading])
 
   // Show loading state while checking authentication
   if (isLoading) {
@@ -77,7 +92,7 @@ export function JwtAuthGate({ children }: JwtAuthGateProps) {
 
   // While we are redirecting an authenticated-but-not-onboarded user, avoid rendering protected content.
   // IMPORTANT: allow /onboarding itself to render (it is intentionally accessible before completion).
-  if (user && !user.onboardingCompleted && pathname !== '/onboarding' && !isOnboardingFlow) {
+  if (user && !user.onboardingCompleted && pathname !== '/onboarding' && !isOnboardingConversation) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
         <motion.div className="flex flex-col items-center space-y-4" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} transition={{ duration: 0.5 }}>

@@ -43,7 +43,9 @@ export function OnboardingPage(): React.JSX.Element {
     ;(async () => {
       try {
         const res = await chatStart.mutateAsync({})
-        router.replace(`/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}&onboarding=1`)
+        router.replace(
+          `/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}`
+        )
       } catch (e: any) {
         autoResumeRef.current = false
         setAutoStartFailed(true)
@@ -58,7 +60,9 @@ export function OnboardingPage(): React.JSX.Element {
       autoResumeRef.current = true
       setAutoStartFailed(false)
       const res = await chatStart.mutateAsync({})
-      router.replace(`/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}&onboarding=1`)
+      router.replace(
+        `/ship/${encodeURIComponent(res.starship.slug)}/conversations/${encodeURIComponent(res.conversation.id)}?agent=${encodeURIComponent(res.ariaAgent.slug)}`
+      )
     } catch (e: any) {
       autoResumeRef.current = false
       setAutoStartFailed(true)

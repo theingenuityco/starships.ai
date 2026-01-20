@@ -313,7 +313,21 @@ type ToolResultLike = {
 }
 
 // Known widget types from public-docs
-const KNOWN_WIDGET_TYPES = new Set(['StatCard', 'DataTable', 'MetricGrid', 'BarChart', 'LineChart', 'AreaChart', 'PieChart', 'DonutChart', 'RadarChart', 'RadialChart', 'ConnectorSuggestionCard', 'AgentSuggestionCard'])
+const KNOWN_WIDGET_TYPES = new Set([
+  'StatCard',
+  'DataTable',
+  'MetricGrid',
+  'BarChart',
+  'LineChart',
+  'AreaChart',
+  'PieChart',
+  'DonutChart',
+  'RadarChart',
+  'RadialChart',
+  'ConnectorSuggestionCard',
+  'AgentSuggestionCard',
+  'StarshipDetails',
+])
 
 // Cache tool display names so we don't refetch per-message/per-render.
 // Keyed by `${starshipId}:${toolSlug}` -> tool display name.
@@ -1168,7 +1182,8 @@ export function ConversationMessageContent({
                 </div>
 
                 {/* Widget visualization - minimal styling, full width */}
-                <div className="relative w-full max-w-none overflow-x-auto [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
+                <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                   {isPending ? (
                     <div className="h-[420px] flex items-center justify-center">
                       <div className="flex flex-col items-center gap-2">

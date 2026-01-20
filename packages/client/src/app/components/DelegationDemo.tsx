@@ -75,11 +75,12 @@ const DEMO_CONVERSATIONS: Record<
     leftAgentSeed: string
     rightUserLabel: string
     rightUserSeed?: string
+    designation: string
     // When true, the "user" messages in this convo represent a named agent (e.g. Aria)
     userIsAgent: boolean
   }
 > = {
-  main: { id: 'main', label: 'You ↔ Aria', leftAgentName: 'Aria', leftAgentSeed: 'Aria', rightUserLabel: 'You', rightUserSeed: 'You', userIsAgent: false },
+  main: { id: 'main', label: 'You ↔ Aria', leftAgentName: 'Aria', leftAgentSeed: 'Aria', rightUserLabel: 'You', rightUserSeed: 'You', designation: 'Agent Orchestrator', userIsAgent: false },
   dean: {
     id: 'dean',
     label: 'Aria ↔ Dean',
@@ -87,6 +88,7 @@ const DEMO_CONVERSATIONS: Record<
     leftAgentSeed: 'Dean',
     rightUserLabel: 'Aria',
     rightUserSeed: 'Aria',
+    designation: 'Google Drive',
     userIsAgent: true,
   },
   clara: {
@@ -96,6 +98,7 @@ const DEMO_CONVERSATIONS: Record<
     leftAgentSeed: 'Clara',
     rightUserLabel: 'Aria',
     rightUserSeed: 'Aria',
+    designation: 'Gmail specialist',
     userIsAgent: true,
   },
 }
@@ -120,8 +123,7 @@ const DEMO_TIMELINE: DemoStep[] = [
   {
     convoId: 'main',
     role: 'user',
-    content:
-      "Aria, can you set up a Monday Digest that pulls last week's project briefs from our Google Drive folder, summarizes them, and emails the summary to the team via Gmail?",
+    content: "Aria, summarize my last week's Google Drive briefs and email a summary to the team.",
   },
   {
     convoId: 'main',
@@ -135,12 +137,12 @@ const DEMO_TIMELINE: DemoStep[] = [
         function: {
           name: 'call-agent',
           arguments:
-            '{ "agent": "Dean", "task": "Pull last week\'s project briefs from our Google Drive folder and summarize them into a one-pager", "conversationTitle": "Monday Digest - Drive" }',
+            '{ "agent": "Dean", "task": "Pull last week\'s project briefs from our Google Drive folder and summarize them into a one-pager", "conversationTitle": "Drive - Project briefs" }',
         },
       },
     ],
     noStream: false,
-    content: "Sure. I'll call **Dean** to get the briefs from Drive and summarize them.\n\nCreating the child chat now…",
+    content: "I'll call **Dean** to pull the briefs and summarize.",
   },
   {
     convoId: 'main',
@@ -162,15 +164,13 @@ const DEMO_TIMELINE: DemoStep[] = [
   {
     convoId: 'dean',
     role: 'user',
-    content:
-      "Pull last week's project briefs from our Google Drive folder and summarize them into a one-pager.",
+    content: "Summarize last week's project briefs from Drive into a one-pager.",
   },
   {
     convoId: 'dean',
     role: 'assistant',
     agentName: 'Dean',
-    content:
-      "I'll list files in the Project Briefs folder, filter by last week, and summarize the key points into one page.",
+    content: "Listing last week's briefs and summarizing into one page.",
   },
   {
     convoId: 'dean',
@@ -178,9 +178,8 @@ const DEMO_TIMELINE: DemoStep[] = [
     agentName: 'Dean',
     toolCalls: [
       { id: 'tc_demo_list_drive', type: 'function', function: { name: 'list-google-drive-files', arguments: '{ "folderName": "Project Briefs", "modifiedAfter": "last_week" }' } },
-      { id: 'tc_demo_get_drive_info', type: 'function', function: { name: 'get-google-drive-file-info', arguments: '{}' } },
     ],
-    content: 'Fetching files from Drive…',
+    content: '',
   },
   {
     convoId: 'dean',
@@ -189,25 +188,16 @@ const DEMO_TIMELINE: DemoStep[] = [
     toolCallId: 'tc_demo_list_drive',
     noStream: true,
     content: JSON.stringify(
-      { files: ['Q1 Brief.pdf', 'Product Roadmap.docx', 'Sprint Summary.docx'], count: 3 },
+      { status: 'ok', files: ['Q1 Brief.pdf', 'Product Roadmap.docx', 'Sprint Summary.docx'], count: 3, summary: ['Q1 goals and milestones', 'Roadmap through Q3', 'Last sprint deliverables'] },
       null,
       2
     ),
   },
   {
     convoId: 'dean',
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_demo_get_drive_info',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', summaries: ['Q1 goals and milestones', 'Roadmap through Q3', 'Last sprint deliverables'] }, null, 2),
-  },
-  {
-    convoId: 'dean',
     role: 'assistant',
     agentName: 'Dean',
-    content:
-      "✅ Summarized **3 briefs** from Drive into a one-pager.\n\n- Q1 goals and key milestones\n- Roadmap through Q3\n- Sprint deliverables and next steps\n\nReturning to Aria.",
+    content: "✅ **3 briefs** summarized.\n\n- Q1 goals\n- Roadmap through Q3\n- Sprint deliverables",
   },
   {
     convoId: 'main',
@@ -220,12 +210,12 @@ const DEMO_TIMELINE: DemoStep[] = [
         function: {
           name: 'call-agent',
           arguments:
-            '{ "agent": "Clara", "task": "Email the Monday Digest summary to the team distribution list in Gmail", "conversationTitle": "Monday Digest - Gmail" }',
+            '{ "agent": "Clara", "task": "Email the summary to the team via Gmail", "conversationTitle": "Gmail - Team email" }',
         },
       },
     ],
     noStream: false,
-    content: "Good, the summary is ready. Now I'm calling **Clara** to send it via Gmail.",
+    content: "Summary ready. Calling **Clara** to send via Gmail.",
   },
   {
     convoId: 'main',
@@ -247,23 +237,22 @@ const DEMO_TIMELINE: DemoStep[] = [
   {
     convoId: 'clara',
     role: 'user',
-    content: 'Email the Monday Digest summary to the team distribution list in Gmail.',
+    content: 'Email the summary to the team via Gmail.',
   },
   {
     convoId: 'clara',
     role: 'assistant',
     agentName: 'Clara',
-    content: "I'll compose a draft with the summary and send it to the team list.",
+    content: "Drafting and sending to the team.",
   },
   {
     convoId: 'clara',
     role: 'assistant',
     agentName: 'Clara',
     toolCalls: [
-      { id: 'tc_demo_compose_draft', type: 'function', function: { name: 'compose-gmail-draft', arguments: '{ "to": "team@company.com", "subject": "Monday Digest – Project Briefs Summary" }' } },
-      { id: 'tc_demo_send_gmail', type: 'function', function: { name: 'send-gmail-message', arguments: '{}' } },
+      { id: 'tc_demo_compose_draft', type: 'function', function: { name: 'compose-gmail-draft', arguments: '{ "to": "team@company.com", "subject": "Project Briefs Summary" }' } },
     ],
-    content: 'Composing and sending…',
+    content: '',
   },
   {
     convoId: 'clara',
@@ -271,29 +260,19 @@ const DEMO_TIMELINE: DemoStep[] = [
     messageType: 'tool_result',
     toolCallId: 'tc_demo_compose_draft',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', draftId: 'draft_abc', subject: 'Monday Digest – Project Briefs Summary' }, null, 2),
-  },
-  {
-    convoId: 'clara',
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_demo_send_gmail',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', messageId: 'msg_xyz', to: ['team@company.com'] }, null, 2),
+    content: JSON.stringify({ status: 'ok', draftId: 'draft_abc', messageId: 'msg_xyz', to: ['team@company.com'], subject: 'Project Briefs Summary' }, null, 2),
   },
   {
     convoId: 'clara',
     role: 'assistant',
     agentName: 'Clara',
-    content:
-      "✅ Draft created and sent to the team list.\n\n- **To**: team@company.com\n- **Subject**: Monday Digest – Project Briefs Summary\n\nReturning to Aria.",
+    content: "✅ Sent to the team.\n\n- **To**: team@company.com\n- **Subject**: Project Briefs Summary",
   },
   {
     convoId: 'main',
     role: 'assistant',
     agentName: 'Aria',
-    content:
-      "Completed.\n\n- **Drive**: Dean pulled and summarized 3 briefs from the project folder\n- **Gmail**: Clara sent the Monday Digest to the team\n\nWant this to run every Monday automatically?",
+    content: "✅ Done.\n\n- **Drive**: Dean summarized 3 briefs\n- **Gmail**: Clara sent the digest to the team\n\nRun every Monday?",
   },
   { convoId: 'main', role: 'user', content: 'Yes, every Monday at 9am.' },
   {
@@ -306,12 +285,12 @@ const DEMO_TIMELINE: DemoStep[] = [
         type: 'function',
         function: {
           name: 'schedule-agent',
-          arguments: '{ "agent": "Monday Digest", "schedule": { "cron": "0 9 * * MON", "timezone": "UTC" } }',
+          arguments: '{ "agent": "Weekly briefs", "schedule": { "cron": "0 9 * * MON", "timezone": "UTC" } }',
         },
       },
     ],
     noStream: false,
-    content: 'Scheduling it now…',
+    content: 'Scheduling…',
   },
   {
     convoId: 'main',
@@ -330,8 +309,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     role: 'assistant',
     agentName: 'Aria',
     noStream: true,
-    content:
-      "- ✅ Scheduled **every Monday at 9am**\n- ✅ **Drive** (Dean) + **Gmail** (Clara)\n\nNext: connect Google Drive and Gmail in Connectors, then you're set.",
+    content: "✅ **Mondays 9am**. **Drive** (Dean) + **Gmail** (Clara).",
   },
 ]
 
@@ -507,7 +485,7 @@ export default function DelegationDemo() {
               position += part.length
               chunks = [...chunks, { content: part, position, timestamp: Date.now() }]
               updateMessage(step.convoId, id, { chunks, streaming: true })
-              await sleep(70)
+              await sleep(150)
             }
           } else {
             // Immediate (non-streaming) assistant text
@@ -522,7 +500,7 @@ export default function DelegationDemo() {
         }
 
         // Pause before restarting.
-        await sleep(2200)
+        await sleep(5000)
       }
     }
 
@@ -655,7 +633,7 @@ export default function DelegationDemo() {
                       <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.main.label}</div>
                       <div className="mt-1 flex items-center gap-2 min-w-0">
                         <div className="text-xs text-muted-foreground truncate">
-                          {DEMO_CONVERSATIONS.main.rightUserLabel}, {DEMO_CONVERSATIONS.main.leftAgentName} · Delegator conversation
+                          {DEMO_CONVERSATIONS.main.leftAgentName} - {DEMO_CONVERSATIONS.main.designation}
                         </div>
                       </div>
                     </div>
@@ -664,7 +642,7 @@ export default function DelegationDemo() {
                     ) : null}
                   </div>
                 </div>
-                <div className="h-[480px] sm:h-[540px] md:h-[600px] flex flex-col">
+                <div className="h-[480px] sm:h-[540px] md:h-[710px] flex flex-col">
                   <div className="flex-1 overflow-hidden">
                     <ConversationMessageList
                       conversationId={null}
@@ -718,7 +696,7 @@ export default function DelegationDemo() {
                         <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.dean.label}</div>
                         <div className="mt-1 flex items-center gap-2 min-w-0">
                           <div className="text-xs text-muted-foreground truncate">
-                            {DEMO_CONVERSATIONS.dean.leftAgentName}, {DEMO_CONVERSATIONS.dean.rightUserLabel} · Google Drive
+                            {DEMO_CONVERSATIONS.dean.leftAgentName} - {DEMO_CONVERSATIONS.dean.designation}
                           </div>
                         </div>
                       </div>
@@ -780,7 +758,7 @@ export default function DelegationDemo() {
                         <div className="text-sm font-medium leading-none truncate">{DEMO_CONVERSATIONS.clara.label}</div>
                         <div className="mt-1 flex items-center gap-2 min-w-0">
                           <div className="text-xs text-muted-foreground truncate">
-                            {DEMO_CONVERSATIONS.clara.leftAgentName}, {DEMO_CONVERSATIONS.clara.rightUserLabel} · Gmail
+                            {DEMO_CONVERSATIONS.clara.leftAgentName} - {DEMO_CONVERSATIONS.clara.designation}
                           </div>
                         </div>
                       </div>

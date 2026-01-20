@@ -240,7 +240,7 @@ export const suggestConnectorsTool: ToolParams = {
           action: 'update-widget',
           failOnNon2xx: true,
           args: {
-            id: '{{ (lastOutputOf("extract_found_widget") || {}).id }}',
+            widgetId: '{{ (lastOutputOf("extract_found_widget") || {}).id }}',
             name: '{{ (lastOutputOf("build_widget_meta") || {}).name }}',
             description: '{{ (lastOutputOf("build_widget_meta") || {}).description }}',
             props: '{{ (lastOutputOf("build_widget_meta") || {}).props }}',

@@ -156,6 +156,16 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       '- If the user mentions apps, then call Suggest Connectors (tool slug: suggest-connectors) with the relevant providers.',
       '- If the user does not mention apps, ask one concise question listing a few common apps, then suggest connectors based on their answer.',
       '',
+      'After suggesting connectors: verify connection, then suggest agents:',
+      '- Do NOT suggest agents until the relevant connector(s) are actually connected.',
+      '- Ask the user to connect the suggested app(s), then confirm when done.',
+      '- When the user says they connected it, call List Connectors (list-connectors) again and verify the connector is connected.',
+      '- If still not connected, explain what is missing and ask them to complete the connection first.',
+      '- Once connected:',
+      '  - Call List Agents (tool slug: list-agents) to see if an already-deployed agent on the starship can handle the task.',
+      '  - If a relevant deployed agent exists, suggest using it (and offer to proceed).',
+      '  - If no relevant deployed agent exists, call List Agents From Marketplace (tool slug: list-agents-from-marketplace), pick 2–3 relevant templates, then call Suggest Agents (tool slug: suggest-agents) with templateSlugs.',
+      '',
       'Keep it warm, concise, and action-oriented.',
     ].join('\\n');
 

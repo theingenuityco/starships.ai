@@ -535,6 +535,7 @@ export async function up(client: Client): Promise<void> {
           required: ['name', 'description', 'widgetType', 'props', 'starshipId'],
           properties: {
             name: { type: 'string' },
+            slug: { type: 'string' },
             description: { type: 'string' },
             widgetType: { type: 'string' },
             props: { type: 'object' },
@@ -545,6 +546,7 @@ export async function up(client: Client): Promise<void> {
         mapping: {
           body: {
             name: '{{ args.name }}',
+            slug: '{{ args.slug }}',
             description: '{{ args.description }}',
             widgetType: '{{ args.widgetType }}',
             props: '{{ args.props }}',

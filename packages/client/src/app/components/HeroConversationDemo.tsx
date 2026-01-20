@@ -70,32 +70,36 @@ type ConvoConfig = {
   tabName: string
   actorName: string
   agentSeed: string
+  designation: string
   subtitle: string
 }
 
 const CONVOS: Record<ConvoId, ConvoConfig> = {
   aria: {
     id: 'aria',
-    label: 'You ↔ Aria',
+    label: 'Aria - Agent Orchestrator',
     tabName: 'Demo',
     actorName: 'Aria',
     agentSeed: 'Aria',
-    subtitle: 'Quick win (live demo)',
+    designation: 'Agent Orchestrator',
+    subtitle: 'Live Demo',
   },
   iris: {
     id: 'iris',
-    label: 'Iris ↔ You',
+    label: 'Clara - Gmail specialist',
     tabName: 'Inbox',
-    actorName: 'Iris',
-    agentSeed: 'Iris',
+    actorName: 'Clara',
+    agentSeed: 'Clara',
+    designation: 'Gmail specialist',
     subtitle: 'Sort inbox, draft replies in Gmail',
   },
   saga: {
     id: 'saga',
-    label: 'Saga ↔ You',
+    label: 'Saga - WordPress',
     tabName: 'Blog',
     actorName: 'Saga',
     agentSeed: 'Saga',
+    designation: 'WordPress',
     subtitle: 'Write and publish a post in WordPress',
   },
 }
@@ -173,353 +177,104 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'user',
     content:
-      'Saga — publish a blog post for our site.\n\nTopic:\n- “AI staff: what it is and how teams use it”\n\nGoals:\n- Outline + draft\n- Add SEO title + meta description\n- Create a featured image prompt\n- Publish as a draft (not live)\n- Show progress step-by-step',
+      'Saga: publish a blog post.\n\nTopic: "AI staff: what it is and how teams use it."\n\nDraft + SEO, save as draft.',
   },
   {
     role: 'assistant',
     agentName: 'Saga',
-    toolCalls: [
-      { id: 'tc_wp_site', type: 'function', function: { name: 'get_site_info', arguments: '{ "cms": "wordpress" }' } },
-      { id: 'tc_wp_topics', type: 'function', function: { name: 'list_categories_tags', arguments: '{ "limit": 30 }' } },
-      { id: 'tc_wp_recent', type: 'function', function: { name: 'list_recent_posts', arguments: '{ "limit": 5 }' } },
-    ],
-    content:
-      'On it. Plan:\n\n1) Check site and categories\n2) Outline the post\n3) Draft the article\n4) Add SEO title + meta\n5) Create image prompt\n6) Save as **draft** for review',
+    toolCalls: [{ id: 'tc_wp_site', type: 'function', function: { name: 'get_site_info', arguments: '{}' } }],
+    content: 'On it. I’ll check your site, then outline, draft with SEO, and save as a draft for your review.',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
     toolCallId: 'tc_wp_site',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', site: 'Starships.ai Blog', url: 'https://starships.ai', cms: 'wordpress', permissions: ['create_post', 'upload_media'] }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_wp_topics',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        categories: ['Product', 'AI', 'Operations', 'Engineering'],
-        tags: ['ai staff', 'agents', 'workflows', 'automation', 'security'],
-      },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_wp_recent',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        posts: [
-          { title: 'How we use AI staff to ship faster', status: 'published' },
-          { title: 'Security & approvals: staying in control', status: 'published' },
-        ],
-      },
-      null,
-      2
-    ),
+    content: JSON.stringify({ status: 'ok', site: 'Starships.ai Blog' }),
   },
   {
     role: 'assistant',
     agentName: 'Saga',
-    content: "I see you already have AI staff + security posts, so I'll keep it different.\n\nNext: outline, then first draft.",
-  },
-  {
-    role: 'assistant',
-    agentName: 'Saga',
-    toolCalls: [
-      { id: 'tc_wp_outline', type: 'function', function: { name: 'create_outline', arguments: '{ "topic": "AI staff: what it is and how teams use it", "sections": 6, "targetWords": 1200 }' } },
-      { id: 'tc_wp_seo', type: 'function', function: { name: 'generate_seo', arguments: '{ "keyword": "AI staff", "audience": "B2B ops + engineering" }' } },
-    ],
-    content: 'Drafting outline + SEO…',
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_wp_outline',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        outline: [
-          'What “AI staff” means (vs. chatbots)',
-          'The 3 core patterns: sorting, delegation, automation',
-          'How teams use it in week 1 (quick wins)',
-          'Guardrails: approvals, audit trails, human-in-the-loop',
-          'Examples: inbox, blog, research, ops',
-          'How to get started (template + iterate)',
-        ],
-      },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_wp_seo',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        seoTitle: 'AI Staff: What It Is (and How Teams Use It)',
-        metaDescription: 'Learn what “AI staff” means, the most common workflows teams automate first, and the guardrails that keep you in control.',
-        primaryKeyword: 'ai staff',
-      },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'assistant',
-    agentName: 'Saga',
-    content: 'Outline + SEO done. Next: write draft, image prompt, save as draft.',
-  },
-  {
-    role: 'assistant',
-    agentName: 'Saga',
-    toolCalls: [
-      {
-        id: 'tc_wp_draft',
-        type: 'function',
-        function: { name: 'draft_post', arguments: '{ "title": "AI Staff: What It Is (and How Teams Use It)", "outlineRef": "tc_wp_outline", "targetWords": 1200, "tone": "clear, practical" }' },
-      },
-      {
-        id: 'tc_wp_image_prompt',
-        type: 'function',
-        function: { name: 'create_featured_image_prompt', arguments: '{ "style": "modern, dark, minimal", "subject": "AI staff collaborating with humans", "size": "1200x630" }' },
-      },
-      {
-        id: 'tc_wp_create_post',
-        type: 'function',
-        function: { name: 'create_post', arguments: '{ "status": "draft", "category": "AI", "tags": ["ai staff","agents","workflows"], "includeMeta": true }' },
-      },
-    ],
-    content: 'Writing + saving draft…',
+    toolCalls: [{ id: 'tc_wp_draft', type: 'function', function: { name: 'draft_post', arguments: '{"topic":"AI staff","targetWords":1200}' } }],
+    content: 'Drafting the article with outline and SEO; next I’ll save it as a draft for your review.',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
     toolCallId: 'tc_wp_draft',
     noStream: true,
-    content: JSON.stringify({ status: 'ok', words: 1235, readingTimeMin: 6, includes: ['examples', 'guardrails', 'getting started'] }, null, 2),
+    content: JSON.stringify({ status: 'ok', words: 1235 }),
+  },
+  {
+    role: 'assistant',
+    agentName: 'Saga',
+    toolCalls: [{ id: 'tc_wp_create', type: 'function', function: { name: 'create_post', arguments: '{"status":"draft"}' } }],
+    content: 'Saving as draft…',
   },
   {
     role: 'tool',
     messageType: 'tool_result',
-    toolCallId: 'tc_wp_image_prompt',
+    toolCallId: 'tc_wp_create',
     noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        prompt:
-          'Dark, minimal hero illustration of a small AI crew (three stylized assistants) collaborating with a human at a desk, subtle starship UI overlays, high contrast, clean lines, 1200x630.',
-      },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_wp_create_post',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', postId: 1042, statusAfter: 'draft', title: 'AI Staff: What It Is (and How Teams Use It)', url: 'https://starships.ai/blog/?p=1042' }, null, 2),
+    content: JSON.stringify({ status: 'ok', postId: 1042, statusAfter: 'draft' }),
   },
   {
     role: 'assistant',
     agentName: 'Saga',
     content:
-      '✅ Draft ready\n\n- Title: **AI Staff: What It Is (and How Teams Use It)**\n- **1,235 words** (~6 min)\n- SEO + image prompt done\n- **Draft** (not published)\n\nAdd **FAQ**, or focus examples on **Ops** or **Engineering**?',
+      '✅ Done\n\n- **AI Staff: What It Is**\n- **1,235 words** (~6 min)\n- **Draft** (not published)\n\nWant me to add an FAQ section, or focus the examples on Ops or Engineering?',
   },
 ]
 
 const IRIS_TIMELINE: Step[] = [
   {
     role: 'user',
+    content: 'Clara: sort my Gmail inbox. Label, archive promos, draft top 3.',
+  },
+  {
+    role: 'assistant',
+    agentName: 'Clara',
+    toolCalls: [{ id: 'tc_ir_scan', type: 'function', function: { name: 'list_unread', arguments: '{"limit":80}' } }],
+    content: 'On it. I’ll pull unread, find what needs a reply, then label, archive, and draft the top 3 for you.',
+  },
+  {
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_ir_scan',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', unread: 63, needsReply: 14 }),
+  },
+  {
+    role: 'assistant',
+    agentName: 'Clara',
+    toolCalls: [{ id: 'tc_ir_file', type: 'function', function: { name: 'classify_threads', arguments: '{"labels":["Sales","Support","Bills","Newsletter"]}' } }],
+    content: 'Labeling by topic and archiving newsletters and promos; next I’ll draft the top 3 for your review.',
+  },
+  {
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_ir_file',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', labeled: 63, archived: 30 }),
+  },
+  {
+    role: 'assistant',
+    agentName: 'Clara',
+    toolCalls: [{ id: 'tc_ir_draft', type: 'function', function: { name: 'draft_reply', arguments: '{"count":3}' } }],
+    content: 'Drafting replies for the top 3 that need your attention; you review before sending.',
+  },
+  {
+    role: 'tool',
+    messageType: 'tool_result',
+    toolCallId: 'tc_ir_draft',
+    noStream: true,
+    content: JSON.stringify({ status: 'ok', drafts: 3 }),
+  },
+  {
+    role: 'assistant',
+    agentName: 'Clara',
     content:
-      'Iris — sort my Gmail inbox.\n\nGoals:\n- Find emails that need a reply\n- Label by topic (sales, support, bills)\n- Archive newsletters and promos\n- Draft replies for the top 3\n- Show progress step-by-step',
-  },
-  {
-    role: 'assistant',
-    agentName: 'Iris',
-    toolCalls: [
-      {
-        id: 'tc_ir_labels',
-        type: 'function',
-        function: {
-          name: 'ensure_labels',
-          arguments: '{ "labels": ["Sales","Support","Bills","Newsletter"] }',
-        },
-      },
-      { id: 'tc_ir_unread', type: 'function', function: { name: 'list_unread', arguments: '{ "limit": 80, "include": ["inbox","important"] }' } },
-      { id: 'tc_ir_needs_reply', type: 'function', function: { name: 'find_needs_reply', arguments: '{ "threads": "unread", "signals": ["question","request","follow up"], "limit": 25 }' } },
-    ],
-    content:
-      'On it:\n\n1) Pull unread\n2) Find what needs a reply vs. can be filed\n3) Label (Sales / Support / Bills / Newsletter)\n4) Archive newsletters + promos\n5) Draft top 3 (you review/send)',
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_labels',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', created: 2, existing: 2, labels: ['Sales', 'Support', 'Bills', 'Newsletter'] }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_unread',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', unreadInInbox: 63, important: 9, timeWindowDays: 14 }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_needs_reply',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', needsReply: 14, topSenders: ['Acme Procurement', 'Jane (Support)', 'Stripe'] }, null, 2),
-  },
-  {
-    role: 'assistant',
-    agentName: 'Iris',
-    content: 'Next: label by topic, archive promos, draft top 3 for your review.',
-  },
-  {
-    role: 'assistant',
-    agentName: 'Iris',
-    toolCalls: [
-      {
-        id: 'tc_ir_classify',
-        type: 'function',
-        function: { name: 'classify_threads', arguments: '{ "threads": "unread", "labels": ["Sales","Support","Bills","Newsletter"], "max": 63 }' },
-      },
-      {
-        id: 'tc_ir_archive_newsletters',
-        type: 'function',
-        function: {
-          name: 'archive_by_label',
-          arguments: '{ "label": "Newsletter", "olderThanDays": 7, "max": 40 }',
-        },
-      },
-      {
-        id: 'tc_ir_archive_promos',
-        type: 'function',
-        function: { name: 'archive_promotions', arguments: '{ "signals": ["promo","sale","unsubscribe"], "max": 30 }' },
-      },
-    ],
-    content: 'Classifying + filing…',
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_classify',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', labeled: { Sales: 8, Support: 10, Bills: 6, Newsletter: 24, Other: 15 } }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_archive_newsletters',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', archived: 19, kept: 5, label: 'Newsletter' }, null, 2),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_archive_promos',
-    noStream: true,
-    content: JSON.stringify({ status: 'ok', archived: 11, notes: 'Detected promo/unsubscribe patterns' }, null, 2),
-  },
-  {
-    role: 'assistant',
-    agentName: 'Iris',
-    content: 'Inbox cleaner. Next: draft top 3 (you review before sending).',
-  },
-  {
-    role: 'assistant',
-    agentName: 'Iris',
-    toolCalls: [
-      {
-        id: 'tc_ir_pick_top3',
-        type: 'function',
-        function: {
-          name: 'select_top_threads',
-          arguments: '{ "from": "needs_reply", "count": 3, "rules": ["important first","older first","direct questions"] }',
-        },
-      },
-      { id: 'tc_ir_draft_1', type: 'function', function: { name: 'draft_reply', arguments: '{ "threadId": "t_sales_01", "tone": "crisp", "goal": "schedule_call" }' } },
-      { id: 'tc_ir_draft_2', type: 'function', function: { name: 'draft_reply', arguments: '{ "threadId": "t_support_02", "tone": "helpful", "goal": "unblock_user" }' } },
-      { id: 'tc_ir_draft_3', type: 'function', function: { name: 'draft_reply', arguments: '{ "threadId": "t_bills_03", "tone": "neutral", "goal": "confirm_receipt" }' } },
-    ],
-    content: 'Preparing drafts…',
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_pick_top3',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        threads: [
-          { id: 't_sales_01', from: 'Acme Procurement', subject: 'Quick questions before we buy' },
-          { id: 't_support_02', from: 'Jane', subject: 'Login failing for 2 users' },
-          { id: 't_bills_03', from: 'Stripe', subject: 'Invoice available' },
-        ],
-      },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_draft_1',
-    noStream: true,
-    content: JSON.stringify(
-      { status: 'ok', threadId: 't_sales_01', draftId: 'd_001', preview: 'Happy to help — can you share your timeline and team size? If it helps, we can hop on a 15‑min call this week.' },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_draft_2',
-    noStream: true,
-    content: JSON.stringify(
-      {
-        status: 'ok',
-        threadId: 't_support_02',
-        draftId: 'd_002',
-        preview: 'Thanks — I can help. Can you confirm the error message + whether SSO is enabled? In the meantime, try resetting the session…',
-      },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'tool',
-    messageType: 'tool_result',
-    toolCallId: 'tc_ir_draft_3',
-    noStream: true,
-    content: JSON.stringify(
-      { status: 'ok', threadId: 't_bills_03', draftId: 'd_003', preview: 'Received — thank you. Please confirm the billing period and I’ll get this filed with our receipts.' },
-      null,
-      2
-    ),
-  },
-  {
-    role: 'assistant',
-    agentName: 'Iris',
-    content:
-      '✅ Done\n\n- **63** unread (14 days)\n- **14** need reply\n- Labeled: Sales / Support / Bills / Newsletter\n- **30** archived (newsletters + promos)\n- **3** drafts for your review\n\nAuto-label newsletters from now on, or keep it manual?',
+      '✅ Done\n\n- **63** unread\n- **14** need reply\n- **30** archived\n- **3** drafts\n\nWant me to apply an auto-label rule for newsletters going forward, or keep it manual?',
   },
 ]
 
@@ -555,15 +310,20 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
   const { data: irisTemplatesQ = [] } = useAgentTemplates({ search: 'iris' }, !useServerInitial)
   const irisAvatarUrl = useMemo(() => {
     const list = (useServerInitial ? initialAgentTemplates : irisTemplatesQ) as AgentTemplateModel[]
-    const iris = list.find(
+    const found = list.find(
       t =>
         t.slug === 'iris' ||
+        t.slug === 'clara' ||
         t.name === 'Iris' ||
+        t.name === 'Clara' ||
         String(t.slug ?? '')
           .toLowerCase()
-          .startsWith('iris')
+          .startsWith('iris') ||
+        String(t.slug ?? '')
+          .toLowerCase()
+          .startsWith('clara')
     )
-    return iris?.avatarUrl
+    return found?.avatarUrl
   }, [initialAgentTemplates, irisTemplatesQ, useServerInitial])
 
   const { data: sagaTemplatesQ = [] } = useAgentTemplates({ search: 'saga' }, !useServerInitial)
@@ -649,7 +409,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
       id: `demo-${convoId}-a-ack-${a1CreatedAt}`,
       role: 'assistant',
       agentName: 'Aria',
-      content: target === 'iris' ? 'Starting **Iris** to sort your inbox.' : 'Starting **Saga** for the blog post.',
+      content: target === 'iris' ? 'Starting **Clara** to sort your inbox.' : 'Starting **Saga** for the blog post.',
       createdAt: a1CreatedAt,
       updatedAt: a1CreatedAt,
       messageType: 'agent_response',
@@ -666,7 +426,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
       id: `demo-${convoId}-a-tools-${toolRunnerAt}`,
       role: 'assistant',
       agentName: 'Aria',
-      content: 'Running tools…',
+      content: '',
       createdAt: toolRunnerAt,
       updatedAt: toolRunnerAt,
       messageType: 'agent_response',
@@ -679,8 +439,8 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
             name: 'call-agent',
             arguments:
               target === 'iris'
-                ? '{ "agent": "Iris", "task": "Sort my Gmail inbox", "conversationTitle": "Iris — Demo" }'
-                : '{ "agent": "Saga", "task": "Publish a blog post as a draft in WordPress", "conversationTitle": "Saga — Demo" }',
+                ? '{ "agent": "Clara", "task": "Sort my Gmail inbox", "conversationTitle": "Clara, Demo" }'
+                : '{ "agent": "Saga", "task": "Publish a blog post as a draft in WordPress", "conversationTitle": "Saga, Demo" }',
           },
         },
       ],
@@ -697,7 +457,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
       content: JSON.stringify(
         {
           status: 'ok',
-          delegatedTo: target === 'iris' ? 'Iris' : 'Saga',
+          delegatedTo: target === 'iris' ? 'Clara' : 'Saga',
           conversation: {
             id: target === 'iris' ? 'c_demo_iris' : 'c_demo_saga',
           },
@@ -720,7 +480,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
       id: `demo-${convoId}-a-switch-${a2CreatedAt}`,
       role: 'assistant',
       agentName: 'Aria',
-      content: target === 'iris' ? 'Switching you to **Iris**.' : 'Switching you to **Saga**.',
+      content: target === 'iris' ? 'Switching you to **Clara**.' : 'Switching you to **Saga**.',
       createdAt: a2CreatedAt,
       updatedAt: a2CreatedAt,
       messageType: 'agent_response',
@@ -850,7 +610,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
             id: toolRunnerId,
             role: 'assistant',
             agentName: step.agentName ?? CONVOS[convoId].actorName,
-            content: 'Running tools…',
+            content: '',
             createdAt: toolCreatedAt,
             updatedAt: toolCreatedAt,
             messageType: 'agent_response',
@@ -878,7 +638,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
   }
 
   const cfg = CONVOS[activeConvoId]
-  const actorsLine = cfg.id === 'aria' ? `You, ${cfg.actorName}` : `${cfg.actorName}, You`
+  const actorsLine = `${cfg.actorName} - ${cfg.designation}`
   const agentAvatarUrlOverride = cfg.id === 'aria' ? ariaAvatarUrl : cfg.id === 'iris' ? irisAvatarUrl : cfg.id === 'saga' ? sagaAvatarUrl : undefined
   const isResponding = (flagsByConvo[activeConvoId]?.responding ?? false) || (flagsByConvo[activeConvoId]?.awaitingTools ?? false)
   const isRunning = flagsByConvo[activeConvoId]?.isRunning ?? false
@@ -921,7 +681,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div className="min-w-0">
                   {/* Title */}
-                  <div className="text-sm font-medium leading-none truncate">{cfg.subtitle}</div>
+                  <div className={cn('font-medium leading-none truncate', cfg.id === 'aria' ? 'text-base' : 'text-sm')}>{cfg.subtitle}</div>
                   {/* Actors */}
                   <div className="mt-1 flex items-center gap-2 min-w-0">
                     <div className="text-xs text-muted-foreground truncate">{actorsLine}</div>

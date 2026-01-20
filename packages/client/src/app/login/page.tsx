@@ -77,6 +77,13 @@ function LoginContent() {
         return
       }
 
+      // If the user is authenticated but not onboarded, always route to onboarding.
+      // This avoids deep-link returnUrl redirects bypassing onboarding before initial provisioning.
+      if (user && user.onboardingCompleted === false) {
+        router.push('/onboarding')
+        return
+      }
+
       // Handle redirect with returnUrl pattern
       const returnUrl = searchParams?.get('returnUrl')
 
@@ -86,7 +93,7 @@ function LoginContent() {
         router.push('/profile')
       }
     }
-  }, [mounted, isAuthenticated, isLoading, starshipsLoading, router, searchParams, logoutParam, expectedEmail, logout])
+  }, [mounted, isAuthenticated, isLoading, starshipsLoading, router, searchParams, logoutParam, expectedEmail, logout, user])
 
   // Show loading state while checking authentication or mounting
   if (!mounted || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {

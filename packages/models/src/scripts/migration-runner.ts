@@ -25,14 +25,17 @@ export interface MigrationResult {
 
 export class MigrationRunner {
   private connection: ReturnType<typeof getConnection> | null = null;
-  private migrationsPath = join(__dirname, '../../migrations');
+  // In source, this file lives at src/scripts/, and migrations live at src/migrations/.
+  // In dist, this file lives at dist/scripts/, and migrations live at dist/migrations/.
+  // So `../migrations` is the correct relative path in BOTH cases.
+  private migrationsPath = join(__dirname, '../migrations');
 
   private isDistBuild(): boolean {
     return __dirname.includes('/dist/') || __dirname.includes('\\dist\\');
   }
 
   private getMigrationsPath(): string {
-    return this.isDistBuild() ? join(__dirname, '../migrations') : this.migrationsPath;
+    return this.migrationsPath;
   }
 
   private getConnection() {
@@ -136,10 +139,12 @@ export class MigrationRunner {
       await this.ensureMigrationTable();
 
       // Skip if already applied
-      if (await this.isMigrationApplied(migrationId)) {
+      const alreadyApplied = await this.isMigrationApplied(migrationId);
+      if (alreadyApplied) {
         result.warnings?.push(`Migration ${migrationId} already applied`);
         result.success = true;
         result.executionTime = Date.now() - startTime;
+
         return result;
       }
 

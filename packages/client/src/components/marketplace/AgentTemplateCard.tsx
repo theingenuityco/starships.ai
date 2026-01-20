@@ -5,7 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
-import { useUserStarships } from '@/hooks/useStarships'
+import { useStarship, useUserStarships } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useAuth } from '@/hooks/useAuth'
 import { DeploymentConfirmationModal } from './DeploymentConfirmationModal'
@@ -20,23 +20,30 @@ interface AgentTemplateCardProps {
   onDeploy?: (template: AgentTemplateModel) => void
   onClick?: (template: AgentTemplateModel) => void
   /**
+   * Optional override: deploy/compare against a specific starship instead of the user's primary starship.
+   * Useful for inline widgets embedded in a specific starship context (e.g. onboarding).
+   */
+  targetStarshipId?: string
+  /**
    * When false, hides the bottom-right Deploy CTA (useful for landing page carousel previews).
    * Defaults to true.
    */
   showDeployCta?: boolean
 }
 
-export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta = true }: AgentTemplateCardProps) {
+export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta = true, targetStarshipId }: AgentTemplateCardProps) {
   const [isDeploying, setIsDeploying] = useState(false)
   const [showConfirmationModal, setShowConfirmationModal] = useState(false)
 
   // Get current user and their starships for deployment
   const { userId, isAuthenticated } = useAuth()
-  const { data: starships = [] } = useUserStarships(userId || '', !!userId)
+  const { data: starships = [] } = useUserStarships(userId || '', !!userId && !targetStarshipId)
   const primaryStarship = starships[0] // Use first starship by default
+  const { data: explicitStarship } = useStarship(String(targetStarshipId || ''), !!targetStarshipId && !!isAuthenticated)
+  const starship = targetStarshipId ? explicitStarship ?? { id: targetStarshipId, slug: '', name: '' } : primaryStarship
 
   // Get deployed agents to check if this template is already deployed
-  const { data: deployedAgents = [] } = useStarshipAgents(primaryStarship?.id || '', !!primaryStarship)
+  const { data: deployedAgents = [] } = useStarshipAgents(starship?.id || '', !!starship)
 
   // If this template was published from this starship, disable deploy CTA (it already "lives" here)
   const isPublishedFromThisStarship = deployedAgents.some(agent => agent.publishedTemplateId === template.id)
@@ -96,10 +103,10 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
   const deployLabel = isAlreadyDeployed ? 'Deployed' : isPublishedFromThisStarship ? 'Published' : isDeploying ? 'Deploying…' : 'Deploy'
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
-  const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !primaryStarship)
+  const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !starship)
 
   const handleConfirmDeploy = async () => {
-    if (!primaryStarship) {
+    if (!starship) {
       return // No starship to deploy to
     }
 
@@ -107,8 +114,8 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
     try {
       await createAgentMutation.mutateAsync({
         templateId: template.id,
-        starshipId: primaryStarship.id,
-        starshipSlug: primaryStarship.slug,
+        starshipId: starship.id,
+        starshipSlug: (starship as any)?.slug || undefined,
       })
       onDeploy?.(template)
     } catch {
@@ -136,11 +143,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         <div className="relative w-full aspect-[4/3] overflow-hidden bg-muted/30">
           {avatarUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={avatarUrl}
-              alt={`${displayName || 'Agent'} avatar`}
-              className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-            />
+            <img src={avatarUrl} alt={`${displayName || 'Agent'} avatar`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
               <div className="h-14 w-14 rounded-2xl bg-background/40 border border-border/60 backdrop-blur-sm flex items-center justify-center">
@@ -210,7 +213,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         isProcessing={isDeploying}
         type="agent"
         template={template}
-        starshipName={primaryStarship?.name || 'Unknown Starship'}
+        starshipName={(starship as any)?.name || 'Unknown Starship'}
       />
     </>
   )

@@ -37,6 +37,8 @@ Example:
 - `StatCard` → `stat-card.md`
 - `MetricGrid` → `metric-grid.md`
 - `DataTable` → `data-table.md`
+- `ConnectorSuggestionCard` → `connector-suggestion-card.md`
+- `AgentSuggestionCard` → `agent-suggestion-card.md`
 - Charts:
   - `BarChart` → `charts/bar-chart.md`
   - `LineChart` → `charts/line-chart.md`

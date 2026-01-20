@@ -5,20 +5,14 @@ import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { OnboardingRecommendationService } from '@/services/OnboardingRecommendationService';
 import { StarshipService } from '@/services/StarshipService';
 import { ConversationService } from '@/services/ConversationService';
-import { MessageService } from '@/services/MessageService';
-import { ConversationStreamBus } from '@/services/ConversationStreamBus';
-import { ConnectorService } from '@/services/ConnectorService';
-import { UIActionService } from '@/services/UIActionService';
 import { UserRepository, AgentRepository, StarshipRepository, OnboardingSessionRepository } from '@starships/models';
-import type { AuthUser, StarshipModel, AgentModel, OnboardingConnectorsUIAction } from '@starships/protocol';
+import type { AuthUser, StarshipModel, AgentModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 
 const router: Router = Router();
 const recommendationService = new OnboardingRecommendationService();
-
-type OnboardingChoice = { id: string; label: string; messageText: string };
 
 function getSourceTemplateId(agent: AgentModel): string | null {
   const rec = agent as unknown as Record<string, unknown>;
@@ -34,10 +28,6 @@ function requireAuthUser(req: Request, res: Response): AuthUser | null {
   }
   return user;
 }
-
-const CompleteOnboardingSchema = z.object({
-  starshipName: z.string().trim().min(1).max(100).optional(),
-});
 
 const StartOnboardingSchema = z.object({
   starshipName: z.string().trim().min(1).max(100).optional(),
@@ -90,17 +80,28 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       step: 'connectors',
     });
 
+    // IMPORTANT:
+    // Once a starship exists, onboarding should become optional (user can skip and return later).
+    // Treat `onboardingCompleted` as "initial provisioning complete" rather than "finished every onboarding step".
+    try {
+      if (!dbUser.onboardingCompleted) {
+        await userRepo.update(user.id, { onboardingCompleted: true });
+      }
+    } catch {
+      // best-effort; do not block onboarding chat start
+    }
+
     // Create or reuse an "Onboarding" conversation (normal conversation labeled onboarding)
     const conversationService = new ConversationService();
     const existing = await conversationService.getConversationsByStarshipWithAgents(starship.id);
     const onboardingConversation =
       (Array.isArray(existing)
-        ? existing.find(
-            (c: any) =>
-              String(c?.title || '')
-                .trim()
-                .toLowerCase() === 'onboarding' && String(c?.status || '') === 'active'
-          )
+        ? existing.find((c: unknown) => {
+            const rec = c as Record<string, unknown> | null;
+            const title = typeof rec?.title === 'string' ? rec.title : '';
+            const status = typeof rec?.status === 'string' ? rec.status : '';
+            return title.trim().toLowerCase() === 'onboarding' && status === 'active';
+          })
         : null) || null;
 
     const conversation = onboardingConversation
@@ -112,53 +113,85 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           agentId: aria.id,
         });
 
-    // Build initial connector suggestions from live connector catalog.
-    const connectorService = new ConnectorService();
-    const catalog = await connectorService.getConnectorCatalog();
-    const providers: string[] = (catalog || [])
-      .slice(0, 12)
-      .map((c: any) => String(c?.provider || '').trim())
-      .filter((p) => p.length > 0 && p !== 'starships');
+    // Inject onboarding-only system prompt (conversation-scoped).
+    // This keeps Aria's template prompt generic while customizing behavior for onboarding conversations.
+    const onboardingSystemPrompt = [
+      'You are starting a new onboarding conversation with a user for their starship.',
+      '',
+      'Work one step at a time (turn-based):',
+      '- Do NOT ask clarifying questions and suggest connectors in the same message.',
+      '- If the task is vague, ask ONLY clarifying question(s) and stop. Wait for the user reply before suggesting connectors.',
+      '',
+      'First message:',
+      '- Warmly introduce yourself as Aria.',
+      '- Ask what task/outcome the user wants to get done (what success looks like).',
+      '- Include 3-5 examples of tasks (examples only; do not suggest connectors yet), like:',
+      '  - “Summarize and prioritize new Slack messages into a daily brief”',
+      '  - “Turn my Stripe revenue into weekly KPI charts”',
+      '  - “Answer questions about our Notion knowledge base”',
+      '  - “Track GitHub PRs/issues and report status updates”',
+      '  - “Automate recurring customer support triage”',
+      '',
+      'Clarifying questions (ONLY if the task is EXTREMELY vague):',
+      '- “Not vague” examples (do NOT ask clarifying questions; proceed to list-connectors next):',
+      '  - “Turn my Stripe revenue into weekly KPI charts”',
+      '  - “Track GitHub PRs and summarize status daily”',
+      '  - “Answer questions about our Notion knowledge base”',
+      '- “Extremely vague” examples (ask clarifying question(s) and stop):',
+      '  - “Create some UI”',
+      '  - “Help me with my business”',
+      '  - “Make this better”',
+      '- When you do ask clarifying questions:',
+      '  - Ask the minimum number of questions needed to make the task actionable.',
+      '  - Focus on: goal, apps/data involved, and any constraints (deadline/audience/format).',
+      '  - End the message after questions. Do not suggest connectors yet.',
+      '',
+      'After the user answers (task is clear): suggest connectors:',
+      '- First call List Connectors (tool slug: list-connectors) to understand what connectors are available/connected and whether the task is feasible.',
+      '- If the task is not feasible due to missing connectors, say what is missing and ask the user whether they want to connect those apps.',
+      '- If the user mentions apps, then call Suggest Connectors (tool slug: suggest-connectors) with the relevant providers.',
+      '- If the user does not mention apps, ask one concise question listing a few common apps, then suggest connectors based on their answer.',
+      '',
+      'After suggesting connectors: verify connection, then suggest agents:',
+      '- Do NOT suggest agents until the relevant connector(s) are actually connected.',
+      '- Ask the user to connect the suggested app(s), then confirm when done.',
+      '- When the user says they connected it, call List Connectors (list-connectors) again and verify the connector is connected.',
+      '- If still not connected, explain what is missing and ask them to complete the connection first.',
+      '- Once connected:',
+      '  - Call List Agents (tool slug: list-agents) to see if an already-deployed agent on the starship can handle the task.',
+      '  - If a relevant deployed agent exists, suggest using it (and offer to proceed).',
+      '  - If no relevant deployed agent exists, call List Agents From Marketplace (tool slug: list-agents-from-marketplace), pick 2–3 relevant templates, then call Suggest Agents (tool slug: suggest-agents) with templateSlugs.',
+      '',
+      'Keep it warm, concise, and action-oriented.',
+    ].join('\\n');
 
-    // Persist a lightweight onboarding UI state on the conversation for durability
     try {
+      const prevState =
+        (conversation as unknown as { state?: unknown })?.state &&
+        typeof (conversation as unknown as { state?: unknown }).state === 'object'
+          ? ((conversation as unknown as { state: Record<string, unknown> }).state as Record<string, unknown>)
+          : {};
       await conversationService.updateConversation(conversation.id, {
-        state: {
-          onboarding: {
-            mode: 'conversation',
-            step: 'connectors',
-            providers,
-          },
-        },
+        state: { ...(prevState as Record<string, unknown>), onboardingSystemPrompt },
       });
     } catch {
       // non-fatal
     }
 
-    // Create a greeting assistant message (durable) and publish + emit ui_action choices (live)
-    const bus = ConversationStreamBus.getInstance();
-    const uiActions = new UIActionService(bus);
+    // Kick off the first assistant message so the user sees Aria immediately without any hardcoded greeting.
+    // IMPORTANT: best-effort only; never fail onboarding start if kickoff fails.
     try {
-      const messageService = new MessageService();
-      const greeting = await messageService.createMessage({
-        conversationId: conversation.id,
-        role: 'assistant',
-        messageType: 'agent_response',
-        agentId: aria.id,
-        agentName: aria.name,
-        content: `Welcome! Let’s start by connecting the apps you already use.\n\nPick one (or a few) connectors below — I’ll use live data to tailor the rest of onboarding.`,
-      });
-      await bus.publish(conversation.id, { type: 'message.append', data: { conversationId: conversation.id, message: greeting } });
-    } catch {
-      // non-fatal
-    }
-
-    try {
-      // NOTE: legacy UI action shape removed; UI actions are now { action, payload }.
-      await uiActions.publish(conversation.id, {
-        action: 'onboarding_connectors',
-        payload: { conversationId: conversation.id, providers },
-      });
+      // Avoid spamming: only kick off if there are no assistant messages yet.
+      const existingMessages = await conversationService.getConversationMessages(conversation.id).catch(() => []);
+      const hasAssistant =
+        Array.isArray(existingMessages) &&
+        existingMessages.some((m: unknown) => {
+          const rec = m as Record<string, unknown> | null;
+          return rec != null && rec['role'] === 'assistant';
+        });
+      if (!hasAssistant) {
+        await conversationService.continueAfterToolApproval(conversation.id, aria.id, { authContext: { userId: user.id } });
+      }
     } catch {
       // non-fatal
     }
@@ -295,6 +328,13 @@ router.get('/onboarding/session', jwtAuthMiddleware, async (req: Request, res: R
     const user = requireAuthUser(req, res);
     if (!user) return;
 
+    const userRepo = new UserRepository();
+    const dbUser = await userRepo.findById(user.id);
+    if (!dbUser) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
+      return;
+    }
+
     const sessionRepo = new OnboardingSessionRepository();
     let session = await sessionRepo.findByUserId(user.id);
 
@@ -309,6 +349,28 @@ router.get('/onboarding/session', jwtAuthMiddleware, async (req: Request, res: R
         selectedAgentTemplateIds: [],
         primaryAgentTemplateId: null,
         completedAt: null,
+      });
+    }
+
+    // Auto-provision: if the user is not onboarded yet, ensure they have a starship and that the onboarding
+    // session points at it. This enables the client to auto-resume onboarding chat without a manual click.
+    if (!dbUser.onboardingCompleted && !session.starshipId) {
+      let starship: StarshipModel | null = null;
+      try {
+        const starshipRepo = new StarshipRepository();
+        const userStarships = await starshipRepo.findByOwner(user.id);
+        starship = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
+      } catch {
+        // ignore - will fall back to provisioning
+      }
+
+      if (!starship) {
+        starship = await ensureStarshipForUser(user.id);
+      }
+
+      session = await sessionRepo.upsertForUser(user.id, {
+        ...session,
+        starshipId: starship.id,
       });
     }
 
@@ -507,97 +569,6 @@ router.post('/onboarding/finish', jwtAuthMiddleware, async (req: Request, res: R
     });
   } catch (error) {
     handleError(error, res, 'finish onboarding');
-  }
-});
-
-/**
- * POST /onboarding/complete
- *
- * Mandatory onboarding for new users.
- * Creates:
- * - a new starship (Scout, 200 welcome credits)
- * - the default agent (Aria) on that starship
- * - tool permissions for Aria
- * Then marks users.onboarding_completed = true.
- */
-router.post('/onboarding/complete', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const user = requireAuthUser(req, res);
-    if (!user) return;
-
-    const body = validateData(CompleteOnboardingSchema, req.body, res, 'onboarding payload');
-    if (!body) return;
-
-    const userRepo = new UserRepository();
-    const starshipRepo = new StarshipRepository();
-
-    // Ensure we read the freshest user record (req.user may be stale vs DB).
-    const dbUser = await userRepo.findById(user.id);
-    if (!dbUser) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
-      return;
-    }
-
-    // Idempotent behavior: if already onboarded, return the first active starship + aria* if present.
-    if (dbUser.onboardingCompleted) {
-      const ships = await starshipRepo.findByOwner(user.id);
-      const starship = ships.find((s) => s.status === 'active') || ships[0] || null;
-      if (!starship) {
-        sendError(res, 'RESOURCE_CONFLICT', 'Onboarding already completed but no starship exists.', 409);
-        return;
-      }
-      const deployedAgents = await starshipRepo.getDeployedAgents(starship.id);
-      const aria = deployedAgents.find((a) => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria')) || null;
-
-      sendSuccess(res, {
-        starship: { id: starship.id, slug: starship.slug, name: starship.name },
-        agent: aria ? { id: aria.id, slug: aria.slug, name: aria.name } : null,
-      });
-      return;
-    }
-
-    // Create starship (explicit name if provided, otherwise generated)
-    let starship: StarshipModel;
-    if (body.starshipName) {
-      const starshipService = new StarshipService();
-      starship = await starshipService.createStarship({
-        ownerId: user.id,
-        name: body.starshipName,
-        shipClass: 'scout',
-        initialCredits: 200,
-      });
-    } else {
-      starship = await StarshipService.createDefaultStarship(user.id);
-    }
-
-    // Create Aria from template
-    const templateService = new AgentTemplateService();
-    const ariaCandidates = await templateService.searchTemplates('Aria');
-    const ariaTemplate = ariaCandidates.find((t) => t.name === 'Aria') || null;
-    if (!ariaTemplate) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Default agent template (Aria) not found', 404);
-      return;
-    }
-
-    const ariaAgent: AgentModel = await templateService.createAgentFromTemplate(ariaTemplate.id, starship.id);
-
-    // Allow all assigned tool permissions for Aria
-    try {
-      const agentRepo = new AgentRepository();
-      await agentRepo.setAllAssignedToolPermissionsForAgent(ariaAgent.id, 'allow');
-    } catch {
-      // Non-fatal: agent exists; user can still proceed.
-    }
-
-    // Mark onboarding complete (legacy endpoint)
-    await userRepo.update(user.id, { onboardingCompleted: true });
-
-    sendSuccess(res, {
-      starship: { id: starship.id, slug: starship.slug, name: starship.name },
-      agent: { id: ariaAgent.id, slug: ariaAgent.slug, name: ariaAgent.name },
-    });
-  } catch (error) {
-    handleError(error, res, 'complete onboarding');
   }
 });
 

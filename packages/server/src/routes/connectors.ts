@@ -20,10 +20,7 @@ import { validateOAuthState } from '@/utils/jwt';
 import type { ConnectorProvider } from '@starships/protocol';
 import { ConnectorTemplateRepository } from '@starships/models';
 import { PlatformSecretService } from '@/services/PlatformSecretService';
-import {
-  parseExternalLaunchConfigFromAuthJson,
-  verifyExternalLaunchQuery,
-} from '@/utils/external-launch';
+import { parseExternalLaunchConfigFromAuthJson, verifyExternalLaunchQuery } from '@/utils/external-launch';
 
 const env = getEnvConfig();
 
@@ -308,16 +305,16 @@ router.post('/starships/:id/connectors/:provider/basic', jwtAuthMiddleware, asyn
 
     if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
 
-    const bodyValidation = validateData(
-      BasicConnectSchema,
-      req.body as ConnectWithBasicAuthRequest,
-      res,
-      'basic auth connector payload'
-    );
+    const bodyValidation = validateData(BasicConnectSchema, req.body as ConnectWithBasicAuthRequest, res, 'basic auth connector payload');
     if (!bodyValidation) return;
 
     const connectorService = new ConnectorService();
-    const connector = await connectorService.connectWithBasicAuth(starshipId, provider, bodyValidation as ConnectWithBasicAuthRequest, userId);
+    const connector = await connectorService.connectWithBasicAuth(
+      starshipId,
+      provider,
+      bodyValidation as ConnectWithBasicAuthRequest,
+      userId
+    );
 
     sendSuccess(res, { connector });
   } catch (error) {

@@ -35,6 +35,7 @@ export default function AgentAvatar({
 }: AgentAvatarProps) {
   const hasSeed = typeof seed === 'string' && seed.trim().length > 0
   const hasImage = typeof imageUrl === 'string' && imageUrl.trim().length > 0
+  const showInitialsFallback = !hasImage && hasSeed
 
   const initials = useMemo(() => {
     if (!hasSeed) return ''
@@ -64,15 +65,25 @@ export default function AgentAvatar({
           alt=""
           width={size}
           height={size}
-          style={{ width: fill ? '100%' : size, height: fill ? '100%' : size, objectFit: 'cover', display: 'block' }}
+          style={{
+            width: fill ? '100%' : size,
+            height: fill ? '100%' : size,
+            objectFit: 'cover',
+            display: 'block',
+            borderRadius: 'inherit',
+          }}
         />
-      ) : hasSeed ? (
+      ) : showInitialsFallback ? (
         <div
-          className={cn('flex items-center justify-center bg-muted text-muted-foreground font-semibold select-none', emphasis && 'text-foreground', rounded ? 'rounded-full' : 'rounded-lg')}
+          className={cn(
+            'flex items-center justify-center bg-muted text-muted-foreground font-semibold select-none',
+            emphasis && 'text-foreground'
+          )}
           style={{
             width: fill ? '100%' : size,
             height: fill ? '100%' : size,
             fontSize: Math.max(10, Math.floor(size * 0.38)),
+            borderRadius: 'inherit',
           }}
           aria-hidden="true"
         >
@@ -81,6 +92,21 @@ export default function AgentAvatar({
       ) : (
         <div style={{ width: fill ? '100%' : size, height: fill ? '100%' : size }} />
       )}
+
+      {/* Subtle inward glow for initials fallback (matches marketplace), with light-mode support */}
+      {showInitialsFallback ? (
+        <div
+          className={cn(
+            'pointer-events-none absolute inset-0',
+            // "Purple inward glow" to match marketplace blank avatars
+            'ring-1 ring-inset ring-violet-500/20',
+            'shadow-[inset_0_1px_0_rgba(124,58,237,0.18),inset_0_0_18px_rgba(124,58,237,0.18)]',
+            'dark:ring-violet-400/20',
+            'dark:shadow-[inset_0_1px_0_rgba(167,139,250,0.14),inset_0_0_18px_rgba(167,139,250,0.14)]'
+          )}
+          style={{ borderRadius: 'inherit' }}
+        />
+      ) : null}
     </div>
   )
 }

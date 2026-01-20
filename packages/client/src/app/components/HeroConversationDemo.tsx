@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
+import AgentAvatar from '@/components/animated/AgentAvatar'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import Icon from '@/components/primitives/Icon'
 import { useAgentTemplates } from '@/hooks/useTemplates'
@@ -86,20 +87,20 @@ const CONVOS: Record<ConvoId, ConvoConfig> = {
   },
   iris: {
     id: 'iris',
-    label: 'Clara - Gmail specialist',
+    label: 'Clara - Gmail Specialist',
     tabName: 'Inbox',
     actorName: 'Clara',
     agentSeed: 'Clara',
-    designation: 'Gmail specialist',
+    designation: 'Gmail Specialist',
     subtitle: 'Sort inbox, draft replies in Gmail',
   },
   saga: {
     id: 'saga',
-    label: 'Saga - WordPress',
+    label: 'Saga - WordPress Specialist',
     tabName: 'Blog',
     actorName: 'Saga',
     agentSeed: 'Saga',
-    designation: 'WordPress',
+    designation: 'WordPress Specialist',
     subtitle: 'Write and publish a post in WordPress',
   },
 }
@@ -177,13 +178,13 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'user',
     content:
-      'Saga: publish a blog post.\n\nTopic: "AI staff: what it is and how teams use it."\n\nDraft + SEO, save as draft.',
+      'Write a post about "AI staff: what it is and how teams use it." Draft with SEO and save as draft.',
   },
   {
     role: 'assistant',
     agentName: 'Saga',
-    toolCalls: [{ id: 'tc_wp_site', type: 'function', function: { name: 'get_site_info', arguments: '{}' } }],
-    content: 'On it. I’ll check your site, then outline, draft with SEO, and save as a draft for your review.',
+    toolCalls: [{ id: 'tc_wp_site', type: 'function', function: { name: 'Getting site info...', arguments: '{}' } }],
+    content: 'On it. I’ll check your site first.',
   },
   {
     role: 'tool',
@@ -195,8 +196,8 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Saga',
-    toolCalls: [{ id: 'tc_wp_draft', type: 'function', function: { name: 'draft_post', arguments: '{"topic":"AI staff","targetWords":1200}' } }],
-    content: 'Drafting the article with outline and SEO; next I’ll save it as a draft for your review.',
+    toolCalls: [{ id: 'tc_wp_draft', type: 'function', function: { name: 'Drafting post...', arguments: '{"topic":"AI staff","targetWords":1200}' } }],
+    content: 'Drafting the post with an outline and SEO.',
   },
   {
     role: 'tool',
@@ -208,8 +209,8 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Saga',
-    toolCalls: [{ id: 'tc_wp_create', type: 'function', function: { name: 'create_post', arguments: '{"status":"draft"}' } }],
-    content: 'Saving as draft…',
+    toolCalls: [{ id: 'tc_wp_create', type: 'function', function: { name: 'Creating post...', arguments: '{"status":"draft"}' } }],
+    content: 'Let me save the draft.',
   },
   {
     role: 'tool',
@@ -222,20 +223,20 @@ const SAGA_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Saga',
     content:
-      '✅ Done\n\n- **AI Staff: What It Is**\n- **1,235 words** (~6 min)\n- **Draft** (not published)\n\nWant me to add an FAQ section, or focus the examples on Ops or Engineering?',
+      "✅ Done.\n\n 'AI Staff: What It Is' – 1,235 words (~6 min), saved as draft.\n\nAdd an FAQ, or different examples?",
   },
 ]
 
 const IRIS_TIMELINE: Step[] = [
   {
     role: 'user',
-    content: 'Clara: sort my Gmail inbox. Label, archive promos, draft top 3.',
+    content: 'Sort my inbox and draft replies for the ones that need it.',
   },
   {
     role: 'assistant',
     agentName: 'Clara',
-    toolCalls: [{ id: 'tc_ir_scan', type: 'function', function: { name: 'list_unread', arguments: '{"limit":80}' } }],
-    content: 'On it. I’ll pull unread, find what needs a reply, then label, archive, and draft the top 3 for you.',
+    toolCalls: [{ id: 'tc_ir_scan', type: 'function', function: { name: 'Listing unread...', arguments: '{"limit":80}' } }],
+    content: 'On it. I’ll first check what is unread.',
   },
   {
     role: 'tool',
@@ -247,8 +248,8 @@ const IRIS_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Clara',
-    toolCalls: [{ id: 'tc_ir_file', type: 'function', function: { name: 'classify_threads', arguments: '{"labels":["Sales","Support","Bills","Newsletter"]}' } }],
-    content: 'Labeling by topic and archiving newsletters and promos; next I’ll draft the top 3 for your review.',
+    toolCalls: [{ id: 'tc_ir_file', type: 'function', function: { name: 'Classifying threads...', arguments: '{"labels":["Sales","Support","Bills","Newsletter"]}' } }],
+    content: 'Organizing by topic and archiving promos.',
   },
   {
     role: 'tool',
@@ -260,8 +261,8 @@ const IRIS_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Clara',
-    toolCalls: [{ id: 'tc_ir_draft', type: 'function', function: { name: 'draft_reply', arguments: '{"count":3}' } }],
-    content: 'Drafting replies for the top 3 that need your attention; you review before sending.',
+    toolCalls: [{ id: 'tc_ir_draft', type: 'function', function: { name: 'Drafting replies...', arguments: '{"count":3}' } }],
+    content: 'Drafting 3 replies for you to review before sending.',
   },
   {
     role: 'tool',
@@ -274,7 +275,7 @@ const IRIS_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Clara',
     content:
-      '✅ Done\n\n- **63** unread\n- **14** need reply\n- **30** archived\n- **3** drafts\n\nWant me to apply an auto-label rule for newsletters going forward, or keep it manual?',
+      '✅ Done.\n\n 63 unread, 14 need a reply, 30 archived, 3 drafts ready.\n\nWant me to auto-label newsletters from now on?',
   },
 ]
 
@@ -436,7 +437,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
           id: toolCallId,
           type: 'function',
           function: {
-            name: 'call-agent',
+            name: target === 'iris' ? 'Switching to Clara…' : 'Switching to Saga…',
             arguments:
               target === 'iris'
                 ? '{ "agent": "Clara", "task": "Sort my Gmail inbox", "conversationTitle": "Clara, Demo" }'
@@ -638,7 +639,6 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
   }
 
   const cfg = CONVOS[activeConvoId]
-  const actorsLine = `${cfg.actorName} - ${cfg.designation}`
   const agentAvatarUrlOverride = cfg.id === 'aria' ? ariaAvatarUrl : cfg.id === 'iris' ? irisAvatarUrl : cfg.id === 'saga' ? sagaAvatarUrl : undefined
   const isResponding = (flagsByConvo[activeConvoId]?.responding ?? false) || (flagsByConvo[activeConvoId]?.awaitingTools ?? false)
   const isRunning = flagsByConvo[activeConvoId]?.isRunning ?? false
@@ -679,13 +679,11 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
           <div className="h-[640px] sm:h-[620px] md:h-[680px] flex flex-col">
             <div className="px-4 sm:px-6 py-4 border-b border-border/40 bg-background/10 backdrop-blur">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="min-w-0">
-                  {/* Title */}
-                  <div className={cn('font-medium leading-none truncate', cfg.id === 'aria' ? 'text-base' : 'text-sm')}>{cfg.subtitle}</div>
-                  {/* Actors */}
-                  <div className="mt-1 flex items-center gap-2 min-w-0">
-                    <div className="text-xs text-muted-foreground truncate">{actorsLine}</div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full overflow-hidden bg-muted flex items-center justify-center">
+                    <AgentAvatar seed={cfg.agentSeed} imageUrl={agentAvatarUrlOverride} size={40} />
                   </div>
+                  <div className={cn('font-medium leading-none truncate', 'text-sm')}>{cfg.label}</div>
                 </div>
                 <div className="flex items-center justify-end gap-2 flex-wrap sm:flex-nowrap flex-shrink-0 w-full sm:w-auto">
                   {(Object.keys(CONVOS) as ConvoId[]).map(id => {

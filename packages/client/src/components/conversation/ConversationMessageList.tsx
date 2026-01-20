@@ -63,8 +63,11 @@ interface ConversationMessageListProps {
   isAwaitingToolResultsOverride?: boolean
   /**
    * When 'hero', uses larger text (+2px) and bigger avatars for landing demos.
+   * When 'delegation', uses smaller text and tighter spacing to fit multi-panel demos without scroll.
    */
-  sizeVariant?: 'default' | 'hero'
+  sizeVariant?: 'default' | 'hero' | 'delegation'
+  /** When true, hide the copy and download turn-action buttons (e.g. for landing demos). */
+  hideTurnActionButtons?: boolean
 }
 
 export function ConversationMessageList({
@@ -85,6 +88,7 @@ export function ConversationMessageList({
   isAssistantStreamingOverride,
   isAwaitingToolResultsOverride,
   sizeVariant = 'default',
+  hideTurnActionButtons = false,
 }: ConversationMessageListProps) {
   // Render from stream context when available, otherwise allow static/demo rendering via overrides.
   const stream = useConversationStreamContextOptional()
@@ -687,7 +691,7 @@ export function ConversationMessageList({
     <div className={cn('h-full flex flex-col', className)}>
       <div
         ref={scrollContainerRef}
-        className={cn('flex-1 overflow-y-auto px-4 pt-6 scroll-smooth', scrollClassName)}
+        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
         style={{ paddingBottom: bottomPaddingPx ?? 160 }}
         onScroll={() => {
           const container = scrollContainerRef.current
@@ -741,7 +745,7 @@ export function ConversationMessageList({
                 />
                 {/* Only show buttons after the final assistant message of a complete turn (not tool_result messages or intermediate messages) */}
                 {/* Must be: marked as turn end, assistant message, not tool_result, at turn boundary (next is user or null), and have turn messages */}
-                {isTurnEnd && message.role === 'assistant' && message.messageType !== 'tool_result' && (next?.role === 'user' || next === null) && turnMessages.length > 0 && (
+                {!hideTurnActionButtons && isTurnEnd && message.role === 'assistant' && message.messageType !== 'tool_result' && (next?.role === 'user' || next === null) && turnMessages.length > 0 && (
                   <TurnActionButtons turnMessages={turnMessages} turnId={message.id} />
                 )}
               </Fragment>
@@ -750,14 +754,27 @@ export function ConversationMessageList({
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
-              <div className="flex items-start gap-3 w-full">
+              <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
                 {/* No avatar for typing indicator; keep spacer for alignment */}
-                <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-8 h-8')} aria-hidden="true" />
+                <div
+                  className={cn(
+                    'flex-shrink-0 mt-1',
+                    sizeVariant === 'hero' ? 'w-10 h-10' : sizeVariant === 'delegation' ? 'w-6 h-6' : 'w-8 h-8'
+                  )}
+                  aria-hidden="true"
+                />
                 <div className="min-w-0 flex-1">
-                  <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
-                    <TypingDots />
-                    <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
-                  </div>
+                <div
+                  className={cn(
+                    'flex items-center gap-2 leading-relaxed text-muted-foreground',
+                    sizeVariant === 'hero' ? 'text-base' : 'text-sm'
+                  )}
+                >
+                  <TypingDots />
+                  <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>
+                    Typing...
+                  </span>
+                </div>
                 </div>
               </div>
             </div>
@@ -807,7 +824,7 @@ interface ConversationMessageBubbleProps {
   userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
   isAwaitingToolResults?: boolean
   isLastMessage?: boolean
-  sizeVariant?: 'default' | 'hero'
+  sizeVariant?: 'default' | 'hero' | 'delegation'
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -872,8 +889,9 @@ const MemoizedMessageBubble = memo(
     sizeVariant = 'default',
   }: ConversationMessageBubbleProps) {
     const isHero = sizeVariant === 'hero'
-    const avatarSize = isHero ? 40 : 32
-    const avatarClass = isHero ? 'w-10 h-10' : 'w-8 h-8'
+    const isDelegation = sizeVariant === 'delegation'
+    const avatarSize = isHero ? 40 : isDelegation ? 24 : 32
+    const avatarClass = isHero ? 'w-10 h-10' : isDelegation ? 'w-6 h-6' : 'w-8 h-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
@@ -891,15 +909,18 @@ const MemoizedMessageBubble = memo(
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
 
       // User message: Neutral bubble on the right
+      const userRowClass = isDelegation ? 'mb-4 mt-3 gap-2' : isHero ? 'mb-4 mt-6 gap-3 mr-6' : 'mb-4 mt-6 gap-3'
+      const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
+      const userTextClass = isHero ? 'text-base' : 'text-sm'
       return (
         <div className="flex justify-end">
-          <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
+          <div className={cn('flex w-full sm:w-auto items-end max-w-full sm:max-w-[70%]', userRowClass)}>
             <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
               {/* Attachments outside bubble */}
               {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
               {/* Message bubble (match navigation/sidebar background color) */}
-              <div className={`w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
-                <div className={cn('leading-relaxed whitespace-pre-wrap', isHero ? 'text-base' : 'text-sm')}>{message.content}</div>
+              <div className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}>
+                <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{message.content}</div>
                 {message.sending && (
                   <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
                     <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
@@ -929,7 +950,7 @@ const MemoizedMessageBubble = memo(
               ) : null}
               <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
                 {fallbackVariant === 'user-icon' ? (
-                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 16} className="text-primary" />
+                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
                 ) : (
                   initialsFromName(effectiveUserName || effectiveUserEmail)
                 )}
@@ -940,9 +961,10 @@ const MemoizedMessageBubble = memo(
       )
     } else {
       // AI message: Plain text on the left (no bubble)
+      const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
       return (
         <div className="flex justify-start">
-          <div className="flex items-start gap-3 w-full">
+          <div className={cn('flex items-start w-full', assistantGap)}>
             {showAssistantAvatar ? (
               <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
                 <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={avatarSize} />

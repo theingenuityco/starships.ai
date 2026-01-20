@@ -1,6 +1,4 @@
 import React from 'react'
-import { Avatar } from '@/components/ui/avatar'
-import AgentAvatar from '@/components/animated/AgentAvatar'
 import { cn } from '@/lib/utils'
 
 export type MonthCalendarCell = {
@@ -15,6 +13,7 @@ export type MonthCalendarRun = {
   agentAvatarSeed?: string
   agentAvatarUrl?: string
   prompt?: string
+  taskType?: 'inbox' | 'report' | 'research' | 'content'
 }
 
 export type MonthScheduleCalendarProps = {
@@ -31,6 +30,13 @@ function getRunsForDay(runsByDay: Map<string, MonthCalendarRun[]> | Record<strin
   return runsByDay[key] ?? []
 }
 
+const TASK_TYPE_DOT: Record<string, string> = {
+  inbox: 'bg-blue-500/80',
+  report: 'bg-emerald-500/80',
+  research: 'bg-amber-500/80',
+  content: 'bg-violet-500/80',
+}
+
 export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runsByDay, onDayClick, className }: MonthScheduleCalendarProps) {
   const CellTag: any = onDayClick ? 'button' : 'div'
 
@@ -38,7 +44,7 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
     <div className={cn('space-y-3', className)}>
       {/* Mobile: allow horizontal scrolling like responsive tables */}
       <div className="overflow-x-auto -mx-2 px-2 sm:mx-0 sm:px-0">
-        <div className="min-w-[640px] sm:min-w-0">
+        <div className="min-w-[640px] sm:min-w-0 rounded-lg bg-muted/10 p-2">
           <div className="grid grid-cols-7 gap-1 text-xs text-muted-foreground mb-1">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(d => (
               <div key={d} className="px-2 py-1 text-center font-medium">
@@ -73,13 +79,13 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                     'relative group min-h-[104px] rounded-lg border p-2 flex flex-col gap-1 bg-card/80 text-left transition-colors',
                     onDayClick && 'hover:border-primary/60 hover:bg-primary/5 cursor-pointer',
                     inCurrentMonth ? 'border-border/60' : 'border-dashed border-border/40 opacity-60',
-                    isToday && 'ring-1 ring-primary/60 border-primary/60'
+                    isToday && 'ring-1 ring-primary/60 border-primary/60 bg-primary/5'
                   )}
                 >
                   <div className="flex items-center justify-between">
                     <span className={cn('text-[11px] font-medium', inCurrentMonth ? 'text-foreground' : 'text-muted-foreground')}>{cell.date.getDate()}</span>
                     {sortedDayRuns.length > 0 && (
-                      <span className="inline-flex items-center rounded-full bg-primary/10 text-primary px-1.5 py-0.5 text-[10px] font-medium">
+                      <span className="inline-flex items-center rounded-full bg-primary/15 text-primary px-2 py-1 text-[11px] font-semibold">
                         {sortedDayRuns.length} run{sortedDayRuns.length > 1 ? 's' : ''}
                       </span>
                     )}
@@ -110,9 +116,9 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                               {isTop && (
                                 <>
                                   <div className="flex items-center gap-1 mb-1">
-                                    <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                      <AgentAvatar seed={latest.agentAvatarSeed || latest.agentName} imageUrl={latest.agentAvatarUrl} size={16} rounded />
-                                    </Avatar>
+                                    {latest.taskType && TASK_TYPE_DOT[latest.taskType] ? (
+                                      <span className={cn('flex-shrink-0 w-1.5 h-1.5 rounded-full', TASK_TYPE_DOT[latest.taskType])} aria-hidden />
+                                    ) : null}
                                     <span className="font-medium truncate">{latest.agentName}</span>
                                     {extraCount > 0 && <span className="ml-auto text-[9px] text-muted-foreground">+{extraCount}</span>}
                                   </div>
@@ -129,9 +135,9 @@ export function MonthScheduleCalendar({ currentMonth, monthCells, todayKey, runs
                         {sortedDayRuns.map(run => (
                           <div key={run.id} className="w-full h-14 rounded-md border border-border/60 bg-muted px-1.5 py-0.5 text-[10px] leading-tight shadow-sm overflow-hidden">
                             <div className="flex items-center gap-1 mb-1">
-                              <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                                <AgentAvatar seed={run.agentAvatarSeed || run.agentName} imageUrl={run.agentAvatarUrl} size={16} rounded />
-                              </Avatar>
+                              {run.taskType && TASK_TYPE_DOT[run.taskType] ? (
+                                <span className={cn('flex-shrink-0 w-1.5 h-1.5 rounded-full', TASK_TYPE_DOT[run.taskType])} aria-hidden />
+                              ) : null}
                               <span className="font-medium truncate">{run.agentName}</span>
                             </div>
                             {run.prompt && <div className="text-[10px] text-muted-foreground line-clamp-2">{String(run.prompt)}</div>}

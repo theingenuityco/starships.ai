@@ -169,7 +169,7 @@ const ARIA_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Aria',
     content:
-      'Starships.ai gives you AI teammates that:\n\n- 📈 **Help you scale your brand across platforms.**\n- 💤 **Work while you sleep.**\n- 📱 **Collaborate across apps to fit your custom requirements.**',
+      'Starships.ai gives you AI teammates that:\n\n- 📈 **Help you scale your brand across platforms.**\n- 💤 **Work while you sleep by automating your tasks.**\n- 📱 **Collaborate across apps to fit your custom needs.**\n\nPick a quick demo:',
   },
 ]
 
@@ -753,9 +753,9 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                             type="button"
                             onClick={() => handleDemoChoice('iris')}
                             className={cn(
-                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:bg-primary hover:text-primary-foreground hover:border-primary [&:hover_svg]:text-primary-foreground',
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-amber-100 hover:border-primary/50 [&:hover_svg]:text-amber-100',
                               !isDemoChooserHovered && demoChooserBlinkIndex === 0
-                                ? 'bg-primary text-primary-foreground border-primary [&_svg]:text-primary-foreground'
+                                ? 'bg-primary/20 backdrop-blur-sm text-amber-100 border-primary/40 [&_svg]:text-amber-100'
                                 : 'bg-card text-card-foreground border-border/50'
                             )}
                             aria-label="Sort my inbox"
@@ -769,9 +769,9 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                             type="button"
                             onClick={() => handleDemoChoice('saga')}
                             className={cn(
-                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:bg-primary hover:text-primary-foreground hover:border-primary [&:hover_svg]:text-primary-foreground',
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background backdrop-blur-sm hover:bg-primary/25 hover:text-amber-100 hover:border-primary/50 [&:hover_svg]:text-amber-100',
                               !isDemoChooserHovered && demoChooserBlinkIndex === 1
-                                ? 'bg-primary text-primary-foreground border-primary [&_svg]:text-primary-foreground'
+                                ? 'bg-primary/20 backdrop-blur-sm text-amber-100 border-primary/40 [&_svg]:text-amber-100'
                                 : 'bg-card text-card-foreground border-border/50'
                             )}
                             aria-label="Publish a blog post"
@@ -782,8 +782,8 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                             </div>
                           </button>
                         </div>
-                        <div className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden flex items-center justify-center">
-                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={20} className="text-primary" />
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-primary/30 bg-primary/15 backdrop-blur-sm mb-1 overflow-hidden flex items-center justify-center">
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={20} className="text-amber-400/90" />
                         </div>
                       </div>
                     </div>

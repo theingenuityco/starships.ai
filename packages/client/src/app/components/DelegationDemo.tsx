@@ -123,7 +123,7 @@ const DEMO_TIMELINE: DemoStep[] = [
   {
     convoId: 'main',
     role: 'user',
-    content: "Aria, summarize my last week's Google Drive briefs and email a summary to the team.",
+    content: "Aria, summarize last week's project briefs from our Google Drive folder and email a summary to the team.",
   },
   {
     convoId: 'main',
@@ -135,7 +135,7 @@ const DEMO_TIMELINE: DemoStep[] = [
         id: 'tc_demo_delegate_dean',
         type: 'function',
         function: {
-          name: 'call-agent',
+          name: 'Switching to Dean…',
           arguments:
             '{ "agent": "Dean", "task": "Pull last week\'s project briefs from our Google Drive folder and summarize them into a one-pager", "conversationTitle": "Drive - Project briefs" }',
         },
@@ -160,7 +160,6 @@ const DEMO_TIMELINE: DemoStep[] = [
       2
     ),
   },
-  { convoId: 'main', role: 'assistant', agentName: 'Aria', noStream: true, content: 'Switching to Dean…' },
   {
     convoId: 'dean',
     role: 'user',
@@ -177,7 +176,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     role: 'assistant',
     agentName: 'Dean',
     toolCalls: [
-      { id: 'tc_demo_list_drive', type: 'function', function: { name: 'list-google-drive-files', arguments: '{ "folderName": "Project Briefs", "modifiedAfter": "last_week" }' } },
+      { id: 'tc_demo_list_drive', type: 'function', function: { name: 'Listing files...', arguments: '{ "folderName": "Project Briefs", "modifiedAfter": "last_week" }' } },
     ],
     content: '',
   },
@@ -188,7 +187,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     toolCallId: 'tc_demo_list_drive',
     noStream: true,
     content: JSON.stringify(
-      { status: 'ok', files: ['Q1 Brief.pdf', 'Product Roadmap.docx', 'Sprint Summary.docx'], count: 3, summary: ['Q1 goals and milestones', 'Roadmap through Q3', 'Last sprint deliverables'] },
+      { status: 'ok', files: ['Q1 Brief.pdf', 'Product Roadmap.docx', 'Sprint Summary.docx'], count: 3, summary: ['Quarterly focus', 'Plans for the year', 'Recent work'] },
       null,
       2
     ),
@@ -197,7 +196,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     convoId: 'dean',
     role: 'assistant',
     agentName: 'Dean',
-    content: "✅ **3 briefs** summarized.\n\n- Q1 goals\n- Roadmap through Q3\n- Sprint deliverables",
+    content: "✅ **3 briefs** summarized.\n\n- Quarterly focus\n- Plans for the year\n- Recent work",
   },
   {
     convoId: 'main',
@@ -208,7 +207,7 @@ const DEMO_TIMELINE: DemoStep[] = [
         id: 'tc_demo_delegate_clara',
         type: 'function',
         function: {
-          name: 'call-agent',
+          name: 'Switching to Clara…',
           arguments:
             '{ "agent": "Clara", "task": "Email the summary to the team via Gmail", "conversationTitle": "Gmail - Team email" }',
         },
@@ -233,7 +232,6 @@ const DEMO_TIMELINE: DemoStep[] = [
       2
     ),
   },
-  { convoId: 'main', role: 'assistant', agentName: 'Aria', noStream: true, content: 'Switching to Clara…' },
   {
     convoId: 'clara',
     role: 'user',
@@ -250,7 +248,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     role: 'assistant',
     agentName: 'Clara',
     toolCalls: [
-      { id: 'tc_demo_compose_draft', type: 'function', function: { name: 'compose-gmail-draft', arguments: '{ "to": "team@company.com", "subject": "Project Briefs Summary" }' } },
+      { id: 'tc_demo_compose_draft', type: 'function', function: { name: 'Composing email...', arguments: '{ "to": "team@company.com", "subject": "Project Briefs Summary" }' } },
     ],
     content: '',
   },

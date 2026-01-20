@@ -33,6 +33,7 @@ export { searchWidgetsToolTemplate } from './search-widgets';
 export { renderWidgetToolTemplate } from './render-widget';
 export { suggestConnectorsToolTemplate } from './suggest-connectors';
 export { suggestAgentsToolTemplate } from './suggest-agents';
+export { renderStarshipDetailsToolTemplate } from './render-starship-details';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -65,6 +66,7 @@ import { searchWidgetsToolTemplate } from './search-widgets';
 import { renderWidgetToolTemplate } from './render-widget';
 import { suggestConnectorsToolTemplate } from './suggest-connectors';
 import { suggestAgentsToolTemplate } from './suggest-agents';
+import { renderStarshipDetailsToolTemplate } from './render-starship-details';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -97,4 +99,5 @@ export const ALL_TOOL_TEMPLATES = [
   renderWidgetToolTemplate,
   suggestConnectorsToolTemplate,
   suggestAgentsToolTemplate,
+  renderStarshipDetailsToolTemplate,
 ];

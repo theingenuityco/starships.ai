@@ -510,7 +510,7 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     const user = requireAuthUser(req, res);
     if (!user) return;
     const userId = user.id;
-    const { name, status, maxAgents } = req.body;
+    const { name, status, maxAgents, description, websiteUrl } = req.body;
 
     // Validate starship ID
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
@@ -580,10 +580,58 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
       allowedUpdates.maxAgents = maxAgents;
     }
 
+    if (description !== undefined) {
+      if (description === null) {
+        allowedUpdates.description = '';
+      } else if (typeof description !== 'string') {
+        sendError(res, 'VALIDATION_ERROR', 'description must be a string', 400, { field: 'description' });
+        return;
+      } else {
+        const trimmed = description.trim();
+        // Allow empty to clear.
+        allowedUpdates.description = trimmed;
+        if (trimmed.length > 2000) {
+          sendError(res, 'VALIDATION_ERROR', 'description must be 2000 characters or less', 400, { field: 'description' });
+          return;
+        }
+      }
+    }
+
+    if (websiteUrl !== undefined) {
+      if (websiteUrl === null) {
+        allowedUpdates.websiteUrl = '';
+      } else if (typeof websiteUrl !== 'string') {
+        sendError(res, 'VALIDATION_ERROR', 'websiteUrl must be a string', 400, { field: 'websiteUrl' });
+        return;
+      } else {
+        const trimmed = websiteUrl.trim();
+        // Allow empty to clear.
+        if (trimmed.length === 0) {
+          allowedUpdates.websiteUrl = '';
+        } else {
+          if (trimmed.length > 2048) {
+            sendError(res, 'VALIDATION_ERROR', 'websiteUrl must be 2048 characters or less', 400, { field: 'websiteUrl' });
+            return;
+          }
+          try {
+            const u = new URL(trimmed);
+            if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+              sendError(res, 'VALIDATION_ERROR', 'websiteUrl must start with http:// or https://', 400, { field: 'websiteUrl' });
+              return;
+            }
+          } catch {
+            sendError(res, 'VALIDATION_ERROR', 'websiteUrl must be a valid URL', 400, { field: 'websiteUrl' });
+            return;
+          }
+          allowedUpdates.websiteUrl = trimmed;
+        }
+      }
+    }
+
     if (Object.keys(allowedUpdates).length === 0) {
       sendError(res, 'VALIDATION_ERROR', 'No valid updates provided', 400, {
         message: 'At least one valid field must be provided for update',
-        allowed_fields: ['name', 'status', 'maxAgents'],
+        allowed_fields: ['name', 'description', 'websiteUrl', 'status', 'maxAgents'],
       });
       return;
     }

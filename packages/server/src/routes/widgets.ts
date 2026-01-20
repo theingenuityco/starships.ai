@@ -11,28 +11,40 @@ import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 const router: Router = Router();
 
 // Zod schemas for validation
+const emptyStringToUndefined = (v: unknown) => (typeof v === 'string' && v.trim().length === 0 ? undefined : v);
+
 const SearchWidgetsQuerySchema = z.object({
-  name: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100, 'name must be less than 100 characters')
-    .optional()
-    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
-  slug: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100, 'slug must be less than 100 characters')
-    .optional()
-    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
-  widgetType: z
-    .string()
-    .trim()
-    .min(1)
-    .max(100, 'widgetType must be less than 100 characters')
-    .optional()
-    .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE }),
+  // Some clients/tools may send empty strings for optional fields; treat those as "not provided".
+  name: z.preprocess(
+    emptyStringToUndefined,
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(100, 'name must be less than 100 characters')
+      .optional()
+      .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE })
+  ),
+  slug: z.preprocess(
+    emptyStringToUndefined,
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(100, 'slug must be less than 100 characters')
+      .optional()
+      .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE })
+  ),
+  widgetType: z.preprocess(
+    emptyStringToUndefined,
+    z
+      .string()
+      .trim()
+      .min(1)
+      .max(100, 'widgetType must be less than 100 characters')
+      .optional()
+      .refine((val) => !val || noXSS(val), { message: XSS_ERROR_MESSAGE })
+  ),
   limit: z.coerce.number().int().min(0).max(200).optional(),
   offset: z.coerce.number().int().min(0).max(10_000).optional(),
 });

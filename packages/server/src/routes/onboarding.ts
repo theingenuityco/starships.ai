@@ -5,7 +5,6 @@ import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { OnboardingRecommendationService } from '@/services/OnboardingRecommendationService';
 import { StarshipService } from '@/services/StarshipService';
 import { ConversationService } from '@/services/ConversationService';
-import { MessageService } from '@/services/MessageService';
 import { UserRepository, AgentRepository, StarshipRepository, OnboardingSessionRepository } from '@starships/models';
 import type { AuthUser, StarshipModel, AgentModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
@@ -85,6 +84,17 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       step: 'connectors',
     });
 
+    // IMPORTANT:
+    // Once a starship exists, onboarding should become optional (user can skip and return later).
+    // Treat `onboardingCompleted` as "initial provisioning complete" rather than "finished every onboarding step".
+    try {
+      if (!dbUser.onboardingCompleted) {
+        await userRepo.update(user.id, { onboardingCompleted: true });
+      }
+    } catch {
+      // best-effort; do not block onboarding chat start
+    }
+
     // Create or reuse an "Onboarding" conversation (normal conversation labeled onboarding)
     const conversationService = new ConversationService();
     const existing = await conversationService.getConversationsByStarshipWithAgents(starship.id);
@@ -98,7 +108,6 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           })
         : null) || null;
 
-    const isResume = !!onboardingConversation;
     const conversation = onboardingConversation
       ? onboardingConversation
       : await conversationService.createConversation({
@@ -113,20 +122,40 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
     const onboardingSystemPrompt = [
       'You are starting a new onboarding conversation with a user for their starship.',
       '',
-      'Do this first:',
-      '- Warmly introduce yourself as Aria.',
-      '- Ask what task/outcome the user wants to get done.',
-      '- Ask only the minimum clarifying questions needed to identify the goal and the apps/data involved.',
+      'Work one step at a time (turn-based):',
+      '- Do NOT ask clarifying questions and suggest connectors in the same message.',
+      '- If the task is vague, ask ONLY clarifying question(s) and stop. Wait for the user reply before suggesting connectors.',
       '',
-      'Then start onboarding by suggesting connectors:',
-      '- If the user mentions apps, call Suggest Connectors (tool slug: suggest-connectors) with the relevant providers.',
+      'First message:',
+      '- Warmly introduce yourself as Aria.',
+      '- Ask what task/outcome the user wants to get done (what success looks like).',
+      '- Include 3-5 examples of tasks (examples only; do not suggest connectors yet), like:',
+      '  - “Summarize and prioritize new Slack messages into a daily brief”',
+      '  - “Turn my Stripe revenue into weekly KPI charts”',
+      '  - “Answer questions about our Notion knowledge base”',
+      '  - “Track GitHub PRs/issues and report status updates”',
+      '  - “Automate recurring customer support triage”',
+      '',
+      'Clarifying questions (ONLY if task is vague):',
+      '- Ask the minimum number of questions needed to make the task actionable.',
+      '- Focus on: goal, apps/data involved, and any constraints (deadline/audience/format).',
+      '- End the message after questions. Do not suggest connectors yet.',
+      '',
+      'After the user answers (task is clear): suggest connectors:',
+      '- First call List Connectors (tool slug: list-connectors) to understand what connectors are available/connected and whether the task is feasible.',
+      '- If the task is not feasible due to missing connectors, say what is missing and ask the user whether they want to connect those apps.',
+      '- If the user mentions apps, then call Suggest Connectors (tool slug: suggest-connectors) with the relevant providers.',
       '- If the user does not mention apps, ask one concise question listing a few common apps, then suggest connectors based on their answer.',
       '',
       'Keep it warm, concise, and action-oriented.',
     ].join('\\n');
 
     try {
-      const prevState = (conversation as any)?.state && typeof (conversation as any).state === 'object' ? (conversation as any).state : {};
+      const prevState =
+        (conversation as unknown as { state?: unknown })?.state &&
+        typeof (conversation as unknown as { state?: unknown }).state === 'object'
+          ? ((conversation as unknown as { state: Record<string, unknown> }).state as Record<string, unknown>)
+          : {};
       await conversationService.updateConversation(conversation.id, {
         state: { ...(prevState as Record<string, unknown>), onboardingSystemPrompt },
       });
@@ -139,7 +168,12 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
     try {
       // Avoid spamming: only kick off if there are no assistant messages yet.
       const existingMessages = await conversationService.getConversationMessages(conversation.id).catch(() => []);
-      const hasAssistant = Array.isArray(existingMessages) && existingMessages.some((m: any) => m && m.role === 'assistant');
+      const hasAssistant =
+        Array.isArray(existingMessages) &&
+        existingMessages.some((m: unknown) => {
+          const rec = m as Record<string, unknown> | null;
+          return rec != null && rec['role'] === 'assistant';
+        });
       if (!hasAssistant) {
         await conversationService.continueAfterToolApproval(conversation.id, aria.id, { authContext: { userId: user.id } });
       }

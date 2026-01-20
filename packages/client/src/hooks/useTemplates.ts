@@ -120,17 +120,10 @@ export function useCreateAgentFromTemplate() {
         queryKey: TEMPLATE_QUERY_KEYS.agentTemplate(variables.templateId),
       })
 
-      // Redirect to connectors page with agent info in URL params
-      const starshipSlug = (agent as any)?._starshipSlug || variables.starshipSlug
-      if (starshipSlug && typeof window !== 'undefined') {
-        const agentSlug = (agent as any)?.slug || ''
-        const params = new URLSearchParams({ agentId: agent.id, agentSlug, agentName: agent.name || '', agentRole: agent.role || '' })
-        window.location.href = `/ship/${starshipSlug}/connectors?${params.toString()}`
-      } else {
-        toast.success('Agent deployed successfully!', {
-          description: `${formatAgentDisplayName(agent)} has been created and deployed to your starship.`,
-        })
-      }
+      // Do not auto-navigate after deploy; keep the user in-context (e.g. onboarding chat / marketplace page).
+      toast.success('Agent deployed successfully!', {
+        description: `${formatAgentDisplayName(agent)} has been created and deployed to your starship.`,
+      })
     },
     onError: (error: any) => {
       // Extract error message with better handling for ValidationError

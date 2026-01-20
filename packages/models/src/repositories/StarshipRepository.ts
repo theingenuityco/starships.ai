@@ -133,7 +133,10 @@ export class StarshipRepository extends BaseRepository {
         if (updates.name && !updates.slug) {
           const existingStarship = await this.findById(id);
           if (existingStarship) {
-            updates.slug = await this.generateUniqueSlug(updates.name, existingStarship.ownerId);
+            // Only regenerate slug when the name is actually different.
+            if (updates.name !== existingStarship.name) {
+              updates.slug = await this.generateUniqueSlug(updates.name, existingStarship.ownerId);
+            }
           }
         }
 

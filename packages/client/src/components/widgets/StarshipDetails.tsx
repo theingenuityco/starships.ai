@@ -12,6 +12,7 @@ import { useStarship, useUpdateStarship } from '@/hooks/useStarships'
 import api from '@/lib/api'
 import Icon from '@/components/primitives/Icon'
 import { Orbitron } from 'next/font/google'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -27,8 +28,22 @@ export interface StarshipDetailsProps {
  * Intended to be rendered inline in chat via widgetType: "StarshipDetails".
  */
 export function StarshipDetails({ starshipId, className }: StarshipDetailsProps): React.JSX.Element {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { data: starship, isLoading, isError } = useStarship(starshipId, Boolean(starshipId))
   const updateStarship = useUpdateStarship()
+
+  function replaceShipSlugInPath(currentPathname: string, nextSlug: string): string | null {
+    // Only rewrite paths that follow /ship/:slug/...
+    const parts = String(currentPathname || '').split('/').filter(Boolean)
+    if (parts.length < 2) return null
+    if (parts[0] !== 'ship') return null
+    const currentSlug = parts[1]
+    if (!currentSlug || currentSlug === nextSlug) return null
+    parts[1] = encodeURIComponent(nextSlug)
+    return `/${parts.join('/')}`
+  }
 
   function generateSlug(value: string): string {
     return String(value || '')
@@ -98,7 +113,7 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
     e.preventDefault()
     if (!canSubmit) return
 
-    await updateStarship.mutateAsync({
+    const updated = await updateStarship.mutateAsync({
       starshipId,
       updates: {
         name: name.trim(),
@@ -106,6 +121,16 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
         websiteUrl: websiteUrl.trim(),
       },
     })
+
+    // If the canonical slug changed and we're on a /ship/:slug/* route, replace the URL in-place.
+    // Preserve the current query string.
+    if (updated?.slug && pathname) {
+      const nextPath = replaceShipSlugInPath(pathname, updated.slug)
+      if (nextPath) {
+        const qs = searchParams?.toString()
+        router.replace(qs ? `${nextPath}?${qs}` : nextPath)
+      }
+    }
   }
 
   async function onGenerateFromWebsite() {

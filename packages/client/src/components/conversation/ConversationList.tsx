@@ -27,9 +27,9 @@ interface ConversationListProps {
 
 type ConversationWithAgents = ConversationModel & { agents: AgentModel[] }
 
-function isOnboardingConversation(conversation: { title?: string | null | undefined }): boolean {
-  const title = typeof conversation.title === 'string' ? conversation.title.trim().toLowerCase() : ''
-  return title === 'onboarding'
+function isOnboardingConversation(conversation: { state?: unknown }): boolean {
+  const state = conversation.state && typeof conversation.state === 'object' ? (conversation.state as any) : null
+  return state?.isOnboardingConversation === true
 }
 
 function CompactConversationAgents({ starshipId, agents }: { starshipId: string; agents: AgentModel[] }) {

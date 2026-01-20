@@ -102,7 +102,7 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           agentId: aria.id,
         });
 
-    // Inject onboarding-only system prompt (conversation-scoped).
+    // Mark this conversation as onboarding + inject onboarding-only system prompt (conversation-scoped).
     // This keeps Aria's template prompt generic while customizing behavior for onboarding conversations.
     const onboardingSystemPrompt = [
       'You are starting a new onboarding conversation with a user for their starship.',
@@ -169,7 +169,7 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           ? ((conversation as unknown as { state: Record<string, unknown> }).state as Record<string, unknown>)
           : {};
       await conversationService.updateConversation(conversation.id, {
-        state: { ...(prevState as Record<string, unknown>), onboardingSystemPrompt },
+        state: { ...(prevState as Record<string, unknown>), isOnboardingConversation: true, onboardingSystemPrompt },
       });
     } catch {
       // non-fatal

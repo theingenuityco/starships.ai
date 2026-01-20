@@ -747,8 +747,10 @@ export function ConversationMessageList({
           {shouldShowGapLoader && (
             <div className="flex justify-start">
               <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
-                {/* No avatar for typing indicator; keep spacer for alignment */}
-                <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
+                {/* Show a placeholder avatar while typing (so layout doesn't jump when avatar URL loads) */}
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                  <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
+                </div>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
                     <TypingDots />

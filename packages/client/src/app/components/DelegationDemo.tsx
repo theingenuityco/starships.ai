@@ -143,7 +143,7 @@ const DEMO_TIMELINE: DemoStep[] = [
       },
     ],
     noStream: false,
-    content: "I'll call **Dean** to pull the briefs and summarize.",
+    content: "I'll call **Dean** to pull the briefs.",
   },
   {
     convoId: 'main',
@@ -271,7 +271,7 @@ const DEMO_TIMELINE: DemoStep[] = [
     convoId: 'main',
     role: 'assistant',
     agentName: 'Aria',
-    content: "✅ Done.\n\n Summary emailed to your team!",
+    content: "✅ Summary emailed to your team!",
   },
   { convoId: 'main', role: 'user', content: 'Run this every Monday at 9am' },
   {
@@ -652,7 +652,6 @@ export default function DelegationDemo() {
                       userNameOverride="You"
                       userAvatarFallbackVariantOverride="user-icon"
                       sizeVariant="delegation"
-                      hideTurnActionButtons
                     />
                   </div>
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-background/50 to-transparent" aria-hidden />

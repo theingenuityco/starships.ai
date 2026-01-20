@@ -12,7 +12,6 @@ import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
-import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
@@ -828,33 +827,6 @@ function initialsFromName(name?: string | null): string {
     .join('')
 }
 
-// User message attachments component
-function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: string[]; starshipId: string }) {
-  const { data: attachments, isLoading } = useMessageAttachments(attachmentIds, starshipId)
-
-  if (isLoading) {
-    return (
-      <div className="mb-1 space-y-2">
-        {attachmentIds.map(id => (
-          <MessageAttachmentSkeleton key={id} className="max-w-xs" />
-        ))}
-      </div>
-    )
-  }
-
-  if (!attachments || attachments.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="mb-1 space-y-2">
-      {attachments.map(attachment => (
-        <MessageAttachment key={attachment.id} attachment={attachment} className="max-w-xs" />
-      ))}
-    </div>
-  )
-}
-
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
   function ConversationMessageBubble({
@@ -888,24 +860,13 @@ const MemoizedMessageBubble = memo(
       const shouldUseExplicitUserAvatar = isImageUrl(explicitUserAvatarUrl)
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
 
-      // User message: Neutral bubble on the right
+      // User message: Render using the same engine as assistant messages (no bubble)
+      const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
+
       return (
-        <div className="flex justify-end">
-          <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
-            <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
-              {/* Attachments outside bubble */}
-              {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
-              {/* Message bubble (match navigation/sidebar background color) */}
-              <div className={`w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
-                {message.sending && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
-                  </div>
-                )}
-              </div>
-            </div>
-            <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
+        <div className="flex justify-start">
+          <div className="mb-4 mt-6 flex items-start gap-3 w-full max-w-full pr-[52px]">
+            <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
                   src={explicitUserAvatarUrl!}
@@ -933,11 +894,36 @@ const MemoizedMessageBubble = memo(
                 )}
               </AvatarFallback>
             </Avatar>
+            <div className="flex-1 w-full pt-0.5">
+              <div className="mb-1 text-sm font-bold text-foreground">{userDisplayName}</div>
+              <ConversationMessageContent
+                content={message.content}
+                messageId={message.id}
+                enableMarkdown={true}
+                enableCopy={true}
+                enableLinkPreview={true}
+                isStreaming={false}
+                className="text-foreground/80"
+                chunks={message.chunks}
+                reasoning={message.reasoning}
+                reasoningChunks={message.reasoningChunks}
+                agentName={userDisplayName}
+                toolCalls={message.toolCalls}
+                toolResults={message.toolResults}
+                uiActions={message.uiActions}
+                messageType={message.messageType}
+                attachmentIds={message.attachmentIds}
+                starshipId={starshipId}
+                isAwaitingToolResults={isAwaitingToolResults}
+                isLastMessage={isLastMessage}
+              />
+            </div>
           </div>
         </div>
       )
     } else {
       // AI message: Plain text on the left (no bubble)
+      const assistantDisplayName = (agentName || 'Assistant').trim()
       return (
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
           <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
@@ -948,7 +934,8 @@ const MemoizedMessageBubble = memo(
             ) : (
               <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
-            <div className="flex-1 w-full">
+            <div className="flex-1 w-full pt-0.5">
+              {showAssistantAvatar && <div className="mb-1 text-sm font-bold text-foreground">{assistantDisplayName}</div>}
               <ConversationMessageContent
                 content={message.content}
                 messageId={message.id}
@@ -956,11 +943,11 @@ const MemoizedMessageBubble = memo(
                 enableCopy={!isStreamingActive}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
-                className="text-foreground"
+                className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
                 reasoningChunks={message.reasoningChunks}
-                agentName={agentName}
+                agentName={assistantDisplayName}
                 toolCalls={message.toolCalls}
                 toolResults={message.toolResults}
                 uiActions={message.uiActions}

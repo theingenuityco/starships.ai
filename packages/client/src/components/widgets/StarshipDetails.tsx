@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { useStarship, useUpdateStarship } from '@/hooks/useStarships'
 import api from '@/lib/api'
 
@@ -38,12 +39,21 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   const [websiteUrl, setWebsiteUrl] = useState(initial.websiteUrl)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const descriptionRef = useRef<HTMLTextAreaElement | null>(null)
 
   useEffect(() => {
     setName(initial.name)
     setDescription(initial.description)
     setWebsiteUrl(initial.websiteUrl)
   }, [initial.name, initial.description, initial.websiteUrl])
+
+  // Auto-expand description textarea to fit content
+  useEffect(() => {
+    const el = descriptionRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [description])
 
   const canSubmit = Boolean(starshipId) && name.trim().length > 0 && !updateStarship.isPending
 
@@ -88,58 +98,65 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   }
 
   return (
-    <form onSubmit={onSubmit} className={cn('w-full max-w-none', className)}>
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="starship-name">Name</Label>
-          <Input
-            id="starship-name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Aurora"
-            disabled={isLoading || updateStarship.isPending}
-          />
-          {isError ? <div className="text-xs text-red-600 dark:text-red-400">Failed to load starship details.</div> : null}
-        </div>
+    <Card className={cn('w-full max-w-none rounded-lg shadow-none', className)}>
+      <CardContent className="p-4">
+        <form onSubmit={onSubmit} className="w-full max-w-none">
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="starship-name">Name</Label>
+              <Input
+                id="starship-name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Aurora"
+                disabled={isLoading || updateStarship.isPending}
+              />
+              {isError ? <div className="text-xs text-red-600 dark:text-red-400">Failed to load starship details.</div> : null}
+            </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="starship-website">Website URL</Label>
-          <div className="flex gap-2">
-            <Input
-              id="starship-website"
-              value={websiteUrl}
-              onChange={(e) => setWebsiteUrl(e.target.value)}
-              placeholder="https://example.com"
-              disabled={isLoading || updateStarship.isPending || isGenerating}
-            />
-            <Button type="button" variant="outline" onClick={onGenerateFromWebsite} disabled={!websiteUrl.trim() || isGenerating || isLoading}>
-              {isGenerating ? 'Generating…' : 'Generate'}
-            </Button>
+            <div className="space-y-2">
+              <Label htmlFor="starship-website">Website URL</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="starship-website"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://example.com"
+                  disabled={isLoading || updateStarship.isPending || isGenerating}
+                />
+                <Button type="button" variant="outline" onClick={onGenerateFromWebsite} disabled={!websiteUrl.trim() || isGenerating || isLoading}>
+                  {isGenerating ? 'Generating…' : 'Generate'}
+                </Button>
+              </div>
+              <div className="text-xs text-muted-foreground">
+                Include <code className="font-mono">http://</code> or <code className="font-mono">https://</code>.
+              </div>
+              {generateError ? <div className="text-xs text-red-600 dark:text-red-400">{generateError}</div> : null}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="starship-description">Description</Label>
+              <Textarea
+                id="starship-description"
+                ref={descriptionRef}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="Describe what your starship/company/org/project does…"
+                disabled={isLoading || updateStarship.isPending || isGenerating}
+                className="resize-none overflow-hidden"
+                rows={3}
+              />
+            </div>
+
+            <div className="flex justify-end">
+              <Button type="submit" disabled={!canSubmit}>
+                {updateStarship.isPending ? 'Saving…' : 'Save'}
+              </Button>
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">
-            Include <code className="font-mono">http://</code> or <code className="font-mono">https://</code>.
-          </div>
-          {generateError ? <div className="text-xs text-red-600 dark:text-red-400">{generateError}</div> : null}
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="starship-description">Description</Label>
-          <Textarea
-            id="starship-description"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder="Describe what your starship/company/org/project does…"
-            disabled={isLoading || updateStarship.isPending || isGenerating}
-          />
-        </div>
-
-        <div className="flex justify-end">
-          <Button type="submit" disabled={!canSubmit}>
-            {updateStarship.isPending ? 'Saving…' : 'Save'}
-          </Button>
-        </div>
-      </div>
-    </form>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
 

@@ -9,6 +9,16 @@ import type {
 } from '@starships/protocol';
 import OpenAI from 'openai';
 import { CancelledError } from '@starships/autopilot';
+import {
+  BedrockRuntimeClient,
+  ConverseStreamCommand,
+  type Message as BedrockMessage,
+  type ContentBlock as BedrockContentBlock,
+  type Tool as BedrockTool,
+  type ToolConfiguration as BedrockToolConfiguration,
+  type ImageFormat as BedrockImageFormat,
+  type ConverseStreamCommandInput,
+} from '@aws-sdk/client-bedrock-runtime';
 
 type OpenAIChatCompletionCreateParamsNonStreaming = Omit<OpenAI.Chat.ChatCompletionCreateParamsStreaming, 'stream' | 'stream_options'> & {
   stream: false;
@@ -34,6 +44,17 @@ export interface LlmRuntimeConfig {
   apiKey: string;
   baseUrl?: string;
   defaultHeaders?: Record<string, string>;
+}
+
+export interface AwsRuntimeConfig {
+  accessKeyId: string;
+  secretAccessKey: string;
+  region: string;
+}
+
+export interface ProviderRoute {
+  provider: 'openrouter' | 'aws_bedrock';
+  providerModelId: string;
 }
 
 export interface RunnerHostRuntimeOptions {
@@ -67,6 +88,18 @@ export interface RunnerHostRuntimeOptions {
   llm?: LlmRuntimeConfig;
 
   /**
+   * AWS runtime configuration for Bedrock.
+   */
+  aws?: AwsRuntimeConfig;
+
+  /**
+   * Model routing table. Maps canonical model ID to one or more provider routes,
+   * ordered by descending priority. The host may provide multiple routes so the
+   * runner can fail over between providers.
+   */
+  modelRoutes?: Record<string, ProviderRoute[] | undefined>;
+
+  /**
    * Execution-wide abort signal. When aborted, all in-flight host runtime operations
    * (HTTP + LLM) should be cancelled promptly.
    */
@@ -90,6 +123,24 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   const connectorSessions = options.connectorSessions ?? {};
   const connectorMetadata = options.connectorMetadata ?? {};
   const runtimeEnv = options.runtimeEnv ?? {};
+
+  // Initialize clients lazily or once
+  let _bedrockClient: BedrockRuntimeClient | null = null;
+  const getBedrockClient = (): BedrockRuntimeClient => {
+    if (!_bedrockClient) {
+      if (!options.aws) {
+        throw new Error('AWS credentials not configured in RunnerHostRuntimeOptions');
+      }
+      _bedrockClient = new BedrockRuntimeClient({
+        region: options.aws.region,
+        credentials: {
+          accessKeyId: options.aws.accessKeyId,
+          secretAccessKey: options.aws.secretAccessKey,
+        },
+      });
+    }
+    return _bedrockClient;
+  };
 
   const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
     const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
@@ -479,6 +530,240 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   };
 
   const llm = async (request: LlmHostRequest): Promise<AsyncIterable<unknown>> => {
+    // 1. Determine provider routes (ordered by priority).
+    const configuredRoutes = options.modelRoutes?.[request.model];
+    const routes: ProviderRoute[] =
+      Array.isArray(configuredRoutes) && configuredRoutes.length > 0
+        ? configuredRoutes
+        : [
+            // Backwards-compatible default: treat the canonical model as an OpenRouter ID.
+            { provider: 'openrouter', providerModelId: request.model },
+          ];
+
+    const failures: Array<{ provider: string; providerModelId: string; error: unknown }> = [];
+
+    for (let i = 0; i < routes.length; i++) {
+      const route = routes[i];
+      const provider = route.provider;
+      const providerModelId = route.providerModelId || request.model;
+
+      console.log(
+        `[RunnerHostRuntime.llm] Routing model "${request.model}" to provider: ${provider} (ID: ${providerModelId}) [attempt ${i + 1}/${routes.length}]`,
+      );
+
+      try {
+        if (provider === 'aws_bedrock') {
+          return await invokeBedrock(request, providerModelId);
+        }
+
+        // Default/OpenRouter
+        return await invokeOpenRouter(request, providerModelId);
+      } catch (e) {
+        failures.push({ provider, providerModelId, error: e });
+        console.error('[RunnerHostRuntime.llm] Provider route failed', {
+          model: request.model,
+          provider,
+          providerModelId,
+          attempt: i + 1,
+          attemptsTotal: routes.length,
+          error: e,
+        });
+
+        // If this was the last route, surface an aggregated error.
+        if (i === routes.length - 1) {
+          const err = new Error('All LLM provider routes failed');
+          (err as any).causes = failures;
+          throw err;
+        }
+        // Otherwise, continue to the next provider route.
+      }
+    }
+
+    // Should be unreachable, but keep a defensive fallback.
+    throw new Error('No LLM provider routes available');
+  };
+
+  const invokeBedrock = async (request: LlmHostRequest, providerModelId: string): Promise<AsyncIterable<unknown>> => {
+    const client = getBedrockClient();
+
+    // Separate system prompts from messages
+    const bedrockMessages: BedrockMessage[] = [];
+    const system: { text: string }[] = [];
+
+    const rawMessages = request.messages as OpenAI.Chat.ChatCompletionMessageParam[];
+    
+    for (const m of rawMessages) {
+      if (m.role === 'system') {
+        if (typeof m.content === 'string') {
+          system.push({ text: m.content });
+        }
+        continue;
+      }
+      
+      const content: BedrockContentBlock[] = [];
+      if (typeof m.content === 'string') {
+        content.push({ text: m.content });
+      } else if (Array.isArray(m.content)) {
+        for (const part of m.content) {
+          if (part.type === 'text' && part.text) {
+            content.push({ text: part.text });
+          } else if (part.type === 'image_url' && part.image_url?.url) {
+             const matches = part.image_url.url.match(/^data:image\/([a-z]+);base64,(.+)$/);
+             if (matches) {
+               const format = matches[1] as BedrockImageFormat;
+               const bytes = Buffer.from(matches[2], 'base64');
+               content.push({ image: { format, source: { bytes } } });
+             }
+          }
+        }
+      }
+
+      // Map other roles to user/assistant. 
+      // Note: Bedrock strictly alternates user/assistant usually, but Converse API is more flexible.
+      // However, it expects 'user' or 'assistant'.
+      const role = m.role === 'user' ? 'user' : 'assistant';
+      bedrockMessages.push({
+        role,
+        content,
+      });
+    }
+
+    // Map Tools
+    let toolConfig: BedrockToolConfiguration | undefined;
+    if (Array.isArray(request.tools) && request.tools.length > 0) {
+      const tools: BedrockTool[] = request.tools.map((t) => {
+        // Safe cast as we know the shape from LlmHostRequest
+        const params = t as unknown as { slug?: string; name?: string; description?: string; parameters: unknown };
+        return {
+          toolSpec: {
+            name: params.slug || params.name || 'tool',
+            description: params.description,
+            inputSchema: { json: params.parameters },
+          },
+        };
+      });
+      toolConfig = { tools };
+    }
+
+    const input: ConverseStreamCommandInput = {
+      modelId: providerModelId,
+      messages: bedrockMessages,
+      toolConfig,
+      inferenceConfig: {
+        maxTokens: request.maxTokens,
+        temperature: request.temperature,
+        topP: request.topP,
+      },
+    };
+
+    if (system.length > 0) {
+      input.system = system;
+    }
+
+    try {
+      const command = new ConverseStreamCommand(input);
+      // Cast to any to avoid spurious TS error "Property 'send' does not exist"
+      // which happens despite BedrockRuntimeClient inheriting from Client
+      const response = await (client as any).send(command);
+
+      async function* gen() {
+        if (!response.stream) return;
+
+        // Bedrock streams a sequence of structured events (messageStart,
+        // contentBlockStart, contentBlockDelta, contentBlockStop, messageStop, ...).
+        // We normalize these into OpenAI-style ChatCompletionChunk objects so the
+        // existing LLM node tooling (including tool call handling) continues to work.
+        type BedrockToolUseState = {
+          toolUseId: string;
+          name: string;
+        };
+        const toolUseStates: Record<number, BedrockToolUseState> = {};
+
+        for await (const event of response.stream as AsyncIterable<any>) {
+          // Text deltas
+          if (event.contentBlockDelta && event.contentBlockDelta.delta) {
+            const idx = event.contentBlockDelta.contentBlockIndex ?? 0;
+            const delta = event.contentBlockDelta.delta;
+
+            // Tool calling: map Bedrock toolUse deltas to OpenAI-style tool_calls
+            if (delta.toolUse) {
+              const toolState = toolUseStates[idx];
+              if (toolState) {
+                const argsFragment = typeof delta.toolUse.input === 'string' ? delta.toolUse.input : '';
+                yield {
+                  id: 'bedrock-stream',
+                  object: 'chat.completion.chunk',
+                  created: Date.now(),
+                  model: providerModelId,
+                  choices: [
+                    {
+                      index: idx,
+                      delta: {
+                        tool_calls: [
+                          {
+                            index: 0,
+                            id: toolState.toolUseId,
+                            type: 'function',
+                            function: {
+                              name: toolState.name,
+                              arguments: argsFragment,
+                            },
+                          },
+                        ],
+                      },
+                      finish_reason: null,
+                    },
+                  ],
+                };
+              }
+              continue;
+            }
+
+            // Plain text delta
+            if (typeof delta.text === 'string' && delta.text.length > 0) {
+              yield {
+                id: 'bedrock-stream',
+                object: 'chat.completion.chunk',
+                created: Date.now(),
+                model: providerModelId,
+                choices: [
+                  {
+                    index: idx,
+                    delta: { content: delta.text },
+                    finish_reason: null,
+                  },
+                ],
+              };
+            }
+          }
+
+          // Tool use start: remember toolUseId + name for this content block index
+          if (event.contentBlockStart && event.contentBlockStart.start?.toolUse) {
+            const idx = event.contentBlockStart.contentBlockIndex ?? 0;
+            const tu = event.contentBlockStart.start.toolUse;
+            if (tu && typeof tu.toolUseId === 'string' && typeof tu.name === 'string') {
+              toolUseStates[idx] = {
+                toolUseId: tu.toolUseId,
+                name: tu.name,
+              };
+            }
+            continue;
+          }
+
+          // We currently don't need to emit anything for messageStart/contentBlockStop/messageStop
+          // because the LLM node infers finishReason when the stream completes and tool calls
+          // are reconstructed from the accumulated tool_calls deltas.
+        }
+      }
+
+      return gen();
+    } catch (e: unknown) {
+      console.error('[RunnerHostRuntime.llm] Bedrock error', e);
+      throw e;
+    }
+  };
+
+  const invokeOpenRouter = async (request: LlmHostRequest, providerModelId: string): Promise<AsyncIterable<unknown>> => {
     const llmConfig = options.llm;
 
     // Prefer host-provided LLM configuration; fall back to process.env for
@@ -574,7 +859,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const toolsCount = Array.isArray(request.tools) ? request.tools.length : 0;
       const modalities = Array.isArray(request.modalities) ? request.modalities : undefined;
       return {
-        model: request.model,
+        model: providerModelId, // Log mapped ID
         wantsStream: typeof request.stream === 'boolean' ? request.stream : true,
         modalities,
         toolsCount,
@@ -588,7 +873,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     const wantsStream = typeof request.stream === 'boolean' ? request.stream : true;
 
     const baseRequest: Record<string, unknown> = {
-      model: request.model,
+      model: providerModelId, // Use mapped ID
       messages: request.messages as OpenAI.Chat.ChatCompletionMessageParam[],
     };
 

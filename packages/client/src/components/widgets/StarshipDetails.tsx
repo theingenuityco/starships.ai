@@ -11,6 +11,9 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useStarship, useUpdateStarship } from '@/hooks/useStarships'
 import api from '@/lib/api'
 import Icon from '@/components/primitives/Icon'
+import { Orbitron } from 'next/font/google'
+
+const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 export interface StarshipDetailsProps {
   starshipId: string
@@ -135,24 +138,31 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
     <Card
       className={cn(
         // Distinct "starships" card: premium surface + nebula accents, but still fits inside chat.
+        // Match AgentTemplateCard shadow convention: shadow-sm → hover:shadow-md
         'group relative w-full max-w-[760px] overflow-hidden rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm shadow-sm',
-        'transition-all duration-200 hover:bg-card/70 hover:border-primary/25',
+        'transition-all duration-200 hover:bg-card/70 hover:shadow-md',
         className
       )}
     >
       {/* Subtle accent without a "header" */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-violet-500/60 via-sky-500/50 to-emerald-500/50" />
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(124,58,237,0.18),transparent_52%),radial-gradient(circle_at_85%_20%,rgba(14,165,233,0.14),transparent_48%),radial-gradient(circle_at_30%_110%,rgba(16,185,129,0.12),transparent_55%)]" />
+      {/* Subtle glow that works in both light + dark (different tuning per theme) */}
+      <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_18%_0%,rgba(99,102,241,0.10),transparent_58%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.08),transparent_60%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.06),transparent_62%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.06),transparent_64%)]" />
+      <div className="pointer-events-none absolute inset-0 hidden dark:block bg-[radial-gradient(circle_at_18%_0%,rgba(168,85,247,0.16),transparent_54%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.12),transparent_56%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.09),transparent_60%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.10),transparent_62%)]" />
 
       <CardContent className="relative p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
           <StarshipsLogo width={44} height={44} gradientId={logoGradientId} idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} animationDelay={0} activeStroke="gradient" />
           <div className="min-w-0">
-            <div className="text-2xl sm:text-3xl font-semibold leading-none tracking-tight">My Starship</div>
+            <div className={`${orbitron.className} text-2xl sm:text-3xl font-semibold leading-none tracking-tight`}>My Starship</div>
+          </div>
+          <div className="ml-auto">
+            <Button type="submit" form="starship-details-form" disabled={!canSubmit} className="shadow-sm">
+              {updateStarship.isPending ? 'Saving…' : 'Save'}
+            </Button>
           </div>
         </div>
 
-        <form onSubmit={onSubmit} className="w-full max-w-none">
+        <form id="starship-details-form" onSubmit={onSubmit} className="w-full max-w-none">
           {/* OUTER GROUP: (inputs group: flex-1) + (draft button: auto width) */}
           <div className="mt-4 space-y-4">
             <div className="flex gap-2 items-start">
@@ -205,7 +215,7 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                   'h-10 shrink-0 border-border/60 bg-card/50 backdrop-blur-sm',
                   // Manual spacing from top (accounts for label + gap)
                   'mt-[32px]',
-                  'hover:bg-card/70 hover:border-primary/30'
+                  'hover:bg-card/70'
                 )}
               >
                 <Icon name={isGenerating ? 'loading' : 'magic-wand'} className={cn('mr-2 h-4 w-4', isGenerating ? 'animate-spin' : '')} />
@@ -230,13 +240,6 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                 maxLength={descriptionMax}
               />
               <div className={cn('text-xs text-muted-foreground', descriptionCount > descriptionMax ? 'text-red-600 dark:text-red-400' : undefined)}>{descriptionRemaining} left</div>
-            </div>
-
-            {/* Save */}
-            <div className="flex justify-end pt-1">
-              <Button type="submit" disabled={!canSubmit} className="shadow-sm">
-                {updateStarship.isPending ? 'Saving…' : 'Save'}
-              </Button>
             </div>
           </div>
         </form>

@@ -656,7 +656,7 @@ export function ConversationMessageList({
       <div className="flex justify-start">
         <div className="flex items-start gap-3 w-full">
           {/* Spacer to match avatar width */}
-          <div className="flex-shrink-0 w-8 h-8" aria-hidden="true" />
+          <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
           <motion.div key={`turn-buttons-${turnId}`} variants={staggerContainer} initial={shouldAnimateButtons ? 'hidden' : 'visible'} animate="visible" className="flex items-center gap-2 mt-4 mb-4">
             <motion.div variants={staggerItem}>
               <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTurn} title="Copy turn">
@@ -748,7 +748,7 @@ export function ConversationMessageList({
             <div className="flex justify-start">
               <div className="flex items-start gap-3 w-full">
                 {/* No avatar for typing indicator; keep spacer for alignment */}
-                <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
+                <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
                     <TypingDots />
@@ -903,7 +903,7 @@ const MemoizedMessageBubble = memo(
                 )}
               </div>
             </div>
-            <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
+            <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
                   src={explicitUserAvatarUrl!}
@@ -913,7 +913,7 @@ const MemoizedMessageBubble = memo(
                   className="rounded-full object-cover"
                 />
               ) : userAvatarSeedOverride ? (
-                <AgentAvatar seed={userAvatarSeedOverride} size={32} />
+                <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
               ) : shouldUseAuthedUserAvatar ? (
                 <AvatarImage
                   src={effectiveUserAvatar!}
@@ -940,11 +940,11 @@ const MemoizedMessageBubble = memo(
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
           <div className="flex items-start gap-3 w-full">
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />
               </div>
             ) : (
-              <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
+              <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
             <div className="flex-1 w-full">
               <ConversationMessageContent

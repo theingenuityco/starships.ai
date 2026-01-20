@@ -313,7 +313,21 @@ type ToolResultLike = {
 }
 
 // Known widget types from public-docs
-const KNOWN_WIDGET_TYPES = new Set(['StatCard', 'DataTable', 'MetricGrid', 'BarChart', 'LineChart', 'AreaChart', 'PieChart', 'DonutChart', 'RadarChart', 'RadialChart', 'ConnectorSuggestionCard', 'AgentSuggestionCard'])
+const KNOWN_WIDGET_TYPES = new Set([
+  'StatCard',
+  'DataTable',
+  'MetricGrid',
+  'BarChart',
+  'LineChart',
+  'AreaChart',
+  'PieChart',
+  'DonutChart',
+  'RadarChart',
+  'RadialChart',
+  'ConnectorSuggestionCard',
+  'AgentSuggestionCard',
+  'StarshipDetails',
+])
 
 // Cache tool display names so we don't refetch per-message/per-render.
 // Keyed by `${starshipId}:${toolSlug}` -> tool display name.

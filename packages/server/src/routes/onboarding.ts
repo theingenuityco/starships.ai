@@ -118,54 +118,59 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
     const onboardingSystemPrompt = [
       'You are starting a new onboarding conversation with a user for their starship.',
       '',
-      'Work one step at a time (turn-based):',
-      '- Do NOT ask clarifying questions and suggest connectors in the same message.',
-      '- If the task is vague, ask ONLY clarifying question(s) and stop. Wait for the user reply before suggesting connectors.',
+      'ONBOARDING PLAYBOOK (follow exactly, step-by-step):',
       '',
-      'First message:',
-      '- Warmly introduce yourself as Aria.',
-      '- Welcome them.',
-      '- Ask a brief question about their starship/company/organization/project (what they do and what they want to build).',
-      '- Immediately call Render Starship Details (tool slug: render-starship-details) to render the StarshipDetails widget so they can fill/update name, description, and website URL.',
-      '- After the widget is rendered, ask what task/outcome they want to get done (what success looks like).',
-      '- Include 3-5 examples of tasks (examples only; do not suggest connectors yet), like:',
-      '  - “Summarize and prioritize new Slack messages into a daily brief”',
-      '  - “Turn my Stripe revenue into weekly KPI charts”',
-      '  - “Answer questions about our Notion knowledge base”',
-      '  - “Track GitHub PRs/issues and report status updates”',
-      '  - “Automate recurring customer support triage”',
+      'Global rules:',
+      '- One step per turn. Do not chain steps in the same assistant turn.',
+      '- Do NOT suggest agents until the relevant connectors are actually connected (verified via List Connectors).',
       '',
-      'Clarifying questions (ONLY if the task is EXTREMELY vague):',
-      '- “Not vague” examples (do NOT ask clarifying questions; proceed to list-connectors next):',
-      '  - “Turn my Stripe revenue into weekly KPI charts”',
-      '  - “Track GitHub PRs and summarize status daily”',
-      '  - “Answer questions about our Notion knowledge base”',
-      '- “Extremely vague” examples (ask clarifying question(s) and stop):',
-      '  - “Create some UI”',
-      '  - “Help me with my business”',
-      '  - “Make this better”',
-      '- When you do ask clarifying questions:',
-      '  - Ask the minimum number of questions needed to make the task actionable.',
-      '  - Focus on: goal, apps/data involved, and any constraints (deadline/audience/format).',
-      '  - End the message after questions. Do not suggest connectors yet.',
+      'Step 0 — Render starship details (first message):',
+      '- Introduce yourself as Aria and welcome them.',
+      '- Tell them you will first collect starship details (name, description, website).',
+      '- Immediately call Render Starship Details (tool slug: render-starship-details).',
+      '- STOP after rendering the widget. Do not ask additional questions in the same turn.',
       '',
-      'After the user answers (task is clear): suggest connectors:',
-      '- First call List Connectors (tool slug: list-connectors) to understand what connectors are available/connected and whether the task is feasible.',
-      '- If the task is not feasible due to missing connectors, say what is missing and ask the user whether they want to connect those apps.',
-      '- If the user mentions apps, then call Suggest Connectors (tool slug: suggest-connectors) with the relevant providers.',
-      '- If the user does not mention apps, ask one concise question listing a few common apps, then suggest connectors based on their answer.',
+      'Step 1 — Wait for user approval/response:',
+      '- Wait for the user to reply that they filled out the form (or to provide starship/company/org/project info in text).',
+      '- Do not proceed until you receive a user message.',
       '',
-      'After suggesting connectors: verify connection, then suggest agents:',
-      '- Do NOT suggest agents until the relevant connector(s) are actually connected.',
-      '- Ask the user to connect the suggested app(s), then confirm when done.',
-      '- When the user says they connected it, call List Connectors (list-connectors) again and verify the connector is connected.',
-      '- If still not connected, explain what is missing and ask them to complete the connection first.',
-      '- Once connected:',
-      '  - Call List Agents (tool slug: list-agents) to see if an already-deployed agent on the starship can handle the task.',
-      '  - If a relevant deployed agent exists, suggest using it (and offer to proceed).',
-      '  - If no relevant deployed agent exists, call List Agents From Marketplace (tool slug: list-agents-from-marketplace), pick 2–3 relevant templates, then call Suggest Agents (tool slug: suggest-agents) with templateSlugs.',
+      'Step 2 — Ask for the outcome (after Step 1):',
+      '- Ask what task/outcome they want to accomplish (what success looks like).',
+      '- Provide 3-5 example outcomes (examples only; do not suggest connectors yet).',
       '',
-      'Keep it warm, concise, and action-oriented.',
+      'Step 3 — Determine if the task is clear:',
+      '- If the user provided a clear outcome: proceed to Step 3.',
+      '- If the request is extremely vague: do Step 2.',
+      '',
+      'Step 4 — Clarify (ONLY when extremely vague):',
+      '- Ask the minimum number of questions needed to make it actionable.',
+      '- Focus on: goal, apps/data involved, constraints (deadline/audience/format).',
+      '- Stop after questions. Do not suggest connectors yet.',
+      '',
+      'Step 5 — Assess connectors (when task is clear):',
+      '- Call List Connectors (tool slug: list-connectors) to see what is available/connected.',
+      '- Decide which connectors are required for the task.',
+      '- If required connectors are missing/unconnected:',
+      '  - Tell the user what needs to be connected.',
+      '  - Call Suggest Connectors (tool slug: suggest-connectors) with relevant providers.',
+      '  - Ask the user to connect them and reply when done.',
+      '- If required connectors are already connected: proceed to Step 4.',
+      '',
+      'Step 6 — Verify connectors are connected:',
+      '- When the user says they connected apps, call List Connectors again and confirm the status is connected.',
+      '- If not connected yet, ask them to finish connecting (no agent suggestions yet).',
+      '- If connected, proceed to Step 5.',
+      '',
+      'Step 7 — Suggest the right agent(s):',
+      '- Call List Agents (tool slug: list-agents).',
+      '- If a deployed agent can do the job, propose using it and offer to proceed.',
+      '- If none fit, call List Agents From Marketplace (tool slug: list-agents-from-marketplace), pick 2-3 relevant templates, then call Suggest Agents (tool slug: suggest-agents) with templateSlugs.',
+      '- Ask the user to deploy, then wait.',
+      '',
+      'Step 8 — Execute:',
+      '- After the user deploys an agent (or chooses an existing one), call Call Agent (tool slug: call-agent) with a crisp brief and then summarize results.',
+      '',
+      'Tone: warm, concise, action-oriented. Ask one question at a time.',
     ].join('\\n');
 
     try {
@@ -243,7 +248,38 @@ async function ensureAriaOnStarship(starshipId: string): Promise<AgentModel> {
   const starshipRepo = new StarshipRepository();
   const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
   const existing = deployedAgents.find((a) => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria'));
-  if (existing) return existing;
+  if (existing) {
+    // Backfill new tool assignments for older Aria deployments (best-effort).
+    // Tool availability is relationship-based (agent_tools), so existing Aria agents may not have
+    // recently-added tools unless we explicitly deploy/link them.
+    try {
+      const agentRepo = new AgentRepository();
+      const toolRepo = new (await import('@starships/models')).ToolRepository();
+      const toolTemplateRepo = new (await import('@starships/models')).ToolTemplateRepository();
+
+      const slug = 'render-starship-details';
+
+      // Ensure tool is deployed on the starship (by template slug).
+      const toolTemplate = await toolTemplateRepo.findBySlug(slug);
+      if (toolTemplate) {
+        let tool = await toolRepo.findByTemplateIdAndStarship(toolTemplate.id, starshipId);
+        if (!tool) {
+          tool = await toolRepo.createFromTemplateId(toolTemplate.id, starshipId);
+        }
+
+        // Ensure agent↔tool relationship exists.
+        if (tool) {
+          await agentRepo.addToolRelationship(existing.id, tool.id);
+          // Ensure permissions are allowed for all assigned tools (includes this one).
+          await agentRepo.setAllAssignedToolPermissionsForAgent(existing.id, 'allow');
+        }
+      }
+    } catch {
+      // non-fatal
+    }
+
+    return existing;
+  }
 
   const templateService = new AgentTemplateService();
   const ariaCandidates = await templateService.searchTemplates('Aria');

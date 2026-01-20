@@ -1106,7 +1106,21 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div ref={messageContainerRef} className={cn('relative group w-full ph-mask-chat-message', className)}>
+    <div ref={messageContainerRef} className={cn('relative w-full ph-mask-chat-message', className)}>
+      {/* Message actions (copy + download): show on hover, float at bottom edge */}
+      {enableCopy && (
+        <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          <div className="pointer-events-auto inline-flex items-center gap-1 rounded-md border border-border/60 bg-background/80 backdrop-blur px-1 py-1 shadow-sm">
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+              <Icon name="copy" className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+              <Icon name="download" className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Reasoning (thinking) collapsible */}
       {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
         <>

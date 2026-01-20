@@ -210,8 +210,8 @@ export function useLogin() {
         return
       }
 
-      // If onboarding is enabled server-side and required for this user, always route to onboarding.
-      // Server does not provision a starship during login when ONBOARDING_ENABLED=true.
+      // If onboarding is required for this user, always route to onboarding.
+      // Starship provisioning is handled by onboarding (not login).
       if ((data as any)?.onboardingRequired === true) {
         router.push('/onboarding')
         queryClient.invalidateQueries()

@@ -285,7 +285,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
               </div>
             ) : (
               messages.map(message => (
-                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+                <div key={message.id} className="flex justify-start mb-4">
                   <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-200 border border-zinc-700'}`}>
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     <p className="text-xs opacity-70 mt-1">

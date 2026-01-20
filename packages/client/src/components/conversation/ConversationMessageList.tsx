@@ -22,6 +22,8 @@ import { toast } from 'sonner'
 import { tableToMarkdown } from '@/components/markdown/markdownComponents'
 import { isAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { TypingDots } from '@/components/ui/TypingDots'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -80,6 +82,14 @@ export function ConversationMessageList({
   isAssistantStreamingOverride,
   isAwaitingToolResultsOverride,
 }: ConversationMessageListProps) {
+  const params = useParams<{ slug?: string }>()
+  const starshipSlug = useMemo(() => {
+    const raw = (params as any)?.slug
+    if (typeof raw === 'string') return raw
+    if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0]
+    return undefined
+  }, [params])
+
   // Render from stream context when available, otherwise allow static/demo rendering via overrides.
   const stream = useConversationStreamContextOptional()
   const messages = messagesOverride ?? stream?.messages ?? []
@@ -91,6 +101,10 @@ export function ConversationMessageList({
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
   const agentName = agentNameOverride ?? agentObj?.name
+  const agentSlug = useMemo(() => {
+    const raw = (agentObj as any)?.slug
+    return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined
+  }, [agentObj])
   const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
@@ -721,6 +735,8 @@ export function ConversationMessageList({
                 <MemoizedMessageBubble
                   message={message}
                   agentName={message.agentName || agentName}
+                  agentSlug={agentSlug}
+                  starshipSlug={starshipSlug}
                   agentAvatarUrl={agentAvatarUrl}
                   isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                   starshipId={starshipId}
@@ -793,6 +809,8 @@ interface ExtendedMessage extends MessageModel {
 interface ConversationMessageBubbleProps {
   message: ExtendedMessage
   agentName?: string
+  agentSlug?: string
+  starshipSlug?: string
   agentAvatarUrl?: string
   isStreamingActive?: boolean
   starshipId?: string
@@ -832,6 +850,8 @@ const MemoizedMessageBubble = memo(
   function ConversationMessageBubble({
     message,
     agentName,
+    agentSlug,
+    starshipSlug,
     agentAvatarUrl,
     isStreamingActive,
     starshipId,
@@ -862,10 +882,12 @@ const MemoizedMessageBubble = memo(
 
       // User message: Render using the same engine as assistant messages (no bubble)
       const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
+      const userProfileHref =
+        typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
 
       return (
         <div className="flex justify-start">
-          <div className="mb-4 mt-6 flex items-start gap-3 w-full max-w-full pr-[52px]">
+          <div className="group mb-4 mt-6 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-1 -mx-2 hover:bg-foreground/5 transition-colors">
             <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
@@ -895,7 +917,11 @@ const MemoizedMessageBubble = memo(
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 w-full pt-0.5">
-              <div className="mb-1 text-sm font-bold text-foreground">{userDisplayName}</div>
+              <div className="mb-1 text-sm font-bold text-foreground">
+                <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                  {userDisplayName}
+                </Link>
+              </div>
               <ConversationMessageContent
                 content={message.content}
                 messageId={message.id}
@@ -924,9 +950,13 @@ const MemoizedMessageBubble = memo(
     } else {
       // AI message: Plain text on the left (no bubble)
       const assistantDisplayName = (agentName || 'Assistant').trim()
+      const assistantProfileHref =
+        typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
+          ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
+          : null
       return (
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
-          <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
+          <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-1 -mx-2 hover:bg-foreground/5 transition-colors">
             {showAssistantAvatar ? (
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                 <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />
@@ -935,7 +965,17 @@ const MemoizedMessageBubble = memo(
               <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
             <div className="flex-1 w-full pt-0.5">
-              {showAssistantAvatar && <div className="mb-1 text-sm font-bold text-foreground">{assistantDisplayName}</div>}
+              {showAssistantAvatar && (
+                <div className="mb-1 text-sm font-bold text-foreground">
+                  {assistantProfileHref ? (
+                    <Link href={assistantProfileHref} className="hover:underline underline-offset-2">
+                      {assistantDisplayName}
+                    </Link>
+                  ) : (
+                    <span>{assistantDisplayName}</span>
+                  )}
+                </div>
+              )}
               <ConversationMessageContent
                 content={message.content}
                 messageId={message.id}
@@ -1007,6 +1047,8 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.userAvatarUrlOverride || '') !== (nextProps.userAvatarUrlOverride || '')) return false
     if ((prevProps.userAvatarSeedOverride || '') !== (nextProps.userAvatarSeedOverride || '')) return false
     if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
+    if ((prevProps.starshipSlug || '') !== (nextProps.starshipSlug || '')) return false
+    if ((prevProps.agentSlug || '') !== (nextProps.agentSlug || '')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0

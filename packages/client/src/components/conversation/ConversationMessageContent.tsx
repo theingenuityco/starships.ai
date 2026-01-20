@@ -300,6 +300,11 @@ interface MessageContentProps {
   isAwaitingToolResults?: boolean
   // Whether this is the last message in the conversation
   isLastMessage?: boolean
+  /**
+   * Optional override for the message content text+prose class (e.g. "text-base leading-relaxed prose" for hero).
+   * When omitted, uses "text-sm leading-relaxed prose prose-sm".
+   */
+  contentTextClass?: string
 }
 
 type ToolResultLike = {
@@ -412,7 +417,9 @@ export function ConversationMessageContent({
   starshipId,
   isAwaitingToolResults = false,
   isLastMessage = false,
+  contentTextClass,
 }: MessageContentProps) {
+  const resolvedContentClass = contentTextClass ?? 'text-sm leading-relaxed prose prose-sm'
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
@@ -1022,7 +1029,7 @@ export function ConversationMessageContent({
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
-      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message">
+      <div className={cn(resolvedContentClass, 'dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message')}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {String(displayContent ?? '')}
         </ReactMarkdown>
@@ -1082,7 +1089,7 @@ export function ConversationMessageContent({
   if (!enableMarkdown) {
     return (
       <div className={cn('relative group', className)}>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap ph-mask-chat-message">
+        <div className={cn(contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed', 'whitespace-pre-wrap ph-mask-chat-message')}>
           {String(displayContent ?? '')}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>

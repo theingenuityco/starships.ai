@@ -61,6 +61,10 @@ interface ConversationMessageListProps {
   isRespondingOverride?: boolean
   isAssistantStreamingOverride?: boolean
   isAwaitingToolResultsOverride?: boolean
+  /**
+   * When 'hero', uses larger text (+2px) and bigger avatars for landing demos.
+   */
+  sizeVariant?: 'default' | 'hero'
 }
 
 export function ConversationMessageList({
@@ -80,6 +84,7 @@ export function ConversationMessageList({
   isRespondingOverride,
   isAssistantStreamingOverride,
   isAwaitingToolResultsOverride,
+  sizeVariant = 'default',
 }: ConversationMessageListProps) {
   // Render from stream context when available, otherwise allow static/demo rendering via overrides.
   const stream = useConversationStreamContextOptional()
@@ -732,6 +737,7 @@ export function ConversationMessageList({
                   userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={idx === renderMessages.length - 1}
+                  sizeVariant={sizeVariant}
                 />
                 {/* Only show buttons after the final assistant message of a complete turn (not tool_result messages or intermediate messages) */}
                 {/* Must be: marked as turn end, assistant message, not tool_result, at turn boundary (next is user or null), and have turn messages */}
@@ -746,11 +752,11 @@ export function ConversationMessageList({
             <div className="flex justify-start">
               <div className="flex items-start gap-3 w-full">
                 {/* No avatar for typing indicator; keep spacer for alignment */}
-                <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
+                <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-8 h-8')} aria-hidden="true" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
+                  <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
                     <TypingDots />
-                    <span className="text-sm leading-relaxed">Typing...</span>
+                    <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
                   </div>
                 </div>
               </div>
@@ -801,6 +807,7 @@ interface ConversationMessageBubbleProps {
   userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
   isAwaitingToolResults?: boolean
   isLastMessage?: boolean
+  sizeVariant?: 'default' | 'hero'
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -862,7 +869,12 @@ const MemoizedMessageBubble = memo(
     userAvatarFallbackVariantOverride,
     isAwaitingToolResults = false,
     isLastMessage = false,
+    sizeVariant = 'default',
   }: ConversationMessageBubbleProps) {
+    const isHero = sizeVariant === 'hero'
+    const avatarSize = isHero ? 40 : 32
+    const avatarClass = isHero ? 'w-10 h-10' : 'w-8 h-8'
+    const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
     const effectiveUserName = userNameOverride ?? userName
@@ -887,7 +899,7 @@ const MemoizedMessageBubble = memo(
               {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
               {/* Message bubble (match navigation/sidebar background color) */}
               <div className={`w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
+                <div className={cn('leading-relaxed whitespace-pre-wrap', isHero ? 'text-base' : 'text-sm')}>{message.content}</div>
                 {message.sending && (
                   <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
                     <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
@@ -895,7 +907,7 @@ const MemoizedMessageBubble = memo(
                 )}
               </div>
             </div>
-            <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
+            <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
                   src={explicitUserAvatarUrl!}
@@ -905,7 +917,7 @@ const MemoizedMessageBubble = memo(
                   className="rounded-full object-cover"
                 />
               ) : userAvatarSeedOverride ? (
-                <AgentAvatar seed={userAvatarSeedOverride} size={32} />
+                <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
               ) : shouldUseAuthedUserAvatar ? (
                 <AvatarImage
                   src={effectiveUserAvatar!}
@@ -917,7 +929,7 @@ const MemoizedMessageBubble = memo(
               ) : null}
               <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
                 {fallbackVariant === 'user-icon' ? (
-                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
+                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 16} className="text-primary" />
                 ) : (
                   initialsFromName(effectiveUserName || effectiveUserEmail)
                 )}
@@ -932,11 +944,11 @@ const MemoizedMessageBubble = memo(
         <div className="flex justify-start">
           <div className="flex items-start gap-3 w-full">
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
+              <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
+                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={avatarSize} />
               </div>
             ) : (
-              <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
+              <div className={cn('flex-shrink-0 mt-1', avatarClass)} aria-hidden="true" />
             )}
             <div className="flex-1 w-full">
               <ConversationMessageContent
@@ -947,6 +959,7 @@ const MemoizedMessageBubble = memo(
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 className="text-foreground"
+                contentTextClass={contentTextClass}
                 chunks={message.chunks}
                 reasoning={message.reasoning}
                 reasoningChunks={message.reasoningChunks}
@@ -1009,6 +1022,7 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.userAvatarUrlOverride || '') !== (nextProps.userAvatarUrlOverride || '')) return false
     if ((prevProps.userAvatarSeedOverride || '') !== (nextProps.userAvatarSeedOverride || '')) return false
     if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
+    if ((prevProps.sizeVariant ?? 'default') !== (nextProps.sizeVariant ?? 'default')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0

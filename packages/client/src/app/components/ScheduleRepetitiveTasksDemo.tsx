@@ -75,7 +75,7 @@ export default function ScheduleRepetitiveTasksDemo() {
     const agents = [
       {
         name: 'Support Inbox Assistant',
-        prompts: ['Triage the support inbox and draft responses for approval.', 'Summarize urgent customer threads and propose next steps.'],
+        prompts: ['Sort the support inbox and draft responses for approval.', 'Summarize urgent customer threads and propose next steps.'],
       },
       {
         name: 'Release Notes Drafter',
@@ -122,7 +122,7 @@ export default function ScheduleRepetitiveTasksDemo() {
         addRun(cursor, 9, 15, 'KPI Analyst', 'Prepare KPI snapshot + chart for standup.')
       } else if (weekday === 3 && weekOfMonth % 2 === 1) {
         // Wednesdays (every other week): inbox triage
-        addRun(cursor, 13, 30, 'Support Inbox Assistant', 'Triage the support inbox and draft responses for approval.')
+        addRun(cursor, 13, 30, 'Support Inbox Assistant', 'Sort the support inbox and draft responses for approval.')
       } else if (weekday === 5 && weekOfMonth % 2 === 0) {
         // Fridays (every other week): release notes
         addRun(cursor, 16, 0, 'Release Notes Drafter', 'Draft the weekly Slack update from GitHub changes.')

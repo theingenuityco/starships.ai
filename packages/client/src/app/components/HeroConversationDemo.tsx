@@ -4,6 +4,7 @@ import { useEffect, useMemo, useReducer, useRef, useState } from 'react'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import Icon from '@/components/primitives/Icon'
 import { useAgentTemplates } from '@/hooks/useTemplates'
+import { cn } from '@/lib/utils'
 import type { AgentTemplateModel } from '@starships/protocol'
 
 type DemoStreamChunk = { content: string; position: number; timestamp: number }
@@ -79,7 +80,7 @@ const CONVOS: Record<ConvoId, ConvoConfig> = {
     tabName: 'Demo',
     actorName: 'Aria',
     agentSeed: 'Aria',
-    subtitle: 'Pick a first‑week win (live demo)',
+    subtitle: 'Quick win (live demo)',
   },
   iris: {
     id: 'iris',
@@ -87,7 +88,7 @@ const CONVOS: Record<ConvoId, ConvoConfig> = {
     tabName: 'Inbox',
     actorName: 'Iris',
     agentSeed: 'Iris',
-    subtitle: 'Inbox triage + draft replies in Gmail',
+    subtitle: 'Sort inbox, draft replies in Gmail',
   },
   saga: {
     id: 'saga',
@@ -95,7 +96,7 @@ const CONVOS: Record<ConvoId, ConvoConfig> = {
     tabName: 'Blog',
     actorName: 'Saga',
     agentSeed: 'Saga',
-    subtitle: 'Write + publish a blog post in WordPress',
+    subtitle: 'Write and publish a post in WordPress',
   },
 }
 
@@ -164,7 +165,7 @@ const ARIA_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Aria',
     content:
-      'Starships.ai helps you **delegate real work** to AI teammates that can follow workflows and show their progress.\n\n- Get a specialist for a task (ops, marketing, docs, research, etc.)\n- Connect tools/apps and run step‑by‑step with visible tool results\n- Stay in control with guardrails like approvals and reviewable changes\n\nPick a quick demo to see it end‑to‑end:',
+      'Starships.ai gives you AI teammates that:\n\n- 📈 **Help you scale your brand across platforms.**\n- 💤 **Work while you sleep.**\n- 📱 **Collaborate across apps to fit your custom requirements.**',
   },
 ]
 
@@ -183,7 +184,7 @@ const SAGA_TIMELINE: Step[] = [
       { id: 'tc_wp_recent', type: 'function', function: { name: 'list_recent_posts', arguments: '{ "limit": 5 }' } },
     ],
     content:
-      'On it. I’ll do this in phases:\n\n1) Check your WordPress site + existing categories/tags\n2) Outline the post and confirm angle\n3) Draft the article (scannable + practical)\n4) Add SEO title + meta description\n5) Create a featured-image prompt\n6) Publish as a **draft** for review',
+      'On it. Plan:\n\n1) Check site and categories\n2) Outline the post\n3) Draft the article\n4) Add SEO title + meta\n5) Create image prompt\n6) Save as **draft** for review',
   },
   {
     role: 'tool',
@@ -227,7 +228,7 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Saga',
-    content: 'Great — I see existing content around AI staff + security, so I’ll keep this post practical and avoid repeating.\n\nNext: I’ll draft a crisp outline and then write the first draft.',
+    content: "I see you already have AI staff + security posts, so I'll keep it different.\n\nNext: outline, then first draft.",
   },
   {
     role: 'assistant',
@@ -248,7 +249,7 @@ const SAGA_TIMELINE: Step[] = [
         status: 'ok',
         outline: [
           'What “AI staff” means (vs. chatbots)',
-          'The 3 core patterns: triage, delegation, automation',
+          'The 3 core patterns: sorting, delegation, automation',
           'How teams use it in week 1 (quick wins)',
           'Guardrails: approvals, audit trails, human-in-the-loop',
           'Examples: inbox, blog, research, ops',
@@ -278,7 +279,7 @@ const SAGA_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Saga',
-    content: 'Outline + SEO are ready. Next I’ll write the draft, generate a featured-image prompt, and save it as a draft post in WordPress.',
+    content: 'Outline + SEO done. Next: write draft, image prompt, save as draft.',
   },
   {
     role: 'assistant',
@@ -335,7 +336,7 @@ const SAGA_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Saga',
     content:
-      '✅ Draft blog post ready\n\n- Title: **AI Staff: What It Is (and How Teams Use It)**\n- Length: **1,235 words** (~6 min)\n- SEO: title + meta description included\n- Featured image: prompt generated\n- Status: **Draft** (not published)\n\nWant me to add an **FAQ section** or tailor examples more toward **Ops** or **Engineering**?',
+      '✅ Draft ready\n\n- Title: **AI Staff: What It Is (and How Teams Use It)**\n- **1,235 words** (~6 min)\n- SEO + image prompt done\n- **Draft** (not published)\n\nAdd **FAQ**, or focus examples on **Ops** or **Engineering**?',
   },
 ]
 
@@ -343,7 +344,7 @@ const IRIS_TIMELINE: Step[] = [
   {
     role: 'user',
     content:
-      'Iris — triage my Gmail inbox.\n\nGoals:\n- Find emails that need a reply\n- Label by topic (sales, support, bills)\n- Archive newsletters and promos\n- Draft replies for the top 3\n- Show progress step-by-step',
+      'Iris — sort my Gmail inbox.\n\nGoals:\n- Find emails that need a reply\n- Label by topic (sales, support, bills)\n- Archive newsletters and promos\n- Draft replies for the top 3\n- Show progress step-by-step',
   },
   {
     role: 'assistant',
@@ -361,7 +362,7 @@ const IRIS_TIMELINE: Step[] = [
       { id: 'tc_ir_needs_reply', type: 'function', function: { name: 'find_needs_reply', arguments: '{ "threads": "unread", "signals": ["question","request","follow up"], "limit": 25 }' } },
     ],
     content:
-      'Absolutely. I’ll do this like a real inbox workflow:\n\n1) Pull your current unread inbox\n2) Identify what needs a reply vs. can be filed\n3) Label by topic (Sales / Support / Bills / Newsletter)\n4) Archive newsletters + promos\n5) Draft replies for the top 3 (you review/send)',
+      'On it:\n\n1) Pull unread\n2) Find what needs a reply vs. can be filed\n3) Label (Sales / Support / Bills / Newsletter)\n4) Archive newsletters + promos\n5) Draft top 3 (you review/send)',
   },
   {
     role: 'tool',
@@ -387,7 +388,7 @@ const IRIS_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Iris',
-    content: 'Got it. Next I’ll label threads by topic, archive newsletters/promos, and draft replies for the top 3 (so you can review).',
+    content: 'Next: label by topic, archive promos, draft top 3 for your review.',
   },
   {
     role: 'assistant',
@@ -438,7 +439,7 @@ const IRIS_TIMELINE: Step[] = [
   {
     role: 'assistant',
     agentName: 'Iris',
-    content: 'Inbox is cleaner now. Next: draft replies for the top 3 priority threads (you’ll review before sending).',
+    content: 'Inbox cleaner. Next: draft top 3 (you review before sending).',
   },
   {
     role: 'assistant',
@@ -518,7 +519,7 @@ const IRIS_TIMELINE: Step[] = [
     role: 'assistant',
     agentName: 'Iris',
     content:
-      '✅ Inbox triage complete\n\n- Unread in inbox: **63** (last 14 days)\n- Needs reply: **14**\n- Labeled: Sales / Support / Bills / Newsletter\n- Archived: **30** (newsletters + promos)\n- Drafted: **3 replies** (ready for your review)\n\nWant me to apply an **auto-label rule** for newsletters going forward, or keep it manual?',
+      '✅ Done\n\n- **63** unread (14 days)\n- **14** need reply\n- Labeled: Sales / Support / Bills / Newsletter\n- **30** archived (newsletters + promos)\n- **3** drafts for your review\n\nAuto-label newsletters from now on, or keep it manual?',
   },
 ]
 
@@ -589,6 +590,8 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
     stage: 'choose',
     selected: null,
   })
+  const [demoChooserBlinkIndex, setDemoChooserBlinkIndex] = useState(0)
+  const [isDemoChooserHovered, setIsDemoChooserHovered] = useState(false)
 
   const abortControllerRef = useRef<AbortController>(new AbortController())
   const sleepCtlRef = useRef<ReturnType<typeof createAbortableSleep>>(createAbortableSleep(abortControllerRef.current.signal))
@@ -631,7 +634,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
     appendDemoChooserMessage(convoId, {
       id: `demo-${convoId}-u-choice-${userCreatedAt}`,
       role: 'user',
-      content: target === 'iris' ? 'Sure, help me triage my inbox' : 'Sure, help me publish a blog post',
+      content: target === 'iris' ? 'Sort my inbox' : 'Publish a blog post',
       createdAt: userCreatedAt,
       updatedAt: userCreatedAt,
       messageType: 'user_input',
@@ -646,7 +649,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
       id: `demo-${convoId}-a-ack-${a1CreatedAt}`,
       role: 'assistant',
       agentName: 'Aria',
-      content: target === 'iris' ? 'Perfect — I’ll spin up **Iris** and hand it the inbox triage.' : 'Perfect — I’ll spin up **Saga** and hand it the blog draft.',
+      content: target === 'iris' ? 'Starting **Iris** to sort your inbox.' : 'Starting **Saga** for the blog post.',
       createdAt: a1CreatedAt,
       updatedAt: a1CreatedAt,
       messageType: 'agent_response',
@@ -676,7 +679,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
             name: 'call-agent',
             arguments:
               target === 'iris'
-                ? '{ "agent": "Iris", "task": "Triage my Gmail inbox", "conversationTitle": "Iris — Demo" }'
+                ? '{ "agent": "Iris", "task": "Sort my Gmail inbox", "conversationTitle": "Iris — Demo" }'
                 : '{ "agent": "Saga", "task": "Publish a blog post as a draft in WordPress", "conversationTitle": "Saga — Demo" }',
           },
         },
@@ -717,7 +720,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
       id: `demo-${convoId}-a-switch-${a2CreatedAt}`,
       role: 'assistant',
       agentName: 'Aria',
-      content: target === 'iris' ? 'Done — switching you to **Iris**.' : 'Done — switching you to **Saga**.',
+      content: target === 'iris' ? 'Switching you to **Iris**.' : 'Switching you to **Saga**.',
       createdAt: a2CreatedAt,
       updatedAt: a2CreatedAt,
       messageType: 'agent_response',
@@ -885,6 +888,13 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
   const showDemoChooser = activeConvoId === 'aria' && flagsByConvo.aria.hasRun && !flagsByConvo.aria.isRunning && demoChoiceState.stage === 'choose' && (messagesByConvo.aria?.length || 0) > 0
   const isDemoCalling = activeConvoId === 'aria' && demoChoiceState.stage === 'calling'
 
+  // Blink demo chooser buttons one by one (primary) when visible; pause while hovering
+  useEffect(() => {
+    if (!showDemoChooser || isDemoChooserHovered) return
+    const id = setInterval(() => setDemoChooserBlinkIndex(i => (i === 0 ? 1 : 0)), 1800)
+    return () => clearInterval(id)
+  }, [showDemoChooser, isDemoChooserHovered])
+
   const handleRestart = () => {
     // Restart should fully reset the Demo chooser state so the two choice buttons appear again
     // after the Demo (Aria) autoplay finishes.
@@ -950,6 +960,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                 bottomPaddingPx={140}
                 userNameOverride="You"
                 userAvatarFallbackVariantOverride="user-icon"
+                sizeVariant="hero"
               />
 
               {/* Restart control (shown after a run has completed) */}
@@ -973,32 +984,46 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                   <div className="w-full max-w-4xl mx-auto">
                     <div className="flex justify-end">
                       <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
-                        <div className="flex flex-1 flex-col gap-2 items-end w-full">
+                        <div
+                          className="flex flex-1 flex-col gap-2 items-end w-full"
+                          onMouseEnter={() => setIsDemoChooserHovered(true)}
+                          onMouseLeave={() => setIsDemoChooserHovered(false)}
+                        >
                           <button
                             type="button"
                             onClick={() => handleDemoChoice('iris')}
-                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            aria-label="Sure, help me triage my inbox"
+                            className={cn(
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:bg-primary hover:text-primary-foreground hover:border-primary [&:hover_svg]:text-primary-foreground',
+                              !isDemoChooserHovered && demoChooserBlinkIndex === 0
+                                ? 'bg-primary text-primary-foreground border-primary [&_svg]:text-primary-foreground'
+                                : 'bg-card text-card-foreground border-border/50'
+                            )}
+                            aria-label="Sort my inbox"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm leading-relaxed">Sure, help me triage my inbox</div>
+                              <div className="text-base leading-relaxed">Sort my inbox</div>
                               <Icon name="caret-right" iconOverride={{ type: 'phosphor', component: 'CaretRight' }} weight="bold" className="w-4 h-4 text-muted-foreground" />
                             </div>
                           </button>
                           <button
                             type="button"
                             onClick={() => handleDemoChoice('saga')}
-                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                            aria-label="Sure, help me publish a blog post"
+                            className={cn(
+                              'w-full text-left shadow-sm rounded-2xl rounded-br-md px-4 py-3 border transition-colors duration-300 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:bg-primary hover:text-primary-foreground hover:border-primary [&:hover_svg]:text-primary-foreground',
+                              !isDemoChooserHovered && demoChooserBlinkIndex === 1
+                                ? 'bg-primary text-primary-foreground border-primary [&_svg]:text-primary-foreground'
+                                : 'bg-card text-card-foreground border-border/50'
+                            )}
+                            aria-label="Publish a blog post"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <div className="text-sm leading-relaxed">Sure, help me publish a blog post</div>
+                              <div className="text-base leading-relaxed">Publish a blog post</div>
                               <Icon name="caret-right" iconOverride={{ type: 'phosphor', component: 'CaretRight' }} weight="bold" className="w-4 h-4 text-muted-foreground" />
                             </div>
                           </button>
                         </div>
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden flex items-center justify-center">
-                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
+                        <div className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden flex items-center justify-center">
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={20} className="text-primary" />
                         </div>
                       </div>
                     </div>

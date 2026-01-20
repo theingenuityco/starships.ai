@@ -99,7 +99,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
             })()}
           </h1>
           <p className="text-base sm:text-lg text-muted-foreground mb-8 md:mb-12 leading-relaxed w-full max-w-[72ch] mx-auto text-balance break-words">
-            Triage your inbox, run your socials, manage products — and much more.
+            Sort your inbox, run your socials, manage products — and much more.
           </p>
           <div className="flex flex-col items-center gap-6 justify-center w-full min-w-0">
             <HeroMarketplaceCarousel initialAgentTemplates={initialAgentTemplates} />

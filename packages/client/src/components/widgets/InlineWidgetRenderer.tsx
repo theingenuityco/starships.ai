@@ -7,6 +7,7 @@ import { DataTable } from './DataTable'
 import { MetricGrid } from './MetricGrid'
 import { AreaChart, BarChart, DonutChart, LineChart, PieChart, RadarChart, RadialChart } from './charts'
 import { ConnectorSuggestionCard } from './ConnectorSuggestionCard'
+import { AgentSuggestionCard } from './AgentSuggestionCard'
 
 export interface InlineWidgetConfig {
   id?: string
@@ -32,6 +33,7 @@ const WIDGET_MAP: Record<string, React.ComponentType<any>> = {
   RadarChart,
   RadialChart,
   ConnectorSuggestionCard,
+  AgentSuggestionCard,
 }
 
 /**

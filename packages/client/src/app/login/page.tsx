@@ -78,7 +78,7 @@ function LoginContent() {
       }
 
       // If the user is authenticated but not onboarded, always route to onboarding.
-      // This avoids deep-link returnUrl redirects bypassing onboarding when ONBOARDING_ENABLED=true.
+      // This avoids deep-link returnUrl redirects bypassing onboarding before initial provisioning.
       if (user && user.onboardingCompleted === false) {
         router.push('/onboarding')
         return

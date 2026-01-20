@@ -25,7 +25,7 @@ export function JwtAuthGate({ children }: JwtAuthGateProps) {
   const isOnboardingFlow = searchParams?.get('onboarding') === '1'
 
   // If a user is authenticated but has not completed onboarding, force them into /onboarding.
-  // This prevents deep-links (e.g. /ship/*) from bypassing onboarding when ONBOARDING_ENABLED=true.
+  // This prevents deep-links (e.g. /ship/*) from bypassing onboarding before initial provisioning.
   useEffect(() => {
     if (isLoading) return
     if (!isAuthenticated) return

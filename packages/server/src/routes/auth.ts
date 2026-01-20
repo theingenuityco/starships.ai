@@ -11,7 +11,7 @@ import { validateData } from '@/utils/validation';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { EmailSchema, PasswordSchema, OAuthProviderSchema, DisplayNameSchema, IdSchema } from '@/schemas/common';
 import { getEnvConfig } from '@starships/env';
-import { AgentRepository, StarshipRepository, UserRepository } from '@starships/models';
+import { AgentRepository, OnboardingSessionRepository, StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
 import type { UserModel } from '@starships/protocol';
 import bcrypt from 'bcrypt';
@@ -29,40 +29,6 @@ import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 const router: Router = Router();
 const env = getEnvConfig();
 
-async function ensureDefaultStarshipAndAria(
-  userId: string
-): Promise<{ starship: { id: string; slug: string; name: string } | null }> {
-  const starshipRepo = new StarshipRepository();
-  const ships = await starshipRepo.findByOwner(userId);
-  const existing = ships.find((s) => s.status === 'active') || ships[0] || null;
-
-  const starship = existing ? existing : await StarshipService.createDefaultStarship(userId);
-
-  // Ensure Aria is deployed
-  try {
-    const deployed = await starshipRepo.getDeployedAgents(starship.id);
-    const hasAria = deployed.some((a) => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria'));
-    if (!hasAria) {
-      const templateService = new AgentTemplateService();
-      const ariaCandidates = await templateService.searchTemplates('Aria');
-      const ariaTemplate = ariaCandidates.find((t) => t.name === 'Aria') || null;
-      if (ariaTemplate) {
-        const ariaAgent = await templateService.createAgentFromTemplate(ariaTemplate.id, starship.id);
-        try {
-          const agentRepo = new AgentRepository();
-          await agentRepo.setAllAssignedToolPermissionsForAgent(ariaAgent.id, 'allow');
-        } catch {
-          // non-fatal
-        }
-      }
-    }
-  } catch {
-    // non-fatal
-  }
-
-  return { starship: { id: starship.id, slug: starship.slug, name: starship.name } };
-}
-
 function isValidRedirectUrl(url: string): boolean {
   if (!url || typeof url !== 'string') return false;
   if (!url.startsWith('/')) return false;
@@ -72,6 +38,57 @@ function isValidRedirectUrl(url: string): boolean {
   if (/^(javascript|data):/i.test(url)) return false;
   if (url.includes('@')) return false;
   return true;
+}
+
+/**
+ * Pre-onboarding-era compatibility:
+ * Some existing users already have a starship but were created before onboarding sessions existed.
+ *
+ * When such a user logs in with `users.onboarding_completed=false`, the client will force `/onboarding`.
+ * If the onboarding session doesn't already point at their existing starship, the onboarding flow would
+ * incorrectly prompt them to "Create your starship" (and could create a duplicate starship).
+ *
+ * This helper links an onboarding session to the user's first active starship (best-effort).
+ * It intentionally does NOT create a starship or agent (provisioning remains onboarding-only).
+ */
+async function ensureOnboardingSessionLinkedToExistingStarship(
+  userId: string,
+  onboardingCompleted: boolean
+): Promise<{ id: string; slug: string; name: string } | null> {
+  // Only do this work for users who are still gated by onboarding.
+  if (onboardingCompleted) return null;
+
+  try {
+    const starshipRepo = new StarshipRepository();
+    const ships = await starshipRepo.findByOwner(userId);
+    const first = ships.find((s) => s.status === 'active') || ships[0];
+    if (!first) return null;
+
+    const sessionRepo = new OnboardingSessionRepository();
+    const session = await sessionRepo.findByUserId(userId);
+
+    // If a session already points at a starship, don't override it.
+    if (!session?.starshipId) {
+      await sessionRepo.upsertForUser(userId, {
+        starshipId: first.id,
+        step: session?.step ?? 'welcome',
+        goals: session?.goals ?? [],
+        selectedConnectorProviders: session?.selectedConnectorProviders ?? [],
+        selectedAgentTemplateIds: session?.selectedAgentTemplateIds ?? [],
+        primaryAgentTemplateId: session?.primaryAgentTemplateId ?? null,
+        completedAt: session?.completedAt ?? null,
+        createdAt: session?.createdAt,
+      });
+    }
+
+    return { id: first.id, slug: first.slug, name: first.name };
+  } catch (error) {
+    logger.warn('[AUTH] Failed to link onboarding session to existing starship (best-effort)', {
+      userId,
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return null;
+  }
 }
 
 // Zod schemas for validation
@@ -187,7 +204,7 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         emailNotVerified: true,
         message: 'Please verify your email address before signing in.',
         canResendVerification: true,
-        onboardingRequired: env.ONBOARDING_ENABLED ? true : false,
+        onboardingRequired: true,
       };
 
       return sendSuccess(res, response, 200);
@@ -221,24 +238,8 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    // When onboarding is disabled, provision the default starship + Aria automatically.
-    let starship: { id: string; slug: string; name: string } | null = null;
-    let onboardingCompleted = user.onboardingCompleted;
-    if (!env.ONBOARDING_ENABLED) {
-      const provisioned = await ensureDefaultStarshipAndAria(user.id);
-      starship = provisioned.starship;
-      if (!user.onboardingCompleted) {
-        try {
-          const userRepo = new UserRepository();
-          await userRepo.update(user.id, { onboardingCompleted: true });
-          onboardingCompleted = true;
-        } catch {
-          // non-fatal
-        }
-      } else {
-        onboardingCompleted = true;
-      }
-    }
+    const onboardingCompleted = user.onboardingCompleted;
+    const starship = await ensureOnboardingSessionLinkedToExistingStarship(user.id, onboardingCompleted);
 
     sendSuccess(res, {
       user: {
@@ -255,7 +256,7 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       },
       token,
       isFirstLogin,
-      onboardingRequired: env.ONBOARDING_ENABLED ? !user.onboardingCompleted : false,
+      onboardingRequired: !user.onboardingCompleted,
       starship,
     });
   } catch (error) {
@@ -901,24 +902,8 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    // When onboarding is disabled, provision the default starship + Aria automatically.
-    let starship: { id: string; slug: string; name: string } | null = null;
-    let onboardingCompleted = user.onboardingCompleted;
-    if (!env.ONBOARDING_ENABLED) {
-      const provisioned = await ensureDefaultStarshipAndAria(user.id);
-      starship = provisioned.starship;
-      if (!user.onboardingCompleted) {
-        try {
-          const userRepo = new UserRepository();
-          await userRepo.update(user.id, { onboardingCompleted: true });
-          onboardingCompleted = true;
-        } catch {
-          // non-fatal
-        }
-      } else {
-        onboardingCompleted = true;
-      }
-    }
+    const onboardingCompleted = user.onboardingCompleted;
+    const starship = await ensureOnboardingSessionLinkedToExistingStarship(user.id, onboardingCompleted);
 
     // Return secure response with JWT in body
     sendSuccess(res, {
@@ -935,7 +920,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       },
       token,
       isFirstLogin,
-      onboardingRequired: env.ONBOARDING_ENABLED ? !user.onboardingCompleted : false,
+      onboardingRequired: !user.onboardingCompleted,
       starship,
     });
   } catch (error) {

@@ -1367,14 +1367,24 @@ export class ConversationService {
           baseState as Record<string, unknown> | undefined
         );
 
-        // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+        // Optional onboarding-only system prompt injection (conversation-scoped).
+        const onboardingSystemPrompt =
+          conversationState && typeof conversationState === 'object' && typeof (conversationState as Record<string, unknown>)['onboardingSystemPrompt'] === 'string'
+            ? String((conversationState as Record<string, unknown>)['onboardingSystemPrompt']).trim()
+            : '';
+
+        // Exclude plugins (and any onboarding system prompt) from baseState and conversationState
+        // - plugins are set explicitly from resolvePlugins
+        // - onboardingSystemPrompt is used to augment agent.systemPrompt and should NOT be placed into agent.state
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
+        const { plugins: _conversationPlugins, onboardingSystemPrompt: _onboardingSystemPrompt, ...conversationStateWithoutPlugins } =
+          conversationState as Record<string, unknown>;
 
         const agentWithTools: AgentParams = {
           ...agentModel,
+          ...(onboardingSystemPrompt ? { systemPrompt: [String((agentModel as any)?.systemPrompt ?? ''), onboardingSystemPrompt].filter(Boolean).join('\n\n') } : null),
           // Always use the server-tools blueprint (no legacy tool-node execution).
           blueprint: Agent.defaultAgentBlueprintServerTools(),
           state: {
@@ -1559,13 +1569,27 @@ export class ConversationService {
       // Also seed resumeTurnSeqOffset so new messages don't overwrite prior turn slots.
       try {
         const at = new Date().toISOString();
-        const latestTurnId =
+        let latestTurnId =
           this.currentTurnId.get(conversationId) ||
           (await this.turnRepository
             .findLatestByConversationId(conversationId)
             .then((t) => (t?.id ? t.id : null))
             .catch(() => null)) ||
           null;
+
+        // If this is the first ever kickoff for a conversation (no DB turn exists yet),
+        // create a DB-backed turn so streaming persistence (upsertByTurnSlot) has a valid turn_id.
+        if (!latestTurnId) {
+          try {
+            const created = await this.turnRepository.createTurn({ conversationId, status: 'active' });
+            latestTurnId = created?.id ? String(created.id) : null;
+          } catch (e) {
+            // best-effort: if we fail to create a DB turn, fall back to a synthetic id.
+            // Note: persistence may still fail; caller handles errors as best-effort.
+            latestTurnId = null;
+          }
+        }
+
         const turnId = latestTurnId || conversationId;
 
         // Ensure turn-aware persistence uses the real DB turn id (not a synthetic generation id).
@@ -1576,6 +1600,16 @@ export class ConversationService {
             this.resumeTurnSeqOffset.set(conversationId, Math.max(0, Number(maxSeq) || 0));
           } catch {
             // best-effort; fallback keeps old behavior
+          }
+        }
+
+        // If we created a fresh turn above, publish a turn.started so clients have a consistent turn lifecycle.
+        // (Harmless if the client ignores it.)
+        if (latestTurnId) {
+          try {
+            await this.streamBus.publish(conversationId, { type: 'turn.started', data: { conversationId, turnId, at } });
+          } catch {
+            // best-effort
           }
         }
 
@@ -1623,6 +1657,8 @@ export class ConversationService {
         string,
         unknown
       >;
+      const onboardingSystemPrompt =
+        typeof conversationState['onboardingSystemPrompt'] === 'string' ? String(conversationState['onboardingSystemPrompt']).trim() : '';
 
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
@@ -1640,10 +1676,12 @@ export class ConversationService {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState;
+      const { plugins: _conversationPluginsContinue, onboardingSystemPrompt: _onboardingSystemPromptContinue, ...conversationStateWithoutPlugins } =
+        conversationState;
 
       const agentWithTools: AgentParams = {
         ...(agentModel as Partial<AgentParams>),
+        ...(onboardingSystemPrompt ? { systemPrompt: [String((agentModel as any)?.systemPrompt ?? ''), onboardingSystemPrompt].filter(Boolean).join('\n\n') } : null),
         // Always use the server-tools blueprint (no legacy tool-node execution).
         blueprint: Agent.defaultAgentBlueprintServerTools(),
         state: {

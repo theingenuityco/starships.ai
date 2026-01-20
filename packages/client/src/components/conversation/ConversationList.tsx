@@ -27,6 +27,11 @@ interface ConversationListProps {
 
 type ConversationWithAgents = ConversationModel & { agents: AgentModel[] }
 
+function isOnboardingConversation(conversation: { title?: string | null | undefined }): boolean {
+  const title = typeof conversation.title === 'string' ? conversation.title.trim().toLowerCase() : ''
+  return title === 'onboarding'
+}
+
 function CompactConversationAgents({ starshipId, agents }: { starshipId: string; agents: AgentModel[] }) {
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
@@ -38,23 +43,24 @@ function CompactConversationAgents({ starshipId, agents }: { starshipId: string;
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
 
+  const agentNamesText = useMemo(() => {
+    const names = visibleAgents.map(a => formatAgentDisplayName(a)).filter(Boolean)
+    const base = names.join(', ')
+    return remaining > 0 ? `${base} +${remaining}` : base
+  }, [visibleAgents, remaining])
+
   if (!agents.length) return null
 
   return (
-    <div className="mt-1 flex items-center gap-1 text-muted-foreground group-hover:text-foreground" style={{ fontSize: '12px' }}>
-      {visibleAgents.map(agent => (
-        <div key={agent.id} className="flex items-center gap-1 max-w-[6rem]">
-          <Avatar className="h-3.5 w-3.5 ring-1 ring-border/40">
+    <div className="mt-1 flex items-center gap-1 text-muted-foreground group-hover:text-foreground min-w-0" style={{ fontSize: '12px' }}>
+      <div className="flex items-center gap-1 flex-shrink-0">
+        {visibleAgents.map(agent => (
+          <Avatar key={agent.id} className="h-3.5 w-3.5 ring-1 ring-border/40">
             <AgentAvatar seed={agent.name} imageUrl={agent.avatarAttachmentId ? avatarUrlById.get(agent.avatarAttachmentId) : undefined} size={14} />
           </Avatar>
-          <span className="truncate">{formatAgentDisplayName(agent)}</span>
-        </div>
-      ))}
-      {remaining > 0 && (
-        <span className="text-muted-foreground/70 group-hover:text-foreground/80" style={{ fontSize: '12px' }}>
-          +{remaining}
-        </span>
-      )}
+        ))}
+      </div>
+      <span className="truncate min-w-0">{agentNamesText}</span>
     </div>
   )
 }
@@ -128,6 +134,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const renderCompactConversation = (conversation: ConversationWithAgents, isChild: boolean) => {
     const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
     const isActive = conversation.id === currentConversationId
+    const isOnboarding = isOnboardingConversation(conversation)
     const agents = conversation.agents
 
     return (
@@ -135,12 +142,33 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         key={conversation.id}
         className={cn(
           'group flex items-center gap-1.5 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
-          isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+          isOnboarding
+            ? isActive
+              ? 'text-primary bg-primary/10 border-transparent'
+              : 'text-foreground/90 bg-muted/40 border-transparent hover:bg-muted/60'
+            : isActive
+              ? 'text-primary bg-primary/10 border-transparent'
+              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
         )}
         style={isChild ? { paddingLeft: '1.5rem' } : undefined}
       >
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-          <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{title}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center gap-1 min-w-0">
+              {isOnboarding ? (
+                <Icon
+                  name="zap"
+                  className={cn(
+                    'h-3.5 w-3.5 flex-shrink-0 mt-[1px]',
+                    isActive ? 'text-primary' : 'text-primary/80',
+                    // Subtle special treatment without changing layout or borders
+                    'opacity-90 group-hover:opacity-100 motion-safe:animate-pulse'
+                  )}
+                />
+              ) : null}
+              <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{title}</p>
+            </div>
+          </div>
           <CompactConversationAgents starshipId={starshipId} agents={agents} />
         </div>
         {/* Delete button - appears on hover */}

@@ -210,6 +210,14 @@ export function useLogin() {
         return
       }
 
+      // If onboarding is required for this user, always route to onboarding.
+      // Starship provisioning is handled by onboarding (not login).
+      if ((data as any)?.onboardingRequired === true) {
+        router.push('/onboarding')
+        queryClient.invalidateQueries()
+        return
+      }
+
       const redirectTarget = getPostAuthRedirectTarget()
       if (redirectTarget) {
         router.push(addWelcomeParamToPath(redirectTarget))
@@ -279,6 +287,13 @@ export function useRegister() {
         return
       }
 
+      // If onboarding is enabled server-side and required for this user, always route to onboarding.
+      if ((data as any)?.onboardingRequired === true) {
+        router.push('/onboarding')
+        queryClient.invalidateQueries()
+        return
+      }
+
       const redirectTarget = getPostAuthRedirectTarget()
       if (redirectTarget) {
         router.push(addWelcomeParamToPath(redirectTarget))
@@ -337,6 +352,13 @@ export function useOAuthLogin() {
       // If OAuth exchange is happening on an install flow, the /login page should redirect via returnUrl.
       // If we still somehow land on /connectors/*/install, stay put and let the UI advance.
       if (isConnectorInstallPath(typeof window !== 'undefined' ? window.location.pathname : null)) {
+        queryClient.invalidateQueries()
+        return
+      }
+
+      // If onboarding is enabled server-side and required for this user, always route to onboarding.
+      if ((data as any)?.onboardingRequired === true) {
+        router.push('/onboarding')
         queryClient.invalidateQueries()
         return
       }

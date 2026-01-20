@@ -146,7 +146,7 @@ export const suggestConnectorsTool: ToolParams = {
         name: 'Widget exists?',
         description: 'Branch: reuse existing widget or create it',
         parameters: {
-          edgeCondition: '{{ lastOutputOf("extract_found_widget") ? "exists" : "missing" }}',
+          condition: '{{ lastOutputOf("extract_found_widget") ? "exists" : "missing" }}',
         },
       },
       {

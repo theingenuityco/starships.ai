@@ -198,6 +198,20 @@ export const renderStarshipDetailsTool: ToolParams = {
         },
       },
       {
+        ref: 'ok_output',
+        type: 'code',
+        name: 'OK Output',
+        description: 'Return minimal tool output',
+        parameters: {
+          code: `
+            async function main() {
+              return { ok: true };
+            }
+          `,
+          timeout: 1000,
+        },
+      },
+      {
         ref: 'fetch_starship',
         type: 'connector_action',
         name: 'Fetch Starship',
@@ -238,7 +252,7 @@ export const renderStarshipDetailsTool: ToolParams = {
         name: 'End',
         description: '',
         parameters: {
-          output: '{{ lastOutputOf("extract_starship") }}',
+          output: '{{ lastOutputOf("ok_output") }}',
         },
       },
     ],
@@ -257,11 +271,9 @@ export const renderStarshipDetailsTool: ToolParams = {
       { ref: 'e_create', from: 'create_widget', to: 'extract_created_widget' },
       { ref: 'e_emit_created', from: 'extract_created_widget', to: 'emit_created' },
 
-      { ref: 'e_after_emit_existing', from: 'emit_existing', to: 'fetch_starship' },
-      { ref: 'e_after_emit_created', from: 'emit_created', to: 'fetch_starship' },
-
-      { ref: 'e_extract_starship', from: 'fetch_starship', to: 'extract_starship' },
-      { ref: 'e_end', from: 'extract_starship', to: 'end_1' },
+      { ref: 'e_after_emit_existing', from: 'emit_existing', to: 'ok_output' },
+      { ref: 'e_after_emit_created', from: 'emit_created', to: 'ok_output' },
+      { ref: 'e_end', from: 'ok_output', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -274,7 +286,7 @@ export const renderStarshipDetailsToolTemplate: Omit<ToolTemplateModel, 'id' | '
   blueprint: renderStarshipDetailsTool.blueprint,
 
   slug: renderStarshipDetailsTool.slug,
-  version: '1.0.0',
+  version: '1.0.1',
   category: 'automation',
   exampleUsage: '{}',
   requiresApiKey: false,

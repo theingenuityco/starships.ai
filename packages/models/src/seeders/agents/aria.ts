@@ -113,6 +113,7 @@ export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'list-connectors',
     'suggest-connectors',
     'suggest-agents',
+    'render-starship-details',
   ],
 
   icon: '🎼',

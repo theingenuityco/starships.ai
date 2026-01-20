@@ -9,6 +9,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipConnectors } from '@/hooks/useConnectors'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useConversationDetail } from '@/hooks/useConversations'
 import { StarTheme } from '@/components/theme-context'
 import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHandler'
 
@@ -135,8 +136,23 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const showTopRightUserProfile = hasMounted && isPageReady && (isShipPage || (isMarketplace && isAuthenticated))
 
   // Ship navbar hiding rule:
-  // Hide the nav when the starship has <1 connected connector AND <2 agents.
-  // This keeps the onboarding chat focused until the starship is minimally configured.
+  // Hide the nav ONLY for onboarding conversations, and only until the starship is minimally configured.
+  // This keeps the onboarding chat focused without affecting normal ship navigation.
+  const conversationIdFromPath = (() => {
+    if (!isShipPage) return null
+    const parts = String(pathname).split('/').filter(Boolean) // ["ship", "<slug>", ...]
+    // /ship/:slug/conversations/:conversationId
+    if (!(parts.length >= 4 && parts[2] === 'conversations' && Boolean(parts[3]))) return null
+    return String(parts[3])
+  })()
+  const { data: conversationForOnboardingNav } = useConversationDetail(conversationIdFromPath)
+  const isOnboardingConversationRoute = (() => {
+    if (!conversationIdFromPath) return false
+    const rec = conversationForOnboardingNav as any
+    const state = rec?.state && typeof rec.state === 'object' ? (rec.state as any) : null
+    return state?.isOnboardingConversation === true
+  })()
+
   const starshipSlugFromPath = (() => {
     if (!isShipPage) return null
     const parts = String(pathname).split('/').filter(Boolean) // ["ship", "<slug>", ...]
@@ -156,7 +172,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   // - at least 1 connected connector
   // - at least 2 agents
   // (i.e. hide if either requirement is not yet met)
-  const shouldHideNavigationForEarlyStarship = Boolean(isShipPage && (connectedConnectorCount < 1 || agentCount < 2))
+  const shouldHideNavigationForEarlyStarship = Boolean(
+    isOnboardingConversationRoute && (connectedConnectorCount < 1 || agentCount < 2)
+  )
 
   useEffect(() => {
     const checkMobile = () => {

@@ -562,7 +562,11 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
         });
         return;
       }
-      allowedUpdates.name = name.trim();
+      const nextName = name.trim();
+      // Only update name (and thus trigger slug regeneration) when the name actually changes.
+      if (nextName !== starship.name) {
+        allowedUpdates.name = nextName;
+      }
     }
 
     if (status !== undefined) {
@@ -755,13 +759,13 @@ router.post(
         return;
       }
 
-      const model = 'openai/gpt-4o-mini';
+      const model = 'openai/gpt-5.2';
       const system = [
         'You write clear, accurate, professional company/project descriptions.',
         'Given a website URL and extracted website text, draft a description the user can paste into a product profile.',
         'Constraints:',
         '- Output plain text (no markdown headings).',
-        '- Approximately 2000 characters (including spaces).',
+        '- HARD LIMIT: 2000 characters maximum (including spaces). Never exceed 2000 characters.',
         '- Focus on: what they do, who it is for, key features/capabilities, differentiators, and tone/voice matching the site.',
         '- Do not invent claims that are not supported by the text.',
       ].join('\n');
@@ -775,24 +779,46 @@ router.post(
         'Write the description now. Return only the description text.',
       ].join('\n');
 
-      const completion = await openRouterClient.chat.completions.create({
-        model,
-        messages: [
-          { role: 'system', content: system },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.3,
-        max_tokens: 700,
-      });
+      const MAX_CHARS = 2000;
+      const generateOnce = async (extraUserInstruction?: string): Promise<string> => {
+        const completion = await openRouterClient.chat.completions.create({
+          model,
+          messages: [
+            { role: 'system', content: system },
+            { role: 'user', content: userPrompt + (extraUserInstruction ? `\n\n${extraUserInstruction}` : '') },
+          ],
+          temperature: 0.2,
+          max_tokens: 800,
+        });
+        return String(completion.choices?.[0]?.message?.content ?? '').trim();
+      };
 
-      const generated = String(completion.choices?.[0]?.message?.content ?? '').trim();
-      if (!generated) {
+      // First attempt.
+      let description = await generateOnce();
+      if (!description) {
         sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to generate description', 500);
         return;
       }
 
-      // Keep within server validation limit.
-      const description = generated.slice(0, 2000);
+      // Retry once if the model violated the hard character limit.
+      if (description.length > MAX_CHARS) {
+        description = await generateOnce(
+          `Your previous output was ${description.length} characters. Rewrite it to be ${MAX_CHARS} characters or fewer while preserving key details. Return only the description text.`
+        );
+      }
+
+      if (!description) {
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to generate description', 500);
+        return;
+      }
+      if (description.length > MAX_CHARS) {
+        sendError(res, 'INTERNAL_SERVER_ERROR', `Generated description exceeded ${MAX_CHARS} characters`, 500, {
+          maxChars: MAX_CHARS,
+          actualChars: description.length,
+        });
+        return;
+      }
+
       sendSuccess(res, { description }, 200);
     } catch (error) {
       handleError(error, res, 'generating starship description from website');

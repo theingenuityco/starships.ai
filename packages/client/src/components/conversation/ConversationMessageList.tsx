@@ -654,7 +654,7 @@ export function ConversationMessageList({
 
     return (
       <div className="flex justify-start">
-        <div className="flex items-start gap-3 w-full">
+        <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
           {/* Spacer to match avatar width */}
           <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
           <motion.div key={`turn-buttons-${turnId}`} variants={staggerContainer} initial={shouldAnimateButtons ? 'hidden' : 'visible'} animate="visible" className="flex items-center gap-2 mt-4 mb-4">
@@ -746,7 +746,7 @@ export function ConversationMessageList({
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
-              <div className="flex items-start gap-3 w-full">
+              <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
                 {/* No avatar for typing indicator; keep spacer for alignment */}
                 <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
                 <div className="min-w-0 flex-1">
@@ -938,7 +938,7 @@ const MemoizedMessageBubble = memo(
       // AI message: Plain text on the left (no bubble)
       return (
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
-          <div className="flex items-start gap-3 w-full">
+          <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
             {showAssistantAvatar ? (
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                 <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />

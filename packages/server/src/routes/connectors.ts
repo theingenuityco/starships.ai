@@ -32,6 +32,7 @@ const router: Router = Router();
 interface OAuthStateContext {
   starshipId?: string;
   provider?: string;
+  returnUrl?: string;
 }
 
 const ApiKeyConnectSchema = z.object({
@@ -52,7 +53,30 @@ const ProviderParamSchema = z.object({
 
 const StartOAuthBodySchema = z.object({
   metadata: z.record(z.string(), z.unknown()).optional(),
+  returnUrl: z.string().optional(),
 });
+
+function isValidRedirectUrl(url: string): boolean {
+  if (!url || typeof url !== 'string') return false;
+  if (!url.startsWith('/')) return false;
+  if (url.startsWith('//')) return false;
+  // Prevent backslash-based protocol-relative tricks like "/\\evil.com"
+  if (url.includes('\\')) return false;
+  if (/^(javascript|data):/i.test(url)) return false;
+  if (url.includes('@')) return false;
+  return true;
+}
+
+function addQueryParamsToPath(path: string, params: Record<string, string>): string {
+  try {
+    // Ensure relative-path handling while preserving existing query/hash.
+    const url = new URL(path, env.PUBLIC_URL);
+    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
+    return `${url.pathname}${url.search}${url.hash}`;
+  } catch {
+    return path;
+  }
+}
 
 // GET /connectors/catalog - Static connector catalog
 router.get('/connectors/catalog', async (req: Request, res: Response): Promise<void> => {
@@ -367,6 +391,7 @@ async function startConnectorHandler(req: Request, res: Response): Promise<void>
 
     const authorizationUrl = await connectorService.startConnector(starshipId, userId, provider as ConnectorProvider, {
       metadata: bodyValidation.metadata,
+      returnUrl: bodyValidation.returnUrl,
     });
 
     const response: StartOAuthResponse = {
@@ -443,7 +468,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
               connector: provider,
               status: 'error',
             });
-            const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
+            const redirectUrl = `/?${redirectParams.toString()}`;
             res.redirect(redirectUrl);
             return;
           }
@@ -459,7 +484,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
         connector: provider,
         status: 'error',
       });
-      const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
+      const redirectUrl = `/?${redirectParams.toString()}`;
       res.redirect(redirectUrl);
       return;
     }
@@ -471,7 +496,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
         starshipSlug !== undefined && starshipSlug.length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/connectors`
           : `/ship/${encodeURIComponent(starshipId)}/connectors`;
-      return `${env.PUBLIC_URL}${basePath}?${params.toString()}`;
+      return `${basePath}?${params.toString()}`;
     };
 
     // Custom connector completion is removed in v2 (no fallback).
@@ -483,14 +508,23 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
           const ctx = stateValidation.context as OAuthStateContext | undefined;
           const starshipId = ctx?.starshipId as string | undefined;
           const providerFromState = ctx?.provider as string | undefined;
+          const returnUrl = ctx?.returnUrl as string | undefined;
 
           if (starshipId) {
             const redirectParams = new URLSearchParams({
               connector: providerFromState || provider,
               status: 'error',
             });
-            const redirectUrl = buildStarshipRedirect(starshipId, undefined, redirectParams);
-            res.redirect(redirectUrl);
+            if (returnUrl && isValidRedirectUrl(returnUrl)) {
+              const withParams = addQueryParamsToPath(returnUrl, {
+                connector: providerFromState || provider,
+                status: 'error',
+              });
+              res.redirect(withParams);
+            } else {
+              const redirectUrl = buildStarshipRedirect(starshipId, undefined, redirectParams);
+              res.redirect(redirectUrl);
+            }
             return;
           }
         }
@@ -507,26 +541,29 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
         connector: provider,
         status: 'error',
       });
-      const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
+      const redirectUrl = `/?${redirectParams.toString()}`;
       res.redirect(redirectUrl);
       return;
     }
 
-    const { starshipId, starshipSlug } = await connectorService.completeOAuthConnector(
+    const { starshipId, starshipSlug, returnUrl } = await connectorService.completeOAuthConnector(
       provider as ConnectorProvider,
       code,
       state,
       req.query as Record<string, unknown>
     );
 
-    const redirectParams = new URLSearchParams({
-      connector: provider,
-      status: 'success',
-    });
-
-    const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
-
-    res.redirect(redirectUrl);
+    if (returnUrl && isValidRedirectUrl(returnUrl)) {
+      const withParams = addQueryParamsToPath(returnUrl, { connector: provider, status: 'success' });
+      res.redirect(withParams);
+    } else {
+      const redirectParams = new URLSearchParams({
+        connector: provider,
+        status: 'success',
+      });
+      const redirectUrl = buildStarshipRedirect(starshipId, starshipSlug, redirectParams);
+      res.redirect(redirectUrl);
+    }
   } catch (err) {
     // Keep error logs minimal and safe (no code/state leakage).
     console.error('[CONNECTOR_CALLBACK] Unhandled error during connector callback', {
@@ -546,15 +583,24 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
         if (stateValidation.valid) {
           const ctx = stateValidation.context as OAuthStateContext | undefined;
           const starshipId = ctx?.starshipId as string | undefined;
+          const returnUrl = ctx?.returnUrl as string | undefined;
           const redirectParams = new URLSearchParams({
             connector: provider || ctx?.provider || 'unknown',
             status: 'error',
           });
 
           if (starshipId) {
-            const basePath = `/ship/${encodeURIComponent(starshipId)}/connectors`;
-            const redirectUrl = `${env.PUBLIC_URL}${basePath}?${redirectParams.toString()}`;
-            res.redirect(redirectUrl);
+            if (returnUrl && isValidRedirectUrl(returnUrl)) {
+              const withParams = addQueryParamsToPath(returnUrl, {
+                connector: String(provider || ctx?.provider || 'unknown'),
+                status: 'error',
+              });
+              res.redirect(withParams);
+            } else {
+              const basePath = `/ship/${encodeURIComponent(starshipId)}/connectors`;
+              const redirectUrl = `${basePath}?${redirectParams.toString()}`;
+              res.redirect(redirectUrl);
+            }
             return;
           }
         }
@@ -572,7 +618,7 @@ async function connectorCallbackHandler(req: Request, res: Response): Promise<vo
       connector: req.params.provider || 'unknown',
       status: 'error',
     });
-    const redirectUrl = `${env.PUBLIC_URL}/?${redirectParams.toString()}`;
+    const redirectUrl = `/?${redirectParams.toString()}`;
     res.redirect(redirectUrl);
   }
 }

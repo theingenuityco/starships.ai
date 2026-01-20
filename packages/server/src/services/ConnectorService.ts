@@ -252,7 +252,7 @@ export class ConnectorService {
     starshipId: string,
     userId: string,
     provider: ConnectorProvider,
-    opts?: { metadata?: Record<string, unknown> }
+    opts?: { metadata?: Record<string, unknown>; returnUrl?: string }
   ): Promise<string> {
     const template = await this.loadTemplateOrThrow(provider);
     if (template.isEnabled === false) {
@@ -306,7 +306,13 @@ export class ConnectorService {
       throw new Error(`OAuth is not configured for provider ${provider}. Missing env: ${clientIdRef.key}`);
     }
 
-    const state = await generateOAuthState(true, userId, { starshipId, provider });
+    const state = await generateOAuthState(true, userId, {
+      starshipId,
+      provider,
+      // Carry through a best-effort return URL so the callback can redirect back to the initiating page.
+      // This is validated again at redirect time.
+      ...(opts?.returnUrl ? { returnUrl: opts.returnUrl } : {}),
+    });
 
     // Redirect URI is derived from the standard callback route (no template field).
     const env = getEnvConfig();
@@ -351,7 +357,7 @@ export class ConnectorService {
     code: string,
     stateToken: string,
     callbackQuery: Record<string, unknown> | undefined
-  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string }> {
+  ): Promise<{ starshipId: string; starshipSlug?: string; userId: string; returnUrl?: string }> {
     const template = await this.loadTemplateOrThrow(providerFromCallback);
     if (template.isEnabled === false) {
       throw new Error(`Connector ${providerFromCallback} is disabled by the instance admin`);
@@ -392,6 +398,7 @@ export class ConnectorService {
 
     const starshipId = context?.starshipId as string | undefined;
     const provider = context?.provider as string | undefined;
+    const returnUrl = context?.returnUrl as string | undefined;
 
     if (!starshipId || provider !== providerFromCallback) {
       throw new Error('OAuth state missing starship context');
@@ -519,6 +526,7 @@ export class ConnectorService {
       starshipId,
       starshipSlug,
       userId,
+      ...(returnUrl ? { returnUrl } : {}),
     };
   }
 

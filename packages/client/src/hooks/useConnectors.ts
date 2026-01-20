@@ -124,10 +124,17 @@ export function useStartOAuthConnector(starshipId: string) {
         | {
             provider: ConnectorProvider
             metadata?: StartOAuthRequest['metadata']
+            returnUrl?: StartOAuthRequest['returnUrl']
           }
     ): Promise<string> => {
       const provider = typeof input === 'string' ? input : input.provider
-      const body: StartOAuthRequest | undefined = typeof input === 'string' ? undefined : { metadata: input.metadata }
+      const body: StartOAuthRequest | undefined =
+        typeof input === 'string'
+          ? undefined
+          : {
+              metadata: input.metadata,
+              returnUrl: input.returnUrl,
+            }
       const response: FetchResponse<ApiResponse<StartOAuthResponse>> = await api.post(
         `/api/v1/starships/${starshipId}/connectors/${provider}/start`,
         body,

@@ -484,6 +484,13 @@ export interface ConnectWithBasicAuthResponse {
  */
 export interface StartOAuthRequest {
   metadata?: Record<string, unknown>;
+  /**
+   * Optional post-auth redirect path within the Starships UI.
+   * Must be a relative path beginning with `/` (server will validate).
+   *
+   * Used to return users back to the onboarding conversation after connecting a connector.
+   */
+  returnUrl?: string;
 }
 
 export interface StartOAuthResponse {

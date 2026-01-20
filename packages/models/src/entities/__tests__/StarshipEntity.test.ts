@@ -24,6 +24,8 @@ describe('StarshipEntity', () => {
       starship.slug = 'test-starship';
       starship.ownerId = 'user-456';
       starship.name = 'Test Starship';
+      starship.description = 'A great test starship';
+      starship.websiteUrl = 'https://example.com';
       starship.shipClass = 'scout';
       starship.maxAgents = 3;
       starship.maxConcurrentTurns = 1;
@@ -39,6 +41,8 @@ describe('StarshipEntity', () => {
         owner_id: 'user-456',
 
         name: 'Test Starship',
+        description: 'A great test starship',
+        website_url: 'https://example.com',
         ship_class: 'scout',
         max_agents: 3,
         max_concurrent_turns: 1,

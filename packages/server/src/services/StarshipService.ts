@@ -53,6 +53,7 @@ export class StarshipService {
     const starship = await this.starshipRepository.create({
       ownerId: data.ownerId,
       name: data.name,
+      description: '',
       shipClass,
       maxAgents: data.maxAgents ?? defaultEntitlements.maxAgents,
       maxConcurrentTurns: data.maxConcurrentTurns ?? defaultEntitlements.maxConcurrentTurns,

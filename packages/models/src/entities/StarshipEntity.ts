@@ -7,7 +7,7 @@
 
 import type { ShipClass, StarshipModel, StarshipStatus } from '@starships/protocol';
 import { Expose, Transform } from 'class-transformer';
-import { IsEnum, IsISO8601, IsNumber, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
+import { IsEnum, IsISO8601, IsNumber, IsOptional, IsString, Length, Max, Min, validate, ValidationError } from 'class-validator';
 
 /**
  * Custom transformers for the StarshipEntity
@@ -51,6 +51,16 @@ export class StarshipEntity implements StarshipModel {
   @IsString()
   @Length(1, 100)
   name!: string;
+
+  @Expose()
+  @IsString()
+  @Length(0, 2000)
+  description!: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  websiteUrl?: string;
 
   @Expose()
   @IsEnum(['scout', 'frigate', 'cruiser'])
@@ -98,6 +108,7 @@ export class StarshipEntity implements StarshipModel {
         slug: dataRecord.slug || '',
         ownerId: dataRecord.ownerId || '',
         name: dataRecord.name || '',
+        description: (typeof dataRecord.description === 'string' ? dataRecord.description : '') || '',
         shipClass: (dataRecord.shipClass as ShipClass) ?? 'scout',
         maxAgents: dataRecord.maxAgents ?? 5,
         maxConcurrentTurns: dataRecord.maxConcurrentTurns ?? 3,

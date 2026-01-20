@@ -7,6 +7,7 @@ import { MetricGrid } from './MetricGrid'
 import { AreaChart, BarChart, DonutChart, LineChart, PieChart, RadarChart, RadialChart } from './charts'
 import { ConnectorSuggestionCard } from './ConnectorSuggestionCard'
 import { AgentSuggestionCard } from './AgentSuggestionCard'
+import { StarshipDetails } from './StarshipDetails'
 
 export interface WidgetConfig {
   id: string
@@ -32,6 +33,7 @@ const WIDGET_MAP: Record<string, React.ComponentType<any>> = {
   RadialChart,
   ConnectorSuggestionCard,
   AgentSuggestionCard,
+  StarshipDetails,
 }
 
 export function WidgetRenderer({ widget, className }: WidgetRendererProps): React.JSX.Element {

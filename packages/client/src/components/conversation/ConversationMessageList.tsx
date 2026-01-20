@@ -16,11 +16,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { motion } from 'motion/react'
-import { staggerContainer, staggerItem } from '@/lib/animations'
-import { toast } from 'sonner'
-import { tableToMarkdown } from '@/components/markdown/markdownComponents'
-import { isAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { TypingDots } from '@/components/ui/TypingDots'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -117,13 +112,6 @@ export function ConversationMessageList({
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
   const SCROLL_THRESHOLD_PX = 120
-
-  // Track which turns have been marked as complete (to prevent flickering)
-  // Once a turn is complete, its buttons should always be shown
-  const completedTurnIdsRef = useRef<Set<string>>(new Set())
-
-  // Track which turns have already animated their buttons (to prevent re-animation)
-  const animatedTurnIdsRef = useRef<Set<string>>(new Set())
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
@@ -541,152 +529,6 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
-  // Effect to mark turns as complete when they meet the criteria
-  // This runs after renderMessages is computed to avoid using it before declaration
-  useEffect(() => {
-    renderMessages.forEach((message, idx) => {
-      const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
-      const messageId = message.id
-
-      // Skip if already marked complete
-      if (completedTurnIdsRef.current.has(messageId)) return
-
-      // Only process assistant messages (not tool_result messages)
-      if (message.role !== 'assistant' || message.messageType === 'tool_result') return
-
-      // Check if this turn should be complete
-      const extendedMsg = message as ExtendedMessage
-      const isNotStreaming = !extendedMsg.streaming
-      const isTurnBoundary = next?.role === 'user' || next === null
-      const animationDone = isAnimationComplete(messageId)
-      const hasChunks = Array.isArray(extendedMsg.chunks) && extendedMsg.chunks.length > 0
-
-      // Check if all tool calls have completed
-      const toolCalls = extendedMsg.toolCalls || []
-      const toolResults = extendedMsg.toolResults || []
-      const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
-      const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
-      const allToolCallsDone = totalToolCalls === 0 || (totalToolCalls > 0 && completedToolResults >= totalToolCalls)
-
-      // Don't mark as complete if we're still awaiting tool results (for the last message)
-      const isLastMessage = idx === renderMessages.length - 1
-      const shouldWaitForToolResults = isLastMessage && isAwaitingToolResults
-
-      // Check if there are any more assistant messages in this turn after this one
-      // Look ahead to find the next user message, and check if there are any assistant messages between now and then
-      let hasMoreAssistantMessagesInTurn = false
-      if (!isTurnBoundary) {
-        // Look ahead through messages until we hit a user message or end
-        for (let i = idx + 1; i < renderMessages.length; i++) {
-          const futureMsg = renderMessages[i] as ExtendedMessage
-          if (futureMsg.role === 'user') {
-            // Found the next turn, stop looking
-            break
-          }
-          if (futureMsg.role === 'assistant' && futureMsg.messageType !== 'tool_result') {
-            // Found another assistant message in this turn
-            hasMoreAssistantMessagesInTurn = true
-            break
-          }
-        }
-      }
-
-      // A turn is complete if: assistant message (not tool_result), not streaming, at turn boundary,
-      // (animation done OR never streamed), all tool calls are done, not awaiting tool results,
-      // and there are no more assistant messages in this turn
-      if (isNotStreaming && isTurnBoundary && (animationDone || !hasChunks) && allToolCallsDone && !shouldWaitForToolResults && !hasMoreAssistantMessagesInTurn) {
-        completedTurnIdsRef.current.add(messageId)
-      }
-    })
-  }, [renderMessages, isAwaitingToolResults])
-
-  // Component to render action buttons after a complete turn
-  function TurnActionButtons({ turnMessages, turnId }: { turnMessages: MessageModel[]; turnId: string }) {
-    // Initialize state based on whether this turn has already been animated
-    // Once a turn is marked as animated, it will never animate again (even on re-renders)
-    const [shouldAnimateButtons] = useState<boolean>(() => {
-      const alreadyAnimated = animatedTurnIdsRef.current.has(turnId)
-      if (!alreadyAnimated) {
-        // Mark as animated immediately to prevent re-animation on future renders
-        animatedTurnIdsRef.current.add(turnId)
-        return true
-      }
-      return false
-    })
-
-    const extractTurnText = (): string => {
-      const parts: string[] = []
-      for (const msg of turnMessages) {
-        if (msg.role === 'user') {
-          parts.push(`**User:**\n${msg.content || ''}`)
-        } else if (msg.role === 'assistant') {
-          const content = msg.content || ''
-          const reasoning = (msg as ExtendedMessage).reasoning
-          if (reasoning && typeof reasoning === 'string' && reasoning.trim()) {
-            parts.push(`**Assistant (thinking):**\n${reasoning}`)
-          }
-          if (content.trim()) {
-            parts.push(`**Assistant:**\n${content}`)
-          }
-        }
-      }
-      return parts.join('\n\n')
-    }
-
-    const handleCopyTurn = async () => {
-      try {
-        const turnText = extractTurnText()
-        await navigator.clipboard.writeText(turnText)
-        toast.success('Turn copied to clipboard')
-      } catch (error) {
-        toast.error('Failed to copy turn')
-      }
-    }
-
-    const handleExportTurn = () => {
-      try {
-        const turnText = extractTurnText()
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-        const filename = `turn-${turnId.slice(0, 8)}-${timestamp}.md`
-
-        const blob = new Blob([turnText], { type: 'text/markdown' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = filename
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        URL.revokeObjectURL(url)
-
-        toast.success('Turn exported successfully')
-      } catch (error) {
-        toast.error('Failed to export turn')
-      }
-    }
-
-    return (
-      <div className="flex justify-start">
-        <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
-          {/* Spacer to match avatar width */}
-          <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
-          <motion.div key={`turn-buttons-${turnId}`} variants={staggerContainer} initial={shouldAnimateButtons ? 'hidden' : 'visible'} animate="visible" className="flex items-center gap-2 mt-4 mb-4">
-            <motion.div variants={staggerItem}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTurn} title="Copy turn">
-                <Icon name="copy" className="w-3 h-3" />
-              </Button>
-            </motion.div>
-            <motion.div variants={staggerItem}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportTurn} title="Export turn">
-                <Icon name="download" className="w-3 h-3" />
-              </Button>
-            </motion.div>
-          </motion.div>
-        </div>
-      </div>
-    )
-  }
-
   if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
@@ -706,29 +548,8 @@ export function ConversationMessageList({
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
-            const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
             const isFirstMessage = idx === 0
-
-            // Check if this is the end of a complete turn
-            // Once a turn is marked as complete (via useEffect), always show its buttons (prevents flickering)
-            const messageId = message.id
-            const isTurnEnd = completedTurnIdsRef.current.has(messageId)
-
-            // Find the start of this turn (the user message before this assistant message)
-            // Use a reverse loop since findLastIndex is not available in older TypeScript targets
-            const turnStartIdx =
-              message.role === 'assistant'
-                ? (() => {
-                    const slice = renderMessages.slice(0, idx + 1)
-                    for (let i = slice.length - 1; i >= 0; i--) {
-                      if (slice[i].role === 'user') return i
-                    }
-                    return -1
-                  })()
-                : -1
-
-            const turnMessages = turnStartIdx >= 0 ? renderMessages.slice(turnStartIdx, idx + 1) : []
 
             return (
               <Fragment key={message.id}>
@@ -750,11 +571,6 @@ export function ConversationMessageList({
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={idx === renderMessages.length - 1}
                 />
-                {/* Only show buttons after the final assistant message of a complete turn (not tool_result messages or intermediate messages) */}
-                {/* Must be: marked as turn end, assistant message, not tool_result, at turn boundary (next is user or null), and have turn messages */}
-                {isTurnEnd && message.role === 'assistant' && message.messageType !== 'tool_result' && (next?.role === 'user' || next === null) && turnMessages.length > 0 && (
-                  <TurnActionButtons turnMessages={turnMessages} turnId={message.id} />
-                )}
               </Fragment>
             )
           })}
@@ -887,7 +703,7 @@ const MemoizedMessageBubble = memo(
 
       return (
         <div className="flex justify-start">
-          <div className="group mb-4 mt-6 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-1 -mx-2 hover:bg-foreground/5 transition-colors">
+          <div className="group mb-2 mt-4 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-foreground/5 dark:hover:bg-foreground/10 transition-colors">
             <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
@@ -956,7 +772,7 @@ const MemoizedMessageBubble = memo(
           : null
       return (
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
-          <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-1 -mx-2 hover:bg-foreground/5 transition-colors">
+          <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-foreground/5 dark:hover:bg-foreground/10 transition-colors">
             {showAssistantAvatar ? (
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                 <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />

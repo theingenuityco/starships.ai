@@ -6,19 +6,14 @@ import { OnboardingRecommendationService } from '@/services/OnboardingRecommenda
 import { StarshipService } from '@/services/StarshipService';
 import { ConversationService } from '@/services/ConversationService';
 import { MessageService } from '@/services/MessageService';
-import { ConversationStreamBus } from '@/services/ConversationStreamBus';
-import { ConnectorService } from '@/services/ConnectorService';
-import { UIActionService } from '@/services/UIActionService';
 import { UserRepository, AgentRepository, StarshipRepository, OnboardingSessionRepository } from '@starships/models';
-import type { AuthUser, StarshipModel, AgentModel, OnboardingConnectorsUIAction } from '@starships/protocol';
+import type { AuthUser, StarshipModel, AgentModel } from '@starships/protocol';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 
 const router: Router = Router();
 const recommendationService = new OnboardingRecommendationService();
-
-type OnboardingChoice = { id: string; label: string; messageText: string };
 
 function getSourceTemplateId(agent: AgentModel): string | null {
   const rec = agent as unknown as Record<string, unknown>;
@@ -95,14 +90,15 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
     const existing = await conversationService.getConversationsByStarshipWithAgents(starship.id);
     const onboardingConversation =
       (Array.isArray(existing)
-        ? existing.find(
-            (c: any) =>
-              String(c?.title || '')
-                .trim()
-                .toLowerCase() === 'onboarding' && String(c?.status || '') === 'active'
-          )
+        ? existing.find((c: unknown) => {
+            const rec = c as Record<string, unknown> | null;
+            const title = typeof rec?.title === 'string' ? rec.title : '';
+            const status = typeof rec?.status === 'string' ? rec.status : '';
+            return title.trim().toLowerCase() === 'onboarding' && status === 'active';
+          })
         : null) || null;
 
+    const isResume = !!onboardingConversation;
     const conversation = onboardingConversation
       ? onboardingConversation
       : await conversationService.createConversation({
@@ -112,53 +108,41 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
           agentId: aria.id,
         });
 
-    // Build initial connector suggestions from live connector catalog.
-    const connectorService = new ConnectorService();
-    const catalog = await connectorService.getConnectorCatalog();
-    const providers: string[] = (catalog || [])
-      .slice(0, 12)
-      .map((c: any) => String(c?.provider || '').trim())
-      .filter((p) => p.length > 0 && p !== 'starships');
+    // Inject onboarding-only system prompt (conversation-scoped).
+    // This keeps Aria's template prompt generic while customizing behavior for onboarding conversations.
+    const onboardingSystemPrompt = [
+      'You are starting a new onboarding conversation with a user for their starship.',
+      '',
+      'Do this first:',
+      '- Warmly introduce yourself as Aria.',
+      '- Ask what task/outcome the user wants to get done.',
+      '- Ask only the minimum clarifying questions needed to identify the goal and the apps/data involved.',
+      '',
+      'Then start onboarding by suggesting connectors:',
+      '- If the user mentions apps, call Suggest Connectors (tool slug: suggest-connectors) with the relevant providers.',
+      '- If the user does not mention apps, ask one concise question listing a few common apps, then suggest connectors based on their answer.',
+      '',
+      'Keep it warm, concise, and action-oriented.',
+    ].join('\\n');
 
-    // Persist a lightweight onboarding UI state on the conversation for durability
     try {
+      const prevState = (conversation as any)?.state && typeof (conversation as any).state === 'object' ? (conversation as any).state : {};
       await conversationService.updateConversation(conversation.id, {
-        state: {
-          onboarding: {
-            mode: 'conversation',
-            step: 'connectors',
-            providers,
-          },
-        },
+        state: { ...(prevState as Record<string, unknown>), onboardingSystemPrompt },
       });
     } catch {
       // non-fatal
     }
 
-    // Create a greeting assistant message (durable) and publish + emit ui_action choices (live)
-    const bus = ConversationStreamBus.getInstance();
-    const uiActions = new UIActionService(bus);
+    // Kick off the first assistant message so the user sees Aria immediately without any hardcoded greeting.
+    // IMPORTANT: best-effort only; never fail onboarding start if kickoff fails.
     try {
-      const messageService = new MessageService();
-      const greeting = await messageService.createMessage({
-        conversationId: conversation.id,
-        role: 'assistant',
-        messageType: 'agent_response',
-        agentId: aria.id,
-        agentName: aria.name,
-        content: `Welcome! Let’s start by connecting the apps you already use.\n\nPick one (or a few) connectors below — I’ll use live data to tailor the rest of onboarding.`,
-      });
-      await bus.publish(conversation.id, { type: 'message.append', data: { conversationId: conversation.id, message: greeting } });
-    } catch {
-      // non-fatal
-    }
-
-    try {
-      // NOTE: legacy UI action shape removed; UI actions are now { action, payload }.
-      await uiActions.publish(conversation.id, {
-        action: 'onboarding_connectors',
-        payload: { conversationId: conversation.id, providers },
-      });
+      // Avoid spamming: only kick off if there are no assistant messages yet.
+      const existingMessages = await conversationService.getConversationMessages(conversation.id).catch(() => []);
+      const hasAssistant = Array.isArray(existingMessages) && existingMessages.some((m: any) => m && m.role === 'assistant');
+      if (!hasAssistant) {
+        await conversationService.continueAfterToolApproval(conversation.id, aria.id, { authContext: { userId: user.id } });
+      }
     } catch {
       // non-fatal
     }

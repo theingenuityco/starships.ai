@@ -29,7 +29,7 @@ import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
-import type { ConversationStreamUIAction, OnboardingConnectorsUIAction } from '@starships/protocol'
+import type { ConversationStreamUIAction } from '@starships/protocol'
 
 interface ConversationInterfaceProps {
   starshipId: string
@@ -97,13 +97,7 @@ function isUIAction(v: unknown): v is ConversationStreamUIAction {
   return !!v && typeof v === 'object' && typeof (v as any).action === 'string'
 }
 
-function isOnboardingConnectorsUIAction(v: unknown): v is OnboardingConnectorsUIAction {
-  if (!isUIAction(v)) return false
-  if ((v as any).action !== 'onboarding_connectors') return false
-  const payload = (v as any).payload
-  const providers = payload?.providers
-  return Array.isArray(providers) && providers.every(p => typeof p === 'string')
-}
+// onboarding_connectors ui_action removed (connector suggestions are no longer driven by UI actions)
 
 export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
@@ -653,12 +647,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         // Builders are route-based now; no in-place form updates
 
         switch (action) {
-          case 'onboarding_connectors': {
-            if (!isOnboardingConnectorsUIAction(payload)) break
-            const normalized = payload.payload.providers.map(p => p.trim()).filter(p => p.length > 0)
-            setOnboardingConnectorProviders(normalized)
-            break
-          }
           case 'tool_approval_required': {
             const cid = (payload as any)?.payload?.conversationId
             if (cid) {
@@ -712,19 +700,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     },
     [queryClient, router, starshipId, starshipSlug, externalConversationId]
   )
-
-  // Also restore onboarding choices from conversation.state if present (durable)
-  useEffect(() => {
-    try {
-      const state: any = (currentConversationDetail as any)?.state
-      const providers = state?.onboarding?.providers
-      if (!Array.isArray(providers)) return
-      const normalized = providers.map((p: any) => String(p)).filter((p: string) => p.trim().length > 0)
-      if (normalized.length > 0) setOnboardingConnectorProviders(normalized)
-    } catch {
-      // ignore
-    }
-  }, [currentConversationDetail])
 
   // Stream-dependent side-effects are handled within the provider context to avoid duplicate SSE connections
   function StreamSideEffects() {

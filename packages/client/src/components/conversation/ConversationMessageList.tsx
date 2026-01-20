@@ -695,6 +695,7 @@ export function ConversationMessageList({
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+            const isFirstMessage = idx === 0
 
             // Check if this is the end of a complete turn
             // Once a turn is marked as complete (via useEffect), always show its buttons (prevents flickering)
@@ -725,6 +726,7 @@ export function ConversationMessageList({
                   isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                   starshipId={starshipId}
                   showAssistantAvatar={showAssistantAvatar}
+                  isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
                   userNameOverride={userNameOverride}
                   userEmailOverride={userEmailOverride}
                   userAvatarUrlOverride={userAvatarUrlOverride}
@@ -794,6 +796,11 @@ interface ConversationMessageBubbleProps {
   isStreamingActive?: boolean
   starshipId?: string
   showAssistantAvatar?: boolean
+  /**
+   * If true, apply the same top spacing a first user message gets (mt-6)
+   * so assistant-first conversations don't look "pinned" to the top.
+   */
+  isFirstMessage?: boolean
   userNameOverride?: string
   userEmailOverride?: string
   userAvatarUrlOverride?: string
@@ -855,6 +862,7 @@ const MemoizedMessageBubble = memo(
     isStreamingActive,
     starshipId,
     showAssistantAvatar = true,
+    isFirstMessage = false,
     userNameOverride,
     userEmailOverride,
     userAvatarUrlOverride,
@@ -929,7 +937,7 @@ const MemoizedMessageBubble = memo(
     } else {
       // AI message: Plain text on the left (no bubble)
       return (
-        <div className="flex justify-start">
+        <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
           <div className="flex items-start gap-3 w-full">
             {showAssistantAvatar ? (
               <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
@@ -973,6 +981,7 @@ const MemoizedMessageBubble = memo(
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
+    if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false

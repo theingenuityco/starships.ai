@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { useStarship, useUpdateStarship } from '@/hooks/useStarships'
+import api from '@/lib/api'
 
 export interface StarshipDetailsProps {
   starshipId: string
@@ -35,6 +36,8 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   const [name, setName] = useState(initial.name)
   const [description, setDescription] = useState(initial.description)
   const [websiteUrl, setWebsiteUrl] = useState(initial.websiteUrl)
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState<string | null>(null)
 
   useEffect(() => {
     setName(initial.name)
@@ -58,6 +61,24 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
     })
   }
 
+  async function onGenerateFromWebsite() {
+    const url = websiteUrl.trim()
+    if (!starshipId || !url || isGenerating) return
+    setGenerateError(null)
+    setIsGenerating(true)
+    try {
+      const res = await api.post(`/api/v1/starships/${starshipId}/generate-description-from-website`, { websiteUrl: url })
+      const data: any = (res as any)?.data?.data ?? (res as any)?.data
+      const next = typeof data?.description === 'string' ? data.description : ''
+      if (!next.trim()) throw new Error('No description returned')
+      setDescription(next)
+    } catch (err) {
+      setGenerateError('Failed to generate description from website.')
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
   if (!starshipId) {
     return (
       <div className={cn('p-4 border border-red-500 rounded-lg bg-red-50 dark:bg-red-950/20', className)}>
@@ -67,18 +88,8 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   }
 
   return (
-    <form onSubmit={onSubmit} className={cn('w-full max-w-none rounded-lg border bg-background p-4', className)}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-sm font-semibold">Starship details</div>
-          <div className="text-xs text-muted-foreground">Name, description, and website URL</div>
-        </div>
-        <Button type="submit" disabled={!canSubmit}>
-          {updateStarship.isPending ? 'Saving…' : 'Save'}
-        </Button>
-      </div>
-
-      <div className="mt-4 space-y-4">
+    <form onSubmit={onSubmit} className={cn('w-full max-w-none', className)}>
+      <div className="space-y-4">
         <div className="space-y-2">
           <Label htmlFor="starship-name">Name</Label>
           <Input
@@ -92,26 +103,40 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
         </div>
 
         <div className="space-y-2">
+          <Label htmlFor="starship-website">Website URL</Label>
+          <div className="flex gap-2">
+            <Input
+              id="starship-website"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://example.com"
+              disabled={isLoading || updateStarship.isPending || isGenerating}
+            />
+            <Button type="button" variant="outline" onClick={onGenerateFromWebsite} disabled={!websiteUrl.trim() || isGenerating || isLoading}>
+              {isGenerating ? 'Generating…' : 'Generate'}
+            </Button>
+          </div>
+          <div className="text-xs text-muted-foreground">
+            Include <code className="font-mono">http://</code> or <code className="font-mono">https://</code>.
+          </div>
+          {generateError ? <div className="text-xs text-red-600 dark:text-red-400">{generateError}</div> : null}
+        </div>
+
+        <div className="space-y-2">
           <Label htmlFor="starship-description">Description</Label>
           <Textarea
             id="starship-description"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="What does this starship do?"
-            disabled={isLoading || updateStarship.isPending}
+            placeholder="Describe what your starship/company/org/project does…"
+            disabled={isLoading || updateStarship.isPending || isGenerating}
           />
         </div>
 
-        <div className="space-y-2">
-          <Label htmlFor="starship-website">Website URL</Label>
-          <Input
-            id="starship-website"
-            value={websiteUrl}
-            onChange={(e) => setWebsiteUrl(e.target.value)}
-            placeholder="https://example.com"
-            disabled={isLoading || updateStarship.isPending}
-          />
-          <div className="text-xs text-muted-foreground">Include `http://` or `https://`. Leave blank to clear.</div>
+        <div className="flex justify-end">
+          <Button type="submit" disabled={!canSubmit}>
+            {updateStarship.isPending ? 'Saving…' : 'Save'}
+          </Button>
         </div>
       </div>
     </form>

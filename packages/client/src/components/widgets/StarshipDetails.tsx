@@ -7,8 +7,10 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { useStarship, useUpdateStarship } from '@/hooks/useStarships'
 import api from '@/lib/api'
+import Icon from '@/components/primitives/Icon'
 
 export interface StarshipDetailsProps {
   starshipId: string
@@ -25,6 +27,15 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   const { data: starship, isLoading, isError } = useStarship(starshipId, Boolean(starshipId))
   const updateStarship = useUpdateStarship()
 
+  function generateSlug(value: string): string {
+    return String(value || '')
+      .toLowerCase()
+      .trim()
+      .replace(/[^\w\s-]/g, '')
+      .replace(/[\s_]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+  }
+
   const initial = useMemo(
     () => ({
       name: starship?.name ?? '',
@@ -40,6 +51,8 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
   const descriptionRef = useRef<HTMLTextAreaElement | null>(null)
+  const [logoTrigger, setLogoTrigger] = useState(0)
+  const logoTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
     setName(initial.name)
@@ -54,6 +67,27 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
     el.style.height = 'auto'
     el.style.height = `${el.scrollHeight}px`
   }, [description])
+
+  // Delay logo entry animation a bit after mount (feels more premium + less distracting)
+  useEffect(() => {
+    // Ensure we never leave a dangling timer around (StrictMode remounts, fast navigation, etc.)
+    if (logoTimeoutRef.current) clearTimeout(logoTimeoutRef.current)
+    logoTimeoutRef.current = setTimeout(() => setLogoTrigger(v => v + 1), 2000)
+    return () => {
+      if (logoTimeoutRef.current) clearTimeout(logoTimeoutRef.current)
+      logoTimeoutRef.current = null
+    }
+  }, [])
+
+  const descriptionMax = 2000
+  const descriptionCount = description.length
+  const descriptionRemaining = Math.max(0, descriptionMax - descriptionCount)
+  const nameChanged = Boolean(starship && name.trim() && name.trim() !== starship.name)
+  const generatedSlug = useMemo(() => generateSlug(name), [name])
+  const logoGradientId = useMemo(() => {
+    const raw = `starship-details-logo-${String(starshipId || '')}`
+    return raw.replace(/[^a-zA-Z0-9_-]/g, '')
+  }, [starshipId])
 
   const canSubmit = Boolean(starshipId) && name.trim().length > 0 && !updateStarship.isPending
 
@@ -98,58 +132,109 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   }
 
   return (
-    <Card className={cn('w-full max-w-none rounded-lg shadow-none', className)}>
-      <CardContent className="p-4">
+    <Card
+      className={cn(
+        // Distinct "starships" card: premium surface + nebula accents, but still fits inside chat.
+        'group relative w-full max-w-[760px] overflow-hidden rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm shadow-sm',
+        'transition-all duration-200 hover:bg-card/70 hover:border-primary/25',
+        className
+      )}
+    >
+      {/* Subtle accent without a "header" */}
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-violet-500/60 via-sky-500/50 to-emerald-500/50" />
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(124,58,237,0.18),transparent_52%),radial-gradient(circle_at_85%_20%,rgba(14,165,233,0.14),transparent_48%),radial-gradient(circle_at_30%_110%,rgba(16,185,129,0.12),transparent_55%)]" />
+
+      <CardContent className="relative p-5 sm:p-6">
+        <div className="flex items-center gap-3 mb-4">
+          <StarshipsLogo width={44} height={44} gradientId={logoGradientId} idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} animationDelay={0} activeStroke="gradient" />
+          <div className="min-w-0">
+            <div className="text-2xl sm:text-3xl font-semibold leading-none tracking-tight">My Starship</div>
+          </div>
+        </div>
+
         <form onSubmit={onSubmit} className="w-full max-w-none">
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="starship-name">Name</Label>
-              <Input
-                id="starship-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Aurora"
-                disabled={isLoading || updateStarship.isPending}
-              />
-              {isError ? <div className="text-xs text-red-600 dark:text-red-400">Failed to load starship details.</div> : null}
+          {/* OUTER GROUP: (inputs group: flex-1) + (draft button: auto width) */}
+          <div className="mt-4 space-y-4">
+            <div className="flex gap-2 items-start">
+              {/* INNER GROUP: two inputs share width 50/50 */}
+              <div className="flex-1">
+                <div className="flex gap-2">
+                  <div className="w-1/2 space-y-2">
+                    <Label htmlFor="starship-name" className="text-xs text-muted-foreground">
+                      Starship name
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="starship-name"
+                        value={name}
+                        onChange={e => setName(e.target.value)}
+                        placeholder="Starship name"
+                        disabled={isLoading || updateStarship.isPending}
+                        className="pr-9 ring-1 ring-transparent focus-visible:ring-primary/25"
+                      />
+                      <Icon name="type" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    </div>
+                    {isError ? <div className="text-xs text-red-600 dark:text-red-400">Failed to load starship details.</div> : null}
+                    {starship ? <div className="text-[11px] text-muted-foreground">{nameChanged ? <>/ship/{generatedSlug}-xxxxxx</> : <>/ship/{starship.slug}</>}</div> : null}
+                  </div>
+
+                  <div className="w-1/2 space-y-2">
+                    <Label htmlFor="starship-website" className="text-xs text-muted-foreground">
+                      Website
+                    </Label>
+                    <Input
+                      id="starship-website"
+                      value={websiteUrl}
+                      onChange={e => setWebsiteUrl(e.target.value)}
+                      placeholder="https://example.com"
+                      disabled={isLoading || updateStarship.isPending || isGenerating}
+                      className="ring-1 ring-transparent focus-visible:ring-primary/25"
+                    />
+                    <div className="text-xs text-muted-foreground">Include http:// or https://</div>
+                    {generateError ? <div className="text-xs text-red-600 dark:text-red-400">{generateError}</div> : null}
+                  </div>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onGenerateFromWebsite}
+                disabled={!websiteUrl.trim() || isGenerating || isLoading}
+                className={cn(
+                  'h-10 shrink-0 border-border/60 bg-card/50 backdrop-blur-sm',
+                  // Manual spacing from top (accounts for label + gap)
+                  'mt-[32px]',
+                  'hover:bg-card/70 hover:border-primary/30'
+                )}
+              >
+                <Icon name={isGenerating ? 'loading' : 'magic-wand'} className={cn('mr-2 h-4 w-4', isGenerating ? 'animate-spin' : '')} />
+                {isGenerating ? 'Filling…' : 'Fill bio'}
+              </Button>
             </div>
 
+            {/* Description */}
             <div className="space-y-2">
-              <Label htmlFor="starship-website">Website URL</Label>
-              <div className="flex gap-2">
-                <Input
-                  id="starship-website"
-                  value={websiteUrl}
-                  onChange={(e) => setWebsiteUrl(e.target.value)}
-                  placeholder="https://example.com"
-                  disabled={isLoading || updateStarship.isPending || isGenerating}
-                />
-                <Button type="button" variant="outline" onClick={onGenerateFromWebsite} disabled={!websiteUrl.trim() || isGenerating || isLoading}>
-                  {isGenerating ? 'Generating…' : 'Generate'}
-                </Button>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                Include <code className="font-mono">http://</code> or <code className="font-mono">https://</code>.
-              </div>
-              {generateError ? <div className="text-xs text-red-600 dark:text-red-400">{generateError}</div> : null}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="starship-description">Description</Label>
+              <Label htmlFor="starship-description" className="text-xs text-muted-foreground">
+                Starship bio
+              </Label>
               <Textarea
                 id="starship-description"
                 ref={descriptionRef}
                 value={description}
-                onChange={(e) => setDescription(e.target.value)}
+                onChange={e => setDescription(e.target.value)}
                 placeholder="Describe what your starship/company/org/project does…"
                 disabled={isLoading || updateStarship.isPending || isGenerating}
-                className="resize-none overflow-hidden"
-                rows={3}
+                className={cn('resize-none overflow-hidden bg-background/60', 'ring-1 ring-transparent focus-visible:ring-primary/25')}
+                rows={4}
+                maxLength={descriptionMax}
               />
+              <div className={cn('text-xs text-muted-foreground', descriptionCount > descriptionMax ? 'text-red-600 dark:text-red-400' : undefined)}>{descriptionRemaining} left</div>
             </div>
 
-            <div className="flex justify-end">
-              <Button type="submit" disabled={!canSubmit}>
+            {/* Save */}
+            <div className="flex justify-end pt-1">
+              <Button type="submit" disabled={!canSubmit} className="shadow-sm">
                 {updateStarship.isPending ? 'Saving…' : 'Save'}
               </Button>
             </div>
@@ -161,4 +246,3 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
 }
 
 export default StarshipDetails
-

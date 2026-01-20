@@ -39,6 +39,9 @@ export async function up(client: DbClient): Promise<void> {
         JOIN agent_templates at ON at.id = a.source_template_id
         WHERE a.starship_id IS NOT NULL
           AND a.deployed_at IS NOT NULL
+          -- Never delete Aria (default Executive Officer) even if unused.
+          -- Aria is required for core starship UX and is auto-provisioned during onboarding.
+          AND COALESCE(LOWER(at.slug), '') <> 'aria'
           -- "No conversation": no user message in any conversation linked to this agent
           AND NOT EXISTS (
             SELECT 1

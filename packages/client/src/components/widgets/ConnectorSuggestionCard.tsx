@@ -31,7 +31,13 @@ export function ConnectorSuggestionCard({ starshipId, providers, hideSearch = tr
 
   return (
     <div className={cn('w-full max-w-none', className)}>
-      <StarshipConnectorsPanel starshipId={starshipId} onlyProviders={normalized} hideSearch={hideSearch} hideDisconnect={hideDisconnect} />
+      <StarshipConnectorsPanel
+        starshipId={starshipId}
+        onlyProviders={normalized}
+        hideSearch={hideSearch}
+        hideDisconnect={hideDisconnect}
+        maxColumns={2}
+      />
     </div>
   )
 }

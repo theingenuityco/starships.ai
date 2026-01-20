@@ -30,6 +30,11 @@ interface StarshipConnectorsPanelProps {
    * Hide disconnect UI (useful for onboarding).
    */
   hideDisconnect?: boolean
+  /**
+   * Max number of columns to render connector cards in the grid.
+   * Defaults to 3 (current connectors page behavior).
+   */
+  maxColumns?: 1 | 2 | 3
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -46,7 +51,13 @@ function getConnectorLogoSrc(provider: string): string {
   return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
 }
 
-export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch = false, hideDisconnect = false }: StarshipConnectorsPanelProps) {
+export function StarshipConnectorsPanel({
+  starshipId,
+  onlyProviders,
+  hideSearch = false,
+  hideDisconnect = false,
+  maxColumns = 3,
+}: StarshipConnectorsPanelProps) {
   const { data: catalog = [] } = useConnectorCatalog()
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
@@ -376,6 +387,13 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
     )
   }
 
+  const gridClassName =
+    maxColumns === 1
+      ? 'grid gap-6 grid-cols-1'
+      : maxColumns === 2
+        ? 'grid gap-6 grid-cols-1 md:grid-cols-2'
+        : 'grid gap-6 md:grid-cols-2 lg:grid-cols-3'
+
   return (
     <div className="space-y-6">
       {/* Search - match Environment page styling */}
@@ -396,7 +414,7 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
 
       {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+      <div className={gridClassName}>{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
 
       {!hideDisconnect ? (
         <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>

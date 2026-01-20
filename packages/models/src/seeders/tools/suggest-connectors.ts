@@ -77,12 +77,6 @@ export const suggestConnectorsTool: ToolParams = {
               const middle = joined.length > 0 ? joined.slice(0, 60) : 'providers';
               const slug = safe(\`\${base}-\${middle}-\${h}\`).slice(0, 100);
 
-              const name = capped.length === 1 ? \`Connect \${capped[0]}\` : \`Connectors: \${capped.join(', ')}\`;
-              const description =
-                capped.length === 1
-                  ? \`Suggested connector: \${capped[0]}\`
-                  : \`Suggested connectors: \${capped.join(', ')}\`;
-
               const props = {
                 starshipId: String(starshipId).trim(),
                 providers: capped,
@@ -93,10 +87,97 @@ export const suggestConnectorsTool: ToolParams = {
               return {
                 starshipId: String(starshipId).trim(),
                 slug,
-                name,
-                description,
+                providers: capped,
                 widgetType: 'ConnectorSuggestionCard',
                 props,
+              };
+            }
+          `,
+          timeout: 3000,
+        },
+      },
+      {
+        ref: 'fetch_catalog',
+        type: 'http_request',
+        name: 'Fetch Connector Catalog',
+        description: 'Fetch connector catalog to map provider -> display name',
+        parameters: {
+          url: '{{ String(env("SERVER_URL") ?? "") + "/api/v1/connectors/catalog" }}',
+          method: 'GET',
+          headers: {
+            Accept: 'application/json',
+          },
+          timeout: 5000,
+        },
+      },
+      {
+        ref: 'extract_catalog',
+        type: 'code',
+        name: 'Extract Catalog',
+        description: 'Extract connector catalog items (provider -> name)',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const raw = ctx.input;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              let payload = hasBody ? raw.body : raw;
+              if (typeof payload === 'string') {
+                try {
+                  payload = JSON.parse(payload);
+                } catch (e) {
+                  payload = {};
+                }
+              }
+              const data = (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) ? payload.data : payload;
+              const connectors = data && typeof data === 'object' && Array.isArray(data.connectors) ? data.connectors : [];
+              return connectors
+                .map((c) => ({
+                  provider: c && typeof c === 'object' ? String(c.provider ?? '') : '',
+                  name: c && typeof c === 'object' ? String(c.name ?? '') : '',
+                }))
+                .filter((c) => c.provider.trim().length > 0);
+            }
+          `,
+          timeout: 3000,
+        },
+      },
+      {
+        ref: 'build_widget_meta',
+        type: 'code',
+        name: 'Build Widget Meta',
+        description: 'Build widget name/description using connector display names',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const base = (ctx.lastOutputOf && ctx.lastOutputOf('validate_input')) || {};
+              const providers = Array.isArray(base.providers) ? base.providers.map((p) => String(p)) : [];
+              const catalog = (ctx.lastOutputOf && ctx.lastOutputOf('extract_catalog')) || [];
+
+              const nameByProvider = new Map();
+              for (const c of catalog) {
+                if (!c || typeof c !== 'object') continue;
+                const provider = String(c.provider ?? '').trim();
+                const name = String(c.name ?? '').trim();
+                if (provider) nameByProvider.set(provider, name || provider);
+              }
+
+              const display = providers.map((p) => nameByProvider.get(String(p)) || String(p));
+              const list = display.filter((s) => String(s).trim().length > 0);
+              const joined = list.join(', ');
+              const title = list.length === 1 ? \`Connect \${list[0]}\` : \`Connectors: \${joined}\`;
+              const description =
+                list.length === 1
+                  ? \`Suggested connector: \${list[0]}\`
+                  : \`Suggested connectors: \${joined}\`;
+
+              return {
+                starshipId: String(base.starshipId || ''),
+                slug: String(base.slug || ''),
+                widgetType: String(base.widgetType || 'ConnectorSuggestionCard'),
+                props: base.props && typeof base.props === 'object' ? base.props : { starshipId: String(base.starshipId || ''), providers },
+                providers,
+                name: title,
+                description,
               };
             }
           `,
@@ -113,8 +194,8 @@ export const suggestConnectorsTool: ToolParams = {
           action: 'search-widgets',
           failOnNon2xx: true,
           args: {
-            starshipId: '{{ (lastOutputOf("validate_input") || {}).starshipId }}',
-            slug: '{{ (lastOutputOf("validate_input") || {}).slug }}',
+            starshipId: '{{ (lastOutputOf("build_widget_meta") || {}).starshipId }}',
+            slug: '{{ (lastOutputOf("build_widget_meta") || {}).slug }}',
             limit: 1,
           },
           timeout: 5000,
@@ -150,6 +231,44 @@ export const suggestConnectorsTool: ToolParams = {
         },
       },
       {
+        ref: 'update_existing_widget',
+        type: 'connector_action',
+        name: 'Update Widget (Title)',
+        description: 'Update existing widget name/description to use connector display names',
+        parameters: {
+          connector: 'starships',
+          action: 'update-widget',
+          failOnNon2xx: true,
+          args: {
+            id: '{{ (lastOutputOf("extract_found_widget") || {}).id }}',
+            name: '{{ (lastOutputOf("build_widget_meta") || {}).name }}',
+            description: '{{ (lastOutputOf("build_widget_meta") || {}).description }}',
+            props: '{{ (lastOutputOf("build_widget_meta") || {}).props }}',
+          },
+          timeout: 5000,
+        },
+      },
+      {
+        ref: 'extract_updated_widget',
+        type: 'code',
+        name: 'Extract Updated Widget',
+        description: 'Extract widget data from API response',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const raw = ctx.input;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
+              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+                return payload.data;
+              }
+              return payload;
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'emit_existing',
         type: 'ui_action',
         name: 'Emit render_widget (existing)',
@@ -157,7 +276,7 @@ export const suggestConnectorsTool: ToolParams = {
         parameters: {
           action: 'render_widget',
           payload: {
-            widget: '{{ lastOutputOf("extract_found_widget") }}',
+            widget: '{{ lastOutputOf("extract_updated_widget") }}',
           },
         },
       },
@@ -171,12 +290,12 @@ export const suggestConnectorsTool: ToolParams = {
           action: 'create-widget',
           failOnNon2xx: true,
           args: {
-            starshipId: '{{ (lastOutputOf("validate_input") || {}).starshipId }}',
-            slug: '{{ (lastOutputOf("validate_input") || {}).slug }}',
-            name: '{{ (lastOutputOf("validate_input") || {}).name }}',
-            description: '{{ (lastOutputOf("validate_input") || {}).description }}',
-            widgetType: '{{ (lastOutputOf("validate_input") || {}).widgetType }}',
-            props: '{{ (lastOutputOf("validate_input") || {}).props }}',
+            starshipId: '{{ (lastOutputOf("build_widget_meta") || {}).starshipId }}',
+            slug: '{{ (lastOutputOf("build_widget_meta") || {}).slug }}',
+            name: '{{ (lastOutputOf("build_widget_meta") || {}).name }}',
+            description: '{{ (lastOutputOf("build_widget_meta") || {}).description }}',
+            widgetType: '{{ (lastOutputOf("build_widget_meta") || {}).widgetType }}',
+            props: '{{ (lastOutputOf("build_widget_meta") || {}).props }}',
           },
           timeout: 5000,
         },
@@ -220,18 +339,32 @@ export const suggestConnectorsTool: ToolParams = {
         description: '',
         parameters: {
           output:
-            '{{ lastOutputOf("extract_found_widget") ? lastOutputOf("extract_found_widget") : lastOutputOf("extract_created_widget") }}',
+            '{{ lastOutputOf("extract_updated_widget") ? lastOutputOf("extract_updated_widget") : lastOutputOf("extract_created_widget") }}',
         },
       },
     ],
     edges: [
       { ref: 'e1', from: 'start_1', to: 'validate_input' },
-      { ref: 'e2', from: 'validate_input', to: 'search_widgets' },
-      { ref: 'e3', from: 'search_widgets', to: 'extract_found_widget' },
-      { ref: 'e4', from: 'extract_found_widget', to: 'widget_exists?' },
+      { ref: 'e2', from: 'validate_input', to: 'fetch_catalog' },
+      { ref: 'e3', from: 'fetch_catalog', to: 'extract_catalog' },
+      {
+        ref: 'e4',
+        from: 'extract_catalog',
+        to: 'build_widget_meta',
+      },
+      {
+        ref: 'e5',
+        from: 'build_widget_meta',
+        to: 'search_widgets',
+      },
+      { ref: 'e6', from: 'search_widgets', to: 'extract_found_widget' },
+      { ref: 'e7', from: 'extract_found_widget', to: 'widget_exists?' },
 
-      { ref: 'e_exists', from: 'widget_exists?', to: 'emit_existing', condition: 'exists' },
+      { ref: 'e_exists', from: 'widget_exists?', to: 'update_existing_widget', condition: 'exists' },
       { ref: 'e_missing', from: 'widget_exists?', to: 'create_widget', condition: 'missing' },
+
+      { ref: 'e_update', from: 'update_existing_widget', to: 'extract_updated_widget' },
+      { ref: 'e_emit_existing', from: 'extract_updated_widget', to: 'emit_existing' },
 
       { ref: 'e_create', from: 'create_widget', to: 'extract_created_widget' },
       { ref: 'e_after_create', from: 'extract_created_widget', to: 'emit_created' },

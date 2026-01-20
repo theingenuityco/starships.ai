@@ -328,6 +328,13 @@ router.get('/onboarding/session', jwtAuthMiddleware, async (req: Request, res: R
     const user = requireAuthUser(req, res);
     if (!user) return;
 
+    const userRepo = new UserRepository();
+    const dbUser = await userRepo.findById(user.id);
+    if (!dbUser) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404);
+      return;
+    }
+
     const sessionRepo = new OnboardingSessionRepository();
     let session = await sessionRepo.findByUserId(user.id);
 
@@ -342,6 +349,28 @@ router.get('/onboarding/session', jwtAuthMiddleware, async (req: Request, res: R
         selectedAgentTemplateIds: [],
         primaryAgentTemplateId: null,
         completedAt: null,
+      });
+    }
+
+    // Auto-provision: if the user is not onboarded yet, ensure they have a starship and that the onboarding
+    // session points at it. This enables the client to auto-resume onboarding chat without a manual click.
+    if (!dbUser.onboardingCompleted && !session.starshipId) {
+      let starship: StarshipModel | null = null;
+      try {
+        const starshipRepo = new StarshipRepository();
+        const userStarships = await starshipRepo.findByOwner(user.id);
+        starship = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
+      } catch {
+        // ignore - will fall back to provisioning
+      }
+
+      if (!starship) {
+        starship = await ensureStarshipForUser(user.id);
+      }
+
+      session = await sessionRepo.upsertForUser(user.id, {
+        ...session,
+        starshipId: starship.id,
       });
     }
 

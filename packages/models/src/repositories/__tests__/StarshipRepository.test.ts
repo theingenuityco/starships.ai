@@ -190,6 +190,7 @@ describe('StarshipRepository', () => {
     it('should use provided slug if given', async () => {
       const createData = {
         name: 'Test Starship',
+        description: '',
         slug: 'custom-slug',
         ownerId: 'user-123',
         shipClass: 'scout' as const,
@@ -201,6 +202,8 @@ describe('StarshipRepository', () => {
       const mockCreatedStarship = {
         id: 'test-starship-id-123',
         name: 'Test Starship',
+        description: '',
+        website_url: '',
         slug: 'custom-slug',
         owner_id: 'user-123',
         ship_class: 'scout',

@@ -198,13 +198,47 @@ export const renderStarshipDetailsTool: ToolParams = {
         },
       },
       {
+        ref: 'fetch_starship',
+        type: 'connector_action',
+        name: 'Fetch Starship',
+        description: 'Fetch current starship details (name/description/websiteUrl) to return as tool output',
+        parameters: {
+          connector: 'starships',
+          action: 'get-starship',
+          failOnNon2xx: true,
+          args: {
+            starshipId: '{{ (lastOutputOf("build_widget_meta") || {}).starshipId }}',
+          },
+          timeout: 5000,
+        },
+      },
+      {
+        ref: 'extract_starship',
+        type: 'code',
+        name: 'Extract Starship',
+        description: 'Extract starship model from API response',
+        parameters: {
+          code: `
+            async function main(ctx) {
+              const raw = ctx.input;
+              const hasBody = raw && typeof raw === 'object' && Object.prototype.hasOwnProperty.call(raw, 'body');
+              const payload = hasBody ? raw.body : raw;
+              if (payload && typeof payload === 'object' && Object.prototype.hasOwnProperty.call(payload, 'data')) {
+                return payload.data;
+              }
+              return payload;
+            }
+          `,
+          timeout: 2000,
+        },
+      },
+      {
         ref: 'end_1',
         type: 'end',
         name: 'End',
         description: '',
         parameters: {
-          output:
-            '{{ lastOutputOf("extract_updated_widget") ? lastOutputOf("extract_updated_widget") : lastOutputOf("extract_created_widget") }}',
+          output: '{{ lastOutputOf("extract_starship") }}',
         },
       },
     ],
@@ -223,8 +257,11 @@ export const renderStarshipDetailsTool: ToolParams = {
       { ref: 'e_create', from: 'create_widget', to: 'extract_created_widget' },
       { ref: 'e_emit_created', from: 'extract_created_widget', to: 'emit_created' },
 
-      { ref: 'e_end_existing', from: 'emit_existing', to: 'end_1' },
-      { ref: 'e_end_created', from: 'emit_created', to: 'end_1' },
+      { ref: 'e_after_emit_existing', from: 'emit_existing', to: 'fetch_starship' },
+      { ref: 'e_after_emit_created', from: 'emit_created', to: 'fetch_starship' },
+
+      { ref: 'e_extract_starship', from: 'fetch_starship', to: 'extract_starship' },
+      { ref: 'e_end', from: 'extract_starship', to: 'end_1' },
     ],
     metadata: {},
   },
@@ -243,4 +280,3 @@ export const renderStarshipDetailsToolTemplate: Omit<ToolTemplateModel, 'id' | '
   requiresApiKey: false,
   configurationFields: [],
 };
-

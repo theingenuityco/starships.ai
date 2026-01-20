@@ -116,7 +116,7 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       'Step 0 — Render starship details (first message):',
       '- Introduce yourself as Aria and welcome them.',
       '- Tell them you will first collect starship details (name, description, website).',
-      '- Immediately call Render Starship Details (tool slug: render-starship-details).',
+      '- Immediately call the Render Starship Details tool.',
       '- STOP after rendering the widget. Do not ask additional questions in the same turn.',
       '',
       'Step 1 — Wait for user approval/response:',
@@ -137,27 +137,27 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       '- Stop after questions. Do not suggest connectors yet.',
       '',
       'Step 5 — Assess connectors (when task is clear):',
-      '- Call List Connectors (tool slug: list-connectors) to see what is available/connected.',
+      '- Call the List Connectors tool to see what is available/connected.',
       '- Decide which connectors are required for the task.',
       '- If required connectors are missing/unconnected:',
       '  - Tell the user what needs to be connected.',
-      '  - Call Suggest Connectors (tool slug: suggest-connectors) with relevant providers.',
+      '  - Call the Suggest Connectors tool with relevant providers.',
       '  - Ask the user to connect them and reply when done.',
       '- If required connectors are already connected: proceed to Step 4.',
       '',
       'Step 6 — Verify connectors are connected:',
-      '- When the user says they connected apps, call List Connectors again and confirm the status is connected.',
+      '- When the user says they connected apps, call the List Connectors tool again and confirm the status is connected.',
       '- If not connected yet, ask them to finish connecting (no agent suggestions yet).',
       '- If connected, proceed to Step 5.',
       '',
       'Step 7 — Suggest the right agent(s):',
-      '- Call List Agents (tool slug: list-agents).',
+      '- Call the List Agents tool.',
       '- If a deployed agent can do the job, propose using it and offer to proceed.',
-      '- If none fit, call List Agents From Marketplace (tool slug: list-agents-from-marketplace), pick 2-3 relevant templates, then call Suggest Agents (tool slug: suggest-agents) with templateSlugs.',
+      '- If none fit, call List Agents From Marketplace, pick 2-3 relevant templates, then call Suggest Agents with templateSlugs.',
       '- Ask the user to deploy, then wait.',
       '',
       'Step 8 — Execute:',
-      '- After the user deploys an agent (or chooses an existing one), call Call Agent (tool slug: call-agent) with a crisp brief and then summarize results.',
+      '- After the user deploys an agent (or chooses an existing one), call the Call Agent tool with a crisp brief and then summarize results.',
       '',
       'Tone: warm, concise, action-oriented. Ask one question at a time.',
     ].join('\\n');
@@ -257,31 +257,11 @@ async function ensureAriaOnStarship(starshipId: string): Promise<AgentModel> {
   const deployedAgents = await starshipRepo.getDeployedAgents(starshipId);
   const existing = deployedAgents.find((a) => typeof a.slug === 'string' && a.slug.toLowerCase().startsWith('aria'));
   if (existing) {
-    // Backfill new tool assignments for older Aria deployments (best-effort).
-    // Tool availability is relationship-based (agent_tools), so existing Aria agents may not have
-    // recently-added tools unless we explicitly deploy/link them.
+    // Best-effort backfill: ensure all already-assigned tools are allowed.
+    // Keep onboarding route tool-agnostic (no hard-coded tool slugs).
     try {
       const agentRepo = new AgentRepository();
-      const toolRepo = new (await import('@starships/models')).ToolRepository();
-      const toolTemplateRepo = new (await import('@starships/models')).ToolTemplateRepository();
-
-      const slug = 'render-starship-details';
-
-      // Ensure tool is deployed on the starship (by template slug).
-      const toolTemplate = await toolTemplateRepo.findBySlug(slug);
-      if (toolTemplate) {
-        let tool = await toolRepo.findByTemplateIdAndStarship(toolTemplate.id, starshipId);
-        if (!tool) {
-          tool = await toolRepo.createFromTemplateId(toolTemplate.id, starshipId);
-        }
-
-        // Ensure agent↔tool relationship exists.
-        if (tool) {
-          await agentRepo.addToolRelationship(existing.id, tool.id);
-          // Ensure permissions are allowed for all assigned tools (includes this one).
-          await agentRepo.setAllAssignedToolPermissionsForAgent(existing.id, 'allow');
-        }
-      }
+      await agentRepo.setAllAssignedToolPermissionsForAgent(existing.id, 'allow');
     } catch {
       // non-fatal
     }

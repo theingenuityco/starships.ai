@@ -22,10 +22,29 @@ import { SubscriptionManagementService } from '@/services/SubscriptionManagement
 import { getConnection } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import Stripe from 'stripe';
+import OpenAI from 'openai';
 
 const router: Router = Router();
 const envConfig = getEnvConfig();
 const stripe = new Stripe(envConfig.STRIPE_SECRET_KEY);
+const openRouterClient =
+  envConfig.OPENROUTER_API_KEY && envConfig.OPENROUTER_API_KEY.trim().length > 0
+    ? new OpenAI({
+        apiKey: envConfig.OPENROUTER_API_KEY,
+        baseURL: 'https://openrouter.ai/api/v1',
+        defaultHeaders: {
+          'HTTP-Referer': 'https://starships.ai',
+          'X-Title': 'Starships.ai',
+        },
+      })
+    : null;
+
+function extractTextFromHtml(html: string): string {
+  // Very lightweight extraction to avoid extra deps.
+  const withoutScripts = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ');
+  const withoutTags = withoutScripts.replace(/<[^>]+>/g, ' ');
+  return withoutTags.replace(/\s+/g, ' ').trim();
+}
 
 function requireAuthUser(req: Request, res: Response): AuthUser | null {
   const user = req.user as AuthUser | null | undefined;
@@ -647,6 +666,139 @@ router.put('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Respon
     handleError(error, res, 'updating starship');
   }
 });
+
+/**
+ * POST /starships/:id/generate-description-from-website
+ *
+ * Fetches the provided (or saved) website URL and uses an LLM to draft a long-form description.
+ * This does NOT save the description; the client should call PUT /starships/:id to persist.
+ */
+router.post(
+  '/starships/:id/generate-description-from-website',
+  rateLimiters.apiAuthenticated,
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const starshipId = req.params.id;
+      const user = requireAuthUser(req, res);
+      if (!user) return;
+      const userId = user.id;
+
+      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+      if (!paramValidation) return;
+
+      if (!openRouterClient) {
+        sendError(res, 'CONFIGURATION_ERROR', 'OPENROUTER_API_KEY is not configured on server', 500);
+        return;
+      }
+
+      const BodySchema = z.object({
+        websiteUrl: z.string().trim().max(2048).optional(),
+      });
+      const body = validateData(BodySchema, req.body, res, 'generate description payload');
+      if (!body) return;
+
+      const starshipService = new StarshipService();
+      const starship = await starshipService.getStarship(starshipId);
+      if (!starship) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, { resource: 'starship', id: starshipId });
+        return;
+      }
+      if (starship.ownerId !== userId) {
+        sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
+        return;
+      }
+
+      const url = (body.websiteUrl ?? starship.websiteUrl ?? '').trim();
+      if (!url) {
+        sendError(res, 'VALIDATION_ERROR', 'websiteUrl is required (either provide it or save it on the starship first)', 400, {
+          field: 'websiteUrl',
+        });
+        return;
+      }
+
+      let parsed: URL;
+      try {
+        parsed = new URL(url);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          sendError(res, 'VALIDATION_ERROR', 'websiteUrl must start with http:// or https://', 400, { field: 'websiteUrl' });
+          return;
+        }
+      } catch {
+        sendError(res, 'VALIDATION_ERROR', 'websiteUrl must be a valid URL', 400, { field: 'websiteUrl' });
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 12000);
+      let html = '';
+      try {
+        const resp = await fetch(parsed.toString(), {
+          method: 'GET',
+          signal: controller.signal,
+          headers: {
+            'User-Agent': 'starships.ai (onboarding)',
+            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+          },
+        });
+        html = await resp.text();
+      } catch {
+        sendError(res, 'NETWORK_ERROR', 'Failed to fetch website content', 400, { websiteUrl: parsed.toString() });
+        return;
+      } finally {
+        clearTimeout(timeout);
+      }
+
+      const extracted = extractTextFromHtml(String(html || '')).slice(0, 40000);
+      if (!extracted) {
+        sendError(res, 'NETWORK_ERROR', 'Website content was empty or could not be parsed', 400, { websiteUrl: parsed.toString() });
+        return;
+      }
+
+      const model = 'openai/gpt-4o-mini';
+      const system = [
+        'You write clear, accurate, professional company/project descriptions.',
+        'Given a website URL and extracted website text, draft a description the user can paste into a product profile.',
+        'Constraints:',
+        '- Output plain text (no markdown headings).',
+        '- Approximately 2000 characters (including spaces).',
+        '- Focus on: what they do, who it is for, key features/capabilities, differentiators, and tone/voice matching the site.',
+        '- Do not invent claims that are not supported by the text.',
+      ].join('\n');
+
+      const userPrompt = [
+        `Website: ${parsed.toString()}`,
+        '',
+        'Extracted website text (may be truncated):',
+        extracted,
+        '',
+        'Write the description now. Return only the description text.',
+      ].join('\n');
+
+      const completion = await openRouterClient.chat.completions.create({
+        model,
+        messages: [
+          { role: 'system', content: system },
+          { role: 'user', content: userPrompt },
+        ],
+        temperature: 0.3,
+        max_tokens: 700,
+      });
+
+      const generated = String(completion.choices?.[0]?.message?.content ?? '').trim();
+      if (!generated) {
+        sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to generate description', 500);
+        return;
+      }
+
+      // Keep within server validation limit.
+      const description = generated.slice(0, 2000);
+      sendSuccess(res, { description }, 200);
+    } catch (error) {
+      handleError(error, res, 'generating starship description from website');
+    }
+  }
+);
 
 // DELETE /starships/:id - Cancel subscription first, then delete starship (OpenAPI pattern)
 router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

@@ -40,7 +40,7 @@ const StartOnboardingSchema = z.object({
  * - requires explicit user action (this endpoint call)
  * - creates starship + deploys Aria
  * - creates or reuses an "Onboarding" conversation
- * - posts an initial assistant greeting + emits option chips via ui_action
+ * - fire-and-forget kickoff: schedules the initial assistant greeting in the background
  */
 router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -79,17 +79,6 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       starshipId: starship.id,
       step: 'connectors',
     });
-
-    // IMPORTANT:
-    // Once a starship exists, onboarding should become optional (user can skip and return later).
-    // Treat `onboardingCompleted` as "initial provisioning complete" rather than "finished every onboarding step".
-    try {
-      if (!dbUser.onboardingCompleted) {
-        await userRepo.update(user.id, { onboardingCompleted: true });
-      }
-    } catch {
-      // best-effort; do not block onboarding chat start
-    }
 
     // Create or reuse an "Onboarding" conversation (normal conversation labeled onboarding)
     const conversationService = new ConversationService();
@@ -186,29 +175,48 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       // non-fatal
     }
 
-    // Kick off the first assistant message so the user sees Aria immediately without any hardcoded greeting.
-    // IMPORTANT: best-effort only; never fail onboarding start if kickoff fails.
-    try {
-      // Avoid spamming: only kick off if there are no assistant messages yet.
-      const existingMessages = await conversationService.getConversationMessages(conversation.id).catch(() => []);
-      const hasAssistant =
-        Array.isArray(existingMessages) &&
-        existingMessages.some((m: unknown) => {
-          const rec = m as Record<string, unknown> | null;
-          return rec != null && rec['role'] === 'assistant';
-        });
-      if (!hasAssistant) {
-        await conversationService.continueAfterToolApproval(conversation.id, aria.id, { authContext: { userId: user.id } });
-      }
-    } catch {
-      // non-fatal
-    }
-
     sendSuccess(res, {
       session,
       starship: { id: starship.id, slug: starship.slug, name: starship.name },
       ariaAgent: { id: aria.id, slug: aria.slug, name: aria.name },
       conversation: { id: conversation.id, title: conversation.title },
+    });
+
+    // -----------------------------
+    // Fire-and-forget background tasks (never block this request)
+    // -----------------------------
+
+    // IMPORTANT:
+    // Once a starship exists, onboarding should become optional (user can skip and return later).
+    // Treat `onboardingCompleted` as "initial provisioning complete" rather than "finished every onboarding step".
+    void Promise.resolve().then(async () => {
+      try {
+        if (!dbUser.onboardingCompleted) {
+          await userRepo.update(user.id, { onboardingCompleted: true });
+        }
+      } catch {
+        // best-effort; ignore
+      }
+    });
+
+    // Kick off the first assistant message so the user sees Aria immediately without any hardcoded greeting.
+    // IMPORTANT: best-effort only; never fail onboarding start if kickoff fails.
+    void Promise.resolve().then(async () => {
+      try {
+        // Avoid spamming: only kick off if there are no assistant messages yet.
+        const existingMessages = await conversationService.getConversationMessages(conversation.id).catch(() => []);
+        const hasAssistant =
+          Array.isArray(existingMessages) &&
+          existingMessages.some((m: unknown) => {
+            const rec = m as Record<string, unknown> | null;
+            return rec != null && rec['role'] === 'assistant';
+          });
+        if (!hasAssistant) {
+          await conversationService.continueAfterToolApproval(conversation.id, aria.id, { authContext: { userId: user.id } });
+        }
+      } catch (err) {
+        console.warn('[ONBOARDING] kickoff failed (non-fatal):', err);
+      }
     });
   } catch (error) {
     handleError(error, res, 'start onboarding chat');

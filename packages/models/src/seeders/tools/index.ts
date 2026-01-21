@@ -19,7 +19,6 @@ export { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-nod
 export { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 export { agentListToolTemplate } from './list-agents';
 export { agentTemplateListToolTemplate } from './list-agents-from-marketplace';
-export { deployAgentsFromMarketplaceToolTemplate } from './deploy-agents-from-marketplace';
 export { agentGetToolTemplate } from './get-agent';
 export { agentOpenToolTemplate } from './open-agent';
 export { agentEditToolTemplate } from './edit-agent';
@@ -32,6 +31,9 @@ export { createWidgetToolTemplate } from './create-widget';
 export { updateWidgetToolTemplate } from './update-widget';
 export { searchWidgetsToolTemplate } from './search-widgets';
 export { renderWidgetToolTemplate } from './render-widget';
+export { suggestConnectorsToolTemplate } from './suggest-connectors';
+export { suggestAgentsToolTemplate } from './suggest-agents';
+export { renderStarshipDetailsToolTemplate } from './render-starship-details';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -50,7 +52,6 @@ import { toolModifyBlueprintNodeToolTemplate } from './modify-tool-blueprint-nod
 import { toolModifyBlueprintEdgeToolTemplate } from './modify-tool-blueprint-edge';
 import { agentListToolTemplate } from './list-agents';
 import { agentTemplateListToolTemplate } from './list-agents-from-marketplace';
-import { deployAgentsFromMarketplaceToolTemplate } from './deploy-agents-from-marketplace';
 import { agentGetToolTemplate } from './get-agent';
 import { agentOpenToolTemplate } from './open-agent';
 import { agentEditToolTemplate } from './edit-agent';
@@ -63,6 +64,9 @@ import { createWidgetToolTemplate } from './create-widget';
 import { updateWidgetToolTemplate } from './update-widget';
 import { searchWidgetsToolTemplate } from './search-widgets';
 import { renderWidgetToolTemplate } from './render-widget';
+import { suggestConnectorsToolTemplate } from './suggest-connectors';
+import { suggestAgentsToolTemplate } from './suggest-agents';
+import { renderStarshipDetailsToolTemplate } from './render-starship-details';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -81,7 +85,6 @@ export const ALL_TOOL_TEMPLATES = [
   toolModifyBlueprintEdgeToolTemplate,
   agentListToolTemplate,
   agentTemplateListToolTemplate,
-  deployAgentsFromMarketplaceToolTemplate,
   agentGetToolTemplate,
   agentOpenToolTemplate,
   agentEditToolTemplate,
@@ -94,4 +97,7 @@ export const ALL_TOOL_TEMPLATES = [
   updateWidgetToolTemplate,
   searchWidgetsToolTemplate,
   renderWidgetToolTemplate,
+  suggestConnectorsToolTemplate,
+  suggestAgentsToolTemplate,
+  renderStarshipDetailsToolTemplate,
 ];

@@ -11,6 +11,7 @@ import Image from 'next/image'
 import { motion } from 'motion/react'
 import { Textarea } from '@/components/ui/textarea'
 import { toast } from 'sonner'
+import { usePathname, useSearchParams } from 'next/navigation'
 
 const CONNECTOR_CTA_BUTTON_CLASS =
   'h-9 px-3 font-medium transition-all duration-200 border border-transparent text-[rgba(245,158,11,0.8)] hover:text-[rgba(245,158,11,0.8)] hover:border-[rgba(245,158,11,0.25)] hover:bg-[linear-gradient(135deg,rgba(245,158,11,0.10),rgba(251,191,36,0.06))] hover:shadow-[0_0_4px_rgba(245,158,11,0.10)] disabled:text-muted-foreground disabled:hover:text-muted-foreground disabled:hover:border-transparent disabled:hover:bg-transparent disabled:hover:shadow-none'
@@ -30,6 +31,11 @@ interface StarshipConnectorsPanelProps {
    * Hide disconnect UI (useful for onboarding).
    */
   hideDisconnect?: boolean
+  /**
+   * Max number of columns to render connector cards in the grid.
+   * Defaults to 3 (current connectors page behavior).
+   */
+  maxColumns?: 1 | 2 | 3
 }
 
 function toSafeConnectorLogoSlug(provider: string): string {
@@ -46,7 +52,9 @@ function getConnectorLogoSrc(provider: string): string {
   return `/connectors/${toSafeConnectorLogoSlug(provider)}.svg`
 }
 
-export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch = false, hideDisconnect = false }: StarshipConnectorsPanelProps) {
+export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch = false, hideDisconnect = false, maxColumns = 3 }: StarshipConnectorsPanelProps) {
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const { data: catalog = [] } = useConnectorCatalog()
   const { data: connectors = [], isLoading } = useStarshipConnectors(starshipId, !!starshipId)
   const disconnectMutation = useDisconnectConnector(starshipId)
@@ -111,7 +119,9 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
     }
 
     try {
-      const result = await oauthMutation.mutateAsync(provider as any)
+      const qs = searchParams?.toString() || ''
+      const returnUrl = `${pathname}${qs ? `?${qs}` : ''}`
+      const result = await oauthMutation.mutateAsync({ provider: provider as any, returnUrl } as any)
       if (result) window.location.href = result
     } catch (err: any) {
       const code = err?.response?.data?.error?.code
@@ -160,9 +170,12 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
     setPreOauthErrors(errors)
     if (Object.keys(errors).length) return
 
+    const qs = searchParams?.toString() || ''
+    const returnUrl = `${pathname}${qs ? `?${qs}` : ''}`
     const result = await oauthMutation.mutateAsync({
       provider: preOauthProvider as any,
       metadata: Object.fromEntries(Object.entries(preOauthValues).map(([k, v]) => [k, v.trim()])),
+      returnUrl,
     } as any)
     if (result) window.location.href = result
   }
@@ -376,6 +389,8 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
     )
   }
 
+  const gridClassName = maxColumns === 1 ? 'grid gap-6 grid-cols-1' : maxColumns === 2 ? 'grid gap-6 grid-cols-1 md:grid-cols-2' : 'grid gap-6 md:grid-cols-2 lg:grid-cols-3'
+
   return (
     <div className="space-y-6">
       {/* Search - match Environment page styling */}
@@ -396,7 +411,7 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
 
       {!hasAnyVisibleConnector && <p className="text-sm text-muted-foreground">No connectors match “{searchQuery}”. Try a different search.</p>}
 
-      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
+      <div className={gridClassName}>{visibleCatalog.map(entry => renderConnectorCard(entry.provider))}</div>
 
       {!hideDisconnect ? (
         <Dialog open={pendingDisconnect !== null} onOpenChange={open => !open && setPendingDisconnect(null)}>

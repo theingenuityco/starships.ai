@@ -1,5 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import type { Request, Response } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
@@ -12,6 +12,14 @@ import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { ImportExportService } from '@/services/ImportExportService';
 import { triggerNextRevalidate } from '@/utils/nextRevalidate';
+import type {
+  AuthUser,
+  CreateToolRequest,
+  CreateToolTemplateRequest,
+  ToolModel,
+  UpdateToolRequest,
+  WalletModel,
+} from '@starships/protocol';
 
 const router: Router = Router();
 
@@ -122,8 +130,10 @@ const UpdateToolSchema = z.object({
   status: z.enum(['draft', 'active']).optional(),
 });
 
+type WalletRequest = Request & { wallet?: WalletModel };
+
 // Balance validation middleware for tool operations
-const validateToolBalance = async (req: Request, res: Response, next: any) => {
+const validateToolBalance = async (req: WalletRequest, res: Response, next: NextFunction) => {
   try {
     const { starshipId } = req.params;
 
@@ -155,7 +165,7 @@ const validateToolBalance = async (req: Request, res: Response, next: any) => {
     }
 
     // Add wallet to request for use in route handlers
-    (req as any).wallet = wallet;
+    req.wallet = wallet;
     next();
   } catch (error) {
     console.error('[TOOLS] Balance validation error:', error);
@@ -236,7 +246,7 @@ router.post('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Resp
     if (!bodyValidation) return;
 
     const toolTemplateRepository = new ToolTemplateRepository();
-    const template = await toolTemplateRepository.create(bodyValidation as any);
+    const template = await toolTemplateRepository.create(bodyValidation as unknown as CreateToolTemplateRequest);
 
     console.log(`[TOOLS] Tool template created successfully: ${template.slug}`);
     // Do not return executable blueprints in template responses
@@ -259,7 +269,7 @@ router.post('/tool-templates', jwtAuthMiddleware, async (req: Request, res: Resp
  */
 router.get('/tools/:id/export', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as any)) {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
       sendError(res, 'FORBIDDEN', 'Only instance admins can export tools', 403);
       return;
     }
@@ -366,7 +376,7 @@ router.post('/starships/:starshipId/tools', jwtAuthMiddleware, validateToolBalan
         transforms: undefined,
         mutations: undefined,
         condition: undefined,
-      } as any,
+      } as unknown as CreateToolRequest,
       starshipId
     );
 
@@ -448,7 +458,7 @@ router.put('/tools/:id', jwtAuthMiddleware, async (req: Request, res: Response):
     const hasAccess = await verifyResourceAccess(existingTool.starshipId, userId, 'tool', paramValidation.id, res);
     if (!hasAccess) return;
 
-    const tool = await toolRepository.update(paramValidation.id, bodyValidation as any);
+    const tool = await toolRepository.update(paramValidation.id, bodyValidation as unknown as UpdateToolRequest);
 
     if (!tool) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404);
@@ -631,7 +641,7 @@ router.post('/tools/:id/publish-request', jwtAuthMiddleware, async (req: Request
 // GET /admin/tools/pending - List tools pending approval
 router.get('/admin/tools/pending', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as any)) {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
       sendError(res, 'FORBIDDEN', 'Only instance admins can view pending tools', 403);
       return;
     }
@@ -652,7 +662,7 @@ router.get('/admin/tools/pending', jwtAuthMiddleware, async (req: Request, res: 
     const starshipRepo = new StarshipRepository();
 
     const enrichedTools: Array<{
-      tool: any;
+      tool: ToolModel;
       requestedBy?: {
         id: string;
         name?: string;
@@ -739,7 +749,7 @@ router.get('/admin/tools/pending', jwtAuthMiddleware, async (req: Request, res: 
 // POST /admin/tools/:id/approve - Approve pending tool publication
 router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as any)) {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
       sendError(res, 'FORBIDDEN', 'Only instance admins can approve tools', 403);
       return;
     }
@@ -776,7 +786,7 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
     }
 
     // Determine target template (publishedTemplateId or new template)
-    let targetTemplateId = (tool as any).publishedTemplateId as string | undefined;
+    let targetTemplateId = tool.publishedTemplateId;
 
     if (targetTemplateId) {
       const existingTemplate = await templateRepository.findById(targetTemplateId);
@@ -798,12 +808,13 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
         mutations: tool.mutations,
         condition: tool.condition,
         version: nextVersion,
-      } as any);
+      } satisfies CreateToolTemplateRequest);
 
       targetTemplateId = createdTemplate.id;
     } else {
       // Update existing template from this tool
       await templateRepository.update(targetTemplateId, {
+        name: tool.name,
         description: tool.description,
         parameters: tool.parameters,
         blueprint: tool.blueprint,
@@ -821,7 +832,7 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
       publicationStatus: 'published',
       publicationApprovedBy: adminUserId,
       publicationApprovedAt: new Date().toISOString(),
-    } as any);
+    } satisfies UpdateToolRequest);
 
     if (!updated) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });
@@ -844,7 +855,7 @@ router.post('/admin/tools/:id/approve', jwtAuthMiddleware, async (req: Request, 
 // POST /admin/tools/:id/reject - Reject pending tool publication
 router.post('/admin/tools/:id/reject', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
-    if (!isInstanceAdmin(req.user as any)) {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
       sendError(res, 'FORBIDDEN', 'Only instance admins can reject tools', 403);
       return;
     }
@@ -871,7 +882,7 @@ router.post('/admin/tools/:id/reject', jwtAuthMiddleware, async (req: Request, r
       publicationStatus: 'rejected',
       publicationApprovedBy: adminUserId,
       publicationApprovedAt: new Date().toISOString(),
-    } as any);
+    } satisfies UpdateToolRequest);
 
     if (!updated) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Tool not found', 404, { resource: 'tool', id: toolId });

@@ -37,6 +37,14 @@ export interface StarshipModel {
   slug: string;
   ownerId: string; // Foreign key to User
   name: string;
+  /**
+   * Human-readable description for the starship (shown in UI).
+   */
+  description: string;
+  /**
+   * Optional public website URL for the starship.
+   */
+  websiteUrl?: string;
   shipClass: ShipClass;
   maxAgents: number;
   maxConcurrentTurns: number;
@@ -55,6 +63,8 @@ export interface StarshipModel {
 export interface UpdateStarshipRequest {
   name?: string;
   slug?: string; // Optional - will be auto-generated from name if not provided
+  description?: string;
+  websiteUrl?: string;
   status?: StarshipStatus;
   maxAgents?: number;
   maxConcurrentTurns?: number;

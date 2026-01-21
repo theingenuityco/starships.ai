@@ -86,9 +86,6 @@ export function getEnvConfig(): EnvironmentConfig {
     // JWT Authentication Configuration
     JWT_SECRET: requiredEnvVars.JWT_SECRET!,
 
-    // Feature flags
-    ONBOARDING_ENABLED: process.env.ONBOARDING_ENABLED === 'true',
-
     // Next.js ISR revalidation (optional)
     REVALIDATE_TOKEN: process.env.REVALIDATE_TOKEN,
 

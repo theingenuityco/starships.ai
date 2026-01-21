@@ -358,7 +358,14 @@ describe('AgentTemplateRepository', () => {
       const updates = { name: 'Updated Template' };
       const mockUpdatedRaw = createMockRawTemplate(updates);
 
-      mockConnection.query.mockResolvedValue([mockUpdatedRaw]);
+      // update() now checks the current name to avoid regenerating slugs unnecessarily
+      mockConnection.query
+        // findById() -> SELECT * FROM agent_templates WHERE id = $1
+        .mockResolvedValueOnce([createMockRawTemplate()])
+        // findById() -> SELECT tt.slug ... (assigned tools)
+        .mockResolvedValueOnce([])
+        // updateEntity() -> UPDATE agent_templates ... RETURNING *
+        .mockResolvedValueOnce([mockUpdatedRaw]);
 
       const result = await repository.update('template-123', updates);
 
@@ -366,6 +373,26 @@ describe('AgentTemplateRepository', () => {
         name: 'Updated Template',
       });
       expect(mockConnection.query).toHaveBeenCalledWith(expect.stringContaining('UPDATE agent_templates'), expect.any(Array));
+    });
+
+    it('should not regenerate slug when name is unchanged (even if payload includes slug)', async () => {
+      const existing = createMockRawTemplate({ name: 'Test Template', slug: 'stable-slug' });
+      const updates = { name: 'test template', slug: 'attempted-override' } as unknown as Parameters<typeof repository.update>[1];
+      const updated = createMockRawTemplate({ name: 'test template', slug: 'stable-slug' });
+
+      const slugSpy = jest.spyOn(repository as unknown as { generateUniqueTemplateSlug: (base: string) => Promise<string> }, 'generateUniqueTemplateSlug');
+
+      mockConnection.query
+        // findById() -> SELECT * FROM agent_templates WHERE id = $1
+        .mockResolvedValueOnce([existing])
+        // findById() -> SELECT tt.slug ... (assigned tools)
+        .mockResolvedValueOnce([])
+        // updateEntity() -> UPDATE agent_templates ... RETURNING *
+        .mockResolvedValueOnce([updated]);
+
+      await repository.update('template-123', updates);
+
+      expect(slugSpy).not.toHaveBeenCalled();
     });
 
     it('should return null when template not found', async () => {

@@ -171,7 +171,7 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
     >
       {/* Subtle accent without a "header" */}
       {/* Subtle glow that works in both light + dark (different tuning per theme) */}
-      <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_18%_0%,rgba(99,102,241,0.10),transparent_58%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.08),transparent_60%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.06),transparent_62%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.06),transparent_64%)]" />
+      <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_18%_0%,rgba(99,102,241,0.30),transparent_46%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.24),transparent_48%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.20),transparent_54%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.20),transparent_56%)]" />
       <div className="pointer-events-none absolute inset-0 hidden dark:block bg-[radial-gradient(circle_at_18%_0%,rgba(168,85,247,0.16),transparent_54%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.12),transparent_56%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.09),transparent_60%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.10),transparent_62%)]" />
 
       <CardContent className="relative p-5 sm:p-6">

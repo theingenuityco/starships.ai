@@ -577,12 +577,21 @@ export function ConversationMessageList({
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
-              <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
+              <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                 {/* Show a placeholder avatar while typing (so layout doesn't jump when avatar URL loads) */}
                 <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                   <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
                 </div>
-                <div className="min-w-0 flex-1">
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div className="mb-1 text-sm font-bold text-foreground">
+                    {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
+                      <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
+                        {(agentName || 'Assistant').trim()}
+                      </Link>
+                    ) : (
+                      <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
                     <TypingDots />
                     <span className="text-sm leading-relaxed">Typing...</span>
@@ -703,7 +712,7 @@ const MemoizedMessageBubble = memo(
 
       return (
         <div className="flex justify-start">
-          <div className="group mb-2 mt-4 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-foreground/5 dark:hover:bg-foreground/10 transition-colors">
+          <div className="group mb-2 mt-4 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
             <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
@@ -733,7 +742,7 @@ const MemoizedMessageBubble = memo(
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 w-full pt-0.5">
-              <div className="mb-1 text-sm font-bold text-foreground">
+              <div className="mb-1 text-sm font-bold font-mono text-foreground">
                 <Link href={userProfileHref} className="hover:underline underline-offset-2">
                   {userDisplayName}
                 </Link>
@@ -772,23 +781,30 @@ const MemoizedMessageBubble = memo(
           : null
       return (
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
-          <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-foreground/5 dark:hover:bg-foreground/10 transition-colors">
+          <div
+            className={cn(
+              'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors',
+              // Tighter spacing for consecutive assistant messages within the same turn
+              showAssistantAvatar ? 'py-2' : 'py-0.5'
+            )}
+          >
             {showAssistantAvatar ? (
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                 <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />
               </div>
             ) : (
-              <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
+              // Keep the left gutter, but don't add vertical height/offset for continuation messages
+              <div className="flex-shrink-0 w-10 h-0 mt-0" aria-hidden="true" />
             )}
-            <div className="flex-1 w-full pt-0.5">
+            <div className={cn('flex-1 w-full', showAssistantAvatar ? 'pt-0.5' : 'pt-0')}>
               {showAssistantAvatar && (
                 <div className="mb-1 text-sm font-bold text-foreground">
                   {assistantProfileHref ? (
-                    <Link href={assistantProfileHref} className="hover:underline underline-offset-2">
+                    <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
                       {assistantDisplayName}
                     </Link>
                   ) : (
-                    <span>{assistantDisplayName}</span>
+                    <span className="font-mono">{assistantDisplayName}</span>
                   )}
                 </div>
               )}

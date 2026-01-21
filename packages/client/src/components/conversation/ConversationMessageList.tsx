@@ -58,6 +58,13 @@ interface ConversationMessageListProps {
   isRespondingOverride?: boolean
   isAssistantStreamingOverride?: boolean
   isAwaitingToolResultsOverride?: boolean
+  /**
+   * When 'hero', uses larger text (+2px) and bigger avatars for landing demos.
+   * When 'delegation', uses smaller text and tighter spacing to fit multi-panel demos without scroll.
+   */
+  sizeVariant?: 'default' | 'hero' | 'delegation'
+  /** When true, hide the copy and download turn-action buttons (e.g. for landing demos). */
+  hideTurnActionButtons?: boolean
 }
 
 export function ConversationMessageList({
@@ -77,6 +84,8 @@ export function ConversationMessageList({
   isRespondingOverride,
   isAssistantStreamingOverride,
   isAwaitingToolResultsOverride,
+  sizeVariant = 'default',
+  hideTurnActionButtons = false,
 }: ConversationMessageListProps) {
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
@@ -538,7 +547,7 @@ export function ConversationMessageList({
     <div className={cn('h-full flex flex-col', className)}>
       <div
         ref={scrollContainerRef}
-        className={cn('flex-1 overflow-y-auto px-4 pt-6 scroll-smooth', scrollClassName)}
+        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
         style={{ paddingBottom: bottomPaddingPx ?? 160 }}
         onScroll={() => {
           const container = scrollContainerRef.current
@@ -571,6 +580,7 @@ export function ConversationMessageList({
                   userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={idx === renderMessages.length - 1}
+                  sizeVariant={sizeVariant}
                 />
                 {(() => {
                   const widgets =
@@ -619,27 +629,51 @@ export function ConversationMessageList({
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
-              <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                {/* Show a placeholder avatar while typing (so layout doesn't jump when avatar URL loads) */}
-                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                  <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
-                </div>
-                <div className="min-w-0 flex-1 pt-0.5">
-                  <div className="mb-1 text-sm font-bold text-foreground">
-                    {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
-                      <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
-                        {(agentName || 'Assistant').trim()}
-                      </Link>
-                    ) : (
-                      <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
+              {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
+                <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
+                  <div
+                    className={cn(
+                      'flex-shrink-0 mt-1',
+                      sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6'
                     )}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                    <TypingDots />
-                    <span className="text-sm leading-relaxed">Typing...</span>
+                    aria-hidden="true"
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div
+                      className={cn(
+                        'flex items-center gap-2 leading-relaxed text-muted-foreground',
+                        sizeVariant === 'hero' ? 'text-base' : 'text-sm'
+                      )}
+                    >
+                      <TypingDots />
+                      <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>
+                        Typing...
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                    <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
+                  </div>
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="mb-1 text-sm font-bold text-foreground">
+                      {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
+                        <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
+                          {(agentName || 'Assistant').trim()}
+                        </Link>
+                      ) : (
+                        <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
+                      <TypingDots />
+                      <span className="text-sm leading-relaxed">Typing...</span>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -694,6 +728,7 @@ interface ConversationMessageBubbleProps {
   userAvatarFallbackVariantOverride?: 'initials' | 'user-icon'
   isAwaitingToolResults?: boolean
   isLastMessage?: boolean
+  sizeVariant?: 'default' | 'hero' | 'delegation'
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -804,7 +839,13 @@ const MemoizedMessageBubble = memo(
     userAvatarFallbackVariantOverride,
     isAwaitingToolResults = false,
     isLastMessage = false,
+    sizeVariant = 'default',
   }: ConversationMessageBubbleProps) {
+    const isHero = sizeVariant === 'hero'
+    const isDelegation = sizeVariant === 'delegation'
+    const avatarSize = isHero ? 40 : isDelegation ? 24 : 32
+    const avatarClass = isHero ? 'w-10 h-10' : isDelegation ? 'w-6 h-6' : 'w-8 h-8'
+    const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
     const effectiveUserName = userNameOverride ?? userName
@@ -820,7 +861,58 @@ const MemoizedMessageBubble = memo(
       const shouldUseExplicitUserAvatar = isImageUrl(explicitUserAvatarUrl)
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
 
-      // User message: Render using the same engine as assistant messages (no bubble)
+      if (isHero || isDelegation) {
+        // User message: Neutral bubble on the right (landing demos)
+        const userRowClass = isDelegation ? 'mb-4 mt-3 gap-2' : 'mb-4 mt-6 gap-3 mr-6'
+        const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
+        const userTextClass = isHero ? 'text-base' : 'text-sm'
+        return (
+          <div className="flex justify-end">
+            <div className={cn('flex w-full sm:w-auto items-end max-w-full sm:max-w-[70%]', userRowClass)}>
+              <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
+                <div className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}>
+                  <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{message.content}</div>
+                  {message.sending && (
+                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
+                      <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
+                    </div>
+                  )}
+                </div>
+              </div>
+              <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
+                {shouldUseExplicitUserAvatar ? (
+                  <AvatarImage
+                    src={explicitUserAvatarUrl!}
+                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="rounded-full object-cover"
+                  />
+                ) : userAvatarSeedOverride ? (
+                  <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
+                ) : shouldUseAuthedUserAvatar ? (
+                  <AvatarImage
+                    src={effectiveUserAvatar!}
+                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="rounded-full object-cover"
+                  />
+                ) : null}
+                <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {fallbackVariant === 'user-icon' ? (
+                    <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
+                  ) : (
+                    initialsFromName(effectiveUserName || effectiveUserEmail)
+                  )}
+                </AvatarFallback>
+              </Avatar>
+            </div>
+          </div>
+        )
+      }
+
+      // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
       const userProfileHref =
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
@@ -850,7 +942,7 @@ const MemoizedMessageBubble = memo(
               ) : null}
               <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
                 {fallbackVariant === 'user-icon' ? (
-                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
+                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
                 ) : (
                   initialsFromName(effectiveUserName || effectiveUserEmail)
                 )}
@@ -887,19 +979,58 @@ const MemoizedMessageBubble = memo(
         </div>
       )
     } else {
-      // AI message: Plain text on the left (no bubble)
+      // AI message
       const assistantDisplayName = (agentName || 'Assistant').trim()
       const assistantProfileHref =
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
           : null
+
+      if (isHero || isDelegation) {
+        const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
+        return (
+          <div className="flex justify-start">
+            <div className={cn('flex items-start w-full', assistantGap)}>
+              {showAssistantAvatar ? (
+                <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
+                  <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={avatarSize} />
+                </div>
+              ) : (
+                <div className={cn('flex-shrink-0 mt-1', avatarClass)} aria-hidden="true" />
+              )}
+              <div className="flex-1 w-full pt-0.5">
+                <ConversationMessageContent
+                  content={message.content}
+                  messageId={message.id}
+                  enableMarkdown={true}
+                  enableCopy={!isStreamingActive}
+                  enableLinkPreview={true}
+                  isStreaming={!!isStreamingActive}
+                  className="text-foreground"
+                  contentTextClass={contentTextClass}
+                  chunks={message.chunks}
+                  reasoning={message.reasoning}
+                  reasoningChunks={message.reasoningChunks}
+                  agentName={assistantDisplayName}
+                  toolCalls={message.toolCalls}
+                  toolResults={message.toolResults}
+                  messageType={message.messageType}
+                  attachmentIds={message.attachmentIds}
+                  starshipId={starshipId}
+                  isAwaitingToolResults={isAwaitingToolResults}
+                  isLastMessage={isLastMessage}
+                />
+              </div>
+            </div>
+          </div>
+        )
+      }
+
       return (
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
           <div
             className={cn(
               'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors',
-              // Keep padding consistent even when avatar/name are hidden,
-              // but slightly overlap consecutive assistant messages so they feel like one block.
               'py-2',
               !showAssistantAvatar && '-mt-1'
             )}
@@ -909,7 +1040,6 @@ const MemoizedMessageBubble = memo(
                 <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />
               </div>
             ) : (
-              // Keep the left gutter aligned with avatar rows
               <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
             <div className="flex-1 w-full pt-0.5">
@@ -994,6 +1124,7 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.userAvatarUrlOverride || '') !== (nextProps.userAvatarUrlOverride || '')) return false
     if ((prevProps.userAvatarSeedOverride || '') !== (nextProps.userAvatarSeedOverride || '')) return false
     if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
+    if ((prevProps.sizeVariant ?? 'default') !== (nextProps.sizeVariant ?? 'default')) return false
     if ((prevProps.starshipSlug || '') !== (nextProps.starshipSlug || '')) return false
     if ((prevProps.agentSlug || '') !== (nextProps.agentSlug || '')) return false
 

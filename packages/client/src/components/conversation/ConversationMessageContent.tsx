@@ -1041,7 +1041,7 @@ export function ConversationMessageContent({
       <div className="relative">
         {/* Message actions (copy + download): show on hover, float at bottom edge */}
         {enableCopy && (
-          <div className="pointer-events-none absolute top-1/2 right-2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+          <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
             <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
                 <Icon name="copy" className="h-4 w-4" />
@@ -1138,7 +1138,7 @@ export function ConversationMessageContent({
       )}
 
       {/* Workflow output without tool calls */}
-      {messageType === 'workflow_output' && (!toolCalls || toolCalls.length === 0) && parsedJson && (
+      {messageType === 'workflow_output' && (!toolCalls || toolCalls.length === 0) && parsedJson != null && (
         <Card className="mt-3 border bg-blue-50 dark:bg-blue-950/20">
           <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800">
             <div className="text-xs uppercase text-blue-700 dark:text-blue-300 tracking-wide font-medium">Workflow Output</div>

@@ -6,6 +6,13 @@ import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/ca
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import { useAuth } from '@/hooks/useAuth'
 import Link from 'next/link'
 import React, { useMemo, useState } from 'react'
@@ -124,7 +131,15 @@ function ProvidersRow({ model }: { model: string }) {
             <div className="grid grid-cols-1 md:grid-cols-5 gap-2 items-end">
               <div className="md:col-span-1">
                 <label className="text-[11px] text-muted-foreground">provider</label>
-                <Input value={provider} onChange={e => setProvider(e.target.value)} className="h-8 font-mono text-xs" spellCheck={false} />
+                <Select value={provider} onValueChange={setProvider}>
+                  <SelectTrigger className="h-8 font-mono text-xs w-full">
+                    <SelectValue placeholder="Select provider" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="openrouter">openrouter</SelectItem>
+                    <SelectItem value="aws_bedrock">aws_bedrock</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div className="md:col-span-2">
                 <label className="text-[11px] text-muted-foreground">providerModelId</label>

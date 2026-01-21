@@ -26,6 +26,11 @@ export interface EnvironmentConfig {
   // LLM Provider Configuration
   OPENROUTER_API_KEY?: string;
 
+  // AWS Bedrock Configuration (optional; used by autopilot execution bundle)
+  AWS_BEDROCK_ACCESS_KEY_ID?: string;
+  AWS_BEDROCK_SECRET_ACCESS_KEY?: string;
+  AWS_BEDROCK_REGION?: string;
+
   // JWT Authentication Configuration
   JWT_SECRET: string;
 

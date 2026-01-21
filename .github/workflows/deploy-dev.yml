@@ -171,6 +171,9 @@ jobs:
           AWS_SES_REGION: ${{ vars.AWS_SES_REGION }}
           AWS_S3_BUCKET: ${{ vars.AWS_S3_BUCKET }}
           AWS_S3_REGION: ${{ vars.AWS_S3_REGION }}
+          AWS_BEDROCK_ACCESS_KEY_ID: ${{ secrets.AWS_BEDROCK_ACCESS_KEY_ID }}
+          AWS_BEDROCK_SECRET_ACCESS_KEY: ${{ secrets.AWS_BEDROCK_SECRET_ACCESS_KEY }}
+          AWS_BEDROCK_REGION: ${{ vars.AWS_BEDROCK_REGION }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT }}
           REDIS_DB: ${{ secrets.REDIS_DB }}
@@ -224,6 +227,9 @@ jobs:
             --from-literal=AWS_SES_REGION="$AWS_SES_REGION" \
             --from-literal=AWS_S3_BUCKET="$AWS_S3_BUCKET" \
             --from-literal=AWS_S3_REGION="$AWS_S3_REGION" \
+            --from-literal=AWS_BEDROCK_ACCESS_KEY_ID="$AWS_BEDROCK_ACCESS_KEY_ID" \
+            --from-literal=AWS_BEDROCK_SECRET_ACCESS_KEY="$AWS_BEDROCK_SECRET_ACCESS_KEY" \
+            --from-literal=AWS_BEDROCK_REGION="$AWS_BEDROCK_REGION" \
             --from-literal=REDIS_HOST="$REDIS_HOST" \
             --from-literal=REDIS_PORT="$REDIS_PORT" \
             --from-literal=REDIS_DB="$REDIS_DB" \

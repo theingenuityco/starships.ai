@@ -57,10 +57,10 @@ export class HttpRequest implements NodeHandler {
       bodyData = payload.data;
 
       // Best-effort content-type propagation: only set if caller hasn't specified it already.
-      const currentHeaders = new Headers(this.params.headers as any);
+      const currentHeaders = new Headers(this.params.headers as unknown as HeadersInit);
       if (payload.contentType && !currentHeaders.has('content-type')) {
         currentHeaders.set('content-type', payload.contentType);
-        this.params.headers = currentHeaders as any;
+        this.params.headers = currentHeaders as unknown as HttpRequestParams['headers'];
       }
     } else if (this.params.body !== undefined) {
       bodyData = this.params.body;

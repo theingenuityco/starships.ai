@@ -64,7 +64,7 @@ export class GrpcServer {
           try {
             this.checkAuth((req.headers['authorization'] as string | undefined) ?? null);
             return true;
-          } catch (authErr) {
+          } catch {
             res.statusCode = 401;
             res.setHeader('Content-Type', 'application/json');
             // Security: do not echo request_id or other body-derived fields to unauthorized callers.

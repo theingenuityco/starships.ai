@@ -785,7 +785,7 @@ describe('HttpRequest Node Handler', () => {
         contentType: 'application/octet-stream',
         sizeBytes: 4,
       });
-      expect((result[0].binary?.file as any)?.data).toBeInstanceOf(ArrayBuffer);
+      expect((result[0].binary?.file as unknown as { data?: unknown })?.data).toBeInstanceOf(ArrayBuffer);
     });
 
     it('uploads raw ArrayBuffer from ExecutionItem.binary when bodyFromBinaryKey is set', async () => {
@@ -800,7 +800,7 @@ describe('HttpRequest Node Handler', () => {
               contentType: 'image/png',
               sizeBytes: 3,
             },
-          } as any,
+          } as unknown as ExecutionItem['binary'],
           pairedItem: { item: 0 },
         },
       ];

@@ -1,6 +1,6 @@
 import { Queue } from './Queue';
 
-export class InMemoryQueue<T = any> implements Queue<T> {
+export class InMemoryQueue<T = unknown> implements Queue<T> {
   private items: T[] = [];
   private resolvers: Array<(value: T) => void> = [];
 

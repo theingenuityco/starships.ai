@@ -212,7 +212,20 @@ describe('Engine', () => {
 
   describe('Binary in-flight payloads', () => {
     it('preserves in-flight binary between nodes while keeping execution JSON-safe', async () => {
-      const httpMock = jest.fn(async ({ url, method, responseType, body, headers }: any) => {
+      const httpMock = jest.fn(
+        async ({
+          url,
+          method,
+          responseType,
+          body,
+          headers,
+        }: {
+          url: string;
+          method: string;
+          responseType?: 'json' | 'text' | 'arrayBuffer';
+          body?: unknown;
+          headers?: Record<string, unknown>;
+        }) => {
         if (url === 'https://storage.example.com/download') {
           expect(responseType).toBe('arrayBuffer');
           return {
@@ -238,11 +251,12 @@ describe('Engine', () => {
           };
         }
         throw new Error('unexpected url in http mock');
-      });
+      }
+      );
 
       const hostRuntime: HostRuntime = {
-        http: httpMock as any,
-        connectorAction: (jest.fn(async () => ({ status: 200, statusText: 'OK', headers: {}, body: {}, url: 'connector://noop' })) as any),
+        http: httpMock as unknown as HostRuntime['http'],
+        connectorAction: jest.fn(async () => ({ status: 200, statusText: 'OK', headers: {}, body: {}, url: 'connector://noop' })) as unknown as HostRuntime['connectorAction'],
       };
 
       const blueprint: Blueprint = createMockBlueprint({
@@ -300,7 +314,7 @@ describe('Engine', () => {
 
       // Event payloads must also be JSON-safe (no binary).
       for (const call of eventCallback.mock.calls) {
-        const ev = call[0] as any;
+        const ev = call[0] as unknown as { data?: { execution?: { results?: Array<{ items?: Array<{ binary?: unknown }> }> } } };
         expect(() => JSON.stringify(ev)).not.toThrow();
         const exec = ev?.data?.execution;
         if (exec?.results) {

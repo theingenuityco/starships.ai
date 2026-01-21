@@ -52,6 +52,10 @@ export async function invokeBedrock(
 ): Promise<AsyncIterable<unknown>> {
   const client = options.client;
 
+  type AdditionalModelRequestFields = Record<string, unknown> & {
+    thinking?: { type: 'enabled'; budget_tokens: number };
+  };
+
   // Extract reasoning config (do not log prompts/PII; only config shape/flags)
   const reasoningCfg = (request as unknown as { reasoning?: unknown }).reasoning as unknown;
   const reasoningRec =
@@ -217,7 +221,7 @@ export async function invokeBedrock(
     maxTokens: request.maxTokens,
   };
 
-  const input: ConverseStreamCommandInput = {
+  const input: ConverseStreamCommandInput & { additionalModelRequestFields?: AdditionalModelRequestFields } = {
     modelId: providerModelId,
     messages: bedrockMessages,
     toolConfig,
@@ -233,10 +237,8 @@ export async function invokeBedrock(
   // Docs: Claude on Bedrock extended thinking uses: { thinking: { type: 'enabled', budget_tokens: <int> } }
   try {
     if (thinkingWillBeEnabled) {
-        (input as any).additionalModelRequestFields = {
-          ...(typeof (input as any).additionalModelRequestFields === 'object' && (input as any).additionalModelRequestFields
-            ? (input as any).additionalModelRequestFields
-            : {}),
+        input.additionalModelRequestFields = {
+          ...(input.additionalModelRequestFields ?? {}),
           thinking: { type: 'enabled', budget_tokens: thinkingBudgetTokens },
         };
 
@@ -250,7 +252,7 @@ export async function invokeBedrock(
   }
 
   // If thinking is not enabled, forward sampling params as-is.
-  if (!(input as any).additionalModelRequestFields?.thinking) {
+  if (!input.additionalModelRequestFields?.thinking) {
     if (typeof request.temperature === 'number') inferenceConfig.temperature = request.temperature;
     if (typeof request.topP === 'number') inferenceConfig.topP = request.topP;
   }
@@ -259,7 +261,7 @@ export async function invokeBedrock(
     const command = new ConverseStreamCommand(input);
     // Cast to any to avoid spurious TS error "Property 'send' does not exist"
     // which happens despite BedrockRuntimeClient inheriting from Client
-    const response = await (client as any).send(command);
+    const response = await (client as unknown as { send: (cmd: ConverseStreamCommand) => Promise<{ stream?: unknown }> }).send(command);
 
     async function* gen() {
       if (!response.stream) return;
@@ -276,7 +278,21 @@ export async function invokeBedrock(
       const toolUseStates: Record<number, BedrockToolUseState> = {};
       const reasoningStates: Record<number, string> = {};
 
-      for await (const event of response.stream as AsyncIterable<any>) {
+      type BedrockDelta = {
+        text?: string;
+        toolUse?: { input?: unknown };
+        reasoningContent?: unknown;
+      };
+      type BedrockStreamEvent = {
+        contentBlockDelta?: { contentBlockIndex?: number; delta?: BedrockDelta };
+        contentBlockStart?: {
+          contentBlockIndex?: number;
+          start?: { toolUse?: { toolUseId?: string; name?: string } };
+        };
+      };
+      const stream = response.stream as AsyncIterable<BedrockStreamEvent>;
+
+      for await (const event of stream) {
         // Text deltas
         if (event.contentBlockDelta && event.contentBlockDelta.delta) {
           const idx = event.contentBlockDelta.contentBlockIndex ?? 0;
@@ -284,8 +300,8 @@ export async function invokeBedrock(
 
           // Reasoning / thinking deltas (Bedrock: reasoningContent). Map to OpenAI-style delta.reasoning.
           // Bedrock may send either incremental deltas or cumulative snapshots; compute a non-overlapping fragment.
-          if (delta && typeof delta === 'object' && (delta as any).reasoningContent) {
-            const rc = (delta as any).reasoningContent as unknown;
+          if (delta.reasoningContent) {
+            const rc = delta.reasoningContent;
             let nextText = '';
             try {
               if (typeof rc === 'string') {

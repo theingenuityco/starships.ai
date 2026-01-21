@@ -45,15 +45,6 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
     return `/${parts.join('/')}`
   }
 
-  function generateSlug(value: string): string {
-    return String(value || '')
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-  }
-
   const initial = useMemo(
     () => ({
       name: starship?.name ?? '',
@@ -100,8 +91,6 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   const descriptionMax = 2000
   const descriptionCount = description.length
   const descriptionRemaining = Math.max(0, descriptionMax - descriptionCount)
-  const nameChanged = Boolean(starship && name.trim() && name.trim() !== starship.name)
-  const generatedSlug = useMemo(() => generateSlug(name), [name])
   const logoGradientId = useMemo(() => {
     const raw = `starship-details-logo-${String(starshipId || '')}`
     return raw.replace(/[^a-zA-Z0-9_-]/g, '')
@@ -204,7 +193,6 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                       <Icon name="type" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     </div>
                     {isError ? <div className="text-xs text-red-600 dark:text-red-400">Failed to load starship details.</div> : null}
-                    {starship ? <div className="text-[11px] text-muted-foreground">{nameChanged ? <>/ship/{generatedSlug}-xxxxxx</> : <>/ship/{starship.slug}</>}</div> : null}
                   </div>
 
                   <div className="w-1/2 space-y-2">
@@ -213,13 +201,13 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                     </Label>
                     <Input
                       id="starship-website"
+                      type="url"
                       value={websiteUrl}
                       onChange={e => setWebsiteUrl(e.target.value)}
                       placeholder="https://example.com"
                       disabled={isLoading || updateStarship.isPending || isGenerating}
                       className="ring-1 ring-transparent focus-visible:ring-primary/25"
                     />
-                    <div className="text-xs text-muted-foreground">Include http:// or https://</div>
                     {generateError ? <div className="text-xs text-red-600 dark:text-red-400">{generateError}</div> : null}
                   </div>
                 </div>
@@ -252,7 +240,7 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                 ref={descriptionRef}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder="Describe what your starship/company/org/project does…"
+                placeholder="Describe what your organization/project does…"
                 disabled={isLoading || updateStarship.isPending || isGenerating}
                 className={cn('resize-none overflow-hidden bg-background/60', 'ring-1 ring-transparent focus-visible:ring-primary/25')}
                 rows={4}

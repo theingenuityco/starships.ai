@@ -15,7 +15,7 @@ export default function UseCases() {
         {/* Deploy your agent */}
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
-            <div className="text-left mb-6 md:mb-8">
+            <div className="text-left mb-4 md:mb-5">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Deploy agents</h3>
               <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Deploy agentic teams of specialists to get the job done.</p>
             </div>
@@ -31,7 +31,7 @@ export default function UseCases() {
         {/* Connect your apps */}
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
-            <div className="text-left mb-6 md:mb-8">
+            <div className="text-left mb-4 md:mb-5">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Connect your apps</h3>
               <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Integrate with apps you already use.</p>
             </div>
@@ -47,7 +47,7 @@ export default function UseCases() {
         {/* Delegate like never before */}
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
-            <div className="text-left mb-6 md:mb-8">
+            <div className="text-left mb-4 md:mb-5">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Delegate like never before</h3>
               <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Aria spins up specialist chats and brings back the result.</p>
             </div>
@@ -61,13 +61,13 @@ export default function UseCases() {
           </div>
         </div>
 
-        {/* Build agents for your custom workflows */}
-        <div className="mt-14 md:mt-16">
+        {/* Build agents for your custom workflows — commented out for now */}
+        {/* <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
             <div className="text-left mb-6 md:mb-8">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Build agents for your custom workflows</h3>
               <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">
-                Gaia helps you define an agent’s responsibilities, inputs/outputs, and success criteria.
+                Gaia helps you define an agent's responsibilities, inputs/outputs, and success criteria.
               </p>
             </div>
 
@@ -77,14 +77,14 @@ export default function UseCases() {
               </ErrorBoundary>
             </div>
           </div>
-        </div>
+        </div> */}
 
         {/* Schedule repetitive tasks */}
         <div className="mt-14 md:mt-16">
           <div className="w-full max-w-6xl mx-auto">
-            <div className="text-left mb-6 md:mb-8">
+            <div className="text-left mb-4 md:mb-5">
               <h3 className="text-lg sm:text-xl md:text-2xl font-semibold tracking-tight text-foreground">Schedule repetitive tasks</h3>
-              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Run on a schedule, review a draft, then approve.</p>
+              <p className="mt-2 text-sm md:text-base font-normal text-muted-foreground/90 leading-relaxed max-w-2xl text-pretty">Schedule agents. Review and approve.</p>
             </div>
 
             <div className="py-8 sm:py-10">

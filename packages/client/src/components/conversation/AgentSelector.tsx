@@ -64,8 +64,8 @@ export function AgentSelector({ selectedAgent, onAgentChange, starshipId, compac
           variant="outline"
           aria-label={selectedAgent ? `Selected agent: ${formatAgentDisplayName(selectedAgent)}. Change agent.` : 'Select an agent'}
           className={cn(
-            // Match ConversationMessageInput container styling
-            'justify-between bg-card border border-border/60 rounded-2xl shadow-sm transition-all hover:bg-card focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/70',
+            // Match "Sort my inbox" / demo chooser styling: warm golden-brown bg and border
+            'justify-between bg-primary/20 border border-primary/40 rounded-2xl shadow-sm transition-all hover:bg-primary/25 hover:border-primary/50 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:border-primary/70',
             // Match ConversationMessageInput inner padding: minimal => pl-3 pr-2 py-2, default => px-3 py-3
             compact ? 'h-auto px-2 py-1 text-xs min-w-[120px]' : 'h-auto px-3 py-2 text-sm min-w-[220px]'
           )}

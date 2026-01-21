@@ -21,8 +21,6 @@ import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
-import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
-import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
 import { StatusDots } from '@/components/ui/StatusDots'
@@ -290,8 +288,6 @@ interface MessageContentProps {
   agentName?: string
   toolCalls?: LlmToolCall[]
   toolResults?: ToolResultLike[]
-  // UI actions emitted over SSE (preferred, tool-name agnostic)
-  uiActions?: Array<{ action: string; payload?: Record<string, unknown> }>
   messageType?: MessageModel['messageType']
   // Attachments
   attachmentIds?: string[]
@@ -300,6 +296,11 @@ interface MessageContentProps {
   isAwaitingToolResults?: boolean
   // Whether this is the last message in the conversation
   isLastMessage?: boolean
+  /**
+   * Optional override for the message content text+prose class (e.g. "text-base leading-relaxed prose" for hero).
+   * When omitted, uses "text-sm leading-relaxed prose prose-sm".
+   */
+  contentTextClass?: string
 }
 
 type ToolResultLike = {
@@ -311,23 +312,6 @@ type ToolResultLike = {
   content?: unknown
   result?: unknown
 }
-
-// Known widget types from public-docs
-const KNOWN_WIDGET_TYPES = new Set([
-  'StatCard',
-  'DataTable',
-  'MetricGrid',
-  'BarChart',
-  'LineChart',
-  'AreaChart',
-  'PieChart',
-  'DonutChart',
-  'RadarChart',
-  'RadialChart',
-  'ConnectorSuggestionCard',
-  'AgentSuggestionCard',
-  'StarshipDetails',
-])
 
 // Cache tool display names so we don't refetch per-message/per-render.
 // Keyed by `${starshipId}:${toolSlug}` -> tool display name.
@@ -420,13 +404,14 @@ export function ConversationMessageContent({
   agentName,
   toolCalls,
   toolResults = [],
-  uiActions = [],
   messageType,
   attachmentIds,
   starshipId,
   isAwaitingToolResults = false,
   isLastMessage = false,
+  contentTextClass,
 }: MessageContentProps) {
+  const resolvedContentClass = contentTextClass ?? 'text-sm leading-relaxed prose prose-sm'
   const { theme } = useTheme()
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
@@ -1036,7 +1021,7 @@ export function ConversationMessageContent({
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
-      <div className="text-sm leading-relaxed prose prose-sm dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message">
+      <div className={cn(resolvedContentClass, 'dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message')}>
         <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
           {String(displayContent ?? '')}
         </ReactMarkdown>
@@ -1044,59 +1029,11 @@ export function ConversationMessageContent({
       </div>
     ) : null
 
-  // Widget rendering: driven by ui_action payloads (tool-name agnostic)
-  const widgetResults = useMemo(() => {
-    const actions = Array.isArray(uiActions) ? uiActions : []
-    if (actions.length === 0) return []
-
-    const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
-    const out = actions
-      .map((ua, index) => {
-        if (!ua || ua.action !== 'render_widget') return null
-        const payload = ua.payload
-        if (!payload || !isRecord(payload)) return null
-        const widget = payload['widget']
-        if (!isRecord(widget)) return null
-
-        const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
-        const props = widget['props']
-        if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
-        if (!props || typeof props !== 'object') return null
-
-        return {
-          id:
-            (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
-            (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
-            `ui-widget-${index}`,
-          widgetType,
-          props,
-          name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
-          description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
-          index,
-        }
-      })
-      .filter((w): w is NonNullable<typeof w> => w !== null)
-
-    // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
-    const deduped = (() => {
-      const seen = new Set<string>()
-      const next: typeof out = []
-      for (const w of out) {
-        if (seen.has(w.id)) continue
-        seen.add(w.id)
-        next.push(w)
-      }
-      return next
-    })()
-
-    return deduped
-  }, [uiActions])
-
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
     return (
       <div className={cn('relative group', className)}>
-        <div className="text-sm leading-relaxed whitespace-pre-wrap ph-mask-chat-message">
+        <div className={cn(contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed', 'whitespace-pre-wrap ph-mask-chat-message')}>
           {String(displayContent ?? '')}
           {isStreaming && <span className="inline-block w-2 h-4 bg-primary animate-pulse ml-1" />}
         </div>
@@ -1106,35 +1043,51 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div ref={messageContainerRef} className={cn('relative group w-full ph-mask-chat-message', className)}>
-      {/* Reasoning (thinking) collapsible */}
-      {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
-        <>
-          {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
-          <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
-            {/* Match tool-call collapsed row spacing + trigger styling */}
-            <p className="mb-2 leading-relaxed">
-              <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
-                <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
-                  {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
-                  <span className="truncate">{reasoningHeaderLabel}</span>
-                </span>
-              </CollapsibleTrigger>
-            </p>
-            <CollapsibleContent>
-              <div className="pb-2">
-                <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
-                  <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {String(displayReasoning ?? '')}
-                    </ReactMarkdown>
-                  </div>
-                </blockquote>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </>
-      )}
+    <div ref={messageContainerRef} className={cn('relative w-full ph-mask-chat-message', className)}>
+      {/* Content block: actions anchor here so widgets below don't shift them */}
+      <div className="relative">
+        {/* Message actions (copy + download): show on hover, float at bottom edge */}
+        {enableCopy && (
+          <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+                <Icon name="copy" className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+                <Icon name="download" className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Reasoning (thinking) collapsible */}
+        {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
+          <>
+            {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
+            <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
+              {/* Match tool-call collapsed row spacing + trigger styling */}
+              <p className="mb-2 leading-relaxed">
+                <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                  <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+                    {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
+                    <span className="truncate">{reasoningHeaderLabel}</span>
+                  </span>
+                </CollapsibleTrigger>
+              </p>
+              <CollapsibleContent>
+                <div className="pb-2">
+                  <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
+                    <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        {String(displayReasoning ?? '')}
+                      </ReactMarkdown>
+                    </div>
+                  </blockquote>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </>
+        )}
 
       {/*
         Attachments created by USER uploads (message attachments) should stay near the top of the message.
@@ -1142,71 +1095,29 @@ export function ConversationMessageContent({
         visually associated with the tool call that produced them.
       */}
 
-      {/* Message attachments (top) */}
-      {messageAttachmentIds.length > 0 && starshipId && (
-        <div className="mb-1 inline-flex flex-col gap-2">
-          {isLoadingAttachments
-            ? // Loading state
-              messageAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
-            : // Render attachments
-              attachments?.filter(a => messageAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
-        </div>
-      )}
+        {/* Message attachments (top) */}
+        {messageAttachmentIds.length > 0 && starshipId && (
+          <div className="mb-1 inline-flex flex-col gap-2">
+            {isLoadingAttachments
+              ? // Loading state
+                messageAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+              : // Render attachments
+                attachments?.filter(a => messageAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
+          </div>
+        )}
 
-      {/* Unified markdown rendering - message content at normal size */}
-      {markdownWithToolsNode as any}
+        {/* Unified markdown rendering - message content at normal size */}
+        {markdownWithToolsNode as any}
 
-      {/* Tool-result attachments (below tool panel) */}
-      {toolResultAttachmentIds.length > 0 && starshipId && (
-        <div className="mt-2 inline-flex flex-col gap-2">
-          {isLoadingAttachments
-            ? toolResultAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
-            : attachments?.filter(a => toolResultAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
-        </div>
-      )}
-
-      {/* Widget rendering: Display widgets inline when requested by ui_action */}
-      {widgetResults.length > 0 && messageType !== 'tool_result' && (
-        <div className="space-y-4 mt-3 w-full max-w-none">
-          {widgetResults.map(widget => {
-            const isPending = false
-
-            return (
-              <div key={widget.id} className="w-full max-w-none mb-4">
-                {/* Conversational widget header - looks like text */}
-                <div className="text-sm w-full mb-4">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-medium">{widget.name}</span>
-                  </div>
-                  {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
-                </div>
-
-                {/* Widget visualization - minimal styling, full width */}
-                {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
-                <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  {isPending ? (
-                    <div className="h-[420px] flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <LoadingSpinner className="w-5 h-5" />
-                        <span className="text-xs text-muted-foreground">Rendering...</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <InlineWidgetRenderer
-                      widget={{
-                        widgetType: widget.widgetType,
-                        props: widget.props,
-                      }}
-                      compactMode={true}
-                      className="w-full"
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
+        {/* Tool-result attachments (below tool panel) */}
+        {toolResultAttachmentIds.length > 0 && starshipId && (
+          <div className="mt-2 inline-flex flex-col gap-2">
+            {isLoadingAttachments
+              ? toolResultAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+              : attachments?.filter(a => toolResultAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
+          </div>
+        )}
+      </div>
 
       {/* Tool result message rendering - fallback for unmatched results */}
       {messageType === 'tool_result' && (
@@ -1234,7 +1145,7 @@ export function ConversationMessageContent({
       )}
 
       {/* Workflow output without tool calls */}
-      {messageType === 'workflow_output' && (!toolCalls || toolCalls.length === 0) && parsedJson && (
+      {messageType === 'workflow_output' && (!toolCalls || toolCalls.length === 0) && parsedJson != null && (
         <Card className="mt-3 border bg-blue-50 dark:bg-blue-950/20">
           <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800">
             <div className="text-xs uppercase text-blue-700 dark:text-blue-300 tracking-wide font-medium">Workflow Output</div>

@@ -200,8 +200,9 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
       <div className="border-b border-zinc-800 bg-zinc-900 px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center">
+            <div className="relative w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center overflow-hidden">
               <span className="text-white text-sm font-medium">{agent.name.charAt(0).toUpperCase()}</span>
+              <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
             </div>
             <div>
               <h2 className="font-semibold text-lg text-white">Testing: {formatAgentDisplayName(agent)}</h2>
@@ -284,7 +285,7 @@ export function AgentTester({ agent, onClose }: AgentTesterProps) {
               </div>
             ) : (
               messages.map(message => (
-                <div key={message.id} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}>
+                <div key={message.id} className="flex justify-start mb-4">
                   <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${message.role === 'user' ? 'bg-blue-600 text-white' : 'bg-zinc-800 text-zinc-200 border border-zinc-700'}`}>
                     <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                     <p className="text-xs opacity-70 mt-1">

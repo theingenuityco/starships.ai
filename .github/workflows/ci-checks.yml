@@ -53,6 +53,11 @@ jobs:
       EMAIL_FROM_NAME: ${{ vars.EMAIL_FROM_NAME }}
       AWS_SES_REGION: ${{ vars.AWS_SES_REGION }}
 
+      # AWS Bedrock Configuration (optional LLM provider)
+      AWS_BEDROCK_ACCESS_KEY_ID: ${{ secrets.AWS_BEDROCK_ACCESS_KEY_ID }}
+      AWS_BEDROCK_SECRET_ACCESS_KEY: ${{ secrets.AWS_BEDROCK_SECRET_ACCESS_KEY }}
+      AWS_BEDROCK_REGION: ${{ vars.AWS_BEDROCK_REGION }}
+
       # Analytics (optional for CI)
       GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
       POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}

@@ -68,6 +68,14 @@ export class Engine {
   private onCancel?: (cancel: () => void) => void;
   private runtimeEnv?: Record<string, unknown>;
   private hostRuntime?: HostRuntime;
+  /**
+   * In-memory (non-serialized) latest results by nodeRef.
+   *
+   * This is required to support non-JSON in-flight payloads (e.g. binary bytes)
+   * without recording them into execution.results (which must remain JSON-serializable
+   * for RemoteRunner and for event emission).
+   */
+  private volatileResults: Map<string, ExecutionItem[]> = new Map();
 
   constructor(config: EngineConfig = {}) {
     this.eventCallback = config.eventCallback;
@@ -78,6 +86,24 @@ export class Engine {
     this.runtimeEnv = config.runtimeEnv;
     this.hostRuntime = config.hostRuntime;
     this.eval = new Eval(this.runtimeEnv);
+  }
+
+  private sanitizeItemsForRecording(items: Array<ExecutionItem | null | undefined>): ExecutionItem[] {
+    const list = Array.isArray(items) ? items : [];
+    return list.filter((item): item is ExecutionItem => Boolean(item)).map((item) => ({
+      json: item?.json,
+      pairedItem: item?.pairedItem,
+      error: item?.error,
+      // Always strip binary from recorded results.
+      binary: undefined,
+    }));
+  }
+
+  private recordNodeResult(execution: Execution, nodeRef: string, items: ExecutionItem[]): void {
+    // Preserve full in-flight items (may contain binary) for downstream nodes in this run.
+    this.volatileResults.set(nodeRef, items);
+    // Persist a sanitized version into execution history (must be JSON-safe).
+    execution.results.push({ nodeRef, items: this.sanitizeItemsForRecording(items) });
   }
 
   async createHandler(node: Node, resolvedParams: NodeParameters, execution: Execution): Promise<NodeHandler> {
@@ -149,7 +175,7 @@ export class Engine {
     const transformHandler = await this.createHandler(virtualNode, resolved, execution);
     const items = await transformHandler.execute(inputItems);
     // Record inline transform result like a normal node
-    execution.results.push({ nodeRef: virtualNode.ref, items });
+    this.recordNodeResult(execution, virtualNode.ref, items);
     return items;
   }
 
@@ -169,7 +195,7 @@ export class Engine {
     const handler = await this.createHandler(virtualNode, params, execution);
     const items = await handler.execute(inputItems);
     // Record inline mutate result like a normal node
-    execution.results.push({ nodeRef: virtualNode.ref, items });
+    this.recordNodeResult(execution, virtualNode.ref, items);
     return items;
   }
 
@@ -189,7 +215,7 @@ export class Engine {
     const conditionalHandler = await this.createHandler(virtualNode, params, execution);
     const conditionalResultItems = await conditionalHandler.execute(inputItems);
     // Record inline conditional result like a normal node
-    execution.results.push({ nodeRef: virtualNode.ref, items: conditionalResultItems });
+    this.recordNodeResult(execution, virtualNode.ref, conditionalResultItems);
 
     const firstItem = conditionalResultItems[0];
     if (firstItem?.json && typeof firstItem.json === 'object') {
@@ -240,6 +266,9 @@ export class Engine {
   }
 
   async executeBlueprint(blueprint: Blueprint, execution: Execution): Promise<ExecutionItem[]> {
+    // volatileResults is per Engine instance; clear between executions to avoid unbounded growth
+    // in long-running processes.
+    this.volatileResults.clear();
     try {
       await this.validateForExecution(blueprint);
       let currentNode: Node | null;
@@ -258,10 +287,24 @@ export class Engine {
       }
 
       execution.status = 'running';
+      // Seed volatile results from any pre-existing execution history (e.g., __initial__).
+      // These are assumed JSON-safe; volatileResults is only used to avoid losing in-flight binary.
+      try {
+        for (const entry of execution.results ?? []) {
+          if (entry?.nodeRef && Array.isArray(entry.items)) {
+            this.volatileResults.set(entry.nodeRef, entry.items);
+          }
+        }
+      } catch {
+        // ignore
+      }
       return await this.executeLoop(blueprint, execution, currentNode);
     } catch (error) {
       await this.handleExecutionError(error, execution);
       throw error;
+    } finally {
+      // Always clear after execution completes/fails to avoid retaining large in-flight payloads.
+      this.volatileResults.clear();
     }
   }
 
@@ -371,7 +414,7 @@ export class Engine {
     } catch {
       console.error('[ERROR Engine.handleNodeError] node_failed');
     }
-    execution.results.push({ nodeRef: currentNode.ref, items: ExecutionItemUtils.wrapError(errorMessage) });
+    this.recordNodeResult(execution, currentNode.ref, ExecutionItemUtils.wrapError(errorMessage));
     // Only mark the whole workflow as failed and emit workflow_failed when configured to fail on node errors.
     if (this.failOnNodeError) {
       await this.setExecutionError(execution, errorMessage);
@@ -409,22 +452,17 @@ export class Engine {
 
   private getNodeInput(execution: Execution): ExecutionItem[] | undefined {
     if (!execution.currentNodeInputRef) return undefined;
-
-    // Find latest result for the input node (reverse search for efficiency)
-    for (let i = execution.results.length - 1; i >= 0; i--) {
-      if (execution.results[i].nodeRef === execution.currentNodeInputRef) {
-        return execution.results[i].items;
-      }
-    }
-    return undefined;
+    return this.findNodeResult(execution, execution.currentNodeInputRef);
   }
 
   private findNodeResult(execution: Execution, nodeRef: string): ExecutionItem[] | undefined {
-    // Find latest result for the specified node (reverse search for efficiency)
+    // Prefer in-memory results (may include binary) for this run.
+    const volatile = this.volatileResults.get(nodeRef);
+    if (volatile) return volatile;
+
+    // Fallback: find latest recorded result (JSON-safe; binary stripped).
     for (let i = execution.results.length - 1; i >= 0; i--) {
-      if (execution.results[i].nodeRef === nodeRef) {
-        return execution.results[i].items;
-      }
+      if (execution.results[i].nodeRef === nodeRef) return execution.results[i].items;
     }
     return undefined;
   }
@@ -508,7 +546,7 @@ export class Engine {
       }
 
       // Record primary node output immediately (as a normal node result)
-      execution.results.push({ nodeRef: currentNode.ref, items: outputItems });
+      this.recordNodeResult(execution, currentNode.ref, outputItems);
 
       // Execute inline transforms AFTER handler if present, transforming the node output.
       // IMPORTANT: Skip when the current node IS the dedicated transform node to avoid double-processing.

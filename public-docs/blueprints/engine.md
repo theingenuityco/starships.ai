@@ -32,7 +32,7 @@ Execution lifecycle
    - Set `execution.currentNodeRef` and derive input from latest output of the upstream node.
    - Resolve handler parameters (templates) as per rules above.
    - Create handler and validate.
-   - Execute handler; record primary result in `execution.results`.
+   - Execute handler; record primary result in `execution.results` (sanitized; see Binary handling below).
    - Execute inline transforms (post-handler) on the handler output and record a result entry.
    - Execute inline reducers (post-handler) to mutate state and record a result entry.
    - Execute inline condition (post-handler) to produce an `edgeCondition` result (unless already present).
@@ -77,6 +77,14 @@ Runtime configuration and secrets
   - `connector_action` requires `hostRuntime.connectorAction`
 - Hosts may pass non-secret configuration via `Engine({ runtimeEnv })`. At runtime, templates can read these values via `env('KEY')` and Code nodes can read them via `ctx.env('KEY')`.
 - In the hosted Starships product, the server supplies `runtimeEnv` (for example `STARSHIP_ID`, `CONVERSATION_ID`, `SERVER_URL`) and a connector/LLM-capable `hostRuntime`. Blueprints never receive raw API keys or OAuth tokens.
+
+Binary handling (in-flight only)
+
+- `ExecutionItem.binary` may contain non-JSON binary payloads (for example `{ kind: "bytes", data: ArrayBuffer }`).
+- The Engine supports this by splitting **in-flight** vs **recorded** data:
+  - **In-flight**: node outputs (including `binary`) are kept in-memory and can be consumed by downstream nodes in the same run.
+  - **Recorded**: `execution.results` (and emitted events which include `execution`) store a **sanitized copy** of items with `binary` stripped.
+- Why: the RemoteRunner and event transport serialize `execution` as JSON; real binary data must not be placed into `execution.results` or events.
 
 Cross-links
 

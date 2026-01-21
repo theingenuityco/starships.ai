@@ -209,4 +209,122 @@ describe('Engine', () => {
       );
     });
   });
+
+  describe('Binary in-flight payloads', () => {
+    it('preserves in-flight binary between nodes while keeping execution JSON-safe', async () => {
+      const httpMock = jest.fn(
+        async ({
+          url,
+          method,
+          responseType,
+          body,
+          headers,
+        }: {
+          url: string;
+          method: string;
+          responseType?: 'json' | 'text' | 'arrayBuffer';
+          body?: unknown;
+          headers?: Record<string, unknown>;
+        }) => {
+        if (url === 'https://storage.example.com/download') {
+          expect(responseType).toBe('arrayBuffer');
+          return {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'content-type': 'application/octet-stream' },
+            body: new Uint8Array([1, 2, 3]).buffer,
+            url,
+          };
+        }
+        if (url === 'https://uploads.example.com/upload') {
+          // Upload step should receive the raw bytes as request body (in-flight)
+          expect(method).toBe('PUT');
+          expect(body).toBeInstanceOf(ArrayBuffer);
+          // Node should set content-type from binary payload if not explicitly set.
+          expect(headers).toEqual(expect.objectContaining({ 'content-type': 'application/octet-stream' }));
+          return {
+            status: 201,
+            statusText: 'Created',
+            headers: {},
+            body: '',
+            url,
+          };
+        }
+        throw new Error('unexpected url in http mock');
+      }
+      );
+
+      const hostRuntime: HostRuntime = {
+        http: httpMock as unknown as HostRuntime['http'],
+        connectorAction: jest.fn(async () => ({ status: 200, statusText: 'OK', headers: {}, body: {}, url: 'connector://noop' })) as unknown as HostRuntime['connectorAction'],
+      };
+
+      const blueprint: Blueprint = createMockBlueprint({
+        nodes: [
+          { ref: 'start', type: 'start', name: 'Start', description: 'Start', parameters: {} },
+          {
+            ref: 'download',
+            type: 'http_request',
+            name: 'Download',
+            description: 'Download bytes',
+            parameters: {
+              url: 'https://storage.example.com/download',
+              method: 'GET',
+              responseType: 'arrayBuffer',
+              binaryKey: 'payload',
+            },
+          },
+          {
+            ref: 'upload',
+            type: 'http_request',
+            name: 'Upload',
+            description: 'Upload bytes',
+            parameters: {
+              url: 'https://uploads.example.com/upload',
+              method: 'PUT',
+              bodyFromBinaryKey: 'payload',
+            },
+          },
+          { ref: 'end', type: 'end', name: 'End', description: 'End', parameters: {} },
+        ],
+        edges: [
+          { ref: 'e1', from: 'start', to: 'download' },
+          { ref: 'e2', from: 'download', to: 'upload' },
+          { ref: 'e3', from: 'upload', to: 'end' },
+        ],
+      });
+
+      const eventCallback = jest.fn();
+      const engine = new Engine({ eventCallback, hostRuntime });
+      const execution = ExecutionItemUtils.createExecution();
+
+      await engine.executeBlueprint(blueprint, execution);
+
+      // Execution should be JSON-stringifiable (RemoteRunner compatibility).
+      expect(() => JSON.stringify(execution)).not.toThrow();
+
+      // Recorded results must not contain binary (sanitized for JSON).
+      const recordedDownload = execution.results.find((r) => r.nodeRef === 'download');
+      expect(recordedDownload?.items?.[0]?.binary).toBeUndefined();
+      const recordedUpload = execution.results.find((r) => r.nodeRef === 'upload');
+      expect(recordedUpload?.items?.[0]?.binary).toBeUndefined();
+
+      // And we should have invoked both HTTP calls.
+      expect(httpMock).toHaveBeenCalled();
+
+      // Event payloads must also be JSON-safe (no binary).
+      for (const call of eventCallback.mock.calls) {
+        const ev = call[0] as unknown as { data?: { execution?: { results?: Array<{ items?: Array<{ binary?: unknown }> }> } } };
+        expect(() => JSON.stringify(ev)).not.toThrow();
+        const exec = ev?.data?.execution;
+        if (exec?.results) {
+          for (const entry of exec.results) {
+            for (const item of entry.items || []) {
+              expect(item.binary).toBeUndefined();
+            }
+          }
+        }
+      }
+    });
+  });
 });

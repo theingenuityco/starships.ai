@@ -52,11 +52,55 @@ export async function invokeBedrock(
 ): Promise<AsyncIterable<unknown>> {
   const client = options.client;
 
+  type AdditionalModelRequestFields = Record<string, unknown> & {
+    thinking?: { type: 'enabled'; budget_tokens: number };
+  };
+
+  // Extract reasoning config (do not log prompts/PII; only config shape/flags)
+  const reasoningCfg = (request as unknown as { reasoning?: unknown }).reasoning as unknown;
+  const reasoningRec =
+    reasoningCfg && typeof reasoningCfg === 'object' && !Array.isArray(reasoningCfg) ? (reasoningCfg as Record<string, unknown>) : undefined;
+  const reasoningEnabled = reasoningRec?.enabled === true && reasoningRec?.exclude !== true;
+  const computeThinkingBudgetTokens = (): number => {
+    if (!reasoningEnabled) return 0;
+    const effort = typeof reasoningRec?.effort === 'string' ? reasoningRec.effort : undefined;
+    const requestedBudget = typeof reasoningRec?.max_tokens === 'number' ? reasoningRec.max_tokens : undefined;
+    let budgetTokens =
+      typeof requestedBudget === 'number' && Number.isFinite(requestedBudget) && requestedBudget > 0
+        ? Math.floor(requestedBudget)
+        : effort === 'low'
+          ? 256
+          : effort === 'high'
+            ? 2048
+            : 1024; // default/medium
+
+    const maxTokens = typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : undefined;
+    // Bedrock/Claude requires maxTokens > budget_tokens, so clamp conservatively.
+    if (typeof maxTokens === 'number') {
+      if (maxTokens <= 1) {
+        budgetTokens = 0;
+      } else if (budgetTokens >= maxTokens) {
+        budgetTokens = Math.max(1, maxTokens - 1);
+      }
+    }
+    return budgetTokens;
+  };
+  const thinkingBudgetTokens = computeThinkingBudgetTokens();
+  let thinkingWillBeEnabled = thinkingBudgetTokens > 0;
+
   // Separate system prompts from messages
   const bedrockMessages: BedrockMessage[] = [];
   const system: { text: string }[] = [];
 
   const rawMessages = request.messages as OpenAI.Chat.ChatCompletionMessageParam[];
+  // Claude extended thinking requires that any prior assistant turns include the provider-issued
+  // thinking/reasoning blocks (including signatures) exactly as returned. We currently do not
+  // persist those provider-native blocks, so enabling thinking on multi-turn conversations
+  // will fail Bedrock validation. Only enable thinking when there is no assistant history.
+  const hasAssistantHistory = Array.isArray(rawMessages) && rawMessages.some((m) => m?.role === 'assistant');
+  if (hasAssistantHistory) {
+    thinkingWillBeEnabled = false;
+  }
 
   for (const m of rawMessages) {
     if (m.role === 'system') {
@@ -143,10 +187,11 @@ export async function invokeBedrock(
       }
     }
 
-    // Map other roles to user/assistant.
-    // Note: Bedrock strictly alternates user/assistant usually, but Converse API is more flexible.
-    // However, it expects 'user' or 'assistant'.
-    const role = m.role === 'user' ? 'user' : 'assistant';
+    // Map roles to Bedrock roles.
+    // - tool results should be treated like user content (toolResult blocks ideally; we at least avoid 'assistant' here)
+    // - Bedrock expects 'user' or 'assistant'
+    const role = m.role === 'user' || m.role === 'tool' ? 'user' : 'assistant';
+
     bedrockMessages.push({
       role,
       content,
@@ -170,26 +215,53 @@ export async function invokeBedrock(
     toolConfig = { tools };
   }
 
-  const input: ConverseStreamCommandInput = {
+  // Bedrock inference config: when Claude "thinking" is enabled, Bedrock enforces constraints
+  // (notably: temperature may only be set to 1). We'll adjust below after computing thinking budget.
+  const inferenceConfig: Record<string, unknown> = {
+    maxTokens: request.maxTokens,
+  };
+
+  const input: ConverseStreamCommandInput & { additionalModelRequestFields?: AdditionalModelRequestFields } = {
     modelId: providerModelId,
     messages: bedrockMessages,
     toolConfig,
-    inferenceConfig: {
-      maxTokens: request.maxTokens,
-      temperature: request.temperature,
-      topP: request.topP,
-    },
+    inferenceConfig,
   };
 
   if (system.length > 0) {
     input.system = system;
   }
 
+  // Best-effort: enable Anthropic "extended thinking" via Bedrock additionalModelRequestFields.
+  // This is required for Bedrock to emit separate thinking/reasoning content blocks.
+  // Docs: Claude on Bedrock extended thinking uses: { thinking: { type: 'enabled', budget_tokens: <int> } }
+  try {
+    if (thinkingWillBeEnabled) {
+        input.additionalModelRequestFields = {
+          ...(input.additionalModelRequestFields ?? {}),
+          thinking: { type: 'enabled', budget_tokens: thinkingBudgetTokens },
+        };
+
+        // Bedrock validation for Claude extended thinking:
+        // - temperature may only be set to 1 when thinking is enabled
+        // - (provider-dependent) avoid sending topP alongside this
+        inferenceConfig.temperature = 1;
+    }
+  } catch {
+    // Non-fatal: if unsupported by model/provider, Bedrock will ignore or validate; don't crash here.
+  }
+
+  // If thinking is not enabled, forward sampling params as-is.
+  if (!input.additionalModelRequestFields?.thinking) {
+    if (typeof request.temperature === 'number') inferenceConfig.temperature = request.temperature;
+    if (typeof request.topP === 'number') inferenceConfig.topP = request.topP;
+  }
+
   try {
     const command = new ConverseStreamCommand(input);
     // Cast to any to avoid spurious TS error "Property 'send' does not exist"
     // which happens despite BedrockRuntimeClient inheriting from Client
-    const response = await (client as any).send(command);
+    const response = await (client as unknown as { send: (cmd: ConverseStreamCommand) => Promise<{ stream?: unknown }> }).send(command);
 
     async function* gen() {
       if (!response.stream) return;
@@ -204,12 +276,76 @@ export async function invokeBedrock(
         accumulatedArgs: string;
       };
       const toolUseStates: Record<number, BedrockToolUseState> = {};
+      const reasoningStates: Record<number, string> = {};
 
-      for await (const event of response.stream as AsyncIterable<any>) {
+      type BedrockDelta = {
+        text?: string;
+        toolUse?: { input?: unknown };
+        reasoningContent?: unknown;
+      };
+      type BedrockStreamEvent = {
+        contentBlockDelta?: { contentBlockIndex?: number; delta?: BedrockDelta };
+        contentBlockStart?: {
+          contentBlockIndex?: number;
+          start?: { toolUse?: { toolUseId?: string; name?: string } };
+        };
+      };
+      const stream = response.stream as AsyncIterable<BedrockStreamEvent>;
+
+      for await (const event of stream) {
         // Text deltas
         if (event.contentBlockDelta && event.contentBlockDelta.delta) {
           const idx = event.contentBlockDelta.contentBlockIndex ?? 0;
           const delta = event.contentBlockDelta.delta;
+
+          // Reasoning / thinking deltas (Bedrock: reasoningContent). Map to OpenAI-style delta.reasoning.
+          // Bedrock may send either incremental deltas or cumulative snapshots; compute a non-overlapping fragment.
+          if (delta.reasoningContent) {
+            const rc = delta.reasoningContent;
+            let nextText = '';
+            try {
+              if (typeof rc === 'string') {
+                nextText = rc;
+              } else if (rc && typeof rc === 'object') {
+                const rco = rc as Record<string, unknown>;
+                // Common shapes:
+                // - { reasoningText: { text: string, signature?: string } }
+                // - { text: string }
+                const reasoningText = (rco as { reasoningText?: unknown }).reasoningText as unknown;
+                if (reasoningText && typeof reasoningText === 'object') {
+                  const rt = reasoningText as Record<string, unknown>;
+                  if (typeof rt.text === 'string') nextText = rt.text;
+                }
+                if (!nextText && typeof (rco as { text?: unknown }).text === 'string') {
+                  nextText = (rco as { text: string }).text;
+                }
+              }
+            } catch {
+              nextText = '';
+            }
+
+            if (typeof nextText === 'string') {
+              const prev = reasoningStates[idx] || '';
+              const fragment = nextText.startsWith(prev) ? nextText.slice(prev.length) : nextText;
+              reasoningStates[idx] = nextText;
+              if (fragment.length > 0) {
+                yield {
+                  id: 'bedrock-stream',
+                  object: 'chat.completion.chunk',
+                  created: Date.now(),
+                  model: providerModelId,
+                  choices: [
+                    {
+                      index: 0,
+                      delta: { reasoning: fragment },
+                      finish_reason: null,
+                    },
+                  ],
+                };
+              }
+            }
+            continue;
+          }
 
           // Tool calling: map Bedrock toolUse deltas to OpenAI-style tool_calls
           if (delta.toolUse) {
@@ -297,6 +433,35 @@ export async function invokeBedrock(
               toolUseId: tu.toolUseId,
               name: tu.name,
               accumulatedArgs: '',
+            };
+
+            // Bedrock may emit a toolUseStart and then provide an EMPTY input (or no deltas)
+            // for no-argument tools. Our LLM layer detects tool calls only via tool_calls deltas,
+            // so emit an initial OpenAI-style tool_calls delta immediately on start.
+            yield {
+              id: 'bedrock-stream',
+              object: 'chat.completion.chunk',
+              created: Date.now(),
+              model: providerModelId,
+              choices: [
+                {
+                  index: 0,
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: idx,
+                        id: tu.toolUseId,
+                        type: 'function',
+                        function: {
+                          name: tu.name,
+                          arguments: '',
+                        },
+                      },
+                    ],
+                  },
+                  finish_reason: null,
+                },
+              ],
             };
           }
           continue;

@@ -5,7 +5,7 @@
  * Follows the same pattern as Workflow and Agent classes for consistency.
  */
 
-import { HttpRequestParams, ValidationResult, ValidationError, ExecutionItem } from '@/types';
+import { HttpRequestParams, ValidationResult, ValidationError, ExecutionItem, BinaryPayload } from '@/types';
 import { NodeHandler, NodeHandlerOptions } from '@/types/node-handler';
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 
@@ -41,12 +41,29 @@ export class HttpRequest implements NodeHandler {
 
     const method = (this.params.method || 'GET').toUpperCase();
     let bodyData: unknown;
+    // Use local headers so we don't mutate node params during execution.
+    let headersParam: HttpRequestParams['headers'] = this.params.headers;
 
     // Body selection rules:
     // - GET/HEAD => never send a body, even if provided
+    // - If bodyFromBinaryKey is set => use input[0].binary[key] as raw body
     // - Other methods => only use explicitly configured body; upstream input is ignored
     if (method === 'GET' || method === 'HEAD') {
       bodyData = undefined;
+    } else if (typeof this.params.bodyFromBinaryKey === 'string' && this.params.bodyFromBinaryKey.trim().length > 0) {
+      const key = this.params.bodyFromBinaryKey.trim();
+      const payload = input?.[0]?.binary?.[key] as BinaryPayload | undefined;
+      if (!payload || payload.kind !== 'bytes' || !(payload.data instanceof ArrayBuffer)) {
+        throw new Error(`HttpRequest missing binary payload for key "${key}"`);
+      }
+      bodyData = payload.data;
+
+      // Best-effort content-type propagation: only set if caller hasn't specified it already.
+      const currentHeaders = new Headers(headersParam as unknown as HeadersInit);
+      if (payload.contentType && !currentHeaders.has('content-type')) {
+        currentHeaders.set('content-type', payload.contentType);
+        headersParam = currentHeaders as unknown as HttpRequestParams['headers'];
+      }
     } else if (this.params.body !== undefined) {
       bodyData = this.params.body;
     } else {
@@ -55,21 +72,21 @@ export class HttpRequest implements NodeHandler {
 
     // Normalize headers into a plain record
     let headers: Record<string, unknown> = {};
-    if (this.params.headers) {
-      if (this.params.headers instanceof Headers) {
+    if (headersParam) {
+      if (headersParam instanceof Headers) {
         const tmp: Record<string, string> = {};
-        this.params.headers.forEach((value, key) => {
+        headersParam.forEach((value, key) => {
           tmp[key] = value;
         });
         headers = tmp;
-      } else if (Array.isArray(this.params.headers)) {
+      } else if (Array.isArray(headersParam)) {
         const tmp: Record<string, string> = {};
-        for (const [key, value] of this.params.headers) {
+        for (const [key, value] of headersParam) {
           tmp[key] = value;
         }
         headers = tmp;
       } else {
-        headers = { ...(this.params.headers as Record<string, unknown>) };
+        headers = { ...(headersParam as Record<string, unknown>) };
       }
     }
 
@@ -81,6 +98,7 @@ export class HttpRequest implements NodeHandler {
       headers,
       body: bodyData ?? undefined,
       timeoutMs,
+      responseType: this.params.responseType,
     });
 
     const httpResponse: HttpResponse = {
@@ -108,6 +126,37 @@ export class HttpRequest implements NodeHandler {
           snippet ? ` | body: ${snippet}` : ''
         }`
       );
+    }
+
+    // Optional: store binary response payload in ExecutionItem.binary.
+    if (this.params.responseType === 'arrayBuffer') {
+      const key = (typeof this.params.binaryKey === 'string' && this.params.binaryKey.trim().length > 0 ? this.params.binaryKey.trim() : 'data') as string;
+      const ab = response.body;
+      if (!(ab instanceof ArrayBuffer)) {
+        throw new Error('Host runtime returned non-ArrayBuffer body for responseType=arrayBuffer');
+      }
+      const contentType =
+        typeof (response.headers as Record<string, unknown>)?.['content-type'] === 'string'
+          ? String((response.headers as Record<string, unknown>)['content-type'])
+          : typeof (response.headers as Record<string, unknown>)?.['Content-Type'] === 'string'
+            ? String((response.headers as Record<string, unknown>)['Content-Type'])
+            : undefined;
+
+      const out: ExecutionItem[] = ExecutionItemUtils.wrapSingle(
+        {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          body: undefined,
+          url: response.url,
+        },
+        input?.[0]
+      );
+      out[0].binary = {
+        ...(out[0].binary ?? {}),
+        [key]: { kind: 'bytes', data: ab, contentType, sizeBytes: ab.byteLength } satisfies BinaryPayload,
+      };
+      return out;
     }
 
     return ExecutionItemUtils.wrapSingle(httpResponse, input?.[0]);

@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { TypingDots } from '@/components/ui/TypingDots'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
+import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -571,6 +572,47 @@ export function ConversationMessageList({
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={idx === renderMessages.length - 1}
                 />
+                {(() => {
+                  const widgets =
+                    message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
+                  if (widgets.length === 0) return null
+                  return (
+                    <div className="flex justify-start">
+                      <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
+                        {/* Spacer to match avatar width */}
+                        <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
+                        <div className="flex-1 w-full">
+                          <div className="space-y-4 mt-3 w-full max-w-none">
+                            {widgets.map(widget => (
+                              <div key={widget.id} className="w-full max-w-none mb-4">
+                                {/* Conversational widget header - looks like text */}
+                                <div className="text-sm w-full mb-4">
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="font-medium">{widget.name}</span>
+                                  </div>
+                                  {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
+                                </div>
+
+                                {/* Widget visualization - minimal styling, full width */}
+                                {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
+                                <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                  <InlineWidgetRenderer
+                                    widget={{
+                                      widgetType: widget.widgetType,
+                                      props: widget.props,
+                                    }}
+                                    compactMode={true}
+                                    className="w-full"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
               </Fragment>
             )
           })}
@@ -670,6 +712,79 @@ function initialsFromName(name?: string | null): string {
     .join('')
 }
 
+// Known widget types from public-docs (rendered immediately after the message row)
+const KNOWN_WIDGET_TYPES = new Set([
+  'StatCard',
+  'DataTable',
+  'MetricGrid',
+  'BarChart',
+  'LineChart',
+  'AreaChart',
+  'PieChart',
+  'DonutChart',
+  'RadarChart',
+  'RadialChart',
+  'ConnectorSuggestionCard',
+  'AgentSuggestionCard',
+  'StarshipDetails',
+])
+
+type WidgetResult = {
+  id: string
+  widgetType: string
+  props: Record<string, unknown>
+  name: string
+  description: string | undefined
+  index: number
+}
+
+function extractWidgetResults(uiActions: unknown): WidgetResult[] {
+  const actions = Array.isArray(uiActions) ? (uiActions as Array<{ action?: unknown; payload?: unknown }>) : []
+  if (actions.length === 0) return []
+
+  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+
+  const outRaw: Array<WidgetResult | null> = actions
+    .map((ua, index) => {
+      if (!ua || ua.action !== 'render_widget') return null
+      const payload = ua.payload
+      if (!payload || !isRecord(payload)) return null
+      const widget = payload['widget']
+      if (!isRecord(widget)) return null
+
+      const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
+      const props = widget['props']
+      if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
+      if (!props || typeof props !== 'object') return null
+
+      const id =
+        (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
+        (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
+        `ui-widget-${index}`
+
+      return {
+        id,
+        widgetType,
+        props: props as Record<string, unknown>,
+        name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
+        description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
+        index,
+      } satisfies WidgetResult
+    })
+  const out = outRaw.filter((w): w is WidgetResult => w !== null)
+
+  // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
+  const seen = new Set<string>()
+  const deduped: WidgetResult[] = []
+  for (const w of out) {
+    if (seen.has(w.id)) continue
+    seen.add(w.id)
+    deduped.push(w)
+  }
+
+  return deduped
+}
+
 // Memoized message bubble to prevent unnecessary re-renders
 const MemoizedMessageBubble = memo(
   function ConversationMessageBubble({
@@ -761,7 +876,6 @@ const MemoizedMessageBubble = memo(
                 agentName={userDisplayName}
                 toolCalls={message.toolCalls}
                 toolResults={message.toolResults}
-                uiActions={message.uiActions}
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
@@ -784,8 +898,10 @@ const MemoizedMessageBubble = memo(
           <div
             className={cn(
               'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors',
-              // Tighter spacing for consecutive assistant messages within the same turn
-              showAssistantAvatar ? 'py-2' : 'py-0.5'
+              // Keep padding consistent even when avatar/name are hidden,
+              // but slightly overlap consecutive assistant messages so they feel like one block.
+              'py-2',
+              !showAssistantAvatar && '-mt-1'
             )}
           >
             {showAssistantAvatar ? (
@@ -793,10 +909,10 @@ const MemoizedMessageBubble = memo(
                 <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />
               </div>
             ) : (
-              // Keep the left gutter, but don't add vertical height/offset for continuation messages
-              <div className="flex-shrink-0 w-10 h-0 mt-0" aria-hidden="true" />
+              // Keep the left gutter aligned with avatar rows
+              <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
-            <div className={cn('flex-1 w-full', showAssistantAvatar ? 'pt-0.5' : 'pt-0')}>
+            <div className="flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
                 <div className="mb-1 text-sm font-bold text-foreground">
                   {assistantProfileHref ? (
@@ -822,7 +938,6 @@ const MemoizedMessageBubble = memo(
                 agentName={assistantDisplayName}
                 toolCalls={message.toolCalls}
                 toolResults={message.toolResults}
-                uiActions={message.uiActions}
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}

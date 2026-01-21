@@ -21,8 +21,6 @@ import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
-import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
-import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
 import { StatusDots } from '@/components/ui/StatusDots'
@@ -290,8 +288,6 @@ interface MessageContentProps {
   agentName?: string
   toolCalls?: LlmToolCall[]
   toolResults?: ToolResultLike[]
-  // UI actions emitted over SSE (preferred, tool-name agnostic)
-  uiActions?: Array<{ action: string; payload?: Record<string, unknown> }>
   messageType?: MessageModel['messageType']
   // Attachments
   attachmentIds?: string[]
@@ -311,23 +307,6 @@ type ToolResultLike = {
   content?: unknown
   result?: unknown
 }
-
-// Known widget types from public-docs
-const KNOWN_WIDGET_TYPES = new Set([
-  'StatCard',
-  'DataTable',
-  'MetricGrid',
-  'BarChart',
-  'LineChart',
-  'AreaChart',
-  'PieChart',
-  'DonutChart',
-  'RadarChart',
-  'RadialChart',
-  'ConnectorSuggestionCard',
-  'AgentSuggestionCard',
-  'StarshipDetails',
-])
 
 // Cache tool display names so we don't refetch per-message/per-render.
 // Keyed by `${starshipId}:${toolSlug}` -> tool display name.
@@ -420,7 +399,6 @@ export function ConversationMessageContent({
   agentName,
   toolCalls,
   toolResults = [],
-  uiActions = [],
   messageType,
   attachmentIds,
   starshipId,
@@ -1044,54 +1022,6 @@ export function ConversationMessageContent({
       </div>
     ) : null
 
-  // Widget rendering: driven by ui_action payloads (tool-name agnostic)
-  const widgetResults = useMemo(() => {
-    const actions = Array.isArray(uiActions) ? uiActions : []
-    if (actions.length === 0) return []
-
-    const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
-    const out = actions
-      .map((ua, index) => {
-        if (!ua || ua.action !== 'render_widget') return null
-        const payload = ua.payload
-        if (!payload || !isRecord(payload)) return null
-        const widget = payload['widget']
-        if (!isRecord(widget)) return null
-
-        const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
-        const props = widget['props']
-        if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
-        if (!props || typeof props !== 'object') return null
-
-        return {
-          id:
-            (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
-            (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
-            `ui-widget-${index}`,
-          widgetType,
-          props,
-          name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
-          description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
-          index,
-        }
-      })
-      .filter((w): w is NonNullable<typeof w> => w !== null)
-
-    // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
-    const deduped = (() => {
-      const seen = new Set<string>()
-      const next: typeof out = []
-      for (const w of out) {
-        if (seen.has(w.id)) continue
-        seen.add(w.id)
-        next.push(w)
-      }
-      return next
-    })()
-
-    return deduped
-  }, [uiActions])
-
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
     return (
@@ -1108,7 +1038,7 @@ export function ConversationMessageContent({
   return (
     <div ref={messageContainerRef} className={cn('relative w-full ph-mask-chat-message', className)}>
       {/* Content block: actions anchor here so widgets below don't shift them */}
-      <div className={cn('relative', widgetResults.length > 0 ? 'mb-2' : '')}>
+      <div className="relative">
         {/* Message actions (copy + download): show on hover, float at bottom edge */}
         {enableCopy && (
           <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
@@ -1181,51 +1111,6 @@ export function ConversationMessageContent({
           </div>
         )}
       </div>
-
-      {/* Widget rendering: Display widgets inline when requested by ui_action */}
-      {widgetResults.length > 0 && messageType !== 'tool_result' && (
-        // NOTE: Widgets should not inherit the row hover highlight.
-        // Paint the page background over the hover area and extend into the row padding.
-        <div className="space-y-4 mt-3 w-full max-w-none bg-background -mx-2 px-2">
-          {widgetResults.map(widget => {
-            const isPending = false
-
-            return (
-              <div key={widget.id} className="w-full max-w-none mb-4">
-                {/* Conversational widget header - looks like text */}
-                <div className="text-sm w-full mb-4">
-                  <div className="flex items-baseline gap-1">
-                    <span className="font-medium">{widget.name}</span>
-                  </div>
-                  {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
-                </div>
-
-                {/* Widget visualization - minimal styling, full width */}
-                {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
-                <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  {isPending ? (
-                    <div className="h-[420px] flex items-center justify-center">
-                      <div className="flex flex-col items-center gap-2">
-                        <LoadingSpinner className="w-5 h-5" />
-                        <span className="text-xs text-muted-foreground">Rendering...</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <InlineWidgetRenderer
-                      widget={{
-                        widgetType: widget.widgetType,
-                        props: widget.props,
-                      }}
-                      compactMode={true}
-                      className="w-full"
-                    />
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
 
       {/* Tool result message rendering - fallback for unmatched results */}
       {messageType === 'tool_result' && (

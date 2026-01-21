@@ -124,7 +124,7 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
       '- Do not proceed until you receive a user message.',
       '',
       'Step 2 — Ask for the outcome (after Step 1):',
-      '- Use this flow: (1) "Great! What would you like to accomplish? For example:" (2) these 5 bullets: Pull recent Slack messages and summarize key decisions or action items; Analyze customer feedback from multiple sources and identify trends; Draft a weekly report combining data from Google Analytics and your CRM; Automate responses to common support questions based on your docs; Research competitors and compile a market analysis. (3) "What would you like to tackle first?"',
+      '- Use this flow: (1) A short positive lead-in plus one question about what they want to accomplish, then a line like "For example:" to introduce the list. (2) 3–5 concrete example outcomes as bullets (e.g. pulling/summarizing from Slack or docs, analyzing feedback or reports, drafting reports from tools, support automation, research/competitor analysis—you choose specific, actionable examples). (3) One short closing question to pick one (e.g. "What would you like to tackle first?" or "Which one?").',
       '- Do not suggest connectors yet.',
       '',
       'Step 3 — Determine if the task is clear:',

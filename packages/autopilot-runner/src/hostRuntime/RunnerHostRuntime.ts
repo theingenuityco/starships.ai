@@ -91,7 +91,16 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   const connectorMetadata = options.connectorMetadata ?? {};
   const runtimeEnv = options.runtimeEnv ?? {};
 
-  const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
+  const http: HostRuntime['http'] = async (request) => {
+    const { method, url, headers = {}, body, timeoutMs } = request as {
+      method: string;
+      url: string;
+      headers?: Record<string, unknown>;
+      body?: unknown;
+      timeoutMs?: number;
+    };
+    // Backward/forward compatible: older @starships/autopilot types may not include this field.
+    const responseType = (request as any)?.responseType as 'json' | 'text' | 'arrayBuffer' | undefined;
     const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
       const out: Record<string, unknown> = {};
       const sensitive = new Set([
@@ -264,14 +273,22 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const contentType = resp.headers.get('content-type') || '';
       let responseBody: unknown;
 
-      if (contentType.includes('application/json')) {
-        try {
-          responseBody = await resp.json();
-        } catch {
+      // Respect explicit responseType first
+      if (responseType === 'arrayBuffer') {
+        responseBody = await resp.arrayBuffer();
+      } else if (responseType === 'text') {
+        responseBody = await resp.text();
+      } else {
+        // Default: best-effort JSON, otherwise text
+        if (contentType.includes('application/json')) {
+          try {
+            responseBody = await resp.json();
+          } catch {
+            responseBody = await resp.text();
+          }
+        } else {
           responseBody = await resp.text();
         }
-      } else {
-        responseBody = await resp.text();
       }
 
       const responseHeaders: Record<string, string> = {};

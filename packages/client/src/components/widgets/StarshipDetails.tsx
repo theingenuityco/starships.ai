@@ -162,18 +162,12 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   return (
     <Card
       className={cn(
-        // Distinct "starships" card: premium surface + nebula accents, but still fits inside chat.
-        // Match AgentTemplateCard shadow convention: shadow-sm → hover:shadow-md
-        'group relative w-full max-w-[760px] overflow-hidden rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm shadow-sm',
-        'transition-all duration-200 hover:bg-card/70 hover:shadow-md',
+        // Solid card surface (no gradient overlays), still fits inside chat.
+        'group relative w-full max-w-[760px] overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm',
+        'transition-all duration-200 hover:shadow-md',
         className
       )}
     >
-      {/* Subtle accent without a "header" */}
-      {/* Subtle glow that works in both light + dark (different tuning per theme) */}
-      <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_18%_0%,rgba(99,102,241,0.10),transparent_58%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.08),transparent_60%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.06),transparent_62%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.06),transparent_64%)]" />
-      <div className="pointer-events-none absolute inset-0 hidden dark:block bg-[radial-gradient(circle_at_18%_0%,rgba(168,85,247,0.16),transparent_54%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.12),transparent_56%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.09),transparent_60%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.10),transparent_62%)]" />
-
       <CardContent className="relative p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
           <StarshipsLogo width={44} height={44} gradientId={logoGradientId} idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} animationDelay={0} activeStroke="gradient" />

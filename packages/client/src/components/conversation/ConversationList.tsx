@@ -56,7 +56,7 @@ function CompactConversationAgents({ starshipId, agents }: { starshipId: string;
       <div className="flex items-center gap-1 flex-shrink-0">
         {visibleAgents.map(agent => (
           <Avatar key={agent.id} className="h-3.5 w-3.5 ring-1 ring-border/40">
-            <AgentAvatar seed={agent.name} imageUrl={agent.avatarAttachmentId ? avatarUrlById.get(agent.avatarAttachmentId) : undefined} size={14} />
+            <AgentAvatar seed={agent.name} imageUrl={agent.avatarAttachmentId ? avatarUrlById.get(agent.avatarAttachmentId) : undefined} size={14} rounded />
           </Avatar>
         ))}
       </div>

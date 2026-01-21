@@ -1,7 +1,7 @@
 'use client'
 
 import api from '@/lib/api'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type {
   ApiResponse,
   OnboardingApplySelectionRequest,
@@ -14,6 +14,7 @@ import type {
   OnboardingStartResponse,
   OnboardingFinishResponse,
 } from '@starships/protocol'
+import { AUTH_QUERY_KEYS, type AuthUser } from '@/hooks/useAuth'
 
 export const ONBOARDING_QUERY_KEYS = {
   session: () => ['onboarding', 'session'] as const,
@@ -72,10 +73,17 @@ export function useOnboardingApply() {
 }
 
 export function useOnboardingFinish() {
+  const queryClient = useQueryClient()
   return useMutation({
     mutationFn: async (): Promise<OnboardingFinishResponse> => {
       const res = await api.post<ApiResponse<OnboardingFinishResponse>>('/api/v1/onboarding/finish')
       return extractData(res)
+    },
+    onSuccess: async () => {
+      // Ensure the client immediately stops gating the user into onboarding.
+      queryClient.setQueryData<AuthUser | null>(AUTH_QUERY_KEYS.me(), prev => (prev ? { ...prev, onboardingCompleted: true } : prev))
+      await queryClient.invalidateQueries({ queryKey: AUTH_QUERY_KEYS.me() })
+      await queryClient.invalidateQueries({ queryKey: ONBOARDING_QUERY_KEYS.session() })
     },
   })
 }

@@ -595,13 +595,15 @@ export function ConversationMessageList({
                           <div className="space-y-4 mt-3 w-full max-w-none">
                             {widgets.map(widget => (
                               <div key={widget.id} className="w-full max-w-none mb-4">
-                                {/* Conversational widget header - looks like text */}
-                                <div className="text-sm w-full mb-4">
-                                  <div className="flex items-baseline gap-1">
-                                    <span className="font-medium">{widget.name}</span>
+                                {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
+                                {widget.widgetType !== 'StarshipDetails' && (
+                                  <div className="text-sm w-full mb-4">
+                                    <div className="flex items-baseline gap-1">
+                                      <span className="font-medium">{widget.name}</span>
+                                    </div>
+                                    {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
                                   </div>
-                                  {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
-                                </div>
+                                )}
 
                                 {/* Widget visualization - minimal styling, full width */}
                                 {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}

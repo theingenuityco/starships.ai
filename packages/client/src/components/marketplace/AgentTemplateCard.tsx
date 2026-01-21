@@ -146,8 +146,9 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
             <img src={avatarUrl} alt={`${displayName || 'Agent'} avatar`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
-              <div className="h-14 w-14 rounded-2xl bg-background/40 border border-border/60 backdrop-blur-sm flex items-center justify-center">
+              <div className="relative h-14 w-14 rounded-2xl bg-background/40 border border-border/60 backdrop-blur-sm flex items-center justify-center overflow-hidden">
                 <span className="text-lg font-semibold text-muted-foreground">{initials || 'AI'}</span>
+                <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-violet-500/20 shadow-[inset_0_1px_0_rgba(124,58,237,0.18),inset_0_0_18px_rgba(124,58,237,0.18)] dark:ring-violet-400/20 dark:shadow-[inset_0_1px_0_rgba(167,139,250,0.14),inset_0_0_18px_rgba(167,139,250,0.14)]" />
               </div>
             </div>
           )}

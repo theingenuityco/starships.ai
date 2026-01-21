@@ -12,17 +12,14 @@ import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
-import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
-import { motion } from 'motion/react'
-import { staggerContainer, staggerItem } from '@/lib/animations'
-import { toast } from 'sonner'
-import { tableToMarkdown } from '@/components/markdown/markdownComponents'
-import { isAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { TypingDots } from '@/components/ui/TypingDots'
+import Link from 'next/link'
+import { useParams } from 'next/navigation'
+import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -81,6 +78,14 @@ export function ConversationMessageList({
   isAssistantStreamingOverride,
   isAwaitingToolResultsOverride,
 }: ConversationMessageListProps) {
+  const params = useParams<{ slug?: string }>()
+  const starshipSlug = useMemo(() => {
+    const raw = (params as any)?.slug
+    if (typeof raw === 'string') return raw
+    if (Array.isArray(raw) && typeof raw[0] === 'string') return raw[0]
+    return undefined
+  }, [params])
+
   // Render from stream context when available, otherwise allow static/demo rendering via overrides.
   const stream = useConversationStreamContextOptional()
   const messages = messagesOverride ?? stream?.messages ?? []
@@ -92,6 +97,10 @@ export function ConversationMessageList({
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
   const agentName = agentNameOverride ?? agentObj?.name
+  const agentSlug = useMemo(() => {
+    const raw = (agentObj as any)?.slug
+    return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined
+  }, [agentObj])
   const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
@@ -104,13 +113,6 @@ export function ConversationMessageList({
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
   const SCROLL_THRESHOLD_PX = 120
-
-  // Track which turns have been marked as complete (to prevent flickering)
-  // Once a turn is complete, its buttons should always be shown
-  const completedTurnIdsRef = useRef<Set<string>>(new Set())
-
-  // Track which turns have already animated their buttons (to prevent re-animation)
-  const animatedTurnIdsRef = useRef<Set<string>>(new Set())
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
@@ -528,152 +530,6 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
-  // Effect to mark turns as complete when they meet the criteria
-  // This runs after renderMessages is computed to avoid using it before declaration
-  useEffect(() => {
-    renderMessages.forEach((message, idx) => {
-      const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
-      const messageId = message.id
-
-      // Skip if already marked complete
-      if (completedTurnIdsRef.current.has(messageId)) return
-
-      // Only process assistant messages (not tool_result messages)
-      if (message.role !== 'assistant' || message.messageType === 'tool_result') return
-
-      // Check if this turn should be complete
-      const extendedMsg = message as ExtendedMessage
-      const isNotStreaming = !extendedMsg.streaming
-      const isTurnBoundary = next?.role === 'user' || next === null
-      const animationDone = isAnimationComplete(messageId)
-      const hasChunks = Array.isArray(extendedMsg.chunks) && extendedMsg.chunks.length > 0
-
-      // Check if all tool calls have completed
-      const toolCalls = extendedMsg.toolCalls || []
-      const toolResults = extendedMsg.toolResults || []
-      const totalToolCalls = Array.isArray(toolCalls) ? toolCalls.length : 0
-      const completedToolResults = Array.isArray(toolResults) ? toolResults.length : 0
-      const allToolCallsDone = totalToolCalls === 0 || (totalToolCalls > 0 && completedToolResults >= totalToolCalls)
-
-      // Don't mark as complete if we're still awaiting tool results (for the last message)
-      const isLastMessage = idx === renderMessages.length - 1
-      const shouldWaitForToolResults = isLastMessage && isAwaitingToolResults
-
-      // Check if there are any more assistant messages in this turn after this one
-      // Look ahead to find the next user message, and check if there are any assistant messages between now and then
-      let hasMoreAssistantMessagesInTurn = false
-      if (!isTurnBoundary) {
-        // Look ahead through messages until we hit a user message or end
-        for (let i = idx + 1; i < renderMessages.length; i++) {
-          const futureMsg = renderMessages[i] as ExtendedMessage
-          if (futureMsg.role === 'user') {
-            // Found the next turn, stop looking
-            break
-          }
-          if (futureMsg.role === 'assistant' && futureMsg.messageType !== 'tool_result') {
-            // Found another assistant message in this turn
-            hasMoreAssistantMessagesInTurn = true
-            break
-          }
-        }
-      }
-
-      // A turn is complete if: assistant message (not tool_result), not streaming, at turn boundary,
-      // (animation done OR never streamed), all tool calls are done, not awaiting tool results,
-      // and there are no more assistant messages in this turn
-      if (isNotStreaming && isTurnBoundary && (animationDone || !hasChunks) && allToolCallsDone && !shouldWaitForToolResults && !hasMoreAssistantMessagesInTurn) {
-        completedTurnIdsRef.current.add(messageId)
-      }
-    })
-  }, [renderMessages, isAwaitingToolResults])
-
-  // Component to render action buttons after a complete turn
-  function TurnActionButtons({ turnMessages, turnId }: { turnMessages: MessageModel[]; turnId: string }) {
-    // Initialize state based on whether this turn has already been animated
-    // Once a turn is marked as animated, it will never animate again (even on re-renders)
-    const [shouldAnimateButtons] = useState<boolean>(() => {
-      const alreadyAnimated = animatedTurnIdsRef.current.has(turnId)
-      if (!alreadyAnimated) {
-        // Mark as animated immediately to prevent re-animation on future renders
-        animatedTurnIdsRef.current.add(turnId)
-        return true
-      }
-      return false
-    })
-
-    const extractTurnText = (): string => {
-      const parts: string[] = []
-      for (const msg of turnMessages) {
-        if (msg.role === 'user') {
-          parts.push(`**User:**\n${msg.content || ''}`)
-        } else if (msg.role === 'assistant') {
-          const content = msg.content || ''
-          const reasoning = (msg as ExtendedMessage).reasoning
-          if (reasoning && typeof reasoning === 'string' && reasoning.trim()) {
-            parts.push(`**Assistant (thinking):**\n${reasoning}`)
-          }
-          if (content.trim()) {
-            parts.push(`**Assistant:**\n${content}`)
-          }
-        }
-      }
-      return parts.join('\n\n')
-    }
-
-    const handleCopyTurn = async () => {
-      try {
-        const turnText = extractTurnText()
-        await navigator.clipboard.writeText(turnText)
-        toast.success('Turn copied to clipboard')
-      } catch (error) {
-        toast.error('Failed to copy turn')
-      }
-    }
-
-    const handleExportTurn = () => {
-      try {
-        const turnText = extractTurnText()
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5)
-        const filename = `turn-${turnId.slice(0, 8)}-${timestamp}.md`
-
-        const blob = new Blob([turnText], { type: 'text/markdown' })
-        const url = URL.createObjectURL(blob)
-        const a = document.createElement('a')
-        a.href = url
-        a.download = filename
-        document.body.appendChild(a)
-        a.click()
-        a.remove()
-        URL.revokeObjectURL(url)
-
-        toast.success('Turn exported successfully')
-      } catch (error) {
-        toast.error('Failed to export turn')
-      }
-    }
-
-    return (
-      <div className="flex justify-start">
-        <div className="flex items-start gap-3 w-full">
-          {/* Spacer to match avatar width */}
-          <div className="flex-shrink-0 w-8 h-8" aria-hidden="true" />
-          <motion.div key={`turn-buttons-${turnId}`} variants={staggerContainer} initial={shouldAnimateButtons ? 'hidden' : 'visible'} animate="visible" className="flex items-center gap-2 mt-4 mb-4">
-            <motion.div variants={staggerItem}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCopyTurn} title="Copy turn">
-                <Icon name="copy" className="w-3 h-3" />
-              </Button>
-            </motion.div>
-            <motion.div variants={staggerItem}>
-              <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleExportTurn} title="Export turn">
-                <Icon name="download" className="w-3 h-3" />
-              </Button>
-            </motion.div>
-          </motion.div>
-        </div>
-      </div>
-    )
-  }
-
   if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
@@ -693,35 +549,16 @@ export function ConversationMessageList({
         <div className="w-full max-w-4xl mx-auto bg-transparent">
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
-            const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
             const isFirstMessage = idx === 0
-
-            // Check if this is the end of a complete turn
-            // Once a turn is marked as complete (via useEffect), always show its buttons (prevents flickering)
-            const messageId = message.id
-            const isTurnEnd = completedTurnIdsRef.current.has(messageId)
-
-            // Find the start of this turn (the user message before this assistant message)
-            // Use a reverse loop since findLastIndex is not available in older TypeScript targets
-            const turnStartIdx =
-              message.role === 'assistant'
-                ? (() => {
-                    const slice = renderMessages.slice(0, idx + 1)
-                    for (let i = slice.length - 1; i >= 0; i--) {
-                      if (slice[i].role === 'user') return i
-                    }
-                    return -1
-                  })()
-                : -1
-
-            const turnMessages = turnStartIdx >= 0 ? renderMessages.slice(turnStartIdx, idx + 1) : []
 
             return (
               <Fragment key={message.id}>
                 <MemoizedMessageBubble
                   message={message}
                   agentName={message.agentName || agentName}
+                  agentSlug={agentSlug}
+                  starshipSlug={starshipSlug}
                   agentAvatarUrl={agentAvatarUrl}
                   isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                   starshipId={starshipId}
@@ -735,21 +572,68 @@ export function ConversationMessageList({
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={idx === renderMessages.length - 1}
                 />
-                {/* Only show buttons after the final assistant message of a complete turn (not tool_result messages or intermediate messages) */}
-                {/* Must be: marked as turn end, assistant message, not tool_result, at turn boundary (next is user or null), and have turn messages */}
-                {isTurnEnd && message.role === 'assistant' && message.messageType !== 'tool_result' && (next?.role === 'user' || next === null) && turnMessages.length > 0 && (
-                  <TurnActionButtons turnMessages={turnMessages} turnId={message.id} />
-                )}
+                {(() => {
+                  const widgets =
+                    message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
+                  if (widgets.length === 0) return null
+                  return (
+                    <div className="flex justify-start">
+                      <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
+                        {/* Spacer to match avatar width */}
+                        <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
+                        <div className="flex-1 w-full">
+                          <div className="space-y-4 mt-3 w-full max-w-none">
+                            {widgets.map(widget => (
+                              <div key={widget.id} className="w-full max-w-none mb-4">
+                                {/* Conversational widget header - looks like text */}
+                                <div className="text-sm w-full mb-4">
+                                  <div className="flex items-baseline gap-1">
+                                    <span className="font-medium">{widget.name}</span>
+                                  </div>
+                                  {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
+                                </div>
+
+                                {/* Widget visualization - minimal styling, full width */}
+                                {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
+                                <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                  <InlineWidgetRenderer
+                                    widget={{
+                                      widgetType: widget.widgetType,
+                                      props: widget.props,
+                                    }}
+                                    compactMode={true}
+                                    className="w-full"
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })()}
               </Fragment>
             )
           })}
           {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
           {shouldShowGapLoader && (
             <div className="flex justify-start">
-              <div className="flex items-start gap-3 w-full">
-                {/* No avatar for typing indicator; keep spacer for alignment */}
-                <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
-                <div className="min-w-0 flex-1">
+              <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                {/* Show a placeholder avatar while typing (so layout doesn't jump when avatar URL loads) */}
+                <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                  <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
+                </div>
+                <div className="min-w-0 flex-1 pt-0.5">
+                  <div className="mb-1 text-sm font-bold text-foreground">
+                    {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
+                      <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
+                        {(agentName || 'Assistant').trim()}
+                      </Link>
+                    ) : (
+                      <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
                     <TypingDots />
                     <span className="text-sm leading-relaxed">Typing...</span>
@@ -792,6 +676,8 @@ interface ExtendedMessage extends MessageModel {
 interface ConversationMessageBubbleProps {
   message: ExtendedMessage
   agentName?: string
+  agentSlug?: string
+  starshipSlug?: string
   agentAvatarUrl?: string
   isStreamingActive?: boolean
   starshipId?: string
@@ -826,31 +712,77 @@ function initialsFromName(name?: string | null): string {
     .join('')
 }
 
-// User message attachments component
-function UserMessageAttachments({ attachmentIds, starshipId }: { attachmentIds: string[]; starshipId: string }) {
-  const { data: attachments, isLoading } = useMessageAttachments(attachmentIds, starshipId)
+// Known widget types from public-docs (rendered immediately after the message row)
+const KNOWN_WIDGET_TYPES = new Set([
+  'StatCard',
+  'DataTable',
+  'MetricGrid',
+  'BarChart',
+  'LineChart',
+  'AreaChart',
+  'PieChart',
+  'DonutChart',
+  'RadarChart',
+  'RadialChart',
+  'ConnectorSuggestionCard',
+  'AgentSuggestionCard',
+  'StarshipDetails',
+])
 
-  if (isLoading) {
-    return (
-      <div className="mb-1 space-y-2">
-        {attachmentIds.map(id => (
-          <MessageAttachmentSkeleton key={id} className="max-w-xs" />
-        ))}
-      </div>
-    )
+type WidgetResult = {
+  id: string
+  widgetType: string
+  props: Record<string, unknown>
+  name: string
+  description: string | undefined
+  index: number
+}
+
+function extractWidgetResults(uiActions: unknown): WidgetResult[] {
+  const actions = Array.isArray(uiActions) ? (uiActions as Array<{ action?: unknown; payload?: unknown }>) : []
+  if (actions.length === 0) return []
+
+  const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+
+  const outRaw: Array<WidgetResult | null> = actions
+    .map((ua, index) => {
+      if (!ua || ua.action !== 'render_widget') return null
+      const payload = ua.payload
+      if (!payload || !isRecord(payload)) return null
+      const widget = payload['widget']
+      if (!isRecord(widget)) return null
+
+      const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
+      const props = widget['props']
+      if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
+      if (!props || typeof props !== 'object') return null
+
+      const id =
+        (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
+        (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
+        `ui-widget-${index}`
+
+      return {
+        id,
+        widgetType,
+        props: props as Record<string, unknown>,
+        name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
+        description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
+        index,
+      } satisfies WidgetResult
+    })
+  const out = outRaw.filter((w): w is WidgetResult => w !== null)
+
+  // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
+  const seen = new Set<string>()
+  const deduped: WidgetResult[] = []
+  for (const w of out) {
+    if (seen.has(w.id)) continue
+    seen.add(w.id)
+    deduped.push(w)
   }
 
-  if (!attachments || attachments.length === 0) {
-    return null
-  }
-
-  return (
-    <div className="mb-1 space-y-2">
-      {attachments.map(attachment => (
-        <MessageAttachment key={attachment.id} attachment={attachment} className="max-w-xs" />
-      ))}
-    </div>
-  )
+  return deduped
 }
 
 // Memoized message bubble to prevent unnecessary re-renders
@@ -858,6 +790,8 @@ const MemoizedMessageBubble = memo(
   function ConversationMessageBubble({
     message,
     agentName,
+    agentSlug,
+    starshipSlug,
     agentAvatarUrl,
     isStreamingActive,
     starshipId,
@@ -886,24 +820,15 @@ const MemoizedMessageBubble = memo(
       const shouldUseExplicitUserAvatar = isImageUrl(explicitUserAvatarUrl)
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
 
-      // User message: Neutral bubble on the right
+      // User message: Render using the same engine as assistant messages (no bubble)
+      const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
+      const userProfileHref =
+        typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
+
       return (
-        <div className="flex justify-end">
-          <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
-            <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
-              {/* Attachments outside bubble */}
-              {message.attachmentIds && message.attachmentIds.length > 0 && starshipId && <UserMessageAttachments attachmentIds={message.attachmentIds} starshipId={starshipId} />}
-              {/* Message bubble (match navigation/sidebar background color) */}
-              <div className={`w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md px-4 py-3 relative ${message.sending ? 'opacity-70' : ''}`}>
-                <div className="text-sm leading-relaxed whitespace-pre-wrap">{message.content}</div>
-                {message.sending && (
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
-                    <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
-                  </div>
-                )}
-              </div>
-            </div>
-            <Avatar className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden">
+        <div className="flex justify-start">
+          <div className="group mb-2 mt-4 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+            <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
                   src={explicitUserAvatarUrl!}
@@ -913,7 +838,7 @@ const MemoizedMessageBubble = memo(
                   className="rounded-full object-cover"
                 />
               ) : userAvatarSeedOverride ? (
-                <AgentAvatar seed={userAvatarSeedOverride} size={32} />
+                <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
               ) : shouldUseAuthedUserAvatar ? (
                 <AvatarImage
                   src={effectiveUserAvatar!}
@@ -931,22 +856,74 @@ const MemoizedMessageBubble = memo(
                 )}
               </AvatarFallback>
             </Avatar>
+            <div className="flex-1 w-full pt-0.5">
+              <div className="mb-1 text-sm font-bold font-mono text-foreground">
+                <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                  {userDisplayName}
+                </Link>
+              </div>
+              <ConversationMessageContent
+                content={message.content}
+                messageId={message.id}
+                enableMarkdown={true}
+                enableCopy={true}
+                enableLinkPreview={true}
+                isStreaming={false}
+                className="text-foreground/80"
+                chunks={message.chunks}
+                reasoning={message.reasoning}
+                reasoningChunks={message.reasoningChunks}
+                agentName={userDisplayName}
+                toolCalls={message.toolCalls}
+                toolResults={message.toolResults}
+                messageType={message.messageType}
+                attachmentIds={message.attachmentIds}
+                starshipId={starshipId}
+                isAwaitingToolResults={isAwaitingToolResults}
+                isLastMessage={isLastMessage}
+              />
+            </div>
           </div>
         </div>
       )
     } else {
       // AI message: Plain text on the left (no bubble)
+      const assistantDisplayName = (agentName || 'Assistant').trim()
+      const assistantProfileHref =
+        typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
+          ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
+          : null
       return (
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
-          <div className="flex items-start gap-3 w-full">
+          <div
+            className={cn(
+              'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors',
+              // Keep padding consistent even when avatar/name are hidden,
+              // but slightly overlap consecutive assistant messages so they feel like one block.
+              'py-2',
+              !showAssistantAvatar && '-mt-1'
+            )}
+          >
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={32} />
+              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />
               </div>
             ) : (
-              <div className="flex-shrink-0 w-8 h-8 mt-1" aria-hidden="true" />
+              // Keep the left gutter aligned with avatar rows
+              <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
-            <div className="flex-1 w-full">
+            <div className="flex-1 w-full pt-0.5">
+              {showAssistantAvatar && (
+                <div className="mb-1 text-sm font-bold text-foreground">
+                  {assistantProfileHref ? (
+                    <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
+                      {assistantDisplayName}
+                    </Link>
+                  ) : (
+                    <span className="font-mono">{assistantDisplayName}</span>
+                  )}
+                </div>
+              )}
               <ConversationMessageContent
                 content={message.content}
                 messageId={message.id}
@@ -954,14 +931,13 @@ const MemoizedMessageBubble = memo(
                 enableCopy={!isStreamingActive}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
-                className="text-foreground"
+                className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
                 reasoningChunks={message.reasoningChunks}
-                agentName={agentName}
+                agentName={assistantDisplayName}
                 toolCalls={message.toolCalls}
                 toolResults={message.toolResults}
-                uiActions={message.uiActions}
                 messageType={message.messageType}
                 attachmentIds={message.attachmentIds}
                 starshipId={starshipId}
@@ -1018,6 +994,8 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.userAvatarUrlOverride || '') !== (nextProps.userAvatarUrlOverride || '')) return false
     if ((prevProps.userAvatarSeedOverride || '') !== (nextProps.userAvatarSeedOverride || '')) return false
     if ((prevProps.userAvatarFallbackVariantOverride || '') !== (nextProps.userAvatarFallbackVariantOverride || '')) return false
+    if ((prevProps.starshipSlug || '') !== (nextProps.starshipSlug || '')) return false
+    if ((prevProps.agentSlug || '') !== (nextProps.agentSlug || '')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0

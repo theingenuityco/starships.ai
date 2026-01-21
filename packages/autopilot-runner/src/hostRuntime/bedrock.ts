@@ -52,6 +52,12 @@ export async function invokeBedrock(
 ): Promise<AsyncIterable<unknown>> {
   const client = options.client;
 
+  // Extract reasoning config (do not log prompts/PII; only config shape/flags)
+  const reasoningCfg = (request as unknown as { reasoning?: unknown }).reasoning as unknown;
+  const reasoningRec =
+    reasoningCfg && typeof reasoningCfg === 'object' && !Array.isArray(reasoningCfg) ? (reasoningCfg as Record<string, unknown>) : undefined;
+  const reasoningEnabled = reasoningRec?.enabled === true && reasoningRec?.exclude !== true;
+
   // Separate system prompts from messages
   const bedrockMessages: BedrockMessage[] = [];
   const system: { text: string }[] = [];
@@ -185,6 +191,45 @@ export async function invokeBedrock(
     input.system = system;
   }
 
+  // Best-effort: enable Anthropic "extended thinking" via Bedrock additionalModelRequestFields.
+  // This is required for Bedrock to emit separate thinking/reasoning content blocks.
+  // Docs: Claude on Bedrock extended thinking uses: { thinking: { type: 'enabled', budget_tokens: <int> } }
+  try {
+    if (reasoningEnabled) {
+      const effort = typeof reasoningRec?.effort === 'string' ? reasoningRec.effort : undefined;
+      const requestedBudget = typeof reasoningRec?.max_tokens === 'number' ? reasoningRec.max_tokens : undefined;
+      let budgetTokens =
+        typeof requestedBudget === 'number' && Number.isFinite(requestedBudget) && requestedBudget > 0
+          ? Math.floor(requestedBudget)
+          : effort === 'low'
+            ? 256
+            : effort === 'high'
+              ? 2048
+              : 1024; // default/medium
+
+      const maxTokens = typeof request.maxTokens === 'number' && Number.isFinite(request.maxTokens) ? Math.floor(request.maxTokens) : undefined;
+      // Bedrock/Claude requires maxTokens > budget_tokens, so clamp conservatively.
+      if (typeof maxTokens === 'number') {
+        if (maxTokens <= 1) {
+          budgetTokens = 0;
+        } else if (budgetTokens >= maxTokens) {
+          budgetTokens = Math.max(1, maxTokens - 1);
+        }
+      }
+
+      if (budgetTokens > 0) {
+        (input as any).additionalModelRequestFields = {
+          ...(typeof (input as any).additionalModelRequestFields === 'object' && (input as any).additionalModelRequestFields
+            ? (input as any).additionalModelRequestFields
+            : {}),
+          thinking: { type: 'enabled', budget_tokens: budgetTokens },
+        };
+      }
+    }
+  } catch {
+    // Non-fatal: if unsupported by model/provider, Bedrock will ignore or validate; don't crash here.
+  }
+
   try {
     const command = new ConverseStreamCommand(input);
     // Cast to any to avoid spurious TS error "Property 'send' does not exist"
@@ -297,6 +342,35 @@ export async function invokeBedrock(
               toolUseId: tu.toolUseId,
               name: tu.name,
               accumulatedArgs: '',
+            };
+
+            // Bedrock may emit a toolUseStart and then provide an EMPTY input (or no deltas)
+            // for no-argument tools. Our LLM layer detects tool calls only via tool_calls deltas,
+            // so emit an initial OpenAI-style tool_calls delta immediately on start.
+            yield {
+              id: 'bedrock-stream',
+              object: 'chat.completion.chunk',
+              created: Date.now(),
+              model: providerModelId,
+              choices: [
+                {
+                  index: 0,
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: idx,
+                        id: tu.toolUseId,
+                        type: 'function',
+                        function: {
+                          name: tu.name,
+                          arguments: '',
+                        },
+                      },
+                    ],
+                  },
+                  finish_reason: null,
+                },
+              ],
             };
           }
           continue;

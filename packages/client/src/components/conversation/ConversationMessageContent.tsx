@@ -1107,48 +1107,50 @@ export function ConversationMessageContent({
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
     <div ref={messageContainerRef} className={cn('relative w-full ph-mask-chat-message', className)}>
-      {/* Message actions (copy + download): show on hover, float at bottom edge */}
-      {enableCopy && (
-        <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-          <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
-              <Icon name="copy" className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
-              <Icon name="download" className="h-4 w-4" />
-            </Button>
+      {/* Content block: actions anchor here so widgets below don't shift them */}
+      <div className={cn('relative', widgetResults.length > 0 ? 'mb-2' : '')}>
+        {/* Message actions (copy + download): show on hover, float at bottom edge */}
+        {enableCopy && (
+          <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
+            <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+                <Icon name="copy" className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+                <Icon name="download" className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Reasoning (thinking) collapsible */}
-      {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
-        <>
-          {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
-          <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
-            {/* Match tool-call collapsed row spacing + trigger styling */}
-            <p className="mb-2 leading-relaxed">
-              <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
-                <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
-                  {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
-                  <span className="truncate">{reasoningHeaderLabel}</span>
-                </span>
-              </CollapsibleTrigger>
-            </p>
-            <CollapsibleContent>
-              <div className="pb-2">
-                <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
-                  <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                    <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                      {String(displayReasoning ?? '')}
-                    </ReactMarkdown>
-                  </div>
-                </blockquote>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        </>
-      )}
+        {/* Reasoning (thinking) collapsible */}
+        {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
+          <>
+            {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
+            <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
+              {/* Match tool-call collapsed row spacing + trigger styling */}
+              <p className="mb-2 leading-relaxed">
+                <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                  <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+                    {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
+                    <span className="truncate">{reasoningHeaderLabel}</span>
+                  </span>
+                </CollapsibleTrigger>
+              </p>
+              <CollapsibleContent>
+                <div className="pb-2">
+                  <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
+                    <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        {String(displayReasoning ?? '')}
+                      </ReactMarkdown>
+                    </div>
+                  </blockquote>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          </>
+        )}
 
       {/*
         Attachments created by USER uploads (message attachments) should stay near the top of the message.
@@ -1156,32 +1158,35 @@ export function ConversationMessageContent({
         visually associated with the tool call that produced them.
       */}
 
-      {/* Message attachments (top) */}
-      {messageAttachmentIds.length > 0 && starshipId && (
-        <div className="mb-1 inline-flex flex-col gap-2">
-          {isLoadingAttachments
-            ? // Loading state
-              messageAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
-            : // Render attachments
-              attachments?.filter(a => messageAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
-        </div>
-      )}
+        {/* Message attachments (top) */}
+        {messageAttachmentIds.length > 0 && starshipId && (
+          <div className="mb-1 inline-flex flex-col gap-2">
+            {isLoadingAttachments
+              ? // Loading state
+                messageAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+              : // Render attachments
+                attachments?.filter(a => messageAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
+          </div>
+        )}
 
-      {/* Unified markdown rendering - message content at normal size */}
-      {markdownWithToolsNode as any}
+        {/* Unified markdown rendering - message content at normal size */}
+        {markdownWithToolsNode as any}
 
-      {/* Tool-result attachments (below tool panel) */}
-      {toolResultAttachmentIds.length > 0 && starshipId && (
-        <div className="mt-2 inline-flex flex-col gap-2">
-          {isLoadingAttachments
-            ? toolResultAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
-            : attachments?.filter(a => toolResultAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
-        </div>
-      )}
+        {/* Tool-result attachments (below tool panel) */}
+        {toolResultAttachmentIds.length > 0 && starshipId && (
+          <div className="mt-2 inline-flex flex-col gap-2">
+            {isLoadingAttachments
+              ? toolResultAttachmentIds.map(id => <MessageAttachmentSkeleton key={id} />)
+              : attachments?.filter(a => toolResultAttachmentIds.includes(a.id)).map(attachment => <MessageAttachment key={attachment.id} attachment={attachment} />)}
+          </div>
+        )}
+      </div>
 
       {/* Widget rendering: Display widgets inline when requested by ui_action */}
       {widgetResults.length > 0 && messageType !== 'tool_result' && (
-        <div className="space-y-4 mt-3 w-full max-w-none">
+        // NOTE: Widgets should not inherit the row hover highlight.
+        // Paint the page background over the hover area and extend into the row padding.
+        <div className="space-y-4 mt-3 w-full max-w-none bg-background -mx-2 px-2">
           {widgetResults.map(widget => {
             const isPending = false
 

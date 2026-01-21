@@ -16,10 +16,33 @@ export type ExecutionStatus = 'not_started' | 'running' | 'paused' | 'completed'
  */
 export interface ExecutionItem {
   json: unknown; // The actual data
-  binary?: Record<string, unknown>; // File attachments (for future use)
+  /**
+   * Optional binary payloads.
+   *
+   * These are intended for in-flight data only (between nodes within a single execution).
+   * They MUST NOT be recorded into execution history that is JSON-serialized (RemoteRunner)
+   * or emitted in events. The Engine is responsible for stripping them from recorded results.
+   */
+  binary?: Record<string, BinaryPayload>;
   pairedItem?: { item: number }; // Source tracking for debugging
   error?: string; // Item-level error handling
 }
+
+/**
+ * Minimal binary payload schema for in-flight workflow transport.
+ */
+export type BinaryPayload =
+  | {
+      kind: 'bytes';
+      data: ArrayBuffer;
+      contentType?: string;
+      filename?: string;
+      sizeBytes?: number;
+    }
+  | {
+      kind: 'redacted';
+      reason?: string;
+    };
 
 /**
  * Engine execution

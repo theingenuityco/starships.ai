@@ -39,30 +39,37 @@ export async function invokeOpenRouter(
   });
 
   const summarizeProviderError = (err: unknown): Record<string, unknown> => {
-    const e = err as any;
+    const e: Record<string, unknown> =
+      err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown>) : {};
 
     // Best-effort extraction for openai@6 API errors (also used by OpenRouter).
-    const status = typeof e?.status === 'number' ? e.status : undefined;
-    const name = typeof e?.name === 'string' ? e.name : undefined;
-    const message = typeof e?.message === 'string' ? e.message : String(err);
-    const code = typeof e?.code === 'string' ? e.code : undefined;
-    const type = typeof e?.type === 'string' ? e.type : undefined;
+    const status = typeof e.status === 'number' ? e.status : undefined;
+    const name = typeof e.name === 'string' ? e.name : undefined;
+    const message = typeof e.message === 'string' ? e.message : String(err);
+    const code = typeof e.code === 'string' ? e.code : undefined;
+    const type = typeof e.type === 'string' ? e.type : undefined;
 
     // OpenAI SDK may attach the parsed JSON error body at e.error
-    const apiError = e?.error && typeof e.error === 'object' ? e.error : undefined;
+    const apiError = e.error && typeof e.error === 'object' ? (e.error as Record<string, unknown>) : undefined;
     const apiErrorMessage = typeof apiError?.message === 'string' ? apiError.message : undefined;
     const apiErrorType = typeof apiError?.type === 'string' ? apiError.type : undefined;
     const apiErrorCode = typeof apiError?.code === 'string' ? apiError.code : undefined;
 
     // Request id can appear as request_id or in headers (OpenRouter sometimes uses x-request-id)
     const requestId =
-      typeof e?.request_id === 'string'
-        ? e.request_id
-        : typeof e?.headers?.['x-request-id'] === 'string'
-          ? e.headers['x-request-id']
-          : typeof e?.headers?.['x-openrouter-request-id'] === 'string'
-            ? e.headers['x-openrouter-request-id']
-            : undefined;
+      typeof (e as { request_id?: unknown }).request_id === 'string'
+        ? ((e as { request_id: string }).request_id as string)
+        : (() => {
+            const headers = (e as { headers?: unknown }).headers;
+            if (!headers || typeof headers !== 'object') return undefined;
+            const h = headers as Record<string, unknown>;
+            return typeof h['x-request-id'] === 'string'
+              ? (h['x-request-id'] as string)
+              : typeof h['x-openrouter-request-id'] === 'string'
+                ? (h['x-openrouter-request-id'] as string)
+                : undefined;
+          })()
+          ;
 
     // Provide a safe payload snippet (no prompts); OpenRouter often returns { error: { message, code, ... } }
     let apiErrorSnippet: string | undefined;
@@ -253,7 +260,7 @@ export async function invokeOpenRouter(
           ...(baseRequest as Record<string, unknown>),
           stream: false,
         } as unknown as OpenAIChatCompletionCreateParamsNonStreaming,
-        options.signal ? ({ signal: options.signal } as any) : undefined
+        options.signal ? ({ signal: options.signal } as unknown as { signal: AbortSignal }) : undefined
       );
     } catch (e: unknown) {
       if (options.signal?.aborted) {
@@ -276,7 +283,10 @@ export async function invokeOpenRouter(
   };
   let stream: unknown;
   try {
-    stream = await client.chat.completions.create(openaiRequest, options.signal ? ({ signal: options.signal } as any) : undefined);
+    stream = await client.chat.completions.create(
+      openaiRequest,
+      options.signal ? ({ signal: options.signal } as unknown as { signal: AbortSignal }) : undefined
+    );
   } catch (e: unknown) {
     if (options.signal?.aborted) {
       throw new CancelledError('cancelled');

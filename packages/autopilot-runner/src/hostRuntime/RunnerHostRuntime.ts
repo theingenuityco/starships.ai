@@ -130,7 +130,18 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     return _bedrockClient;
   };
 
-  const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
+  const http: HostRuntime['http'] = async (request) => {
+    const { method, url, headers = {}, body, timeoutMs } = request as {
+      method: string;
+      url: string;
+      headers?: Record<string, unknown>;
+      body?: unknown;
+      timeoutMs?: number;
+    };
+    // Backward/forward compatible: older @starships/autopilot types may not include this field.
+    const responseTypeRaw = (request as { responseType?: unknown } | null | undefined)?.responseType;
+    const responseType =
+      responseTypeRaw === 'json' || responseTypeRaw === 'text' || responseTypeRaw === 'arrayBuffer' ? responseTypeRaw : undefined;
     const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
       const out: Record<string, unknown> = {};
       const sensitive = new Set([
@@ -176,19 +187,21 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     };
 
     const summarizeFetchError = (err: unknown): Record<string, unknown> => {
-      const e = err as any;
+      const e =
+        err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
       const cause = e?.cause;
-      const pick = (x: any): Record<string, unknown> => {
+      const pick = (x: unknown): Record<string, unknown> => {
         if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
+        const rec = x as Record<string, unknown>;
         return {
-          name: typeof x.name === 'string' ? x.name : undefined,
-          message: typeof x.message === 'string' ? x.message : undefined,
-          code: typeof x.code === 'string' ? x.code : undefined,
-          errno: typeof x.errno === 'number' ? x.errno : undefined,
-          syscall: typeof x.syscall === 'string' ? x.syscall : undefined,
-          address: typeof x.address === 'string' ? x.address : undefined,
-          port: typeof x.port === 'number' ? x.port : undefined,
-          hostname: typeof x.hostname === 'string' ? x.hostname : undefined,
+          name: typeof rec.name === 'string' ? rec.name : undefined,
+          message: typeof rec.message === 'string' ? rec.message : undefined,
+          code: typeof rec.code === 'string' ? rec.code : undefined,
+          errno: typeof rec.errno === 'number' ? rec.errno : undefined,
+          syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
+          address: typeof rec.address === 'string' ? rec.address : undefined,
+          port: typeof rec.port === 'number' ? rec.port : undefined,
+          hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
         };
       };
 
@@ -303,14 +316,22 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const contentType = resp.headers.get('content-type') || '';
       let responseBody: unknown;
 
-      if (contentType.includes('application/json')) {
-        try {
-          responseBody = await resp.json();
-        } catch {
+      // Respect explicit responseType first
+      if (responseType === 'arrayBuffer') {
+        responseBody = await resp.arrayBuffer();
+      } else if (responseType === 'text') {
+        responseBody = await resp.text();
+      } else {
+        // Default: best-effort JSON, otherwise text
+        if (contentType.includes('application/json')) {
+          try {
+            responseBody = await resp.json();
+          } catch {
+            responseBody = await resp.text();
+          }
+        } else {
           responseBody = await resp.text();
         }
-      } else {
-        responseBody = await resp.text();
       }
 
       const responseHeaders: Record<string, string> = {};
@@ -558,7 +579,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         // If this was the last route, surface an aggregated error.
         if (i === routes.length - 1) {
           const err = new Error('All LLM provider routes failed');
-          (err as any).causes = failures;
+          (err as Error & { causes?: typeof failures }).causes = failures;
           throw err;
         }
         // Otherwise, continue to the next provider route.

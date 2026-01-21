@@ -7,7 +7,8 @@
  * SECURITY: S3 URLs never exposed to client - only used server-side for LLM processing
  */
 
-import { Router, Request, Response } from 'express';
+import { Router } from 'express';
+import type { Request as ExpressRequest, Response as ExpressResponse } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
@@ -40,7 +41,7 @@ const AttachmentIdSchema = z.object({
 /**
  * Helper: Check authentication
  */
-const checkAuth = (req: Request, res: Response): boolean => {
+const checkAuth = (req: ExpressRequest, res: ExpressResponse): boolean => {
   if (!req.user?.id) {
     sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
     return false;
@@ -65,7 +66,7 @@ router.post(
   '/conversations/:conversationId/attachments',
   jwtAuthMiddleware,
   upload.single('file'),
-  async (req: Request, res: Response): Promise<void> => {
+  async (req: ExpressRequest, res: ExpressResponse): Promise<void> => {
     try {
       // Authentication check
       if (!checkAuth(req, res)) return;
@@ -116,7 +117,7 @@ router.post(
  * GET /api/v1/attachments/:attachmentId
  * Get attachment with presigned URL
  */
-router.get('/attachments/:attachmentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/attachments/:attachmentId', jwtAuthMiddleware, async (req: ExpressRequest, res: ExpressResponse): Promise<void> => {
   try {
     // Authentication check
     if (!checkAuth(req, res)) return;
@@ -160,7 +161,7 @@ router.get('/attachments/:attachmentId', jwtAuthMiddleware, async (req: Request,
  * Batch fetch attachment metadata (no S3 URLs)
  * Query params: ids (comma-separated), starshipId
  */
-router.get('/attachments', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/attachments', jwtAuthMiddleware, async (req: ExpressRequest, res: ExpressResponse): Promise<void> => {
   try {
     // Authentication check
     if (!checkAuth(req, res)) return;
@@ -210,7 +211,7 @@ router.get('/attachments', jwtAuthMiddleware, async (req: Request, res: Response
  * Proxy endpoint to fetch image/file data from S3
  * Returns image data directly (security: S3 URL never exposed to client)
  */
-router.get('/attachments/:attachmentId/preview', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.get('/attachments/:attachmentId/preview', jwtAuthMiddleware, async (req: ExpressRequest, res: ExpressResponse): Promise<void> => {
   try {
     // Authentication check
     if (!checkAuth(req, res)) return;
@@ -279,7 +280,7 @@ router.get('/attachments/:attachmentId/preview', jwtAuthMiddleware, async (req: 
  * DELETE /api/v1/attachments/:attachmentId
  * Delete attachment
  */
-router.delete('/attachments/:attachmentId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+router.delete('/attachments/:attachmentId', jwtAuthMiddleware, async (req: ExpressRequest, res: ExpressResponse): Promise<void> => {
   try {
     // Authentication check
     if (!checkAuth(req, res)) return;

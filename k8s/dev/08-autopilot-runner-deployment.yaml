@@ -45,6 +45,22 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: OPENROUTER_API_KEY
+            # AWS Bedrock (optional LLM provider)
+            - name: AWS_BEDROCK_ACCESS_KEY_ID
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_BEDROCK_ACCESS_KEY_ID
+            - name: AWS_BEDROCK_SECRET_ACCESS_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_BEDROCK_SECRET_ACCESS_KEY
+            - name: AWS_BEDROCK_REGION
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AWS_BEDROCK_REGION
           resources:
             requests:
               cpu: '100m'

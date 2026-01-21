@@ -99,10 +99,11 @@ export default function AgentAvatar({
           className={cn(
             'pointer-events-none absolute inset-0',
             // "Purple inward glow" to match marketplace blank avatars
-            'ring-1 ring-inset ring-violet-500/20',
-            'shadow-[inset_0_1px_0_rgba(124,58,237,0.18),inset_0_0_18px_rgba(124,58,237,0.18)]',
-            'dark:ring-violet-400/20',
-            'dark:shadow-[inset_0_1px_0_rgba(167,139,250,0.14),inset_0_0_18px_rgba(167,139,250,0.14)]'
+            // Keep border/ring neutral (theme border), only the inset glow is purple
+            'ring-1 ring-inset ring-border/60',
+            'shadow-[inset_0_1px_0_rgba(124,58,237,0.10),inset_0_0_14px_rgba(124,58,237,0.10)]',
+            'dark:ring-border/60',
+            'dark:shadow-[inset_0_1px_0_rgba(167,139,250,0.09),inset_0_0_14px_rgba(167,139,250,0.09)]'
           )}
           style={{ borderRadius: 'inherit' }}
         />

@@ -55,7 +55,16 @@ export class InProcessExecutor implements Executor {
     // Extract host-runtime-only configuration. NOTE: runtimeEnv is explicitly
     // intended to be exposed to templates via env("KEY") and to user-authored
     // Code/Mutate nodes, but MUST NOT contain secrets.
-    const { connectorTemplates, connectorSessions, connectorMetadata, llm, runtimeEnv, ...engineConfig } = rawConfig;
+    const {
+      connectorTemplates,
+      connectorSessions,
+      connectorMetadata,
+      llm,
+      aws,
+      modelRoutes,
+      runtimeEnv,
+      ...engineConfig
+    } = rawConfig as any;
 
     const controller = new AbortController();
 
@@ -65,6 +74,8 @@ export class InProcessExecutor implements Executor {
       connectorMetadata: connectorMetadata ?? {},
       runtimeEnv: runtimeEnv ?? {},
       llm,
+      aws,
+      modelRoutes,
       signal: controller.signal,
     });
 

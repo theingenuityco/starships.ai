@@ -83,6 +83,11 @@ export function getEnvConfig(): EnvironmentConfig {
     // LLM Provider Configuration
     OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 
+    // AWS Bedrock Configuration (optional; used by autopilot execution bundle)
+    AWS_BEDROCK_ACCESS_KEY_ID: process.env.AWS_BEDROCK_ACCESS_KEY_ID,
+    AWS_BEDROCK_SECRET_ACCESS_KEY: process.env.AWS_BEDROCK_SECRET_ACCESS_KEY,
+    AWS_BEDROCK_REGION: process.env.AWS_BEDROCK_REGION,
+
     // JWT Authentication Configuration
     JWT_SECRET: requiredEnvVars.JWT_SECRET!,
 

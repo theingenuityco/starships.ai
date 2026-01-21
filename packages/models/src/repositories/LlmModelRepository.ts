@@ -211,6 +211,50 @@ export class LlmModelRepository extends BaseRepository {
     );
   }
 
+  async getAllModelProviders(opts: { enabledOnly?: boolean } = {}): Promise<LlmModelProviderRow[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const conn = this.getConnection();
+        const enabledOnly = opts.enabledOnly !== false;
+        const rows = await conn.query<{
+          model: string;
+          provider: string;
+          provider_model_id: string;
+          priority: number;
+          is_enabled: boolean;
+          pricing: Record<string, unknown> | null;
+          metadata: Record<string, unknown> | null;
+          last_synced_at: string | null;
+          created_at: string;
+          updated_at: string;
+        }>(
+          `
+          SELECT *
+          FROM llm_model_providers
+          WHERE ($1::boolean = false OR is_enabled = true)
+          ORDER BY model ASC, priority DESC
+          `,
+          [enabledOnly]
+        );
+
+        return (rows || []).map((r) => ({
+          model: r.model,
+          provider: r.provider,
+          providerModelId: r.provider_model_id,
+          priority: Number(r.priority ?? 0),
+          isEnabled: Boolean(r.is_enabled),
+          pricing: r.pricing ?? null,
+          metadata: r.metadata ?? {},
+          lastSyncedAt: r.last_synced_at ?? null,
+          createdAt: String(r.created_at),
+          updatedAt: String(r.updated_at),
+        }));
+      },
+      'getAllModelProviders',
+      'LlmModel'
+    );
+  }
+
   /**
    * Upsert canonical models (keyed by `model` string).
    * NOTE: This does not delete missing models; it's safe for incremental syncs.

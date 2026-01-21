@@ -1459,12 +1459,12 @@ export class ConversationService {
         }
 
         const agent = new Agent(agentWithTools, {
-          eventCallback: (event) => this.eventCallback(data.conversationId, event),
+          eventCallback: (event: AutopilotEvent) => this.eventCallback(data.conversationId, event),
           runtimeEnv,
           // Ensure ConversationService can still choose isolation strategy (child vs remote) and support cancellation.
           runner: this.defaultRunner,
           runnerConfig: engineConfig as unknown as Record<string, unknown>,
-          onCancel: (cancel) => {
+          onCancel: (cancel: () => void) => {
             ConversationService.activeCancellations.set(data.conversationId, cancel);
           },
         });
@@ -1746,11 +1746,11 @@ export class ConversationService {
       this.currentAgentForConversation.set(conversationId, { id: agentModel.id, name: agentModel.name });
 
       const agent = new Agent(agentWithTools, {
-        eventCallback: (event) => this.eventCallback(conversationId, event),
+        eventCallback: (event: AutopilotEvent) => this.eventCallback(conversationId, event),
         runtimeEnv,
         runner: this.defaultRunner,
         runnerConfig: engineConfig as unknown as Record<string, unknown>,
-        onCancel: (cancel) => {
+        onCancel: (cancel: () => void) => {
           ConversationService.activeCancellations.set(conversationId, cancel);
         },
       });

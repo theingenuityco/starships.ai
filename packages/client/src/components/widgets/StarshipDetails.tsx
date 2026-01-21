@@ -45,15 +45,6 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
     return `/${parts.join('/')}`
   }
 
-  function generateSlug(value: string): string {
-    return String(value || '')
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '')
-      .replace(/[\s_]+/g, '-')
-      .replace(/^-+|-+$/g, '')
-  }
-
   const initial = useMemo(
     () => ({
       name: starship?.name ?? '',
@@ -100,8 +91,6 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   const descriptionMax = 2000
   const descriptionCount = description.length
   const descriptionRemaining = Math.max(0, descriptionMax - descriptionCount)
-  const nameChanged = Boolean(starship && name.trim() && name.trim() !== starship.name)
-  const generatedSlug = useMemo(() => generateSlug(name), [name])
   const logoGradientId = useMemo(() => {
     const raw = `starship-details-logo-${String(starshipId || '')}`
     return raw.replace(/[^a-zA-Z0-9_-]/g, '')
@@ -162,18 +151,12 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
   return (
     <Card
       className={cn(
-        // Distinct "starships" card: premium surface + nebula accents, but still fits inside chat.
-        // Match AgentTemplateCard shadow convention: shadow-sm → hover:shadow-md
-        'group relative w-full max-w-[760px] overflow-hidden rounded-2xl border border-border/60 bg-card/60 backdrop-blur-sm shadow-sm',
-        'transition-all duration-200 hover:bg-card/70 hover:shadow-md',
+        // Solid card surface (no gradient overlays), still fits inside chat.
+        'group relative w-full max-w-[760px] overflow-hidden rounded-2xl border border-border/60 bg-card shadow-sm',
+        'transition-all duration-200 hover:shadow-md',
         className
       )}
     >
-      {/* Subtle accent without a "header" */}
-      {/* Subtle glow that works in both light + dark (different tuning per theme) */}
-      <div className="pointer-events-none absolute inset-0 dark:hidden bg-[radial-gradient(circle_at_18%_0%,rgba(99,102,241,0.10),transparent_58%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.08),transparent_60%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.06),transparent_62%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.06),transparent_64%)]" />
-      <div className="pointer-events-none absolute inset-0 hidden dark:block bg-[radial-gradient(circle_at_18%_0%,rgba(168,85,247,0.16),transparent_54%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.12),transparent_56%),radial-gradient(circle_at_30%_112%,rgba(16,185,129,0.09),transparent_60%),radial-gradient(circle_at_55%_0%,rgba(245,158,11,0.10),transparent_62%)]" />
-
       <CardContent className="relative p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-4">
           <StarshipsLogo width={44} height={44} gradientId={logoGradientId} idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} animationDelay={0} activeStroke="gradient" />
@@ -210,7 +193,6 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                       <Icon name="type" className="pointer-events-none absolute right-2 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     </div>
                     {isError ? <div className="text-xs text-red-600 dark:text-red-400">Failed to load starship details.</div> : null}
-                    {starship ? <div className="text-[11px] text-muted-foreground">{nameChanged ? <>/ship/{generatedSlug}-xxxxxx</> : <>/ship/{starship.slug}</>}</div> : null}
                   </div>
 
                   <div className="w-1/2 space-y-2">
@@ -219,13 +201,13 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                     </Label>
                     <Input
                       id="starship-website"
+                      type="url"
                       value={websiteUrl}
                       onChange={e => setWebsiteUrl(e.target.value)}
                       placeholder="https://example.com"
                       disabled={isLoading || updateStarship.isPending || isGenerating}
                       className="ring-1 ring-transparent focus-visible:ring-primary/25"
                     />
-                    <div className="text-xs text-muted-foreground">Include http:// or https://</div>
                     {generateError ? <div className="text-xs text-red-600 dark:text-red-400">{generateError}</div> : null}
                   </div>
                 </div>
@@ -258,7 +240,7 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                 ref={descriptionRef}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                placeholder="Describe what your starship/company/org/project does…"
+                placeholder="Describe what your organization/project does…"
                 disabled={isLoading || updateStarship.isPending || isGenerating}
                 className={cn('resize-none overflow-hidden bg-background/60', 'ring-1 ring-transparent focus-visible:ring-primary/25')}
                 rows={4}

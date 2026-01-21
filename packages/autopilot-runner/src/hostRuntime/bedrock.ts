@@ -216,8 +216,11 @@ export async function invokeBedrock(
             const toolState = toolUseStates[idx];
             if (toolState) {
               // Bedrock sends the FULL accumulated arguments in each delta, not just the fragment.
-              // We need to compute the delta (new portion) by comparing with previous accumulated args.
-              const newAccumulatedArgs = typeof delta.toolUse.input === 'string' ? delta.toolUse.input : '';
+              // input can be a string or a structured object; normalize to string for diffing.
+              const newAccumulatedArgs =
+                typeof delta.toolUse.input === 'string'
+                  ? delta.toolUse.input
+                  : JSON.stringify(delta.toolUse.input ?? '');
               const previousArgs = toolState.accumulatedArgs || '';
               
               // Compute the delta: only the new portion that wasn't in the previous args
@@ -234,6 +237,8 @@ export async function invokeBedrock(
               toolState.accumulatedArgs = newAccumulatedArgs;
               
               // Only emit if there's new content
+              // Use idx (contentBlockIndex) as the tool_calls index to match OpenAI format
+              // Each Bedrock tool call has its own contentBlockIndex, which maps to tool_calls[index]
               if (argsFragment.length > 0) {
                 yield {
                   id: 'bedrock-stream',
@@ -242,11 +247,11 @@ export async function invokeBedrock(
                   model: providerModelId,
                   choices: [
                     {
-                      index: idx,
+                      index: 0, // OpenAI always uses choice index 0 for streaming
                       delta: {
                         tool_calls: [
                           {
-                            index: 0,
+                            index: idx, // Map Bedrock's contentBlockIndex to tool_calls[index]
                             id: toolState.toolUseId,
                             type: 'function',
                             function: {

@@ -201,6 +201,7 @@ export function StarshipDetails({ starshipId, className }: StarshipDetailsProps)
                     </Label>
                     <Input
                       id="starship-website"
+                      type="url"
                       value={websiteUrl}
                       onChange={e => setWebsiteUrl(e.target.value)}
                       placeholder="https://example.com"

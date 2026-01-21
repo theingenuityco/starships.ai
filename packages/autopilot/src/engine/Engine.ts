@@ -88,8 +88,9 @@ export class Engine {
     this.eval = new Eval(this.runtimeEnv);
   }
 
-  private sanitizeItemsForRecording(items: ExecutionItem[]): ExecutionItem[] {
-    return (items || []).map((item) => ({
+  private sanitizeItemsForRecording(items: Array<ExecutionItem | null | undefined>): ExecutionItem[] {
+    const list = Array.isArray(items) ? items : [];
+    return list.filter((item): item is ExecutionItem => Boolean(item)).map((item) => ({
       json: item?.json,
       pairedItem: item?.pairedItem,
       error: item?.error,
@@ -265,6 +266,9 @@ export class Engine {
   }
 
   async executeBlueprint(blueprint: Blueprint, execution: Execution): Promise<ExecutionItem[]> {
+    // volatileResults is per Engine instance; clear between executions to avoid unbounded growth
+    // in long-running processes.
+    this.volatileResults.clear();
     try {
       await this.validateForExecution(blueprint);
       let currentNode: Node | null;
@@ -298,6 +302,9 @@ export class Engine {
     } catch (error) {
       await this.handleExecutionError(error, execution);
       throw error;
+    } finally {
+      // Always clear after execution completes/fails to avoid retaining large in-flight payloads.
+      this.volatileResults.clear();
     }
   }
 

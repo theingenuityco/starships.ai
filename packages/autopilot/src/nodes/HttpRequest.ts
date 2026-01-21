@@ -41,6 +41,8 @@ export class HttpRequest implements NodeHandler {
 
     const method = (this.params.method || 'GET').toUpperCase();
     let bodyData: unknown;
+    // Use local headers so we don't mutate node params during execution.
+    let headersParam: HttpRequestParams['headers'] = this.params.headers;
 
     // Body selection rules:
     // - GET/HEAD => never send a body, even if provided
@@ -57,10 +59,10 @@ export class HttpRequest implements NodeHandler {
       bodyData = payload.data;
 
       // Best-effort content-type propagation: only set if caller hasn't specified it already.
-      const currentHeaders = new Headers(this.params.headers as unknown as HeadersInit);
+      const currentHeaders = new Headers(headersParam as unknown as HeadersInit);
       if (payload.contentType && !currentHeaders.has('content-type')) {
         currentHeaders.set('content-type', payload.contentType);
-        this.params.headers = currentHeaders as unknown as HttpRequestParams['headers'];
+        headersParam = currentHeaders as unknown as HttpRequestParams['headers'];
       }
     } else if (this.params.body !== undefined) {
       bodyData = this.params.body;
@@ -70,21 +72,21 @@ export class HttpRequest implements NodeHandler {
 
     // Normalize headers into a plain record
     let headers: Record<string, unknown> = {};
-    if (this.params.headers) {
-      if (this.params.headers instanceof Headers) {
+    if (headersParam) {
+      if (headersParam instanceof Headers) {
         const tmp: Record<string, string> = {};
-        this.params.headers.forEach((value, key) => {
+        headersParam.forEach((value, key) => {
           tmp[key] = value;
         });
         headers = tmp;
-      } else if (Array.isArray(this.params.headers)) {
+      } else if (Array.isArray(headersParam)) {
         const tmp: Record<string, string> = {};
-        for (const [key, value] of this.params.headers) {
+        for (const [key, value] of headersParam) {
           tmp[key] = value;
         }
         headers = tmp;
       } else {
-        headers = { ...(this.params.headers as Record<string, unknown>) };
+        headers = { ...(headersParam as Record<string, unknown>) };
       }
     }
 

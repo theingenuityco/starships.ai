@@ -1065,6 +1065,13 @@ export class ConversationService {
 
     // Add attachment blocks based on type
     for (const attachment of attachments) {
+      // Make attachment IDs visible to the LLM so it can reference them in tool calls.
+      // This is intentionally a plain text block so it works across providers and content block schemas.
+      contentBlocks.push({
+        type: 'text',
+        text: `[Attachment] filename="${attachment.filename}" attachmentId="${attachment.id}" mimeType="${attachment.mimeType}" sizeBytes=${attachment.sizeBytes}`,
+      });
+
       if (attachment.mimeType.startsWith('image/')) {
         // Image block for vision models (GPT-4o, Claude 3.5 Sonnet, etc.)
         contentBlocks.push({
@@ -1102,14 +1109,14 @@ export class ConversationService {
           // Append to message text with clear delimiters (first block is always text)
           const textBlock = contentBlocks[0];
           if (textBlock.type === 'text') {
-            textBlock.text += `\n\n--- Content of ${attachment.filename} ---\n${truncatedContent}\n--- End of ${attachment.filename} ---`;
+            textBlock.text += `\n\n--- Content of ${attachment.filename} (attachmentId: ${attachment.id}) ---\n${truncatedContent}\n--- End of ${attachment.filename} ---`;
           }
         } catch (err) {
           console.error(`Failed to fetch text file ${attachment.filename}:`, err);
           // Continue without the file content (non-blocking error)
           const textBlock = contentBlocks[0];
           if (textBlock.type === 'text') {
-            textBlock.text += `\n\n[Note: Could not load content of ${attachment.filename}]`;
+            textBlock.text += `\n\n[Note: Could not load content of ${attachment.filename} (attachmentId: ${attachment.id})]`;
           }
         }
       }

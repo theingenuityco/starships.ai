@@ -971,13 +971,16 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
               {showDemoChooser && (
                 <div className="absolute inset-x-0 bottom-6 px-4">
                   <div className="w-full max-w-4xl mx-auto">
-                    <div className="flex justify-end">
-                      <div className="mb-4 mt-6 flex w-full sm:w-auto items-end gap-3 max-w-full sm:max-w-[70%]">
-                        <div className="flex flex-1 flex-col gap-2 items-end w-full">
+                    <div className="flex justify-start">
+                      <div className="mb-4 mt-6 flex w-full items-start gap-3 max-w-full">
+                        <div className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden flex items-center justify-center">
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
+                        </div>
+                        <div className="flex flex-1 flex-col gap-2 items-start w-full max-w-full sm:max-w-[70%]">
                           <button
                             type="button"
                             onClick={() => handleDemoChoice('iris')}
-                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-bl-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                             aria-label="Sure, help me triage my inbox"
                           >
                             <div className="flex items-center justify-between gap-3">
@@ -988,7 +991,7 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                           <button
                             type="button"
                             onClick={() => handleDemoChoice('saga')}
-                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-br-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                            className="w-full text-left bg-card text-card-foreground shadow-sm rounded-2xl rounded-bl-md px-4 py-3 border border-border/50 hover:border-border/80 hover:bg-muted/20 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                             aria-label="Sure, help me publish a blog post"
                           >
                             <div className="flex items-center justify-between gap-3">
@@ -996,9 +999,6 @@ export default function HeroConversationDemo(props: { initialAgentTemplates?: Ag
                               <Icon name="caret-right" iconOverride={{ type: 'phosphor', component: 'CaretRight' }} weight="bold" className="w-4 h-4 text-muted-foreground" />
                             </div>
                           </button>
-                        </div>
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden flex items-center justify-center">
-                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={16} className="text-primary" />
                         </div>
                       </div>
                     </div>

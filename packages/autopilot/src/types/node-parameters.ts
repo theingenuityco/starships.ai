@@ -64,8 +64,28 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
   // Required URL (not part of RequestInit as it's the first parameter to fetch)
   url: string;
 
-  // Overriding body to make it a string or object
+  // Overriding body to make it a string or object (raw binary bodies should use bodyFromBinaryKey)
   body?: Record<string, unknown> | string | null;
+
+  /**
+   * When set, HttpRequest will read an in-flight binary payload from input[0].binary[key]
+   * and use its bytes as the request body.
+   */
+  bodyFromBinaryKey?: string;
+
+  /**
+   * When set, HttpRequest will store a binary response into outputItems[0].binary[key]
+   * and keep outputItems[0].json as metadata only.
+   */
+  binaryKey?: string;
+
+  /**
+   * Controls how the host returns the response body.
+   * - json: parse JSON when possible (default)
+   * - text: always return string body
+   * - arrayBuffer: return ArrayBuffer (binary)
+   */
+  responseType?: 'json' | 'text' | 'arrayBuffer';
 
   // Custom properties for convenience
   timeout?: number;

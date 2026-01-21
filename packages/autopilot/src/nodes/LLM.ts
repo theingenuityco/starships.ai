@@ -196,9 +196,12 @@ export class LLM extends BaseNode<LlmParams> {
       const imageConfig = this.coerceMaybeJson<Record<string, unknown>>(params.imageConfig);
       const plugins = this.coerceMaybeJson<Array<{ id: string; max_results?: number }>>(params.plugins);
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
+
+      const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessages);
+
       const stream = await hostRuntime.llm({
         model: params.model,
-        messages: this.convertMessagesToOpenAI(providerMessages),
+        messages: openAiMessagesForRequest,
         tools: Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined,
         temperature: typeof params.temperature === 'number' ? params.temperature : undefined,
         maxTokens: typeof params.maxTokens === 'number' ? params.maxTokens : undefined,

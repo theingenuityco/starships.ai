@@ -56,7 +56,7 @@ export async function invokeBedrock(
     thinking?: { type: 'enabled'; budget_tokens: number };
   };
 
-  // Extract reasoning config (do not log prompts/PII; only config shape/flags)
+  // Extract reasoning config
   const reasoningCfg = (request as unknown as { reasoning?: unknown }).reasoning as unknown;
   const reasoningRec =
     reasoningCfg && typeof reasoningCfg === 'object' && !Array.isArray(reasoningCfg) ? (reasoningCfg as Record<string, unknown>) : undefined;
@@ -93,6 +93,7 @@ export async function invokeBedrock(
   const system: { text: string }[] = [];
 
   const rawMessages = request.messages as OpenAI.Chat.ChatCompletionMessageParam[];
+
   // Claude extended thinking requires that any prior assistant turns include the provider-issued
   // thinking/reasoning blocks (including signatures) exactly as returned. We currently do not
   // persist those provider-native blocks, so enabling thinking on multi-turn conversations
@@ -104,10 +105,21 @@ export async function invokeBedrock(
 
   for (const m of rawMessages) {
     if (m.role === 'system') {
+      // OpenAI messages may represent system content as a string OR as an array of content parts
+      // (e.g. when we attach OpenRouter cache_control extensions).
+      let sysText = '';
       if (typeof m.content === 'string') {
-        const trimmed = m.content.trim();
-        system.push({ text: trimmed.length > 0 ? trimmed : 'System instructions' });
+        sysText = m.content;
+      } else if (Array.isArray(m.content)) {
+        const parts = m.content as Array<{ type?: unknown; text?: unknown }>;
+        sysText = parts
+          .map((p) => (p && p.type === 'text' && typeof p.text === 'string' ? p.text : ''))
+          .filter(Boolean)
+          .join('\n');
       }
+
+      const trimmed = sysText.trim();
+      system.push({ text: trimmed.length > 0 ? trimmed : 'System instructions' });
       continue;
     }
 

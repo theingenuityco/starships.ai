@@ -4,6 +4,7 @@ import { ConnectorService } from '@/services/ConnectorService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import type {
+  ConnectorCatalogItem,
   ConnectorCatalogResponse,
   ConnectorListResponse,
   ConnectWithApiKeyRequest,
@@ -75,13 +76,44 @@ function addQueryParamsToPath(path: string, params: Record<string, string>): str
   }
 }
 
-// GET /connectors/catalog - Static connector catalog
+// GET /connectors/catalog - Static connector catalog (with optional search)
 router.get('/connectors/catalog', async (req: Request, res: Response): Promise<void> => {
   try {
+    const ConnectorCatalogQuerySchema = z
+      .object({
+        q: z.string().optional(),
+        limit: z.coerce.number().min(1).max(100).optional(),
+      })
+      .strict();
+
+    const queryData = validateData(ConnectorCatalogQuerySchema, req.query, res, 'connector catalog query');
+    if (!queryData) return;
+
     const connectorService = new ConnectorService();
     const catalog = await connectorService.getConnectorCatalog();
+    const limit = queryData.limit ?? 20;
+    const query = (queryData.q ?? '').trim().toLowerCase();
+
+    let results: ConnectorCatalogItem[];
+
+    if (!query) {
+      // No query: return a lightweight listing
+      results = catalog.slice(0, limit);
+    } else {
+      // Search: filter by provider name, description, and category
+      results = catalog
+        .filter((connector) => {
+          const providerMatch = connector.provider.toLowerCase().includes(query);
+          const nameMatch = connector.name.toLowerCase().includes(query);
+          const descMatch = connector.description?.toLowerCase().includes(query) ?? false;
+          const categoryMatch = (connector as { category?: string }).category?.toLowerCase().includes(query) ?? false;
+          return providerMatch || nameMatch || descMatch || categoryMatch;
+        })
+        .slice(0, limit);
+    }
+
     const response: ConnectorCatalogResponse = {
-      connectors: catalog,
+      connectors: results,
     };
     sendSuccess(res, response);
   } catch (error) {

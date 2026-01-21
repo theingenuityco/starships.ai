@@ -110,7 +110,7 @@ export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'list-agents-from-marketplace',
     'call-agent',
     'list-tools',
-    'list-connectors',
+    'search-connector',
     'suggest-connectors',
     'suggest-agents',
     'render-starship-details',

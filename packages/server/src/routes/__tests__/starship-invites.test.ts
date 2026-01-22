@@ -222,5 +222,57 @@ describe('starship invite routes', () => {
     expect(payload.data.members[0].role).toBe('owner');
     expect(payload.data.members[1].email).toBe('collab@test.com');
   });
+
+  it('DELETE /starships/:id/members/:memberUserId removes member (owner-only)', async () => {
+    jest.mocked(verifyStarshipOwnerAccess).mockResolvedValue(true);
+
+    const memberRepo = { removeMember: jest.fn().mockResolvedValue(true) };
+    (StarshipMemberRepository as unknown as jest.Mock).mockImplementation(() => memberRepo);
+
+    const starshipSvc = {
+      getStarship: jest.fn().mockResolvedValue({ id: 'starship_1234', slug: 'ship-1', name: 'Ship 1', ownerId: 'user_owner', createdAt: new Date().toISOString() }),
+    };
+    (StarshipService as unknown as jest.Mock).mockImplementation(() => starshipSvc);
+
+    const req = {
+      user: { id: 'user_owner', email: 'owner@test.com' },
+      params: { id: 'starship_1234', memberUserId: 'user_collab' },
+    } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/starships/:id/members/:memberUserId');
+    await handler(req, res as unknown as Response);
+
+    expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());
+    expect(memberRepo.removeMember).toHaveBeenCalledWith('starship_1234', 'user_collab');
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.removed).toBe(true);
+  });
+
+  it('DELETE /starships/:id/invites revokes pending invite(s) (owner-only)', async () => {
+    jest.mocked(verifyStarshipOwnerAccess).mockResolvedValue(true);
+
+    const inviteRepo = { cancelOutstandingInvitesForEmail: jest.fn().mockResolvedValue(2) };
+    (StarshipInviteTokenRepository as unknown as jest.Mock).mockImplementation(() => inviteRepo);
+
+    const req = {
+      user: { id: 'user_owner', email: 'owner@test.com' },
+      params: { id: 'starship_1234' },
+      query: { email: 'invitee@test.com' },
+    } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/starships/:id/invites');
+    await handler(req, res as unknown as Response);
+
+    expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());
+    expect(inviteRepo.cancelOutstandingInvitesForEmail).toHaveBeenCalledWith('starship_1234', 'invitee@test.com');
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.revokedCount).toBe(2);
+  });
 });
 

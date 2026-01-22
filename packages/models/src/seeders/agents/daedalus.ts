@@ -90,7 +90,7 @@ export const daedalusTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'Expert tool creator that designs and scaffolds new tools (Tool instances) on the current starship. Users may later publish a tool as a template.',
   category: 'coding',
 
-  model: 'anthropic/claude-sonnet-4.5',
+  model: 'openai/gpt-5.2',
   // Using system defaults for temperature and maxTokens
 
   // Tool assignment - comprehensive tools for tool creation and blueprint understanding

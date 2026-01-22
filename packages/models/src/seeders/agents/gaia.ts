@@ -99,7 +99,7 @@ export const gaiaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'Expert agent creator that designs and scaffolds new agents (Agent instances) on the current starship. Creates agents with custom system prompts, tool assignments, and workflows.',
   category: 'automation',
 
-  model: 'anthropic/claude-sonnet-4.5',
+  model: 'openai/gpt-5.2',
   temperature: 0.4,
   maxTokens: 3000,
 

@@ -16,6 +16,48 @@ export class StarshipInviteTokenRepository extends BaseRepository {
     super('StarshipInviteTokenRepository');
   }
 
+  async listOutstandingByStarship(starshipId: string): Promise<
+    Array<{
+      invitedEmail: string;
+      invitedByUserId: string | null;
+      role: StarshipInviteRole;
+      createdAt: string;
+      expiresAt: string;
+    }>
+  > {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const rows = await connection.query<{
+          invited_email: string;
+          invited_by_user_id: string | null;
+          role: StarshipInviteRole;
+          created_at: string;
+          expires_at: string;
+        }>(
+          `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
+             FROM starship_invite_tokens
+            WHERE starship_id = $1
+              AND NOT consumed
+              AND expires_at > NOW()
+            ORDER BY created_at DESC`,
+          [starshipId]
+        );
+
+        return rows.map((r) => ({
+          invitedEmail: String(r.invited_email),
+          invitedByUserId: r.invited_by_user_id ?? null,
+          role: (r.role as StarshipInviteRole) || 'collaborator',
+          createdAt: String(r.created_at),
+          expiresAt: String(r.expires_at),
+        }));
+      },
+      'listOutstandingByStarship',
+      'starship_invite_tokens',
+      starshipId
+    );
+  }
+
   async generateToken(
     args: {
       starshipId: string;

@@ -729,7 +729,7 @@ export function ConversationMessageContent({
         )
         return (
           <Collapsible key={`${toolCallId || idx}`} defaultOpen={false} className="space-y-0">
-            <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10">
+            <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted">
               {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
               <p className={`${pSpacingClass} leading-relaxed`}>
                 <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
@@ -992,7 +992,7 @@ export function ConversationMessageContent({
               ref={messageContainerRef}
               className={cn(
                 // Keep internal padding; remove outside row-gap in the list instead.
-                'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10'
+                'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
               )}
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
@@ -1028,7 +1028,7 @@ export function ConversationMessageContent({
           <>
             {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
             <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning} className="space-y-0">
-              <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10">
+              <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted">
                 {/* Match tool-call collapsed row spacing + trigger styling */}
                 <p className="m-0 leading-relaxed">
                   <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">

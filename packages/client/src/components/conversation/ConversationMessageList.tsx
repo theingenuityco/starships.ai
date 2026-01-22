@@ -921,7 +921,7 @@ const MemoizedMessageBubble = memo(
 
       return (
         <div className="flex justify-start">
-          <div className="group mb-2 mt-4 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+          <div className="group mb-2 mt-4 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2">
             <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
@@ -1032,7 +1032,7 @@ const MemoizedMessageBubble = memo(
         <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
           <div
             className={cn(
-              'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors',
+              'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2',
               'py-2',
               !showAssistantAvatar && '-mt-1'
             )}

@@ -696,7 +696,6 @@ export function ConversationMessageContent({
         const rawCallId = tc.id ?? null
 
         const toolCallId = rawCallId != null ? String(rawCallId) : ''
-        const combinedBlockId = `${messageId}-tool-all-${idx}`
 
         // Find matching tool result using multiple possible id fields, normalized to strings
         const matchingResult = toolResults?.find((result: any) => {
@@ -740,62 +739,6 @@ export function ConversationMessageContent({
             <CollapsibleContent className="not-prose">
               <div className="pb-2">
                 <blockquote className={toolQuoteClass}>
-                  <div className="absolute top-2 right-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => {
-                        // Build a single payload that includes function, id, arguments and (optional) result
-                        let argsParsed: any
-                        if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                          argsParsed = rawArgsAny
-                        } else {
-                          try {
-                            argsParsed = JSON.parse(String(rawArgsAny))
-                          } catch {
-                            // Fallback to the prettified string for non-JSON args
-                            argsParsed = prettyArgs
-                          }
-                        }
-
-                        let resultParsed: any = undefined
-                        if (matchingResult) {
-                          const resultContent = (() => {
-                            const raw = matchingResult.content ?? matchingResult.result ?? ''
-                            if (typeof raw === 'string') return raw
-                            try {
-                              return JSON.stringify(raw)
-                            } catch {
-                              return String(raw)
-                            }
-                          })()
-                          try {
-                            const t = (resultContent || '').trim()
-                            if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                              resultParsed = JSON.parse(t)
-                            } else {
-                              resultParsed = resultContent
-                            }
-                          } catch {
-                            resultParsed = resultContent
-                          }
-                        }
-
-                        const payload: any = {
-                          function: toolSlug || undefined,
-                          id: toolCallId || undefined,
-                          arguments: argsParsed,
-                          ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
-                        }
-
-                        handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
-                      }}
-                    >
-                      {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-                    </Button>
-                  </div>
-
                   {/* Match Thought quote content sizing + color */}
                   <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
@@ -1018,13 +961,39 @@ export function ConversationMessageContent({
     [theme, enableLinkPreview, messageId, copiedStates]
   )
 
+  const hasCopyableContent = typeof displayContent === 'string' && displayContent.trim().length > 0
+
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
       <div className={cn(resolvedContentClass, 'dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message')}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {String(displayContent ?? '')}
-        </ReactMarkdown>
+        {/* IMPORTANT: Only the content chunk is copyable/exportable. */}
+        <div
+          ref={messageContainerRef}
+          className={cn(
+            'relative',
+            // Only show the hover actions when hovering the content chunk itself (not tools/reasoning/attachments).
+            'rounded-lg px-2 py-2 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10',
+            'hover:[&_.content-chunk-actions]:opacity-100 focus-within:[&_.content-chunk-actions]:opacity-100'
+          )}
+        >
+          {/* Content chunk actions (copy + download): float at bottom edge */}
+          {enableCopy && hasCopyableContent && (
+            <div className="content-chunk-actions pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity">
+              <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+                  <Icon name="copy" className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+                  <Icon name="download" className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {String(displayContent ?? '')}
+          </ReactMarkdown>
+        </div>
         {toolPanelNode}
       </div>
     ) : null
@@ -1043,23 +1012,9 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div ref={messageContainerRef} className={cn('relative w-full ph-mask-chat-message', className)}>
+    <div className={cn('relative w-full ph-mask-chat-message', className)}>
       {/* Content block: actions anchor here so widgets below don't shift them */}
       <div className="relative">
-        {/* Message actions (copy + download): show on hover, float at bottom edge */}
-        {enableCopy && (
-          <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-            <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
-                <Icon name="copy" className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
-                <Icon name="download" className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* Reasoning (thinking) collapsible */}
         {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
           <>
@@ -1129,14 +1084,6 @@ export function ConversationMessageContent({
                 Tool Result (Standalone)
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : String(displayContent ?? ''), `${messageId}-tool-result`)}
-            >
-              {copiedStates[`${messageId}-tool-result`] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-            </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
             <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : String(displayContent ?? '')}</code>
@@ -1149,9 +1096,6 @@ export function ConversationMessageContent({
         <Card className="mt-3 border bg-blue-50 dark:bg-blue-950/20">
           <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800">
             <div className="text-xs uppercase text-blue-700 dark:text-blue-300 tracking-wide font-medium">Workflow Output</div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(JSON.stringify(parsedJson, null, 2), `${messageId}-workflow-result`)}>
-              {copiedStates[`${messageId}-workflow-result`] ? <Icon name="check" className="w-3 h-3 text-blue-500" /> : <Icon name="copy" className="w-3 h-3" />}
-            </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
             <code>{JSON.stringify(parsedJson, null, 2)}</code>

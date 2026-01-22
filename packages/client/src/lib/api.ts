@@ -246,6 +246,7 @@ api.interceptors.request.use(
     // Check if this is an authenticated endpoint
     const requiresAuth =
       config.url?.includes('/api/v1/starships') ||
+      config.url?.includes('/api/v1/starship-invites') ||
       config.url?.includes('/api/v1/agents') ||
       config.url?.includes('/api/v1/users') ||
       config.url?.includes('/api/v1/conversations') ||

@@ -67,7 +67,7 @@ router.get('/ledger/:walletId', jwtAuthMiddleware, async (req: Request, res: Res
     }
 
     const starshipService = new StarshipService();
-    const hasAccess = await starshipService.hasAccess(userId, wallet.starshipId);
+    const hasAccess = await starshipService.hasOwnerAccess(userId, wallet.starshipId);
     if (!hasAccess) {
       sendError(res, 'FORBIDDEN', 'Access denied to this wallet', 403);
       return;

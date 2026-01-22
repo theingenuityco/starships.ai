@@ -139,7 +139,7 @@ router.post('/starships/:id/subscribe', rateLimiters.financial, jwtAuthMiddlewar
     const { priceId } = bodyValidation;
 
     const starshipService = new StarshipService();
-    const hasAccess = await starshipService.hasAccess(userId, starshipId);
+    const hasAccess = await starshipService.hasOwnerAccess(userId, starshipId);
     if (!hasAccess) {
       sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
       return;
@@ -182,7 +182,7 @@ router.post(
       const { priceId } = bodyValidation;
 
       const starshipService = new StarshipService();
-      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      const hasAccess = await starshipService.hasOwnerAccess(userId, starshipId);
       if (!hasAccess) {
         sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
         return;
@@ -216,7 +216,7 @@ router.post(
       if (!paramValidation) return;
 
       const starshipService = new StarshipService();
-      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      const hasAccess = await starshipService.hasOwnerAccess(userId, starshipId);
       if (!hasAccess) {
         sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
         return;
@@ -291,7 +291,7 @@ router.get(
       if (!paramValidation) return;
 
       const starshipService = new StarshipService();
-      const hasAccess = await starshipService.hasAccess(userId, starshipId);
+      const hasAccess = await starshipService.hasOwnerAccess(userId, starshipId);
       if (!hasAccess) {
         sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
         return;
@@ -377,8 +377,8 @@ router.get('/starships/:idOrSlug', jwtAuthMiddleware, async (req: Request, res: 
       return;
     }
 
-    // Check ownership
-    if (starship.ownerId !== userId) {
+    // Check collaborator access (owner/admin/member)
+    if (!(await starshipService.hasCollaboratorAccess(userId, starship.id))) {
       sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
       return;
     }

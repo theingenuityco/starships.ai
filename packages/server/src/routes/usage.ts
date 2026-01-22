@@ -103,7 +103,7 @@ router.get('/starships/:starshipId/usage/totals', jwtAuthMiddleware, async (req:
 
     // Authorization: Check if user has access to this starship
     const starshipService = new StarshipService();
-    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+    if (!(await starshipService.hasOwnerAccess(req.user?.id || '', starshipId))) {
       sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
       return;
     }
@@ -129,7 +129,7 @@ router.get('/starships/:starshipId/usage/totals-with-count', jwtAuthMiddleware, 
 
     // Authorization: Check if user has access to this starship
     const starshipService = new StarshipService();
-    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+    if (!(await starshipService.hasOwnerAccess(req.user?.id || '', starshipId))) {
       sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
       return;
     }
@@ -156,7 +156,7 @@ router.get('/starships/:starshipId/usage', jwtAuthMiddleware, async (req: Reques
 
     // Authorization: Check if user has access to this starship
     const starshipService = new StarshipService();
-    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+    if (!(await starshipService.hasOwnerAccess(req.user?.id || '', starshipId))) {
       sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
       return;
     }
@@ -202,7 +202,7 @@ router.get('/starships/:starshipId/usage/daily', jwtAuthMiddleware, async (req: 
 
     // Authorization: Check if user has access to this starship
     const starshipService = new StarshipService();
-    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+    if (!(await starshipService.hasOwnerAccess(req.user?.id || '', starshipId))) {
       sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
       return;
     }
@@ -241,7 +241,7 @@ router.get('/starships/:starshipId/usage/daily-model', jwtAuthMiddleware, async 
 
     // Authorization: Check if user has access to this starship
     const starshipService = new StarshipService();
-    if (!(await starshipService.hasAccess(req.user?.id || '', starshipId))) {
+    if (!(await starshipService.hasOwnerAccess(req.user?.id || '', starshipId))) {
       sendError(res, 'FORBIDDEN', 'Access denied to starship usage data', 403);
       return;
     }

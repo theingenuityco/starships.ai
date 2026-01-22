@@ -16,6 +16,8 @@ export { OAuthAuthCodeEntity } from './entities/OAuthAuthCodeEntity';
 export { EmailVerificationTokenEntity } from './entities/EmailVerificationTokenEntity';
 export { PasswordResetTokenEntity } from './entities/PasswordResetTokenEntity';
 export { EmailChangeTokenEntity } from './entities/EmailChangeTokenEntity';
+export { StarshipMemberEntity } from './entities/StarshipMemberEntity';
+export { StarshipInviteTokenEntity } from './entities/StarshipInviteTokenEntity';
 export { StarshipEntity } from './entities/StarshipEntity';
 export { ToolEntity } from './entities/ToolEntity';
 export { ToolTemplateEntity } from './entities/ToolTemplateEntity';
@@ -46,6 +48,8 @@ export { OAuthAuthCodeRepository } from './repositories/OAuthAuthCodeRepository'
 export { EmailVerificationTokenRepository } from './repositories/EmailVerificationTokenRepository';
 export { PasswordResetTokenRepository } from './repositories/PasswordResetTokenRepository';
 export { EmailChangeTokenRepository } from './repositories/EmailChangeTokenRepository';
+export { StarshipMemberRepository } from './repositories/StarshipMemberRepository';
+export { StarshipInviteTokenRepository } from './repositories/StarshipInviteTokenRepository';
 export { StarshipRepository } from './repositories/StarshipRepository';
 export { ToolRepository } from './repositories/ToolRepository';
 export { ToolTemplateRepository } from './repositories/ToolTemplateRepository';

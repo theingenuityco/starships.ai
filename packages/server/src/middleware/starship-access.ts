@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express';
-import { StarshipRepository } from '@starships/models';
+import { StarshipMemberRepository, StarshipRepository } from '@starships/models';
 import { logger } from '@/utils/logger';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 
@@ -9,9 +9,11 @@ export interface StarshipRequest extends Request {
 
 // ⚠️ UPDATED: Use dependency injection pattern
 let starshipRepository: StarshipRepository;
+let starshipMemberRepository: StarshipMemberRepository;
 
-export function initializeStarshipAccessMiddleware(deps: { starshipRepository: StarshipRepository }) {
+export function initializeStarshipAccessMiddleware(deps: { starshipRepository: StarshipRepository; starshipMemberRepository?: StarshipMemberRepository }) {
   starshipRepository = deps.starshipRepository;
+  starshipMemberRepository = deps.starshipMemberRepository ?? new StarshipMemberRepository();
 }
 
 export async function checkStarshipAccess(req: StarshipRequest, res: Response, next: NextFunction): Promise<void> {
@@ -32,8 +34,11 @@ export async function checkStarshipAccess(req: StarshipRequest, res: Response, n
     }
 
     if (starship.ownerId !== userId && !isInstanceAdmin(req.user as any)) {
-      res.status(403).json({ error: 'Access denied' });
-      return;
+      const isMember = await (starshipMemberRepository ?? new StarshipMemberRepository()).isMember(userId, starshipId);
+      if (!isMember) {
+        res.status(403).json({ error: 'Access denied' });
+        return;
+      }
     }
 
     req.starship = starship;

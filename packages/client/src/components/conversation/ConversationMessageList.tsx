@@ -460,112 +460,6 @@ export function ConversationMessageList({
     return filtered
   }, [displayMessages])
 
-  // #region agent log H1
-  useEffect(() => {
-    // Log high-level list state to verify which sizeVariant is active in the UI.
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H1',
-        location: 'ConversationMessageList.tsx:list-state',
-        message: 'ConversationMessageList state snapshot',
-        data: {
-          conversationId,
-          sizeVariant,
-          displayMessagesLen: Array.isArray(displayMessages) ? displayMessages.length : null,
-          renderMessagesLen: Array.isArray(renderMessages) ? renderMessages.length : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [conversationId, sizeVariant, renderMessages.length, displayMessages.length])
-  // #endregion
-
-  // #region agent log H2
-  useEffect(() => {
-    // Measure rendered row widths to see if user rows are actually narrower than assistant rows at runtime.
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const rows = Array.from(container.querySelectorAll<HTMLElement>('[data-convo-row-role]'))
-    if (rows.length === 0) return
-
-    const userRows = rows.filter(r => r.getAttribute('data-convo-row-role') === 'user')
-    const assistantRows = rows.filter(r => r.getAttribute('data-convo-row-role') === 'assistant')
-    const lastUser = userRows[userRows.length - 1] ?? null
-    const lastAssistant = assistantRows[assistantRows.length - 1] ?? null
-
-    const rect = (el: HTMLElement | null) => (el ? el.getBoundingClientRect() : null)
-    const lastUserRect = rect(lastUser)
-    const lastAssistantRect = rect(lastAssistant)
-    const containerRect = container.getBoundingClientRect()
-
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H2',
-        location: 'ConversationMessageList.tsx:row-widths',
-        message: 'Measured row widths (last user vs last assistant)',
-        data: {
-          sizeVariant,
-          containerWidth: containerRect?.width,
-          lastUser: lastUser
-            ? { id: lastUser.getAttribute('data-convo-row-message-id'), w: lastUserRect?.width, className: lastUser.className }
-            : null,
-          lastAssistant: lastAssistant
-            ? { id: lastAssistant.getAttribute('data-convo-row-message-id'), w: lastAssistantRect?.width, className: lastAssistant.className }
-            : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [renderMessages.length, sizeVariant])
-  // #endregion
-
-  // #region agent log H3
-  useEffect(() => {
-    // Measure content-column widths to detect shrink-to-fit inside a full-width row.
-    const container = scrollContainerRef.current
-    if (!container) return
-
-    const lastUserContent = container.querySelector<HTMLElement>('[data-convo-row-role="user"] [data-convo-row-content="1"]:last-of-type')
-    const lastAssistantContent = container.querySelector<HTMLElement>('[data-convo-row-role="assistant"] [data-convo-row-content="1"]:last-of-type')
-
-    const rect = (el: HTMLElement | null) => (el ? el.getBoundingClientRect() : null)
-    const u = rect(lastUserContent)
-    const a = rect(lastAssistantContent)
-
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H3',
-        location: 'ConversationMessageList.tsx:content-widths',
-        message: 'Measured content-column widths (last user vs last assistant)',
-        data: {
-          sizeVariant,
-          lastUserContent: lastUserContent
-            ? { w: u?.width, className: lastUserContent.className }
-            : null,
-          lastAssistantContent: lastAssistantContent
-            ? { w: a?.width, className: lastAssistantContent.className }
-            : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [renderMessages.length, sizeVariant])
-  // #endregion
-
   // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
   const activeRenderedStreamingAssistantId = useMemo(() => {
     let lastId: string | null = null
@@ -1027,11 +921,7 @@ const MemoizedMessageBubble = memo(
 
       return (
         <div className="flex justify-start w-full">
-          <div
-            data-convo-row-role="user"
-            data-convo-row-message-id={String(message.id ?? '')}
-            className="group mb-2 mt-4 flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] py-2 -mx-2"
-          >
+          <div className="group mb-2 mt-4 flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] py-2 -mx-2">
             <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
@@ -1060,7 +950,7 @@ const MemoizedMessageBubble = memo(
                 )}
               </AvatarFallback>
             </Avatar>
-            <div data-convo-row-content="1" className="min-w-0 flex-1 w-full pt-0.5">
+            <div className="min-w-0 flex-1 w-full pt-0.5">
               <div className="mb-0 text-sm font-bold font-mono text-foreground">
                 <Link href={userProfileHref} className="hover:underline underline-offset-2">
                   {userDisplayName}
@@ -1141,8 +1031,6 @@ const MemoizedMessageBubble = memo(
       return (
         <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : '')}>
           <div
-            data-convo-row-role="assistant"
-            data-convo-row-message-id={String(message.id ?? '')}
             className={cn(
               'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] -mx-2',
               // Remove the outside vertical gap between consecutive message rows.
@@ -1157,7 +1045,7 @@ const MemoizedMessageBubble = memo(
             ) : (
               <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
-            <div data-convo-row-content="1" className="min-w-0 flex-1 w-full pt-0.5">
+            <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
                 <div className="mb-0 text-sm font-bold text-foreground">
                   {assistantProfileHref ? (

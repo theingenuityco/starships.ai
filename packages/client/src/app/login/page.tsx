@@ -80,6 +80,21 @@ function LoginContent() {
       // If the user is authenticated but not onboarded, always route to onboarding.
       // This avoids deep-link returnUrl redirects bypassing onboarding before initial provisioning.
       if (user && user.onboardingCompleted === false) {
+        // Exception: invite acceptance must run pre-onboarding, otherwise invite links
+        // require login but never get accepted.
+        const returnUrl = searchParams?.get('returnUrl')
+        if (returnUrl && isValidRedirectUrl(returnUrl)) {
+          try {
+            const u = new URL(returnUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+            if (u.pathname === '/accept-invite') {
+              router.push(returnUrl)
+              return
+            }
+          } catch {
+            // ignore
+          }
+        }
+
         router.push('/onboarding')
         return
       }

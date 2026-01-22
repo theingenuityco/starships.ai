@@ -311,7 +311,7 @@ router.get('/users/:id/starships', jwtAuthMiddleware, async (req: Request, res: 
     const { page, limit } = queryValidation;
 
     const starshipService = new StarshipService();
-    const starships = await starshipService.getStarshipsByOwner(requestedUserId);
+    const starships = await starshipService.getStarshipsForUser(requestedUserId);
 
     // Apply pagination
     const total = starships.length;

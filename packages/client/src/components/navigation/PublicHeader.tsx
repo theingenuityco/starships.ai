@@ -5,8 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
-import { Orbitron } from 'next/font/google'
 import { track } from '@/lib/analytics'
+import { Orbitron } from 'next/font/google'
 
 const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
@@ -42,7 +42,7 @@ export function PublicHeader(): React.JSX.Element {
           title="Go to home"
         >
           <span className="flex items-center gap-2">
-            <StarshipsLogo width={32} height={32} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
+            <StarshipsLogo width={36} height={36} className="text-foreground" idleLoop={false} playOnMountOnce={false} triggerAnimation={logoTrigger} />
             <span
               className={`${orbitron.className} text-lg sm:text-xl md:text-2xl font-normal tracking-tight leading-none transition-all duration-200 ease-out ${
                 brandCollapsed ? 'opacity-0 -translate-x-1 max-w-0 w-0 overflow-hidden' : 'opacity-100 translate-x-0 max-w-[260px] w-auto'

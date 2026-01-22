@@ -1,6 +1,6 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, StarshipRepository, ToolRepository, UserRepository } from '@starships/models';
+import { AgentRepository, StarshipMemberRepository, StarshipRepository, ToolRepository, UserRepository } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
@@ -31,11 +31,13 @@ export class StarshipService {
   private starshipRepository: StarshipRepository;
   private agentRepository: AgentRepository;
   private userRepository: UserRepository;
+  private starshipMemberRepository: StarshipMemberRepository;
 
   constructor() {
     this.starshipRepository = new StarshipRepository();
     this.agentRepository = new AgentRepository();
     this.userRepository = new UserRepository();
+    this.starshipMemberRepository = new StarshipMemberRepository();
   }
 
   /**
@@ -82,15 +84,22 @@ export class StarshipService {
   }
 
   /**
+   * Get starships a user can access (owned + member).
+   */
+  async getStarshipsForUser(userId: string): Promise<StarshipModel[]> {
+    return this.starshipRepository.findAccessibleByUser(userId);
+  }
+
+  /**
    * Get starship by ID or slug
    */
   async getStarship(idOrSlug: string, ownerId?: string): Promise<StarshipModel | null> {
     // Try by ID first
     let starship = await this.starshipRepository.findById(idOrSlug);
 
-    // If not found and ownerId provided, try by slug
+    // If not found and userId provided, try by slug for this user's access scope
     if (!starship && ownerId) {
-      starship = await this.starshipRepository.findBySlug(idOrSlug, ownerId);
+      starship = await this.starshipRepository.findBySlugForUser(idOrSlug, ownerId);
     }
 
     return starship;
@@ -245,27 +254,50 @@ export class StarshipService {
   }
 
   /**
-   * Check if user has access to starship (owner or member)
+   * Check if user has access to starship (owner, collaborator, or instance admin).
+   *
+   * NOTE: This is collaborator-level access (non-billing). Use hasOwnerAccess() for
+   * subscription/billing/destructive operations.
    */
   async hasAccess(userId: string, starshipId: string): Promise<boolean> {
+    return this.hasCollaboratorAccess(userId, starshipId);
+  }
+
+  /**
+   * Collaborator access:
+   * - Owner always has access
+   * - Instance admins have access
+   * - Members in starship_members have access
+   */
+  async hasCollaboratorAccess(userId: string, starshipId: string): Promise<boolean> {
     try {
       const [starship, user] = await Promise.all([this.starshipRepository.findById(starshipId), this.userRepository.findById(userId)]);
 
-      if (!starship || !user) {
-        return false;
-      }
+      if (!starship || !user) return false;
 
-      // Check if user is the owner or instance admin
-      if (starship.ownerId === userId || (user as AuthUser).isInstanceAdmin) {
-        return true;
-      }
+      if (starship.ownerId === userId || Boolean((user as AuthUser).isInstanceAdmin)) return true;
 
-      // TODO: Add team membership checks when team functionality is implemented
-      // For now, only owners have access
-
-      return false;
+      return await this.starshipMemberRepository.isMember(userId, starshipId);
     } catch (error) {
-      console.error('[STARSHIP-SERVICE] Error checking starship access:', error);
+      console.error('[STARSHIP-SERVICE] Error checking collaborator access:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Owner access:
+   * - Owner always has access
+   * - Instance admins have access
+   *
+   * Use this for billing/subscription/destructive operations.
+   */
+  async hasOwnerAccess(userId: string, starshipId: string): Promise<boolean> {
+    try {
+      const [starship, user] = await Promise.all([this.starshipRepository.findById(starshipId), this.userRepository.findById(userId)]);
+      if (!starship || !user) return false;
+      return starship.ownerId === userId || Boolean((user as AuthUser).isInstanceAdmin);
+    } catch (error) {
+      console.error('[STARSHIP-SERVICE] Error checking owner access:', error);
       return false;
     }
   }
@@ -279,8 +311,8 @@ export class StarshipService {
       return null;
     }
 
-    // Check if user has access
-    if (starship.ownerId !== userId) {
+    // Check if user has access (collaborator-level)
+    if (!(await this.hasCollaboratorAccess(userId, starshipId))) {
       return null;
     }
 

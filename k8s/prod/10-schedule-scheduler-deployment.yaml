@@ -55,6 +55,11 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: DOCS_URL
+            - name: ENABLE_EMAILS
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ENABLE_EMAILS
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:

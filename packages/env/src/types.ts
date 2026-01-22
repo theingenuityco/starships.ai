@@ -64,6 +64,14 @@ export interface EnvironmentConfig {
   RUNNER_AUTH_TOKEN?: string;
 
   // Email Service Configuration (Amazon SES)
+  /**
+   * Global gate for outbound email delivery.
+   * - true: allow email sends (if SES config is present)
+   * - false: skip all email sends (no-op, logged by EmailService)
+   *
+   * Defaults to false when not set (safe-by-default).
+   */
+  ENABLE_EMAILS: boolean;
   EMAIL_FROM_ADDRESS?: string;
   EMAIL_FROM_NAME?: string;
   AWS_SES_REGION?: string;

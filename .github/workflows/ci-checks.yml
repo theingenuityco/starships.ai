@@ -32,6 +32,9 @@ jobs:
       # SEO / indexing should always be disabled in CI.
       ENABLE_INDEXING: ${{ vars.ENABLE_INDEXING || 'false' }}
 
+      # Email sending should always be disabled in CI.
+      ENABLE_EMAILS: 'false'
+
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
 

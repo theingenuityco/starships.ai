@@ -54,6 +54,49 @@ export interface StarshipModel {
 }
 
 // ============================================================================
+// STARSHIP MEMBERSHIP & INVITES
+// ============================================================================
+
+export type StarshipMemberRole = 'collaborator' | 'admin';
+
+/**
+ * A non-owner user's membership in a starship.
+ */
+export interface StarshipMemberModel {
+  starshipId: string;
+  userId: string;
+  role: StarshipMemberRole;
+  createdAt: string;
+  createdBy?: string | null;
+}
+
+/**
+ * Request to create an invite link to a starship.
+ */
+export interface CreateStarshipInviteRequest {
+  email: string;
+  role?: StarshipMemberRole; // default: collaborator
+}
+
+export interface CreateStarshipInviteResponse {
+  ok: true;
+  /**
+   * Optional: returned for convenience in dev / copy-to-clipboard flows.
+   * Servers may omit this in production.
+   */
+  inviteUrl?: string;
+  expiresAt?: string;
+}
+
+export interface AcceptStarshipInviteRequest {
+  token: string;
+}
+
+export interface AcceptStarshipInviteResponse {
+  starship: StarshipModel;
+}
+
+// ============================================================================
 // REQUEST/RESPONSE TYPES
 // ============================================================================
 

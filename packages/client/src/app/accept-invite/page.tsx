@@ -10,8 +10,9 @@ import { useEffect, useMemo, useState } from 'react'
 export default function AcceptInvitePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  // New canonical param is `invite`; keep `token` as a backwards-compatible fallback.
-  const token = (searchParams.get('invite') || searchParams.get('token') || '').trim()
+  // Canonical param is `invite` (no backwards compatibility with `token`).
+  const inviteToken = (searchParams.get('invite') || '').trim()
+  const hasLegacyTokenParam = Boolean((searchParams.get('token') || '').trim())
 
   const { isAuthenticated, isLoading } = useAuth()
   const acceptInvite = useAcceptStarshipInvite()
@@ -19,12 +20,12 @@ export default function AcceptInvitePage() {
   const [attempted, setAttempted] = useState(false)
 
   const returnUrl = useMemo(() => {
-    if (!token) return '/accept-invite'
-    return `/accept-invite?invite=${encodeURIComponent(token)}`
-  }, [token])
+    if (!inviteToken) return '/accept-invite'
+    return `/accept-invite?invite=${encodeURIComponent(inviteToken)}`
+  }, [inviteToken])
 
   useEffect(() => {
-    if (!token) return
+    if (!inviteToken) return
 
     // If not logged in, redirect to login and come back here after auth.
     if (!isLoading && !isAuthenticated) {
@@ -37,16 +38,16 @@ export default function AcceptInvitePage() {
 
     setAttempted(true)
     void acceptInvite
-      .mutateAsync(token)
+      .mutateAsync(inviteToken)
       .then(starship => {
         router.replace(`/ship/${encodeURIComponent(starship.slug)}/conversations`)
       })
       .catch(() => {
         // errors are surfaced via toast; keep page visible for retry
       })
-  }, [token, isLoading, isAuthenticated, attempted, acceptInvite, router, returnUrl])
+  }, [inviteToken, isLoading, isAuthenticated, attempted, acceptInvite, router, returnUrl])
 
-  const canRetry = Boolean(token) && isAuthenticated && !acceptInvite.isPending
+  const canRetry = Boolean(inviteToken) && isAuthenticated && !acceptInvite.isPending
 
   return (
     <div className="mx-auto mt-12 max-w-xl px-4">
@@ -56,8 +57,12 @@ export default function AcceptInvitePage() {
           <CardDescription>Join a starship as a collaborator.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {!token ? (
-            <p className="text-sm text-muted-foreground">Missing invite token. Please open the invite link from your email.</p>
+          {!inviteToken ? (
+            hasLegacyTokenParam ? (
+              <p className="text-sm text-muted-foreground">This invite link is outdated. Please request a new invite link.</p>
+            ) : (
+              <p className="text-sm text-muted-foreground">Missing invite token. Please open the invite link from your email.</p>
+            )
           ) : isLoading ? (
             <p className="text-sm text-muted-foreground">Checking your account…</p>
           ) : !isAuthenticated ? (
@@ -66,7 +71,7 @@ export default function AcceptInvitePage() {
             <p className="text-sm text-muted-foreground">Accepting invite…</p>
           ) : (
             <div className="flex items-center gap-2">
-              <Button onClick={() => acceptInvite.mutate(token)} disabled={!canRetry}>
+              <Button onClick={() => acceptInvite.mutate(inviteToken)} disabled={!canRetry}>
                 Accept invite
               </Button>
               <Button variant="ghost" onClick={() => router.push('/')} disabled={acceptInvite.isPending}>

@@ -31,22 +31,13 @@ function buildClientInviteUrl(token: string): string {
   const publicUrl = String(env.PUBLIC_URL || '').trim();
   const clientUrl = String(env.CLIENT_URL || '').trim();
   const base = publicUrl || clientUrl;
-  // #region agent log
-  fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:buildClientInviteUrl',message:'buildClientInviteUrl called',data:{publicUrlBase:publicUrl?publicUrl.replace(/\?.*$/,''):'',clientUrlBase:clientUrl?clientUrl.replace(/\?.*$/,''):'',chosenBase:base?base.replace(/\?.*$/,''):'',chosenSource:publicUrl?'PUBLIC_URL':(clientUrl?'CLIENT_URL':'none'),tokenLen:typeof token==='string'?token.length:null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-  // #endregion
   try {
     const u = new URL('/accept-invite', base);
     u.searchParams.set('invite', token);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:buildClientInviteUrl',message:'buildClientInviteUrl success',data:{inviteUrlOrigin:u.origin,inviteUrlPath:u.pathname,hasQuery:u.search.length>0},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     return u.toString();
   } catch {
     // Fallback (best-effort)
     const out = `${base.replace(/\/+$/g, '')}/accept-invite?invite=${encodeURIComponent(token)}`;
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:buildClientInviteUrl',message:'buildClientInviteUrl fallback',data:{outHasAcceptInvite:out.includes('/accept-invite'),outLen:out.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
     return out;
   }
 }
@@ -281,9 +272,6 @@ router.post('/starships/:id/invites', jwtAuthMiddleware, async (req: Request, re
     });
 
     const inviteUrl = buildClientInviteUrl(token);
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:/starships/:id/invites',message:'created inviteUrl',data:{publicUrl:(env.PUBLIC_URL||'').trim(),inviteUrlOrigin:(()=>{try{return new URL(inviteUrl).origin}catch{return 'invalid'}})(),hostHeader:String(req.headers?.host||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
-    // #endregion
 
     const emailService = new EmailService();
     await emailService.sendStarshipInviteEmail({
@@ -311,9 +299,6 @@ router.post('/starship-invites/preview', async (req: Request, res: Response): Pr
       'invite preview'
     );
     if (!body) return;
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:/starship-invites/preview',message:'preview endpoint hit',data:{tokenLen:typeof body.token==='string'?body.token.length:null,hostHeader:String(req.headers?.host||''),xForwardedHost:String(req.headers?.['x-forwarded-host']||''),xForwardedProto:String(req.headers?.['x-forwarded-proto']||''),originalUrl:String((req as any).originalUrl||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
-    // #endregion
 
     const inviteRepo = new StarshipInviteTokenRepository();
     // NOTE: `@starships/models` is imported via its built `dist` types in this repo.

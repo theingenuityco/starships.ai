@@ -29,12 +29,6 @@ export default function AcceptInvitePage() {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewError, setPreviewError] = useState<string | null>(null)
 
-  useEffect(() => {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/client/src/app/accept-invite/page.tsx:useEffect(init)',message:'accept-invite page mounted',data:{pathname:typeof window!=='undefined'?window.location.pathname:'',origin:typeof window!=='undefined'?window.location.origin:'',hasInviteToken:Boolean(inviteToken),tokenLen:inviteToken?inviteToken.length:0},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
-  }, [inviteToken])
-
   const returnUrl = useMemo(() => {
     if (!inviteToken) return '/accept-invite'
     return `/accept-invite?invite=${encodeURIComponent(inviteToken)}`
@@ -45,18 +39,12 @@ export default function AcceptInvitePage() {
     if (preview || previewLoading || previewError) return
 
     setPreviewLoading(true)
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/client/src/app/accept-invite/page.tsx:previewFetch',message:'starting preview fetch',data:{fetchUrl:'/api/v1/starship-invites/preview',tokenLen:inviteToken.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
-    // #endregion
     void fetch('/api/v1/starship-invites/preview', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ token: inviteToken }),
     })
       .then(async r => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/client/src/app/accept-invite/page.tsx:previewFetch',message:'preview fetch response',data:{ok:r.ok,status:r.status,statusText:r.statusText},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
         const json = await r.json().catch(() => null)
         if (!r.ok || !json?.data) {
           throw new Error(json?.error?.message || 'Invalid or expired invite token')
@@ -64,9 +52,6 @@ export default function AcceptInvitePage() {
         setPreview(json.data as InvitePreviewResponse)
       })
       .catch((e: any) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/client/src/app/accept-invite/page.tsx:previewFetch',message:'preview fetch error',data:{errorMessage:typeof e?.message==='string'?e.message:'unknown'},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
         setPreviewError(typeof e?.message === 'string' ? e.message : 'Invalid or expired invite token')
       })
       .finally(() => setPreviewLoading(false))
@@ -83,9 +68,6 @@ export default function AcceptInvitePage() {
 
     // If the user is logged in as the wrong email, force logout and prompt sign-in as the invited email.
     if (!isLoading && isAuthenticated && invitedEmail && currentEmail && invitedEmail !== currentEmail) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/client/src/app/accept-invite/page.tsx:redirect',message:'redirecting due to email mismatch',data:{isAuthenticated,hasInvitedEmail:Boolean(invitedEmail),hasCurrentEmail:Boolean(currentEmail)},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       router.replace(
         `/login?logout=true&expectedEmail=${encodeURIComponent(preview.invitedEmail)}&returnUrl=${encodeURIComponent(returnUrl)}&tab=login`
       )
@@ -94,9 +76,6 @@ export default function AcceptInvitePage() {
 
     // If not logged in, redirect to login and come back here after auth.
     if (!isLoading && !isAuthenticated) {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/client/src/app/accept-invite/page.tsx:redirect',message:'redirecting to login (not authenticated)',data:{hasPreview:Boolean(preview),hasExpectedEmail:Boolean(preview.invitedEmail)},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H4'})}).catch(()=>{});
-      // #endregion
       const expected = preview.invitedEmail ? `&expectedEmail=${encodeURIComponent(preview.invitedEmail)}` : ''
       router.replace(`/login?returnUrl=${encodeURIComponent(returnUrl)}${expected}&tab=login`)
       return

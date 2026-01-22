@@ -975,16 +975,15 @@ export function ConversationMessageContent({
           <div
             ref={messageContainerRef}
             className={cn(
-              'relative',
+              'relative group/content-chunk',
               // Only show the hover actions when hovering the content chunk itself (not tools/reasoning/attachments).
               // Keep internal padding; remove outside row-gap in the list instead.
-              'rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10',
-              'hover:[&_.content-chunk-actions]:opacity-100 focus-within:[&_.content-chunk-actions]:opacity-100'
+              'rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10'
             )}
           >
             {/* Content chunk actions (copy + download): float at bottom edge */}
             {enableCopy && (
-              <div className="content-chunk-actions pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity">
+              <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
                     <Icon name="copy" className="h-4 w-4" />

@@ -102,7 +102,7 @@ export const researchTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'up
     'Expert research agent that combines Wikipedia depth with DuckDuckGo instant answers for comprehensive, accurate information on any topic.',
   category: 'analysis',
 
-  model: 'anthropic/claude-3.5-sonnet',
+  model: 'anthropic/claude-haiku-4.5',
   temperature: 0.3,
   maxTokens: 4000,
 

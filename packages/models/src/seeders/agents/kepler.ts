@@ -101,7 +101,7 @@ export const keplerTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'upda
     'Widget-focused agent that builds, renders, and manages widgets (charts/tables/cards) with correct props and clean UI. Minimal analysis; optimized for widget creation and iteration.',
   category: 'utility',
 
-  model: 'anthropic/claude-sonnet-4.5',
+  model: 'anthropic/claude-haiku-4.5',
   temperature: 0.2,
   maxTokens: 2500,
 

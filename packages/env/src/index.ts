@@ -58,10 +58,9 @@ export function getEnvConfig(): EnvironmentConfig {
   const resolvedPostgresDatabase = process.env.POSTGRES_DATABASE || 'starships';
   const resolvedPostgresSSL = process.env.POSTGRES_SSL === 'true';
 
-  // Backward-compatible default: if ENABLE_EMAILS is unset, treat emails as enabled.
-  // This lets existing deployments continue sending email without adding a new env var.
-  // Set ENABLE_EMAILS=false to hard-disable all email sending.
-  const resolvedEnableEmails = process.env.ENABLE_EMAILS ? process.env.ENABLE_EMAILS === 'true' : true;
+  // Safe default: if ENABLE_EMAILS is unset, treat emails as disabled.
+  // Set ENABLE_EMAILS=true explicitly in environments where outbound email is desired.
+  const resolvedEnableEmails = process.env.ENABLE_EMAILS === 'true';
 
   return {
     // Server Configuration

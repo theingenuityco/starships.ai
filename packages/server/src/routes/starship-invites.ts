@@ -135,6 +135,73 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
   }
 });
 
+// DELETE /starships/:id/members/:memberUserId - remove a member (owner-only)
+router.delete('/starships/:id/members/:memberUserId', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const params = validateData(z.object({ id: IdSchema, memberUserId: IdSchema }), req.params, res, 'member removal');
+    if (!params) return;
+    const starshipId = params.id;
+    const memberUserId = params.memberUserId;
+
+    // Authorization: owner-only
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
+
+    const starshipService = new StarshipService();
+    const starship = await starshipService.getStarship(starshipId);
+    if (!starship) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, { starshipId });
+      return;
+    }
+
+    // Never allow removing the owner via this endpoint.
+    if (memberUserId === starship.ownerId) {
+      sendError(res, 'VALIDATION_ERROR', 'Cannot remove the starship owner', 400);
+      return;
+    }
+
+    const memberRepo = new StarshipMemberRepository();
+    const removed = await memberRepo.removeMember(starshipId, memberUserId);
+    sendSuccess(res, { removed }, 200);
+  } catch (error) {
+    handleError(error, res, 'removing starship member');
+  }
+});
+
+// DELETE /starships/:id/invites?email=... - revoke pending invite(s) for email (owner-only)
+router.delete('/starships/:id/invites', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = requireUserId(req, res);
+    if (!userId) return;
+
+    const params = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
+    if (!params) return;
+    const starshipId = params.id;
+
+    const query = validateData(
+      z.object({
+        email: z.string().email().max(255),
+      }),
+      req.query,
+      res,
+      'invite revoke'
+    );
+    if (!query) return;
+
+    // Authorization: owner-only
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
+
+    const inviteRepo = new StarshipInviteTokenRepository();
+    const revokedCount = await inviteRepo.cancelOutstandingInvitesForEmail(starshipId, query.email).catch(() => 0);
+
+    sendSuccess(res, { revokedCount }, 200);
+  } catch (error) {
+    handleError(error, res, 'revoking starship invite');
+  }
+});
+
 // POST /starships/:id/invites - create an email invite link (owner-only)
 router.post('/starships/:id/invites', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {

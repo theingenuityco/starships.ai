@@ -7,11 +7,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Badge } from '@/components/ui/badge'
 import { useAuth } from '@/hooks/useAuth'
 import { STARSHIP_QUERY_KEYS, useUpdateStarship } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
-import { STARSHIP_MEMBERS_QUERY_KEYS, useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
+import { STARSHIP_MEMBERS_QUERY_KEYS, useRemoveStarshipMember, useRevokeStarshipInvite, useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
@@ -75,6 +76,8 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
 
   const canManageMembers = canManageBilling
   const { data: membersAndInvites, isLoading: isMembersLoading } = useStarshipMembersAndInvites(starship?.id ?? '', Boolean(starship?.id && canManageMembers))
+  const removeMember = useRemoveStarshipMember(starship?.id ?? '')
+  const revokeInvite = useRevokeStarshipInvite(starship?.id ?? '')
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
@@ -147,7 +150,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
         <CardHeader className="pb-4">
           <CardTitle className="text-base flex items-center gap-2">
             <Icon name="rocket" className="h-4 w-4 text-primary" />
-            My Subscription
+            My Starship
           </CardTitle>
           <CardDescription className="text-sm">Loading starship…</CardDescription>
         </CardHeader>
@@ -173,7 +176,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
             <Icon name="rocket" className="h-5 w-5 text-primary" />
           </div>
           <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold">My Subscription</h2>
+            <h2 className="text-lg font-semibold">My Starship</h2>
             {dirty ? (
               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-600">
                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" /> Unsaved changes
@@ -407,7 +410,9 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>Active</span>
-                        <span className="tabular-nums">{membersAndInvites?.members?.length ?? 0}</span>
+                        <Badge variant="outline" className="h-5 px-2 text-[11px] font-medium tabular-nums border-border/60 bg-muted/20">
+                          {membersAndInvites?.members?.length ?? 0}
+                        </Badge>
                       </div>
                       <div className="space-y-2">
                         {(membersAndInvites?.members ?? []).map(m => {
@@ -433,6 +438,22 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                   Active
                                 </span>
+                                {m.role !== 'owner' ? (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    className="h-7 px-2 text-[11px]"
+                                    disabled={removeMember.isPending}
+                                    onClick={async () => {
+                                      if (!starship?.id) return
+                                      if (!window.confirm(`Remove ${label} from this starship?`)) return
+                                      await removeMember.mutateAsync(m.userId)
+                                    }}
+                                  >
+                                    Remove
+                                  </Button>
+                                ) : null}
                               </div>
                             </div>
                           )
@@ -444,7 +465,9 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     <div className="space-y-2 pt-2">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
                         <span>Invited</span>
-                        <span className="tabular-nums">{membersAndInvites?.invites?.length ?? 0}</span>
+                        <Badge variant="outline" className="h-5 px-2 text-[11px] font-medium tabular-nums border-border/60 bg-muted/20">
+                          {membersAndInvites?.invites?.length ?? 0}
+                        </Badge>
                       </div>
                       <div className="space-y-2">
                         {(membersAndInvites?.invites ?? []).map(invite => (
@@ -469,6 +492,20 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                                 Invited
                               </span>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="h-7 px-2 text-[11px]"
+                                disabled={revokeInvite.isPending}
+                                onClick={async () => {
+                                  if (!starship?.id) return
+                                  if (!window.confirm(`Revoke invite for ${invite.invitedEmail}?`)) return
+                                  await revokeInvite.mutateAsync(invite.invitedEmail)
+                                }}
+                              >
+                                Revoke
+                              </Button>
                             </div>
                           </div>
                         ))}

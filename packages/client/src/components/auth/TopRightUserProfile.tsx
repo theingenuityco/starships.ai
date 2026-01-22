@@ -158,7 +158,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
               <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
                 <Icon name="rocket" className={navMenuItemIconClassName} />
               </div>
-              My Subscription
+              My Starship
             </DropdownMenuItem>
             {canManageBilling ? (
               <DropdownMenuItem onClick={handleBillingClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>

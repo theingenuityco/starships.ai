@@ -262,14 +262,10 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     {starship.ownerId === userId ? (
                       <div className="flex h-6 items-center gap-2">
                         <Avatar className="h-5 w-5 rounded-full">
-                          {typeof userAvatar === 'string' && /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(userAvatar.trim()) ? (
-                            <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} />
+                          {typeof userAvatar === 'string' && userAvatar.trim() ? (
+                            <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} referrerPolicy="no-referrer" />
                           ) : null}
-                          <AvatarFallback className="rounded-full text-[9px] leading-none">
-                            {typeof userAvatar === 'string' && userAvatar.trim() && !/^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(userAvatar.trim())
-                              ? userAvatar.trim()
-                              : (userName || 'You').slice(0, 1).toUpperCase()}
-                          </AvatarFallback>
+                          <AvatarFallback className="rounded-full text-[9px] leading-none">{(userName || 'You').slice(0, 1).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <span className="text-xs font-medium">{userName || 'You'}</span>
                       </div>
@@ -422,7 +418,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                             <div key={`member-${m.userId}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3">
                               <div className="flex min-w-0 items-center gap-3">
                                 <Avatar className="h-7 w-7 rounded-full">
-                                  {m.avatar ? <AvatarImage src={m.avatar} alt={label} /> : null}
+                                  {typeof m.avatar === 'string' && m.avatar.trim() ? <AvatarImage src={m.avatar.trim()} alt={label} referrerPolicy="no-referrer" /> : null}
                                   <AvatarFallback className="rounded-full text-[10px] leading-none">{initials}</AvatarFallback>
                                 </Avatar>
                                 <div className="min-w-0">

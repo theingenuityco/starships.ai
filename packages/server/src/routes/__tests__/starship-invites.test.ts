@@ -50,8 +50,8 @@ function createMockRes(): MockRes {
   return res;
 }
 
-function getHandler(path: string): (req: Request, res: Response) => Promise<void> {
-  const layer = (starshipInvitesRouter as any).stack.find((l: any) => l?.route?.path === path);
+function getHandler(path: string, method: 'get' | 'post' | 'delete' | 'patch' = 'get'): (req: Request, res: Response) => Promise<void> {
+  const layer = (starshipInvitesRouter as any).stack.find((l: any) => l?.route?.path === path && Boolean(l?.route?.methods?.[method]));
   if (!layer) throw new Error(`Route not found: ${path}`);
   const stack = layer.route.stack;
   return stack[stack.length - 1].handle;
@@ -84,7 +84,7 @@ describe('starship invite routes', () => {
     } as unknown as Request;
     const res = createMockRes();
 
-    const handler = getHandler('/starships/:id/invites');
+    const handler = getHandler('/starships/:id/invites', 'post');
     await handler(req, res as unknown as Response);
 
     expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_1234567', expect.anything());
@@ -127,7 +127,7 @@ describe('starship invite routes', () => {
     } as unknown as Request;
     const res = createMockRes();
 
-    const handler = getHandler('/starship-invites/accept');
+    const handler = getHandler('/starship-invites/accept', 'post');
     await handler(req, res as unknown as Response);
 
     expect(inviteRepo.validateAndConsumeTokenForEmail).toHaveBeenCalledWith('t'.repeat(64), 'invitee@test');
@@ -156,7 +156,7 @@ describe('starship invite routes', () => {
     } as unknown as Request;
     const res = createMockRes();
 
-    const handler = getHandler('/starship-invites/accept');
+    const handler = getHandler('/starship-invites/accept', 'post');
     await handler(req, res as unknown as Response);
 
     expect(res.status).toHaveBeenCalledWith(400);
@@ -189,12 +189,8 @@ describe('starship invite routes', () => {
           expires_at: new Date(Date.now() + 3600_000).toISOString(),
         },
       ]);
-    (getConnection as unknown as jest.Mock).mockReturnValue({ query });
-
-    const userRepo = {
-      findById: jest.fn().mockResolvedValue({ id: 'user_owner', email: 'owner@test.com', displayName: 'Owner', avatar: null }),
-    };
-    (UserRepository as unknown as jest.Mock).mockImplementation(() => userRepo);
+    const queryOne = jest.fn().mockResolvedValue({ email: 'owner@test.com', display_name: 'Owner', avatar: null });
+    (getConnection as unknown as jest.Mock).mockReturnValue({ query, queryOne });
 
     const starshipSvc = {
       getStarship: jest.fn().mockResolvedValue({ id: 'starship_1234', slug: 'ship-1', name: 'Ship 1', ownerId: 'user_owner', createdAt: new Date().toISOString() }),
@@ -207,12 +203,12 @@ describe('starship invite routes', () => {
     } as unknown as Request;
     const res = createMockRes();
 
-    const handler = getHandler('/starships/:id/members');
+    const handler = getHandler('/starships/:id/members', 'get');
     await handler(req, res as unknown as Response);
 
     expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());
     expect(query).toHaveBeenCalledTimes(2);
-    expect(userRepo.findById).toHaveBeenCalledWith('user_owner');
+    expect(queryOne).toHaveBeenCalledTimes(1);
 
     expect(res.status).toHaveBeenCalledWith(200);
     const payload = res.json.mock.calls[0][0] as any;
@@ -240,7 +236,7 @@ describe('starship invite routes', () => {
     } as unknown as Request;
     const res = createMockRes();
 
-    const handler = getHandler('/starships/:id/members/:memberUserId');
+    const handler = getHandler('/starships/:id/members/:memberUserId', 'delete');
     await handler(req, res as unknown as Response);
 
     expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());
@@ -264,7 +260,7 @@ describe('starship invite routes', () => {
     } as unknown as Request;
     const res = createMockRes();
 
-    const handler = getHandler('/starships/:id/invites');
+    const handler = getHandler('/starships/:id/invites', 'delete');
     await handler(req, res as unknown as Response);
 
     expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());

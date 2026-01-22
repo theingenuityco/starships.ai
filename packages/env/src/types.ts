@@ -69,7 +69,7 @@ export interface EnvironmentConfig {
    * - true: allow email sends (if SES config is present)
    * - false: skip all email sends (no-op, logged by EmailService)
    *
-   * Defaults to true when not set for backward compatibility.
+   * Defaults to false when not set (safe-by-default).
    */
   ENABLE_EMAILS: boolean;
   EMAIL_FROM_ADDRESS?: string;

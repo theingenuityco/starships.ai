@@ -5,7 +5,7 @@ import { StarshipService } from '@/services/StarshipService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { getEnvConfig } from '@starships/env';
-import { StarshipInviteTokenRepository, StarshipMemberRepository, UserRepository, getConnection } from '@starships/models';
+import { StarshipInviteTokenRepository, StarshipMemberRepository, getConnection } from '@starships/models';
 import type { CreateStarshipInviteRequest } from '@starships/protocol';
 import { IdSchema } from '@/schemas/common';
 import type { Request, Response } from 'express';
@@ -58,10 +58,8 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
       return;
     }
 
-    const userRepo = new UserRepository();
-
     const connection = getConnection();
-    const [memberRows, inviteRows, ownerUser] = await Promise.all([
+    const [memberRows, inviteRows, ownerRow] = await Promise.all([
       connection.query<{
         user_id: string;
         role: 'admin' | 'collaborator';
@@ -75,9 +73,16 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
                 m.created_at,
                 u.email,
                 u.display_name,
-                u.avatar
+                COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
            FROM starship_members m
            JOIN users u ON u.id = m.user_id
+            LEFT JOIN LATERAL (
+              SELECT (profile_data->>'avatar') as oauth_avatar
+                FROM oauth_accounts
+               WHERE user_id = u.id
+               ORDER BY updated_at DESC
+               LIMIT 1
+            ) oa ON true
           WHERE m.starship_id = $1
           ORDER BY m.created_at ASC`,
         [starshipId]
@@ -97,16 +102,34 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
           ORDER BY created_at DESC`,
         [starshipId]
       ),
-      userRepo.findById(starship.ownerId),
+      connection.queryOne<{
+        email: string | null;
+        display_name: string | null;
+        avatar: string | null;
+      }>(
+        `SELECT u.email,
+                u.display_name,
+                COALESCE(NULLIF(u.avatar, ''), oa.oauth_avatar) as avatar
+           FROM users u
+           LEFT JOIN LATERAL (
+             SELECT (profile_data->>'avatar') as oauth_avatar
+               FROM oauth_accounts
+              WHERE user_id = u.id
+              ORDER BY updated_at DESC
+              LIMIT 1
+           ) oa ON true
+          WHERE u.id = $1`,
+        [starship.ownerId]
+      ),
     ]);
 
     const owner = {
       userId: starship.ownerId,
       role: 'owner' as const,
       createdAt: starship.createdAt,
-      email: ownerUser?.email ?? null,
-      displayName: (ownerUser as any)?.displayName ?? null,
-      avatar: (ownerUser as any)?.avatar ?? null,
+      email: ownerRow?.email ?? null,
+      displayName: ownerRow?.display_name ?? null,
+      avatar: ownerRow?.avatar ?? null,
     };
 
     const members = [

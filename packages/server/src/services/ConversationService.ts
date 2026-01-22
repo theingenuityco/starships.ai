@@ -249,8 +249,20 @@ export class ConversationService {
 
     // Fetch provider routes; repository orders by priority DESC so [0] is "best".
     const routes = await this.llmModelRepository.listProvidersForModel(model, { enabledOnly: true }).catch(() => []);
-    const best = (Array.isArray(routes) && routes.length > 0 ? routes[0] : null) as { pricing?: Record<string, unknown> | null } | null;
-    const pricing = best?.pricing ?? null;
+    // Prefer the first route that actually has usable pricing (some providers/routes may omit it).
+    const pickPricing = (): Record<string, unknown> | null => {
+      const list = Array.isArray(routes) ? routes : [];
+      for (const r of list) {
+        if (!r || typeof r !== 'object') continue;
+        const pricing = (r as { pricing?: unknown }).pricing;
+        if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) continue;
+        // Treat it as usable if it has at least one of the expected pricing keys.
+        const pr = pricing as Record<string, unknown>;
+        if ('prompt' in pr || 'completion' in pr || 'request' in pr) return pr;
+      }
+      return null;
+    };
+    const pricing = pickPricing();
 
     const toNum = (v: unknown): number | undefined => {
       if (typeof v === 'number' && Number.isFinite(v)) return v;

@@ -7,7 +7,7 @@ import {
   type LlmRuntimeConfig,
   type ProviderRoute,
 } from '../hostRuntime/RunnerHostRuntime';
-import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
+import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol/src/domains/connector';
 import { executionRegistry } from '@/execution/ExecutionRegistry';
 
 export class InProcessExecutor implements Executor {

@@ -101,6 +101,13 @@ spec:
                   name: starships-secrets
                   key: ENABLE_INDEXING
 
+            # Email sending gate (set true in prod unless explicitly disabled)
+            - name: ENABLE_EMAILS
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ENABLE_EMAILS
+
             # Auth
             - name: JWT_SECRET
               valueFrom:

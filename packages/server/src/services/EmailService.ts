@@ -20,6 +20,13 @@ export class EmailService {
 
     const hasEmailConfig = Boolean(this.env.EMAIL_FROM_ADDRESS && this.env.EMAIL_FROM_NAME && this.env.AWS_SES_REGION);
 
+    if (!this.env.ENABLE_EMAILS) {
+      this.isConfigured = false;
+      this.sesClient = null;
+      logger.warn('[EmailService] Email sending is disabled by ENABLE_EMAILS=false.');
+      return;
+    }
+
     if (!hasEmailConfig) {
       this.isConfigured = false;
       this.sesClient = null;
@@ -50,6 +57,13 @@ export class EmailService {
    * Business logic: Email template generation and delivery
    */
   async sendVerificationEmail(email: string, token: string, displayName?: string): Promise<void> {
+    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/verify-email?token=${token}`;
+
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping verification email send', { email, verificationUrl });
+      return;
+    }
+
     if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
       logger.error('[EmailService] Attempted to send verification email but configuration is missing.', {
         EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
@@ -58,8 +72,6 @@ export class EmailService {
       });
       throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
     }
-
-    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/verify-email?token=${token}`;
 
     const command = new SendEmailCommand({
       Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
@@ -90,6 +102,13 @@ export class EmailService {
    * Business logic: Password reset email template generation and delivery
    */
   async sendPasswordResetEmail(email: string, token: string, displayName?: string): Promise<void> {
+    const resetUrl = `${this.env.PUBLIC_URL}/reset-password?token=${token}`;
+
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping password reset email send', { email, resetUrl });
+      return;
+    }
+
     if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
       logger.error('[EmailService] Attempted to send password reset email but configuration is missing.', {
         EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
@@ -98,8 +117,6 @@ export class EmailService {
       });
       throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
     }
-
-    const resetUrl = `${this.env.PUBLIC_URL}/reset-password?token=${token}`;
 
     const command = new SendEmailCommand({
       Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
@@ -130,6 +147,17 @@ export class EmailService {
    * Business logic: Email change verification template generation and delivery
    */
   async sendEmailChangeVerificationEmail(newEmail: string, token: string, oldEmail: string, displayName?: string): Promise<void> {
+    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
+
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping email change verification email send', {
+        newEmail,
+        oldEmail,
+        verificationUrl,
+      });
+      return;
+    }
+
     if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
       logger.error('[EmailService] Attempted to send email change verification email but configuration is missing.', {
         EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
@@ -138,8 +166,6 @@ export class EmailService {
       });
       throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
     }
-
-    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
 
     const command = new SendEmailCommand({
       Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
@@ -175,6 +201,15 @@ export class EmailService {
     starshipName: string;
     inviterName?: string;
   }): Promise<void> {
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping starship invite email send', {
+        email: args.invitedEmail,
+        starshipName: args.starshipName,
+        inviteUrl: args.inviteUrl,
+      });
+      return;
+    }
+
     if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
       logger.error('[EmailService] Attempted to send starship invite email but configuration is missing.', {
         EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,

@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useAuth } from '@/hooks/useAuth'
 import { STARSHIP_QUERY_KEYS, useUpdateStarship } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
+import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
@@ -54,15 +55,27 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   const queryClient = useQueryClient()
   const { userId, userName, userAvatar, isInstanceAdmin } = useAuth()
   const updateStarship = useUpdateStarship()
+  const createInvite = useCreateStarshipInvite(starship?.id ?? '')
 
   const { data: deployedAgents, isLoading: isAgentsLoading } = useStarshipAgents(starship?.id ?? '', Boolean(starship?.id))
   const deployedAgentsCount = Array.isArray(deployedAgents) ? deployedAgents.length : 0
   const maxAgentsLabel = isAgentsLoading ? `…/${starship?.maxAgents ?? '—'}` : `${deployedAgentsCount}/${starship?.maxAgents ?? '—'}`
 
-  const canEdit = useMemo(() => {
+  const canManageBilling = useMemo(() => {
     if (!starship) return false
     return Boolean(isInstanceAdmin || (userId && starship.ownerId === userId))
   }, [starship, isInstanceAdmin, userId])
+
+  const canEdit = useMemo(() => {
+    if (!starship) return false
+    // Collaborators should be allowed to edit starship details (server enforces actual access).
+    return Boolean(isInstanceAdmin || userId)
+  }, [starship, isInstanceAdmin, userId])
+
+  const canManageMembers = canManageBilling
+
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
 
   const [form, setForm] = useState<{
     name: string
@@ -181,7 +194,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
       </div>
 
       <form id={formId} onSubmit={onSave} className="mt-6 grid grid-cols-1 gap-6 xl:grid-cols-[420px_minmax(0,_1fr)] xl:items-start">
-        {starship.id && (
+        {starship.id && canManageBilling && (
           <div className="xl:col-span-2">
             <StarshipUpgradeSection starshipId={starship.id} />
           </div>
@@ -316,6 +329,63 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
               </div>
             </CardContent>
           </Card>
+
+          {canManageMembers && (
+            <Card className={PROFILE_SECTION_CARD_CLASS}>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Icon name="mail" className="h-4 w-4 text-primary" />
+                  Invite collaborator
+                </CardTitle>
+                <CardDescription className="text-sm">Send an invite link to a teammate.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="invite-email">Email</Label>
+                  <Input
+                    id="invite-email"
+                    value={inviteEmail}
+                    onChange={e => setInviteEmail(e.target.value)}
+                    placeholder="teammate@example.com"
+                    disabled={createInvite.isPending}
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    disabled={!inviteEmail.trim() || createInvite.isPending}
+                    onClick={async () => {
+                      if (!starship?.id) return
+                      const res = await createInvite.mutateAsync({ email: inviteEmail.trim() })
+                      setLastInviteUrl(res.inviteUrl || null)
+                    }}
+                  >
+                    {createInvite.isPending ? 'Sending…' : 'Send invite'}
+                  </Button>
+                  {lastInviteUrl ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={async () => {
+                        try {
+                          await navigator.clipboard.writeText(lastInviteUrl)
+                        } catch {
+                          // ignore
+                        }
+                      }}
+                    >
+                      Copy link
+                    </Button>
+                  ) : null}
+                </div>
+                {lastInviteUrl ? (
+                  <p className="text-xs text-muted-foreground break-all">
+                    Invite link: <span className="font-mono">{lastInviteUrl}</span>
+                  </p>
+                ) : null}
+              </CardContent>
+            </Card>
+          )}
         </div>
       </form>
     </>

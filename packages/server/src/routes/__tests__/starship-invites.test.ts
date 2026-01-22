@@ -1,0 +1,166 @@
+import type { Request, Response } from 'express';
+
+jest.mock('@starships/env', () => ({
+  getEnvConfig: () => ({
+    CLIENT_URL: 'https://client.test',
+    PUBLIC_URL: 'https://server.test',
+  }),
+}));
+
+jest.mock('@/middleware/verify-starship-access', () => ({
+  verifyStarshipOwnerAccess: jest.fn(),
+}));
+
+jest.mock('@/services/EmailService', () => ({
+  EmailService: jest.fn().mockImplementation(() => ({
+    sendStarshipInviteEmail: jest.fn(),
+  })),
+}));
+
+jest.mock('@/services/StarshipService', () => ({
+  StarshipService: jest.fn().mockImplementation(() => ({
+    getStarship: jest.fn(),
+  })),
+}));
+
+jest.mock('@starships/models', () => ({
+  StarshipInviteTokenRepository: jest.fn(),
+  StarshipMemberRepository: jest.fn(),
+}));
+
+import starshipInvitesRouter from '@/routes/starship-invites';
+import { verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
+import { EmailService } from '@/services/EmailService';
+import { StarshipService } from '@/services/StarshipService';
+import { StarshipInviteTokenRepository, StarshipMemberRepository } from '@starships/models';
+
+type MockRes = {
+  status: jest.Mock<Response, [number]>;
+  json: jest.Mock<Response, [unknown]>;
+};
+
+function createMockRes(): MockRes {
+  const res: MockRes = {
+    status: jest.fn<Response, [number]>(),
+    json: jest.fn<Response, [unknown]>(),
+  };
+  res.status.mockImplementation(() => res as unknown as Response);
+  res.json.mockImplementation(() => res as unknown as Response);
+  return res;
+}
+
+function getHandler(path: string): (req: Request, res: Response) => Promise<void> {
+  const layer = (starshipInvitesRouter as any).stack.find((l: any) => l?.route?.path === path);
+  if (!layer) throw new Error(`Route not found: ${path}`);
+  const stack = layer.route.stack;
+  return stack[stack.length - 1].handle;
+}
+
+describe('starship invite routes', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('POST /starships/:id/invites creates token and sends email', async () => {
+    jest.mocked(verifyStarshipOwnerAccess).mockResolvedValue(true);
+
+    const inviteRepo = {
+      cancelOutstandingInvitesForEmail: jest.fn().mockResolvedValue(0),
+      generateToken: jest.fn().mockResolvedValue({ token: 't'.repeat(64), expiresAt: new Date().toISOString() }),
+    };
+    (StarshipInviteTokenRepository as unknown as jest.Mock).mockImplementation(() => inviteRepo);
+
+    const starshipSvc = { getStarship: jest.fn().mockResolvedValue({ id: 'starship_1234', slug: 'ship-1', name: 'Ship 1', ownerId: 'user_1234567' }) };
+    (StarshipService as unknown as jest.Mock).mockImplementation(() => starshipSvc);
+
+    const emailSvc = { sendStarshipInviteEmail: jest.fn().mockResolvedValue(undefined) };
+    (EmailService as unknown as jest.Mock).mockImplementation(() => emailSvc);
+
+    const req = {
+      user: { id: 'user_1234567', email: 'owner@test' },
+      params: { id: 'starship_1234' },
+      body: { email: 'invitee@test.com' },
+    } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/starships/:id/invites');
+    await handler(req, res as unknown as Response);
+
+    expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_1234567', expect.anything());
+    expect(inviteRepo.generateToken).toHaveBeenCalledWith(
+      expect.objectContaining({ starshipId: 'starship_1234', invitedEmail: 'invitee@test.com' })
+    );
+    expect(emailSvc.sendStarshipInviteEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        invitedEmail: 'invitee@test.com',
+        starshipName: 'Ship 1',
+        inviteUrl: expect.stringContaining('token='),
+      })
+    );
+    expect(res.status).toHaveBeenCalledWith(201);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.ok).toBe(true);
+  });
+
+  it('POST /starship-invites/accept adds membership and returns starship', async () => {
+    const inviteRepo = {
+      validateAndConsumeTokenForEmail: jest.fn().mockResolvedValue({
+        starshipId: 'starship_1234',
+        invitedEmail: 'invitee@test',
+        invitedByUserId: 'user_1234567',
+        role: 'collaborator',
+      }),
+    };
+    (StarshipInviteTokenRepository as unknown as jest.Mock).mockImplementation(() => inviteRepo);
+
+    const memberRepo = { createOrIgnoreMember: jest.fn().mockResolvedValue({ created: true }) };
+    ;(StarshipMemberRepository as unknown as jest.Mock).mockImplementation(() => memberRepo);
+
+    const starshipSvc = { getStarship: jest.fn().mockResolvedValue({ id: 'starship_1234', slug: 'ship-1', name: 'Ship 1', ownerId: 'user_1234567' }) };
+    (StarshipService as unknown as jest.Mock).mockImplementation(() => starshipSvc);
+
+    const req = {
+      user: { id: 'u2', email: 'invitee@test' },
+      body: { token: 't'.repeat(64) },
+    } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/starship-invites/accept');
+    await handler(req, res as unknown as Response);
+
+    expect(inviteRepo.validateAndConsumeTokenForEmail).toHaveBeenCalledWith('t'.repeat(64), 'invitee@test');
+    expect(memberRepo.createOrIgnoreMember).toHaveBeenCalledWith(
+      expect.objectContaining({
+        starshipId: 'starship_1234',
+        userId: 'u2',
+        role: 'collaborator',
+      })
+    );
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.starship.slug).toBe('ship-1');
+  });
+
+  it('POST /starship-invites/accept returns 400 on invalid token', async () => {
+    const inviteRepo = {
+      validateAndConsumeTokenForEmail: jest.fn().mockResolvedValue(null),
+    };
+    (StarshipInviteTokenRepository as unknown as jest.Mock).mockImplementation(() => inviteRepo);
+
+    const req = {
+      user: { id: 'u2', email: 'invitee@test' },
+      body: { token: 'bad' },
+    } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/starship-invites/accept');
+    await handler(req, res as unknown as Response);
+
+    expect(res.status).toHaveBeenCalledWith(400);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(false);
+  });
+});
+

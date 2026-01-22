@@ -10,7 +10,8 @@ import { useEffect, useMemo, useState } from 'react'
 export default function AcceptInvitePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const token = (searchParams.get('token') || '').trim()
+  // New canonical param is `invite`; keep `token` as a backwards-compatible fallback.
+  const token = (searchParams.get('invite') || searchParams.get('token') || '').trim()
 
   const { isAuthenticated, isLoading } = useAuth()
   const acceptInvite = useAcceptStarshipInvite()
@@ -19,7 +20,7 @@ export default function AcceptInvitePage() {
 
   const returnUrl = useMemo(() => {
     if (!token) return '/accept-invite'
-    return `/accept-invite?token=${encodeURIComponent(token)}`
+    return `/accept-invite?invite=${encodeURIComponent(token)}`
   }, [token])
 
   useEffect(() => {

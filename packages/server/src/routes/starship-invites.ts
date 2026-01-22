@@ -25,14 +25,16 @@ function requireUserId(req: Request, res: Response): string | null {
 }
 
 function buildClientInviteUrl(token: string): string {
-  const base = (env.CLIENT_URL || env.PUBLIC_URL || '').trim();
+  // Invite links should be rooted at PUBLIC_URL (not CLIENT_URL / APP_URL),
+  // since deployments may not expose the client separately.
+  const base = (env.PUBLIC_URL || '').trim();
   try {
     const u = new URL('/accept-invite', base);
-    u.searchParams.set('token', token);
+    u.searchParams.set('invite', token);
     return u.toString();
   } catch {
     // Fallback (best-effort)
-    return `${base.replace(/\/+$/g, '')}/accept-invite?token=${encodeURIComponent(token)}`;
+    return `${base.replace(/\/+$/g, '')}/accept-invite?invite=${encodeURIComponent(token)}`;
   }
 }
 
@@ -85,7 +87,7 @@ router.post('/starships/:id/invites', jwtAuthMiddleware, async (req: Request, re
       invitedEmail: body.email,
       inviteUrl,
       starshipName: starship.name,
-      inviterName: (req.user as unknown as { displayName?: string; email?: string })?.displayName || (req.user as any)?.email,
+      inviterName: (req.user as unknown as { displayName?: string; email?: string })?.displayName || (req.user as unknown as { email?: string })?.email,
     });
 
     sendSuccess(res, { ok: true, inviteUrl, expiresAt }, 201);

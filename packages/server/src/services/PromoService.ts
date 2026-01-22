@@ -38,7 +38,7 @@ export class PromoService {
     if (!starshipId?.trim()) throw new Error('STARSHIP_ID_REQUIRED');
 
     // Verify access to starship (owner)
-    const hasAccess = await this.starshipService.hasAccess(userId, starshipId);
+    const hasAccess = await this.starshipService.hasOwnerAccess(userId, starshipId);
     if (!hasAccess) {
       throw new Error('FORBIDDEN');
     }

@@ -49,7 +49,14 @@ export function TopRightUserProfile(): React.JSX.Element | null {
   const activeStarshipSlug = starshipFromList?.slug ?? pathStarshipSlug ?? null
   const activeStarshipName = starshipFromList?.name ?? starshipBySlug?.name ?? null
 
-  const { data: wallet, isLoading: walletLoading } = useWallet(activeStarshipId || '', !!activeStarshipId && isAuthenticated)
+  const canManageBilling = Boolean(
+    isAuthenticated &&
+      user?.id &&
+      activeStarshipId &&
+      (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id)
+  )
+
+  const { data: wallet, isLoading: walletLoading } = useWallet(activeStarshipId || '', Boolean(activeStarshipId && canManageBilling))
 
   const isImageUrl = useCallback((value?: string | null): boolean => {
     if (!value || typeof value !== 'string') return false
@@ -89,12 +96,30 @@ export function TopRightUserProfile(): React.JSX.Element | null {
   return (
     <div className="fixed top-4 right-4 z-[60]">
       <div className="flex items-center gap-3">
-        <Button type="button" variant="ghost" size="sm" aria-label="Go to billing" onClick={handleBillingClick} className="h-8 px-3 py-1 cursor-pointer rounded-full bg-card border border-border/60 text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
-          <Icon name="coins" className="w-4 h-4" />
-          <span className="min-w-0">
-            <BalanceStatusIndicator valueClassName="text-xs" wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
-          </span>
-        </Button>
+        {canManageBilling ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            aria-label="Go to billing"
+            onClick={handleBillingClick}
+            className="h-8 px-3 py-1 cursor-pointer rounded-full bg-card border border-border/60 text-muted-foreground transition-all hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <Icon name="coins" className="w-4 h-4" />
+            <span className="min-w-0">
+              <BalanceStatusIndicator
+                valueClassName="text-xs"
+                wallet={wallet}
+                isLoading={walletLoading}
+                variant="minimal"
+                showDot={false}
+                showUnit={false}
+                inheritTextColor
+                className="min-w-0"
+              />
+            </span>
+          </Button>
+        ) : null}
         <ThemeToggle size="md" />
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -133,14 +158,16 @@ export function TopRightUserProfile(): React.JSX.Element | null {
               <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
                 <Icon name="rocket" className={navMenuItemIconClassName} />
               </div>
-              My Subscription
+              My Starship
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleBillingClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
-              <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
-                <Icon name="credit-card" className={navMenuItemIconClassName} />
-              </div>
-              Billing
-            </DropdownMenuItem>
+            {canManageBilling ? (
+              <DropdownMenuItem onClick={handleBillingClick} disabled={!activeStarshipSlug} className={navMenuItemClassName}>
+                <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
+                  <Icon name="credit-card" className={navMenuItemIconClassName} />
+                </div>
+                Billing
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={handleLogoutClick} className={`${navMenuItemClassName} text-destructive hover:text-destructive focus:text-destructive`}>
               <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>

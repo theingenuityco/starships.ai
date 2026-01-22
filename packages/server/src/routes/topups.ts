@@ -64,7 +64,7 @@ router.post('/wallets/:starshipId/topup', rateLimiters.financial, jwtAuthMiddlew
 
     // Authorization: ensure user owns the starship
     const starshipService = new StarshipService();
-    const hasAccess = await starshipService.hasAccess(userId, starshipId);
+    const hasAccess = await starshipService.hasOwnerAccess(userId, starshipId);
     if (!hasAccess) {
       sendError(res, 'FORBIDDEN', 'Access denied to this starship', 403);
       return;

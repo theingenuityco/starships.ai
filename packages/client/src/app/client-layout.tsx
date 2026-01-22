@@ -58,6 +58,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isPublicSimplePage =
     pathname === '/' ||
     pathname === '/login' ||
+    pathname === '/accept-invite' ||
     pathname === '/forgot-password' ||
     pathname === '/reset-password' ||
     pathname === '/terms' ||

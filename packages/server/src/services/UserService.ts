@@ -147,7 +147,8 @@ export class UserService {
     if (!user) {
       return null;
     }
-    return this.transformUserForResponse(user, options);
+    const hydrated = await this.hydrateUserFromOAuthProfile(user);
+    return this.transformUserForResponse(hydrated, options);
   }
 
   /**
@@ -158,7 +159,8 @@ export class UserService {
     if (!user) {
       return null;
     }
-    return this.transformUserForResponse(user, options);
+    const hydrated = await this.hydrateUserFromOAuthProfile(user);
+    return this.transformUserForResponse(hydrated, options);
   }
 
   /**
@@ -241,7 +243,8 @@ export class UserService {
     }
 
     // Return user without password for security
-    return this.transformUserForResponse(user, { includePassword: false });
+    const hydrated = await this.hydrateUserFromOAuthProfile(user);
+    return this.transformUserForResponse(hydrated, { includePassword: false });
   }
 
   // ============================================================================
@@ -283,6 +286,36 @@ export class UserService {
     // Remove password unless explicitly requested
     if (!options.includePassword) {
       delete result.password;
+    }
+
+    return result;
+  }
+
+  /**
+   * Hydrate missing user fields from linked OAuth account profile data.
+   *
+   * Today, this is primarily used to ensure avatars show consistently after page reload
+   * even when `users.avatar` is empty but the OAuth profile has an avatar URL.
+   */
+  private async hydrateUserFromOAuthProfile(user: UserModel): Promise<UserModel> {
+    const result: UserModel = { ...user };
+
+    const hasAvatar = typeof result.avatar === 'string' && result.avatar.trim().length > 0;
+    if (hasAvatar) return result;
+
+    try {
+      const accounts = await this.oauthRepository.findByUserId(result.id);
+      // Prefer most recently updated account with an avatar.
+      const sorted = [...accounts].sort((a, b) => String(b.updatedAt || '').localeCompare(String(a.updatedAt || '')));
+      const avatar = sorted
+        .map((a) => (a.profileData && typeof (a.profileData as any).avatar === 'string' ? String((a.profileData as any).avatar).trim() : ''))
+        .find((v) => v.length > 0);
+
+      if (avatar) {
+        result.avatar = avatar;
+      }
+    } catch (e) {
+      // Best-effort hydration; never fail user fetch due to OAuth lookups.
     }
 
     return result;

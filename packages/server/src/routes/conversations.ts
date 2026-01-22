@@ -19,6 +19,7 @@ import {
   AgentRepository,
   ConversationWidgetRepository,
   MessageRepository,
+  StarshipMemberRepository,
   ToolCallApprovalRepository,
   ToolRepository,
   TurnRepository,
@@ -165,13 +166,20 @@ async function verifyResourceAccess200(args: {
   }
 
   if (starship.ownerId !== args.userId && !isInstanceAdmin(user)) {
-    sendError(args.res, 'ACCESS_DENIED', `Access denied to this ${args.resourceType}`, 200, {
-      resource: args.resourceType,
-      id: args.resourceId,
-      reason: 'not_owner',
-    });
-    return false;
+    const memberRepo = new StarshipMemberRepository();
+    const isMember = await memberRepo.isMember(args.userId, args.resourceStarshipId);
+    if (!isMember) {
+      sendError(args.res, 'ACCESS_DENIED', `Access denied to this ${args.resourceType}`, 200, {
+        resource: args.resourceType,
+        id: args.resourceId,
+        reason: 'not_authorized',
+      });
+      return false;
+    }
+  } else {
+    // owner/admin access allowed
   }
+ 
 
   return true;
 }

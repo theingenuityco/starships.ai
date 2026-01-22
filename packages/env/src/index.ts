@@ -58,6 +58,10 @@ export function getEnvConfig(): EnvironmentConfig {
   const resolvedPostgresDatabase = process.env.POSTGRES_DATABASE || 'starships';
   const resolvedPostgresSSL = process.env.POSTGRES_SSL === 'true';
 
+  // Safe default: if ENABLE_EMAILS is unset, treat emails as disabled.
+  // Set ENABLE_EMAILS=true explicitly in environments where outbound email is desired.
+  const resolvedEnableEmails = process.env.ENABLE_EMAILS === 'true';
+
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
@@ -118,6 +122,7 @@ export function getEnvConfig(): EnvironmentConfig {
     RUNNER_AUTH_TOKEN: process.env.RUNNER_AUTH_TOKEN,
 
     // Email Service Configuration (optional; email delivery disabled if not set)
+    ENABLE_EMAILS: resolvedEnableEmails,
     EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,
     EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
     AWS_SES_REGION: process.env.AWS_SES_REGION,

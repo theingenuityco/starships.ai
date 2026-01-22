@@ -11,8 +11,8 @@
   --fd-primary: 224 99% 53%;
   --fd-primary-foreground: 0 0% 100%;
 
-  /* Background - Pure crisp white */
-  --fd-background: 0 0% 100%;
+  /* Background - Match app root background (warmer off-white) */
+  --fd-background: 38 30% 97.5%;
   --fd-foreground: 0 0% 9%;
 
   /* Muted - Neutral grays, no color tint */

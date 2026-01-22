@@ -166,6 +166,19 @@ function isConnectorInstallPath(pathname: string | null | undefined): boolean {
   return p.startsWith('/connectors/') && p.includes('/install')
 }
 
+function isPreOnboardingAllowedReturnUrl(returnUrl: string | null): boolean {
+  if (!returnUrl) return false
+  // Return URLs are expected to be relative paths beginning with `/`.
+  try {
+    const u = new URL(returnUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
+    // Allow invite acceptance to run before onboarding, otherwise invited users never get added.
+    if (u.pathname === '/accept-invite') return true
+    return false
+  } catch {
+    return false
+  }
+}
+
 // Login mutation
 export function useLogin() {
   const queryClient = useQueryClient()
@@ -210,15 +223,20 @@ export function useLogin() {
         return
       }
 
+      const redirectTarget = getPostAuthRedirectTarget()
+
       // If onboarding is required for this user, always route to onboarding.
       // Starship provisioning is handled by onboarding (not login).
       if ((data as any)?.onboardingRequired === true) {
-        router.push('/onboarding')
+        if (isPreOnboardingAllowedReturnUrl(redirectTarget)) {
+          router.push(addWelcomeParamToPath(redirectTarget!))
+        } else {
+          router.push('/onboarding')
+        }
         queryClient.invalidateQueries()
         return
       }
 
-      const redirectTarget = getPostAuthRedirectTarget()
       if (redirectTarget) {
         router.push(addWelcomeParamToPath(redirectTarget))
       } else if (data.starship?.slug) {
@@ -287,14 +305,19 @@ export function useRegister() {
         return
       }
 
+      const redirectTarget = getPostAuthRedirectTarget()
+
       // If onboarding is enabled server-side and required for this user, always route to onboarding.
       if ((data as any)?.onboardingRequired === true) {
-        router.push('/onboarding')
+        if (isPreOnboardingAllowedReturnUrl(redirectTarget)) {
+          router.push(addWelcomeParamToPath(redirectTarget!))
+        } else {
+          router.push('/onboarding')
+        }
         queryClient.invalidateQueries()
         return
       }
 
-      const redirectTarget = getPostAuthRedirectTarget()
       if (redirectTarget) {
         router.push(addWelcomeParamToPath(redirectTarget))
       } else if (starship) {
@@ -356,14 +379,19 @@ export function useOAuthLogin() {
         return
       }
 
+      const redirectTarget = getPostAuthRedirectTarget()
+
       // If onboarding is enabled server-side and required for this user, always route to onboarding.
       if ((data as any)?.onboardingRequired === true) {
-        router.push('/onboarding')
+        if (isPreOnboardingAllowedReturnUrl(redirectTarget)) {
+          router.push(addWelcomeParamToPath(redirectTarget!))
+        } else {
+          router.push('/onboarding')
+        }
         queryClient.invalidateQueries()
         return
       }
 
-      const redirectTarget = getPostAuthRedirectTarget()
       if (redirectTarget) {
         router.push(addWelcomeParamToPath(redirectTarget))
       } else if (data.starship?.slug) {

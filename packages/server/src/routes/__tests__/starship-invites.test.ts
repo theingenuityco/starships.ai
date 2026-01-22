@@ -25,13 +25,15 @@ jest.mock('@/services/StarshipService', () => ({
 jest.mock('@starships/models', () => ({
   StarshipInviteTokenRepository: jest.fn(),
   StarshipMemberRepository: jest.fn(),
+  UserRepository: jest.fn(),
+  getConnection: jest.fn(),
 }));
 
 import starshipInvitesRouter from '@/routes/starship-invites';
 import { verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
 import { EmailService } from '@/services/EmailService';
 import { StarshipService } from '@/services/StarshipService';
-import { StarshipInviteTokenRepository, StarshipMemberRepository } from '@starships/models';
+import { StarshipInviteTokenRepository, StarshipMemberRepository, UserRepository, getConnection } from '@starships/models';
 
 type MockRes = {
   status: jest.Mock<Response, [number]>;
@@ -160,6 +162,65 @@ describe('starship invite routes', () => {
     expect(res.status).toHaveBeenCalledWith(400);
     const payload = res.json.mock.calls[0][0] as any;
     expect(payload.success).toBe(false);
+  });
+
+  it('GET /starships/:id/members returns active members and pending invites', async () => {
+    jest.mocked(verifyStarshipOwnerAccess).mockResolvedValue(true);
+
+    // Route uses raw SQL via getConnection().query(...)
+    const query = jest
+      .fn()
+      .mockResolvedValueOnce([
+        {
+          user_id: 'user_collab',
+          role: 'admin',
+          created_at: new Date().toISOString(),
+          email: 'collab@test.com',
+          display_name: 'Collab User',
+          avatar: null,
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          invited_email: 'invitee@test.com',
+          invited_by_user_id: 'user_owner',
+          role: 'collaborator',
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 3600_000).toISOString(),
+        },
+      ]);
+    (getConnection as unknown as jest.Mock).mockReturnValue({ query });
+
+    const userRepo = {
+      findById: jest.fn().mockResolvedValue({ id: 'user_owner', email: 'owner@test.com', displayName: 'Owner', avatar: null }),
+    };
+    (UserRepository as unknown as jest.Mock).mockImplementation(() => userRepo);
+
+    const starshipSvc = {
+      getStarship: jest.fn().mockResolvedValue({ id: 'starship_1234', slug: 'ship-1', name: 'Ship 1', ownerId: 'user_owner', createdAt: new Date().toISOString() }),
+    };
+    (StarshipService as unknown as jest.Mock).mockImplementation(() => starshipSvc);
+
+    const req = {
+      user: { id: 'user_owner', email: 'owner@test.com' },
+      params: { id: 'starship_1234' },
+    } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/starships/:id/members');
+    await handler(req, res as unknown as Response);
+
+    expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());
+    expect(query).toHaveBeenCalledTimes(2);
+    expect(userRepo.findById).toHaveBeenCalledWith('user_owner');
+
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.members.length).toBe(2); // owner + 1 collaborator
+    expect(payload.data.invites.length).toBe(1);
+    expect(payload.data.members[0].role).toBe('owner');
+    expect(payload.data.members[1].email).toBe('collab@test.com');
   });
 });
 

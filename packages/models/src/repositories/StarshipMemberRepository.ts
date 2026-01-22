@@ -45,6 +45,65 @@ export class StarshipMemberRepository extends BaseRepository {
     );
   }
 
+  async listByStarshipWithUsers(
+    starshipId: string
+  ): Promise<
+    Array<{
+      starshipId: string;
+      userId: string;
+      role: StarshipMemberRole;
+      createdAt: string;
+      createdBy: string | null;
+      email: string | null;
+      displayName: string | null;
+      avatar: string | null;
+    }>
+  > {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const rows = await connection.query<{
+          starship_id: string;
+          user_id: string;
+          role: StarshipMemberRole;
+          created_at: string;
+          created_by: string | null;
+          email: string | null;
+          display_name: string | null;
+          avatar: string | null;
+        }>(
+          `SELECT m.starship_id,
+                  m.user_id,
+                  m.role,
+                  m.created_at,
+                  m.created_by,
+                  u.email,
+                  u.display_name,
+                  u.avatar
+             FROM starship_members m
+             JOIN users u ON u.id = m.user_id
+            WHERE m.starship_id = $1
+            ORDER BY m.created_at ASC`,
+          [starshipId]
+        );
+
+        return rows.map((r) => ({
+          starshipId: String(r.starship_id),
+          userId: String(r.user_id),
+          role: (r.role as StarshipMemberRole) || 'collaborator',
+          createdAt: String(r.created_at),
+          createdBy: r.created_by ?? null,
+          email: r.email ?? null,
+          displayName: r.display_name ?? null,
+          avatar: r.avatar ?? null,
+        }));
+      },
+      'listByStarshipWithUsers',
+      'starship_members',
+      starshipId
+    );
+  }
+
   /**
    * Idempotently create a membership row.
    * Returns true if inserted, false if it already existed.

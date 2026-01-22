@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { STARSHIP_QUERY_KEYS, useUpdateStarship } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
+import { STARSHIP_MEMBERS_QUERY_KEYS, useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
@@ -73,6 +74,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   }, [starship, isInstanceAdmin, userId])
 
   const canManageMembers = canManageBilling
+  const { data: membersAndInvites, isLoading: isMembersLoading } = useStarshipMembersAndInvites(starship?.id ?? '', Boolean(starship?.id && canManageMembers))
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
@@ -358,6 +360,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                       if (!starship?.id) return
                       const res = await createInvite.mutateAsync({ email: inviteEmail.trim() })
                       setLastInviteUrl(res.inviteUrl || null)
+                      queryClient.invalidateQueries({ queryKey: STARSHIP_MEMBERS_QUERY_KEYS.byStarship(starship.id) })
                     }}
                   >
                     {createInvite.isPending ? 'Sending…' : 'Send invite'}
@@ -383,6 +386,97 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     Invite link: <span className="font-mono">{lastInviteUrl}</span>
                   </p>
                 ) : null}
+              </CardContent>
+            </Card>
+          )}
+
+          {canManageMembers && starship.id && (
+            <Card className={PROFILE_SECTION_CARD_CLASS}>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Icon name="users" className="h-4 w-4 text-primary" />
+                  Members
+                </CardTitle>
+                <CardDescription className="text-sm">All active members and pending invites.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-1 flex-col gap-4">
+                {isMembersLoading ? (
+                  <p className="text-sm text-muted-foreground">Loading members…</p>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Active</span>
+                        <span className="tabular-nums">{membersAndInvites?.members?.length ?? 0}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {(membersAndInvites?.members ?? []).map(m => {
+                          const label = m.displayName || m.email || m.userId
+                          const initials = (label || '?').trim().slice(0, 2).toUpperCase()
+                          return (
+                            <div key={`member-${m.userId}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3">
+                              <div className="flex min-w-0 items-center gap-3">
+                                <Avatar className="h-7 w-7 rounded-full">
+                                  {m.avatar ? <AvatarImage src={m.avatar} alt={label} /> : null}
+                                  <AvatarFallback className="rounded-full text-[10px] leading-none">{initials}</AvatarFallback>
+                                </Avatar>
+                                <div className="min-w-0">
+                                  <div className="text-sm font-medium truncate">{label}</div>
+                                  {m.email && m.displayName ? <div className="text-xs text-muted-foreground truncate">{m.email}</div> : null}
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">
+                                  {m.role}
+                                </span>
+                                <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
+                                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                                  Active
+                                </span>
+                              </div>
+                            </div>
+                          )
+                        })}
+                        {(membersAndInvites?.members ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No members found.</p> : null}
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 pt-2">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>Invited</span>
+                        <span className="tabular-nums">{membersAndInvites?.invites?.length ?? 0}</span>
+                      </div>
+                      <div className="space-y-2">
+                        {(membersAndInvites?.invites ?? []).map(invite => (
+                          <div
+                            key={`invite-${invite.invitedEmail}-${invite.createdAt}`}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3"
+                          >
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
+                                <Icon name="mail" className="h-4 w-4 text-primary" />
+                              </div>
+                              <div className="min-w-0">
+                                <div className="text-sm font-medium truncate">{invite.invitedEmail}</div>
+                                <div className="text-xs text-muted-foreground truncate">Expires {formatHumanDateTime(invite.expiresAt)}</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">
+                                {invite.role}
+                              </span>
+                              <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                                Invited
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                        {(membersAndInvites?.invites ?? []).length === 0 ? <p className="text-sm text-muted-foreground">No pending invites.</p> : null}
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </Card>
           )}

@@ -15,9 +15,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Orbitron } from 'next/font/google'
-
-const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 interface NavigationProps {
   isMobile?: boolean
@@ -316,7 +313,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="px-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="px-2 pt-7 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
             <div
               className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
@@ -327,8 +324,8 @@ export function Navigation(props: NavigationProps) {
               <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
                 {isExpanded || isCollapsing || !isHovered ? (
                   <StarshipsLogo
-                    width={20}
-                    height={20}
+                    width={22}
+                    height={22}
                     className=""
                     gradientId="nav-gradient"
                     animationDelay={1}
@@ -347,10 +344,10 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className={`${orbitron.className} text-sm font-medium tracking-tight leading-none whitespace-nowrap`}
+                  className="text-[15px] font-medium tracking-tight leading-none whitespace-nowrap max-w-[11.5rem] truncate"
                   style={{ marginLeft: '0.375rem' }}
                 >
-                  starships.ai
+                  {starshipData?.name || 'Starships.ai'}
                 </motion.span>
               )}
             </div>

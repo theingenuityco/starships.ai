@@ -2,6 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { StarshipsLogo } from '@/components/ui/starships-logo'
 import type { StarshipModel } from '@starships/protocol'
 import { useMemo } from 'react'
 
@@ -63,9 +64,21 @@ export function StarshipRail({
                   <span className="text-xs font-semibold">{getInitials(s.name)}</span>
                 </button>
               </TooltipTrigger>
-              <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover border border-border shadow-xl">
-                <div className="text-sm font-medium">{s.name}</div>
-                <div className="text-xs text-muted-foreground">Switch starship</div>
+              <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
+                <div className="grid grid-cols-[22px_1fr] items-center gap-x-2 gap-y-0.5">
+                  <div className="mt-0.5">
+                    <StarshipsLogo
+                      width={22}
+                      height={22}
+                      className="text-muted-foreground"
+                      gradientId={`rail-tooltip-gradient-${s.id}`}
+                      idleLoop={false}
+                      playOnMountOnce={false}
+                    />
+                  </div>
+                  <div className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">{s.name}</div>
+                  <div className="col-span-2 text-xs text-muted-foreground">Switch starship</div>
+                </div>
               </TooltipContent>
             </Tooltip>
           )
@@ -84,8 +97,18 @@ export function StarshipRail({
               <Icon name="plus" className="h-4 w-4" />
             </button>
           </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover border border-border shadow-xl">
-            Create starship
+          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
+            <div className="flex items-center gap-2">
+              <StarshipsLogo
+                width={22}
+                height={22}
+                className="text-muted-foreground"
+                gradientId="rail-tooltip-gradient-create"
+                idleLoop={false}
+                playOnMountOnce={false}
+              />
+              <span className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Create starship</span>
+            </div>
           </TooltipContent>
         </Tooltip>
       ) : null}

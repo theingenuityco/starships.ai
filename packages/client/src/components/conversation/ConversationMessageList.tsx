@@ -951,7 +951,7 @@ const MemoizedMessageBubble = memo(
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 w-full pt-0.5">
-              <div className="mb-1 text-sm font-bold font-mono text-foreground">
+              <div className="mb-0 text-sm font-bold font-mono text-foreground">
                 <Link href={userProfileHref} className="hover:underline underline-offset-2">
                   {userDisplayName}
                 </Link>
@@ -1047,7 +1047,7 @@ const MemoizedMessageBubble = memo(
             )}
             <div className="flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-1 text-sm font-bold text-foreground">
+                <div className="mb-0 text-sm font-bold text-foreground">
                   {assistantProfileHref ? (
                     <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
                       {assistantDisplayName}

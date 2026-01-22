@@ -650,7 +650,7 @@ export function ConversationMessageContent({
 
   const shouldRenderToolPanel: boolean = normalizedToolCalls.length > 0 && messageType !== 'tool_result'
   const toolPanelNode: ReactNode = shouldRenderToolPanel ? (
-    <>
+    <div className="not-prose">
       {normalizedToolCalls.map((tc, idx) => {
         const rawArgsAny = tc.function?.arguments ?? ''
         let prettyArgs = ''
@@ -714,8 +714,8 @@ export function ConversationMessageContent({
             <span className="truncate">{children}</span>
           </span>
         )
-        // Match markdown paragraph spacing; keep consistent even for the last tool call.
-        const pSpacingClass = 'mb-2'
+        // No extra margins on collapsed tool-call row (avoid prose defaults).
+        const pSpacingClass = 'm-0'
 
         // Tool calls are always expandable (no expert-mode gating).
         const toolQuoteClass = cn(
@@ -728,17 +728,18 @@ export function ConversationMessageContent({
               : 'border-emerald-500/30 dark:border-emerald-400/30 bg-emerald-500/5 dark:bg-emerald-400/5'
         )
         return (
-          <Collapsible key={`${toolCallId || idx}`} defaultOpen={false}>
-            {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
-            <p className={`${pSpacingClass} leading-relaxed`}>
-              <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
-                <Chip>{toolDisplayName}</Chip>
-              </CollapsibleTrigger>
-            </p>
-            {/* Avoid typography/prose rules affecting the expanded card */}
-            <CollapsibleContent className="not-prose">
-              <div className="pb-2">
-                <blockquote className={toolQuoteClass}>
+          <Collapsible key={`${toolCallId || idx}`} defaultOpen={false} className="space-y-0">
+            <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10">
+              {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
+              <p className={`${pSpacingClass} leading-relaxed`}>
+                <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                  <Chip>{toolDisplayName}</Chip>
+                </CollapsibleTrigger>
+              </p>
+              {/* Avoid typography/prose rules affecting the expanded card */}
+              <CollapsibleContent className="not-prose">
+                <div>
+                  <blockquote className={toolQuoteClass}>
                   {/* Match Thought quote content sizing + color */}
                   <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
@@ -783,13 +784,14 @@ export function ConversationMessageContent({
                       </>
                     )}
                   </div>
-                </blockquote>
-              </div>
-            </CollapsibleContent>
+                  </blockquote>
+                </div>
+              </CollapsibleContent>
+            </div>
           </Collapsible>
         )
       })}
-    </>
+    </div>
   ) : null
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
@@ -976,7 +978,7 @@ export function ConversationMessageContent({
               'relative',
               // Only show the hover actions when hovering the content chunk itself (not tools/reasoning/attachments).
               // Keep internal padding; remove outside row-gap in the list instead.
-              'rounded-lg px-2 py-2 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10',
+              'rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10',
               'hover:[&_.content-chunk-actions]:opacity-100 focus-within:[&_.content-chunk-actions]:opacity-100'
             )}
           >
@@ -1024,27 +1026,29 @@ export function ConversationMessageContent({
         {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
           <>
             {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
-            <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
-              {/* Match tool-call collapsed row spacing + trigger styling */}
-              <p className="mb-2 leading-relaxed">
-                <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
-                  <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
-                    {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
-                    <span className="truncate">{reasoningHeaderLabel}</span>
-                  </span>
-                </CollapsibleTrigger>
-              </p>
-              <CollapsibleContent>
-                <div className="pb-2">
-                  <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
-                    <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                        {String(displayReasoning ?? '')}
-                      </ReactMarkdown>
-                    </div>
-                  </blockquote>
-                </div>
-              </CollapsibleContent>
+            <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning} className="space-y-0">
+              <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10">
+                {/* Match tool-call collapsed row spacing + trigger styling */}
+                <p className="m-0 leading-relaxed">
+                  <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                    <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+                      {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
+                      <span className="truncate">{reasoningHeaderLabel}</span>
+                    </span>
+                  </CollapsibleTrigger>
+                </p>
+                <CollapsibleContent>
+                  <div className="pb-2">
+                    <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
+                      <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                          {String(displayReasoning ?? '')}
+                        </ReactMarkdown>
+                      </div>
+                    </blockquote>
+                  </div>
+                </CollapsibleContent>
+              </div>
             </Collapsible>
           </>
         )}

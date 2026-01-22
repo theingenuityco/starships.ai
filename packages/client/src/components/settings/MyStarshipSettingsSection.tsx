@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
@@ -78,6 +79,12 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   const { data: membersAndInvites, isLoading: isMembersLoading } = useStarshipMembersAndInvites(starship?.id ?? '', Boolean(starship?.id && canManageMembers))
   const removeMember = useRemoveStarshipMember(starship?.id ?? '')
   const revokeInvite = useRevokeStarshipInvite(starship?.id ?? '')
+
+  const [confirmAction, setConfirmAction] = useState<
+    | { kind: 'removeMember'; memberUserId: string; label: string }
+    | { kind: 'revokeInvite'; email: string }
+    | null
+  >(null)
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
@@ -443,8 +450,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                                     disabled={removeMember.isPending}
                                     onClick={async () => {
                                       if (!starship?.id) return
-                                      if (!window.confirm(`Remove ${label} from this starship?`)) return
-                                      await removeMember.mutateAsync(m.userId)
+                                      setConfirmAction({ kind: 'removeMember', memberUserId: m.userId, label })
                                     }}
                                   >
                                     Remove
@@ -496,8 +502,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                                 disabled={revokeInvite.isPending}
                                 onClick={async () => {
                                   if (!starship?.id) return
-                                  if (!window.confirm(`Revoke invite for ${invite.invitedEmail}?`)) return
-                                  await revokeInvite.mutateAsync(invite.invitedEmail)
+                                  setConfirmAction({ kind: 'revokeInvite', email: invite.invitedEmail })
                                 }}
                               >
                                 Revoke
@@ -515,6 +520,85 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
           )}
         </div>
       </form>
+
+      <Dialog
+        open={confirmAction !== null}
+        onOpenChange={open => {
+          if (!open) setConfirmAction(null)
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle className={confirmAction?.kind === 'removeMember' ? 'text-destructive' : undefined}>
+              {confirmAction?.kind === 'removeMember' ? 'Remove member' : 'Revoke invite'}
+            </DialogTitle>
+            <DialogDescription>
+              {confirmAction?.kind === 'removeMember'
+                ? 'This will remove the member’s access to this starship immediately.'
+                : 'This will invalidate the invite link so it can no longer be used.'}
+            </DialogDescription>
+          </DialogHeader>
+
+          {confirmAction?.kind === 'removeMember' ? (
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/10 text-sm">
+                <div className="flex items-start gap-2">
+                  <Icon name="alert-triangle" className="h-4 w-4 text-destructive mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-destructive">You’re about to remove:</p>
+                    <p className="text-destructive/80 break-words">{confirmAction.label}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : confirmAction?.kind === 'revokeInvite' ? (
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg border border-amber-500/20 bg-amber-500/10 text-sm">
+                <div className="flex items-start gap-2">
+                  <Icon name="alert-triangle" className="h-4 w-4 text-amber-600 mt-0.5" />
+                  <div className="min-w-0">
+                    <p className="font-medium text-amber-700 dark:text-amber-300">You’re about to revoke the invite for:</p>
+                    <p className="text-amber-700/80 dark:text-amber-200/80 break-words">{confirmAction.email}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <DialogFooter className="gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setConfirmAction(null)}
+              disabled={removeMember.isPending || revokeInvite.isPending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant={confirmAction?.kind === 'removeMember' ? 'destructive' : 'default'}
+              disabled={removeMember.isPending || revokeInvite.isPending}
+              onClick={async () => {
+                if (!starship?.id) return
+                const action = confirmAction
+                if (!action) return
+
+                try {
+                  if (action.kind === 'removeMember') {
+                    await removeMember.mutateAsync(action.memberUserId)
+                  } else {
+                    await revokeInvite.mutateAsync(action.email)
+                  }
+                } finally {
+                  setConfirmAction(null)
+                }
+              }}
+            >
+              {confirmAction?.kind === 'removeMember' ? (removeMember.isPending ? 'Removing…' : 'Remove') : revokeInvite.isPending ? 'Revoking…' : 'Revoke'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

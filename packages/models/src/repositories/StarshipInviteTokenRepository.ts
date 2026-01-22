@@ -16,6 +16,51 @@ export class StarshipInviteTokenRepository extends BaseRepository {
     super('StarshipInviteTokenRepository');
   }
 
+  /**
+   * Fetch a valid (unconsumed + unexpired) invite token without consuming it.
+   * Intended for "invite preview" flows (e.g. showing invited email before login).
+   */
+  async getValidInviteByToken(token: string): Promise<{
+    starshipId: string;
+    invitedEmail: string;
+    invitedByUserId: string | null;
+    role: StarshipInviteRole;
+    expiresAt: string;
+  } | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{
+          starship_id: string;
+          invited_email: string;
+          invited_by_user_id: string | null;
+          role: StarshipInviteRole;
+          expires_at: string;
+        }>(
+          `SELECT starship_id, invited_email, invited_by_user_id, role, expires_at
+             FROM starship_invite_tokens
+            WHERE token = $1
+              AND NOT consumed
+              AND expires_at > NOW()
+            LIMIT 1`,
+          [token]
+        );
+
+        if (!row) return null;
+
+        return {
+          starshipId: String(row.starship_id),
+          invitedEmail: String(row.invited_email),
+          invitedByUserId: row.invited_by_user_id ?? null,
+          role: (row.role as StarshipInviteRole) || 'collaborator',
+          expiresAt: String(row.expires_at),
+        };
+      },
+      'getValidInviteByToken',
+      'starship_invite_tokens'
+    );
+  }
+
   async listOutstandingByStarship(starshipId: string): Promise<
     Array<{
       invitedEmail: string;

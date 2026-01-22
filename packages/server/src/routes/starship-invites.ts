@@ -25,16 +25,29 @@ function requireUserId(req: Request, res: Response): string | null {
 }
 
 function buildClientInviteUrl(token: string): string {
-  // Invite links should be rooted at PUBLIC_URL (not CLIENT_URL / APP_URL),
-  // since deployments may not expose the client separately.
-  const base = (env.PUBLIC_URL || '').trim();
+  // Invite links must be rooted at the canonical PUBLIC origin users visit.
+  // This should be the same origin that serves `/accept-invite` in the browser.
+  // (In local dev, that's the reverse proxy; in prod, that's the public domain.)
+  const publicUrl = String(env.PUBLIC_URL || '').trim();
+  const clientUrl = String(env.CLIENT_URL || '').trim();
+  const base = publicUrl || clientUrl;
+  // #region agent log
+  fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:buildClientInviteUrl',message:'buildClientInviteUrl called',data:{publicUrlBase:publicUrl?publicUrl.replace(/\?.*$/,''):'',clientUrlBase:clientUrl?clientUrl.replace(/\?.*$/,''):'',chosenBase:base?base.replace(/\?.*$/,''):'',chosenSource:publicUrl?'PUBLIC_URL':(clientUrl?'CLIENT_URL':'none'),tokenLen:typeof token==='string'?token.length:null},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+  // #endregion
   try {
     const u = new URL('/accept-invite', base);
     u.searchParams.set('invite', token);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:buildClientInviteUrl',message:'buildClientInviteUrl success',data:{inviteUrlOrigin:u.origin,inviteUrlPath:u.pathname,hasQuery:u.search.length>0},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
     return u.toString();
   } catch {
     // Fallback (best-effort)
-    return `${base.replace(/\/+$/g, '')}/accept-invite?invite=${encodeURIComponent(token)}`;
+    const out = `${base.replace(/\/+$/g, '')}/accept-invite?invite=${encodeURIComponent(token)}`;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:buildClientInviteUrl',message:'buildClientInviteUrl fallback',data:{outHasAcceptInvite:out.includes('/accept-invite'),outLen:out.length},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
+    return out;
   }
 }
 
@@ -268,6 +281,9 @@ router.post('/starships/:id/invites', jwtAuthMiddleware, async (req: Request, re
     });
 
     const inviteUrl = buildClientInviteUrl(token);
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:/starships/:id/invites',message:'created inviteUrl',data:{publicUrl:(env.PUBLIC_URL||'').trim(),inviteUrlOrigin:(()=>{try{return new URL(inviteUrl).origin}catch{return 'invalid'}})(),hostHeader:String(req.headers?.host||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H1'})}).catch(()=>{});
+    // #endregion
 
     const emailService = new EmailService();
     await emailService.sendStarshipInviteEmail({
@@ -280,6 +296,68 @@ router.post('/starships/:id/invites', jwtAuthMiddleware, async (req: Request, re
     sendSuccess(res, { ok: true, inviteUrl, expiresAt }, 201);
   } catch (error) {
     handleError(error, res, 'creating starship invite');
+  }
+});
+
+// POST /starship-invites/preview - preview invite context without consuming (public)
+router.post('/starship-invites/preview', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const body = validateData(
+      z.object({
+        token: z.string().min(1),
+      }),
+      req.body,
+      res,
+      'invite preview'
+    );
+    if (!body) return;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/starship-invites.ts:/starship-invites/preview',message:'preview endpoint hit',data:{tokenLen:typeof body.token==='string'?body.token.length:null,hostHeader:String(req.headers?.host||''),xForwardedHost:String(req.headers?.['x-forwarded-host']||''),xForwardedProto:String(req.headers?.['x-forwarded-proto']||''),originalUrl:String((req as any).originalUrl||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H2'})}).catch(()=>{});
+    // #endregion
+
+    const inviteRepo = new StarshipInviteTokenRepository();
+    // NOTE: `@starships/models` is imported via its built `dist` types in this repo.
+    // In local/dev test runs, that `dist` may lag behind source edits. Use a narrow
+    // type assertion so server type-checking doesn't block on package build order.
+    const invite = await (
+      inviteRepo as unknown as StarshipInviteTokenRepository & {
+        getValidInviteByToken: (token: string) => Promise<{
+          starshipId: string;
+          invitedEmail: string;
+          invitedByUserId: string | null;
+          role: 'admin' | 'collaborator';
+          expiresAt: string;
+        } | null>;
+      }
+    ).getValidInviteByToken(body.token);
+    if (!invite) {
+      sendError(res, 'VALIDATION_ERROR', 'Invalid or expired invite token', 400);
+      return;
+    }
+
+    const starshipService = new StarshipService();
+    const starship = await starshipService.getStarship(invite.starshipId);
+    if (!starship) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, { starshipId: invite.starshipId });
+      return;
+    }
+
+    sendSuccess(
+      res,
+      {
+        invitedEmail: invite.invitedEmail,
+        role: invite.role,
+        expiresAt: invite.expiresAt,
+        starship: {
+          id: starship.id,
+          slug: starship.slug,
+          name: starship.name,
+        },
+      },
+      200
+    );
+  } catch (error) {
+    handleError(error, res, 'previewing starship invite');
   }
 });
 

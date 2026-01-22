@@ -144,6 +144,37 @@ describe('starship invite routes', () => {
     expect(payload.data.starship.slug).toBe('ship-1');
   });
 
+  it('POST /starship-invites/preview returns invite context without consuming', async () => {
+    const inviteRepo = {
+      getValidInviteByToken: jest.fn().mockResolvedValue({
+        starshipId: 'starship_1234',
+        invitedEmail: 'invitee@test.com',
+        invitedByUserId: 'user_owner',
+        role: 'collaborator',
+        expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+      }),
+    };
+    (StarshipInviteTokenRepository as unknown as jest.Mock).mockImplementation(() => inviteRepo);
+
+    const starshipSvc = { getStarship: jest.fn().mockResolvedValue({ id: 'starship_1234', slug: 'ship-1', name: 'Ship 1', ownerId: 'user_owner' }) };
+    (StarshipService as unknown as jest.Mock).mockImplementation(() => starshipSvc);
+
+    const req = {
+      body: { token: 't'.repeat(64) },
+    } as unknown as Request;
+    const res = createMockRes();
+
+    const handler = getHandler('/starship-invites/preview', 'post');
+    await handler(req, res as unknown as Response);
+
+    expect(inviteRepo.getValidInviteByToken).toHaveBeenCalledWith('t'.repeat(64));
+    expect(res.status).toHaveBeenCalledWith(200);
+    const payload = res.json.mock.calls[0][0] as any;
+    expect(payload.success).toBe(true);
+    expect(payload.data.invitedEmail).toBe('invitee@test.com');
+    expect(payload.data.starship.slug).toBe('ship-1');
+  });
+
   it('POST /starship-invites/accept returns 400 on invalid token', async () => {
     const inviteRepo = {
       validateAndConsumeTokenForEmail: jest.fn().mockResolvedValue(null),

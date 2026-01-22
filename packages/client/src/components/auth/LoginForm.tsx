@@ -107,6 +107,16 @@ export function LoginForm({
     setActiveTab(defaultTab)
   }, [defaultTab])
 
+  // If the URL includes an expectedEmail (e.g. invite flow), prefill email fields.
+  // Never overwrite a value the user already typed.
+  useEffect(() => {
+    const expectedEmail = (searchParams?.get('expectedEmail') || '').trim()
+    if (!expectedEmail) return
+
+    setLoginData(prev => (prev.email.trim() ? prev : { ...prev, email: expectedEmail }))
+    setRegisterData(prev => (prev.email.trim() ? prev : { ...prev, email: expectedEmail }))
+  }, [searchParams])
+
   // Track if OAuth has been handled to prevent duplicate calls (use ref for immediate synchronous check)
   const oauthHandledRef = useRef(false)
   // Track if success messages have been shown to prevent duplicates

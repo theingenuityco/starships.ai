@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
+import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation } from '@/hooks/useConversations'
@@ -31,7 +32,7 @@ export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { isAuthenticated, user, userName, isInstanceAdmin } = useAuth()
-  const { getSelectedStarshipId } = useSelectedStarship()
+  const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
   // On mobile, always expanded (no collapse functionality)
@@ -106,6 +107,33 @@ export function Navigation(props: NavigationProps) {
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
 
   const starshipSlug = navigationStarshipSlug
+  const activeStarshipSlug = pathStarshipSlug || starshipSlug
+
+  const replaceStarshipSlugInPath = useCallback(
+    (nextSlug: string): string => {
+      const p = typeof pathname === 'string' ? pathname : ''
+      if (!p.startsWith('/ship/')) {
+        return `/ship/${nextSlug}/conversations`
+      }
+      const parts = p.split('/')
+      // /ship/<slug>/...
+      if (parts.length >= 3) {
+        parts[2] = nextSlug
+        return parts.join('/')
+      }
+      return `/ship/${nextSlug}/conversations`
+    },
+    [pathname]
+  )
+
+  const handleStarshipSelect = useCallback(
+    (s: { id: string; slug: string }) => {
+      setSelectedStarship(s.id)
+      router.push(replaceStarshipSlugInPath(s.slug))
+      if (isMobile && onClose) onClose()
+    },
+    [setSelectedStarship, router, replaceStarshipSlugInPath, isMobile, onClose]
+  )
 
   // Memoize route checks to prevent unnecessary recalculations
   const routeChecks = useMemo(() => {
@@ -268,6 +296,16 @@ export function Navigation(props: NavigationProps) {
         onMouseLeave={() => !isMobile && setIsHovered(false)}
         onClick={handleSidebarBackgroundClick}
       >
+        {/* Discord-style starship rail */}
+        {isAuthenticated ? (
+          <StarshipRail
+            starships={userStarships ?? []}
+            activeSlug={activeStarshipSlug}
+            onSelect={handleStarshipSelect as any}
+            onCreate={() => router.push('/profile')}
+          />
+        ) : null}
+
         <div
           className="flex flex-col pb-2 transition-all duration-300 ease-in-out"
           style={{

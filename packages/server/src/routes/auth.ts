@@ -578,6 +578,9 @@ router.get('/auth/:provider', async (req: Request, res: Response) => {
     const { provider } = paramValidation;
     // Use PUBLIC_URL for OAuth callback to work in all environments (local, dev, prod)
     const redirectUri = `${env.PUBLIC_URL}/api/v1/auth/${provider}/callback`;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/auth.ts:/auth/:provider',message:'oauth initiation',data:{provider,redirectUriOrigin:(()=>{try{return new URL(redirectUri).origin}catch{return 'invalid'}})(),publicUrlOrigin:(()=>{try{return new URL(String(env.PUBLIC_URL)).origin}catch{return 'invalid'}})(),clientUrlOrigin:(()=>{try{return new URL(String(env.CLIENT_URL)).origin}catch{return 'invalid'}})(),serverUrlOrigin:(()=>{try{return new URL(String(env.SERVER_URL)).origin}catch{return 'invalid'}})(),hasReturnUrl:typeof req.query.returnUrl==='string',returnUrlIsValid:typeof req.query.returnUrl==='string'?isValidRedirectUrl(req.query.returnUrl):false},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
 
     // Check if this is a linking request (user already logged in)
     const isLinking = req.query.link === 'true';
@@ -650,6 +653,9 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     const { isLinking, userId, context } = stateValidation;
     const returnUrlFromState = context && typeof (context as any).returnUrl === 'string' ? ((context as any).returnUrl as string) : undefined;
     const safeReturnUrl = returnUrlFromState && isValidRedirectUrl(returnUrlFromState) ? returnUrlFromState : undefined;
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/auth.ts:/auth/:provider/callback',message:'oauth callback validated state',data:{provider,hasSafeReturnUrl:Boolean(safeReturnUrl),safeReturnPath:safeReturnUrl?new URL(safeReturnUrl,'http://local').pathname:'',redirectingToLoginOrigin:(()=>{try{return new URL(String(env.PUBLIC_URL)).origin}catch{return 'invalid'}})()},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
 
     // If this is account linking, handle differently
     if (isLinking) {
@@ -863,12 +869,18 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
 
     // Validate and consume the authorization code (one-time use)
     logger.info('[OAUTH-EXCHANGE] Attempting to validate auth code');
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/auth.ts:/auth/oauth/exchange',message:'oauth exchange called',data:{hasAuthCode:typeof authCode==='string'&&authCode.length>0,authCodeLen:typeof authCode==='string'?authCode.length:0,hostHeader:String(req.headers?.host||'')},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
     const codeData = await validateAndConsumeAuthCode(authCode);
 
     if (!codeData) {
       logger.error('[OAUTH-EXCHANGE] Auth code validation failed - likely already consumed or expired');
       return sendError(res, 'AUTHENTICATION_FAILED', 'Invalid or expired authorization code. Please try logging in again.', 400);
     }
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'packages/server/src/routes/auth.ts:/auth/oauth/exchange',message:'oauth exchange authCode consumed',data:{consumed:true},timestamp:Date.now(),sessionId:'debug-session',runId:'pre-fix',hypothesisId:'H5'})}).catch(()=>{});
+    // #endregion
 
     logger.info('[OAUTH-EXCHANGE] Auth code validated successfully', { userId: codeData.userId });
 

@@ -1033,7 +1033,8 @@ const MemoizedMessageBubble = memo(
           <div
             className={cn(
               'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2',
-              'py-2',
+              // Remove the outside vertical gap between consecutive message rows.
+              'py-0',
               !showAssistantAvatar && '-mt-1'
             )}
           >

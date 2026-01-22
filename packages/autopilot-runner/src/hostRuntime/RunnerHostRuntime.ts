@@ -6,7 +6,7 @@ import type {
   ExprString,
   HttpMethod,
   QueryParamEncoding,
-} from '@starships/protocol';
+} from '@starships/protocol/src/domains/connector';
 import { CancelledError } from '@starships/autopilot';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { invokeBedrock } from './bedrock';

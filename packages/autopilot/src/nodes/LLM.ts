@@ -532,6 +532,7 @@ export class LLM extends BaseNode<LlmParams> {
     };
 
     let usage: LLMUsage | undefined;
+    let lastUsageHadExplicitCost = false;
     let content = '';
     let reasoning = '';
     let images: GeneratedImage[] = [];
@@ -858,6 +859,17 @@ export class LLM extends BaseNode<LlmParams> {
         // Extract usage if present
         if (chunk.usage) {
           usage = this.normalizeUsage(chunk.usage);
+          // Track whether provider explicitly reported cost. If not, downstream (server) should compute cost from catalog.
+          try {
+            const u = chunk.usage as unknown as Record<string, unknown>;
+            const hasCost = typeof u.cost === 'number' && Number.isFinite(u.cost);
+            const costDetails = u.cost_details;
+            const cd = costDetails && typeof costDetails === 'object' ? (costDetails as Record<string, unknown>) : null;
+            const hasUpstream = cd ? typeof cd.upstream_inference_cost === 'number' && Number.isFinite(cd.upstream_inference_cost) : false;
+            lastUsageHadExplicitCost = hasCost || hasUpstream;
+          } catch {
+            lastUsageHadExplicitCost = false;
+          }
         }
 
         // Broadcast content chunk for streaming - normalize tool_calls to toolCalls
@@ -943,10 +955,10 @@ export class LLM extends BaseNode<LlmParams> {
           data: {
             model: responseMetadata.model,
             usage: {
-              cost: usage.cost,
               promptTokens: usage.promptTokens,
               completionTokens: usage.completionTokens,
               totalTokens: usage.totalTokens,
+              ...(lastUsageHadExplicitCost ? { cost: usage.cost } : {}),
             },
           },
         });

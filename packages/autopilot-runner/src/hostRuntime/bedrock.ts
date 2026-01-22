@@ -278,6 +278,28 @@ export async function invokeBedrock(
     async function* gen() {
       if (!response.stream) return;
 
+      // Use the canonical model id (request.model) for downstream accounting and catalog lookup.
+      // Provider-specific model ids (providerModelId) may not exist in our llm_models catalog.
+      const canonicalModelId = typeof request.model === 'string' && request.model.trim().length > 0 ? request.model : providerModelId;
+
+      const mapBedrockStopReasonToOpenAIFinishReason = (stopReason: string | undefined): string => {
+        // Bedrock stop reasons (subset): end_turn, max_tokens, stop_sequence, tool_use, guardrail_intervened, content_filtered
+        // OpenAI finish_reason (subset): stop, length, tool_calls, content_filter
+        switch (stopReason) {
+          case 'max_tokens':
+            return 'length';
+          case 'tool_use':
+            return 'tool_calls';
+          case 'guardrail_intervened':
+          case 'content_filtered':
+            return 'content_filter';
+          case 'stop_sequence':
+          case 'end_turn':
+          default:
+            return 'stop';
+        }
+      };
+
       // Bedrock streams a sequence of structured events (messageStart,
       // contentBlockStart, contentBlockDelta, contentBlockStop, messageStop, ...).
       // We normalize these into OpenAI-style ChatCompletionChunk objects so the
@@ -301,10 +323,50 @@ export async function invokeBedrock(
           contentBlockIndex?: number;
           start?: { toolUse?: { toolUseId?: string; name?: string } };
         };
+        // Not fully typed here to avoid SDK type/version mismatches; we extract token usage dynamically.
+        messageStop?: { stopReason?: string };
+        metadata?: { usage?: { inputTokens?: number; outputTokens?: number; totalTokens?: number } };
       };
       const stream = response.stream as AsyncIterable<BedrockStreamEvent>;
 
+      // Usage and finish_reason are delivered late in the stream (messageStop/metadata).
+      let bedrockStopReason: string | undefined;
+      let bedrockUsage: { inputTokens?: number; outputTokens?: number; totalTokens?: number } | undefined;
+
       for await (const event of stream) {
+        // Capture stop reason + usage (metadata) when present.
+        try {
+          const anyEvent = event as unknown as Record<string, unknown>;
+          const ms = (anyEvent as { messageStop?: unknown }).messageStop;
+          if (ms && typeof ms === 'object') {
+            const sr = (ms as { stopReason?: unknown }).stopReason;
+            if (typeof sr === 'string' && sr.length > 0) bedrockStopReason = sr;
+          }
+          const md = (anyEvent as { metadata?: unknown }).metadata;
+          if (md && typeof md === 'object') {
+            const u = (md as { usage?: unknown }).usage;
+            if (u && typeof u === 'object') {
+              const ut = u as { inputTokens?: unknown; outputTokens?: unknown; totalTokens?: unknown };
+              const inputTokens = typeof ut.inputTokens === 'number' ? ut.inputTokens : undefined;
+              const outputTokens = typeof ut.outputTokens === 'number' ? ut.outputTokens : undefined;
+              const totalTokens = typeof ut.totalTokens === 'number' ? ut.totalTokens : undefined;
+              if (
+                typeof inputTokens === 'number' ||
+                typeof outputTokens === 'number' ||
+                typeof totalTokens === 'number'
+              ) {
+                bedrockUsage = {
+                  ...(typeof inputTokens === 'number' ? { inputTokens } : {}),
+                  ...(typeof outputTokens === 'number' ? { outputTokens } : {}),
+                  ...(typeof totalTokens === 'number' ? { totalTokens } : {}),
+                };
+              }
+            }
+          }
+        } catch {
+          // Non-fatal: usage/stopReason extraction is best-effort.
+        }
+
         // Text deltas
         if (event.contentBlockDelta && event.contentBlockDelta.delta) {
           const idx = event.contentBlockDelta.contentBlockIndex ?? 0;
@@ -345,7 +407,7 @@ export async function invokeBedrock(
                   id: 'bedrock-stream',
                   object: 'chat.completion.chunk',
                   created: Date.now(),
-                  model: providerModelId,
+                  model: canonicalModelId,
                   choices: [
                     {
                       index: 0,
@@ -392,7 +454,7 @@ export async function invokeBedrock(
                   id: 'bedrock-stream',
                   object: 'chat.completion.chunk',
                   created: Date.now(),
-                  model: providerModelId,
+                  model: canonicalModelId,
                   choices: [
                     {
                       index: 0, // OpenAI always uses choice index 0 for streaming
@@ -424,7 +486,7 @@ export async function invokeBedrock(
               id: 'bedrock-stream',
               object: 'chat.completion.chunk',
               created: Date.now(),
-              model: providerModelId,
+              model: canonicalModelId,
               choices: [
                 {
                   index: idx,
@@ -454,7 +516,7 @@ export async function invokeBedrock(
               id: 'bedrock-stream',
               object: 'chat.completion.chunk',
               created: Date.now(),
-              model: providerModelId,
+              model: canonicalModelId,
               choices: [
                 {
                   index: 0,
@@ -482,6 +544,38 @@ export async function invokeBedrock(
         // We currently don't need to emit anything for messageStart/contentBlockStop/messageStop
         // because the LLM node infers finishReason when the stream completes and tool calls
         // are reconstructed from the accumulated tool_calls deltas.
+      }
+
+      // Emit a final synthetic chunk containing usage + finish_reason so downstream accounting records it.
+      // LLM.ts normalizes snake_case usage (prompt_tokens/completion_tokens/total_tokens).
+      const inputTokens = typeof bedrockUsage?.inputTokens === 'number' ? bedrockUsage.inputTokens : undefined;
+      const outputTokens = typeof bedrockUsage?.outputTokens === 'number' ? bedrockUsage.outputTokens : undefined;
+      const totalTokens =
+        typeof bedrockUsage?.totalTokens === 'number'
+          ? bedrockUsage.totalTokens
+          : typeof inputTokens === 'number' && typeof outputTokens === 'number'
+            ? inputTokens + outputTokens
+            : undefined;
+
+      if (typeof inputTokens === 'number' || typeof outputTokens === 'number' || typeof totalTokens === 'number') {
+        yield {
+          id: 'bedrock-stream',
+          object: 'chat.completion.chunk',
+          created: Math.floor(Date.now() / 1000),
+          model: canonicalModelId,
+          choices: [
+            {
+              index: 0,
+              delta: {},
+              finish_reason: mapBedrockStopReasonToOpenAIFinishReason(bedrockStopReason),
+            },
+          ],
+          usage: {
+            prompt_tokens: typeof inputTokens === 'number' ? inputTokens : 0,
+            completion_tokens: typeof outputTokens === 'number' ? outputTokens : 0,
+            total_tokens: typeof totalTokens === 'number' ? totalTokens : 0,
+          },
+        };
       }
     }
 

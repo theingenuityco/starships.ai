@@ -84,28 +84,6 @@ export async function up(client: Client): Promise<void> {
         requestStyle: 'query',
         timeoutMs: 5000,
       },
-      {
-        name: 'search-connector',
-        description: 'Search connector templates (catalog) by query',
-        method: 'GET',
-        path: '/connectors/catalog',
-        parameters: {
-          type: 'object',
-          properties: {
-            q: { type: 'string', description: 'Search query' },
-            limit: { type: 'number', description: 'Maximum results (1-100)' },
-          },
-          additionalProperties: false,
-        },
-        mapping: {
-          query: {
-            q: '{{ String(args.q ?? "") }}',
-            limit: '{{ Number(args.limit ?? 20) }}',
-          },
-        },
-        requestStyle: 'query',
-        timeoutMs: 5000,
-      },
 
       // ---------------------------------------------------------------------
       // Tools (used by seeded tools: list-tools, get-tool, test-tool, open-tool, edit-tool, modify-tool-blueprint-*)

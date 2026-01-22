@@ -2,7 +2,6 @@ import type { Request, Response } from 'express';
 
 jest.mock('@starships/env', () => ({
   getEnvConfig: () => ({
-    CLIENT_URL: 'https://client.test',
     PUBLIC_URL: 'https://server.test',
   }),
 }));
@@ -94,7 +93,7 @@ describe('starship invite routes', () => {
       expect.objectContaining({
         invitedEmail: 'invitee@test.com',
         starshipName: 'Ship 1',
-        inviteUrl: expect.stringContaining('token='),
+        inviteUrl: expect.stringContaining('invite='),
       })
     );
     expect(res.status).toHaveBeenCalledWith(201);

@@ -961,45 +961,50 @@ export function ConversationMessageContent({
     [theme, enableLinkPreview, messageId, copiedStates]
   )
 
-  const hasCopyableContent = typeof displayContent === 'string' && displayContent.trim().length > 0
+  const rawDisplayContent = String(displayContent ?? '')
+  const hasCopyableContent = rawDisplayContent.trim().length > 0
 
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
       <div className={cn(resolvedContentClass, 'dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message')}>
-        {/* IMPORTANT: Only the content chunk is copyable/exportable. */}
-        <div
-          ref={messageContainerRef}
-          className={cn(
-            'relative',
-            // Only show the hover actions when hovering the content chunk itself (not tools/reasoning/attachments).
-            'rounded-lg px-2 py-2 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10',
-            'hover:[&_.content-chunk-actions]:opacity-100 focus-within:[&_.content-chunk-actions]:opacity-100'
-          )}
-        >
-          {/* Content chunk actions (copy + download): float at bottom edge */}
-          {enableCopy && hasCopyableContent && (
-            <div className="content-chunk-actions pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity">
-              <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
-                  <Icon name="copy" className="h-4 w-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
-                  <Icon name="download" className="h-4 w-4" />
-                </Button>
+        {/* IMPORTANT: Only render the content chunk container when there is actual content. */}
+        {hasCopyableContent ? (
+          <div
+            ref={messageContainerRef}
+            className={cn(
+              'relative',
+              // Only show the hover actions when hovering the content chunk itself (not tools/reasoning/attachments).
+              // Keep internal padding; remove outside row-gap in the list instead.
+              'rounded-lg px-2 py-2 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10',
+              'hover:[&_.content-chunk-actions]:opacity-100 focus-within:[&_.content-chunk-actions]:opacity-100'
+            )}
+          >
+            {/* Content chunk actions (copy + download): float at bottom edge */}
+            {enableCopy && (
+              <div className="content-chunk-actions pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity">
+                <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+                    <Icon name="copy" className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+                    <Icon name="download" className="h-4 w-4" />
+                  </Button>
+                </div>
               </div>
-            </div>
-          )}
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-            {String(displayContent ?? '')}
-          </ReactMarkdown>
-        </div>
+            )}
+            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              {rawDisplayContent}
+            </ReactMarkdown>
+          </div>
+        ) : null}
         {toolPanelNode}
       </div>
     ) : null
 
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
+    if (!hasCopyableContent) return null
     return (
       <div className={cn('relative group', className)}>
         <div className={cn(contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed', 'whitespace-pre-wrap ph-mask-chat-message')}>

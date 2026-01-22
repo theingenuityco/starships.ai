@@ -729,7 +729,7 @@ export function ConversationMessageContent({
         )
         return (
           <Collapsible key={`${toolCallId || idx}`} defaultOpen={false} className="space-y-0">
-            <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10">
+            <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted">
               {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
               <p className={`${pSpacingClass} leading-relaxed`}>
                 <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
@@ -972,18 +972,11 @@ export function ConversationMessageContent({
       <div className={cn(resolvedContentClass, 'dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message')}>
         {/* IMPORTANT: Only render the content chunk container when there is actual content. */}
         {hasCopyableContent ? (
-          <div
-            ref={messageContainerRef}
-            className={cn(
-              'relative group/content-chunk',
-              // Only show the hover actions when hovering the content chunk itself (not tools/reasoning/attachments).
-              // Keep internal padding; remove outside row-gap in the list instead.
-              'rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10'
-            )}
-          >
-            {/* Content chunk actions (copy + download): float at bottom edge */}
+          <div className="relative w-full group/content-chunk">
+            {/* Content chunk actions (copy + download): float at bottom edge.
+               Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
             {enableCopy && (
-              <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
+              <div className="pointer-events-none absolute bottom-0 right-0 translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
                   <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
                     <Icon name="copy" className="h-4 w-4" />
@@ -994,9 +987,18 @@ export function ConversationMessageContent({
                 </div>
               </div>
             )}
-            <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-              {rawDisplayContent}
-            </ReactMarkdown>
+
+            <div
+              ref={messageContainerRef}
+              className={cn(
+                // Keep internal padding; remove outside row-gap in the list instead.
+                'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
+              )}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {rawDisplayContent}
+              </ReactMarkdown>
+            </div>
           </div>
         ) : null}
         {toolPanelNode}
@@ -1026,7 +1028,7 @@ export function ConversationMessageContent({
           <>
             {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
             <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning} className="space-y-0">
-              <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-black/5 dark:hover:bg-white/10">
+              <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted">
                 {/* Match tool-call collapsed row spacing + trigger styling */}
                 <p className="m-0 leading-relaxed">
                   <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">

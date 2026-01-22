@@ -347,7 +347,8 @@
 @layer base {
   :root {
     /* Enhanced Light Theme - Soothing Blue Foundation */
-    --background: 0 0% 98%;
+    /* Warmer off-white to reduce "cool" cast */
+    --background: 38 30% 97.5%;
     --foreground: 0 0% 8%;
     --card: 0 0% 100%;
     --card-foreground: 0 0% 8%;
@@ -737,7 +738,7 @@
 /* Star Light Theme - Matches regular light theme */
 .star-theme-light {
   /* Use same values as :root for consistency */
-  --background: 0 0% 98%; /* Enhanced Light Theme - Soothing Blue Foundation */
+  --background: 38 30% 97.5%; /* Match :root (warmer off-white) */
   --foreground: 0 0% 8%;
   --card: 0 0% 100%;
   --card-foreground: 0 0% 8%;

@@ -78,6 +78,7 @@ export async function up(client: DbClient): Promise<void> {
   }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function down(_client: DbClient): Promise<void> {
   // This migration is intentionally irreversible.
   // The list-connectors tool template has been removed from the seeders,

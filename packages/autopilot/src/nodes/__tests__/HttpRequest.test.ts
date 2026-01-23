@@ -788,6 +788,34 @@ describe('HttpRequest Node Handler', () => {
       expect((result[0].binary?.file as unknown as { data?: unknown })?.data).toBeInstanceOf(ArrayBuffer);
     });
 
+    it('returns base64 string body when responseType=base64', async () => {
+      const params: HttpRequestParams = {
+        url: 'https://api.example.com/file.b64',
+        method: 'GET',
+        responseType: 'base64',
+      };
+
+      httpMock.mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/file.b64',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: 'AQIDBA==',
+      });
+
+      const httpRequest = new HttpRequest(params, { hostRuntime });
+      const result = await httpRequest.execute();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: 'AQIDBA==',
+        url: 'https://api.example.com/file.b64',
+      });
+    });
+
     it('uploads raw ArrayBuffer from ExecutionItem.binary when bodyFromBinaryKey is set', async () => {
       const data = new Uint8Array([9, 8, 7]).buffer;
       const input: ExecutionItem[] = [

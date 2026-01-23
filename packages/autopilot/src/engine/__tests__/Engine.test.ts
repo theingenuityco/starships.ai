@@ -222,7 +222,7 @@ describe('Engine', () => {
         }: {
           url: string;
           method: string;
-          responseType?: 'json' | 'text' | 'arrayBuffer';
+          responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64';
           body?: unknown;
           headers?: Record<string, unknown>;
         }) => {

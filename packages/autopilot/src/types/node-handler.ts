@@ -91,8 +91,9 @@ export interface HostRuntime {
      * - json: parse JSON when possible (default)
      * - text: always return string body
      * - arrayBuffer: return an ArrayBuffer (binary)
+     * - base64: return base64-encoded string body
      */
-    responseType?: 'json' | 'text' | 'arrayBuffer';
+    responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64';
   }): Promise<{
     status: number;
     statusText: string;

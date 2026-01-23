@@ -84,8 +84,9 @@ export interface HttpRequestParams extends BaseParams, Omit<RequestInit, 'body'>
    * - json: parse JSON when possible (default)
    * - text: always return string body
    * - arrayBuffer: return ArrayBuffer (binary)
+   * - base64: return base64-encoded string body
    */
-  responseType?: 'json' | 'text' | 'arrayBuffer';
+  responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64';
 
   // Custom properties for convenience
   timeout?: number;

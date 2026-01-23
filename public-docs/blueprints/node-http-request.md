@@ -34,9 +34,21 @@ Response parsing
 - If `parameters.responseType` is set:
   - `"arrayBuffer"` => host returns `ArrayBuffer`
   - `"text"` => host returns string
-  - `"base64"` => host returns base64 string
+  - `"base64"` => host returns `data:<content-type>;base64,<...>`
   - `"json"` (or omitted) => host attempts JSON when content-type includes `application/json`, otherwise returns text
 - Headers are returned as a plain object `{ [key: string]: string }`.
+
+### Notes: base64 + attachments (Starships app)
+
+In the Starships app, extremely large base64 blobs are not persisted inline in message content.
+
+- If a **tool result** message contains embedded image data URLs like `data:image/...;base64,...`, the backend will:
+  - extract up to 8 image data URLs,
+  - store them as image attachments,
+  - replace the inline data URLs with lightweight `attachment://<id>` references,
+  - and persist the `attachmentIds` on the message so the UI can render images without storing multi‑MB base64 in `message.content`.
+
+This is a persistence/UI optimization and does not change the in-workflow `http_request` output item shape during execution.
 
 Return value (shape)
 

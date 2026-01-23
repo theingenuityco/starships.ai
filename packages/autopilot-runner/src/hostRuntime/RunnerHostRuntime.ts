@@ -325,9 +325,10 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       if (responseType === 'arrayBuffer') {
         responseBody = await resp.arrayBuffer();
       } else if (responseType === 'base64') {
+        const ct = (resp.headers.get('content-type') || 'application/octet-stream').trim() || 'application/octet-stream';
         const ab = await resp.arrayBuffer();
-        // Node.js runtime: Buffer is available and efficiently encodes base64.
-        responseBody = Buffer.from(ab).toString('base64');
+        const b64 = Buffer.from(ab).toString('base64');
+        responseBody = `data:${ct};base64,${b64}`;
       } else if (responseType === 'text') {
         responseBody = await resp.text();
       } else {

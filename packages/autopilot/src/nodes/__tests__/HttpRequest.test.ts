@@ -800,7 +800,7 @@ describe('HttpRequest Node Handler', () => {
         statusText: 'OK',
         url: 'https://api.example.com/file.b64',
         headers: { 'content-type': 'application/octet-stream' },
-        body: 'AQIDBA==',
+        body: 'data:application/octet-stream;base64,AQIDBA==',
       });
 
       const httpRequest = new HttpRequest(params, { hostRuntime });
@@ -811,7 +811,7 @@ describe('HttpRequest Node Handler', () => {
         status: 200,
         statusText: 'OK',
         headers: { 'content-type': 'application/octet-stream' },
-        body: 'AQIDBA==',
+        body: 'data:application/octet-stream;base64,AQIDBA==',
         url: 'https://api.example.com/file.b64',
       });
     });

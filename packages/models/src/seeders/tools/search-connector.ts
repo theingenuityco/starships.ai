@@ -30,7 +30,7 @@ export const connectorSearchTool: ToolParams = {
             async function main(ctx) {
               const input = ctx.input && typeof ctx.input === 'object' ? ctx.input : {};
               const q = typeof input.q === 'string' ? input.q : '';
-              const limit = typeof input.limit === 'number' && input.limit > 0 ? input.limit : 20;
+              const limit = typeof input.limit === 'number' && input.limit >= 1 && input.limit <= 100 ? Math.floor(input.limit) : 20;
               return { q, limit };
             }
           `,

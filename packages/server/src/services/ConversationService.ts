@@ -2912,7 +2912,9 @@ export class ConversationService {
                         }
                         contentToPersist = replaced;
                         // Merge with any existing ids (e.g. server-tools provided attachments).
-                        const combined = [...attachmentIdsToPersist, ...createdIds].filter((x): x is string => typeof x === 'string' && x.length > 0);
+                        const combined = [...attachmentIdsToPersist, ...createdIds].filter(
+                          (x): x is string => typeof x === 'string' && x.length > 0
+                        );
                         const seen = new Set<string>();
                         const uniq: string[] = [];
                         for (const id of combined) {
@@ -2965,7 +2967,9 @@ export class ConversationService {
                   try {
                     const attachmentService = new AttachmentService();
                     await Promise.all(
-                      attachmentIdsToPersist.map((id) => attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false))
+                      attachmentIdsToPersist.map((id) =>
+                        attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false)
+                      )
                     );
                   } catch {
                     // ignore best-effort linking failures

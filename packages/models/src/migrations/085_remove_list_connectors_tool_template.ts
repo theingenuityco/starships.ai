@@ -9,7 +9,7 @@ function toRows<T>(res: unknown): T[] {
 }
 
 /**
- * Migration 082: Remove list-connectors tool template
+ * Migration 085: Remove list-connectors tool template
  *
  * Removes the deprecated `list-connectors` tool template and all related data:
  * - Deletes tool instances created from this template
@@ -29,7 +29,7 @@ export async function up(client: DbClient): Promise<void> {
     const templates = toRows<{ id: string; name: string; slug: string }>(templateRes);
 
     if (templates.length === 0) {
-      console.log('[MIGRATION-082] No list-connectors tool template found, skipping');
+      console.log('[MIGRATION-085] No list-connectors tool template found, skipping');
       await client.query('COMMIT');
       return;
     }
@@ -38,7 +38,7 @@ export async function up(client: DbClient): Promise<void> {
     let deletedRelationships = 0;
 
     for (const template of templates) {
-      console.log(`[MIGRATION-082] Processing template: ${template.name} (${template.slug}, id: ${template.id})`);
+      console.log(`[MIGRATION-085] Processing template: ${template.name} (${template.slug}, id: ${template.id})`);
 
       // 1. Delete tool instances created from this template
       const toolInstancesRes = await client.query(
@@ -48,7 +48,7 @@ export async function up(client: DbClient): Promise<void> {
       const deletedTools = toRows<{ id: string }>(toolInstancesRes);
       deletedToolInstances += deletedTools.length;
       if (deletedTools.length > 0) {
-        console.log(`[MIGRATION-082] Deleted ${deletedTools.length} tool instance(s) from template ${template.slug}`);
+        console.log(`[MIGRATION-085] Deleted ${deletedTools.length} tool instance(s) from template ${template.slug}`);
       }
 
       // 2. Delete agent-template-tool-template relationships
@@ -59,16 +59,16 @@ export async function up(client: DbClient): Promise<void> {
       const deletedRels = toRows<{ agent_template_id: string }>(relationshipsRes);
       deletedRelationships += deletedRels.length;
       if (deletedRels.length > 0) {
-        console.log(`[MIGRATION-082] Removed ${deletedRels.length} agent-template relationship(s) for template ${template.slug}`);
+        console.log(`[MIGRATION-085] Removed ${deletedRels.length} agent-template relationship(s) for template ${template.slug}`);
       }
 
       // 3. Delete the tool template itself
       await client.query(`DELETE FROM tool_templates WHERE id = $1`, [template.id]);
-      console.log(`[MIGRATION-082] Deleted tool template: ${template.name} (${template.slug})`);
+      console.log(`[MIGRATION-085] Deleted tool template: ${template.name} (${template.slug})`);
     }
 
     console.log(
-      `[MIGRATION-082] Summary: Deleted ${templates.length} tool template(s), ${deletedToolInstances} tool instance(s), ${deletedRelationships} relationship(s)`
+      `[MIGRATION-085] Summary: Deleted ${templates.length} tool template(s), ${deletedToolInstances} tool instance(s), ${deletedRelationships} relationship(s)`
     );
 
     await client.query('COMMIT');
@@ -83,5 +83,5 @@ export async function down(_client: DbClient): Promise<void> {
   // The list-connectors tool template has been removed from the seeders,
   // so we cannot restore it. If needed, it would need to be re-added to
   // the seeders and re-seeded.
-  console.log('[MIGRATION-082] Rollback not supported - list-connectors tool template has been removed from seeders');
+  console.log('[MIGRATION-085] Rollback not supported - list-connectors tool template has been removed from seeders');
 }

@@ -11,10 +11,10 @@ function toRows<T>(res: unknown): T[] {
 type Endpoint = Record<string, unknown> & { name: string };
 
 /**
- * Migration 083: Remove list-connectors connector endpoint from Starships connector
+ * Migration 086: Remove list-connectors connector endpoint from Starships connector
  *
  * Removes the deprecated `list-connectors` connector endpoint from the Starships connector.
- * This endpoint was replaced by `search-connector` (added in migration 081).
+ * This endpoint was replaced by `search-connector` (added in migration 084).
  *
  * Safety check: Before removing, verifies that no tools are using this endpoint.
  * If tools are found, the migration fails with a clear error message.
@@ -51,7 +51,7 @@ export async function up(client: DbClient): Promise<void> {
       );
     }
 
-    // Also check tool templates (though migration 082 should have removed list-connectors template)
+    // Also check tool templates (though migration 085 should have removed list-connectors template)
     const templatesCheckRes = await client.query(
       `
       SELECT id, slug, name
@@ -83,7 +83,7 @@ export async function up(client: DbClient): Promise<void> {
     const rows = toRows<{ id: string; endpoints_json: unknown }>(res);
 
     if (!rows.length) {
-      console.log('[MIGRATION-083] Starships connector template not found, skipping');
+      console.log('[MIGRATION-086] Starships connector template not found, skipping');
       await client.query('COMMIT');
       return;
     }
@@ -95,7 +95,7 @@ export async function up(client: DbClient): Promise<void> {
     const nextEndpoints = endpoints.filter((e) => e?.name !== 'list-connectors');
 
     if (nextEndpoints.length === endpoints.length) {
-      console.log('[MIGRATION-083] list-connectors endpoint not found in Starships connector, skipping');
+      console.log('[MIGRATION-086] list-connectors endpoint not found in Starships connector, skipping');
       await client.query('COMMIT');
       return;
     }
@@ -105,7 +105,7 @@ export async function up(client: DbClient): Promise<void> {
       row.id,
     ]);
 
-    console.log('[MIGRATION-083] Removed list-connectors endpoint from Starships connector');
+    console.log('[MIGRATION-086] Removed list-connectors endpoint from Starships connector');
 
     await client.query('COMMIT');
   } catch (error) {
@@ -131,7 +131,7 @@ export async function down(client: DbClient): Promise<void> {
     // Check if endpoint already exists
     const exists = endpoints.some((e) => e?.name === 'list-connectors');
     if (exists) {
-      console.log('[MIGRATION-083] list-connectors endpoint already exists, skipping rollback');
+      console.log('[MIGRATION-086] list-connectors endpoint already exists, skipping rollback');
       await client.query('COMMIT');
       return;
     }
@@ -166,7 +166,7 @@ export async function down(client: DbClient): Promise<void> {
       row.id,
     ]);
 
-    console.log('[MIGRATION-083] Restored list-connectors endpoint to Starships connector');
+    console.log('[MIGRATION-086] Restored list-connectors endpoint to Starships connector');
 
     await client.query('COMMIT');
   } catch (error) {

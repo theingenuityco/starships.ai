@@ -11,7 +11,7 @@ function toRows<T>(res: unknown): T[] {
 type Endpoint = Record<string, unknown> & { name: string };
 
 /**
- * Migration 081: Add search-connector endpoint to Starships connector
+ * Migration 084: Add search-connector endpoint to Starships connector
  *
  * Adds a connector_action endpoint for:
  * GET /connectors/catalog

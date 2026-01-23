@@ -225,6 +225,65 @@ describe('LLM Node Handler', () => {
       expect(msg.images).toBeDefined();
       expect(msg.images?.[0]?.image_url?.url).toBe(dataUrl);
     });
+
+    it('should pass tool-produced image attachments to provider as multimodal user content', async () => {
+      const params: LlmParams = {
+        model: 'google/gemini-2.5-flash-image',
+        modalities: ['image', 'text'],
+        messages: [
+          { role: 'user', content: 'Look at the tool output image.' },
+          {
+            role: 'tool',
+            toolCallId: 'tc_1',
+            content: JSON.stringify({
+              success: true,
+              data: { ok: true },
+              attachments: [
+                {
+                  id: 'att_1',
+                  mimeType: 'image/png',
+                  previewUrl: 'https://example.com/presigned.png',
+                },
+              ],
+            }),
+          } as any,
+        ],
+      };
+
+      const mockStream = createMockStream([
+        {
+          id: 't-attach',
+          model: 'google/gemini-2.5-flash-image',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'ok' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+        {
+          id: 't-attach',
+          model: 'google/gemini-2.5-flash-image',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+      ]);
+
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
+
+      const llm = new LLM(params, { hostRuntime });
+      await llm.execute();
+
+      const req = llmMock.mock.calls[0]?.[0];
+      expect(req).toBeTruthy();
+      const msgs = (req as any).messages as any[];
+
+      // We should still send the tool message...
+      expect(msgs.some((m) => m && m.role === 'tool' && typeof m.content === 'string')).toBe(true);
+      // ...and inject a provider-only user multimodal message containing an image_url block.
+      const injected = msgs.find((m) => m && m.role === 'user' && Array.isArray(m.content) && m.content.some((p: any) => p?.type === 'image_url'));
+      expect(injected).toBeTruthy();
+      const imagePart = injected.content.find((p: any) => p?.type === 'image_url');
+      expect(imagePart?.image_url?.url).toBe('https://example.com/presigned.png');
+    });
   });
 
   describe('Error Handling', () => {

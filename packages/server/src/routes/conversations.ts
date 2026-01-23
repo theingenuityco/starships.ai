@@ -15,6 +15,7 @@ import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
+import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
   ConversationWidgetRepository,
@@ -255,6 +256,122 @@ async function executeToolBlueprint(args: {
     ...(args.runnerConfig as unknown as EngineConfig),
   });
   return ExecutionItemUtils.unwrapSingle(items);
+}
+
+type ToolResultAttachment = {
+  id: string;
+  previewUrl?: string;
+  mimeType?: string;
+  filename?: string;
+  sizeBytes?: number;
+  imageWidth?: number;
+  imageHeight?: number;
+  createdAt?: string;
+};
+
+function parseBase64ImageDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
+  if (typeof dataUrl !== 'string') return null;
+  const m = dataUrl.match(/^data:(image\/[a-z0-9.+-]+);base64,([a-z0-9+/=\n\r]+)$/i);
+  if (!m) return null;
+  const mimeType = m[1].toLowerCase();
+  const b64 = m[2].replace(/\s+/g, '');
+  try {
+    const buffer = Buffer.from(b64, 'base64');
+    if (!buffer || buffer.length === 0) return null;
+    return { mimeType, buffer };
+  } catch {
+    return null;
+  }
+}
+
+async function replaceBase64ImagesWithAttachments(args: {
+  value: unknown;
+  starshipId: string;
+  conversationId: string;
+  maxImages?: number;
+}): Promise<{ value: unknown; attachments: ToolResultAttachment[] }> {
+  const maxImages = Math.max(0, Math.min(20, Number(args.maxImages ?? 8)));
+  if (maxImages === 0) return { value: args.value, attachments: [] };
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+
+  const collect = (v: unknown, depth = 0): void => {
+    if (candidates.length >= maxImages) return;
+    if (depth > 10) return;
+    if (typeof v === 'string') {
+      // Common/cheap case: the value itself is a data URL.
+      if (v.startsWith('data:image/') && v.includes(';base64,')) {
+        if (!seen.has(v)) {
+          seen.add(v);
+          candidates.push(v);
+        }
+      }
+      return;
+    }
+    if (!v || typeof v !== 'object') return;
+    if (Array.isArray(v)) {
+      for (const it of v) collect(it, depth + 1);
+      return;
+    }
+    for (const it of Object.values(v as Record<string, unknown>)) {
+      collect(it, depth + 1);
+      if (candidates.length >= maxImages) return;
+    }
+  };
+
+  collect(args.value);
+  if (candidates.length === 0) return { value: args.value, attachments: [] };
+
+  const attachmentService = new AttachmentService();
+  const urlToId = new Map<string, string>();
+  const createdIds: string[] = [];
+
+  for (let i = 0; i < candidates.length && createdIds.length < maxImages; i++) {
+    const url = candidates[i];
+    const parsed = parseBase64ImageDataUrl(url);
+    if (!parsed) continue;
+    try {
+      const filenameBase = `generated_tool_${Date.now()}_${i}`;
+      const created = await attachmentService.createGeneratedImageAttachment({
+        starshipId: args.starshipId,
+        conversationId: args.conversationId,
+        mimeType: parsed.mimeType,
+        buffer: parsed.buffer,
+        filenameBase,
+      });
+      urlToId.set(url, created.id);
+      createdIds.push(created.id);
+    } catch (e) {
+      console.warn('[TOOL_CALL] Failed to persist tool-generated image attachment', {
+        conversationId: args.conversationId,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    }
+  }
+
+  if (createdIds.length === 0) return { value: args.value, attachments: [] };
+
+  const apply = (v: unknown, depth = 0): unknown => {
+    if (depth > 10) return v;
+    if (typeof v === 'string') {
+      let out = v;
+      for (const [url, id] of urlToId.entries()) {
+        if (out.includes(url)) out = out.split(url).join(`attachment://${id}`);
+      }
+      return out;
+    }
+    if (!v || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map((it) => apply(it, depth + 1));
+    const rec = v as Record<string, unknown>;
+    const next: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(rec)) next[k] = apply(val, depth + 1);
+    return next;
+  };
+
+  const replaced = apply(args.value);
+  const attachments = (await attachmentService.getAttachmentsBatch(createdIds, args.starshipId).catch(() => [])) as ToolResultAttachment[];
+  return { value: replaced, attachments };
 }
 
 /**
@@ -866,7 +983,13 @@ router.post(
             runnerConfig: engineConfig,
           });
 
-          sendSuccess(res, { toolCallId, result }, 200);
+          const normalized = await replaceBase64ImagesWithAttachments({
+            value: result,
+            starshipId: conversation.starshipId,
+            conversationId,
+            maxImages: 8,
+          });
+          sendSuccess(res, { toolCallId, result: normalized.value, attachments: normalized.attachments }, 200);
           return;
         }
 
@@ -997,7 +1120,13 @@ router.post(
         },
       });
 
-      sendSuccess(res, { toolCallId, result }, 200);
+      const normalized = await replaceBase64ImagesWithAttachments({
+        value: result,
+        starshipId: conversation.starshipId,
+        conversationId,
+        maxImages: 8,
+      });
+      sendSuccess(res, { toolCallId, result: normalized.value, attachments: normalized.attachments }, 200);
     } catch (e) {
       const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
       const toolCallId = typeof body.toolCallId === 'string' ? String(body.toolCallId) : '';

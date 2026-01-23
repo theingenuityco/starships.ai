@@ -250,8 +250,42 @@ export class LLM extends BaseNode<LlmParams> {
       const s = content;
       const looksLikeEmbeddedImage = s.includes('data:image/') && s.includes(';base64,');
 
+      const extractToolAttachmentPreviewUrls = (raw: string): string[] => {
+        // Tool messages in Starships server-tools mode are JSON.stringify(payload),
+        // where payload may include: { attachments: [{ previewUrl, mimeType, ... }] }.
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (!parsed || typeof parsed !== 'object') return [];
+          const rec = parsed as Record<string, unknown>;
+          const attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
+          const urls: string[] = [];
+          for (const a of attachments) {
+            if (!a || typeof a !== 'object') continue;
+            const pr = (a as Record<string, unknown>).previewUrl;
+            if (typeof pr === 'string' && pr.trim().length > 0) urls.push(pr.trim());
+          }
+          return urls;
+        } catch {
+          return [];
+        }
+      };
+
       // Tool results are the primary culprit (often include raw provider responses with base64 images).
       if (role === 'tool') {
+        // If the tool result includes attachment preview URLs, add a provider-only multimodal hint
+        // so vision models can see the image(s) without embedding huge base64 blobs.
+        const previewUrls = extractToolAttachmentPreviewUrls(s);
+        if (previewUrls.length > 0) {
+          out.push(m);
+          out.push({
+            role: 'user',
+            content: [
+              { type: 'text', text: '[Tool produced image attachment(s)]' },
+              ...previewUrls.slice(0, 8).map((url) => ({ type: 'image_url', image_url: { url } })),
+            ],
+          } as LlmMessage);
+          continue;
+        }
         if (looksLikeEmbeddedImage || s.length > MAX_TOOL_TEXT_CHARS) {
           const prefix = s.slice(0, Math.min(MAX_TOOL_TEXT_CHARS, s.length));
           out.push({

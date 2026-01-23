@@ -33,6 +33,10 @@ const StartOnboardingSchema = z.object({
   starshipName: z.string().trim().min(1).max(100).optional(),
 });
 
+const SkipOnboardingChatSchema = z.object({
+  conversationId: z.string().trim().min(1),
+});
+
 /**
  * POST /onboarding/chat/start
  *
@@ -223,6 +227,53 @@ router.post('/onboarding/chat/start', jwtAuthMiddleware, async (req: Request, re
   }
 });
 
+/**
+ * POST /onboarding/chat/skip
+ *
+ * Exits onboarding mode for an onboarding conversation:
+ * - clears onboarding-only conversation state flags
+ * - allows normal ship navigation to render immediately
+ */
+router.post('/onboarding/chat/skip', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const user = requireAuthUser(req, res);
+    if (!user) return;
+
+    const body = validateData(SkipOnboardingChatSchema, req.body, res, 'onboarding chat skip payload');
+    if (!body) return;
+
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(body.conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404);
+      return;
+    }
+
+    // Basic authorization: ensure this conversation's starship belongs to the current user.
+    try {
+      const starship = await conversationService.getConversationStarship(conversation.id);
+      if (!starship || starship.ownerId !== user.id) {
+        sendError(res, 'FORBIDDEN', 'You do not have access to this conversation', 403);
+        return;
+      }
+    } catch {
+      sendError(res, 'FORBIDDEN', 'You do not have access to this conversation', 403);
+      return;
+    }
+
+    await conversationService.updateConversation(conversation.id, {
+      // Ensure both flags are cleared:
+      // - state.isOnboardingConversation controls client onboarding UI/nav gating
+      // - state.onboardingSystemPrompt injects onboarding behavior into Aria's prompt
+      state: { isOnboardingConversation: false, onboardingSystemPrompt: null },
+    });
+
+    sendSuccess(res, { conversationId: conversation.id });
+  } catch (error) {
+    handleError(error, res, 'skip onboarding chat');
+  }
+});
+
 const RecommendationsSchema = z.object({
   goals: z.array(z.enum(['research', 'analytics', 'support', 'automation', 'tool_building'])).min(1),
   constraints: z.record(z.string(), z.unknown()).optional(),
@@ -240,6 +291,19 @@ const AriaSuggestSchema = z.object({
 });
 
 async function ensureStarshipForUser(userId: string, starshipName?: string): Promise<StarshipModel> {
+  // IMPORTANT:
+  // Welcome/onboarding credits are granted via `initialCredits` when a brand-new starship wallet is created.
+  // We must avoid creating additional starships for existing users (e.g. if their onboarding session was reset),
+  // otherwise they would receive the welcome credits multiple times.
+  try {
+    const starshipRepo = new StarshipRepository();
+    const userStarships = await starshipRepo.findByOwner(userId);
+    const existing = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
+    if (existing) return existing;
+  } catch {
+    // ignore and fall back to provisioning
+  }
+
   if (starshipName && starshipName.trim().length > 0) {
     const svc = new StarshipService();
     return await svc.createStarship({

@@ -920,8 +920,8 @@ const MemoizedMessageBubble = memo(
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
 
       return (
-        <div className="flex justify-start">
-          <div className="group mb-2 mt-4 flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+        <div className="flex justify-start w-full">
+          <div className="group mb-2 mt-4 flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] py-2 -mx-2">
             <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
@@ -950,8 +950,8 @@ const MemoizedMessageBubble = memo(
                 )}
               </AvatarFallback>
             </Avatar>
-            <div className="flex-1 w-full pt-0.5">
-              <div className="mb-1 text-sm font-bold font-mono text-foreground">
+            <div className="min-w-0 flex-1 w-full pt-0.5">
+              <div className="mb-0 text-sm font-bold font-mono text-foreground">
                 <Link href={userProfileHref} className="hover:underline underline-offset-2">
                   {userDisplayName}
                 </Link>
@@ -1029,11 +1029,12 @@ const MemoizedMessageBubble = memo(
       }
 
       return (
-        <div className={cn('flex justify-start', isFirstMessage ? 'mt-6' : '')}>
+        <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : '')}>
           <div
             className={cn(
-              'group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors',
-              'py-2',
+              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] -mx-2',
+              // Remove the outside vertical gap between consecutive message rows.
+              'py-0',
               !showAssistantAvatar && '-mt-1'
             )}
           >
@@ -1044,9 +1045,9 @@ const MemoizedMessageBubble = memo(
             ) : (
               <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
             )}
-            <div className="flex-1 w-full pt-0.5">
+            <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
-                <div className="mb-1 text-sm font-bold text-foreground">
+                <div className="mb-0 text-sm font-bold text-foreground">
                   {assistantProfileHref ? (
                     <Link href={assistantProfileHref} className="font-mono hover:underline underline-offset-2">
                       {assistantDisplayName}

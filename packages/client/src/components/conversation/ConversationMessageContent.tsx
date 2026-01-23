@@ -650,7 +650,7 @@ export function ConversationMessageContent({
 
   const shouldRenderToolPanel: boolean = normalizedToolCalls.length > 0 && messageType !== 'tool_result'
   const toolPanelNode: ReactNode = shouldRenderToolPanel ? (
-    <>
+    <div className="not-prose">
       {normalizedToolCalls.map((tc, idx) => {
         const rawArgsAny = tc.function?.arguments ?? ''
         let prettyArgs = ''
@@ -696,7 +696,6 @@ export function ConversationMessageContent({
         const rawCallId = tc.id ?? null
 
         const toolCallId = rawCallId != null ? String(rawCallId) : ''
-        const combinedBlockId = `${messageId}-tool-all-${idx}`
 
         // Find matching tool result using multiple possible id fields, normalized to strings
         const matchingResult = toolResults?.find((result: any) => {
@@ -715,8 +714,8 @@ export function ConversationMessageContent({
             <span className="truncate">{children}</span>
           </span>
         )
-        // Match markdown paragraph spacing; keep consistent even for the last tool call.
-        const pSpacingClass = 'mb-2'
+        // No extra margins on collapsed tool-call row (avoid prose defaults).
+        const pSpacingClass = 'm-0'
 
         // Tool calls are always expandable (no expert-mode gating).
         const toolQuoteClass = cn(
@@ -729,73 +728,18 @@ export function ConversationMessageContent({
               : 'border-emerald-500/30 dark:border-emerald-400/30 bg-emerald-500/5 dark:bg-emerald-400/5'
         )
         return (
-          <Collapsible key={`${toolCallId || idx}`} defaultOpen={false}>
-            {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
-            <p className={`${pSpacingClass} leading-relaxed`}>
-              <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
-                <Chip>{toolDisplayName}</Chip>
-              </CollapsibleTrigger>
-            </p>
-            {/* Avoid typography/prose rules affecting the expanded card */}
-            <CollapsibleContent className="not-prose">
-              <div className="pb-2">
-                <blockquote className={toolQuoteClass}>
-                  <div className="absolute top-2 right-2">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-6 w-6"
-                      onClick={() => {
-                        // Build a single payload that includes function, id, arguments and (optional) result
-                        let argsParsed: any
-                        if (typeof rawArgsAny === 'object' && rawArgsAny !== null) {
-                          argsParsed = rawArgsAny
-                        } else {
-                          try {
-                            argsParsed = JSON.parse(String(rawArgsAny))
-                          } catch {
-                            // Fallback to the prettified string for non-JSON args
-                            argsParsed = prettyArgs
-                          }
-                        }
-
-                        let resultParsed: any = undefined
-                        if (matchingResult) {
-                          const resultContent = (() => {
-                            const raw = matchingResult.content ?? matchingResult.result ?? ''
-                            if (typeof raw === 'string') return raw
-                            try {
-                              return JSON.stringify(raw)
-                            } catch {
-                              return String(raw)
-                            }
-                          })()
-                          try {
-                            const t = (resultContent || '').trim()
-                            if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                              resultParsed = JSON.parse(t)
-                            } else {
-                              resultParsed = resultContent
-                            }
-                          } catch {
-                            resultParsed = resultContent
-                          }
-                        }
-
-                        const payload: any = {
-                          function: toolSlug || undefined,
-                          id: toolCallId || undefined,
-                          arguments: argsParsed,
-                          ...(typeof resultParsed !== 'undefined' ? { result: resultParsed } : {}),
-                        }
-
-                        handleCopyCodeBlock(JSON.stringify(payload, null, 2), combinedBlockId)
-                      }}
-                    >
-                      {copiedStates[combinedBlockId] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-                    </Button>
-                  </div>
-
+          <Collapsible key={`${toolCallId || idx}`} defaultOpen={false} className="space-y-0">
+            <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted">
+              {/* Render the collapsed row as a paragraph to match markdown layout exactly */}
+              <p className={`${pSpacingClass} leading-relaxed`}>
+                <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                  <Chip>{toolDisplayName}</Chip>
+                </CollapsibleTrigger>
+              </p>
+              {/* Avoid typography/prose rules affecting the expanded card */}
+              <CollapsibleContent className="not-prose">
+                <div>
+                  <blockquote className={toolQuoteClass}>
                   {/* Match Thought quote content sizing + color */}
                   <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
                     <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
@@ -840,13 +784,14 @@ export function ConversationMessageContent({
                       </>
                     )}
                   </div>
-                </blockquote>
-              </div>
-            </CollapsibleContent>
+                  </blockquote>
+                </div>
+              </CollapsibleContent>
+            </div>
           </Collapsible>
         )
       })}
-    </>
+    </div>
   ) : null
 
   const messageContainerRef = useRef<HTMLDivElement>(null)
@@ -1018,19 +963,51 @@ export function ConversationMessageContent({
     [theme, enableLinkPreview, messageId, copiedStates]
   )
 
+  const rawDisplayContent = String(displayContent ?? '')
+  const hasCopyableContent = rawDisplayContent.trim().length > 0
+
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
     messageType !== 'tool_result' ? (
       <div className={cn(resolvedContentClass, 'dark:prose-invert max-w-none w-full break-words message-content ph-mask-chat-message')}>
-        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-          {String(displayContent ?? '')}
-        </ReactMarkdown>
+        {/* IMPORTANT: Only render the content chunk container when there is actual content. */}
+        {hasCopyableContent ? (
+          <div className="relative w-full group/content-chunk">
+            {/* Content chunk actions (copy + download): float at bottom edge.
+               Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
+            {enableCopy && (
+              <div className="pointer-events-none absolute bottom-0 right-0 translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
+                <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+                    <Icon name="copy" className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+                    <Icon name="download" className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div
+              ref={messageContainerRef}
+              className={cn(
+                // Keep internal padding; remove outside row-gap in the list instead.
+                'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
+              )}
+            >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                {rawDisplayContent}
+              </ReactMarkdown>
+            </div>
+          </div>
+        ) : null}
         {toolPanelNode}
       </div>
     ) : null
 
   // Fallback for non-markdown content (rare cases)
   if (!enableMarkdown) {
+    if (!hasCopyableContent) return null
     return (
       <div className={cn('relative group', className)}>
         <div className={cn(contentTextClass ? 'text-base leading-relaxed' : 'text-sm leading-relaxed', 'whitespace-pre-wrap ph-mask-chat-message')}>
@@ -1043,48 +1020,36 @@ export function ConversationMessageContent({
 
   // UNIFIED RENDERING: Same ReactMarkdown for both streaming and completed messages
   return (
-    <div ref={messageContainerRef} className={cn('relative w-full ph-mask-chat-message', className)}>
+    <div className={cn('relative w-full ph-mask-chat-message', className)}>
       {/* Content block: actions anchor here so widgets below don't shift them */}
       <div className="relative">
-        {/* Message actions (copy + download): show on hover, float at bottom edge */}
-        {enableCopy && (
-          <div className="pointer-events-none absolute bottom-0 right-2 translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-            <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
-                <Icon name="copy" className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
-                <Icon name="download" className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-        )}
-
         {/* Reasoning (thinking) collapsible */}
         {displayReasoningFull && displayReasoningFull.trim().length > 0 && messageType !== 'tool_result' && (
           <>
             {/* Remount when reasoning-only vs content-start toggles so defaultOpen is re-applied */}
-            <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning}>
-              {/* Match tool-call collapsed row spacing + trigger styling */}
-              <p className="mb-2 leading-relaxed">
-                <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 hover:bg-muted/30 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
-                  <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
-                    {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
-                    <span className="truncate">{reasoningHeaderLabel}</span>
-                  </span>
-                </CollapsibleTrigger>
-              </p>
-              <CollapsibleContent>
-                <div className="pb-2">
-                  <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
-                    <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
-                        {String(displayReasoning ?? '')}
-                      </ReactMarkdown>
-                    </div>
-                  </blockquote>
-                </div>
-              </CollapsibleContent>
+            <Collapsible key={`reasoning-${openReasoning ? 'open' : 'closed'}`} defaultOpen={openReasoning} className="space-y-0">
+              <div className="rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted">
+                {/* Match tool-call collapsed row spacing + trigger styling */}
+                <p className="m-0 leading-relaxed">
+                  <CollapsibleTrigger className="w-full p-0 m-0 inline-flex items-center gap-2 rounded-sm justify-start text-sm leading-relaxed text-muted-foreground hover:text-foreground transition-colors">
+                    <span className="inline-flex items-center gap-2 bg-muted px-1.5 py-0.5 rounded text-[inherit]">
+                      {isStreaming && openReasoning ? <StatusDots variant="running" tone="purple" sizePx={7} /> : <StatusDots variant="info" sizePx={7} />}
+                      <span className="truncate">{reasoningHeaderLabel}</span>
+                    </span>
+                  </CollapsibleTrigger>
+                </p>
+                <CollapsibleContent>
+                  <div className="pb-2">
+                    <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
+                      <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                          {String(displayReasoning ?? '')}
+                        </ReactMarkdown>
+                      </div>
+                    </blockquote>
+                  </div>
+                </CollapsibleContent>
+              </div>
             </Collapsible>
           </>
         )}
@@ -1129,14 +1094,6 @@ export function ConversationMessageContent({
                 Tool Result (Standalone)
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-6 w-6"
-              onClick={() => handleCopyCodeBlock(parsedJson ? JSON.stringify(parsedJson, null, 2) : String(displayContent ?? ''), `${messageId}-tool-result`)}
-            >
-              {copiedStates[`${messageId}-tool-result`] ? <Icon name="check" className="w-3 h-3 text-green-500" /> : <Icon name="copy" className="w-3 h-3" />}
-            </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
             <code>{parsedJson ? JSON.stringify(parsedJson, null, 2) : String(displayContent ?? '')}</code>
@@ -1149,9 +1106,6 @@ export function ConversationMessageContent({
         <Card className="mt-3 border bg-blue-50 dark:bg-blue-950/20">
           <div className="flex items-center justify-between px-3 py-2 border-b border-blue-200 dark:border-blue-800">
             <div className="text-xs uppercase text-blue-700 dark:text-blue-300 tracking-wide font-medium">Workflow Output</div>
-            <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleCopyCodeBlock(JSON.stringify(parsedJson, null, 2), `${messageId}-workflow-result`)}>
-              {copiedStates[`${messageId}-workflow-result`] ? <Icon name="check" className="w-3 h-3 text-blue-500" /> : <Icon name="copy" className="w-3 h-3" />}
-            </Button>
           </div>
           <pre className="text-xs p-3 overflow-x-auto">
             <code>{JSON.stringify(parsedJson, null, 2)}</code>

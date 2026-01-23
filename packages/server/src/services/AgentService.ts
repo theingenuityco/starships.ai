@@ -11,6 +11,7 @@ import { ForbiddenError, NotFoundError, ValidationError } from '@starships/error
 import {
   AgentRepository,
   AgentTemplateRepository,
+  StarshipMemberRepository,
   StarshipRepository,
   UserRepository,
   ToolRepository,
@@ -59,6 +60,7 @@ export interface ConversationResponse {
 export class AgentService {
   private agentRepository: AgentRepository;
   private starshipRepository: StarshipRepository;
+  private starshipMemberRepository?: StarshipMemberRepository;
   private messageService: MessageService;
   // Kept for future use (runtime secrets, connector context, etc.)
 
@@ -413,15 +415,27 @@ export class AgentService {
    * Validate starship access for a user
    */
   async validateStarshipAccess(starshipId: string, userId: string): Promise<boolean> {
-    const { StarshipRepository } = await import('@starships/models');
-    const starshipRepository = new StarshipRepository();
-    const starship = await starshipRepository.findById(starshipId);
+    const starship = await this.starshipRepository.findById(starshipId);
 
     if (!starship) {
       throw new NotFoundError('Starship', starshipId);
     }
 
-    return starship.ownerId === userId;
+    // Instance admins always have access
+    const userRepo = new UserRepository();
+    const user = (await userRepo.findById(userId)) as UserModel | null;
+    if (!user) {
+      throw new NotFoundError('User', userId);
+    }
+    if (isInstanceAdmin(user)) return true;
+
+    // Owner has access
+    if (starship.ownerId === userId) return true;
+
+    // Collaborators (members) have access
+    const memberRepo = this.starshipMemberRepository ?? new StarshipMemberRepository();
+    this.starshipMemberRepository = memberRepo;
+    return await memberRepo.isMember(userId, starshipId);
   }
 
   /**

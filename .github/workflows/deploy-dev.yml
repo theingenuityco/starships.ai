@@ -136,6 +136,9 @@ jobs:
         if: steps.check-image.outputs.image_exists == 'true'
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AZURE_AI_FOUNDRY_API_KEY: ${{ secrets.AZURE_AI_FOUNDRY_API_KEY }}
+          AZURE_AI_FOUNDRY_ENDPOINT: ${{ vars.AZURE_AI_FOUNDRY_ENDPOINT }}
+          AZURE_AI_FOUNDRY_API_VERSION: ${{ vars.AZURE_AI_FOUNDRY_API_VERSION }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
@@ -154,6 +157,8 @@ jobs:
           DOCS_URL: ${{ vars.DOCS_URL }}
           # Default false for dev unless explicitly overridden in the GitHub Environment vars.
           ENABLE_INDEXING: ${{ vars.ENABLE_INDEXING || 'false' }}
+          # Default false in dev to prevent accidental outbound emails.
+          ENABLE_EMAILS: ${{ vars.ENABLE_EMAILS || 'false' }}
           GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}
           USERBACK_TOKEN: ${{ secrets.USERBACK_TOKEN }}
           POSTHOG_KEY: ${{ vars.POSTHOG_KEY }}
@@ -194,6 +199,9 @@ jobs:
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
             --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
+            --from-literal=AZURE_AI_FOUNDRY_API_KEY="$AZURE_AI_FOUNDRY_API_KEY" \
+            --from-literal=AZURE_AI_FOUNDRY_ENDPOINT="$AZURE_AI_FOUNDRY_ENDPOINT" \
+            --from-literal=AZURE_AI_FOUNDRY_API_VERSION="$AZURE_AI_FOUNDRY_API_VERSION" \
             --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
             --from-literal=GH_OAUTH_CLIENT_ID="${GH_OAUTH_CLIENT_ID}" \
@@ -215,6 +223,7 @@ jobs:
             --from-literal=PUBLIC_URL="$PUBLIC_URL" \
             --from-literal=DOCS_URL="$DOCS_URL" \
             --from-literal=ENABLE_INDEXING="$ENABLE_INDEXING" \
+            --from-literal=ENABLE_EMAILS="$ENABLE_EMAILS" \
             --from-literal=GA_MEASUREMENT_ID="$GA_MEASUREMENT_ID" \
             --from-literal=USERBACK_TOKEN="$USERBACK_TOKEN" \
             --from-literal=POSTHOG_KEY="$POSTHOG_KEY" \

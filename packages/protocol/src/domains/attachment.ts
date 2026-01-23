@@ -99,6 +99,15 @@ export const MAX_IMAGE_DIMENSION = 1568; // Max dimension for optimization
 export const MAX_TEXT_FILE_SIZE = 500 * 1024; // 500KB per text file (to avoid context overflow)
 
 /**
+ * Tool-result (inline base64) safety limits
+ *
+ * These apply when the server extracts `data:image/...;base64,...` blobs from tool result payloads
+ * and persists them as attachments (persistence + UI optimization).
+ */
+export const MAX_TOOL_RESULT_BASE64_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB decoded per image
+export const MAX_TOOL_RESULT_DATA_URL_CHARS = 15_000_000; // ~15MB string cap per data URL (bounds parsing/allocations)
+
+/**
  * Helper function to check if MIME type is text-based
  */
 export function isTextFile(mimeType: string): boolean {

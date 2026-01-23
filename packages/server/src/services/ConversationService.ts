@@ -249,8 +249,20 @@ export class ConversationService {
 
     // Fetch provider routes; repository orders by priority DESC so [0] is "best".
     const routes = await this.llmModelRepository.listProvidersForModel(model, { enabledOnly: true }).catch(() => []);
-    const best = (Array.isArray(routes) && routes.length > 0 ? routes[0] : null) as { pricing?: Record<string, unknown> | null } | null;
-    const pricing = best?.pricing ?? null;
+    // Prefer the first route that actually has usable pricing (some providers/routes may omit it).
+    const pickPricing = (): Record<string, unknown> | null => {
+      const list = Array.isArray(routes) ? routes : [];
+      for (const r of list) {
+        if (!r || typeof r !== 'object') continue;
+        const pricing = (r as { pricing?: unknown }).pricing;
+        if (!pricing || typeof pricing !== 'object' || Array.isArray(pricing)) continue;
+        // Treat it as usable if it has at least one of the expected pricing keys.
+        const pr = pricing as Record<string, unknown>;
+        if ('prompt' in pr || 'completion' in pr || 'request' in pr) return pr;
+      }
+      return null;
+    };
+    const pricing = pickPricing();
 
     const toNum = (v: unknown): number | undefined => {
       if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -1065,6 +1077,13 @@ export class ConversationService {
 
     // Add attachment blocks based on type
     for (const attachment of attachments) {
+      // Make attachment IDs visible to the LLM so it can reference them in tool calls.
+      // This is intentionally a plain text block so it works across providers and content block schemas.
+      contentBlocks.push({
+        type: 'text',
+        text: `[Attachment] filename="${attachment.filename}" attachmentId="${attachment.id}" mimeType="${attachment.mimeType}" sizeBytes=${attachment.sizeBytes}`,
+      });
+
       if (attachment.mimeType.startsWith('image/')) {
         // Image block for vision models (GPT-4o, Claude 3.5 Sonnet, etc.)
         contentBlocks.push({
@@ -1102,14 +1121,14 @@ export class ConversationService {
           // Append to message text with clear delimiters (first block is always text)
           const textBlock = contentBlocks[0];
           if (textBlock.type === 'text') {
-            textBlock.text += `\n\n--- Content of ${attachment.filename} ---\n${truncatedContent}\n--- End of ${attachment.filename} ---`;
+            textBlock.text += `\n\n--- Content of ${attachment.filename} (attachmentId: ${attachment.id}) ---\n${truncatedContent}\n--- End of ${attachment.filename} ---`;
           }
         } catch (err) {
           console.error(`Failed to fetch text file ${attachment.filename}:`, err);
           // Continue without the file content (non-blocking error)
           const textBlock = contentBlocks[0];
           if (textBlock.type === 'text') {
-            textBlock.text += `\n\n[Note: Could not load content of ${attachment.filename}]`;
+            textBlock.text += `\n\n[Note: Could not load content of ${attachment.filename} (attachmentId: ${attachment.id})]`;
           }
         }
       }
@@ -2803,6 +2822,49 @@ export class ConversationService {
                 let contentToPersist = contentString;
                 let attachmentIdsToPersist = pendingAttachmentIds;
 
+                // If tool results already include attachment ids (server-tools fast-path),
+                // persist them so the UI can render images/files the same way as uploads.
+                if (role === 'tool' && typeof contentToPersist === 'string' && contentToPersist.trim().length > 0) {
+                  try {
+                    const parsed = JSON.parse(contentToPersist) as unknown;
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                      const rec = parsed as Record<string, unknown>;
+                      const atts = Array.isArray(rec.attachments) ? rec.attachments : [];
+                      const ids: string[] = [];
+                      for (const a of atts) {
+                        if (!a || typeof a !== 'object') continue;
+                        const id = (a as Record<string, unknown>).id;
+                        if (typeof id === 'string' && id.trim().length > 0) ids.push(id.trim());
+                      }
+                      if (ids.length > 0) {
+                        const seen = new Set<string>();
+                        const uniq: string[] = [];
+                        for (const id of ids) {
+                          if (seen.has(id)) continue;
+                          seen.add(id);
+                          uniq.push(id);
+                        }
+                        attachmentIdsToPersist = uniq;
+                        if (!starship) {
+                          starship = await this.getConversationStarship(conversationId);
+                        }
+
+                        // Keep persisted tool_result content lean:
+                        // replace `attachments: [{...}]` with `attachments: [{ id }]` so we don't store presigned URLs
+                        // or other large metadata blobs in message.content.
+                        try {
+                          rec.attachments = uniq.map((id) => ({ id }));
+                          contentToPersist = JSON.stringify(rec);
+                        } catch {
+                          // ignore stringify failures; keep original
+                        }
+                      }
+                    }
+                  } catch {
+                    // ignore: not JSON or no attachments list
+                  }
+                }
+
                 // Option A: do NOT persist base64 image blobs in messages.content for tool_result messages.
                 // Instead, convert base64 data URLs to optimized attachments and replace the embedded URLs with
                 // lightweight references. The UI renders images from attachmentIds.
@@ -2849,7 +2911,18 @@ export class ConversationService {
                           replaced = replaced.split(url).join(placeholder);
                         }
                         contentToPersist = replaced;
-                        attachmentIdsToPersist = createdIds;
+                        // Merge with any existing ids (e.g. server-tools provided attachments).
+                        const combined = [...attachmentIdsToPersist, ...createdIds].filter(
+                          (x): x is string => typeof x === 'string' && x.length > 0
+                        );
+                        const seen = new Set<string>();
+                        const uniq: string[] = [];
+                        for (const id of combined) {
+                          if (seen.has(id)) continue;
+                          seen.add(id);
+                          uniq.push(id);
+                        }
+                        attachmentIdsToPersist = uniq;
                       }
                     }
                   }
@@ -2886,6 +2959,20 @@ export class ConversationService {
                       conversationId,
                       messageId: persistedMsg.id,
                     });
+                  }
+                }
+
+                // Link tool attachments to the persisted tool_result message (best-effort).
+                if (role === 'tool' && attachmentIdsToPersist.length > 0 && starship) {
+                  try {
+                    const attachmentService = new AttachmentService();
+                    await Promise.all(
+                      attachmentIdsToPersist.map((id) =>
+                        attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false)
+                      )
+                    );
+                  } catch {
+                    // ignore best-effort linking failures
                   }
                 }
 

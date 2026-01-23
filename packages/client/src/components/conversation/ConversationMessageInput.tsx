@@ -9,6 +9,7 @@ import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useLlmModels'
 import { useWallet } from '@/hooks/useWallet'
+import { useStarshipBySlug } from '@/hooks/useStarships'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import type { AgentModel, ConversationState, ConversationPlugin } from '@starships/protocol'
@@ -87,7 +88,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     },
     ref
   ) => {
-    const { userId } = useAuth()
+    const { userId, isInstanceAdmin } = useAuth()
     const queryClient = useQueryClient()
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
@@ -124,13 +125,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const clearEditorRef = useRef<() => void>(() => {})
 
     const createConversation = useCreateConversation()
-    const { data: wallet, isLoading } = useWallet(starshipId, !!starshipId)
+    const { data: starshipForPerms } = useStarshipBySlug(starshipSlug || '', Boolean(starshipSlug))
+    const canManageBilling = Boolean(isInstanceAdmin || (userId && starshipForPerms?.ownerId === userId))
+    const { data: wallet, isLoading } = useWallet(starshipId, Boolean(starshipId && canManageBilling))
     // Credits policy (server is authoritative; this is for UX only)
     const CREDITS_PER_MESSAGE = 10
     const LOW_WARNING_THRESHOLD = 50 // ~5 messages left
     const balanceNum = Number(wallet?.balance ?? '0')
-    const hasFunds = balanceNum >= CREDITS_PER_MESSAGE
-    const showLowBalanceWarning = Boolean(conversationId && !isLoading && hasFunds && balanceNum <= LOW_WARNING_THRESHOLD)
+    // Collaborators can't access billing endpoints; avoid blocking chat on wallet data they can't fetch.
+    const hasFunds = canManageBilling ? balanceNum >= CREDITS_PER_MESSAGE : true
+    const showLowBalanceWarning = Boolean(canManageBilling && conversationId && !isLoading && hasFunds && balanceNum <= LOW_WARNING_THRESHOLD)
 
     // Determine current ship slug for billing URL
     const billingHref = `/ship/${starshipSlug}/settings/billing`
@@ -1567,7 +1571,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         )}
 
         {/* Professional insufficient credits indicator */}
-        {!hasFunds && !isLoading && conversationId && (
+        {canManageBilling && !hasFunds && !isLoading && conversationId && (
           <div className="mb-4 p-3 rounded-lg bg-gradient-to-r from-red-50/80 to-orange-50/60 dark:from-red-950/20 dark:to-orange-950/10 border border-red-200/50 dark:border-red-800/30 backdrop-blur-sm shadow-sm">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">

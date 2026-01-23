@@ -10,32 +10,57 @@ Specification (authoritative)
   - method: string (required) — one of: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS
   - headers?: Record<string,string> | Headers | [string, string][]
   - body?: object | string | null
+  - bodyFromBinaryKey?: string (optional) — if set, uses `input?.[0]?.binary[key]` bytes as the raw request body
+  - responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64' (optional)
+  - binaryKey?: string (optional; default `"data"`) — where to store binary responses when `responseType: "arrayBuffer"`
   - timeout?: number (ms; default 30000)
-  - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs
+  - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, responseType
 
 Body selection rules
 
 - Compute `method = (parameters.method || 'GET').toUpperCase()`
 - If method is GET or HEAD => never send a body (even if provided)
+- Else, if `parameters.bodyFromBinaryKey` is a non-empty string => use `input?.[0]?.binary[key]` bytes as the body
 - Else, if `parameters.body` is defined => use it
 - Else => omit the body (upstream input is **not** used implicitly)
 - Body serialization:
   - string => used as-is
   - object => `JSON.stringify(object)`
   - undefined => omitted
+  - binary bytes (ArrayBuffer) => used as-is as a raw body
 
 Response parsing
 
-- Reads `content-type` header:
-  - if includes `application/json` => `response.json()` with fallback to `response.text()`
-  - else => `response.text()`
+- If `parameters.responseType` is set:
+  - `"arrayBuffer"` => host returns `ArrayBuffer`
+  - `"text"` => host returns string
+  - `"base64"` => host returns `data:<content-type>;base64,<...>`
+  - `"json"` (or omitted) => host attempts JSON when content-type includes `application/json`, otherwise returns text
 - Headers are returned as a plain object `{ [key: string]: string }`.
+
+### Notes: base64 + attachments (Starships app)
+
+In the Starships app, extremely large base64 blobs are not persisted inline in message content.
+
+- If a **tool result** message contains embedded image data URLs like `data:image/...;base64,...`, the backend will:
+  - extract up to 8 image data URLs,
+  - store them as image attachments,
+  - replace the inline data URLs with lightweight `attachment://<id>` references,
+  - and persist the `attachmentIds` on the message so the UI can render images without storing multi‑MB base64 in `message.content`.
+
+This is a persistence/UI optimization and does not change the in-workflow `http_request` output item shape during execution.
 
 Return value (shape)
 
 ```ts
 { status: number, statusText: string, headers: Record<string, unknown>, body: unknown, url: string }
 ```
+
+Binary responses (responseType="arrayBuffer")
+
+- The node returns metadata in `json` and stores bytes in `binary`:
+  - `item.json.body` is `undefined` (to keep execution history JSON-safe)
+  - `item.binary[parameters.binaryKey || "data"] = { kind: "bytes", data: ArrayBuffer, contentType?, sizeBytes }`
 
 Error behavior
 
@@ -116,6 +141,37 @@ Example (POST JSON)
     headers: { "Content-Type": "application/json" },
     body: { title: "hello", body: "world" },
     timeout: 15000
+  }
+}
+```
+
+### Example (download bytes then upload bytes)
+
+This pattern supports “download bytes from A, upload bytes to B” without exposing bytes in the blueprint JSON.
+
+```ts
+// 1) Download into output.binary.payload
+{
+  ref: "download",
+  type: "http_request",
+  parameters: {
+    method: "GET",
+    // Provide downloadUrl via Start node input
+    url: "{{ String(input?.downloadUrl ?? '') }}",
+    responseType: "arrayBuffer",
+    binaryKey: "payload"
+  }
+}
+
+// 2) Upload from input.binary.payload as raw body
+{
+  ref: "upload",
+  type: "http_request",
+  parameters: {
+    method: "PUT",
+    // Provide uploadUrl via Start node input
+    url: "{{ String(input?.uploadUrl ?? '') }}",
+    bodyFromBinaryKey: "payload"
   }
 }
 ```

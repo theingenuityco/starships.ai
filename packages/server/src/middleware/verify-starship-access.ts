@@ -5,7 +5,10 @@ import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { sendError } from '@/utils/responseHelpers';
 
 /**
- * Verifies that a user has access to a starship (ownership check)
+ * Verifies that a user has collaborator access to a starship:
+ * - owner OR
+ * - instance admin OR
+ * - starship member
  */
 export async function verifyStarshipAccess(starshipId: string, userId: string, res: Response): Promise<boolean> {
   const starshipService = new StarshipService();
@@ -31,15 +34,44 @@ export async function verifyStarshipAccess(starshipId: string, userId: string, r
     return false;
   }
 
-  if (starship.ownerId !== userId && !isInstanceAdmin(user)) {
+  const hasAccess = await starshipService.hasCollaboratorAccess(userId, starshipId);
+  if (!hasAccess) {
     sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, {
       resource: 'starship',
       id: starshipId,
-      reason: 'not_owner',
+      reason: 'not_authorized',
     });
     return false;
   }
 
+  return true;
+}
+
+/**
+ * Verifies that a user has owner access to a starship:
+ * - owner OR
+ * - instance admin
+ */
+export async function verifyStarshipOwnerAccess(starshipId: string, userId: string, res: Response): Promise<boolean> {
+  const starshipService = new StarshipService();
+  const userService = new UserService();
+  const starship = await starshipService.getStarship(starshipId);
+  const user = await userService.getUserById(userId);
+
+  if (!starship) {
+    sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, { resource: 'starship', id: starshipId });
+    return false;
+  }
+  if (!user) {
+    sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, { resource: 'starship', id: starshipId, reason: 'user_not_found' });
+    return false;
+  }
+
+  const hasOwner = await starshipService.hasOwnerAccess(userId, starshipId);
+  if (!hasOwner) {
+    sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403, { resource: 'starship', id: starshipId, reason: 'not_owner' });
+    return false;
+  }
   return true;
 }
 
@@ -76,11 +108,12 @@ export async function verifyResourceAccess(
     return false;
   }
 
-  if (starship.ownerId !== userId && !isInstanceAdmin(user)) {
+  const hasAccess = await starshipService.hasCollaboratorAccess(userId, resourceStarshipId);
+  if (!hasAccess) {
     sendError(res, 'ACCESS_DENIED', `Access denied to this ${resourceType}`, 403, {
       resource: resourceType,
       id: resourceId,
-      reason: 'not_owner',
+      reason: 'not_authorized',
     });
     return false;
   }

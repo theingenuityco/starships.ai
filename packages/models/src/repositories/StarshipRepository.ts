@@ -51,6 +51,35 @@ export class StarshipRepository extends BaseRepository {
   }
 
   /**
+   * Find a starship by slug where the given user has access (owner or member).
+   *
+   * Used by request paths like /starships/:slug for collaborators.
+   */
+  async findBySlugForUser(slug: string, userId: string): Promise<StarshipModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.queryOne<Record<string, unknown>>(
+          `SELECT s.*
+             FROM starships s
+             LEFT JOIN starship_members m
+               ON m.starship_id = s.id
+              AND m.user_id = $2
+            WHERE s.slug = $1
+              AND (s.owner_id = $2 OR m.user_id IS NOT NULL)
+            ORDER BY s.created_at DESC
+            LIMIT 1`,
+          [slug, userId]
+        );
+        return result ? fromDatabase(StarshipEntity, result) : null;
+      },
+      'findBySlugForUser',
+      'Starship',
+      slug
+    );
+  }
+
+  /**
    * INTERNAL/ADMIN: Find a starship by slug regardless of owner.
    *
    * Why:
@@ -84,6 +113,31 @@ export class StarshipRepository extends BaseRepository {
         return fromDatabaseArray(StarshipEntity, result);
       },
       'findByOwner',
+      'Starship'
+    );
+  }
+
+  /**
+   * Find starships where the user has access (owner or member).
+   */
+  async findAccessibleByUser(userId: string): Promise<StarshipModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const result = await connection.query<Record<string, unknown>>(
+          `SELECT DISTINCT s.*
+             FROM starships s
+             LEFT JOIN starship_members m
+               ON m.starship_id = s.id
+              AND m.user_id = $1
+            WHERE s.owner_id = $1
+               OR m.user_id IS NOT NULL
+            ORDER BY s.created_at DESC`,
+          [userId]
+        );
+        return fromDatabaseArray(StarshipEntity, result);
+      },
+      'findAccessibleByUser',
       'Starship'
     );
   }

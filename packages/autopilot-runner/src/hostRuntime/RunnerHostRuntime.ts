@@ -6,11 +6,12 @@ import type {
   ExprString,
   HttpMethod,
   QueryParamEncoding,
-} from '@starships/protocol';
+} from '@starships/protocol/src/domains/connector';
 import { CancelledError } from '@starships/autopilot';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { invokeBedrock } from './bedrock';
 import { invokeOpenRouter } from './openrouter';
+import { invokeAzureAiFoundry } from './azure-ai-foundry';
 
 /**
  * Connector sessions passed from the embedding host (API server) to the runner.
@@ -40,8 +41,15 @@ export interface AwsRuntimeConfig {
   region: string;
 }
 
+export interface AzureAiFoundryRuntimeConfig {
+  apiKey: string;
+  endpoint: string;
+  apiVersion?: string;
+  defaultHeaders?: Record<string, string>;
+}
+
 export interface ProviderRoute {
-  provider: 'openrouter' | 'aws_bedrock';
+  provider: 'openrouter' | 'aws_bedrock' | 'azure_ai_foundry';
   providerModelId: string;
 }
 
@@ -79,6 +87,11 @@ export interface RunnerHostRuntimeOptions {
    * AWS runtime configuration for Bedrock.
    */
   aws?: AwsRuntimeConfig;
+
+  /**
+   * Azure AI Foundry runtime configuration.
+   */
+  azureAiFoundry?: AzureAiFoundryRuntimeConfig;
 
   /**
    * Model routing table. Maps canonical model ID to one or more provider routes,
@@ -130,7 +143,23 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     return _bedrockClient;
   };
 
-  const http: HostRuntime['http'] = async ({ method, url, headers = {}, body, timeoutMs }) => {
+  const http: HostRuntime['http'] = async (request) => {
+    const { method, url, headers = {}, body, timeoutMs } = request as {
+      method: string;
+      url: string;
+      headers?: Record<string, unknown>;
+      body?: unknown;
+      timeoutMs?: number;
+    };
+    // Backward/forward compatible: older @starships/autopilot types may not include this field.
+    const responseTypeRaw = (request as { responseType?: unknown } | null | undefined)?.responseType;
+    const responseType =
+      responseTypeRaw === 'json' ||
+      responseTypeRaw === 'text' ||
+      responseTypeRaw === 'arrayBuffer' ||
+      responseTypeRaw === 'base64'
+        ? responseTypeRaw
+        : undefined;
     const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
       const out: Record<string, unknown> = {};
       const sensitive = new Set([
@@ -176,19 +205,21 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     };
 
     const summarizeFetchError = (err: unknown): Record<string, unknown> => {
-      const e = err as any;
+      const e =
+        err && (typeof err === 'object' || typeof err === 'function') ? (err as Record<string, unknown> & { cause?: unknown }) : undefined;
       const cause = e?.cause;
-      const pick = (x: any): Record<string, unknown> => {
+      const pick = (x: unknown): Record<string, unknown> => {
         if (!x || (typeof x !== 'object' && typeof x !== 'function')) return {};
+        const rec = x as Record<string, unknown>;
         return {
-          name: typeof x.name === 'string' ? x.name : undefined,
-          message: typeof x.message === 'string' ? x.message : undefined,
-          code: typeof x.code === 'string' ? x.code : undefined,
-          errno: typeof x.errno === 'number' ? x.errno : undefined,
-          syscall: typeof x.syscall === 'string' ? x.syscall : undefined,
-          address: typeof x.address === 'string' ? x.address : undefined,
-          port: typeof x.port === 'number' ? x.port : undefined,
-          hostname: typeof x.hostname === 'string' ? x.hostname : undefined,
+          name: typeof rec.name === 'string' ? rec.name : undefined,
+          message: typeof rec.message === 'string' ? rec.message : undefined,
+          code: typeof rec.code === 'string' ? rec.code : undefined,
+          errno: typeof rec.errno === 'number' ? rec.errno : undefined,
+          syscall: typeof rec.syscall === 'string' ? rec.syscall : undefined,
+          address: typeof rec.address === 'string' ? rec.address : undefined,
+          port: typeof rec.port === 'number' ? rec.port : undefined,
+          hostname: typeof rec.hostname === 'string' ? rec.hostname : undefined,
         };
       };
 
@@ -303,14 +334,27 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       const contentType = resp.headers.get('content-type') || '';
       let responseBody: unknown;
 
-      if (contentType.includes('application/json')) {
-        try {
-          responseBody = await resp.json();
-        } catch {
+      // Respect explicit responseType first
+      if (responseType === 'arrayBuffer') {
+        responseBody = await resp.arrayBuffer();
+      } else if (responseType === 'base64') {
+        const ct = (resp.headers.get('content-type') || 'application/octet-stream').trim() || 'application/octet-stream';
+        const ab = await resp.arrayBuffer();
+        const b64 = Buffer.from(ab).toString('base64');
+        responseBody = `data:${ct};base64,${b64}`;
+      } else if (responseType === 'text') {
+        responseBody = await resp.text();
+      } else {
+        // Default: best-effort JSON, otherwise text
+        if (contentType.includes('application/json')) {
+          try {
+            responseBody = await resp.json();
+          } catch {
+            responseBody = await resp.text();
+          }
+        } else {
           responseBody = await resp.text();
         }
-      } else {
-        responseBody = await resp.text();
       }
 
       const responseHeaders: Record<string, string> = {};
@@ -508,16 +552,117 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       }
     }
 
-    return await http({
+    const resp = await http({
       method,
       url: finalUrl,
       headers,
       body,
       timeoutMs,
     });
+    return resp;
   };
 
   const llm = async (request: LlmHostRequest): Promise<AsyncIterable<unknown>> => {
+    // Best-effort: If a tool message references attachments but does not include previewUrl,
+    // resolve preview URLs via Starships connector so vision-capable providers can see images.
+    // This is intentionally implemented at the host runtime layer so it works regardless of runner type.
+    const __augmentVision = async (): Promise<void> => {
+      try {
+        const msgs = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
+        if (msgs.length === 0) return;
+
+        // If the request already contains image_url blocks, do nothing.
+        let alreadyHasImages = false;
+        for (const m of msgs) {
+          if (!m || typeof m !== 'object') continue;
+          const c = (m as Record<string, unknown>).content;
+          if (!Array.isArray(c)) continue;
+          for (const part of c as unknown[]) {
+            if (!part || typeof part !== 'object') continue;
+            const p = part as Record<string, unknown>;
+            if (p.type === 'image_url') {
+              alreadyHasImages = true;
+              break;
+            }
+          }
+          if (alreadyHasImages) break;
+        }
+        if (alreadyHasImages) return;
+
+        const ids: string[] = [];
+        const seen = new Set<string>();
+        for (const m of msgs) {
+          if (!m || typeof m !== 'object') continue;
+          const role = (m as Record<string, unknown>).role;
+          if (role !== 'tool') continue;
+          const content = (m as Record<string, unknown>).content;
+          if (typeof content !== 'string') continue;
+          if (!content.includes('"attachments"')) continue;
+          if (content.includes('previewUrl')) continue;
+          try {
+            const parsed = JSON.parse(content) as unknown;
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+            const rec = parsed as Record<string, unknown>;
+            const atts = Array.isArray(rec.attachments) ? rec.attachments : [];
+            for (const a of atts) {
+              if (!a || typeof a !== 'object') continue;
+              const id = (a as Record<string, unknown>).id;
+              if (typeof id === 'string' && id.trim().length > 0 && !seen.has(id.trim())) {
+                seen.add(id.trim());
+                ids.push(id.trim());
+              }
+            }
+          } catch {
+            // If the tool content isn't valid JSON (e.g., truncated), we can't reliably extract ids.
+            continue;
+          }
+        }
+
+        if (ids.length === 0) return;
+
+        // Resolve previewUrl via existing Starships connector endpoint.
+        const resp = await connectorAction({
+          connector: 'starships',
+          action: 'get-attachments-preview-urls',
+          args: { ids: ids.join(',') },
+          timeoutMs: 15000,
+        });
+
+        const body = resp?.body as unknown;
+        const list =
+          Array.isArray(body)
+            ? body
+            : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+              ? ((body as Record<string, unknown>).data as unknown[])
+              : body && typeof body === 'object' && (body as Record<string, unknown>).success === true && Array.isArray((body as Record<string, unknown>).data)
+                ? ((body as Record<string, unknown>).data as unknown[])
+                : [];
+
+        const previewUrls: string[] = [];
+        for (const a of list) {
+          if (!a || typeof a !== 'object') continue;
+          const rec = a as Record<string, unknown>;
+          const pr = rec.previewUrl;
+          if (typeof pr === 'string' && pr.trim().length > 0) previewUrls.push(pr.trim());
+        }
+
+        if (previewUrls.length === 0) return;
+
+        // Append a provider-friendly multimodal user message (max 8 images).
+        (request.messages as unknown[]).push({
+          role: 'user',
+          content: [
+            { type: 'text', text: '[Tool produced image attachment(s)]' },
+            ...previewUrls.slice(0, 8).map((url) => ({ type: 'image_url', image_url: { url } })),
+          ],
+        });
+
+      } catch {
+        // best-effort: ignore augmentation failures
+      }
+    };
+    await __augmentVision();
+
     // 1. Determine provider routes (ordered by priority).
     const configuredRoutes = options.modelRoutes?.[request.model];
     if (!Array.isArray(configuredRoutes) || configuredRoutes.length === 0) {
@@ -541,6 +686,9 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
           const client = getBedrockClient();
           return await invokeBedrock(request, providerModelId, { client, signal: options.signal });
         }
+        if (provider === 'azure_ai_foundry') {
+          return await invokeAzureAiFoundry(request, providerModelId, { azure: options.azureAiFoundry, signal: options.signal });
+        }
 
         // Default/OpenRouter
         return await invokeOpenRouter(request, providerModelId, { llm: options.llm, signal: options.signal });
@@ -558,7 +706,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         // If this was the last route, surface an aggregated error.
         if (i === routes.length - 1) {
           const err = new Error('All LLM provider routes failed');
-          (err as any).causes = failures;
+          (err as Error & { causes?: typeof failures }).causes = failures;
           throw err;
         }
         // Otherwise, continue to the next provider route.

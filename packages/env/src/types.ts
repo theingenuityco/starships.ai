@@ -31,6 +31,11 @@ export interface EnvironmentConfig {
   AWS_BEDROCK_SECRET_ACCESS_KEY?: string;
   AWS_BEDROCK_REGION?: string;
 
+  // Azure AI Foundry Configuration (optional; used by autopilot execution bundle)
+  AZURE_AI_FOUNDRY_API_KEY?: string;
+  AZURE_AI_FOUNDRY_ENDPOINT?: string;
+  AZURE_AI_FOUNDRY_API_VERSION?: string;
+
   // JWT Authentication Configuration
   JWT_SECRET: string;
 
@@ -64,6 +69,14 @@ export interface EnvironmentConfig {
   RUNNER_AUTH_TOKEN?: string;
 
   // Email Service Configuration (Amazon SES)
+  /**
+   * Global gate for outbound email delivery.
+   * - true: allow email sends (if SES config is present)
+   * - false: skip all email sends (no-op, logged by EmailService)
+   *
+   * Defaults to false when not set (safe-by-default).
+   */
+  ENABLE_EMAILS: boolean;
   EMAIL_FROM_ADDRESS?: string;
   EMAIL_FROM_NAME?: string;
   AWS_SES_REGION?: string;

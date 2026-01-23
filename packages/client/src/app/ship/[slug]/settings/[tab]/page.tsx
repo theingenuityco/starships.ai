@@ -57,7 +57,7 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                   </TabsTrigger>
                   <TabsTrigger value="my-starship" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="rocket" className="h-4 w-4" />
-                    <span>My Subscription</span>
+                    <span>My Starship</span>
                   </TabsTrigger>
                   <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
                     <Icon name="credit-card" className="h-4 w-4" />

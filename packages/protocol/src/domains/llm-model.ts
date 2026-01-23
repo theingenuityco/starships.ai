@@ -13,6 +13,7 @@ import type { ApiResponse } from '@/contracts/api-response';
 export type LlmProvider =
   | 'openrouter'
   | 'aws_bedrock'
+  | 'azure_ai_foundry'
   | 'google_vertex'
   | 'google_gemini'
   | 'azure_openai'

@@ -80,7 +80,21 @@ export interface HostRuntime {
    *
    * All HTTP performed by Autopilot nodes should flow through this method.
    */
-  http(request: { method: string; url: string; headers?: Record<string, unknown>; body?: unknown; timeoutMs?: number }): Promise<{
+  http(request: {
+    method: string;
+    url: string;
+    headers?: Record<string, unknown>;
+    body?: unknown;
+    timeoutMs?: number;
+    /**
+     * Controls how the host returns the response body.
+     * - json: parse JSON when possible (default)
+     * - text: always return string body
+     * - arrayBuffer: return an ArrayBuffer (binary)
+     * - base64: return a `data:<content-type>;base64,<...>` string
+     */
+    responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64';
+  }): Promise<{
     status: number;
     statusText: string;
     headers: Record<string, unknown>;

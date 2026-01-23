@@ -20,6 +20,13 @@ export class EmailService {
 
     const hasEmailConfig = Boolean(this.env.EMAIL_FROM_ADDRESS && this.env.EMAIL_FROM_NAME && this.env.AWS_SES_REGION);
 
+    if (!this.env.ENABLE_EMAILS) {
+      this.isConfigured = false;
+      this.sesClient = null;
+      logger.warn('[EmailService] Email sending is disabled by ENABLE_EMAILS=false.');
+      return;
+    }
+
     if (!hasEmailConfig) {
       this.isConfigured = false;
       this.sesClient = null;
@@ -50,6 +57,13 @@ export class EmailService {
    * Business logic: Email template generation and delivery
    */
   async sendVerificationEmail(email: string, token: string, displayName?: string): Promise<void> {
+    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/verify-email?token=${token}`;
+
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping verification email send', { email, verificationUrl });
+      return;
+    }
+
     if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
       logger.error('[EmailService] Attempted to send verification email but configuration is missing.', {
         EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
@@ -58,8 +72,6 @@ export class EmailService {
       });
       throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
     }
-
-    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/verify-email?token=${token}`;
 
     const command = new SendEmailCommand({
       Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
@@ -90,6 +102,13 @@ export class EmailService {
    * Business logic: Password reset email template generation and delivery
    */
   async sendPasswordResetEmail(email: string, token: string, displayName?: string): Promise<void> {
+    const resetUrl = `${this.env.PUBLIC_URL}/reset-password?token=${token}`;
+
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping password reset email send', { email, resetUrl });
+      return;
+    }
+
     if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
       logger.error('[EmailService] Attempted to send password reset email but configuration is missing.', {
         EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
@@ -98,8 +117,6 @@ export class EmailService {
       });
       throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
     }
-
-    const resetUrl = `${this.env.PUBLIC_URL}/reset-password?token=${token}`;
 
     const command = new SendEmailCommand({
       Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
@@ -130,6 +147,17 @@ export class EmailService {
    * Business logic: Email change verification template generation and delivery
    */
   async sendEmailChangeVerificationEmail(newEmail: string, token: string, oldEmail: string, displayName?: string): Promise<void> {
+    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
+
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping email change verification email send', {
+        newEmail,
+        oldEmail,
+        verificationUrl,
+      });
+      return;
+    }
+
     if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
       logger.error('[EmailService] Attempted to send email change verification email but configuration is missing.', {
         EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
@@ -138,8 +166,6 @@ export class EmailService {
       });
       throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
     }
-
-    const verificationUrl = `${this.env.PUBLIC_URL}/api/v1/auth/email/change/verify?token=${token}`;
 
     const command = new SendEmailCommand({
       Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
@@ -163,6 +189,58 @@ export class EmailService {
         oldEmail,
       });
       throw new Error(`Failed to send email change verification email: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  }
+
+  /**
+   * Send starship invite email (invite link token).
+   */
+  async sendStarshipInviteEmail(args: {
+    invitedEmail: string;
+    inviteUrl: string;
+    starshipName: string;
+    inviterName?: string;
+  }): Promise<void> {
+    if (!this.env.ENABLE_EMAILS) {
+      logger.info('[EmailService] ENABLE_EMAILS=false; skipping starship invite email send', {
+        email: args.invitedEmail,
+        starshipName: args.starshipName,
+        inviteUrl: args.inviteUrl,
+      });
+      return;
+    }
+
+    if (!this.isConfigured || !this.sesClient || !this.env.EMAIL_FROM_ADDRESS || !this.env.EMAIL_FROM_NAME || !this.env.AWS_SES_REGION) {
+      logger.error('[EmailService] Attempted to send starship invite email but configuration is missing.', {
+        EMAIL_FROM_ADDRESS: this.env.EMAIL_FROM_ADDRESS,
+        EMAIL_FROM_NAME: this.env.EMAIL_FROM_NAME,
+        AWS_SES_REGION: this.env.AWS_SES_REGION,
+      });
+      throw new Error('Email service is not configured. Please set EMAIL_FROM_ADDRESS, EMAIL_FROM_NAME, and AWS_SES_REGION.');
+    }
+
+    const command = new SendEmailCommand({
+      Source: `${this.env.EMAIL_FROM_NAME} <${this.env.EMAIL_FROM_ADDRESS}>`,
+      Destination: { ToAddresses: [args.invitedEmail] },
+      Message: {
+        Subject: { Data: `You’ve been invited to collaborate on ${args.starshipName}` },
+        Body: {
+          Html: { Data: this.generateStarshipInviteTemplate(args.inviteUrl, args.starshipName, args.inviterName) },
+          Text: { Data: this.generateStarshipInviteTextTemplate(args.inviteUrl, args.starshipName, args.inviterName) },
+        },
+      },
+    });
+
+    try {
+      await this.sesClient.send(command);
+      logger.info('[EmailService] Starship invite email sent', { email: args.invitedEmail, starshipName: args.starshipName });
+    } catch (error) {
+      logger.error('[EmailService] Failed to send starship invite email', {
+        error: error instanceof Error ? error.message : 'Unknown error',
+        email: args.invitedEmail,
+        starshipName: args.starshipName,
+      });
+      throw new Error(`Failed to send starship invite email: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 
@@ -362,6 +440,63 @@ export class EmailService {
       This link expires in 1 hour.
 
       This is an automatically generated email—please do not reply to this email.
+    `;
+  }
+
+  private generateStarshipInviteTemplate(inviteUrl: string, starshipName: string, inviterName?: string): string {
+    const safeStarshipName = this.escapeHtml(String(starshipName || 'a starship'));
+    const safeInviter = inviterName && inviterName.trim() ? this.escapeHtml(inviterName.trim().split(' ')[0]) : null;
+    const heading = safeInviter ? `${safeInviter} invited you to collaborate` : 'You’ve been invited to collaborate';
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head><meta charset="utf-8"><title>Starship Invite</title></head>
+        <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #1a202c;">🚀 ${heading}</h1>
+          </div>
+          <div style="background: #f7fafc; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+            <p style="margin-top: 0; color: #2d3748;">
+              You’ve been invited to join <strong>${safeStarshipName}</strong> on Starships.ai.
+            </p>
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${inviteUrl}"
+                 style="background: #4f46e5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block; font-weight: bold;">
+                Accept invite
+              </a>
+            </div>
+            <p style="font-size: 14px; color: #718096;">
+              If the button doesn't work, copy and paste this link:<br>
+              <a href="${inviteUrl}">${inviteUrl}</a>
+            </p>
+            <p style="font-size: 12px; color: #a0aec0; margin-top: 24px;">
+              This invite link can only be accepted by the account using this email address.
+            </p>
+          </div>
+          <div style="margin-top: 24px; padding-top: 24px; border-top: 1px solid #e2e8f0;">
+            <p style="font-size: 12px; color: #a0aec0; text-align: center; margin: 0;">
+              If you weren’t expecting this invite, you can safely ignore this email.
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+  }
+
+  private generateStarshipInviteTextTemplate(inviteUrl: string, starshipName: string, inviterName?: string): string {
+    const inviter = inviterName && inviterName.trim() ? inviterName.trim().split(' ')[0] : null;
+    const heading = inviter ? `${inviter} invited you to collaborate` : 'You’ve been invited to collaborate';
+
+    return `
+      ${heading}
+
+      You’ve been invited to join "${starshipName}" on Starships.ai.
+
+      Accept invite:
+      ${inviteUrl}
+
+      This invite link can only be accepted by the account using this email address.
     `;
   }
 }

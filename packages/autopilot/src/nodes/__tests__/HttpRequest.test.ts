@@ -750,4 +750,109 @@ describe('HttpRequest Node Handler', () => {
       });
     });
   });
+
+  describe('Binary (in-flight) support', () => {
+    it('stores ArrayBuffer responses into ExecutionItem.binary when responseType=arrayBuffer', async () => {
+      const buf = new Uint8Array([1, 2, 3, 4]).buffer;
+      httpMock.mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/file.bin',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: buf,
+      });
+
+      const params: HttpRequestParams = {
+        url: 'https://api.example.com/file.bin',
+        method: 'GET',
+        responseType: 'arrayBuffer',
+        binaryKey: 'file',
+      };
+
+      const httpRequest = new HttpRequest(params, { hostRuntime });
+      const result = await httpRequest.execute();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: undefined,
+        url: 'https://api.example.com/file.bin',
+      });
+      expect(result[0].binary?.file).toMatchObject({
+        kind: 'bytes',
+        contentType: 'application/octet-stream',
+        sizeBytes: 4,
+      });
+      expect((result[0].binary?.file as unknown as { data?: unknown })?.data).toBeInstanceOf(ArrayBuffer);
+    });
+
+    it('returns base64 string body when responseType=base64', async () => {
+      const params: HttpRequestParams = {
+        url: 'https://api.example.com/file.b64',
+        method: 'GET',
+        responseType: 'base64',
+      };
+
+      httpMock.mockResolvedValueOnce({
+        status: 200,
+        statusText: 'OK',
+        url: 'https://api.example.com/file.b64',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: 'data:application/octet-stream;base64,AQIDBA==',
+      });
+
+      const httpRequest = new HttpRequest(params, { hostRuntime });
+      const result = await httpRequest.execute();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].json).toEqual({
+        status: 200,
+        statusText: 'OK',
+        headers: { 'content-type': 'application/octet-stream' },
+        body: 'data:application/octet-stream;base64,AQIDBA==',
+        url: 'https://api.example.com/file.b64',
+      });
+    });
+
+    it('uploads raw ArrayBuffer from ExecutionItem.binary when bodyFromBinaryKey is set', async () => {
+      const data = new Uint8Array([9, 8, 7]).buffer;
+      const input: ExecutionItem[] = [
+        {
+          json: { ok: true },
+          binary: {
+            payload: {
+              kind: 'bytes',
+              data,
+              contentType: 'image/png',
+              sizeBytes: 3,
+            },
+          } as unknown as ExecutionItem['binary'],
+          pairedItem: { item: 0 },
+        },
+      ];
+
+      const params: HttpRequestParams = {
+        url: 'https://uploads.example.com/put',
+        method: 'PUT',
+        bodyFromBinaryKey: 'payload',
+        // Intentionally omit headers; node should set content-type from binary payload.
+      };
+
+      const httpRequest = new HttpRequest(params, { hostRuntime });
+      await httpRequest.execute(input);
+
+      expect(httpMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          url: 'https://uploads.example.com/put',
+          method: 'PUT',
+          body: data,
+          headers: expect.objectContaining({
+            'content-type': 'image/png',
+          }),
+        })
+      );
+    });
+  });
 });

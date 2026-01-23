@@ -1,5 +1,10 @@
 import { redirect } from 'next/navigation'
 
-export default function StarshipOverviewPage({ params }: { params: { slug: string } }): never {
-  redirect(`/ship/${params.slug}/conversations`)
+export default async function StarshipOverviewPage({
+  params,
+}: {
+  params: Promise<{ slug: string }>
+}): Promise<never> {
+  const { slug } = await params
+  redirect(`/ship/${slug}/conversations`)
 }

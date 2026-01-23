@@ -58,6 +58,10 @@ export function getEnvConfig(): EnvironmentConfig {
   const resolvedPostgresDatabase = process.env.POSTGRES_DATABASE || 'starships';
   const resolvedPostgresSSL = process.env.POSTGRES_SSL === 'true';
 
+  // Safe default: if ENABLE_EMAILS is unset, treat emails as disabled.
+  // Set ENABLE_EMAILS=true explicitly in environments where outbound email is desired.
+  const resolvedEnableEmails = process.env.ENABLE_EMAILS === 'true';
+
   return {
     // Server Configuration
     SERVER_PORT: parseInt(process.env.SERVER_PORT || `${DEFAULT_SERVER_PORT}`, 10),
@@ -87,6 +91,11 @@ export function getEnvConfig(): EnvironmentConfig {
     AWS_BEDROCK_ACCESS_KEY_ID: process.env.AWS_BEDROCK_ACCESS_KEY_ID,
     AWS_BEDROCK_SECRET_ACCESS_KEY: process.env.AWS_BEDROCK_SECRET_ACCESS_KEY,
     AWS_BEDROCK_REGION: process.env.AWS_BEDROCK_REGION,
+
+    // Azure AI Foundry Configuration (optional; used by autopilot execution bundle)
+    AZURE_AI_FOUNDRY_API_KEY: process.env.AZURE_AI_FOUNDRY_API_KEY,
+    AZURE_AI_FOUNDRY_ENDPOINT: process.env.AZURE_AI_FOUNDRY_ENDPOINT,
+    AZURE_AI_FOUNDRY_API_VERSION: process.env.AZURE_AI_FOUNDRY_API_VERSION,
 
     // JWT Authentication Configuration
     JWT_SECRET: requiredEnvVars.JWT_SECRET!,
@@ -118,6 +127,7 @@ export function getEnvConfig(): EnvironmentConfig {
     RUNNER_AUTH_TOKEN: process.env.RUNNER_AUTH_TOKEN,
 
     // Email Service Configuration (optional; email delivery disabled if not set)
+    ENABLE_EMAILS: resolvedEnableEmails,
     EMAIL_FROM_ADDRESS: process.env.EMAIL_FROM_ADDRESS,
     EMAIL_FROM_NAME: process.env.EMAIL_FROM_NAME,
     AWS_SES_REGION: process.env.AWS_SES_REGION,

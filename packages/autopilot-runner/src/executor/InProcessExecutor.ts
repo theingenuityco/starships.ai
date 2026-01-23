@@ -1,7 +1,14 @@
 import { Executor, ExecuteInput } from './Executor';
 import { CancelledError, Engine, type Execution } from '@starships/autopilot';
-import { createRunnerHostRuntime, type ConnectorSession, type LlmRuntimeConfig } from '../hostRuntime/RunnerHostRuntime';
-import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol';
+import {
+  createRunnerHostRuntime,
+  type AwsRuntimeConfig,
+  type AzureAiFoundryRuntimeConfig,
+  type ConnectorSession,
+  type LlmRuntimeConfig,
+  type ProviderRoute,
+} from '../hostRuntime/RunnerHostRuntime';
+import type { ConnectorTemplateRuntimeFieldsV2 } from '@starships/protocol/src/domains/connector';
 import { executionRegistry } from '@/execution/ExecutionRegistry';
 
 export class InProcessExecutor implements Executor {
@@ -49,6 +56,18 @@ export class InProcessExecutor implements Executor {
        * the runner does not need to read provider keys from its own env.
        */
       llm?: LlmRuntimeConfig;
+      /**
+       * AWS runtime configuration for Bedrock.
+       */
+      aws?: AwsRuntimeConfig;
+      /**
+       * Azure AI Foundry runtime configuration.
+       */
+      azureAiFoundry?: AzureAiFoundryRuntimeConfig;
+      /**
+       * Model routing table.
+       */
+      modelRoutes?: Record<string, ProviderRoute[] | undefined>;
       [key: string]: unknown;
     };
 
@@ -61,10 +80,11 @@ export class InProcessExecutor implements Executor {
       connectorMetadata,
       llm,
       aws,
+      azureAiFoundry,
       modelRoutes,
       runtimeEnv,
       ...engineConfig
-    } = rawConfig as any;
+    } = rawConfig;
 
     const controller = new AbortController();
 
@@ -75,6 +95,7 @@ export class InProcessExecutor implements Executor {
       runtimeEnv: runtimeEnv ?? {},
       llm,
       aws,
+      azureAiFoundry,
       modelRoutes,
       signal: controller.signal,
     });

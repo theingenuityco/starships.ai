@@ -34,6 +34,7 @@ This folder documents blueprint construction and execution: the Engine/Eval and 
   - [example-10-kitchen-sink.md](./example-10-kitchen-sink.md)
   - [example-11-quirks-and-gotchas.md](./example-11-quirks-and-gotchas.md)
   - [example-12-resume-and-visit-limits.md](./example-12-resume-and-visit-limits.md)
+  - [example-13-binary-download-upload.md](./example-13-binary-download-upload.md)
 
 Related references
 

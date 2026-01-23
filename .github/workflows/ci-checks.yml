@@ -32,6 +32,9 @@ jobs:
       # SEO / indexing should always be disabled in CI.
       ENABLE_INDEXING: ${{ vars.ENABLE_INDEXING || 'false' }}
 
+      # Email sending should always be disabled in CI.
+      ENABLE_EMAILS: 'false'
+
       # Authentication
       JWT_SECRET: ${{ secrets.JWT_SECRET }}
 
@@ -57,6 +60,11 @@ jobs:
       AWS_BEDROCK_ACCESS_KEY_ID: ${{ secrets.AWS_BEDROCK_ACCESS_KEY_ID }}
       AWS_BEDROCK_SECRET_ACCESS_KEY: ${{ secrets.AWS_BEDROCK_SECRET_ACCESS_KEY }}
       AWS_BEDROCK_REGION: ${{ vars.AWS_BEDROCK_REGION }}
+
+      # Azure AI Foundry (optional LLM provider)
+      AZURE_AI_FOUNDRY_API_KEY: ${{ secrets.AZURE_AI_FOUNDRY_API_KEY }}
+      AZURE_AI_FOUNDRY_ENDPOINT: ${{ vars.AZURE_AI_FOUNDRY_ENDPOINT }}
+      AZURE_AI_FOUNDRY_API_VERSION: ${{ vars.AZURE_AI_FOUNDRY_API_VERSION }}
 
       # Analytics (optional for CI)
       GA_MEASUREMENT_ID: ${{ vars.GA_MEASUREMENT_ID }}

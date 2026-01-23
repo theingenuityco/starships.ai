@@ -100,7 +100,7 @@ export const ariaTemplate: Omit<AgentTemplateModel, 'id' | 'createdAt' | 'update
     'Executive Officer that routes user requests to the best specialist agents on the current starship and summarizes their results.',
   category: 'automation',
 
-  model: 'anthropic/claude-sonnet-4.5',
+  model: 'anthropic/claude-haiku-4.5',
   temperature: 0.4,
   maxTokens: 3000,
 

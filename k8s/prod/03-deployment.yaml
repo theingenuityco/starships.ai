@@ -101,6 +101,13 @@ spec:
                   name: starships-secrets
                   key: ENABLE_INDEXING
 
+            # Email sending gate (set true in prod unless explicitly disabled)
+            - name: ENABLE_EMAILS
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: ENABLE_EMAILS
+
             # Auth
             - name: JWT_SECRET
               valueFrom:
@@ -151,6 +158,22 @@ spec:
                 secretKeyRef:
                   name: starships-secrets
                   key: OPENROUTER_API_KEY
+            # Azure AI Foundry (optional LLM provider)
+            - name: AZURE_AI_FOUNDRY_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AZURE_AI_FOUNDRY_API_KEY
+            - name: AZURE_AI_FOUNDRY_ENDPOINT
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AZURE_AI_FOUNDRY_ENDPOINT
+            - name: AZURE_AI_FOUNDRY_API_VERSION
+              valueFrom:
+                secretKeyRef:
+                  name: starships-secrets
+                  key: AZURE_AI_FOUNDRY_API_VERSION
             # AWS Bedrock (optional LLM provider)
             - name: AWS_BEDROCK_ACCESS_KEY_ID
               valueFrom:

@@ -5,6 +5,7 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
+import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useDeleteConversation } from '@/hooks/useConversations'
@@ -14,9 +15,6 @@ import { useAuth } from '@/hooks/useAuth'
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { Orbitron } from 'next/font/google'
-
-const orbitron = Orbitron({ subsets: ['latin'], weight: ['400'] })
 
 interface NavigationProps {
   isMobile?: boolean
@@ -31,7 +29,7 @@ export function Navigation(props: NavigationProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { isAuthenticated, user, userName, isInstanceAdmin } = useAuth()
-  const { getSelectedStarshipId } = useSelectedStarship()
+  const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
   // On mobile, always expanded (no collapse functionality)
@@ -106,6 +104,33 @@ export function Navigation(props: NavigationProps) {
   }, [pathStarshipSlug, userStarships, getSelectedStarshipId])
 
   const starshipSlug = navigationStarshipSlug
+  const activeStarshipSlug = pathStarshipSlug || starshipSlug
+
+  const replaceStarshipSlugInPath = useCallback(
+    (nextSlug: string): string => {
+      const p = typeof pathname === 'string' ? pathname : ''
+      if (!p.startsWith('/ship/')) {
+        return `/ship/${nextSlug}/conversations`
+      }
+      const parts = p.split('/')
+      // /ship/<slug>/...
+      if (parts.length >= 3) {
+        parts[2] = nextSlug
+        return parts.join('/')
+      }
+      return `/ship/${nextSlug}/conversations`
+    },
+    [pathname]
+  )
+
+  const handleStarshipSelect = useCallback(
+    (s: { id: string; slug: string }) => {
+      setSelectedStarship(s.id)
+      router.push(replaceStarshipSlugInPath(s.slug))
+      if (isMobile && onClose) onClose()
+    },
+    [setSelectedStarship, router, replaceStarshipSlugInPath, isMobile, onClose]
+  )
 
   // Memoize route checks to prevent unnecessary recalculations
   const routeChecks = useMemo(() => {
@@ -268,6 +293,16 @@ export function Navigation(props: NavigationProps) {
         onMouseLeave={() => !isMobile && setIsHovered(false)}
         onClick={handleSidebarBackgroundClick}
       >
+        {/* Discord-style starship rail */}
+        {isAuthenticated ? (
+          <StarshipRail
+            starships={userStarships ?? []}
+            activeSlug={activeStarshipSlug}
+            onSelect={handleStarshipSelect as any}
+            onCreate={() => router.push('/profile')}
+          />
+        ) : null}
+
         <div
           className="flex flex-col pb-2 transition-all duration-300 ease-in-out"
           style={{
@@ -278,7 +313,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="px-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="px-2 pt-7 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
             <div
               className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
@@ -289,8 +324,8 @@ export function Navigation(props: NavigationProps) {
               <div className="flex-shrink-0 flex items-center justify-center" style={{ width: '1.5rem', height: '1.5rem' }}>
                 {isExpanded || isCollapsing || !isHovered ? (
                   <StarshipsLogo
-                    width={20}
-                    height={20}
+                    width={22}
+                    height={22}
                     className=""
                     gradientId="nav-gradient"
                     animationDelay={1}
@@ -309,10 +344,10 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className={`${orbitron.className} text-sm font-medium tracking-tight leading-none whitespace-nowrap`}
+                  className="text-[15px] font-medium tracking-tight leading-none whitespace-nowrap max-w-[11.5rem] truncate"
                   style={{ marginLeft: '0.375rem' }}
                 >
-                  starships.ai
+                  {starshipData?.name || 'Starships.ai'}
                 </motion.span>
               )}
             </div>

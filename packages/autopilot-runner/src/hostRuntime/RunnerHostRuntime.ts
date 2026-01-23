@@ -141,7 +141,12 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
     // Backward/forward compatible: older @starships/autopilot types may not include this field.
     const responseTypeRaw = (request as { responseType?: unknown } | null | undefined)?.responseType;
     const responseType =
-      responseTypeRaw === 'json' || responseTypeRaw === 'text' || responseTypeRaw === 'arrayBuffer' ? responseTypeRaw : undefined;
+      responseTypeRaw === 'json' ||
+      responseTypeRaw === 'text' ||
+      responseTypeRaw === 'arrayBuffer' ||
+      responseTypeRaw === 'base64'
+        ? responseTypeRaw
+        : undefined;
     const redactHeadersForLogs = (h: Record<string, unknown>): Record<string, unknown> => {
       const out: Record<string, unknown> = {};
       const sensitive = new Set([
@@ -319,6 +324,10 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       // Respect explicit responseType first
       if (responseType === 'arrayBuffer') {
         responseBody = await resp.arrayBuffer();
+      } else if (responseType === 'base64') {
+        const ab = await resp.arrayBuffer();
+        // Node.js runtime: Buffer is available and efficiently encodes base64.
+        responseBody = Buffer.from(ab).toString('base64');
       } else if (responseType === 'text') {
         responseBody = await resp.text();
       } else {

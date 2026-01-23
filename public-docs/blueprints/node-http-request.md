@@ -11,7 +11,7 @@ Specification (authoritative)
   - headers?: Record<string,string> | Headers | [string, string][]
   - body?: object | string | null
   - bodyFromBinaryKey?: string (optional) — if set, uses `input?.[0]?.binary[key]` bytes as the raw request body
-  - responseType?: 'json' | 'text' | 'arrayBuffer' (optional)
+  - responseType?: 'json' | 'text' | 'arrayBuffer' | 'base64' (optional)
   - binaryKey?: string (optional; default `"data"`) — where to store binary responses when `responseType: "arrayBuffer"`
   - timeout?: number (ms; default 30000)
   - Additional fields on `HttpRequestParams` are typed to be compatible with `RequestInit`, but the current host runtime only uses: method, url, headers, body, timeoutMs, responseType
@@ -34,6 +34,7 @@ Response parsing
 - If `parameters.responseType` is set:
   - `"arrayBuffer"` => host returns `ArrayBuffer`
   - `"text"` => host returns string
+  - `"base64"` => host returns base64 string
   - `"json"` (or omitted) => host attempts JSON when content-type includes `application/json`, otherwise returns text
 - Headers are returned as a plain object `{ [key: string]: string }`.
 

@@ -6,12 +6,33 @@
 
 import { LLM } from '../LLM';
 import type { LlmParams } from '@/types/node-parameters';
-import type { LLMResponse } from '@/types/llm';
+import type { ContentBlock, LLMResponse } from '@/types/llm';
 import type { HostRuntime, LlmHostRequest } from '@/types/node-handler';
 import OpenAI from 'openai';
 
 // Mock console to reduce test noise
 const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
+function isRoleContentMessage(value: unknown): value is { role: string; content: unknown } {
+  return isRecord(value) && typeof value.role === 'string' && 'content' in value;
+}
+
+function isToolRoleStringContentMessage(value: unknown): value is { role: 'tool'; content: string } {
+  return isRoleContentMessage(value) && value.role === 'tool' && typeof value.content === 'string';
+}
+
+function isUserRoleWithContentBlocks(value: unknown): value is { role: 'user'; content: ContentBlock[] } {
+  return (
+    isRoleContentMessage(value) &&
+    value.role === 'user' &&
+    Array.isArray(value.content) &&
+    value.content.every((p) => isRecord(p) && typeof p.type === 'string')
+  );
+}
 
 // Helper to create async iterable stream
 function createMockStream(chunks: OpenAI.Chat.Completions.ChatCompletionChunk[]) {
@@ -224,6 +245,68 @@ describe('LLM Node Handler', () => {
       const msg = response.choices[0].message as unknown as { images?: Array<{ image_url?: { url?: string } }> };
       expect(msg.images).toBeDefined();
       expect(msg.images?.[0]?.image_url?.url).toBe(dataUrl);
+    });
+
+    it('should pass tool-produced image attachments to provider as multimodal user content', async () => {
+      const params: LlmParams = {
+        model: 'google/gemini-2.5-flash-image',
+        modalities: ['image', 'text'],
+        messages: [
+          { role: 'user', content: 'Look at the tool output image.' },
+          {
+            role: 'tool',
+            content: JSON.stringify({
+              success: true,
+              data: { ok: true },
+              attachments: [
+                {
+                  id: 'att_1',
+                  mimeType: 'image/png',
+                  previewUrl: 'https://example.com/presigned.png',
+                },
+              ],
+            }),
+          },
+        ],
+      };
+
+      const mockStream = createMockStream([
+        {
+          id: 't-attach',
+          model: 'google/gemini-2.5-flash-image',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: { content: 'ok' }, finish_reason: null, logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+        {
+          id: 't-attach',
+          model: 'google/gemini-2.5-flash-image',
+          created: 1234567890,
+          object: 'chat.completion.chunk',
+          choices: [{ index: 0, delta: {}, finish_reason: 'stop', logprobs: null }],
+        } as OpenAI.Chat.Completions.ChatCompletionChunk,
+      ]);
+
+      llmMock.mockResolvedValue(mockStream as unknown as AsyncIterable<unknown>);
+
+      const llm = new LLM(params, { hostRuntime });
+      await llm.execute();
+
+      const req = llmMock.mock.calls[0]?.[0];
+      expect(req).toBeTruthy();
+      const msgs = (req as LlmHostRequest).messages;
+
+      // We should still send the tool message...
+      expect(msgs.some(isToolRoleStringContentMessage)).toBe(true);
+      // ...and inject a provider-only user multimodal message containing an image_url block.
+      const injected = msgs.find(
+        (m) => isUserRoleWithContentBlocks(m) && m.content.some((p) => p.type === 'image_url')
+      );
+      expect(injected).toBeTruthy();
+      if (!isUserRoleWithContentBlocks(injected)) throw new Error('Expected injected message with content blocks');
+      const imagePart = injected.content.find((p) => p.type === 'image_url');
+      if (!imagePart || imagePart.type !== 'image_url') throw new Error('Expected image_url content block');
+      expect(imagePart.image_url.url).toBe('https://example.com/presigned.png');
     });
   });
 

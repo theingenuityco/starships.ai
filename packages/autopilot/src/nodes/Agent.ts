@@ -610,16 +610,19 @@ export class Agent implements NodeHandler {
             //
             // We intentionally do NOT infer failure by inspecting the inner result payload (e.g. status codes).
             // Tools that want non-2xx to be treated as failure must throw explicitly.
-            let payload = { success: false, data: body };
+            const attachments =
+              body?.data && typeof body.data === 'object' && Array.isArray(body.data.attachments) ? body.data.attachments : [];
+
+            let payload = { success: false, data: body, attachments };
             if (body && typeof body === 'object') {
               if (body.success === false) {
-                payload = { success: false, data: body.error != null ? body.error : body };
+                payload = { success: false, data: body.error != null ? body.error : body, attachments };
               } else if (body.success === true) {
                 const inner =
                   body?.data && typeof body.data === 'object' && Object.prototype.hasOwnProperty.call(body.data, 'result')
                     ? body.data.result
                     : body.data;
-                payload = { success: true, data: inner };
+                payload = { success: true, data: inner, attachments };
               }
             }
 

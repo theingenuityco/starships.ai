@@ -31,6 +31,11 @@ export interface EnvironmentConfig {
   AWS_BEDROCK_SECRET_ACCESS_KEY?: string;
   AWS_BEDROCK_REGION?: string;
 
+  // Azure AI Foundry Configuration (optional; used by autopilot execution bundle)
+  AZURE_AI_FOUNDRY_API_KEY?: string;
+  AZURE_AI_FOUNDRY_ENDPOINT?: string;
+  AZURE_AI_FOUNDRY_API_VERSION?: string;
+
   // JWT Authentication Configuration
   JWT_SECRET: string;
 

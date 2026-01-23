@@ -92,6 +92,11 @@ export function getEnvConfig(): EnvironmentConfig {
     AWS_BEDROCK_SECRET_ACCESS_KEY: process.env.AWS_BEDROCK_SECRET_ACCESS_KEY,
     AWS_BEDROCK_REGION: process.env.AWS_BEDROCK_REGION,
 
+    // Azure AI Foundry Configuration (optional; used by autopilot execution bundle)
+    AZURE_AI_FOUNDRY_API_KEY: process.env.AZURE_AI_FOUNDRY_API_KEY,
+    AZURE_AI_FOUNDRY_ENDPOINT: process.env.AZURE_AI_FOUNDRY_ENDPOINT,
+    AZURE_AI_FOUNDRY_API_VERSION: process.env.AZURE_AI_FOUNDRY_API_VERSION,
+
     // JWT Authentication Configuration
     JWT_SECRET: requiredEnvVars.JWT_SECRET!,
 

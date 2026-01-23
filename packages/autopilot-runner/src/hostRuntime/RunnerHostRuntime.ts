@@ -644,7 +644,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
           ],
         });
 
-      } catch (e: unknown) {
+      } catch {
         // best-effort: ignore augmentation failures
       }
     };

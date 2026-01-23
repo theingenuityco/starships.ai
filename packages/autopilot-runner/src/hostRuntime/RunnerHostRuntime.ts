@@ -539,16 +539,117 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
       }
     }
 
-    return await http({
+    const resp = await http({
       method,
       url: finalUrl,
       headers,
       body,
       timeoutMs,
     });
+    return resp;
   };
 
   const llm = async (request: LlmHostRequest): Promise<AsyncIterable<unknown>> => {
+    // Best-effort: If a tool message references attachments but does not include previewUrl,
+    // resolve preview URLs via Starships connector so vision-capable providers can see images.
+    // This is intentionally implemented at the host runtime layer so it works regardless of runner type.
+    const __augmentVision = async (): Promise<void> => {
+      try {
+        const msgs = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
+        if (msgs.length === 0) return;
+
+        // If the request already contains image_url blocks, do nothing.
+        let alreadyHasImages = false;
+        for (const m of msgs) {
+          if (!m || typeof m !== 'object') continue;
+          const c = (m as Record<string, unknown>).content;
+          if (!Array.isArray(c)) continue;
+          for (const part of c as unknown[]) {
+            if (!part || typeof part !== 'object') continue;
+            const p = part as Record<string, unknown>;
+            if (p.type === 'image_url') {
+              alreadyHasImages = true;
+              break;
+            }
+          }
+          if (alreadyHasImages) break;
+        }
+        if (alreadyHasImages) return;
+
+        const ids: string[] = [];
+        const seen = new Set<string>();
+        for (const m of msgs) {
+          if (!m || typeof m !== 'object') continue;
+          const role = (m as Record<string, unknown>).role;
+          if (role !== 'tool') continue;
+          const content = (m as Record<string, unknown>).content;
+          if (typeof content !== 'string') continue;
+          if (!content.includes('"attachments"')) continue;
+          if (content.includes('previewUrl')) continue;
+          try {
+            const parsed = JSON.parse(content) as unknown;
+            if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
+            const rec = parsed as Record<string, unknown>;
+            const atts = Array.isArray(rec.attachments) ? rec.attachments : [];
+            for (const a of atts) {
+              if (!a || typeof a !== 'object') continue;
+              const id = (a as Record<string, unknown>).id;
+              if (typeof id === 'string' && id.trim().length > 0 && !seen.has(id.trim())) {
+                seen.add(id.trim());
+                ids.push(id.trim());
+              }
+            }
+          } catch {
+            // If the tool content isn't valid JSON (e.g., truncated), we can't reliably extract ids.
+            continue;
+          }
+        }
+
+        if (ids.length === 0) return;
+
+        // Resolve previewUrl via existing Starships connector endpoint.
+        const resp = await connectorAction({
+          connector: 'starships',
+          action: 'get-attachments-preview-urls',
+          args: { ids: ids.join(',') },
+          timeoutMs: 15000,
+        });
+
+        const body = resp?.body as unknown;
+        const list =
+          Array.isArray(body)
+            ? body
+            : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+              ? ((body as Record<string, unknown>).data as unknown[])
+              : body && typeof body === 'object' && (body as Record<string, unknown>).success === true && Array.isArray((body as Record<string, unknown>).data)
+                ? ((body as Record<string, unknown>).data as unknown[])
+                : [];
+
+        const previewUrls: string[] = [];
+        for (const a of list) {
+          if (!a || typeof a !== 'object') continue;
+          const rec = a as Record<string, unknown>;
+          const pr = rec.previewUrl;
+          if (typeof pr === 'string' && pr.trim().length > 0) previewUrls.push(pr.trim());
+        }
+
+        if (previewUrls.length === 0) return;
+
+        // Append a provider-friendly multimodal user message (max 8 images).
+        (request.messages as unknown[]).push({
+          role: 'user',
+          content: [
+            { type: 'text', text: '[Tool produced image attachment(s)]' },
+            ...previewUrls.slice(0, 8).map((url) => ({ type: 'image_url', image_url: { url } })),
+          ],
+        });
+
+      } catch (e: unknown) {
+        // best-effort: ignore augmentation failures
+      }
+    };
+    await __augmentVision();
+
     // 1. Determine provider routes (ordered by priority).
     const configuredRoutes = options.modelRoutes?.[request.model];
     if (!Array.isArray(configuredRoutes) || configuredRoutes.length === 0) {

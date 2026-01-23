@@ -6,12 +6,33 @@
 
 import { LLM } from '../LLM';
 import type { LlmParams } from '@/types/node-parameters';
-import type { LLMResponse } from '@/types/llm';
+import type { ContentBlock, LLMResponse } from '@/types/llm';
 import type { HostRuntime, LlmHostRequest } from '@/types/node-handler';
 import OpenAI from 'openai';
 
 // Mock console to reduce test noise
 const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object';
+}
+
+function isRoleContentMessage(value: unknown): value is { role: string; content: unknown } {
+  return isRecord(value) && typeof value.role === 'string' && 'content' in value;
+}
+
+function isToolRoleStringContentMessage(value: unknown): value is { role: 'tool'; content: string } {
+  return isRoleContentMessage(value) && value.role === 'tool' && typeof value.content === 'string';
+}
+
+function isUserRoleWithContentBlocks(value: unknown): value is { role: 'user'; content: ContentBlock[] } {
+  return (
+    isRoleContentMessage(value) &&
+    value.role === 'user' &&
+    Array.isArray(value.content) &&
+    value.content.every((p) => isRecord(p) && typeof p.type === 'string')
+  );
+}
 
 // Helper to create async iterable stream
 function createMockStream(chunks: OpenAI.Chat.Completions.ChatCompletionChunk[]) {
@@ -234,7 +255,6 @@ describe('LLM Node Handler', () => {
           { role: 'user', content: 'Look at the tool output image.' },
           {
             role: 'tool',
-            toolCallId: 'tc_1',
             content: JSON.stringify({
               success: true,
               data: { ok: true },
@@ -246,7 +266,7 @@ describe('LLM Node Handler', () => {
                 },
               ],
             }),
-          } as any,
+          },
         ],
       };
 
@@ -274,15 +294,19 @@ describe('LLM Node Handler', () => {
 
       const req = llmMock.mock.calls[0]?.[0];
       expect(req).toBeTruthy();
-      const msgs = (req as any).messages as any[];
+      const msgs = (req as LlmHostRequest).messages;
 
       // We should still send the tool message...
-      expect(msgs.some((m) => m && m.role === 'tool' && typeof m.content === 'string')).toBe(true);
+      expect(msgs.some(isToolRoleStringContentMessage)).toBe(true);
       // ...and inject a provider-only user multimodal message containing an image_url block.
-      const injected = msgs.find((m) => m && m.role === 'user' && Array.isArray(m.content) && m.content.some((p: any) => p?.type === 'image_url'));
+      const injected = msgs.find(
+        (m) => isUserRoleWithContentBlocks(m) && m.content.some((p) => p.type === 'image_url')
+      );
       expect(injected).toBeTruthy();
-      const imagePart = injected.content.find((p: any) => p?.type === 'image_url');
-      expect(imagePart?.image_url?.url).toBe('https://example.com/presigned.png');
+      if (!isUserRoleWithContentBlocks(injected)) throw new Error('Expected injected message with content blocks');
+      const imagePart = injected.content.find((p) => p.type === 'image_url');
+      if (!imagePart || imagePart.type !== 'image_url') throw new Error('Expected image_url content block');
+      expect(imagePart.image_url.url).toBe('https://example.com/presigned.png');
     });
   });
 

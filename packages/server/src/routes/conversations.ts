@@ -33,6 +33,7 @@ import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { UIActionService } from '@/services/UIActionService';
+import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
   ToolModel,
   ConversationStreamSnapshot,
@@ -347,11 +348,8 @@ async function replaceBase64ImagesWithAttachments(args: {
   conversationId: string;
   maxImages?: number;
 }): Promise<{ value: unknown; attachments: ToolResultAttachment[]; attachmentErrors: ToolResultAttachmentError[] }> {
-  // Hard safety limits (per image).
-  const MAX_IMAGE_BYTES = 10 * 1024 * 1024; // 10MB decoded
-  // Cap data URL size to prevent pathological memory usage during parsing.
-  // 10MB decoded ≈ 13.4MB base64 + header → 15MB is a safe ceiling.
-  const MAX_DATA_URL_CHARS = 15_000_000;
+  const MAX_IMAGE_BYTES = MAX_TOOL_RESULT_BASE64_IMAGE_BYTES;
+  const MAX_DATA_URL_CHARS = MAX_TOOL_RESULT_DATA_URL_CHARS;
 
   const maxImages = Math.max(0, Math.min(20, Number(args.maxImages ?? 8)));
   if (maxImages === 0) return { value: args.value, attachments: [], attachmentErrors: [] };

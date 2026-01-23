@@ -261,12 +261,6 @@ async function executeToolBlueprint(args: {
 type ToolResultAttachment = {
   id: string;
   previewUrl?: string;
-  mimeType?: string;
-  filename?: string;
-  sizeBytes?: number;
-  imageWidth?: number;
-  imageHeight?: number;
-  createdAt?: string;
 };
 
 function parseBase64ImageDataUrl(dataUrl: string): { mimeType: string; buffer: Buffer } | null {
@@ -370,7 +364,18 @@ async function replaceBase64ImagesWithAttachments(args: {
   };
 
   const replaced = apply(args.value);
-  const attachments = (await attachmentService.getAttachmentsBatch(createdIds, args.starshipId).catch(() => [])) as ToolResultAttachment[];
+  const full = (await attachmentService.getAttachmentsBatch(createdIds, args.starshipId).catch(() => [])) as Array<
+    ToolResultAttachment & { id: string; previewUrl?: string }
+  >;
+  // Keep tool-result attachments lean: only what we need to render and feed vision models.
+  const attachments: ToolResultAttachment[] = Array.isArray(full)
+    ? full
+        .map((a) => ({
+          id: a.id,
+          ...(typeof (a as any).previewUrl === 'string' ? { previewUrl: String((a as any).previewUrl) } : {}),
+        }))
+        .filter((a) => typeof a.id === 'string' && a.id.length > 0)
+    : [];
   return { value: replaced, attachments };
 }
 

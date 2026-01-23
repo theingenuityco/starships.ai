@@ -2848,6 +2848,16 @@ export class ConversationService {
                         if (!starship) {
                           starship = await this.getConversationStarship(conversationId);
                         }
+
+                        // Keep persisted tool_result content lean:
+                        // replace `attachments: [{...}]` with `attachments: [{ id }]` so we don't store presigned URLs
+                        // or other large metadata blobs in message.content.
+                        try {
+                          rec.attachments = uniq.map((id) => ({ id }));
+                          contentToPersist = JSON.stringify(rec);
+                        } catch {
+                          // ignore stringify failures; keep original
+                        }
                       }
                     }
                   } catch {

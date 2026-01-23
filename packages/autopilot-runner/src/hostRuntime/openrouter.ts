@@ -129,7 +129,27 @@ export async function invokeOpenRouter(
   };
 
   const modalities = request.modalities;
-  const isImageRequest = Array.isArray(modalities) && modalities.includes('image');
+  const hasImageInMessages = (() => {
+    const msgs = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
+    for (const m of msgs) {
+      if (!m || typeof m !== 'object') continue;
+      const rec = m as Record<string, unknown>;
+      const c = rec.content;
+      if (!Array.isArray(c)) continue;
+      for (const part of c as unknown[]) {
+        if (!part || typeof part !== 'object') continue;
+        const p = part as Record<string, unknown>;
+        // OpenAI/OpenRouter style: { type: 'image_url', image_url: { url } }
+        if (p.type === 'image_url') return true;
+        // Some SDKs may use camelCase (OpenRouter SDK uses imageUrl); be defensive.
+        if (p.type === 'image_url' || p.type === 'imageUrl') return true;
+      }
+    }
+    return false;
+  })();
+  // OpenRouter docs show multimodal examples with stream: false. Even when modalities isn't provided,
+  // presence of image parts implies an image request; force non-stream for reliability.
+  const isImageRequest = (Array.isArray(modalities) && modalities.includes('image')) || hasImageInMessages;
   const wantsStream = typeof request.stream === 'boolean' ? request.stream : true;
 
   const baseRequest: Record<string, unknown> = {

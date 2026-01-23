@@ -98,6 +98,9 @@ jobs:
       - name: Update secrets
         env:
           OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          AZURE_AI_FOUNDRY_API_KEY: ${{ secrets.AZURE_AI_FOUNDRY_API_KEY }}
+          AZURE_AI_FOUNDRY_ENDPOINT: ${{ vars.AZURE_AI_FOUNDRY_ENDPOINT }}
+          AZURE_AI_FOUNDRY_API_VERSION: ${{ vars.AZURE_AI_FOUNDRY_API_VERSION }}
           STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
           STRIPE_PUBLISHABLE_KEY: ${{ secrets.STRIPE_PUBLISHABLE_KEY }}
           STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET }}
@@ -158,6 +161,9 @@ jobs:
           kubectl delete secret starships-secrets -n ${{ env.NAMESPACE }} --ignore-not-found=true
           kubectl create secret generic starships-secrets \
             --from-literal=OPENROUTER_API_KEY="$OPENROUTER_API_KEY" \
+            --from-literal=AZURE_AI_FOUNDRY_API_KEY="$AZURE_AI_FOUNDRY_API_KEY" \
+            --from-literal=AZURE_AI_FOUNDRY_ENDPOINT="$AZURE_AI_FOUNDRY_ENDPOINT" \
+            --from-literal=AZURE_AI_FOUNDRY_API_VERSION="$AZURE_AI_FOUNDRY_API_VERSION" \
             --from-literal=STRIPE_SECRET_KEY="$STRIPE_SECRET_KEY" \
             --from-literal=STRIPE_PUBLISHABLE_KEY="$STRIPE_PUBLISHABLE_KEY" \
             --from-literal=GH_OAUTH_CLIENT_ID="${GH_OAUTH_CLIENT_ID}" \

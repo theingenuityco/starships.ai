@@ -3,6 +3,7 @@ import { CancelledError, Engine, type Execution } from '@starships/autopilot';
 import {
   createRunnerHostRuntime,
   type AwsRuntimeConfig,
+  type AzureAiFoundryRuntimeConfig,
   type ConnectorSession,
   type LlmRuntimeConfig,
   type ProviderRoute,
@@ -60,6 +61,10 @@ export class InProcessExecutor implements Executor {
        */
       aws?: AwsRuntimeConfig;
       /**
+       * Azure AI Foundry runtime configuration.
+       */
+      azureAiFoundry?: AzureAiFoundryRuntimeConfig;
+      /**
        * Model routing table.
        */
       modelRoutes?: Record<string, ProviderRoute[] | undefined>;
@@ -75,6 +80,7 @@ export class InProcessExecutor implements Executor {
       connectorMetadata,
       llm,
       aws,
+      azureAiFoundry,
       modelRoutes,
       runtimeEnv,
       ...engineConfig
@@ -89,6 +95,7 @@ export class InProcessExecutor implements Executor {
       runtimeEnv: runtimeEnv ?? {},
       llm,
       aws,
+      azureAiFoundry,
       modelRoutes,
       signal: controller.signal,
     });

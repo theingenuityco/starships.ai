@@ -138,6 +138,7 @@ function ProvidersRow({ model }: { model: string }) {
                   <SelectContent>
                     <SelectItem value="openrouter">openrouter</SelectItem>
                     <SelectItem value="aws_bedrock">aws_bedrock</SelectItem>
+                    <SelectItem value="azure_ai_foundry">azure_ai_foundry</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

@@ -11,6 +11,7 @@ import { CancelledError } from '@starships/autopilot';
 import { BedrockRuntimeClient } from '@aws-sdk/client-bedrock-runtime';
 import { invokeBedrock } from './bedrock';
 import { invokeOpenRouter } from './openrouter';
+import { invokeAzureAiFoundry } from './azure-ai-foundry';
 
 /**
  * Connector sessions passed from the embedding host (API server) to the runner.
@@ -40,8 +41,15 @@ export interface AwsRuntimeConfig {
   region: string;
 }
 
+export interface AzureAiFoundryRuntimeConfig {
+  apiKey: string;
+  endpoint: string;
+  apiVersion?: string;
+  defaultHeaders?: Record<string, string>;
+}
+
 export interface ProviderRoute {
-  provider: 'openrouter' | 'aws_bedrock';
+  provider: 'openrouter' | 'aws_bedrock' | 'azure_ai_foundry';
   providerModelId: string;
 }
 
@@ -79,6 +87,11 @@ export interface RunnerHostRuntimeOptions {
    * AWS runtime configuration for Bedrock.
    */
   aws?: AwsRuntimeConfig;
+
+  /**
+   * Azure AI Foundry runtime configuration.
+   */
+  azureAiFoundry?: AzureAiFoundryRuntimeConfig;
 
   /**
    * Model routing table. Maps canonical model ID to one or more provider routes,
@@ -561,6 +574,9 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         if (provider === 'aws_bedrock') {
           const client = getBedrockClient();
           return await invokeBedrock(request, providerModelId, { client, signal: options.signal });
+        }
+        if (provider === 'azure_ai_foundry') {
+          return await invokeAzureAiFoundry(request, providerModelId, { azure: options.azureAiFoundry, signal: options.signal });
         }
 
         // Default/OpenRouter

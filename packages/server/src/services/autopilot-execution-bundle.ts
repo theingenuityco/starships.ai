@@ -53,6 +53,15 @@ export async function buildAutopilotExecutionBundle(args: {
     region: process.env.AWS_BEDROCK_REGION,
   };
 
+  const azureAiFoundry =
+    env.AZURE_AI_FOUNDRY_API_KEY && env.AZURE_AI_FOUNDRY_ENDPOINT
+      ? {
+          apiKey: env.AZURE_AI_FOUNDRY_API_KEY,
+          endpoint: env.AZURE_AI_FOUNDRY_ENDPOINT,
+          apiVersion: env.AZURE_AI_FOUNDRY_API_VERSION,
+        }
+      : undefined;
+
   const engineConfig: Record<string, unknown> = {
     runtimeEnv: args.runtimeEnv,
     connectorTemplates,
@@ -60,6 +69,7 @@ export async function buildAutopilotExecutionBundle(args: {
     connectorMetadata,
     llm,
     aws,
+    azureAiFoundry,
     modelRoutes,
   };
 

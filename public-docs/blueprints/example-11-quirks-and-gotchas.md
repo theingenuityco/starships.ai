@@ -40,6 +40,7 @@
 - HttpRequest returns `{ status, statusText, headers, body, url }`. To pass only the payload to the next request, forward `body` via Transform/Code. See Node: HttpRequest.
 - Binary download/upload is supported as **in-flight** data:
   - `responseType: "arrayBuffer"` stores bytes on the output item at `binary[binaryKey || "data"]`.
+  - `responseType: "base64"` returns a JSON-safe data URL string in `json.body` (`data:<content-type>;base64,<...>`).
   - `bodyFromBinaryKey: "..."` uploads bytes from `input[0].binary[key]` as a raw body.
   - Bytes are stripped from `execution.results` and events (recorded history stays JSON-safe); only downstream nodes in the same run can consume them.
 - Initial arguments are exposed as `input` after `start`; from later nodes, use `ctx.lastOutputOf('__initial__')`. See Node: Start and Node: Code.

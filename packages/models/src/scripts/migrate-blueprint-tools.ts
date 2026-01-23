@@ -16,7 +16,7 @@
  * Part 2: Deploy unified blueprint tools to all starships
  * - modify-tool-blueprint-node
  * - modify-tool-blueprint-edge
- * - list-connectors
+ * - search-connector
  * - Create tools from templates if missing
  * - Assign tools to Daedalus agent in each starship (when present)
  */
@@ -199,13 +199,16 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
     // Resolve unified templates
     const modifyNodeTemplate = await templateRepo.findBySlug('modify-tool-blueprint-node');
     const modifyEdgeTemplate = await templateRepo.findBySlug('modify-tool-blueprint-edge');
-    const connectorsListTemplate = await templateRepo.findBySlug('list-connectors');
+    const searchConnectorTemplateId = await templateRepo.resolveTemplateIdForAssignedSlug('search-connector');
+    const connectorsListTemplate = searchConnectorTemplateId
+      ? await templateRepo.findById(searchConnectorTemplateId)
+      : null;
 
     if (!modifyNodeTemplate || !modifyEdgeTemplate || !connectorsListTemplate) {
       const missing: string[] = [];
       if (!modifyNodeTemplate) missing.push('modify-tool-blueprint-node');
       if (!modifyEdgeTemplate) missing.push('modify-tool-blueprint-edge');
-      if (!connectorsListTemplate) missing.push('list-connectors');
+      if (!connectorsListTemplate) missing.push('search-connector');
       logger.warn(`Could not find unified blueprint tool templates: ${missing.join(', ')}`);
       stats.errors++;
       return stats;
@@ -254,20 +257,20 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
       }
     }
 
-    // Ensure list-connectors tool exists
+    // Ensure search-connector tool exists
     const hasConnectorsList = existingTools.some((tool) => tool.sourceTemplateId === connectorsListTemplate.id);
     let connectorsListTool = existingTools.find((tool) => tool.sourceTemplateId === connectorsListTemplate.id);
 
     if (!hasConnectorsList) {
       try {
-        logger.info(`Deploying list-connectors to starship ${starshipId}`);
-        connectorsListTool = await toolRepo.createFromTemplate('list-connectors', starshipId);
+        logger.info(`Deploying search-connector to starship ${starshipId}`);
+        connectorsListTool = await toolRepo.createFromTemplate('search-connector', starshipId);
         stats.connectorsListDeployed++;
-        logger.info(`✅ Deployed list-connectors (${connectorsListTool.id})`);
+        logger.info(`✅ Deployed search-connector (${connectorsListTool.id})`);
       } catch (error) {
         stats.errors++;
         logger.error(
-          `Failed to deploy list-connectors to starship ${starshipId}`,
+          `Failed to deploy search-connector to starship ${starshipId}`,
           { component: 'migrate-blueprint-tools', operation: 'deployListConnectors' },
           error as Error
         );
@@ -326,18 +329,18 @@ async function deployUnifiedBlueprintTools(starshipId: string): Promise<{
       }
     }
 
-    // Assign list-connectors if not already assigned
+    // Assign search-connector if not already assigned
     if (connectorsListTool) {
       const isAssigned = assignedTools.some((tool: ToolModel) => tool.id === connectorsListTool!.id);
       if (!isAssigned) {
         try {
           await agentRepo.addToolRelationship(daedalusAgent.id, connectorsListTool.id);
           stats.connectorsListAssigned++;
-          logger.info(`✅ Assigned list-connectors to Daedalus agent "${daedalusAgent.name}"`);
+          logger.info(`✅ Assigned search-connector to Daedalus agent "${daedalusAgent.name}"`);
         } catch (error) {
           stats.errors++;
           logger.error(
-            `Failed to assign list-connectors to Daedalus agent ${daedalusAgent.id}`,
+            `Failed to assign search-connector to Daedalus agent ${daedalusAgent.id}`,
             { component: 'migrate-blueprint-tools', operation: 'assignListConnectors' },
             error as Error
           );
@@ -456,8 +459,8 @@ export async function migrateBlueprintTools(targetStarshipIds?: string[]): Promi
     logger.info(`    - modify-tool-blueprint-edge deployed: ${totalStats.modifyEdgeDeployed}`);
     logger.info(`    - modify-tool-blueprint-node assigned to Daedalus: ${totalStats.modifyNodeAssigned}`);
     logger.info(`    - modify-tool-blueprint-edge assigned to Daedalus: ${totalStats.modifyEdgeAssigned}`);
-    logger.info(`    - list-connectors deployed: ${totalStats.connectorsListDeployed}`);
-    logger.info(`    - list-connectors assigned to Daedalus: ${totalStats.connectorsListAssigned}`);
+    logger.info(`    - search-connector deployed: ${totalStats.connectorsListDeployed}`);
+    logger.info(`    - search-connector assigned to Daedalus: ${totalStats.connectorsListAssigned}`);
     logger.info(`    - Errors: ${totalStats.deploymentErrors}`);
     logger.info('═══════════════════════════════════════════════════════════');
 

@@ -26,7 +26,6 @@ export { agentCallToolTemplate } from './call-agent';
 export { agentAssignToolToolTemplate } from './assign-agent-tool';
 export { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 export { modelsListToolTemplate } from './list-models';
-export { connectorsListToolTemplate } from './list-connectors';
 export { createWidgetToolTemplate } from './create-widget';
 export { updateWidgetToolTemplate } from './update-widget';
 export { searchWidgetsToolTemplate } from './search-widgets';
@@ -34,6 +33,7 @@ export { renderWidgetToolTemplate } from './render-widget';
 export { suggestConnectorsToolTemplate } from './suggest-connectors';
 export { suggestAgentsToolTemplate } from './suggest-agents';
 export { renderStarshipDetailsToolTemplate } from './render-starship-details';
+export { connectorSearchToolTemplate } from './search-connector';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -59,7 +59,6 @@ import { agentCallToolTemplate } from './call-agent';
 import { agentAssignToolToolTemplate } from './assign-agent-tool';
 import { agentUnassignToolToolTemplate } from './unassign-agent-tool';
 import { modelsListToolTemplate } from './list-models';
-import { connectorsListToolTemplate } from './list-connectors';
 import { createWidgetToolTemplate } from './create-widget';
 import { updateWidgetToolTemplate } from './update-widget';
 import { searchWidgetsToolTemplate } from './search-widgets';
@@ -67,6 +66,7 @@ import { renderWidgetToolTemplate } from './render-widget';
 import { suggestConnectorsToolTemplate } from './suggest-connectors';
 import { suggestAgentsToolTemplate } from './suggest-agents';
 import { renderStarshipDetailsToolTemplate } from './render-starship-details';
+import { connectorSearchToolTemplate } from './search-connector';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -92,7 +92,6 @@ export const ALL_TOOL_TEMPLATES = [
   agentAssignToolToolTemplate,
   agentUnassignToolToolTemplate,
   modelsListToolTemplate,
-  connectorsListToolTemplate,
   createWidgetToolTemplate,
   updateWidgetToolTemplate,
   searchWidgetsToolTemplate,
@@ -100,4 +99,5 @@ export const ALL_TOOL_TEMPLATES = [
   suggestConnectorsToolTemplate,
   suggestAgentsToolTemplate,
   renderStarshipDetailsToolTemplate,
+  connectorSearchToolTemplate,
 ];

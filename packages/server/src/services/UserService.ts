@@ -228,6 +228,30 @@ export class UserService {
   }
 
   /**
+   * Mark navigation onboarding as completed
+   */
+  async markNavigationOnboardingCompleted(userId: string): Promise<UserModel> {
+    // Business validation: User must exist
+    const existingUser = await this.userRepository.findById(userId);
+    if (!existingUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Update user with onboarding completion flag
+    const updatedUser = await this.userRepository.update(userId, {
+      navigationOnboardingCompleted: true,
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    logger.info('[UserService] Navigation onboarding marked as completed', { userId });
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
+  }
+
+  /**
    * Authenticate user (for login)
    */
   async authenticateUser(email: string, password: string): Promise<UserModel | null> {

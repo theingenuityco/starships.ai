@@ -171,6 +171,12 @@ export class UserEntity implements UserModel {
   @IsEnum(['password', 'oauth'])
   primaryAuthMethod!: 'password' | 'oauth';
 
+  // Onboarding tracking
+  @Expose()
+  @IsOptional()
+  @IsBoolean()
+  navigationOnboardingCompleted?: boolean;
+
   /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution

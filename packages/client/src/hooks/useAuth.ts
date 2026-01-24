@@ -23,6 +23,11 @@ export interface AuthUser {
    * Optional for backward compatibility with older tokens.
    */
   isInstanceAdmin?: boolean
+  /**
+   * Navigation onboarding completion flag.
+   * When true, user has completed the one-time navigation onboarding tour.
+   */
+  navigationOnboardingCompleted?: boolean
 }
 
 interface AuthLoginResponse {

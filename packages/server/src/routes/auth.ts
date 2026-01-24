@@ -228,6 +228,7 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'password',
         isInstanceAdmin: user.isInstanceAdmin || false,
+        navigationOnboardingCompleted: user.navigationOnboardingCompleted || false,
       },
       token,
       isFirstLogin,
@@ -272,6 +273,7 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password',
       isInstanceAdmin: user.isInstanceAdmin || false,
+      navigationOnboardingCompleted: user.navigationOnboardingCompleted || false,
     });
   } catch (error) {
     // Token expiration/invalidity is expected when a client holds a stale token.
@@ -900,6 +902,7 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'oauth',
         isInstanceAdmin: user.isInstanceAdmin || false,
+        navigationOnboardingCompleted: user.navigationOnboardingCompleted || false,
       },
       token,
       isFirstLogin,

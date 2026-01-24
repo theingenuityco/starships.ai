@@ -17,9 +17,10 @@ interface NavigationItemProps {
   onClick?: () => void
   special?: boolean
   onItemClick?: () => void
+  itemRef?: React.RefObject<HTMLDivElement>
 }
 
-export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick }: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick, itemRef }: NavigationItemProps) {
   const router = useRouter()
 
   const handleClick = useCallback(
@@ -65,6 +66,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
 
   const motionDiv = (
     <div
+      ref={itemRef}
       onClick={handleClick}
       className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 ${
         special

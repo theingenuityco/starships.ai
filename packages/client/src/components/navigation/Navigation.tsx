@@ -8,6 +8,7 @@ import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnboardingTour'
 import { useDeleteConversation } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
@@ -224,15 +225,32 @@ export function Navigation(props: NavigationProps) {
     handleLogoClick()
   }, [isExpanded, handleLogoClick])
 
+  // Create refs for navigation items (for onboarding positioning)
+  const newChatRef = useRef<HTMLElement>(null)
+  const exploreAgentsRef = useRef<HTMLElement>(null)
+  const myAgentsRef = useRef<HTMLElement>(null)
+  const connectorsRef = useRef<HTMLElement>(null)
+  const schedulesRef = useRef<HTMLElement>(null)
+
+  const navigationItemRefs = useMemo(() => {
+    const refs = new Map<string, React.RefObject<HTMLElement>>()
+    refs.set('New Chat', newChatRef)
+    refs.set('Explore Agents', exploreAgentsRef)
+    refs.set('My Agents', myAgentsRef)
+    refs.set('Connectors', connectorsRef)
+    refs.set('Schedules', schedulesRef)
+    return refs
+  }, [])
+
   // Memoize main navigation items - only recalculate when dependencies change
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
-      ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      { href: `/marketplace`, label: 'Explore Agents', icon: 'store', isActive: pathname === '/marketplace' },
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'bot', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true, itemRef: newChatRef }] : []),
+      { href: `/marketplace`, label: 'Explore Agents', icon: 'store', isActive: pathname === '/marketplace', itemRef: exploreAgentsRef },
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'bot', isActive: isAgentsRoute || isAgentBuilderRoute, itemRef: myAgentsRef }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute, itemRef: connectorsRef }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute, itemRef: schedulesRef }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && isInstanceAdmin
         ? [
@@ -444,6 +462,11 @@ export function Navigation(props: NavigationProps) {
           {/* Profile moved to global top-right header (see `TopRightUserProfile`) */}
         </div>
       </motion.div>
+
+      {/* Navigation Onboarding Tour */}
+      {isAuthenticated && starshipSlug && (
+        <NavigationOnboardingTour starshipSlug={starshipSlug} navigationItemRefs={navigationItemRefs} />
+      )}
     </>
   )
 }

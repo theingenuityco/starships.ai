@@ -34,12 +34,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     }
   }, [shouldShowOnboarding, currentStep, router])
 
-  // Don't render conversations interface if we're redirecting to onboarding (but allow step 5)
-  if (shouldShowOnboarding && currentStep !== 5) {
-    return null
-  }
-
   // Handle conversation change from ConversationInterface
+  // Must be called before any early returns to satisfy React Hooks rules
   const handleConversationChange = useCallback(
     (newConversationId: string | null) => {
       if (newConversationId) {
@@ -50,6 +46,11 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     },
     [router, routeParams.slug]
   )
+
+  // Don't render conversations interface if we're redirecting to onboarding (but allow step 5)
+  if (shouldShowOnboarding && currentStep !== 5) {
+    return null
+  }
 
   if (!starshipData) {
     return null // Layout handles loading/error states

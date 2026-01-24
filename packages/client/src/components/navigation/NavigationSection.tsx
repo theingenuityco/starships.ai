@@ -10,7 +10,7 @@ interface NavigationSectionItem {
   isActive?: boolean
   onClick?: () => void
   special?: boolean
-  itemRef?: React.RefObject<HTMLElement>
+  itemRef?: React.RefObject<HTMLDivElement | null>
   isOnboardingHighlighted?: boolean
 }
 

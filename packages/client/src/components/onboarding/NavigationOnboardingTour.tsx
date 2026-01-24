@@ -8,10 +8,11 @@ import { ONBOARDING_STEPS, type OnboardingStep } from '@/hooks/useNavigationOnbo
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { cn } from '@/lib/utils'
+import { calculatePopupPosition } from '@/utils/onboarding-positioning'
 
 interface NavigationOnboardingTourProps {
   starshipSlug?: string | null
-  navigationItemRefs: Map<string, React.RefObject<HTMLElement>>
+  navigationItemRefs: Map<string, React.RefObject<HTMLDivElement | null>>
 }
 
 export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: NavigationOnboardingTourProps) {
@@ -24,30 +25,32 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   // Calculate sidebar width dynamically to exclude it from overlay
   const [sidebarWidth, setSidebarWidth] = useState(312) // Default: 56px (rail) + 256px (expanded sidebar)
 
-  // Start onboarding when component mounts and should show
-  // Start on conversations page (user lands here after login) or marketplace (after redirect)
-  // Don't start if we're in the process of completing
+  // Handle initial redirect: if on conversations page, redirect to marketplace
+  // Split into two effects to avoid race conditions (matches conversations/layout.tsx pattern)
   useEffect(() => {
-    if (shouldShowOnboarding && currentStep === null && !isCompleting) {
-      // If on conversations page, redirect to marketplace first
-      if (pathname.includes('/conversations')) {
-        router.replace('/marketplace')
-        // Small delay to ensure navigation completes before starting onboarding
-        const timer = setTimeout(() => {
-          startOnboarding()
-        }, 150)
-        return () => clearTimeout(timer)
-      }
-      // If already on marketplace, start onboarding immediately
-      else if (pathname === '/marketplace' || pathname.includes('/marketplace')) {
-        // Small delay to ensure navigation items are rendered
-        const timer = setTimeout(() => {
-          startOnboarding()
-        }, 100)
-        return () => clearTimeout(timer)
-      }
+    if (!shouldShowOnboarding || currentStep !== null || isCompleting) return
+    
+    // If on conversations page, redirect to marketplace first
+    if (pathname.includes('/conversations')) {
+      router.replace('/marketplace')
+      return // Let pathname change effect handle starting
     }
-  }, [shouldShowOnboarding, currentStep, startOnboarding, pathname, isCompleting, router])
+  }, [shouldShowOnboarding, currentStep, pathname, router, isCompleting])
+
+  // Separate effect watches pathname changes to start onboarding when ready
+  // Uses requestAnimationFrame for DOM readiness (matches client-layout.tsx pattern)
+  useEffect(() => {
+    if (!shouldShowOnboarding || currentStep !== null) return
+    
+    // When we land on marketplace, start onboarding
+    if (pathname === '/marketplace' || pathname.includes('/marketplace')) {
+      // Use RAF only for DOM readiness, not navigation timing
+      const rafId = requestAnimationFrame(() => {
+        startOnboarding()
+      })
+      return () => cancelAnimationFrame(rafId)
+    }
+  }, [pathname, shouldShowOnboarding, currentStep, startOnboarding])
 
   // Get route for current step
   const getStepRoute = (step: OnboardingStep | null): string | null => {
@@ -119,71 +122,57 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
       return
     }
 
-    // Calculate position: popup appears to the right of the navigation item
-    const rect = element.getBoundingClientRect()
-    const popupWidth = 320 // Approximate popup width
-    const popupHeight = 200 // Approximate popup height
-    const spacing = 16 // Space between item and popup
+    // Calculate position using utility function
+    const position = calculatePopupPosition(element, {
+      popupWidth: 320,
+      popupHeight: 200,
+    })
 
-    // Calculate navigation item center position
-    const itemCenterY = rect.top + rect.height / 2
-
-    // Position popup to the right of the navigation item
-    // Try to align popup center vertically with navigation item center
-    let top = itemCenterY - popupHeight / 2
-    const left = rect.right + spacing
-
-    // Ensure popup stays within viewport
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
-
-    let finalLeft = left
-    let finalTop = top
-
-    // Adjust if popup would go off right edge
-    if (finalLeft + popupWidth > viewportWidth) {
-      finalLeft = rect.left - popupWidth - spacing
-    }
-
-    // Adjust if popup would go off bottom
-    if (finalTop + popupHeight > viewportHeight) {
-      finalTop = viewportHeight - popupHeight - 16
-    }
-
-    // Adjust if popup would go off top
-    if (finalTop < 16) {
-      finalTop = 16
-    }
-
-    // Calculate pointer position relative to popup top
-    // Pointer should point to the center of the navigation item
-    const pointerTop = itemCenterY - finalTop
-
-    setPopupPosition({ top: finalTop, left: finalLeft, pointerTop })
+    setPopupPosition(position)
   }, [currentStepInfo, navigationItemRefs, shouldShowOnboarding])
 
-  // Update sidebar width dynamically
+  // Update sidebar width dynamically with error handling
   useEffect(() => {
     const updateSidebarWidth = () => {
-      const sidebar = document.querySelector('[data-navigation-sidebar]') as HTMLElement
-      if (sidebar) {
-        const rect = sidebar.getBoundingClientRect()
-        setSidebarWidth(rect.width)
+      try {
+        const sidebar = document.querySelector('[data-navigation-sidebar]') as HTMLElement
+        if (sidebar) {
+          const rect = sidebar.getBoundingClientRect()
+          if (rect.width > 0) {
+            setSidebarWidth(rect.width)
+            return
+          }
+        }
+      } catch (error) {
+        // Silent fallback - matches codebase pattern of not logging everything
       }
+      
+      // Fallback to default if sidebar not found or invalid
+      setSidebarWidth(312)
     }
     
     updateSidebarWidth()
-    const observer = new ResizeObserver(updateSidebarWidth)
-    const sidebar = document.querySelector('[data-navigation-sidebar]')
-    if (sidebar) {
-      observer.observe(sidebar)
+    
+    // Try to observe sidebar
+    try {
+      const sidebar = document.querySelector('[data-navigation-sidebar]')
+      if (sidebar) {
+        const observer = new ResizeObserver(updateSidebarWidth)
+        observer.observe(sidebar)
+        window.addEventListener('resize', updateSidebarWidth)
+        
+        return () => {
+          observer.disconnect()
+          window.removeEventListener('resize', updateSidebarWidth)
+        }
+      }
+    } catch (error) {
+      // Fallback: just listen to window resize
     }
     
-    // Also update on window resize
+    // Fallback: just listen to window resize if sidebar not found
     window.addEventListener('resize', updateSidebarWidth)
-    
     return () => {
-      observer.disconnect()
       window.removeEventListener('resize', updateSidebarWidth)
     }
   }, [])

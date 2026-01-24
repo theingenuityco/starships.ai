@@ -17,7 +17,7 @@ interface NavigationItemProps {
   onClick?: () => void
   special?: boolean
   onItemClick?: () => void
-  itemRef?: React.RefObject<HTMLDivElement>
+  itemRef?: React.RefObject<HTMLDivElement | null>
   isOnboardingHighlighted?: boolean
 }
 

@@ -228,14 +228,14 @@ export function Navigation(props: NavigationProps) {
   }, [isExpanded, handleLogoClick])
 
   // Create refs for navigation items (for onboarding positioning)
-  const newChatRef = useRef<HTMLElement>(null)
-  const exploreAgentsRef = useRef<HTMLElement>(null)
-  const myAgentsRef = useRef<HTMLElement>(null)
-  const connectorsRef = useRef<HTMLElement>(null)
-  const schedulesRef = useRef<HTMLElement>(null)
+  const newChatRef = useRef<HTMLDivElement>(null)
+  const exploreAgentsRef = useRef<HTMLDivElement>(null)
+  const myAgentsRef = useRef<HTMLDivElement>(null)
+  const connectorsRef = useRef<HTMLDivElement>(null)
+  const schedulesRef = useRef<HTMLDivElement>(null)
 
   const navigationItemRefs = useMemo(() => {
-    const refs = new Map<string, React.RefObject<HTMLElement>>()
+    const refs = new Map<string, React.RefObject<HTMLDivElement | null>>()
     refs.set('New Chat', newChatRef)
     refs.set('Explore Agents', exploreAgentsRef)
     refs.set('My Agents', myAgentsRef)

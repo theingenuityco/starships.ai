@@ -50,7 +50,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     step: 5,
     route: '/conversations', // This will be replaced with actual starship slug
     label: 'New Chat',
-    description: 'Start a new conversation with your agents. Click here anytime to begin a fresh chat session.',
+    description: 'Click here anytime to start a new conversation.',
     icon: 'plus',
   },
 ]

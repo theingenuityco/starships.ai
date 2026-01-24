@@ -25,18 +25,27 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   const [sidebarWidth, setSidebarWidth] = useState(312) // Default: 56px (rail) + 256px (expanded sidebar)
 
   // Start onboarding when component mounts and should show
-  // Only start on conversations page (as per requirements)
+  // Start on conversations page (user lands here after login) or marketplace (after redirect)
   // Don't start if we're in the process of completing
   useEffect(() => {
-    if (shouldShowOnboarding && currentStep === null && !isCompleting && pathname.includes('/conversations')) {
-      // Navigate to marketplace first, then start onboarding
-      // This ensures the correct background is shown immediately
-      router.replace('/marketplace')
-      // Small delay to ensure navigation items are rendered after route change
-      const timer = setTimeout(() => {
-        startOnboarding()
-      }, 150)
-      return () => clearTimeout(timer)
+    if (shouldShowOnboarding && currentStep === null && !isCompleting) {
+      // If on conversations page, redirect to marketplace first
+      if (pathname.includes('/conversations')) {
+        router.replace('/marketplace')
+        // Small delay to ensure navigation completes before starting onboarding
+        const timer = setTimeout(() => {
+          startOnboarding()
+        }, 150)
+        return () => clearTimeout(timer)
+      }
+      // If already on marketplace, start onboarding immediately
+      else if (pathname === '/marketplace' || pathname.includes('/marketplace')) {
+        // Small delay to ensure navigation items are rendered
+        const timer = setTimeout(() => {
+          startOnboarding()
+        }, 100)
+        return () => clearTimeout(timer)
+      }
     }
   }, [shouldShowOnboarding, currentStep, startOnboarding, pathname, isCompleting, router])
 

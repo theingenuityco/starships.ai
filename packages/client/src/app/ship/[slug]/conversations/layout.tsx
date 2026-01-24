@@ -3,12 +3,14 @@
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
+import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
 
   // Memoize params to prevent unnecessary rerenders
   const routeParams = useMemo(
@@ -21,6 +23,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   )
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
+
+  // Redirect to marketplace immediately if onboarding should start (before conversations page renders)
+  useEffect(() => {
+    if (shouldShowOnboarding && currentStep === null) {
+      router.replace('/marketplace')
+    }
+  }, [shouldShowOnboarding, currentStep, router])
 
   // Handle conversation change from ConversationInterface
   const handleConversationChange = useCallback(

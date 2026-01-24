@@ -63,9 +63,10 @@ export function useNavigationOnboarding() {
   const queryClient = useQueryClient()
   const router = useRouter()
   const [currentStep, setCurrentStep] = useState<number | null>(null)
+  const [hasCompletedLocally, setHasCompletedLocally] = useState(false)
 
-  // Check if user has completed onboarding
-  const hasCompletedOnboarding = user?.navigationOnboardingCompleted ?? false
+  // Check if user has completed onboarding (either from server or locally)
+  const hasCompletedOnboarding = hasCompletedLocally || (user?.navigationOnboardingCompleted ?? false)
 
   // Check if onboarding should be shown
   const shouldShowOnboarding = isAuthenticated && !hasCompletedOnboarding
@@ -76,10 +77,15 @@ export function useNavigationOnboarding() {
       const response: FetchResponse<ApiResponse<any>> = await api.post('/api/v1/users/me/onboarding/navigation/complete')
       return response.data.data
     },
-    onSuccess: () => {
-      // Invalidate user query to refresh user data
-      queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+    onSuccess: async () => {
+      // Immediately mark as completed locally to prevent restart
+      setHasCompletedLocally(true)
       setCurrentStep(null)
+      
+      // Invalidate and refetch user query to refresh user data
+      await queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
+      await queryClient.refetchQueries({ queryKey: ['auth', 'me'] })
+      
       // Redirect to Explore Agents after completion
       router.push('/marketplace')
     },
@@ -87,10 +93,11 @@ export function useNavigationOnboarding() {
 
   // Start onboarding
   const startOnboarding = useCallback(() => {
-    if (shouldShowOnboarding) {
+    // Don't start if we're completing or have completed locally
+    if (shouldShowOnboarding && !hasCompletedLocally && !completeOnboardingMutation.isPending) {
       setCurrentStep(1)
     }
-  }, [shouldShowOnboarding])
+  }, [shouldShowOnboarding, hasCompletedLocally, completeOnboardingMutation.isPending])
 
   // Go to next step
   const nextStep = useCallback(() => {

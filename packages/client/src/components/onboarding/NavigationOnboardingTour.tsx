@@ -17,7 +17,7 @@ interface NavigationOnboardingTourProps {
 export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: NavigationOnboardingTourProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { currentStep, currentStepInfo, totalSteps, nextStep, previousStep, shouldShowOnboarding, startOnboarding } = useNavigationOnboardingContext()
+  const { currentStep, currentStepInfo, totalSteps, nextStep, previousStep, shouldShowOnboarding, startOnboarding, isCompleting } = useNavigationOnboardingContext()
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; pointerTop?: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
   
@@ -26,15 +26,16 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
 
   // Start onboarding when component mounts and should show
   // Only start on conversations page (as per requirements)
+  // Don't start if we're in the process of completing
   useEffect(() => {
-    if (shouldShowOnboarding && currentStep === null && pathname.includes('/conversations')) {
+    if (shouldShowOnboarding && currentStep === null && !isCompleting && pathname.includes('/conversations')) {
       // Small delay to ensure navigation items are rendered
       const timer = setTimeout(() => {
         startOnboarding()
       }, 100)
       return () => clearTimeout(timer)
     }
-  }, [shouldShowOnboarding, currentStep, startOnboarding, pathname])
+  }, [shouldShowOnboarding, currentStep, startOnboarding, pathname, isCompleting])
 
   // Get route for current step
   const getStepRoute = (step: OnboardingStep | null): string | null => {

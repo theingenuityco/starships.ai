@@ -11,11 +11,8 @@ import { useModelContextLength } from '@/hooks/useLlmModels'
 import { cn } from '@/lib/utils'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useAuth } from '@/hooks/useAuth'
-import { useOnboardingChatSkip } from '@/hooks/useOnboardingChatSkip'
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef } from 'react'
-import { Button } from '@/components/ui/button'
-import { toast } from 'sonner'
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
@@ -40,7 +37,6 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   const { isInstanceAdmin } = useAuth()
   const showTokens = expertMode
   const showCost = expertMode && isInstanceAdmin
-  const skipOnboarding = useOnboardingChatSkip()
 
   // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
   const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
@@ -156,11 +152,6 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
 
   const title = currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`
   const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')
-  const isOnboardingConversation = (() => {
-    const rec = currentConversation as any
-    const state = rec?.state && typeof rec.state === 'object' ? (rec.state as any) : null
-    return state?.isOnboardingConversation === true
-  })()
 
   // Format dates
   const formatDate = (date: Date) => {
@@ -242,26 +233,6 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
               {/* Title */}
               <div className="flex items-center gap-2 min-w-0">
                 <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
-                {isOnboardingConversation ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
-                    disabled={skipOnboarding.isPending}
-                    onClick={async () => {
-                      if (!conversationId) return
-                      try {
-                        await skipOnboarding.mutateAsync({ conversationId })
-                        toast.success('Onboarding skipped')
-                      } catch (e: any) {
-                        toast.error('Could not skip onboarding', { description: e?.message || 'Please try again.' })
-                      }
-                    }}
-                  >
-                    Skip
-                  </Button>
-                ) : null}
               </div>
 
               {/* Agents + updated row */}

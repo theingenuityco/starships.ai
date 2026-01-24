@@ -6,10 +6,6 @@ import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { TopRightUserProfile } from '@/components/auth/TopRightUserProfile'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
-import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useStarshipConnectors } from '@/hooks/useConnectors'
-import { useStarshipAgents } from '@/hooks/useAgents'
-import { useConversationDetail } from '@/hooks/useConversations'
 import { StarTheme } from '@/components/theme-context'
 import { EmailChangeToastHandler } from '@/components/global/EmailChangeToastHandler'
 
@@ -53,7 +49,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const isDashboard = pathname === '/'
   const isMarketplace = typeof pathname === 'string' && (pathname === '/marketplace' || pathname.startsWith('/marketplace/'))
   const isConnectorInstallPage = typeof pathname === 'string' && pathname.startsWith('/connectors/') && pathname.endsWith('/install')
-  const isOnboarding = pathname === '/onboarding'
   const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
   const isPublicSimplePage =
     pathname === '/' ||
@@ -63,8 +58,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     pathname === '/reset-password' ||
     pathname === '/terms' ||
     pathname === '/privacy' ||
-    isConnectorInstallPage ||
-    isOnboarding
+    isConnectorInstallPage
 
   useEffect(() => {
     if (!pathname) return
@@ -132,50 +126,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const [isPageReady, setIsPageReady] = useState(false)
 
   // Only show the top-right profile on fully-loaded ship pages.
-  // - Gate on mount to avoid pre-hydration flashes.
-  // - Gate on next animation frame when the route changes to avoid showing during layout churn.
   const showTopRightUserProfile = hasMounted && isPageReady && (isShipPage || (isMarketplace && isAuthenticated))
-
-  // Ship navbar hiding rule:
-  // Hide the nav ONLY for onboarding conversations, and only until the starship is minimally configured.
-  // This keeps the onboarding chat focused without affecting normal ship navigation.
-  const conversationIdFromPath = (() => {
-    if (!isShipPage) return null
-    const parts = String(pathname).split('/').filter(Boolean) // ["ship", "<slug>", ...]
-    // /ship/:slug/conversations/:conversationId
-    if (!(parts.length >= 4 && parts[2] === 'conversations' && Boolean(parts[3]))) return null
-    return String(parts[3])
-  })()
-  const { data: conversationForOnboardingNav } = useConversationDetail(conversationIdFromPath)
-  const isOnboardingConversationRoute = (() => {
-    if (!conversationIdFromPath) return false
-    const rec = conversationForOnboardingNav as any
-    const state = rec?.state && typeof rec.state === 'object' ? (rec.state as any) : null
-    return state?.isOnboardingConversation === true
-  })()
-
-  const starshipSlugFromPath = (() => {
-    if (!isShipPage) return null
-    const parts = String(pathname).split('/').filter(Boolean) // ["ship", "<slug>", ...]
-    return parts.length >= 2 ? parts[1] : null
-  })()
-  const { data: starshipForNav } = useStarshipBySlug(starshipSlugFromPath || '', Boolean(isShipPage && starshipSlugFromPath && isAuthenticated))
-  const starshipIdForNav = (starshipForNav as any)?.id as string | undefined
-  const { data: starshipConnectorsForNav = [] } = useStarshipConnectors(starshipIdForNav || '', Boolean(isShipPage && !!starshipIdForNav && isAuthenticated))
-  const { data: starshipAgentsForNav = [] } = useStarshipAgents(starshipIdForNav || '', Boolean(isShipPage && !!starshipIdForNav && isAuthenticated))
-
-  const connectedConnectorCount = Array.isArray(starshipConnectorsForNav)
-    ? starshipConnectorsForNav.filter((c: any) => String(c?.status || '').toLowerCase() === 'connected').length
-    : 0
-  const agentCount = Array.isArray(starshipAgentsForNav) ? starshipAgentsForNav.length : 0
-
-  // Hide until the starship has BOTH:
-  // - at least 1 connected connector
-  // - at least 2 agents
-  // (i.e. hide if either requirement is not yet met)
-  const shouldHideNavigationForEarlyStarship = Boolean(
-    isOnboardingConversationRoute && (connectedConnectorCount < 1 || agentCount < 2)
-  )
 
   useEffect(() => {
     const checkMobile = () => {
@@ -276,9 +227,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     )
   }
 
-  // Only show navigation for authenticated users (JwtAuthGate will handle this)
   // Hide navigation only on landing page
-  const shouldHideNavigation = isDashboard || shouldHideNavigationForEarlyStarship
+  const shouldHideNavigation = isDashboard
 
   // Regular pages with conditional navigation sidebar
   return (

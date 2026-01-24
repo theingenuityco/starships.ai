@@ -137,10 +137,6 @@ export class UserEntity implements UserModel {
   emailVerified?: boolean;
 
   @Expose()
-  @IsBoolean()
-  onboardingCompleted!: boolean;
-
-  @Expose()
   @IsOptional()
   @IsISO8601()
   lastLoginAt?: string;
@@ -195,9 +191,6 @@ export class UserEntity implements UserModel {
         displayName: dataRecord.displayName,
         avatar: dataRecord.avatar,
         password: dataRecord.password,
-        // Default onboardingCompleted for new users if not explicitly provided
-        onboardingCompleted:
-          typeof dataRecord.onboardingCompleted === 'boolean' ? dataRecord.onboardingCompleted : false,
         ...dataRecord,
       });
     } else {

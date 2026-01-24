@@ -97,7 +97,6 @@ export class UserService {
       avatar: request.avatar,
       password: hashedPassword,
       emailVerified: request.emailVerified || false,
-      onboardingCompleted: false,
       stripeCustomerId: request.stripeCustomerId,
       hasPassword: !!request.password,
       authMethods: request.password ? ['password' as AuthMethod] : [],

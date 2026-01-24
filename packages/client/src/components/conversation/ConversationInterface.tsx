@@ -149,9 +149,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Deduplicate UI action payloads across sources
   const lastUIActionKeyRef = useRef<string | null>(null)
 
-  // Onboarding connector suggestions (conversation-driven onboarding)
-  const [onboardingConnectorProviders, setOnboardingConnectorProviders] = useState<string[]>([])
-
   const queryClient = useQueryClient()
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
@@ -891,16 +888,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                     }}
                   />
                 )}
-
-                {onboardingConnectorProviders.length > 0 && showMessagesArea ? (
-                  <div className="mb-4 rounded-2xl border border-border/50 bg-card/40 p-4">
-                    <div className="mb-3 flex items-center justify-between">
-                      <div className="text-sm font-medium text-foreground">Suggested connectors</div>
-                      <div className="text-xs text-muted-foreground">Connect right here, then keep chatting</div>
-                    </div>
-                    <StarshipConnectorsPanel starshipId={starshipId} onlyProviders={onboardingConnectorProviders} hideSearch={true} hideDisconnect={true} />
-                  </div>
-                ) : null}
 
                 <ConversationMessageInput
                   key={inputKey}

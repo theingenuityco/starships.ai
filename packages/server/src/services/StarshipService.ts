@@ -405,11 +405,10 @@ export class StarshipService {
   }
 
   /**
-   * Create initial agents for a new starship: Daedalus (toolwright), Gaia (agent creator), and Aria (delegator)
+   * Create initial agents for a new starship: Daedalus (toolwright), Gaia (agent creator)
    * - Deploys default tools once
    * - Creates Daedalus if available
    * - Creates Gaia if available
-   * - Creates Aria if available
    * Returns a map of created agents by name when created
    */
   static async createInitialAgents(userId: string, starshipId: string): Promise<Record<string, AgentModel>> {
@@ -421,16 +420,11 @@ export class StarshipService {
       // Ensure default tools are deployed once so agents relying on them have what they need
       await StarshipService.createDefaultTools(starshipId);
 
-      // Fetch templates relevant to initial agents
       const daedalusTemplates = await templateService.searchTemplates('Daedalus');
       const gaiaTemplates = await templateService.searchTemplates('Gaia');
-      const ariaTemplates = await templateService.searchTemplates('Aria');
-
       const daedalusTemplate = daedalusTemplates.find((t) => t.name === 'Daedalus');
       const gaiaTemplate = gaiaTemplates.find((t) => t.name === 'Gaia');
-      const ariaTemplate = ariaTemplates.find((t) => t.name === 'Aria');
 
-      // Create Daedalus if present
       if (daedalusTemplate) {
         try {
           const daedalus = await templateService.createAgentFromTemplate(daedalusTemplate.id, starshipId);
@@ -445,7 +439,6 @@ export class StarshipService {
         console.warn('[STARSHIP-SERVICE] Daedalus template not found - skipping Daedalus creation');
       }
 
-      // Create Gaia if present
       if (gaiaTemplate) {
         try {
           const gaia = await templateService.createAgentFromTemplate(gaiaTemplate.id, starshipId);
@@ -458,21 +451,6 @@ export class StarshipService {
         }
       } else {
         console.warn('[STARSHIP-SERVICE] Gaia template not found - skipping Gaia creation');
-      }
-
-      // Create Aria if present
-      if (ariaTemplate) {
-        try {
-          const aria = await templateService.createAgentFromTemplate(ariaTemplate.id, starshipId);
-          if (aria?.id) {
-            await agentRepo.setAllAssignedToolPermissionsForAgent(aria.id, 'allow');
-          }
-          if (aria) created['Aria'] = aria;
-        } catch (err) {
-          console.error('[STARSHIP-SERVICE] Failed to create Aria agent:', err);
-        }
-      } else {
-        console.warn('[STARSHIP-SERVICE] Aria template not found - skipping Aria creation');
       }
 
       return created;

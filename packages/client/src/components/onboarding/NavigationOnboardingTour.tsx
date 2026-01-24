@@ -29,13 +29,16 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   // Don't start if we're in the process of completing
   useEffect(() => {
     if (shouldShowOnboarding && currentStep === null && !isCompleting && pathname.includes('/conversations')) {
-      // Small delay to ensure navigation items are rendered
+      // Navigate to marketplace first, then start onboarding
+      // This ensures the correct background is shown immediately
+      router.replace('/marketplace')
+      // Small delay to ensure navigation items are rendered after route change
       const timer = setTimeout(() => {
         startOnboarding()
-      }, 100)
+      }, 150)
       return () => clearTimeout(timer)
     }
-  }, [shouldShowOnboarding, currentStep, startOnboarding, pathname, isCompleting])
+  }, [shouldShowOnboarding, currentStep, startOnboarding, pathname, isCompleting, router])
 
   // Get route for current step
   const getStepRoute = (step: OnboardingStep | null): string | null => {
@@ -71,8 +74,8 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
         router.replace(route)
       }
     }
-    // If step 1 just started, navigate to marketplace immediately
-    else if (currentStep === 1 && pathname !== '/marketplace') {
+    // If step 1 is active but we're not on marketplace, navigate there
+    else if (currentStep === 1 && pathname !== '/marketplace' && !pathname.includes('/marketplace')) {
       router.replace('/marketplace')
     }
   }, [currentStep, currentStepInfo, starshipSlug, pathname, router, shouldShowOnboarding])

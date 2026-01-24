@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'motion/react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 import { ONBOARDING_STEPS, type OnboardingStep } from '@/hooks/useNavigationOnboarding'
 import { Button } from '@/components/ui/button'
+import Icon from '@/components/primitives/Icon'
 import { cn } from '@/lib/utils'
 
 interface NavigationOnboardingTourProps {
@@ -198,7 +199,12 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
             <div className="space-y-4">
               {/* Title */}
               <div>
-                <h3 className="text-lg font-semibold text-foreground">{currentStepInfo.label}</h3>
+                <div className="flex items-center gap-2">
+                  {currentStepInfo.icon && (
+                    <Icon name={currentStepInfo.icon} className="w-5 h-5 text-primary" />
+                  )}
+                  <h3 className="text-lg font-semibold text-foreground">{currentStepInfo.label}</h3>
+                </div>
                 <p className="text-sm text-muted-foreground mt-1">{currentStepInfo.description}</p>
               </div>
 

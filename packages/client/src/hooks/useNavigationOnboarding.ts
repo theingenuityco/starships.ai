@@ -14,6 +14,7 @@ export interface OnboardingStep {
   route: string
   label: string
   description: string
+  icon: string
 }
 
 export const ONBOARDING_STEPS: OnboardingStep[] = [
@@ -22,30 +23,35 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     route: '/marketplace',
     label: 'Explore Agents',
     description: 'Find new agents that match your needs and deploy them to your starship.',
+    icon: 'store',
   },
   {
     step: 2,
     route: '/connectors', // This will be replaced with actual starship slug
     label: 'Connectors',
     description: 'Connect your apps for agents to interact with them.',
+    icon: 'plug',
   },
   {
     step: 3,
     route: '/agents', // This will be replaced with actual starship slug
     label: 'My Agents',
     description: 'View and manage your deployed agents.',
+    icon: 'bot',
   },
   {
     step: 4,
     route: '/schedules', // This will be replaced with actual starship slug
     label: 'Schedules',
     description: 'Automate agents to run tasks at a specific time and date.',
+    icon: 'clock',
   },
   {
     step: 5,
     route: '/conversations', // This will be replaced with actual starship slug
     label: 'New Chat',
     description: 'Start a new conversation with your agents. Click here anytime to begin a fresh chat session.',
+    icon: 'plus',
   },
 ]
 

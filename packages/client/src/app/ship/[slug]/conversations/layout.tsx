@@ -4,13 +4,13 @@ import { ConversationInterface } from '@/components/conversation/ConversationInt
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect } from 'react'
-import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
+  const { user, isAuthenticated } = useAuth()
 
   // Memoize params to prevent unnecessary rerenders
   const routeParams = useMemo(
@@ -24,12 +24,21 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
 
+  // Check if onboarding should start and redirect immediately (before rendering)
+  const hasCompletedOnboarding = user?.navigationOnboardingCompleted ?? false
+  const shouldShowOnboarding = isAuthenticated && !hasCompletedOnboarding
+
   // Redirect to marketplace immediately if onboarding should start (before conversations page renders)
   useEffect(() => {
-    if (shouldShowOnboarding && currentStep === null) {
+    if (shouldShowOnboarding) {
       router.replace('/marketplace')
     }
-  }, [shouldShowOnboarding, currentStep, router])
+  }, [shouldShowOnboarding, router])
+
+  // Don't render conversations interface if we're redirecting to onboarding
+  if (shouldShowOnboarding) {
+    return null
+  }
 
   // Handle conversation change from ConversationInterface
   const handleConversationChange = useCallback(

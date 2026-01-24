@@ -11,6 +11,7 @@ interface NavigationSectionItem {
   onClick?: () => void
   special?: boolean
   itemRef?: React.RefObject<HTMLElement>
+  isOnboardingHighlighted?: boolean
 }
 
 type RenderAfterFn = (item: NavigationSectionItem, index: number) => React.ReactNode
@@ -36,7 +37,7 @@ export function NavigationSection({ title, items, pathname, renderAfter, showLab
 
         return (
           <div key={uniqueKey} className="w-full" style={{ marginTop: '4px', marginBottom: '4px' }}>
-            <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} special={item.special} onItemClick={onItemClick} itemRef={item.itemRef} />
+            <NavigationItem {...rest} isActive={isActive} showLabels={showLabels} expanded={expanded} onClick={item.onClick} special={item.special} onItemClick={onItemClick} itemRef={item.itemRef} isOnboardingHighlighted={item.isOnboardingHighlighted} />
             {renderAfter ? renderAfter(item, index) : null}
           </div>
         )

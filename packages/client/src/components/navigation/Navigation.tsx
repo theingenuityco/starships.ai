@@ -12,6 +12,7 @@ import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnbo
 import { useDeleteConversation } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
+import { useNavigationOnboarding } from '@/hooks/useNavigationOnboarding'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -31,6 +32,7 @@ export function Navigation(props: NavigationProps) {
   const router = useRouter()
   const { isAuthenticated, user, userName, isInstanceAdmin } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
+  const { currentStepInfo } = useNavigationOnboarding()
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
   // On mobile, always expanded (no collapse functionality)
@@ -242,15 +244,77 @@ export function Navigation(props: NavigationProps) {
     return refs
   }, [])
 
+  // Determine which navigation item should be highlighted during onboarding
+  const getOnboardingHighlight = useCallback(
+    (label: string): boolean => {
+      if (!currentStepInfo) return false
+      return currentStepInfo.label === label
+    },
+    [currentStepInfo]
+  )
+
   // Memoize main navigation items - only recalculate when dependencies change
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
-      ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true, itemRef: newChatRef }] : []),
-      { href: `/marketplace`, label: 'Explore Agents', icon: 'store', isActive: pathname === '/marketplace', itemRef: exploreAgentsRef },
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'bot', isActive: isAgentsRoute || isAgentBuilderRoute, itemRef: myAgentsRef }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute, itemRef: connectorsRef }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute, itemRef: schedulesRef }] : []),
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: '#',
+              label: 'New Chat',
+              icon: 'plus',
+              isActive: false,
+              onClick: handleNewConversation,
+              special: true,
+              itemRef: newChatRef,
+              isOnboardingHighlighted: getOnboardingHighlight('New Chat'),
+            },
+          ]
+        : []),
+      {
+        href: `/marketplace`,
+        label: 'Explore Agents',
+        icon: 'store',
+        isActive: pathname === '/marketplace',
+        itemRef: exploreAgentsRef,
+        isOnboardingHighlighted: getOnboardingHighlight('Explore Agents'),
+      },
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: `/ship/${starshipSlug}/agents`,
+              label: 'My Agents',
+              icon: 'bot',
+              isActive: isAgentsRoute || isAgentBuilderRoute,
+              itemRef: myAgentsRef,
+              isOnboardingHighlighted: getOnboardingHighlight('My Agents'),
+            },
+          ]
+        : []),
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: `/ship/${starshipSlug}/connectors`,
+              label: 'Connectors',
+              icon: 'plug',
+              isActive: isConnectorsRoute,
+              itemRef: connectorsRef,
+              isOnboardingHighlighted: getOnboardingHighlight('Connectors'),
+            },
+          ]
+        : []),
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: `/ship/${starshipSlug}/schedules`,
+              label: 'Schedules',
+              icon: 'clock',
+              isActive: isSchedulesRoute,
+              itemRef: schedulesRef,
+              isOnboardingHighlighted: getOnboardingHighlight('Schedules'),
+            },
+          ]
+        : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && isInstanceAdmin
         ? [
@@ -276,6 +340,7 @@ export function Navigation(props: NavigationProps) {
       handleNewConversation,
       starshipData?.id,
       isInstanceAdmin,
+      getOnboardingHighlight,
     ]
   )
 

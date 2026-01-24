@@ -18,9 +18,10 @@ interface NavigationItemProps {
   special?: boolean
   onItemClick?: () => void
   itemRef?: React.RefObject<HTMLDivElement>
+  isOnboardingHighlighted?: boolean
 }
 
-export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick, itemRef }: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick, itemRef, isOnboardingHighlighted = false }: NavigationItemProps) {
   const router = useRouter()
 
   const handleClick = useCallback(
@@ -64,6 +65,9 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
     )
   }, [icon])
 
+  // Determine if item should be highlighted (either active route or onboarding highlight)
+  const shouldHighlight = isActive || isOnboardingHighlighted
+
   const motionDiv = (
     <div
       ref={itemRef}
@@ -71,7 +75,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 ${
         special
           ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
-          : isActive
+          : shouldHighlight
             ? 'text-primary bg-primary/10 border-transparent'
             : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
       }`}

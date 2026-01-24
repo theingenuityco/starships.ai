@@ -16,7 +16,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   const router = useRouter()
   const pathname = usePathname()
   const { currentStep, currentStepInfo, totalSteps, nextStep, previousStep, shouldShowOnboarding, startOnboarding } = useNavigationOnboarding()
-  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number } | null>(null)
+  const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; pointerTop?: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
 
   // Start onboarding when component mounts and should show
@@ -97,9 +97,13 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
     const popupHeight = 200 // Approximate popup height
     const spacing = 16 // Space between item and popup
 
+    // Calculate navigation item center position
+    const itemCenterY = rect.top + rect.height / 2
+
     // Position popup to the right of the navigation item
+    // Try to align popup center vertically with navigation item center
+    let top = itemCenterY - popupHeight / 2
     const left = rect.right + spacing
-    const top = rect.top + rect.height / 2 - popupHeight / 2
 
     // Ensure popup stays within viewport
     const viewportWidth = window.innerWidth
@@ -123,7 +127,11 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
       finalTop = 16
     }
 
-    setPopupPosition({ top: finalTop, left: finalLeft })
+    // Calculate pointer position relative to popup top
+    // Pointer should point to the center of the navigation item
+    const pointerTop = itemCenterY - finalTop
+
+    setPopupPosition({ top: finalTop, left: finalLeft, pointerTop })
   }, [currentStepInfo, navigationItemRefs, shouldShowOnboarding])
 
   if (!shouldShowOnboarding || !currentStep || !currentStepInfo || !popupPosition) {
@@ -162,14 +170,18 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
             }}
           >
             {/* Pointer - pointing left to navigation item */}
-            <div
-              className="absolute left-0 top-1/2 -translate-x-full w-0 h-0"
-              style={{
-                borderTop: '12px solid transparent',
-                borderBottom: '12px solid transparent',
-                borderRight: '12px solid hsl(var(--primary))',
-              }}
-            />
+            {popupPosition.pointerTop !== undefined && (
+              <div
+                className="absolute left-0 w-0 h-0"
+                style={{
+                  top: `${popupPosition.pointerTop}px`,
+                  transform: 'translateX(-100%) translateY(-50%)',
+                  borderTop: '12px solid transparent',
+                  borderBottom: '12px solid transparent',
+                  borderRight: '12px solid hsl(var(--primary))',
+                }}
+              />
+            )}
 
             {/* Content */}
             <div className="space-y-4">

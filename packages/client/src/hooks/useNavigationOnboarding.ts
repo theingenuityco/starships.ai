@@ -5,6 +5,7 @@ import { useAuth } from './useAuth'
 import api, { type FetchResponse } from '@/lib/api'
 import type { ApiResponse } from '@starships/protocol'
 import { useState, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 
 const TOTAL_STEPS = 5
 
@@ -20,25 +21,25 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     step: 1,
     route: '/marketplace',
     label: 'Explore Agents',
-    description: 'Browse and discover AI agents from the marketplace. Find agents that match your needs and deploy them to your starship.',
+    description: 'Find new agents that match your needs and deploy them to your starship.',
   },
   {
     step: 2,
     route: '/connectors', // This will be replaced with actual starship slug
     label: 'Connectors',
-    description: 'Connect your favorite tools and services. Connectors allow your agents to interact with external APIs and data sources.',
+    description: 'Connect your apps for agents to interact with them.',
   },
   {
     step: 3,
     route: '/agents', // This will be replaced with actual starship slug
     label: 'My Agents',
-    description: 'Manage your deployed agents. View, configure, and customize the AI agents that power your starship.',
+    description: 'View and manage your deployed agents.',
   },
   {
     step: 4,
     route: '/schedules', // This will be replaced with actual starship slug
     label: 'Schedules',
-    description: 'Set up automated tasks and workflows. Schedule agents to run at specific times or intervals.',
+    description: 'Automate agents to run tasks at a specific time and date.',
   },
   {
     step: 5,
@@ -54,6 +55,7 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
 export function useNavigationOnboarding() {
   const { user, isAuthenticated } = useAuth()
   const queryClient = useQueryClient()
+  const router = useRouter()
   const [currentStep, setCurrentStep] = useState<number | null>(null)
 
   // Check if user has completed onboarding
@@ -72,6 +74,8 @@ export function useNavigationOnboarding() {
       // Invalidate user query to refresh user data
       queryClient.invalidateQueries({ queryKey: ['auth', 'me'] })
       setCurrentStep(null)
+      // Redirect to Explore Agents after completion
+      router.push('/marketplace')
     },
   })
 

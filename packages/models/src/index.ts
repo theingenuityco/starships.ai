@@ -30,7 +30,6 @@ export { PromoRedemptionEntity } from './entities/PromoRedemptionEntity';
 export { WidgetEntity } from './entities/WidgetEntity';
 export { ScheduleEntity } from './entities/ScheduleEntity';
 export { ToolCallApprovalEntity } from './entities/ToolCallApprovalEntity';
-export { OnboardingSessionEntity } from './entities/OnboardingSessionEntity';
 // Turns
 
 /* Repository exports */
@@ -65,7 +64,6 @@ export { ScheduleRepository } from './repositories/ScheduleRepository';
 export { ToolCallApprovalRepository } from './repositories/ToolCallApprovalRepository';
 export { TurnRepository } from './repositories/TurnRepository';
 export { LlmModelRepository } from './repositories/LlmModelRepository';
-export { OnboardingSessionRepository } from './repositories/OnboardingSessionRepository';
 
 // Logging and monitoring
 export { HealthMonitor, Logger, logger, PerformanceMonitor, RequestContext } from './helpers/logging';

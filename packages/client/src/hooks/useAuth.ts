@@ -17,13 +17,17 @@ export interface AuthUser {
   hasPassword: boolean
   authMethods: AuthMethod[]
   primaryAuthMethod: 'password' | 'oauth'
-  onboardingCompleted: boolean
   /**
    * Instance-level admin flag from backend.
    * When true, user can access instance admin views (e.g. publish approvals).
    * Optional for backward compatibility with older tokens.
    */
   isInstanceAdmin?: boolean
+  /**
+   * Navigation onboarding completion flag.
+   * When true, user has completed the one-time navigation onboarding tour.
+   */
+  navigationOnboardingCompleted?: boolean
 }
 
 interface AuthLoginResponse {
@@ -34,12 +38,10 @@ interface AuthLoginResponse {
     id?: string
     name?: string
   }
-  onboardingRequired: boolean
   message?: string
   // Email verification fields
   emailNotVerified?: boolean
   canResendVerification?: boolean
-  // First login detection (backend-tracked)
   isFirstLogin?: boolean
 }
 
@@ -166,19 +168,6 @@ function isConnectorInstallPath(pathname: string | null | undefined): boolean {
   return p.startsWith('/connectors/') && p.includes('/install')
 }
 
-function isPreOnboardingAllowedReturnUrl(returnUrl: string | null): boolean {
-  if (!returnUrl) return false
-  // Return URLs are expected to be relative paths beginning with `/`.
-  try {
-    const u = new URL(returnUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
-    // Allow invite acceptance to run before onboarding, otherwise invited users never get added.
-    if (u.pathname === '/accept-invite') return true
-    return false
-  } catch {
-    return false
-  }
-}
-
 // Login mutation
 export function useLogin() {
   const queryClient = useQueryClient()
@@ -204,48 +193,41 @@ export function useLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token } = data
+      const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
         handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useLogin')
         return
       }
 
-      // Store token
       setStoredToken(token)
-
-      // Update auth user cache
       queryClient.setQueryData(AUTH_QUERY_KEYS.me(), user)
 
-      // Embedded connector install flow should remain on the install page and let the UI advance.
       if (isConnectorInstallPath(typeof window !== 'undefined' ? window.location.pathname : null)) {
         queryClient.invalidateQueries()
         return
       }
 
       const redirectTarget = getPostAuthRedirectTarget()
+      const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
 
-      // If onboarding is required for this user, always route to onboarding.
-      // Starship provisioning is handled by onboarding (not login).
-      if ((data as any)?.onboardingRequired === true) {
-        if (isPreOnboardingAllowedReturnUrl(redirectTarget)) {
-          router.push(addWelcomeParamToPath(redirectTarget!))
-        } else {
-          router.push('/onboarding')
-        }
-        queryClient.invalidateQueries()
-        return
-      }
+      // Check if onboarding should start - redirect to marketplace instead of conversations
+      const hasCompletedOnboarding = user?.navigationOnboardingCompleted ?? false
+      const shouldStartOnboarding = !hasCompletedOnboarding
 
       if (redirectTarget) {
-        router.push(addWelcomeParamToPath(redirectTarget))
-      } else if (data.starship?.slug) {
-        router.push(addWelcomeParamToPath(`/ship/${data.starship.slug}/conversations`))
+        router.push(addWelcome(redirectTarget))
+      } else if (starship?.slug) {
+        // If onboarding should start, go to marketplace; otherwise go to conversations
+        if (shouldStartOnboarding) {
+          router.push('/marketplace')
+        } else {
+          router.push(addWelcome(`/ship/${starship.slug}/conversations`))
+        }
       } else {
         router.push('/profile')
       }
 
-      // Invalidate all queries to refetch with new auth context
       queryClient.invalidateQueries()
     },
     onError: (error: any) => {
@@ -306,25 +288,12 @@ export function useRegister() {
       }
 
       const redirectTarget = getPostAuthRedirectTarget()
-
-      // If onboarding is enabled server-side and required for this user, always route to onboarding.
-      if ((data as any)?.onboardingRequired === true) {
-        if (isPreOnboardingAllowedReturnUrl(redirectTarget)) {
-          router.push(addWelcomeParamToPath(redirectTarget!))
-        } else {
-          router.push('/onboarding')
-        }
-        queryClient.invalidateQueries()
-        return
-      }
-
       if (redirectTarget) {
-        router.push(addWelcomeParamToPath(redirectTarget))
-      } else if (starship) {
-        router.push(addWelcomeParamToPath(`/ship/${starship.slug}/conversations`))
+        router.push(redirectTarget)
+      } else if (starship?.slug) {
+        router.push(`/ship/${starship.slug}/conversations`)
       }
 
-      // Invalidate all queries to refetch with new auth context
       queryClient.invalidateQueries()
     },
     onError: (error: any) => {
@@ -359,7 +328,7 @@ export function useOAuthLogin() {
       return data.data as AuthLoginResponse
     },
     onSuccess: data => {
-      const { user, token } = data
+      const { user, token, starship, isFirstLogin } = data
 
       if (!user || !token) {
         handleError(new Error('We encountered an issue loading your account. Please try refreshing the page or contact support if this persists.'), 'useOAuthLogin')
@@ -380,27 +349,25 @@ export function useOAuthLogin() {
       }
 
       const redirectTarget = getPostAuthRedirectTarget()
+      const addWelcome = (p: string) => (isFirstLogin ? addWelcomeParamToPath(p) : p)
 
-      // If onboarding is enabled server-side and required for this user, always route to onboarding.
-      if ((data as any)?.onboardingRequired === true) {
-        if (isPreOnboardingAllowedReturnUrl(redirectTarget)) {
-          router.push(addWelcomeParamToPath(redirectTarget!))
-        } else {
-          router.push('/onboarding')
-        }
-        queryClient.invalidateQueries()
-        return
-      }
+      // Check if onboarding should start - redirect to marketplace instead of conversations
+      const hasCompletedOnboarding = user?.navigationOnboardingCompleted ?? false
+      const shouldStartOnboarding = !hasCompletedOnboarding
 
       if (redirectTarget) {
-        router.push(addWelcomeParamToPath(redirectTarget))
-      } else if (data.starship?.slug) {
-        router.push(addWelcomeParamToPath(`/ship/${data.starship.slug}/conversations`))
+        router.push(addWelcome(redirectTarget))
+      } else if (starship?.slug) {
+        // If onboarding should start, go to marketplace; otherwise go to conversations
+        if (shouldStartOnboarding) {
+          router.push('/marketplace')
+        } else {
+          router.push(addWelcome(`/ship/${starship.slug}/conversations`))
+        }
       } else {
         router.push('/profile')
       }
 
-      // Invalidate all queries to refetch with new auth context (same as regular login)
       queryClient.invalidateQueries()
     },
     onError: (error: any) => {

@@ -15,5 +15,3 @@ export { UserRepository } from './UserRepository';
 export { WidgetRepository } from './WidgetRepository';
 export { LlmModelRepository } from './LlmModelRepository';
 export { ConversationWidgetRepository } from './ConversationWidgetRepository';
-
-export { OnboardingSessionRepository } from './OnboardingSessionRepository';

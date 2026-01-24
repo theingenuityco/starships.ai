@@ -3,12 +3,16 @@
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useEffect } from 'react'
+import { useAuth } from '@/hooks/useAuth'
+import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
+  const { user, isAuthenticated } = useAuth()
+  const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
 
   // Memoize params to prevent unnecessary rerenders
   const routeParams = useMemo(
@@ -22,7 +26,16 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
 
+  // Redirect to marketplace immediately if onboarding should start BUT we're not on step 5
+  // Step 5 needs to show the conversations page, so we allow it to render
+  useEffect(() => {
+    if (shouldShowOnboarding && currentStep !== 5) {
+      router.replace('/marketplace')
+    }
+  }, [shouldShowOnboarding, currentStep, router])
+
   // Handle conversation change from ConversationInterface
+  // Must be called before any early returns to satisfy React Hooks rules
   const handleConversationChange = useCallback(
     (newConversationId: string | null) => {
       if (newConversationId) {
@@ -33,6 +46,11 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     },
     [router, routeParams.slug]
   )
+
+  // Don't render conversations interface if we're redirecting to onboarding (but allow step 5)
+  if (shouldShowOnboarding && currentStep !== 5) {
+    return null
+  }
 
   if (!starshipData) {
     return null // Layout handles loading/error states

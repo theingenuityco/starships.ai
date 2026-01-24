@@ -1,6 +1,6 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
 import { ConflictError, NotFoundError } from '@starships/errors';
-import { AgentRepository, StarshipMemberRepository, StarshipRepository, ToolRepository, UserRepository } from '@starships/models';
+import { AgentRepository, StarshipMemberRepository, StarshipRepository, UserRepository } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
 import { AgentTemplateService } from './AgentTemplateService';
 import { WalletService } from './WalletService';
@@ -344,73 +344,9 @@ export class StarshipService {
   }
 
   /**
-   * Deploy default host tools to a starship for Daedalus agent
-   */
-  static async createDefaultTools(starshipId: string): Promise<void> {
-    try {
-      const toolRepository = new ToolRepository();
-
-      // Deploy the host tools that Daedalus needs
-      const defaultToolSlugs = ['search-docs', 'get-doc', 'list-tools', 'get-tool', 'open-tool', 'edit-tool', 'test-tool'];
-
-      for (const toolSlug of defaultToolSlugs) {
-        try {
-          const existing = await toolRepository.findByTemplateSlugAndStarship(toolSlug, starshipId);
-          if (!existing) {
-            await toolRepository.createFromTemplate(toolSlug, starshipId);
-            console.log(`[STARSHIP-SERVICE] Deployed tool from template '${toolSlug}' to starship ${starshipId}`);
-          } else {
-            console.log(`[STARSHIP-SERVICE] Tool from template '${toolSlug}' already present on starship ${starshipId}`);
-          }
-        } catch (error) {
-          console.error(`[STARSHIP-SERVICE] Failed to deploy tool '${toolSlug}':`, error);
-        }
-      }
-
-      console.log(`[STARSHIP-SERVICE] Successfully deployed ${defaultToolSlugs.length} default tools to starship ${starshipId}`);
-    } catch (error) {
-      console.error('[STARSHIP-SERVICE] Failed to deploy default tools:', error);
-      // Don't throw error - tool deployment is optional during registration
-    }
-  }
-
-  /**
-   * Create the default Daedalus agent from template for a new user's starship
-   */
-  static async createDefaultAgent(userId: string, starshipId: string): Promise<AgentModel | null> {
-    try {
-      const templateService = new AgentTemplateService();
-
-      // Find the "Daedalus" template to use as the default toolwright
-      const templates = await templateService.searchTemplates('Daedalus');
-      const defaultTemplate = templates.find((t) => t.name === 'Daedalus');
-
-      if (!defaultTemplate) {
-        console.error('[STARSHIP-SERVICE] Daedalus agent template not found - skipping agent creation');
-        return null;
-      }
-
-      // Deploy default tools first so Daedalus can use them
-      await StarshipService.createDefaultTools(starshipId);
-
-      // Create agent from template with Daedalus as the default toolwright
-      const defaultAgent = await templateService.createAgentFromTemplate(defaultTemplate.id, starshipId);
-
-      return defaultAgent;
-    } catch (error) {
-      console.error('[STARSHIP-SERVICE] Failed to create default agent:', error);
-      // Don't throw error - agent creation is optional during registration
-      return null;
-    }
-  }
-
-  /**
-   * Create initial agents for a new starship: Daedalus (toolwright), Gaia (agent creator), and Aria (delegator)
-   * - Deploys default tools once
-   * - Creates Daedalus if available
-   * - Creates Gaia if available
-   * - Creates Aria if available
-   * Returns a map of created agents by name when created
+   * Create initial agent for a new starship: Aria only (Executive Officer).
+   * Aria's tools are deployed by AgentTemplateService when creating from template.
+   * Returns a map of created agents by name when created.
    */
   static async createInitialAgents(userId: string, starshipId: string): Promise<Record<string, AgentModel>> {
     const created: Record<string, AgentModel> = {};
@@ -418,49 +354,9 @@ export class StarshipService {
       const templateService = new AgentTemplateService();
       const agentRepo = new AgentRepository();
 
-      // Ensure default tools are deployed once so agents relying on them have what they need
-      await StarshipService.createDefaultTools(starshipId);
-
-      // Fetch templates relevant to initial agents
-      const daedalusTemplates = await templateService.searchTemplates('Daedalus');
-      const gaiaTemplates = await templateService.searchTemplates('Gaia');
       const ariaTemplates = await templateService.searchTemplates('Aria');
-
-      const daedalusTemplate = daedalusTemplates.find((t) => t.name === 'Daedalus');
-      const gaiaTemplate = gaiaTemplates.find((t) => t.name === 'Gaia');
       const ariaTemplate = ariaTemplates.find((t) => t.name === 'Aria');
 
-      // Create Daedalus if present
-      if (daedalusTemplate) {
-        try {
-          const daedalus = await templateService.createAgentFromTemplate(daedalusTemplate.id, starshipId);
-          if (daedalus?.id) {
-            await agentRepo.setAllAssignedToolPermissionsForAgent(daedalus.id, 'allow');
-          }
-          if (daedalus) created['Daedalus'] = daedalus;
-        } catch (err) {
-          console.error('[STARSHIP-SERVICE] Failed to create Daedalus agent:', err);
-        }
-      } else {
-        console.warn('[STARSHIP-SERVICE] Daedalus template not found - skipping Daedalus creation');
-      }
-
-      // Create Gaia if present
-      if (gaiaTemplate) {
-        try {
-          const gaia = await templateService.createAgentFromTemplate(gaiaTemplate.id, starshipId);
-          if (gaia?.id) {
-            await agentRepo.setAllAssignedToolPermissionsForAgent(gaia.id, 'allow');
-          }
-          if (gaia) created['Gaia'] = gaia;
-        } catch (err) {
-          console.error('[STARSHIP-SERVICE] Failed to create Gaia agent:', err);
-        }
-      } else {
-        console.warn('[STARSHIP-SERVICE] Gaia template not found - skipping Gaia creation');
-      }
-
-      // Create Aria if present
       if (ariaTemplate) {
         try {
           const aria = await templateService.createAgentFromTemplate(ariaTemplate.id, starshipId);

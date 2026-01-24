@@ -8,9 +8,11 @@ import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnboardingTour'
 import { useDeleteConversation } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
+import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -30,6 +32,7 @@ export function Navigation(props: NavigationProps) {
   const router = useRouter()
   const { isAuthenticated, user, userName, isInstanceAdmin } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
+  const { currentStepInfo } = useNavigationOnboardingContext()
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
   // On mobile, always expanded (no collapse functionality)
@@ -224,15 +227,96 @@ export function Navigation(props: NavigationProps) {
     handleLogoClick()
   }, [isExpanded, handleLogoClick])
 
+  // Create refs for navigation items (for onboarding positioning)
+  const newChatRef = useRef<HTMLDivElement>(null)
+  const exploreAgentsRef = useRef<HTMLDivElement>(null)
+  const myAgentsRef = useRef<HTMLDivElement>(null)
+  const connectorsRef = useRef<HTMLDivElement>(null)
+  const schedulesRef = useRef<HTMLDivElement>(null)
+
+  const navigationItemRefs = useMemo(() => {
+    const refs = new Map<string, React.RefObject<HTMLDivElement | null>>()
+    refs.set('New Chat', newChatRef)
+    refs.set('Explore Agents', exploreAgentsRef)
+    refs.set('My Agents', myAgentsRef)
+    refs.set('Connectors', connectorsRef)
+    refs.set('Schedules', schedulesRef)
+    return refs
+  }, [])
+
+  // Determine which navigation item should be highlighted during onboarding
+  const getOnboardingHighlight = useCallback(
+    (label: string): boolean => {
+      if (!currentStepInfo) return false
+      // Match the label exactly
+      const shouldHighlight = currentStepInfo.label === label
+      return shouldHighlight
+    },
+    [currentStepInfo]
+  )
+
   // Memoize main navigation items - only recalculate when dependencies change
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
-      ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
-      { href: `/marketplace`, label: 'Explore Agents', icon: 'store', isActive: pathname === '/marketplace' },
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }] : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: '#',
+              label: 'New Chat',
+              icon: 'plus',
+              isActive: false,
+              onClick: handleNewConversation,
+              special: true,
+              itemRef: newChatRef,
+              isOnboardingHighlighted: getOnboardingHighlight('New Chat'),
+            },
+          ]
+        : []),
+      {
+        href: `/marketplace`,
+        label: 'Explore Agents',
+        icon: 'store',
+        isActive: pathname === '/marketplace',
+        itemRef: exploreAgentsRef,
+        isOnboardingHighlighted: getOnboardingHighlight('Explore Agents'),
+      },
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: `/ship/${starshipSlug}/agents`,
+              label: 'My Agents',
+              icon: 'bot',
+              isActive: isAgentsRoute || isAgentBuilderRoute,
+              itemRef: myAgentsRef,
+              isOnboardingHighlighted: getOnboardingHighlight('My Agents'),
+            },
+          ]
+        : []),
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: `/ship/${starshipSlug}/connectors`,
+              label: 'Connectors',
+              icon: 'plug',
+              isActive: isConnectorsRoute,
+              itemRef: connectorsRef,
+              isOnboardingHighlighted: getOnboardingHighlight('Connectors'),
+            },
+          ]
+        : []),
+      ...(isAuthenticated && starshipSlug
+        ? [
+            {
+              href: `/ship/${starshipSlug}/schedules`,
+              label: 'Schedules',
+              icon: 'clock',
+              isActive: isSchedulesRoute,
+              itemRef: schedulesRef,
+              isOnboardingHighlighted: getOnboardingHighlight('Schedules'),
+            },
+          ]
+        : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && isInstanceAdmin
         ? [
@@ -258,6 +342,7 @@ export function Navigation(props: NavigationProps) {
       handleNewConversation,
       starshipData?.id,
       isInstanceAdmin,
+      getOnboardingHighlight,
     ]
   )
 
@@ -284,6 +369,7 @@ export function Navigation(props: NavigationProps) {
       {/* Navigation sidebar */}
       <motion.div
         ref={sidebarRef}
+        data-navigation-sidebar
         initial={isMobile ? { x: '-100%' } : false}
         animate={isMobile ? { x: isOpen ? 0 : '-100%' } : {}}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
@@ -444,6 +530,11 @@ export function Navigation(props: NavigationProps) {
           {/* Profile moved to global top-right header (see `TopRightUserProfile`) */}
         </div>
       </motion.div>
+
+      {/* Navigation Onboarding Tour */}
+      {isAuthenticated && starshipSlug && (
+        <NavigationOnboardingTour starshipSlug={starshipSlug} navigationItemRefs={navigationItemRefs} />
+      )}
     </>
   )
 }

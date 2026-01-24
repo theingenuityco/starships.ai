@@ -230,7 +230,7 @@ export function Navigation(props: NavigationProps) {
     () => [
       ...(isAuthenticated && starshipSlug ? [{ href: '#', label: 'New Chat', icon: 'plus', isActive: false, onClick: handleNewConversation, special: true }] : []),
       { href: `/marketplace`, label: 'Explore Agents', icon: 'store', isActive: pathname === '/marketplace' },
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'head-circuit', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
+      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/agents`, label: 'My Agents', icon: 'bot', isActive: isAgentsRoute || isAgentBuilderRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/connectors`, label: 'Connectors', icon: 'plug', isActive: isConnectorsRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/schedules`, label: 'Schedules', icon: 'clock', isActive: isSchedulesRoute }] : []),
       ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),

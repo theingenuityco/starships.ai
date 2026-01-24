@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { motion, AnimatePresence } from 'motion/react'
-import { useNavigationOnboarding, type OnboardingStep } from '@/hooks/useNavigationOnboarding'
+import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import { ONBOARDING_STEPS, type OnboardingStep } from '@/hooks/useNavigationOnboarding'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
@@ -15,7 +16,7 @@ interface NavigationOnboardingTourProps {
 export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: NavigationOnboardingTourProps) {
   const router = useRouter()
   const pathname = usePathname()
-  const { currentStep, currentStepInfo, totalSteps, nextStep, previousStep, shouldShowOnboarding, startOnboarding } = useNavigationOnboarding()
+  const { currentStep, currentStepInfo, totalSteps, nextStep, previousStep, shouldShowOnboarding, startOnboarding } = useNavigationOnboardingContext()
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; pointerTop?: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
 
@@ -33,7 +34,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
 
   // Get route for current step
   const getStepRoute = (step: OnboardingStep | null): string | null => {
-    if (!step || !starshipSlug) return null
+    if (!step) return null
 
     // Step 1 is marketplace (no starship slug needed)
     if (step.step === 1) {
@@ -41,6 +42,8 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
     }
 
     // Steps 2-5 need starship slug
+    if (!starshipSlug) return null
+
     const routeMap: Record<number, string> = {
       2: `/ship/${starshipSlug}/connectors`,
       3: `/ship/${starshipSlug}/agents`,
@@ -53,13 +56,21 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
 
   // Navigate to step route when step changes
   useEffect(() => {
-    if (!currentStepInfo || !shouldShowOnboarding) return
+    if (!shouldShowOnboarding) return
 
-    const route = getStepRoute(currentStepInfo)
-    if (route && pathname !== route) {
-      router.push(route)
+    // If we have a current step, navigate to its route
+    if (currentStepInfo) {
+      const route = getStepRoute(currentStepInfo)
+      if (route && pathname !== route) {
+        // Use replace to avoid adding to history during onboarding
+        router.replace(route)
+      }
     }
-  }, [currentStepInfo, starshipSlug, pathname, router, shouldShowOnboarding])
+    // If step 1 just started, navigate to marketplace immediately
+    else if (currentStep === 1 && pathname !== '/marketplace') {
+      router.replace('/marketplace')
+    }
+  }, [currentStep, currentStepInfo, starshipSlug, pathname, router, shouldShowOnboarding])
 
   // Update popup position when step or navigation items change
   useEffect(() => {

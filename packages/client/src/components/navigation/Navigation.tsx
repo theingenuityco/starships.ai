@@ -12,7 +12,7 @@ import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnbo
 import { useDeleteConversation } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
-import { useNavigationOnboarding } from '@/hooks/useNavigationOnboarding'
+import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -32,7 +32,7 @@ export function Navigation(props: NavigationProps) {
   const router = useRouter()
   const { isAuthenticated, user, userName, isInstanceAdmin } = useAuth()
   const { getSelectedStarshipId, setSelectedStarship } = useSelectedStarship()
-  const { currentStepInfo } = useNavigationOnboarding()
+  const { currentStepInfo } = useNavigationOnboardingContext()
 
   // Navbar expansion state (GPT-style: expanded by default, collapsible)
   // On mobile, always expanded (no collapse functionality)
@@ -248,7 +248,9 @@ export function Navigation(props: NavigationProps) {
   const getOnboardingHighlight = useCallback(
     (label: string): boolean => {
       if (!currentStepInfo) return false
-      return currentStepInfo.label === label
+      // Match the label exactly
+      const shouldHighlight = currentStepInfo.label === label
+      return shouldHighlight
     },
     [currentStepInfo]
   )

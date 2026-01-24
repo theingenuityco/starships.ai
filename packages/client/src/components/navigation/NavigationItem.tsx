@@ -74,7 +74,9 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
       onClick={handleClick}
       className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 ${
         special
-          ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
+          ? isOnboardingHighlighted
+            ? 'text-primary bg-primary/30 border-2 border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.3),0_4px_12px_hsl(var(--primary)/0.4)]'
+            : 'text-primary border-transparent hover:text-primary hover:bg-muted'
           : shouldHighlight
             ? isOnboardingHighlighted
               ? 'text-primary bg-primary/30 border-2 border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.3),0_4px_12px_hsl(var(--primary)/0.4)]'

@@ -77,7 +77,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
           ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
           : shouldHighlight
             ? isOnboardingHighlighted
-              ? 'text-primary bg-primary/20 border-2 border-primary shadow-lg'
+              ? 'text-primary bg-primary/30 border-2 border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.3),0_4px_12px_hsl(var(--primary)/0.4)]'
               : 'text-primary bg-primary/10 border-transparent'
             : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
       }`}

@@ -20,6 +20,9 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
   const { currentStep, currentStepInfo, totalSteps, nextStep, previousStep, shouldShowOnboarding, startOnboarding } = useNavigationOnboardingContext()
   const [popupPosition, setPopupPosition] = useState<{ top: number; left: number; pointerTop?: number } | null>(null)
   const popupRef = useRef<HTMLDivElement>(null)
+  
+  // Calculate sidebar width dynamically to exclude it from overlay
+  const [sidebarWidth, setSidebarWidth] = useState(312) // Default: 56px (rail) + 256px (expanded sidebar)
 
   // Start onboarding when component mounts and should show
   // Only start on conversations page (as per requirements)
@@ -146,6 +149,32 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
     setPopupPosition({ top: finalTop, left: finalLeft, pointerTop })
   }, [currentStepInfo, navigationItemRefs, shouldShowOnboarding])
 
+  // Update sidebar width dynamically
+  useEffect(() => {
+    const updateSidebarWidth = () => {
+      const sidebar = document.querySelector('[data-navigation-sidebar]') as HTMLElement
+      if (sidebar) {
+        const rect = sidebar.getBoundingClientRect()
+        setSidebarWidth(rect.width)
+      }
+    }
+    
+    updateSidebarWidth()
+    const observer = new ResizeObserver(updateSidebarWidth)
+    const sidebar = document.querySelector('[data-navigation-sidebar]')
+    if (sidebar) {
+      observer.observe(sidebar)
+    }
+    
+    // Also update on window resize
+    window.addEventListener('resize', updateSidebarWidth)
+    
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updateSidebarWidth)
+    }
+  }, [])
+
   if (!shouldShowOnboarding || !currentStep || !currentStepInfo || !popupPosition) {
     return null
   }
@@ -155,13 +184,19 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
 
   return (
     <>
-      {/* Overlay */}
+      {/* Overlay - excludes navigation sidebar */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="fixed inset-0 bg-black/50 z-[9998]"
-        style={{ pointerEvents: 'auto' }}
+        className="fixed bg-black/50 z-[9998]"
+        style={{ 
+          pointerEvents: 'auto',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: `${sidebarWidth}px`
+        }}
       />
 
       {/* Popup */}

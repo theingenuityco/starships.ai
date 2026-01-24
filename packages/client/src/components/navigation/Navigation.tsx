@@ -369,6 +369,7 @@ export function Navigation(props: NavigationProps) {
       {/* Navigation sidebar */}
       <motion.div
         ref={sidebarRef}
+        data-navigation-sidebar
         initial={isMobile ? { x: '-100%' } : false}
         animate={isMobile ? { x: isOpen ? 0 : '-100%' } : {}}
         transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}

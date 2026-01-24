@@ -83,6 +83,97 @@ export class LLM extends BaseNode<LlmParams> {
     super(params, options);
   }
 
+  private static extractToolAttachmentIds(raw: string): string[] {
+    try {
+      const parsed = JSON.parse(raw) as unknown;
+      if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return [];
+      const rec = parsed as Record<string, unknown>;
+      const attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
+      const ids: string[] = [];
+      for (const a of attachments) {
+        if (!a || typeof a !== 'object') continue;
+        const id = (a as Record<string, unknown>).id;
+        if (typeof id === 'string' && id.trim().length > 0) ids.push(id.trim());
+      }
+      const seen = new Set<string>();
+      const uniq: string[] = [];
+      for (const id of ids) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        uniq.push(id);
+      }
+      return uniq;
+    } catch {
+      return [];
+    }
+  }
+
+  private async maybeResolveToolAttachmentPreviewUrls(args: {
+    providerMessages: LlmMessage[];
+    hostRuntime: NonNullable<NodeHandlerOptions['hostRuntime']>;
+    runtimeEnv?: Record<string, unknown>;
+  }): Promise<Map<string, string>> {
+    const starshipIdRaw = args.runtimeEnv ? (args.runtimeEnv as Record<string, unknown>).STARSHIP_ID : undefined;
+    const starshipId = typeof starshipIdRaw === 'string' && starshipIdRaw.trim().length > 0 ? starshipIdRaw.trim() : '';
+    if (typeof args.hostRuntime.connectorAction !== 'function') return new Map();
+
+    const idsNeedingUrls: string[] = [];
+    const seen = new Set<string>();
+
+    for (const m of Array.isArray(args.providerMessages) ? args.providerMessages : []) {
+      if (!m || typeof m !== 'object') continue;
+      const role = (m as unknown as { role?: unknown }).role;
+      if (role !== 'tool') continue;
+      const c = (m as unknown as { content?: unknown }).content;
+      if (typeof c !== 'string' || !c.includes('"attachments"')) continue;
+      if (c.includes('previewUrl')) continue; // already has previewUrl(s)
+      for (const id of LLM.extractToolAttachmentIds(c)) {
+        if (seen.has(id)) continue;
+        seen.add(id);
+        idsNeedingUrls.push(id);
+      }
+    }
+
+    if (idsNeedingUrls.length === 0) return new Map();
+
+    try {
+      const resp = await args.hostRuntime.connectorAction({
+        connector: 'starships',
+        action: 'get-attachments-preview-urls',
+        args: { ...(starshipId ? { starshipId } : {}), ids: idsNeedingUrls.join(',') },
+        timeoutMs: 15000,
+      });
+
+      const body = resp?.body as unknown;
+      const list =
+        Array.isArray(body)
+          ? body
+          : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+            ? ((body as Record<string, unknown>).data as unknown[])
+            : body &&
+                typeof body === 'object' &&
+                (body as Record<string, unknown>).success === true &&
+                Array.isArray((body as Record<string, unknown>).data)
+              ? ((body as Record<string, unknown>).data as unknown[])
+              : [];
+
+      const out = new Map<string, string>();
+      for (const a of list) {
+        if (!a || typeof a !== 'object') continue;
+        const rec = a as Record<string, unknown>;
+        const id = rec.id;
+        const previewUrl = rec.previewUrl;
+        if (typeof id === 'string' && id.trim() && typeof previewUrl === 'string' && previewUrl.trim()) {
+          out.set(id.trim(), previewUrl.trim());
+        }
+      }
+
+      return out;
+    } catch {
+      return new Map();
+    }
+  }
+
   private coerceMaybeJson<T = unknown>(value: unknown): T | undefined {
     if (value == null) return undefined;
     if (typeof value === 'string') {
@@ -142,7 +233,36 @@ export class LLM extends BaseNode<LlmParams> {
       // Never send those verbatim to the upstream provider, or we'll hit prompt token limits.
       // We sanitize ONLY the provider request (does not mutate state/messages).
       const providerMessages = this.sanitizeMessagesForProvider(sourceMessages);
+      const resolvedPreviewUrlsById = await this.maybeResolveToolAttachmentPreviewUrls({
+        providerMessages,
+        hostRuntime,
+        runtimeEnv: opts?.runtimeEnv,
+      });
 
+      const providerMessagesWithResolved: LlmMessage[] = [];
+      for (const m of Array.isArray(providerMessages) ? providerMessages : []) {
+        providerMessagesWithResolved.push(m);
+        if (!m || typeof m !== 'object') continue;
+        const role = (m as unknown as { role?: unknown }).role;
+        if (role !== 'tool') continue;
+        const c = (m as unknown as { content?: unknown }).content;
+        if (typeof c !== 'string') continue;
+        if (!c.includes('"attachments"')) continue;
+        if (c.includes('previewUrl')) continue; // sanitizeMessagesForProvider already handles these cases
+        const ids = LLM.extractToolAttachmentIds(c);
+        if (ids.length === 0) continue;
+        const previewUrls = ids
+          .map((id) => resolvedPreviewUrlsById.get(id))
+          .filter((u): u is string => typeof u === 'string' && u.length > 0);
+        if (previewUrls.length === 0) continue;
+        providerMessagesWithResolved.push({
+          role: 'user',
+          content: [
+            { type: 'text', text: '[Tool produced image attachment(s)]' },
+            ...previewUrls.slice(0, 8).map((url) => ({ type: 'image_url', image_url: { url } })),
+          ],
+        } as LlmMessage);
+      }
       // Condensed request log: essential params only, with truncated message previews
       // const truncate = (text: unknown, max = 160): string => {
       //   if (typeof text !== 'string') return typeof text === 'undefined' ? '' : '[non-text content]';
@@ -197,7 +317,7 @@ export class LLM extends BaseNode<LlmParams> {
       const plugins = this.coerceMaybeJson<Array<{ id: string; max_results?: number }>>(params.plugins);
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
 
-      const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessages);
+      const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesWithResolved);
 
       const stream = await hostRuntime.llm({
         model: params.model,
@@ -250,8 +370,42 @@ export class LLM extends BaseNode<LlmParams> {
       const s = content;
       const looksLikeEmbeddedImage = s.includes('data:image/') && s.includes(';base64,');
 
+      const extractToolAttachmentPreviewUrls = (raw: string): string[] => {
+        // Tool messages in Starships server-tools mode are JSON.stringify(payload),
+        // where payload may include: { attachments: [{ previewUrl, mimeType, ... }] }.
+        try {
+          const parsed = JSON.parse(raw) as unknown;
+          if (!parsed || typeof parsed !== 'object') return [];
+          const rec = parsed as Record<string, unknown>;
+          const attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
+          const urls: string[] = [];
+          for (const a of attachments) {
+            if (!a || typeof a !== 'object') continue;
+            const pr = (a as Record<string, unknown>).previewUrl;
+            if (typeof pr === 'string' && pr.trim().length > 0) urls.push(pr.trim());
+          }
+          return urls;
+        } catch {
+          return [];
+        }
+      };
+
       // Tool results are the primary culprit (often include raw provider responses with base64 images).
       if (role === 'tool') {
+        // If the tool result includes attachment preview URLs, add a provider-only multimodal hint
+        // so vision models can see the image(s) without embedding huge base64 blobs.
+        const previewUrls = extractToolAttachmentPreviewUrls(s);
+        if (previewUrls.length > 0) {
+          out.push(m);
+          out.push({
+            role: 'user',
+            content: [
+              { type: 'text', text: '[Tool produced image attachment(s)]' },
+              ...previewUrls.slice(0, 8).map((url) => ({ type: 'image_url', image_url: { url } })),
+            ],
+          } as LlmMessage);
+          continue;
+        }
         if (looksLikeEmbeddedImage || s.length > MAX_TOOL_TEXT_CHARS) {
           const prefix = s.slice(0, Math.min(MAX_TOOL_TEXT_CHARS, s.length));
           out.push({

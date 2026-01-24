@@ -101,6 +101,24 @@ export class HttpRequest implements NodeHandler {
       responseType: this.params.responseType,
     });
 
+    const getHeaderValue = (h: Record<string, unknown> | undefined, name: string): string | undefined => {
+      if (!h) return undefined;
+      const direct = h[name];
+      if (typeof direct === 'string') return direct;
+      const alt = h[name.toLowerCase()];
+      if (typeof alt === 'string') return alt;
+      const alt2 = h[name.toUpperCase()];
+      if (typeof alt2 === 'string') return alt2;
+      // Fallback: scan keys case-insensitively (in case of mixed casing).
+      const target = name.toLowerCase();
+      for (const [k, v] of Object.entries(h)) {
+        if (k.toLowerCase() === target && typeof v === 'string') return v;
+      }
+      return undefined;
+    };
+
+    const contentTypeHeader = getHeaderValue(response.headers as Record<string, unknown> | undefined, 'content-type');
+
     const httpResponse: HttpResponse = {
       status: response.status,
       statusText: response.statusText,
@@ -135,12 +153,7 @@ export class HttpRequest implements NodeHandler {
       if (!(ab instanceof ArrayBuffer)) {
         throw new Error('Host runtime returned non-ArrayBuffer body for responseType=arrayBuffer');
       }
-      const contentType =
-        typeof (response.headers as Record<string, unknown>)?.['content-type'] === 'string'
-          ? String((response.headers as Record<string, unknown>)['content-type'])
-          : typeof (response.headers as Record<string, unknown>)?.['Content-Type'] === 'string'
-            ? String((response.headers as Record<string, unknown>)['Content-Type'])
-            : undefined;
+      const contentType = contentTypeHeader;
 
       const out: ExecutionItem[] = ExecutionItemUtils.wrapSingle(
         {

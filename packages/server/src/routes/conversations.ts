@@ -15,6 +15,7 @@ import { MessageService } from '@/services/MessageService';
 import { BillingService, InsufficientFundsError } from '@/services/BillingService';
 import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
+import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
   ConversationWidgetRepository,
@@ -32,6 +33,7 @@ import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { UIActionService } from '@/services/UIActionService';
+import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
   ToolModel,
   ConversationStreamSnapshot,
@@ -255,6 +257,201 @@ async function executeToolBlueprint(args: {
     ...(args.runnerConfig as unknown as EngineConfig),
   });
   return ExecutionItemUtils.unwrapSingle(items);
+}
+
+type ToolResultAttachment = {
+  id: string;
+  previewUrl?: string;
+};
+
+type ToolResultAttachmentError = {
+  index: number;
+  reason: string;
+};
+
+type ParseBase64ImageDataUrlResult =
+  | { ok: true; mimeType: string; buffer: Buffer }
+  | { ok: false; reason: string };
+
+function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number; maxDataUrlChars: number }): ParseBase64ImageDataUrlResult {
+  if (typeof dataUrl !== 'string') return { ok: false, reason: 'not_a_string' };
+  if (dataUrl.length > opts.maxDataUrlChars) return { ok: false, reason: 'data_url_too_large' };
+  if (!dataUrl.startsWith('data:image/')) return { ok: false, reason: 'not_image_data_url' };
+
+  const base64Marker = ';base64,';
+  const markerIdx = dataUrl.indexOf(base64Marker);
+  if (markerIdx < 0) return { ok: false, reason: 'missing_base64_marker' };
+
+  // "data:" prefix length is 5
+  const mimeTypeRaw = dataUrl.slice(5, markerIdx);
+  if (!mimeTypeRaw.toLowerCase().startsWith('image/')) return { ok: false, reason: 'not_image_mime' };
+  // Keep MIME parsing bounded: validate only small header portion.
+  if (mimeTypeRaw.length > 64) return { ok: false, reason: 'mime_too_long' };
+  if (!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(mimeTypeRaw)) return { ok: false, reason: 'invalid_mime' };
+  const mimeType = mimeTypeRaw.toLowerCase();
+
+  let b64 = dataUrl.slice(markerIdx + base64Marker.length);
+  if (!b64) return { ok: false, reason: 'empty_base64' };
+
+  // Reject huge whitespace-containing base64 to avoid extra allocations. Most data URLs won't include whitespace.
+  const hasWhitespace = /[\s]/.test(b64);
+  if (hasWhitespace) {
+    if (b64.length <= 1_000_000) {
+      b64 = b64.replace(/\s+/g, '');
+    } else {
+      return { ok: false, reason: 'base64_contains_whitespace' };
+    }
+  }
+
+  // Validate base64 characters and padding placement in a single pass (linear time).
+  let paddingCount = 0;
+  for (let i = 0; i < b64.length; i++) {
+    const c = b64.charCodeAt(i);
+    const isAZ = c >= 65 && c <= 90;
+    const isaz = c >= 97 && c <= 122;
+    const is09 = c >= 48 && c <= 57;
+    const isPlus = c === 43;
+    const isSlash = c === 47;
+    const isEq = c === 61;
+    if (isEq) {
+      paddingCount++;
+      // padding must be at end
+      continue;
+    }
+    if (paddingCount > 0) return { ok: false, reason: 'invalid_padding_position' };
+    if (!(isAZ || isaz || is09 || isPlus || isSlash)) return { ok: false, reason: 'invalid_base64_char' };
+  }
+  if (paddingCount > 2) return { ok: false, reason: 'too_much_padding' };
+
+  // Estimate decoded bytes before allocating the buffer.
+  // bytes ≈ floor(len * 3/4) - padding
+  const len = b64.length;
+  if (len < 8) return { ok: false, reason: 'base64_too_short' };
+  const pad = b64.endsWith('==') ? 2 : b64.endsWith('=') ? 1 : 0;
+  const estimatedBytes = Math.floor((len * 3) / 4) - pad;
+  if (!Number.isFinite(estimatedBytes) || estimatedBytes <= 0) return { ok: false, reason: 'invalid_base64_length' };
+  if (estimatedBytes > opts.maxImageBytes) return { ok: false, reason: 'image_too_large' };
+
+  try {
+    const buffer = Buffer.from(b64, 'base64');
+    if (!buffer || buffer.length === 0) return { ok: false, reason: 'decoded_empty' };
+    if (buffer.length > opts.maxImageBytes) return { ok: false, reason: 'image_too_large' };
+    return { ok: true, mimeType, buffer };
+  } catch {
+    return { ok: false, reason: 'decode_failed' };
+  }
+}
+
+async function replaceBase64ImagesWithAttachments(args: {
+  value: unknown;
+  starshipId: string;
+  conversationId: string;
+  maxImages?: number;
+}): Promise<{ value: unknown; attachments: ToolResultAttachment[]; attachmentErrors: ToolResultAttachmentError[] }> {
+  const MAX_IMAGE_BYTES = MAX_TOOL_RESULT_BASE64_IMAGE_BYTES;
+  const MAX_DATA_URL_CHARS = MAX_TOOL_RESULT_DATA_URL_CHARS;
+
+  const maxImages = Math.max(0, Math.min(20, Number(args.maxImages ?? 8)));
+  if (maxImages === 0) return { value: args.value, attachments: [], attachmentErrors: [] };
+
+  const candidates: string[] = [];
+  const seen = new Set<string>();
+  const attachmentErrors: ToolResultAttachmentError[] = [];
+
+  const collect = (v: unknown, depth = 0): void => {
+    if (candidates.length >= maxImages) return;
+    if (depth > 10) return;
+    if (typeof v === 'string') {
+      // Common/cheap case: the value itself is a data URL.
+      if (v.startsWith('data:image/') && v.includes(';base64,')) {
+        // Bound individual strings early.
+        if (v.length > MAX_DATA_URL_CHARS) {
+          attachmentErrors.push({ index: candidates.length, reason: 'data_url_too_large' });
+          return;
+        }
+        if (!seen.has(v)) {
+          seen.add(v);
+          candidates.push(v);
+        }
+      }
+      return;
+    }
+    if (!v || typeof v !== 'object') return;
+    if (Array.isArray(v)) {
+      for (const it of v) collect(it, depth + 1);
+      return;
+    }
+    for (const it of Object.values(v as Record<string, unknown>)) {
+      collect(it, depth + 1);
+      if (candidates.length >= maxImages) return;
+    }
+  };
+
+  collect(args.value);
+  if (candidates.length === 0) return { value: args.value, attachments: [], attachmentErrors };
+
+  const attachmentService = new AttachmentService();
+  const urlToId = new Map<string, string>();
+  const createdIds: string[] = [];
+
+  for (let i = 0; i < candidates.length && createdIds.length < maxImages; i++) {
+    const url = candidates[i];
+    const parsed = parseBase64ImageDataUrl(url, { maxImageBytes: MAX_IMAGE_BYTES, maxDataUrlChars: MAX_DATA_URL_CHARS });
+    if (!parsed.ok) {
+      // Only report errors for things that looked like image data URLs (we only collected those),
+      // so callers can decide whether to surface warnings.
+      attachmentErrors.push({ index: i, reason: parsed.reason });
+      continue;
+    }
+    try {
+      const filenameBase = `generated_tool_${Date.now()}_${i}`;
+      const created = await attachmentService.createGeneratedImageAttachment({
+        starshipId: args.starshipId,
+        conversationId: args.conversationId,
+        mimeType: parsed.mimeType,
+        buffer: parsed.buffer,
+        filenameBase,
+      });
+      urlToId.set(url, created.id);
+      createdIds.push(created.id);
+    } catch (e) {
+      attachmentErrors.push({ index: i, reason: 'persist_failed' });
+    }
+  }
+
+  if (createdIds.length === 0) return { value: args.value, attachments: [], attachmentErrors };
+
+  const apply = (v: unknown, depth = 0): unknown => {
+    if (depth > 10) return v;
+    if (typeof v === 'string') {
+      let out = v;
+      for (const [url, id] of urlToId.entries()) {
+        if (out.includes(url)) out = out.split(url).join(`attachment://${id}`);
+      }
+      return out;
+    }
+    if (!v || typeof v !== 'object') return v;
+    if (Array.isArray(v)) return v.map((it) => apply(it, depth + 1));
+    const rec = v as Record<string, unknown>;
+    const next: Record<string, unknown> = {};
+    for (const [k, val] of Object.entries(rec)) next[k] = apply(val, depth + 1);
+    return next;
+  };
+
+  const replaced = apply(args.value);
+  const full = (await attachmentService.getAttachmentsBatch(createdIds, args.starshipId).catch(() => [])) as Array<
+    ToolResultAttachment & { id: string; previewUrl?: string }
+  >;
+  // Keep tool-result attachments lean: only what we need to render and feed vision models.
+  const attachments: ToolResultAttachment[] = Array.isArray(full)
+    ? full
+        .map((a) => ({
+          id: a.id,
+          ...(typeof a.previewUrl === 'string' ? { previewUrl: String(a.previewUrl) } : {}),
+        }))
+        .filter((a) => typeof a.id === 'string' && a.id.length > 0)
+    : [];
+  return { value: replaced, attachments, attachmentErrors };
 }
 
 /**
@@ -866,7 +1063,17 @@ router.post(
             runnerConfig: engineConfig,
           });
 
-          sendSuccess(res, { toolCallId, result }, 200);
+          const normalized = await replaceBase64ImagesWithAttachments({
+            value: result,
+            starshipId: conversation.starshipId,
+            conversationId,
+            maxImages: 8,
+          });
+          sendSuccess(
+            res,
+            { toolCallId, result: normalized.value, attachments: normalized.attachments, attachmentErrors: normalized.attachmentErrors },
+            200
+          );
           return;
         }
 
@@ -997,7 +1204,17 @@ router.post(
         },
       });
 
-      sendSuccess(res, { toolCallId, result }, 200);
+      const normalized = await replaceBase64ImagesWithAttachments({
+        value: result,
+        starshipId: conversation.starshipId,
+        conversationId,
+        maxImages: 8,
+      });
+      sendSuccess(
+        res,
+        { toolCallId, result: normalized.value, attachments: normalized.attachments, attachmentErrors: normalized.attachmentErrors },
+        200
+      );
     } catch (e) {
       const body = (req.body && typeof req.body === 'object' ? (req.body as Record<string, unknown>) : {}) as Record<string, unknown>;
       const toolCallId = typeof body.toolCallId === 'string' ? String(body.toolCallId) : '';

@@ -2822,6 +2822,49 @@ export class ConversationService {
                 let contentToPersist = contentString;
                 let attachmentIdsToPersist = pendingAttachmentIds;
 
+                // If tool results already include attachment ids (server-tools fast-path),
+                // persist them so the UI can render images/files the same way as uploads.
+                if (role === 'tool' && typeof contentToPersist === 'string' && contentToPersist.trim().length > 0) {
+                  try {
+                    const parsed = JSON.parse(contentToPersist) as unknown;
+                    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+                      const rec = parsed as Record<string, unknown>;
+                      const atts = Array.isArray(rec.attachments) ? rec.attachments : [];
+                      const ids: string[] = [];
+                      for (const a of atts) {
+                        if (!a || typeof a !== 'object') continue;
+                        const id = (a as Record<string, unknown>).id;
+                        if (typeof id === 'string' && id.trim().length > 0) ids.push(id.trim());
+                      }
+                      if (ids.length > 0) {
+                        const seen = new Set<string>();
+                        const uniq: string[] = [];
+                        for (const id of ids) {
+                          if (seen.has(id)) continue;
+                          seen.add(id);
+                          uniq.push(id);
+                        }
+                        attachmentIdsToPersist = uniq;
+                        if (!starship) {
+                          starship = await this.getConversationStarship(conversationId);
+                        }
+
+                        // Keep persisted tool_result content lean:
+                        // replace `attachments: [{...}]` with `attachments: [{ id }]` so we don't store presigned URLs
+                        // or other large metadata blobs in message.content.
+                        try {
+                          rec.attachments = uniq.map((id) => ({ id }));
+                          contentToPersist = JSON.stringify(rec);
+                        } catch {
+                          // ignore stringify failures; keep original
+                        }
+                      }
+                    }
+                  } catch {
+                    // ignore: not JSON or no attachments list
+                  }
+                }
+
                 // Option A: do NOT persist base64 image blobs in messages.content for tool_result messages.
                 // Instead, convert base64 data URLs to optimized attachments and replace the embedded URLs with
                 // lightweight references. The UI renders images from attachmentIds.
@@ -2868,7 +2911,18 @@ export class ConversationService {
                           replaced = replaced.split(url).join(placeholder);
                         }
                         contentToPersist = replaced;
-                        attachmentIdsToPersist = createdIds;
+                        // Merge with any existing ids (e.g. server-tools provided attachments).
+                        const combined = [...attachmentIdsToPersist, ...createdIds].filter(
+                          (x): x is string => typeof x === 'string' && x.length > 0
+                        );
+                        const seen = new Set<string>();
+                        const uniq: string[] = [];
+                        for (const id of combined) {
+                          if (seen.has(id)) continue;
+                          seen.add(id);
+                          uniq.push(id);
+                        }
+                        attachmentIdsToPersist = uniq;
                       }
                     }
                   }
@@ -2905,6 +2959,20 @@ export class ConversationService {
                       conversationId,
                       messageId: persistedMsg.id,
                     });
+                  }
+                }
+
+                // Link tool attachments to the persisted tool_result message (best-effort).
+                if (role === 'tool' && attachmentIdsToPersist.length > 0 && starship) {
+                  try {
+                    const attachmentService = new AttachmentService();
+                    await Promise.all(
+                      attachmentIdsToPersist.map((id) =>
+                        attachmentService.linkToMessage(id, persistedMsg.id, starship.id).catch(() => false)
+                      )
+                    );
+                  } catch {
+                    // ignore best-effort linking failures
                   }
                 }
 

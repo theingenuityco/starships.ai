@@ -27,7 +27,6 @@ export * from './domains/auth';
 export * from './domains/conversation';
 export * from './domains/conversation-state';
 export * from './domains/message';
-export * from './domains/onboarding';
 export * from './domains/starship';
 export * from './domains/connector-secrets';
 export * from './domains/system-env';

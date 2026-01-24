@@ -107,7 +107,6 @@ export class UserRepository extends BaseRepository {
         email: userData.email,
         displayName: userData.displayName || userData.name,
         password: userData.password,
-        onboardingCompleted: false,
         hasPassword: true,
         authMethods: ['password' as const],
         primaryAuthMethod: 'password' as const

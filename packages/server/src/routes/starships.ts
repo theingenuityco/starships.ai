@@ -741,7 +741,7 @@ router.post(
           method: 'GET',
           signal: controller.signal,
           headers: {
-            'User-Agent': 'starships.ai (onboarding)',
+            'User-Agent': 'starships.ai',
             Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
           },
         });

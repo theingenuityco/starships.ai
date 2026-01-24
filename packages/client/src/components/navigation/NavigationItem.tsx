@@ -17,9 +17,11 @@ interface NavigationItemProps {
   onClick?: () => void
   special?: boolean
   onItemClick?: () => void
+  itemRef?: React.RefObject<HTMLDivElement | null>
+  isOnboardingHighlighted?: boolean
 }
 
-export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick }: NavigationItemProps) {
+export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick, itemRef, isOnboardingHighlighted = false }: NavigationItemProps) {
   const router = useRouter()
 
   const handleClick = useCallback(
@@ -63,14 +65,22 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
     )
   }, [icon])
 
+  // Determine if item should be highlighted (either active route or onboarding highlight)
+  const shouldHighlight = isActive || isOnboardingHighlighted
+
   const motionDiv = (
     <div
+      ref={itemRef}
       onClick={handleClick}
       className={`group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2 ${
         special
-          ? 'text-primary border-transparent hover:text-primary hover:bg-muted'
-          : isActive
-            ? 'text-primary bg-primary/10 border-transparent'
+          ? isOnboardingHighlighted
+            ? 'text-primary bg-primary/30 border-2 border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.3),0_4px_12px_hsl(var(--primary)/0.4)]'
+            : 'text-primary border-transparent hover:text-primary hover:bg-muted'
+          : shouldHighlight
+            ? isOnboardingHighlighted
+              ? 'text-primary bg-primary/30 border-2 border-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.3),0_4px_12px_hsl(var(--primary)/0.4)]'
+              : 'text-primary bg-primary/10 border-transparent'
             : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
       }`}
       style={{

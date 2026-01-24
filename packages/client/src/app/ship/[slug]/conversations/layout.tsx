@@ -5,12 +5,14 @@ import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect } from 'react'
 import { useAuth } from '@/hooks/useAuth'
+import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isAuthenticated } = useAuth()
+  const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
 
   // Memoize params to prevent unnecessary rerenders
   const routeParams = useMemo(
@@ -24,19 +26,16 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
 
-  // Check if onboarding should start and redirect immediately (before rendering)
-  const hasCompletedOnboarding = user?.navigationOnboardingCompleted ?? false
-  const shouldShowOnboarding = isAuthenticated && !hasCompletedOnboarding
-
-  // Redirect to marketplace immediately if onboarding should start (before conversations page renders)
+  // Redirect to marketplace immediately if onboarding should start BUT we're not on step 5
+  // Step 5 needs to show the conversations page, so we allow it to render
   useEffect(() => {
-    if (shouldShowOnboarding) {
+    if (shouldShowOnboarding && currentStep !== 5) {
       router.replace('/marketplace')
     }
-  }, [shouldShowOnboarding, router])
+  }, [shouldShowOnboarding, currentStep, router])
 
-  // Don't render conversations interface if we're redirecting to onboarding
-  if (shouldShowOnboarding) {
+  // Don't render conversations interface if we're redirecting to onboarding (but allow step 5)
+  if (shouldShowOnboarding && currentStep !== 5) {
     return null
   }
 

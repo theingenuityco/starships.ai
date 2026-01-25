@@ -878,15 +878,39 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    // Get user's first starship for redirect (no creation on OAuth exchange)
+    // Get user's starships for redirect purpose; create default starship + agents if none
     let firstStarship: { id: string; slug: string; name: string } | null = null;
     try {
       const starshipRepo = new StarshipRepository();
       const userStarships = await starshipRepo.findByOwner(user.id);
-      const ship = userStarships.find((s) => s.status === 'active') || userStarships[0];
+      let ship = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
+
+      if (!ship) {
+        logger.info(`[OAUTH-EXCHANGE] Creating starship for user ${user.email}`);
+        try {
+          ship = await StarshipService.createDefaultStarship(user.id);
+          if (ship) {
+            try {
+              await StarshipService.createInitialAgents(user.id, ship.id);
+              logger.info(`[OAUTH-EXCHANGE] Created initial agents for user ${user.email}`);
+            } catch (agentError) {
+              logger.error('[OAUTH-EXCHANGE] Failed to create initial agents', {
+                userId: user.id,
+                error: agentError instanceof Error ? agentError.message : 'Unknown error',
+              });
+            }
+          }
+        } catch (createError) {
+          logger.error('[OAUTH-EXCHANGE] Failed to create default starship for user', {
+            userId: user.id,
+            error: createError instanceof Error ? createError.message : 'Unknown error',
+          });
+        }
+      }
+
       if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
     } catch (error) {
-      logger.warn('[OAUTH-EXCHANGE] Failed to fetch starships for user', {
+      logger.error('[OAUTH-EXCHANGE] Failed to fetch starships for user', {
         userId: user.id,
         error: error instanceof Error ? error.message : 'Unknown error',
       });

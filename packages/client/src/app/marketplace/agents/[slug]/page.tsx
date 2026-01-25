@@ -9,6 +9,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
+import { AgentProfileImage } from '@/components/marketplace/AgentProfileImage'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
@@ -53,6 +54,11 @@ function categoryBadgeClass(category: AgentTemplateModel['category']): string {
     utility: 'bg-gradient-to-r from-teal-500/10 to-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/30',
   }
   return colors[String(category)] || colors.general
+}
+
+function getAgentImagePath(agentName: string, imageType: 'capabilities' | 'prompts'): string {
+  const normalizedName = agentName.toLowerCase().trim()
+  return `/marketplace/agents/${normalizedName}/${imageType}.webp`
 }
 
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
@@ -152,9 +158,9 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
             {/* Hero header */}
             <section className="mt-4 sm:mt-6">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                <div className="flex items-start gap-4 min-w-0">
-                  <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
+                <div className="flex items-start gap-4 min-w-0 flex-1">
+                  <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg flex-shrink-0">
                     {template.avatarUrl ? (
                       // eslint-disable-next-line @next/next/no-img-element
                       <img src={template.avatarUrl} alt={`${template.name || 'Agent'} avatar`} width={112} height={112} className="h-full w-full object-cover" />
@@ -166,7 +172,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
                   </div>
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1">
                     <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
                     {template.role ? <div className="mt-1 text-sm sm:text-base text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
 
@@ -188,89 +194,137 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     </div>
                   </div>
                 </div>
+
+                {/* Action buttons at extreme right */}
+                <div className="flex items-center gap-3 flex-shrink-0">
+                  <MarketplaceAgentDeployCta template={template} />
+                  <MarketplaceShareLinkCard shareUrl={shareUrl} compact />
+                </div>
               </div>
             </section>
 
             {/* Main content grid */}
             <section className="mt-8 pb-10 sm:pb-16">
-              <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 lg:gap-8 items-start">
-                {/* Left column */}
-                <div className="space-y-8">
+              <div className="space-y-8">
                   {template.description ? (
-                    <section className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
-                      <h2 className="text-sm font-semibold tracking-wide text-foreground">About</h2>
-                      <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{template.description}</p>
+                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
+                      <div className="flex items-center gap-2 mb-6">
+                        <Icon name="info" className="h-5 w-5 text-primary" />
+                        <h2 className="text-base font-semibold tracking-tight text-foreground">About</h2>
+                      </div>
+                      <div className="prose prose-sm dark:prose-invert max-w-none">
+                        <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">{template.description}</p>
+                      </div>
                     </section>
                   ) : null}
 
                   {toolSlugs.length > 0 ? (
-                    <section className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
-                      <div className="flex items-center justify-between gap-3">
-                        <h2 className="text-sm font-semibold tracking-wide text-foreground">Capabilities</h2>
-                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/40 px-3 py-1 text-[11px] font-semibold text-muted-foreground">
-                          {toolSlugs.length} tools
-                        </span>
-                      </div>
-                      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {toolSlugs.map(slug => {
-                          const info = toolInfoBySlug.get(slug)
-                          const title = info?.name?.trim() || slug
-                          const desc = info?.description?.trim() || ''
-                          return (
-                            <div key={slug} className="group rounded-xl border border-border/50 bg-background/30 hover:bg-background/40 transition-colors p-4">
-                              <div className="text-sm font-medium leading-5 truncate">{title}</div>
-                              {desc ? <div className="mt-1 text-xs leading-4 text-muted-foreground line-clamp-3">{desc}</div> : null}
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </section>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                      {/* Capabilities Image - Left side */}
+                      {(() => {
+                        const capabilitiesImagePath = getAgentImagePath(template.name, 'capabilities')
+                        return (
+                          <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                            <AgentProfileImage
+                              src={capabilitiesImagePath}
+                              alt={`${template.name} capabilities`}
+                              className="w-full h-auto"
+                              style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                            />
+                          </div>
+                        )
+                      })()}
+
+                      {/* Capabilities Section - Right side */}
+                      <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
+                        <div className="flex items-center gap-2 mb-6">
+                          <Icon name="wrench" className="h-5 w-5 text-primary" />
+                          <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {toolSlugs.map(slug => {
+                            const info = toolInfoBySlug.get(slug)
+                            const title = info?.name?.trim() || slug
+                            const desc = info?.description?.trim() || ''
+                            return (
+                              <div
+                                key={slug}
+                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="mt-0.5 flex-shrink-0">
+                                    <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-semibold leading-5 text-foreground group-hover:text-primary transition-colors">{title}</div>
+                                    {desc ? (
+                                      <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/90">
+                                        {desc}
+                                      </div>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </section>
+                    </div>
                   ) : null}
 
-                  {Array.isArray(template.previewPrompts) && template.previewPrompts.length > 0 ? (
-                    <section className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
-                      <h2 className="text-sm font-semibold tracking-wide text-foreground">Try these prompts</h2>
-                      <div className="mt-4 grid grid-cols-1 gap-3">
+                {/* Try These Prompts Row - 2 columns */}
+                {Array.isArray(template.previewPrompts) && template.previewPrompts.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    {/* Try These Prompts Section - Left side */}
+                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
+                      <div className="flex items-center gap-2 mb-6">
+                        <Icon name="message-square" className="h-5 w-5 text-primary" />
+                        <h2 className="text-base font-semibold tracking-tight text-foreground">Try these prompts</h2>
+                      </div>
+                      <div className="grid grid-cols-1 gap-3">
                         {template.previewPrompts.map((p, idx) => (
-                          <div key={idx} className="rounded-xl border border-border/50 bg-background/30 p-4 text-sm leading-relaxed">
-                            <span className="text-muted-foreground">&quot;</span>
-                            <span className="text-foreground/90">{p}</span>
-                            <span className="text-muted-foreground">&quot;</span>
+                          <div
+                            key={idx}
+                            className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md cursor-pointer"
+                          >
+                            <div className="flex items-start gap-3">
+                              <div className="mt-0.5 flex-shrink-0">
+                                <Icon name="sparkles" className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
+                              </div>
+                              <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors flex-1">
+                                {p}
+                              </p>
+                            </div>
                           </div>
                         ))}
                       </div>
                     </section>
-                  ) : null}
-                </div>
 
-                {/* Right column */}
-                <aside className="lg:sticky lg:top-28 space-y-4">
-                  <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm p-6">
-                    <div className="text-sm font-semibold">Deploy this agent</div>
-                    <div className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                      Add this agent to your starship in one click. Connect apps from your starship’s Connectors page after deployment.
-                    </div>
-                    <div className="mt-4">
-                      <MarketplaceAgentDeployCta template={template} />
-                    </div>
-                    <div className="mt-4 border-t border-border/50 pt-4 space-y-2 text-xs text-muted-foreground">
-                      <div className="flex items-start gap-2">
-                        <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
-                        <span>Private by default (you control what it can access)</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
-                        <span>Works with your existing connectors</span>
-                      </div>
-                      <div className="flex items-start gap-2">
-                        <span className="mt-0.5 h-1.5 w-1.5 rounded-full bg-primary/60" />
-                        <span>Start chatting immediately after deploy</span>
-                      </div>
-                    </div>
+                    {/* Try These Prompts Image - Right side */}
+                    {(() => {
+                      const promptsImagePath = getAgentImagePath(template.name, 'prompts')
+                      return (
+                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                          <AgentProfileImage
+                            src={promptsImagePath}
+                            alt={`${template.name} try these prompts`}
+                            className="w-full h-auto"
+                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                          />
+                        </div>
+                      )
+                    })()}
                   </div>
+                ) : null}
+              </div>
+            </section>
 
-                  <MarketplaceShareLinkCard shareUrl={shareUrl} />
-                </aside>
+            {/* Bottom Deploy Section */}
+            <section className="mt-8 pb-10 sm:pb-16 border-t border-border/60 pt-8">
+              <div className="max-w-2xl mx-auto text-center">
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Ready to get started?</h2>
+                <p className="text-sm text-muted-foreground mb-6">Add this agent to your starship and start using it right away.</p>
+                <MarketplaceAgentDeployCta template={template} />
               </div>
             </section>
           </div>

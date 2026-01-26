@@ -6,7 +6,8 @@
 // Temporarily commenting out Sybil agent
 // export { sybilTemplate } from './sybil';
 export { gaiaTemplate } from './gaia';
-export { researchTemplate } from './research';
+// Research Assistant removed from production
+// export { researchTemplate } from './research';
 export { daedalusTemplate } from './daedalus';
 export { keplerTemplate } from './kepler';
 export { ariaTemplate } from './aria';
@@ -14,15 +15,17 @@ export { ariaTemplate } from './aria';
 // Re-export all agent templates as a single array for convenience
 // import { sybilTemplate } from './sybil';
 import { gaiaTemplate } from './gaia';
-import { researchTemplate } from './research';
+// Research Assistant removed from production
+// import { researchTemplate } from './research';
 import { daedalusTemplate } from './daedalus';
 import { keplerTemplate } from './kepler';
 import { ariaTemplate } from './aria';
 
 // Sybil removed from the array temporarily
+// Research Assistant removed from production
 export const ALL_AGENT_TEMPLATES = [
   /* sybilTemplate, */ gaiaTemplate,
-  researchTemplate,
+  /* researchTemplate, */
   daedalusTemplate,
   keplerTemplate,
   ariaTemplate,

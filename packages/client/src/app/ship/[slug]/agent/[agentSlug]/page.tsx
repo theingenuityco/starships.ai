@@ -15,7 +15,7 @@ import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import api, { agentAPI } from '@/lib/api'
-import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents } from '@/hooks/useAgents'
+import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents, useGenerateProfileImage } from '@/hooks/useAgents'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 import { Badge } from '@/components/ui/badge'
@@ -53,6 +53,13 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState<boolean>(false)
   const [isRegeneratingAvatar, setIsRegeneratingAvatar] = useState<boolean>(false)
   const [avatarRegenMode, setAvatarRegenMode] = useState<'avatar_only' | 'full_chain' | null>(null)
+
+  // Profile image modals
+  const [isProblemStatementsModalOpen, setIsProblemStatementsModalOpen] = useState<boolean>(false)
+  const [isCapabilitiesModalOpen, setIsCapabilitiesModalOpen] = useState<boolean>(false)
+  const [isTryThesePromptsModalOpen, setIsTryThesePromptsModalOpen] = useState<boolean>(false)
+  const [isGeneratingProfileImage, setIsGeneratingProfileImage] = useState<{ type: string | null }>({ type: null })
+  const generateProfileImage = useGenerateProfileImage()
 
   // Autofocus the conversation input when the page loads (and conversation is present)
   useEffect(() => {
@@ -255,6 +262,25 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
   const { data: headerAvatarAttachments = [] } = useMessageAttachments(headerAvatarIds, starship?.id)
   const headerAvatarUrl = headerAvatarAttachments?.[0]?.previewUrl
 
+  // Profile image attachment IDs
+  const problemStatementsAttachmentId = (headerAgentModel as any)?.problemStatementsAttachmentId as string | undefined
+  const capabilitiesAttachmentId = (headerAgentModel as any)?.capabilitiesAttachmentId as string | undefined
+  const tryThesePromptsAttachmentId = (headerAgentModel as any)?.tryThesePromptsAttachmentId as string | undefined
+  const profileImageIds = useMemo(
+    () => [problemStatementsAttachmentId, capabilitiesAttachmentId, tryThesePromptsAttachmentId].filter((id): id is string => !!id),
+    [problemStatementsAttachmentId, capabilitiesAttachmentId, tryThesePromptsAttachmentId]
+  )
+  const { data: profileImageAttachments = [] } = useMessageAttachments(profileImageIds, starship?.id)
+  const profileImageUrls = useMemo(() => {
+    const map = new Map<string, string>()
+    profileImageAttachments.forEach((att) => {
+      if (att.id && att.previewUrl) {
+        map.set(att.id, att.previewUrl)
+      }
+    })
+    return map
+  }, [profileImageAttachments])
+
   if (!starship?.id) return null
 
   const canRegenerateAvatar = !!existingAgent?.id
@@ -275,6 +301,21 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
     } finally {
       setIsRegeneratingAvatar(false)
       setAvatarRegenMode(null)
+    }
+  }
+
+  const handleGenerateProfileImage = async (type: 'problem_statements' | 'capabilities' | 'try_these_prompts') => {
+    if (!existingAgent?.id) return
+    try {
+      setIsGeneratingProfileImage({ type })
+      await generateProfileImage.mutateAsync({ agentId: existingAgent.id, type })
+      // Refresh agent + attachments
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(starship.id) })
+      await queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(existingAgent.id), exact: true })
+    } catch (err: any) {
+      // Error toast is handled by the hook
+    } finally {
+      setIsGeneratingProfileImage({ type: null })
     }
   }
 
@@ -341,6 +382,252 @@ export default function AgentBuilderPage(): React.JSX.Element | null {
                 )}
                 <Button onClick={() => void handleRegenerateAvatar('avatar_only')} disabled={!canRegenerateAvatar || isRegeneratingAvatar}>
                   {isRegeneratingAvatar && avatarRegenMode === 'avatar_only' ? (headerAvatarUrl ? 'Regenerating…' : 'Generating…') : headerAvatarUrl ? 'Regenerate' : 'Generate'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Profile Image Sections */}
+          {existingAgent && (
+            <div className="mt-8 space-y-6">
+              {/* Problem Statements Section */}
+              <div className="rounded-lg border border-border/50 bg-background/50 p-6">
+                <h2 className="text-xl font-semibold mb-4">Problem Statements</h2>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsProblemStatementsModalOpen(true)}
+                    className="group relative rounded-lg overflow-hidden bg-muted/30 hover:bg-muted/50 transition-colors"
+                    disabled={!existingAgent.id}
+                  >
+                    {profileImageUrls.get(problemStatementsAttachmentId || '') ? (
+                      <img
+                        src={profileImageUrls.get(problemStatementsAttachmentId || '')}
+                        alt="Problem Statements"
+                        className="w-48 h-48 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 flex items-center justify-center text-muted-foreground">
+                        <span className="text-sm">No image yet</span>
+                      </div>
+                    )}
+                  </button>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Shows the agent understanding and empathizing with user challenges.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Capabilities Section */}
+              <div className="rounded-lg border border-border/50 bg-background/50 p-6">
+                <h2 className="text-xl font-semibold mb-4">Capabilities</h2>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsCapabilitiesModalOpen(true)}
+                    className="group relative rounded-lg overflow-hidden bg-muted/30 hover:bg-muted/50 transition-colors"
+                    disabled={!existingAgent.id}
+                  >
+                    {profileImageUrls.get(capabilitiesAttachmentId || '') ? (
+                      <img
+                        src={profileImageUrls.get(capabilitiesAttachmentId || '')}
+                        alt="Capabilities"
+                        className="w-48 h-48 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 flex items-center justify-center text-muted-foreground">
+                        <span className="text-sm">No image yet</span>
+                      </div>
+                    )}
+                  </button>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Shows the agent actively using their capabilities and tools.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Try These Prompts Section */}
+              <div className="rounded-lg border border-border/50 bg-background/50 p-6">
+                <h2 className="text-xl font-semibold mb-4">Try These Prompts</h2>
+                <div className="flex items-center gap-4">
+                  <button
+                    type="button"
+                    onClick={() => setIsTryThesePromptsModalOpen(true)}
+                    className="group relative rounded-lg overflow-hidden bg-muted/30 hover:bg-muted/50 transition-colors"
+                    disabled={!existingAgent.id}
+                  >
+                    {profileImageUrls.get(tryThesePromptsAttachmentId || '') ? (
+                      <img
+                        src={profileImageUrls.get(tryThesePromptsAttachmentId || '')}
+                        alt="Try These Prompts"
+                        className="w-48 h-48 object-cover rounded-lg"
+                      />
+                    ) : (
+                      <div className="w-48 h-48 flex items-center justify-center text-muted-foreground">
+                        <span className="text-sm">No image yet</span>
+                      </div>
+                    )}
+                  </button>
+                  <div className="flex-1">
+                    <p className="text-sm text-muted-foreground">
+                      Shows the agent ready to help users with a friendly, approachable demeanor.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Profile Image Modals */}
+          {/* Problem Statements Modal */}
+          <Dialog open={isProblemStatementsModalOpen} onOpenChange={setIsProblemStatementsModalOpen}>
+            <DialogContent className="sm:max-w-xl rounded-lg">
+              <DialogHeader>
+                <DialogTitle>Problem Statements Image</DialogTitle>
+                <DialogDescription>
+                  {existingAgent?.id ? 'Preview the image and regenerate it if you want a new look.' : 'Preview the image.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex items-center justify-center py-2">
+                <div className="relative rounded-2xl overflow-hidden bg-background/80 shadow-lg ring-1 ring-border/70">
+                  {profileImageUrls.get(problemStatementsAttachmentId || '') ? (
+                    <img
+                      src={profileImageUrls.get(problemStatementsAttachmentId || '')}
+                      alt="Problem Statements"
+                      className="h-96 w-96 rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <div className="h-96 w-96 flex items-center justify-center text-muted-foreground bg-muted/30">
+                      <span>No image yet</span>
+                    </div>
+                  )}
+                  {isGeneratingProfileImage.type === 'problem_statements' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
+                      <LoadingSpinner size={28} className="text-foreground" label="Generating image" />
+                      <div className="mt-2 text-xs font-medium text-foreground/80">Generating…</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsProblemStatementsModalOpen(false)} disabled={isGeneratingProfileImage.type === 'problem_statements'}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => void handleGenerateProfileImage('problem_statements')}
+                  disabled={!existingAgent?.id || isGeneratingProfileImage.type === 'problem_statements'}
+                >
+                  {isGeneratingProfileImage.type === 'problem_statements'
+                    ? 'Generating…'
+                    : profileImageUrls.get(problemStatementsAttachmentId || '')
+                      ? 'Regenerate'
+                      : 'Generate'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Capabilities Modal */}
+          <Dialog open={isCapabilitiesModalOpen} onOpenChange={setIsCapabilitiesModalOpen}>
+            <DialogContent className="sm:max-w-xl rounded-lg">
+              <DialogHeader>
+                <DialogTitle>Capabilities Image</DialogTitle>
+                <DialogDescription>
+                  {existingAgent?.id ? 'Preview the image and regenerate it if you want a new look.' : 'Preview the image.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex items-center justify-center py-2">
+                <div className="relative rounded-2xl overflow-hidden bg-background/80 shadow-lg ring-1 ring-border/70">
+                  {profileImageUrls.get(capabilitiesAttachmentId || '') ? (
+                    <img
+                      src={profileImageUrls.get(capabilitiesAttachmentId || '')}
+                      alt="Capabilities"
+                      className="h-96 w-96 rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <div className="h-96 w-96 flex items-center justify-center text-muted-foreground bg-muted/30">
+                      <span>No image yet</span>
+                    </div>
+                  )}
+                  {isGeneratingProfileImage.type === 'capabilities' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
+                      <LoadingSpinner size={28} className="text-foreground" label="Generating image" />
+                      <div className="mt-2 text-xs font-medium text-foreground/80">Generating…</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsCapabilitiesModalOpen(false)} disabled={isGeneratingProfileImage.type === 'capabilities'}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => void handleGenerateProfileImage('capabilities')}
+                  disabled={!existingAgent?.id || isGeneratingProfileImage.type === 'capabilities'}
+                >
+                  {isGeneratingProfileImage.type === 'capabilities'
+                    ? 'Generating…'
+                    : profileImageUrls.get(capabilitiesAttachmentId || '')
+                      ? 'Regenerate'
+                      : 'Generate'}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+
+          {/* Try These Prompts Modal */}
+          <Dialog open={isTryThesePromptsModalOpen} onOpenChange={setIsTryThesePromptsModalOpen}>
+            <DialogContent className="sm:max-w-xl rounded-lg">
+              <DialogHeader>
+                <DialogTitle>Try These Prompts Image</DialogTitle>
+                <DialogDescription>
+                  {existingAgent?.id ? 'Preview the image and regenerate it if you want a new look.' : 'Preview the image.'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="flex items-center justify-center py-2">
+                <div className="relative rounded-2xl overflow-hidden bg-background/80 shadow-lg ring-1 ring-border/70">
+                  {profileImageUrls.get(tryThesePromptsAttachmentId || '') ? (
+                    <img
+                      src={profileImageUrls.get(tryThesePromptsAttachmentId || '')}
+                      alt="Try These Prompts"
+                      className="h-96 w-96 rounded-2xl object-cover"
+                    />
+                  ) : (
+                    <div className="h-96 w-96 flex items-center justify-center text-muted-foreground bg-muted/30">
+                      <span>No image yet</span>
+                    </div>
+                  )}
+                  {isGeneratingProfileImage.type === 'try_these_prompts' && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/60 backdrop-blur-[1px]">
+                      <LoadingSpinner size={28} className="text-foreground" label="Generating image" />
+                      <div className="mt-2 text-xs font-medium text-foreground/80">Generating…</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <DialogFooter className="gap-2 sm:gap-0">
+                <Button variant="outline" onClick={() => setIsTryThesePromptsModalOpen(false)} disabled={isGeneratingProfileImage.type === 'try_these_prompts'}>
+                  Close
+                </Button>
+                <Button
+                  onClick={() => void handleGenerateProfileImage('try_these_prompts')}
+                  disabled={!existingAgent?.id || isGeneratingProfileImage.type === 'try_these_prompts'}
+                >
+                  {isGeneratingProfileImage.type === 'try_these_prompts'
+                    ? 'Generating…'
+                    : profileImageUrls.get(tryThesePromptsAttachmentId || '')
+                      ? 'Regenerate'
+                      : 'Generate'}
                 </Button>
               </DialogFooter>
             </DialogContent>

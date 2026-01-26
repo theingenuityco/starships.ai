@@ -230,6 +230,38 @@ export function useGenerateAgentAvatar() {
 }
 
 /**
+ * Generate a profile image (Problem Statements, Capabilities, or Try These Prompts)
+ * for an agent via OpenRouter image model.
+ */
+export function useGenerateProfileImage() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { 
+      agentId: string; 
+      type: 'problem_statements' | 'capabilities' | 'try_these_prompts' 
+    }): Promise<AgentModel> => {
+      const response: FetchResponse<ApiResponse<{ agent: AgentModel }>> = await api.post(
+        `/api/v1/agents/${input.agentId}/profile-images/generate`,
+        { type: input.type }
+      )
+      return response.data.data.agent
+    },
+    onSuccess: (agent, variables) => {
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.detail(variables.agentId) })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.byStarship(agent.starshipId) })
+      queryClient.invalidateQueries({ queryKey: AGENT_QUERY_KEYS.all })
+      const typeName = variables.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+      toast.success(`${typeName} image generated`)
+    },
+    onError: (error: any) => {
+      const message = error?.response?.data?.error || error?.response?.data?.message || error?.message || 'Failed to generate profile image'
+      toast.error('Generation failed', { description: message })
+    },
+  })
+}
+
+/**
  * Create a new agent
  */
 export function useCreateAgent() {

@@ -51,7 +51,7 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
   - `problem_statements_attachment_id` (FK → attachments, ON DELETE SET NULL)
   - `capabilities_attachment_id`
   - `try_these_prompts_attachment_id`
-- **Migration:** New migration (e.g. `086_add_agent_profile_image_attachments`) adding the 3 columns + indexes, mirroring `040_add_agent_avatars`.
+- **Migration:** New migration **`087_add_agent_profile_image_attachments`** adding the 3 columns + indexes, mirroring `040_add_agent_avatars`.
 
 ### 2.2 API
 
@@ -63,42 +63,54 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
 - **Access:** `verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res)` — **identical** to avatar.
 - **Flow:**
   1. Validate `type`; load agent; access check.
-  2. Resolve placeholders from agent (name, role, description, category, tools, preview prompts) → `ProfileImageGenerationService.generateProfileImage(agent, type)`.
-  3. Create attachment (`conversationId: 'agent-profile-{agentId}-{type}'`, `filename: 'agent-{slug}-{type}.webp'`).
-  4. `updateAgent(agent.id, { [typeToField(type)]: attachment.id })`.
-  5. Return `{ agent, attachment }`.
+  2. **Require `agent.avatarPrompt`.** If missing, return **400** with a clear message (e.g. “Generate an avatar first”).
+  3. Fetch tools via `AgentService.getAgentTools(agentId, agent.starshipId)`; build `core_capabilities` from tool names + role + description (see §2.3).
+  4. Resolve placeholders (including `avatarPrompt` injection — see §2.5) → `ProfileImageGenerationService.generateProfileImage(agent, type, params)`.
+  5. Create attachment (`conversationId: 'agent-profile-{agentId}-{type}'`, `filename: 'agent-{slug}-{type}.webp'`).
+  6. `updateAgent(agent.id, { [typeToField(type)]: attachment.id })`.
+  7. Return `{ agent, attachment }`.
 
 **Delete (mirror avatar):**
 
 - **Endpoint:** `DELETE /agents/:id/profile-images/:type`
 - **Auth + access:** Same as avatar delete.
-- **Flow:** Resolve FK from `type`; delete attachment; `updateAgent` with that FK `undefined`.
+- **Flow:**
+  1. **Validate `:type`** against `problem_statements` | `capabilities` | `try_these_prompts`. If invalid, return **400**.
+  2. Resolve FK from `type`; delete attachment (if any); `updateAgent` with that FK `undefined`.
 
 ### 2.3 Service: `ProfileImageGenerationService`
 
 - **Location:** `packages/server/src/services/ProfileImageGenerationService.ts`.
 - **Reuse:** Same infra as avatar: **RunnerFactory**, OpenRouter, **same image model** (`google/gemini-3-pro-image-preview`), `imageConfig: { aspect_ratio: '1:1', num_images: 1 }`, `modalities: ['image','text']`, `stream: false`. Same **optimization** (e.g. sharp, 512px or 1024px, WebP).
-- **Input:** Agent model + `type`. No LLM “mirror” step; prompts are **fixed templates** with placeholder substitution.
+- **Input:** Agent model + `type` + **resolved params** (e.g. `coreCapabilities`, `domainContext`). No LLM “mirror” step; we **reuse `avatarPrompt`** (see §2.5). Prompts are **fixed templates** with placeholder substitution.
+- **Prompts:** **Embed the three prompts in-code** (e.g. constants in the service or a shared module). Use `AGENT_PROFILE_IMAGE_PROMPTS.md` as the spec; **do not read the file at runtime.**
 
-**Placeholder resolution (from agent):**
+**Placeholder resolution:**
 
 | Placeholder | Source |
 |-------------|--------|
 | `{{name}}` | `agent.name` |
 | `{{role}}` | `agent.role` (truncate to 32 chars if needed) |
 | `{{category}}` | `agent.category` or `'general'` |
-| `{{background_color}}` | Category → color map in `AGENT_PROFILE_IMAGE_PROMPTS.md` |
-| `{{core_capabilities}}` | From `agent.role` + `agent.description` + `agent.assignedToolSlugs` / tool names; short bullet list |
-| `{{domain_context}}` | Short summary of expertise from `description` or role |
+| `{{background_color}}` | Category → color map (see `AGENT_PROFILE_IMAGE_PROMPTS.md`); implement in-code. |
+| `{{core_capabilities}}` | **Route fetches tools** via `AgentService.getAgentTools(agentId, starshipId)`; build short bullet list from tool `name` (or `slug`) + `agent.role` + `agent.description`. Pass into service as `coreCapabilities`. If no tools, use role + description only. |
+| `{{domain_context}}` | Short summary of expertise from `description` or role; build in route or service. |
 
 **Methods:**
 
-- `generateProfileImage(agent, type: 'problem_statements' | 'capabilities' | 'try_these_prompts'): Promise<{ buffer, mimeType }>`  
-  - Build prompt from `AGENT_PROFILE_IMAGE_PROMPTS.md` (Prompt 0, 1, or 2), substitute placeholders, run same blueprint-style LLM image node, extract image, optimize, return buffer + mimeType.
+- `generateProfileImage(agent, type, params?: { coreCapabilities?: string; domainContext?: string }): Promise<{ buffer, mimeType }>`  
+  - Build prompt from **in-code** template (Prompt 0, 1, or 2 per type), substitute placeholders + **inject `avatarPrompt`** (§2.5), run same blueprint-style LLM image node, extract image, optimize, return buffer + mimeType.
 
 ### 2.4 Security Summary
 
 - **Same as avatar:** JWT, `verifyResourceAccess` for agent’s starship, attachments starship-scoped, presigned URLs only via batch attachments API (which checks starship access). No new auth or resource model.
+
+### 2.5 Recommendation B: Reuse `avatarPrompt` (no new mirror)
+
+- **Reuse** the existing `agent.avatarPrompt` (from the avatar “mirror” step) when generating profile images. **Do not** add a new LLM mirror step for the 3 types.
+- **Require** `avatarPrompt` for profile image generation. If missing, return **400** and tell the user to generate an avatar first (or use avatar “Reset & Generate”).
+- **Inject** `avatarPrompt` into each of the 3 prompts as an extra block, e.g. “Identity (match avatar — use this for character appearance): [avatarPrompt]”. Keep it **additive**; do not remove or override existing instructions.
+- **Preserve** all other prompt elements unchanged: **speech bubble texts** (“I've seen this before”, “Here's what I can do.”, “Just tell me what to do”), **eye contact / camera** (“{{name}} must be looking directly at the camera/viewer”), poses, shot specifics, style, and negative constraints. Only add the avatar identity block for character consistency across all 4 images.
 
 ---
 
@@ -148,7 +160,7 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
 
 ### 4.1 Backend
 
-1. **Migration**
+1. **Migration** (`087_add_agent_profile_image_attachments`)
    - Add `problem_statements_attachment_id`, `capabilities_attachment_id`, `try_these_prompts_attachment_id` to `agents` (FK → attachments, ON DELETE SET NULL).
    - Add indexes for each FK (optional but consistent with avatar).
 
@@ -157,13 +169,13 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
    - Add same fields to `AgentEntity` (and repository update logic if needed).
 
 3. **`ProfileImageGenerationService`**
-   - Placeholder substitution (category → color, `core_capabilities`, `domain_context`).
-   - Load prompts from `AGENT_PROFILE_IMAGE_PROMPTS.md` or in-code equivalent.
+   - **Embed** the three prompts in-code (no runtime file read). Placeholder substitution (category → color, `core_capabilities`, `domain_context`), plus **avatarPrompt** injection (§2.5).
+   - Route fetches tools via `getAgentTools`, builds `coreCapabilities` (and optionally `domainContext`), passes into service.
    - Reuse runner + OpenRouter image model + optimization (mirror `AvatarGenerationService` image path).
 
 4. **Routes**
-   - `POST /agents/:id/profile-images/generate` — body `{ type }`, same auth + access as avatar generate.
-   - `DELETE /agents/:id/profile-images/:type` — same auth + access as avatar delete.
+   - `POST /agents/:id/profile-images/generate` — body `{ type }`, same auth + access as avatar generate; require `avatarPrompt`, fetch tools, build params.
+   - `DELETE /agents/:id/profile-images/:type` — same auth + access as avatar delete; **validate `:type`** (return 400 if invalid).
 
 5. **AgentService / AgentRepository**
    - `updateAgent` already accepts `UpdateAgentRequest`; add the 3 new fields there. Repository uses `toDatabase(toEntityInstance(AgentEntity, ...))`, so entity + protocol coverage is enough.
@@ -185,8 +197,10 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
 ### 4.3 Edge Cases
 
 - **Missing agent data:** If `name` or `role` is missing, validation in generate handler; return 400 with clear message.
+- **Missing `avatarPrompt`:** Return 400; tell user to generate an avatar first.
 - **Missing category:** Use `'general'` and `background_color: 'gray'`.
 - **No tools:** `core_capabilities` from role + description only.
+- **Invalid `:type` on DELETE:** Validate against the three allowed values; return 400 if invalid.
 - **Image generation failure:** Same as avatar — handle in service, return 5xx; client shows error toast.
 
 ---
@@ -196,6 +210,7 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
 - **Same architecture:** Attachments + FKs, generate/delete API, runner + OpenRouter image model, optimization.
 - **Same security:** JWT + `verifyResourceAccess` for agent’s starship; attachments starship-scoped; no new privilege model.
 - **Same UX:** Click-to-open modal, preview, Generate/Regenerate, loading overlay, toasts; one modal per profile image type.
+- **Recommendation B:** Reuse `avatarPrompt` (no new mirror). Require it for profile image generation; inject into prompts. Keep speech bubbles, eye contact, and all other prompt bits unchanged.
 
 Implementing the migration, service, routes, and frontend hooks + profile page sections/modals as above will give users the ability to generate the 3 profile images with the same architecture, security, and UX as the avatar.
 

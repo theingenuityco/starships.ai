@@ -51,7 +51,7 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
   - `problem_statements_attachment_id` (FK → attachments, ON DELETE SET NULL)
   - `capabilities_attachment_id`
   - `try_these_prompts_attachment_id`
-- **Migration:** New migration **`087_add_agent_profile_image_attachments`** adding the 3 columns + indexes, mirroring `040_add_agent_avatars`.
+- **Migration:** New migration **`088_add_agent_profile_image_attachments`** adding the 3 columns + indexes, mirroring `040_add_agent_avatars`.
 
 ### 2.2 API
 
@@ -160,7 +160,7 @@ User clicks avatar → Modal opens → Preview + Generate / Regenerate / Reset &
 
 ### 4.1 Backend
 
-1. **Migration** (`087_add_agent_profile_image_attachments`)
+1. **Migration** (`088_add_agent_profile_image_attachments`)
    - Add `problem_statements_attachment_id`, `capabilities_attachment_id`, `try_these_prompts_attachment_id` to `agents` (FK → attachments, ON DELETE SET NULL).
    - Add indexes for each FK (optional but consistent with avatar).
 

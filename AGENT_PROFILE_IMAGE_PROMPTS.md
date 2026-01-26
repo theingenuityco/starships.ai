@@ -1,6 +1,6 @@
 # Agent Profile Image Generation Prompts (Generic Template)
 
-Template for generating **two** square (1:1) comic-style images per agent: **Capabilities** and **Try These Prompts**. Use the same strategy for all agents (Gaia, Aria, Daedalus, etc.) by substituting the placeholders below.
+Template for generating **three** square (1:1) comic-style images per agent: **Problem Statements**, **Capabilities**, and **Try These Prompts**. Use the same strategy for all agents (Gaia, Aria, Daedalus, etc.) by substituting the placeholders below.
 
 ## Placeholders
 
@@ -26,6 +26,55 @@ Template for generating **two** square (1:1) comic-style images per agent: **Cap
 | support | amber |
 | utility | teal |
 | general | gray |
+
+---
+
+## Prompt 0: Problem Statements Image (Single Square Image)
+
+**Usage:** Substitute placeholders, then send to image model. Output: 1× square image for "The Problem" section.
+
+```
+I want to create 1 square format image (1:1 aspect ratio) for {{name}} showing them understanding and empathizing with user challenges.
+
+Identity Anchors:
+- Name: {{name}}
+- Role: {{role}}
+- Interaction Style: Empathetic, understanding, reassuring
+- Style: Comic strip
+- Aspect Ratio: Square (1:1)
+
+Shot Specifics:
+- Camera: Medium shot, slightly closer than capabilities image (more intimate, understanding perspective)
+- Eye Contact: {{name}} should be looking directly at the camera/viewer with empathetic, understanding expression
+- Pose: Understanding, empathetic, listening - {{name}} leaning slightly forward or with a thoughtful, understanding gesture (e.g., hand near chin, or open palms showing understanding), showing they're actively listening and understanding user challenges
+- Expression: Empathetic, understanding, reassuring (warm but not overly casual), looking at camera with genuine concern and understanding
+- Setting: Clean, modern tech workspace with subtle elements relevant to {{domain_context}}, but less cluttered than capabilities image - focus on {{name}} and their understanding expression
+- Background: Solid {{background_color}} color (matching {{category}} category) or subtle gradient
+- Speech Bubble: "I've seen this before" (exact text - same for all agents)
+
+Quality/Style:
+- High-resolution comic strip style
+- Square format (1:1 aspect ratio) suitable for web app display
+- Warm, empathetic color palette
+- Emphasis on understanding and empathy
+- Professional but warm and reassuring
+- Consistent character appearance with {{name}} avatar
+- {{name}} must be looking directly at the camera/viewer
+- Expression should convey genuine understanding and empathy
+
+Negative Constraints:
+- Avoid overly technical or action-oriented poses
+- Keep it empathetic and understanding, not dismissive or casual
+- Maintain character consistency with {{name}} avatar
+- Background should be simple (solid color or subtle gradient)
+- Don't make it too casual - maintain professional, empathetic tone
+- Single cohesive image, not multiple panels
+- Ensure composition works well in square format
+- Show {{name}} understanding user pain points in their domain
+- {{name}} must maintain eye contact with the camera/viewer
+- Speech bubble must say exactly "I've seen this before" - keep this consistent for all agents
+- Avoid making {{name}} look sad or overly concerned - should be understanding and reassuring
+```
 
 ---
 
@@ -133,4 +182,4 @@ Negative Constraints:
 - `{{background_color}}`: green  
 - `{{domain_context}}`: agent creation and management  
 
-Apply these values to both prompts above to reproduce the original Gaia-specific prompts.
+Apply these values to all three prompts above to reproduce the original Gaia-specific prompts.

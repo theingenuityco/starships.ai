@@ -174,33 +174,26 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
                   </div>
 
-                  <div className="min-w-0 flex-1 flex flex-col">
-                    <div>
-                      <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
-                      {template.role ? <div className="mt-1 text-sm sm:text-base text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
+                  <div className="min-w-0 flex-1">
+                    <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>
+                    {template.role ? <div className="mt-1 text-sm sm:text-base text-muted-foreground line-clamp-2 max-w-[72ch]">{template.role}</div> : null}
 
-                      <div className="mt-3 flex flex-wrap items-center gap-2">
-                        {template.category ? (
-                          <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
-                        ) : null}
-                        {template.version ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span>
-                        ) : null}
-                        {typeof template.usageCount === 'number' ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
-                            {template.usageCount.toLocaleString()} deployments
-                          </span>
-                        ) : null}
-                        {template.model ? (
-                          <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span>
-                        ) : null}
-                      </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      {template.category ? (
+                        <span className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold capitalize ${categoryBadgeClass(template.category)}`}>{template.category}</span>
+                      ) : null}
+                      {template.version ? (
+                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">v{template.version}</span>
+                      ) : null}
+                      {typeof template.usageCount === 'number' ? (
+                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold text-muted-foreground">
+                          {template.usageCount.toLocaleString()} deployments
+                        </span>
+                      ) : null}
+                      {template.model ? (
+                        <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span>
+                      ) : null}
                     </div>
-
-                    {/* Description aligned to match image height */}
-                    {template.description ? (
-                      <p className="mt-auto pt-4 text-sm sm:text-base leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p>
-                    ) : null}
                   </div>
                 </div>
 
@@ -210,6 +203,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   <MarketplaceShareLinkCard shareUrl={shareUrl} compact />
                 </div>
               </div>
+
+              {/* Description as separate section below */}
+              {template.description ? (
+                <p className="mt-6 text-sm sm:text-base leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p>
+              ) : null}
             </section>
 
             {/* Main content grid */}

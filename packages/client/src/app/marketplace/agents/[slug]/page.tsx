@@ -250,7 +250,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                             {problemStatementsText.slice(0, 3).map((statement, index) => (
                               <p
                                 key={index}
-                                className="text-lg font-bold text-foreground leading-relaxed"
+                                className="text-lg font-bold text-foreground leading-relaxed italic"
                               >
                                 &quot;{statement}&quot;
                               </p>

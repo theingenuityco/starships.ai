@@ -246,21 +246,14 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           <h2 className="text-base font-semibold tracking-tight text-foreground">Problem Statements</h2>
                         </div>
                         {problemStatementsText.length > 0 ? (
-                          <div className="space-y-3">
+                          <div className="space-y-4">
                             {problemStatementsText.map((statement, index) => (
-                              <div
+                              <p
                                 key={index}
-                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md"
+                                className="text-base font-bold text-foreground leading-relaxed"
                               >
-                                <div className="flex items-start gap-3">
-                                  <div className="mt-0.5 flex-shrink-0">
-                                    <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <p className="text-sm leading-relaxed text-foreground group-hover:text-primary transition-colors">{statement}</p>
-                                  </div>
-                                </div>
-                              </div>
+                                &quot;{statement}&quot;
+                              </p>
                             ))}
                           </div>
                         ) : (

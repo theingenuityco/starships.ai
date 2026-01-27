@@ -194,6 +194,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         <span className="inline-flex items-center rounded-full border border-border/60 bg-background/50 px-3 py-1 text-xs font-semibold font-mono">{template.model}</span>
                       ) : null}
                     </div>
+
+                    {/* Description directly below agent info */}
+                    {template.description ? (
+                      <p className="mt-4 text-sm sm:text-base leading-relaxed text-muted-foreground">{template.description}</p>
+                    ) : null}
                   </div>
                 </div>
 
@@ -208,18 +213,6 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             {/* Main content grid */}
             <section className="mt-8 pb-10 sm:pb-16">
               <div className="space-y-8">
-                  {template.description ? (
-                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
-                      <div className="flex items-center gap-2 mb-6">
-                        <Icon name="info" className="h-5 w-5 text-primary" />
-                        <h2 className="text-base font-semibold tracking-tight text-foreground">About</h2>
-                      </div>
-                      <div className="prose prose-sm dark:prose-invert max-w-none">
-                        <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">{template.description}</p>
-                      </div>
-                    </section>
-                  ) : null}
-
                   {/* Problem Statements Section */}
                   {(problemStatementsImageUrl || problemStatementsText.length > 0) ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">

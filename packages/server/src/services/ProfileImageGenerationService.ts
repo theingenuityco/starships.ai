@@ -215,6 +215,12 @@ export class ProfileImageGenerationService {
     params?: {
       coreCapabilities?: string;
       domainContext?: string;
+      /**
+       * Optional engine config from the host (e.g. from buildAutopilotExecutionBundle).
+       * When using the remote runner, this must include modelRoutes so the runner can route
+       * the image model to a provider.
+       */
+      engineConfigFromHost?: Record<string, unknown>;
     }
   ): Promise<ProfileImageGenerationResult> {
     const env = getEnvConfig();
@@ -304,13 +310,19 @@ export class ProfileImageGenerationService {
       return undefined;
     };
 
-    const runner = RunnerFactory.getTopLevelRunner(0);
-    const engineConfig = {
-      runtimeEnv: { STARSHIP_ID: agent.starshipId },
+    const runtimeEnv = { STARSHIP_ID: agent.starshipId };
+    const baseConfig = {
+      runtimeEnv,
       llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
       failOnNodeError: true,
+    };
+    const engineConfig = {
+      ...baseConfig,
+      ...(params?.engineConfigFromHost ?? {}),
+      runtimeEnv: (params?.engineConfigFromHost?.runtimeEnv as Record<string, unknown>) ?? runtimeEnv,
     } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
 
+    const runner = RunnerFactory.getTopLevelRunner(0);
     let lastDebug: Record<string, unknown> | undefined;
     const safeStringifyForDebug = (value: unknown, maxChars = 8000): string => {
       try {

@@ -65,6 +65,12 @@ export class AvatarGenerationService {
     agentTools?: unknown[];
     starshipId: string;
     runtimeEnv?: Record<string, unknown>;
+    /**
+     * Optional engine config from the host (e.g. from buildAutopilotExecutionBundle).
+     * When using the remote runner, this must include modelRoutes so the runner can route
+     * the agent's model (e.g. anthropic/claude-sonnet-4.5) to a provider.
+     */
+    engineConfigFromHost?: Record<string, unknown>;
   }): Promise<{ description: string; model: string }> {
     const env = getEnvConfig();
     if (!env.OPENROUTER_API_KEY) {
@@ -136,17 +142,22 @@ export class AvatarGenerationService {
     };
 
     const runtimeEnv = { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) };
-    const engineConfig = {
+    const baseConfig = {
       runtimeEnv,
       llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
       failOnNodeError: true,
+    };
+    const engineConfig = {
+      ...baseConfig,
+      ...(options.engineConfigFromHost ?? {}),
+      runtimeEnv: (options.engineConfigFromHost?.runtimeEnv as Record<string, unknown>) ?? runtimeEnv,
     } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
 
     const runner = RunnerFactory.getTopLevelRunner(0);
     const agent = new Agent(agentParams, {
       runtimeEnv,
       runner,
-      // Forward remote-runner configuration (llm credentials, etc.)
+      // Forward remote-runner configuration (llm credentials, modelRoutes, etc.)
       runnerConfig: engineConfig as unknown as Record<string, unknown>,
     });
 
@@ -227,6 +238,12 @@ export class AvatarGenerationService {
     styleHint?: string;
     starshipId: string;
     runtimeEnv?: Record<string, unknown>;
+    /**
+     * Optional engine config from the host (e.g. from buildAutopilotExecutionBundle).
+     * When using the remote runner, this must include modelRoutes so the runner can route
+     * the image model to a provider.
+     */
+    engineConfigFromHost?: Record<string, unknown>;
   }): Promise<AvatarGenerationResult> {
     const env = getEnvConfig();
     if (!env.OPENROUTER_API_KEY) {
@@ -312,13 +329,19 @@ export class AvatarGenerationService {
       return undefined;
     };
 
-    const runner = RunnerFactory.getTopLevelRunner(0);
-    const engineConfig = {
-      runtimeEnv: { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) },
+    const runtimeEnv = { STARSHIP_ID: options.starshipId, ...(options.runtimeEnv ?? {}) };
+    const baseConfig = {
+      runtimeEnv,
       llm: { apiKey: env.OPENROUTER_API_KEY, baseUrl: 'https://openrouter.ai/api/v1' },
       failOnNodeError: true,
+    };
+    const engineConfig = {
+      ...baseConfig,
+      ...(options.engineConfigFromHost ?? {}),
+      runtimeEnv: (options.engineConfigFromHost?.runtimeEnv as Record<string, unknown>) ?? runtimeEnv,
     } as unknown as EngineConfig & { llm?: { apiKey: string; baseUrl?: string } };
 
+    const runner = RunnerFactory.getTopLevelRunner(0);
     let lastDebug: Record<string, unknown> | undefined;
     const safeStringifyForDebug = (value: unknown, maxChars = 8000): string => {
       try {

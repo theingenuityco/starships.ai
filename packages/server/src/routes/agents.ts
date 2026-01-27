@@ -16,6 +16,7 @@ import { ProfileImageGenerationService } from '@/services/ProfileImageGeneration
 import { AttachmentService } from '@/services/AttachmentService';
 import { ImportExportService } from '@/services/ImportExportService';
 import { triggerNextRevalidate } from '@/utils/nextRevalidate';
+import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 
 const router: Router = Router();
 
@@ -526,6 +527,13 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
     if (!hasAccess) return;
 
+    // Build engine config with modelRoutes so the remote runner can route the agent's model.
+    const { engineConfig: engineConfigFromHost } = await buildAutopilotExecutionBundle({
+      starshipId: agent.starshipId,
+      authUserId: req.user!.id,
+      runtimeEnv: { STARSHIP_ID: agent.starshipId },
+    });
+
     // Ensure we have an agent-authored "mirror" description saved for this agent.
     const generator = new AvatarGenerationService();
     let avatarPrompt = agent.avatarPrompt;
@@ -548,6 +556,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
             ? ((agent.state as { tools: unknown[] }).tools as unknown[])
             : [],
         starshipId: agent.starshipId,
+        engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
       });
       avatarPrompt = mirrorResult.description;
       // Persist on agent for future avatar generations
@@ -560,6 +569,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       subjectDescription: agent.description,
       subjectAvatarPrompt: avatarPrompt,
       starshipId: agent.starshipId,
+      engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
     });
 
     // Store as attachment (auth-scoped)
@@ -704,11 +714,19 @@ router.post('/agents/:id/profile-images/generate', jwtAuthMiddleware, async (req
       domainContext = agent.role || 'general assistance';
     }
 
+    // Build engine config with modelRoutes so the remote runner can route the image model.
+    const { engineConfig: engineConfigFromHost } = await buildAutopilotExecutionBundle({
+      starshipId: agent.starshipId,
+      authUserId: req.user!.id,
+      runtimeEnv: { STARSHIP_ID: agent.starshipId },
+    });
+
     // Generate profile image
     const generator = new ProfileImageGenerationService();
     const gen = await generator.generateProfileImage(agent, type, {
       coreCapabilities,
       domainContext,
+      engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
     });
 
     // Store as attachment (auth-scoped)

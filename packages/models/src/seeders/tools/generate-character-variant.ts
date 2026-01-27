@@ -19,13 +19,13 @@ export const generateCharacterVariantTool: ToolParams = {
         description: 'Optional output size preset like "1024x1024". Mutually exclusive with width/height.',
       },
       width: {
-        type: 'integer',
+        type: 'number',
         maximum: 4096,
         minimum: 64,
         description: 'Optional output width in pixels. Must be provided together with height. Mutually exclusive with size.',
       },
       height: {
-        type: 'integer',
+        type: 'number',
         maximum: 4096,
         minimum: 64,
         description: 'Optional output height in pixels. Must be provided together with width. Mutually exclusive with size.',
@@ -118,12 +118,14 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'start',
         name: 'Start',
         type: 'start',
+        description: '',
         parameters: {},
       },
       {
         ref: 'init',
         name: 'Validate + Choose Source',
         type: 'code',
+        description: 'Validate inputs and choose attachment source',
         parameters: {
           code: `async function main(ctx) {
   const input = ctx.input || {};
@@ -196,6 +198,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'route',
         name: 'Route (direct vs agent)',
         type: 'conditional',
+        description: 'Route to direct attachment or agent lookup',
         parameters: {
           condition: "{{ String((lastOutputOf('init') || {}).route) }}",
         },
@@ -204,6 +207,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'direct_attachment',
         name: 'Use Direct attachmentId',
         type: 'code',
+        description: 'Use provided attachmentId directly',
         parameters: {
           code: `async function main(ctx) {
   const init = ctx.lastOutputOf('init') || {};
@@ -224,6 +228,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'get_agent',
         name: 'Starships: Get Agent',
         type: 'connector_action',
+        description: 'Fetch agent details from Starships',
         parameters: {
           args: "{{ ({ starshipId: String(env('STARSHIP_ID') ?? ''), slug: String((lastOutputOf('init') || {}).agentSlug ?? '') }) }}",
           action: 'get-agent',
@@ -236,6 +241,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'extract_attachment',
         name: 'Extract attachmentId from Agent',
         type: 'code',
+        description: 'Extract attachmentId from agent response',
         parameters: {
           code: `async function main(ctx) {
   const init = ctx.lastOutputOf('init') || {};
@@ -350,6 +356,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'resolve_preview',
         name: 'Starships: Resolve Attachment Preview URL',
         type: 'connector_action',
+        description: 'Resolve attachment preview URL',
         parameters: {
           args: "{{ ({ starshipId: String(env('STARSHIP_ID') ?? ''), ids: [String(((lastOutputOf('direct_attachment') || lastOutputOf('extract_attachment') || {}).attachmentId) ?? '')] }) }}",
           action: 'get-attachments-preview-urls',
@@ -362,6 +369,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'extract_preview_url',
         name: 'Extract previewUrl',
         type: 'code',
+        description: 'Extract preview URL from response',
         parameters: {
           code: `async function main(ctx) {
   const resp = ctx.input || {};
@@ -463,6 +471,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'prep_messages',
         name: 'Prepare Gemini Messages',
         type: 'code',
+        description: 'Prepare messages for Gemini API',
         parameters: {
           code: `async function main(ctx) {
   const input = ctx.input || {};
@@ -527,6 +536,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'llm',
         name: 'Gemini (character ref)',
         type: 'llm',
+        description: 'Generate image variant using Gemini',
         parameters: {
           model: 'google/gemini-3-pro-image-preview',
           stream: false,
@@ -542,6 +552,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'extract_image',
         name: 'Extract 1 Image',
         type: 'code',
+        description: 'Extract generated image from response',
         parameters: {
           code: `async function main(ctx) {
   const resp = ctx.input || {};
@@ -639,6 +650,7 @@ export const generateCharacterVariantTool: ToolParams = {
         ref: 'end',
         name: 'End',
         type: 'end',
+        description: '',
         parameters: {
           output: "{{ (lastOutputOf('extract_image') || {}).image }}",
         },
@@ -652,9 +664,9 @@ export const generateCharacterVariantToolTemplate: Omit<ToolTemplateModel, 'id' 
   description: generateCharacterVariantTool.description,
   parameters: generateCharacterVariantTool.parameters,
   blueprint: generateCharacterVariantTool.blueprint,
-  transforms: null,
-  mutations: null,
-  condition: null,
+  transforms: undefined,
+  mutations: undefined,
+  condition: undefined,
 
   slug: 'generate-character-variant',
   version: '1.0.0',

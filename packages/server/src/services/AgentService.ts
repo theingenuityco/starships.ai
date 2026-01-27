@@ -1654,25 +1654,35 @@ export class AgentService {
         engineConfigFromHost: executionBundle.engineConfig,
       });
 
+      // Ensure statements is always an array of strings
+      const statements = Array.isArray(statementsResult.statements)
+        ? statementsResult.statements.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+        : [];
+
       await marketingContentRepo.createOrUpdate({
         entityType: 'agent_template',
         entityId: targetTemplateId,
         contentType: 'problem_statements_text',
         contentFormat: 'text',
-        textContent: JSON.stringify(statementsResult.statements),
+        textContent: JSON.stringify(statements),
         textFormat: 'json',
         generationMetadata: { model: statementsResult.model },
       });
 
-      marketingContent.problemStatementsText = statementsResult.statements;
+      marketingContent.problemStatementsText = statements;
     } else {
       // Use existing
       try {
         const parsed = JSON.parse(existingProblemStatements.textContent || '[]');
         if (Array.isArray(parsed)) {
-          marketingContent.problemStatementsText = parsed;
+          // Ensure all items are strings
+          marketingContent.problemStatementsText = parsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
+        } else {
+          console.warn('[AGENT-PUBLICATION] Existing problem statements is not an array, will regenerate');
+          // Will fall through to regeneration below
         }
-      } catch {
+      } catch (err) {
+        console.warn('[AGENT-PUBLICATION] Failed to parse existing problem statements, will regenerate:', err);
         // Invalid JSON, will regenerate below
       }
     }
@@ -1981,7 +1991,11 @@ export class AgentService {
         generationMetadata: { model: statementsResult.model },
       });
 
-      marketingContent.problemStatementsText = statementsResult.statements;
+      // Ensure statements is always an array of strings
+      const statements = Array.isArray(statementsResult.statements)
+        ? statementsResult.statements.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
+        : [];
+      marketingContent.problemStatementsText = statements;
     } else {
       // Profile images
       const profileImageGenerator = new ProfileImageGenerationService();

@@ -250,6 +250,7 @@ export class ProfileImageGenerationService {
     let prompt = this.substitutePlaceholders(template, placeholders);
 
     // Inject avatarPrompt in "Identity" section (matching avatar pattern)
+    // CRITICAL: This is the primary source of character consistency
     if (agent.avatarPrompt) {
       const identitySection = prompt.indexOf('Identity Anchors:');
       if (identitySection >= 0) {
@@ -264,13 +265,32 @@ export class ProfileImageGenerationService {
             beforeIdentity,
             identityContent,
             '',
-            'Identity (match avatar — use this for character appearance):',
+            'CRITICAL - Character Identity (MUST match avatar exactly — this is the reference for ALL character features):',
             agent.avatarPrompt,
+            '',
+            'CONSISTENCY REQUIREMENT:',
+            '- Face shape, features, hair, age, and all physical characteristics MUST match the avatar description above',
+            '- Use the avatar description as the PRIMARY reference for character appearance',
+            '- Do NOT deviate from the avatar description - maintain exact character consistency',
+            '- All three profile images (problem statements, capabilities, try these prompts) must show the SAME character',
             '',
             rest,
           ].join('\n');
         }
+      } else {
+        // If no Identity Anchors section, prepend the avatar prompt at the beginning
+        prompt = [
+          'CRITICAL - Character Identity (MUST match avatar exactly):',
+          agent.avatarPrompt,
+          '',
+          'CONSISTENCY REQUIREMENT: Maintain exact character consistency with the avatar description above.',
+          '',
+          prompt,
+        ].join('\n');
       }
+    } else {
+      // Warn if avatarPrompt is missing - consistency will be poor
+      console.warn(`[PROFILE-IMAGE] Agent ${agent.id} (${agent.name}) missing avatarPrompt - character consistency may be poor`);
     }
 
     // Build user message

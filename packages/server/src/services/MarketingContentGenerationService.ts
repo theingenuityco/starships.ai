@@ -151,8 +151,63 @@ export class MarketingContentGenerationService {
       ...runnerConfig,
     });
 
-    const result = ExecutionItemUtils.unwrapSingle(items);
-    const llmOutput = typeof result === 'string' ? result : JSON.stringify(result);
+    // Extract LLM node output from execution results
+    const extractNodeJsonFromExecutionResults = (value: unknown, nodeRef: string): unknown => {
+      if (!Array.isArray(value)) return undefined;
+      // Take the last recorded output for the nodeRef
+      for (let i = value.length - 1; i >= 0; i--) {
+        const entry = value[i];
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const last = items[items.length - 1];
+        if (!last || typeof last !== 'object') return undefined;
+        return (last as Record<string, unknown>).json;
+      }
+      return undefined;
+    };
+
+    const llmJson = ExecutionItemUtils.unwrapSingle(items);
+    let llmNodeJson: unknown = llmJson;
+    
+    if (Array.isArray(llmJson)) {
+      const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
+      if (typeof extracted === 'undefined') {
+        throw new Error(
+          `Problem statements generation returned execution.results but did not include output for nodeRef "llm_1"`
+        );
+      }
+      llmNodeJson = extracted;
+    }
+
+    // Unwrap LLM response to get message content
+    type AnyRecord = Record<string, unknown>;
+    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
+
+    const unwrapResponse = (value: unknown): unknown => {
+      if (!isRecord(value)) return value;
+      const topChoices = value.choices;
+      if (Array.isArray(topChoices)) return value;
+      for (const key of ['response', 'data', 'result'] as const) {
+        const nested = value[key];
+        if (isRecord(nested) && Array.isArray(nested.choices)) return nested;
+      }
+      return value;
+    };
+
+    const response = unwrapResponse(llmNodeJson);
+    const responseRec = isRecord(response) ? response : undefined;
+    const choices = responseRec?.choices;
+    const choice0 = Array.isArray(choices) ? choices[0] : undefined;
+    const choice0Rec = isRecord(choice0) ? choice0 : undefined;
+    const msg = (choice0Rec && isRecord(choice0Rec.message) ? (choice0Rec.message as AnyRecord) : undefined) ?? undefined;
+    const llmOutput = isRecord(msg) && typeof msg.content === 'string' ? (msg.content as string).trim() : '';
+
+    if (!llmOutput) {
+      throw new Error('Problem statements generation returned empty text');
+    }
 
     // Parse JSON array from LLM output
     let statements: string[] = [];

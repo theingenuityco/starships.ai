@@ -246,11 +246,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           <h2 className="text-base font-semibold tracking-tight text-foreground">Problem Statements</h2>
                         </div>
                         {problemStatementsText.length > 0 ? (
-                          <div className="space-y-5">
+                          <div className="space-y-6 flex flex-col justify-between min-h-full">
                             {problemStatementsText.slice(0, 3).map((statement, index) => (
                               <p
                                 key={index}
-                                className="text-lg font-bold text-foreground leading-relaxed italic"
+                                className={`text-xl text-foreground leading-relaxed italic ${
+                                  index % 2 === 0 ? 'text-left' : 'text-right'
+                                }`}
                               >
                                 &quot;{statement}&quot;
                               </p>

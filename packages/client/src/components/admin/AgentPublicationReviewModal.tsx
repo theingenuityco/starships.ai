@@ -35,63 +35,12 @@ export function AgentPublicationReviewModal({
   marketingContent: initialMarketingContent,
   onConfirm,
 }: AgentPublicationReviewModalProps) {
-  // Safely parse problem statements - handle both array and JSON string
-  const parseProblemStatements = (input: string[] | string | undefined | unknown): string[] => {
+  // Parse problem statements - backend already returns as array, just like previewPrompts
+  const parseProblemStatements = (input: string[] | undefined): string[] => {
     if (!input) return []
     if (Array.isArray(input)) {
-      // Ensure all items are strings
+      // Ensure all items are strings (defensive)
       return input.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-    }
-    if (typeof input === 'string') {
-      // Try to parse as JSON first
-      try {
-        const parsed = JSON.parse(input)
-        if (Array.isArray(parsed)) {
-          return parsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-        }
-        // If parsed but not an array, check if it's an object with nested content
-        if (parsed && typeof parsed === 'object') {
-          // Check for common execution result structures
-          if (Array.isArray(parsed)) {
-            return parsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-          }
-          // If it's an execution result object, try to extract statements from it
-          if (parsed.items && Array.isArray(parsed.items)) {
-            // This might be an execution result - try to find the actual statements
-            for (const item of parsed.items) {
-              if (item && typeof item === 'object' && item.json) {
-                const json = item.json
-                if (json && typeof json === 'object' && json.choices && Array.isArray(json.choices)) {
-                  // This looks like an LLM response - try to extract content
-                  const choice = json.choices[0]
-                  if (choice && choice.message && choice.message.content) {
-                    const content = choice.message.content
-                    if (typeof content === 'string') {
-                      try {
-                        const contentParsed = JSON.parse(content)
-                        if (Array.isArray(contentParsed)) {
-                          return contentParsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0)
-                        }
-                      } catch {
-                        // Content is not JSON, continue
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        }
-      } catch {
-        // If it's not JSON, treat as a single statement
-        return input.trim() ? [input] : []
-      }
-    }
-    // If input is an object (execution result), try to extract statements
-    if (input && typeof input === 'object' && !Array.isArray(input)) {
-      // This might be a raw execution result - log for debugging but return empty
-      console.warn('[AgentPublicationReviewModal] Received unexpected object format for problemStatementsText:', input)
-      return []
     }
     return []
   }

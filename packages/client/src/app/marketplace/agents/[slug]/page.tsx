@@ -246,11 +246,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           <h2 className="text-base font-semibold tracking-tight text-foreground">Problem Statements</h2>
                         </div>
                         {problemStatementsText.length > 0 ? (
-                          <div className="space-y-4">
-                            {problemStatementsText.map((statement, index) => (
+                          <div className="space-y-5">
+                            {problemStatementsText.slice(0, 3).map((statement, index) => (
                               <p
                                 key={index}
-                                className="text-base font-bold text-foreground leading-relaxed"
+                                className="text-lg font-bold text-foreground leading-relaxed"
                               >
                                 &quot;{statement}&quot;
                               </p>

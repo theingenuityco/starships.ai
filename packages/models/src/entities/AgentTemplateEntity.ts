@@ -197,6 +197,80 @@ export class AgentTemplateEntity implements AgentTemplateModel {
   @IsISO8601()
   avatarUpdatedAt?: string;
 
+  /**
+   * Public profile image URLs (computed by repository/service).
+   * Note: We do not store these in the DB; we store S3 keys and expose stable API route URLs.
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 2000)
+  problemStatementsImageUrl?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 2000)
+  capabilitiesImageUrl?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 2000)
+  tryThesePromptsImageUrl?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  problemStatementsUpdatedAt?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  capabilitiesUpdatedAt?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsISO8601()
+  tryThesePromptsUpdatedAt?: string;
+
+  // Internal persistence fields (do not expose raw S3 keys to clients)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 1000)
+  problemStatementsS3Key?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  problemStatementsMimeType?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 1000)
+  capabilitiesS3Key?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  capabilitiesMimeType?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 1000)
+  tryThesePromptsS3Key?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 100)
+  tryThesePromptsMimeType?: string;
+
   @Expose()
   @IsOptional()
   @IsArray()

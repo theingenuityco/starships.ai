@@ -56,10 +56,6 @@ function categoryBadgeClass(category: AgentTemplateModel['category']): string {
   return colors[String(category)] || colors.general
 }
 
-function getAgentImagePath(agentName: string, imageType: 'capabilities' | 'prompts'): string {
-  const normalizedName = agentName.toLowerCase().trim()
-  return `/marketplace/agents/${normalizedName}/${imageType}.webp`
-}
 
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
   const templates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
@@ -130,6 +126,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
     .slice(0, 2)
     .map(p => p[0]?.toUpperCase())
     .join('')
+
+  // Profile image URLs from template (API routes)
+  const problemStatementsImageUrl = template.problemStatementsImageUrl
+  const capabilitiesImageUrl = template.capabilitiesImageUrl
+  const tryThesePromptsImageUrl = template.tryThesePromptsImageUrl
 
   return (
     <>
@@ -218,22 +219,51 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     </section>
                   ) : null}
 
+                  {/* Problem Statements Section */}
+                  {problemStatementsImageUrl ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                      {/* Problem Statements Image - Left side */}
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                        <AgentProfileImage
+                          src={problemStatementsImageUrl}
+                          alt={`${template.name} problem statements`}
+                          className="w-full h-auto"
+                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                        />
+                      </div>
+
+                      {/* Problem Statements Section - Right side */}
+                      <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
+                        <div className="flex items-center gap-2 mb-6">
+                          <Icon name="lightbulb" className="h-5 w-5 text-primary" />
+                          <h2 className="text-base font-semibold tracking-tight text-foreground">Problem Statements</h2>
+                        </div>
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">
+                            Shows the agent understanding and empathizing with user challenges.
+                          </p>
+                        </div>
+                      </section>
+                    </div>
+                  ) : null}
+
                   {toolSlugs.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                       {/* Capabilities Image - Left side */}
-                      {(() => {
-                        const capabilitiesImagePath = getAgentImagePath(template.name, 'capabilities')
-                        return (
-                          <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
-                            <AgentProfileImage
-                              src={capabilitiesImagePath}
-                              alt={`${template.name} capabilities`}
-                              className="w-full h-auto"
-                              style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                            />
-                          </div>
-                        )
-                      })()}
+                      {capabilitiesImageUrl ? (
+                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                          <AgentProfileImage
+                            src={capabilitiesImageUrl}
+                            alt={`${template.name} capabilities`}
+                            className="w-full h-auto"
+                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
+                          <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                        </div>
+                      )}
 
                       {/* Capabilities Section - Right side */}
                       <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
@@ -301,19 +331,20 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                     </section>
 
                     {/* Try These Prompts Image - Right side */}
-                    {(() => {
-                      const promptsImagePath = getAgentImagePath(template.name, 'prompts')
-                      return (
-                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
-                          <AgentProfileImage
-                            src={promptsImagePath}
-                            alt={`${template.name} try these prompts`}
-                            className="w-full h-auto"
-                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                          />
-                        </div>
-                      )
-                    })()}
+                    {tryThesePromptsImageUrl ? (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                        <AgentProfileImage
+                          src={tryThesePromptsImageUrl}
+                          alt={`${template.name} try these prompts`}
+                          className="w-full h-auto"
+                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
+                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </div>

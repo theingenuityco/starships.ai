@@ -1214,6 +1214,103 @@ export class AgentService {
       }
     }
 
+    // 3c. Ensure template has public profile images
+    if (targetTemplateId) {
+      try {
+        const templateRepoInternal = new AgentTemplateRepository();
+        const attachmentService = new AttachmentService();
+
+        const toMs = (s?: string) => {
+          if (!s) return NaN;
+          const t = new Date(s).getTime();
+          return Number.isFinite(t) ? t : NaN;
+        };
+
+        // Copy problem statements image
+        if (agent.problemStatementsAttachmentId) {
+          try {
+            const existingStorage = await templateRepoInternal.getProfileImageStorageById(targetTemplateId, 'problem_statements');
+            const existingAttachment = await attachmentService.getAttachmentWithUrl(
+              agent.problemStatementsAttachmentId,
+              agent.starshipId
+            );
+
+            const templateImageMs = toMs(existingStorage?.updatedAt);
+            const attachmentCreatedMs = toMs(existingAttachment?.createdAt);
+            const shouldUpdate =
+              !existingStorage?.s3Key ||
+              (Number.isFinite(templateImageMs) && Number.isFinite(attachmentCreatedMs) && attachmentCreatedMs > templateImageMs) ||
+              (!Number.isFinite(templateImageMs) && Number.isFinite(attachmentCreatedMs));
+
+            if (shouldUpdate && existingAttachment?.s3Key) {
+              await templateRepoInternal.updateProfileImageStorage(targetTemplateId, 'problem_statements', {
+                s3Key: existingAttachment.s3Key,
+                mimeType: existingAttachment.mimeType || 'image/webp',
+                updatedAt: existingAttachment.createdAt || new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.error('[AGENT-PUBLICATION] Failed to copy problem statements image:', err);
+          }
+        }
+
+        // Copy capabilities image
+        if (agent.capabilitiesAttachmentId) {
+          try {
+            const existingStorage = await templateRepoInternal.getProfileImageStorageById(targetTemplateId, 'capabilities');
+            const existingAttachment = await attachmentService.getAttachmentWithUrl(agent.capabilitiesAttachmentId, agent.starshipId);
+
+            const templateImageMs = toMs(existingStorage?.updatedAt);
+            const attachmentCreatedMs = toMs(existingAttachment?.createdAt);
+            const shouldUpdate =
+              !existingStorage?.s3Key ||
+              (Number.isFinite(templateImageMs) && Number.isFinite(attachmentCreatedMs) && attachmentCreatedMs > templateImageMs) ||
+              (!Number.isFinite(templateImageMs) && Number.isFinite(attachmentCreatedMs));
+
+            if (shouldUpdate && existingAttachment?.s3Key) {
+              await templateRepoInternal.updateProfileImageStorage(targetTemplateId, 'capabilities', {
+                s3Key: existingAttachment.s3Key,
+                mimeType: existingAttachment.mimeType || 'image/webp',
+                updatedAt: existingAttachment.createdAt || new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.error('[AGENT-PUBLICATION] Failed to copy capabilities image:', err);
+          }
+        }
+
+        // Copy try these prompts image
+        if (agent.tryThesePromptsAttachmentId) {
+          try {
+            const existingStorage = await templateRepoInternal.getProfileImageStorageById(targetTemplateId, 'try_these_prompts');
+            const existingAttachment = await attachmentService.getAttachmentWithUrl(
+              agent.tryThesePromptsAttachmentId,
+              agent.starshipId
+            );
+
+            const templateImageMs = toMs(existingStorage?.updatedAt);
+            const attachmentCreatedMs = toMs(existingAttachment?.createdAt);
+            const shouldUpdate =
+              !existingStorage?.s3Key ||
+              (Number.isFinite(templateImageMs) && Number.isFinite(attachmentCreatedMs) && attachmentCreatedMs > templateImageMs) ||
+              (!Number.isFinite(templateImageMs) && Number.isFinite(attachmentCreatedMs));
+
+            if (shouldUpdate && existingAttachment?.s3Key) {
+              await templateRepoInternal.updateProfileImageStorage(targetTemplateId, 'try_these_prompts', {
+                s3Key: existingAttachment.s3Key,
+                mimeType: existingAttachment.mimeType || 'image/webp',
+                updatedAt: existingAttachment.createdAt || new Date().toISOString(),
+              });
+            }
+          } catch (err) {
+            console.error('[AGENT-PUBLICATION] Failed to copy try these prompts image:', err);
+          }
+        }
+      } catch (err) {
+        console.error('[AGENT-PUBLICATION] Failed to ensure template profile images:', err);
+      }
+    }
+
     // 4. Persist publication metadata on agent
     const updated = await this.agentRepository.update(agentId, {
       version: nextVersion,

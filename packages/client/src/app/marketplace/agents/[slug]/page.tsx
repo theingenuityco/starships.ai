@@ -197,7 +197,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
                     {/* Description directly below agent info */}
                     {template.description ? (
-                      <p className="mt-4 text-sm sm:text-base leading-relaxed text-muted-foreground">{template.description}</p>
+                      <p className="mt-4 text-sm sm:text-base leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p>
                     ) : null}
                   </div>
                 </div>
@@ -215,7 +215,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
               <div className="space-y-8">
                   {/* Problem Statements Section */}
                   {(problemStatementsImageUrl || problemStatementsText.length > 0) ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
                       {/* Problem Statements Image - Left side */}
                       {problemStatementsImageUrl ? (
                         <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
@@ -233,13 +233,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       )}
 
                       {/* Problem Statements Section - Right side */}
-                      <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
+                      <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8 h-full flex flex-col">
                         <div className="flex items-center gap-2 mb-6">
                           <Icon name="lightbulb" className="h-5 w-5 text-primary" />
                           <h2 className="text-base font-semibold tracking-tight text-foreground">Problem Statements</h2>
                         </div>
                         {problemStatementsText.length > 0 ? (
-                          <div className="space-y-8 flex flex-col justify-between min-h-full">
+                          <div className="flex-1 flex flex-col justify-between space-y-10">
                             {problemStatementsText.slice(0, 3).map((statement, index) => (
                               <p
                                 key={index}

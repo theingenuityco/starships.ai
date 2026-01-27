@@ -465,7 +465,10 @@ export class AgentTemplateRepository extends BaseRepository {
     if (problemStatementsTextContent?.textContent) {
       try {
         const parsed = JSON.parse(problemStatementsTextContent.textContent);
-        problemStatementsText = Array.isArray(parsed) ? parsed : undefined;
+        if (Array.isArray(parsed)) {
+          // Ensure all items are strings (defensive, same as previewPrompts handling)
+          problemStatementsText = parsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
+        }
       } catch {
         // Invalid JSON, ignore
       }

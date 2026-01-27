@@ -35,7 +35,23 @@ export function AgentPublicationReviewModal({
   marketingContent: initialMarketingContent,
   onConfirm,
 }: AgentPublicationReviewModalProps) {
-  const [problemStatements, setProblemStatements] = useState<string[]>(initialMarketingContent.problemStatementsText || [])
+  // Safely parse problem statements - handle both array and JSON string
+  const parseProblemStatements = (input: string[] | string | undefined): string[] => {
+    if (!input) return []
+    if (Array.isArray(input)) return input
+    if (typeof input === 'string') {
+      try {
+        const parsed = JSON.parse(input)
+        return Array.isArray(parsed) ? parsed : []
+      } catch {
+        // If it's not JSON, treat as a single statement
+        return input.trim() ? [input] : []
+      }
+    }
+    return []
+  }
+
+  const [problemStatements, setProblemStatements] = useState<string[]>(parseProblemStatements(initialMarketingContent.problemStatementsText))
   const [marketingContent, setMarketingContent] = useState(initialMarketingContent)
   const [regeneratingType, setRegeneratingType] = useState<string | null>(null)
 
@@ -46,7 +62,7 @@ export function AgentPublicationReviewModal({
   // Update local state when prop changes
   useEffect(() => {
     setMarketingContent(initialMarketingContent)
-    setProblemStatements(initialMarketingContent.problemStatementsText || [])
+    setProblemStatements(parseProblemStatements(initialMarketingContent.problemStatementsText))
   }, [initialMarketingContent])
 
   const handleRegenerate = async (type: 'avatar' | 'problem_statements_text' | 'problem_statements_image' | 'capabilities_image' | 'try_these_prompts_image') => {

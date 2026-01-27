@@ -131,6 +131,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
   const problemStatementsImageUrl = template.problemStatementsImageUrl
   const capabilitiesImageUrl = template.capabilitiesImageUrl
   const tryThesePromptsImageUrl = template.tryThesePromptsImageUrl
+  const problemStatementsText = Array.isArray(template.problemStatementsText) ? template.problemStatementsText : []
 
   return (
     <>
@@ -220,17 +221,23 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                   ) : null}
 
                   {/* Problem Statements Section */}
-                  {problemStatementsImageUrl ? (
+                  {(problemStatementsImageUrl || problemStatementsText.length > 0) ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                       {/* Problem Statements Image - Left side */}
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
-                        <AgentProfileImage
-                          src={problemStatementsImageUrl}
-                          alt={`${template.name} problem statements`}
-                          className="w-full h-auto"
-                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                        />
-                      </div>
+                      {problemStatementsImageUrl ? (
+                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                          <AgentProfileImage
+                            src={problemStatementsImageUrl}
+                            alt={`${template.name} problem statements`}
+                            className="w-full h-auto"
+                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
+                          <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                        </div>
+                      )}
 
                       {/* Problem Statements Section - Right side */}
                       <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
@@ -238,11 +245,31 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           <Icon name="lightbulb" className="h-5 w-5 text-primary" />
                           <h2 className="text-base font-semibold tracking-tight text-foreground">Problem Statements</h2>
                         </div>
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">
-                            Shows the agent understanding and empathizing with user challenges.
-                          </p>
-                        </div>
+                        {problemStatementsText.length > 0 ? (
+                          <div className="space-y-3">
+                            {problemStatementsText.map((statement, index) => (
+                              <div
+                                key={index}
+                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="mt-0.5 flex-shrink-0">
+                                    <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm leading-relaxed text-foreground group-hover:text-primary transition-colors">{statement}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="prose prose-sm dark:prose-invert max-w-none">
+                            <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">
+                              Shows the agent understanding and empathizing with user challenges.
+                            </p>
+                          </div>
+                        )}
                       </section>
                     </div>
                   ) : null}

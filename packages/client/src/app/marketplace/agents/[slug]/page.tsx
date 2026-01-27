@@ -249,23 +249,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
                   {toolSlugs.length > 0 ? (
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                      {/* Capabilities Image - Left side */}
-                      {capabilitiesImageUrl ? (
-                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
-                          <AgentProfileImage
-                            src={capabilitiesImageUrl}
-                            alt={`${template.name} capabilities`}
-                            className="w-full h-auto"
-                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
-                          <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
-                        </div>
-                      )}
-
-                      {/* Capabilities Section - Right side */}
+                      {/* Capabilities Section - Left side */}
                       <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
                         <div className="flex items-center gap-2 mb-6">
                           <Icon name="wrench" className="h-5 w-5 text-primary" />
@@ -299,13 +283,45 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           })}
                         </div>
                       </section>
+
+                      {/* Capabilities Image - Right side */}
+                      {capabilitiesImageUrl ? (
+                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                          <AgentProfileImage
+                            src={capabilitiesImageUrl}
+                            alt={`${template.name} capabilities`}
+                            className="w-full h-auto"
+                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                          />
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
+                          <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                        </div>
+                      )}
                     </div>
                   ) : null}
 
                 {/* Try These Prompts Row - 2 columns */}
                 {Array.isArray(template.previewPrompts) && template.previewPrompts.length > 0 ? (
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                    {/* Try These Prompts Section - Left side */}
+                    {/* Try These Prompts Image - Left side */}
+                    {tryThesePromptsImageUrl ? (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                        <AgentProfileImage
+                          src={tryThesePromptsImageUrl}
+                          alt={`${template.name} try these prompts`}
+                          className="w-full h-auto"
+                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
+                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                      </div>
+                    )}
+
+                    {/* Try These Prompts Section - Right side */}
                     <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
                       <div className="flex items-center gap-2 mb-6">
                         <Icon name="message-square" className="h-5 w-5 text-primary" />
@@ -329,22 +345,6 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         ))}
                       </div>
                     </section>
-
-                    {/* Try These Prompts Image - Right side */}
-                    {tryThesePromptsImageUrl ? (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
-                        <AgentProfileImage
-                          src={tryThesePromptsImageUrl}
-                          alt={`${template.name} try these prompts`}
-                          className="w-full h-auto"
-                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                        />
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
-                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
-                      </div>
-                    )}
                   </div>
                 ) : null}
               </div>

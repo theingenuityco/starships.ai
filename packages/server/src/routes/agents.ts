@@ -978,7 +978,121 @@ router.get('/admin/agents/:id/tools', async (req: Request, res: Response): Promi
   }
 });
 
-// POST /admin/agents/:id/approve - Approve pending agent publication
+// POST /agents/:id/publication/prepare - Prepare publication (generate missing marketing content)
+router.post('/agents/:id/publication/prepare', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const result = await agentService.preparePublication(agentId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Marketing content prepared',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error preparing publication:', error);
+    handleError(error, res, 'preparing publication');
+  }
+});
+
+// POST /agents/:id/publication/regenerate - Regenerate specific marketing content item
+router.post('/agents/:id/publication/regenerate', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const bodyValidation = validateData(
+      z.object({
+        templateId: IdSchema,
+        type: z.enum(['avatar', 'problem_statements_text', 'problem_statements_image', 'capabilities_image', 'try_these_prompts_image']),
+      }),
+      req.body,
+      res,
+      'regenerate request'
+    );
+    if (!bodyValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const { templateId, type } = bodyValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const result = await agentService.regenerateMarketingContent(agentId, templateId, type, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Marketing content regenerated',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error regenerating marketing content:', error);
+    handleError(error, res, 'regenerating marketing content');
+  }
+});
+
+// PUT /agents/:id/publication/problem-statements - Update problem statements
+router.put('/agents/:id/publication/problem-statements', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const bodyValidation = validateData(
+      z.object({
+        templateId: IdSchema,
+        statements: z.array(z.string().min(1).max(200)).min(1).max(5),
+      }),
+      req.body,
+      res,
+      'problem statements update'
+    );
+    if (!bodyValidation) return;
+
+    const { templateId, statements } = bodyValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const result = await agentService.updateProblemStatements(templateId, statements, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Problem statements updated',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error updating problem statements:', error);
+    handleError(error, res, 'updating problem statements');
+  }
+});
+
+// POST /agents/:id/publication/confirm - Confirm publication (final step)
+router.post('/agents/:id/publication/confirm', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const updated = await agentService.confirmPublication(agentId, adminUserId);
+
+    // Refresh marketing/marketplace ISR immediately (keep SEO, avoid staleness).
+    triggerNextRevalidate({ tags: ['public-agent-templates'] });
+
+    sendSuccess(res, {
+      message: 'Agent publication confirmed',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error confirming publication:', error);
+    handleError(error, res, 'confirming publication');
+  }
+});
+
+// POST /admin/agents/:id/approve - Approve pending agent publication (legacy - now uses two-step flow)
 router.post('/admin/agents/:id/approve', async (req: Request, res: Response): Promise<void> => {
   try {
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
@@ -988,7 +1102,9 @@ router.post('/admin/agents/:id/approve', async (req: Request, res: Response): Pr
     const adminUserId = req.user!.id;
 
     const agentService = new AgentService();
-    const updated = await agentService.approvePublication(agentId, adminUserId);
+    // For backwards compatibility, prepare then confirm
+    await agentService.preparePublication(agentId, adminUserId);
+    const updated = await agentService.confirmPublication(agentId, adminUserId);
 
     // Refresh marketing/marketplace ISR immediately (keep SEO, avoid staleness).
     triggerNextRevalidate({ tags: ['public-agent-templates'] });

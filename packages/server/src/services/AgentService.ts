@@ -36,6 +36,11 @@ import { MessageService } from './MessageService';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
 import { AttachmentService } from './AttachmentService';
+import { AvatarGenerationService } from './AvatarGenerationService';
+import { ProfileImageGenerationService } from './ProfileImageGenerationService';
+import { MarketingContentGenerationService } from './MarketingContentGenerationService';
+import { MarketingContentRepository } from '@starships/models';
+import { buildAutopilotExecutionBundle } from './autopilot-execution-bundle';
 
 export interface ConversationRequest {
   agentId: string;
@@ -1354,6 +1359,802 @@ export class AgentService {
       publicationStatus: 'rejected',
       publicationApprovedBy: adminUserId,
       publicationApprovedAt: new Date().toISOString(),
+    });
+
+    if (!updated) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return updated;
+  }
+
+  /**
+   * Prepare publication: Generate missing marketing content and return preview
+   * Creates/updates template but does NOT mark as published yet
+   */
+  async preparePublication(agentId: string, adminUserId: string): Promise<{
+    agent: AgentModel;
+    templateId: string;
+    marketingContent: {
+      avatarUrl?: string;
+      problemStatementsText?: string[];
+      problemStatementsImageUrl?: string;
+      capabilitiesImageUrl?: string;
+      tryThesePromptsImageUrl?: string;
+    };
+  }> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    // Validate admin
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can prepare agent publication');
+    }
+
+    if (agent.publicationStatus !== 'pending_approval') {
+      throw new ValidationError('Agent is not pending approval');
+    }
+
+    // Determine next version
+    const currentVersion = agent.version || '1.0.0';
+    let nextVersion = agent.publicationRequestedVersion;
+    if (!nextVersion) {
+      const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+      nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
+    }
+
+    // Sanitize numeric fields
+    const safeTemperature =
+      typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature) ? agent.temperature : DEFAULT_AGENT_TEMPERATURE;
+    const safeMaxTokens =
+      typeof agent.maxTokens === 'number' && !Number.isNaN(agent.maxTokens)
+        ? Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, agent.maxTokens))
+        : undefined;
+    const safeTimeout =
+      typeof agent.timeout === 'number' && !Number.isNaN(agent.timeout)
+        ? Math.min(MAX_AGENT_TIMEOUT_MS, Math.max(MIN_AGENT_TIMEOUT_MS, agent.timeout))
+        : DEFAULT_AGENT_TIMEOUT_MS;
+
+    // Create or update template (but don't mark as published yet)
+    const templateRepo = new AgentTemplateRepository();
+    let targetTemplateId = agent.publishedTemplateId;
+
+    if (targetTemplateId) {
+      const existingTemplate = await templateRepo.findById(targetTemplateId);
+      if (!existingTemplate) {
+        targetTemplateId = undefined;
+      }
+    }
+
+    if (!targetTemplateId) {
+      const createdTemplate = await templateRepo.create({
+        name: agent.name,
+        description: agent.description,
+        role: agent.role || 'Assistant',
+        category: agent.category ?? 'general',
+        model: agent.model,
+        temperature: safeTemperature,
+        maxTokens: safeMaxTokens,
+        reasoning: agent.reasoning,
+        timeout: safeTimeout,
+        systemPrompt: agent.systemPrompt,
+        state: agent.state!,
+        blueprint: agent.blueprint!,
+        icon: undefined,
+        previewPrompts: agent.previewPrompts,
+        assignedToolSlugs: [],
+      });
+      await templateRepo.update(createdTemplate.id, { version: nextVersion });
+      targetTemplateId = createdTemplate.id;
+    } else {
+      await templateRepo.update(targetTemplateId, {
+        name: agent.name,
+        description: agent.description,
+        role: agent.role || 'Assistant',
+        category: agent.category ?? 'general',
+        model: agent.model,
+        temperature: safeTemperature,
+        maxTokens: safeMaxTokens,
+        reasoning: agent.reasoning,
+        timeout: safeTimeout,
+        systemPrompt: agent.systemPrompt,
+        state: agent.state,
+        blueprint: agent.blueprint,
+        previewPrompts: agent.previewPrompts,
+        version: nextVersion,
+      });
+    }
+
+    // Sync tools
+    try {
+      const toolRepo = new ToolRepository();
+      const toolTemplateRepo = new ToolTemplateRepository();
+      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+      const toolTemplateIds: string[] = [];
+
+      for (const tool of agentTools as ToolModel[]) {
+        const hasParams = !!tool.parameters && tool.parameters.type === 'object';
+        const hasBlueprint = !!(
+          tool.blueprint &&
+          typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&
+          Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
+        );
+
+        if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
+
+        let templateId = tool.publishedTemplateId;
+        const nextToolVersion = tool.publicationRequestedVersion || tool.version || '1.0.0';
+
+        if (templateId) {
+          const existingTemplate = await toolTemplateRepo.findById(templateId);
+          if (existingTemplate) {
+            await toolTemplateRepo.update(templateId, {
+              name: tool.name,
+              description: tool.description,
+              parameters: tool.parameters,
+              blueprint: tool.blueprint,
+              transforms: tool.transforms,
+              mutations: tool.mutations,
+              condition: tool.condition,
+              version: nextToolVersion,
+            });
+          } else {
+            templateId = undefined;
+          }
+        }
+
+        if (!templateId) {
+          const createdTemplate = await toolTemplateRepo.create({
+            name: tool.name,
+            description: tool.description,
+            category: 'utility',
+            parameters: tool.parameters!,
+            blueprint: tool.blueprint!,
+            transforms: tool.transforms,
+            mutations: tool.mutations,
+            condition: tool.condition,
+            version: nextToolVersion,
+          });
+          templateId = createdTemplate.id;
+        }
+
+        await toolRepo.update(tool.id, {
+          version: nextToolVersion,
+          publishedTemplateId: templateId,
+          publicationStatus: 'published',
+          publicationApprovedBy: adminUserId,
+          publicationApprovedAt: new Date().toISOString(),
+        });
+
+        if (templateId && !toolTemplateIds.includes(templateId)) {
+          toolTemplateIds.push(templateId);
+        }
+      }
+
+      await templateRepo.setToolTemplateRelationshipsByIds(targetTemplateId, toolTemplateIds);
+    } catch (err) {
+      console.error('[AGENT-PUBLICATION] Failed to synchronize tools:', err);
+    }
+
+    // Build execution bundle for LLM calls
+    const starship = await this.starshipRepository.findById(agent.starshipId);
+    if (!starship) {
+      throw new NotFoundError('Starship', agent.starshipId);
+    }
+
+    const runtimeEnv: Record<string, unknown> = {
+      STARSHIP_ID: agent.starshipId,
+      AGENT_ID: agent.id,
+    };
+
+    const executionBundle = await buildAutopilotExecutionBundle({
+      starshipId: agent.starshipId,
+      authUserId: adminUserId,
+      runtimeEnv,
+    });
+
+    const marketingContentRepo = new MarketingContentRepository();
+    const attachmentService = new AttachmentService();
+    const marketingContent: {
+      avatarUrl?: string;
+      problemStatementsText?: string[];
+      problemStatementsImageUrl?: string;
+      capabilitiesImageUrl?: string;
+      tryThesePromptsImageUrl?: string;
+    } = {};
+
+    // 1. Ensure avatar exists (auto-generate if missing)
+    if (!agent.avatarPrompt || !agent.avatarAttachmentId) {
+      console.log('[AGENT-PUBLICATION] Auto-generating avatar...');
+      const avatarGenerator = new AvatarGenerationService();
+      
+      // Generate avatarPrompt
+      const mirrorResult = await avatarGenerator.generateMirrorDescription({
+        agentName: agent.name,
+        agentDescription: agent.description,
+        agentModel: agent.model,
+        agentBlueprint: agent.blueprint!,
+        agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),
+        starshipId: agent.starshipId,
+        runtimeEnv,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      // Generate avatar image
+      const avatarResult = await avatarGenerator.generateAvatar({
+        subjectName: agent.name,
+        subjectDescription: agent.description,
+        subjectAvatarPrompt: mirrorResult.description,
+        starshipId: agent.starshipId,
+        runtimeEnv,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      // Create attachment
+      const avatarAttachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-avatar-${agent.id}`,
+        filename: `agent-${agent.slug || agent.id}-avatar.webp`,
+        buffer: avatarResult.buffer,
+        mimeType: avatarResult.mimeType,
+      });
+
+      // Update agent
+      await this.agentRepository.update(agent.id, {
+        avatarPrompt: mirrorResult.description,
+        avatarAttachmentId: avatarAttachment.id,
+      });
+
+      // Reload agent
+      const updatedAgent = await this.agentRepository.findById(agentId);
+      if (updatedAgent) {
+        Object.assign(agent, updatedAgent);
+      }
+    }
+
+    // Copy avatar to template
+    if (agent.avatarAttachmentId) {
+      const attachment = await attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
+      if (attachment?.s3Key) {
+        await templateRepo.updateAvatarStorage(targetTemplateId, {
+          avatarS3Key: attachment.s3Key,
+          avatarMimeType: attachment.mimeType || 'image/png',
+          avatarUpdatedAt: attachment.createdAt || new Date().toISOString(),
+        });
+        marketingContent.avatarUrl = `/api/v1/agent-templates/${targetTemplateId}/avatar`;
+      }
+    }
+
+    // 2. Generate problem statements text (only if missing)
+    const existingProblemStatements = await marketingContentRepo.findByEntityAndType(
+      'agent_template',
+      targetTemplateId,
+      'problem_statements_text'
+    );
+
+    if (!existingProblemStatements || !existingProblemStatements.textContent) {
+      console.log('[AGENT-PUBLICATION] Generating problem statements text...');
+      const marketingGenerator = new MarketingContentGenerationService();
+      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+      
+      const statementsResult = await marketingGenerator.generateProblemStatements({
+        agentName: agent.name,
+        agentRole: agent.role,
+        agentDescription: agent.description,
+        agentCategory: agent.category,
+        agentTools: agentTools.map((t) => ({ name: t.name, slug: t.slug, description: t.description })),
+        agentModel: agent.model,
+        agentBlueprint: agent.blueprint!,
+        starshipId: agent.starshipId,
+        runtimeEnv,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      await marketingContentRepo.createOrUpdate({
+        entityType: 'agent_template',
+        entityId: targetTemplateId,
+        contentType: 'problem_statements_text',
+        contentFormat: 'text',
+        textContent: JSON.stringify(statementsResult.statements),
+        textFormat: 'json',
+        generationMetadata: { model: statementsResult.model },
+      });
+
+      marketingContent.problemStatementsText = statementsResult.statements;
+    } else {
+      // Use existing
+      try {
+        const parsed = JSON.parse(existingProblemStatements.textContent || '[]');
+        if (Array.isArray(parsed)) {
+          marketingContent.problemStatementsText = parsed;
+        }
+      } catch {
+        // Invalid JSON, will regenerate below
+      }
+    }
+
+    // 3. Generate profile images (only if missing)
+    const profileImageGenerator = new ProfileImageGenerationService();
+    const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+    
+    let coreCapabilities = '';
+    if (agentTools.length > 0) {
+      coreCapabilities = agentTools.map((t) => t.name || t.slug).join(', ');
+    } else {
+      const parts: string[] = [];
+      if (agent.role) parts.push(agent.role);
+      if (agent.description) {
+        const desc = agent.description.length > 100 ? agent.description.slice(0, 100) + '...' : agent.description;
+        parts.push(desc);
+      }
+      coreCapabilities = parts.join(' — ') || 'general assistance';
+    }
+    if (coreCapabilities.length > 200) {
+      coreCapabilities = coreCapabilities.slice(0, 197) + '...';
+    }
+
+    const domainContext = agent.description
+      ? agent.description.split(/[.!?]/)[0].trim().slice(0, 100)
+      : agent.role || 'general assistance';
+
+    // Problem statements image
+    if (!agent.problemStatementsAttachmentId) {
+      console.log('[AGENT-PUBLICATION] Generating problem statements image...');
+      const imageResult = await profileImageGenerator.generateProfileImage(agent, 'problem_statements', {
+        coreCapabilities,
+        domainContext,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      const attachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-profile-${agent.id}-problem_statements`,
+        filename: `agent-${agent.slug || agent.id}-problem-statements.webp`,
+        buffer: imageResult.buffer,
+        mimeType: imageResult.mimeType,
+      });
+
+      await this.agentRepository.update(agent.id, {
+        problemStatementsAttachmentId: attachment.id,
+      });
+
+      const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
+      if (attachmentWithUrl?.s3Key) {
+        await templateRepo.updateProfileImageStorage(targetTemplateId, 'problem_statements', {
+          s3Key: attachmentWithUrl.s3Key,
+          mimeType: attachmentWithUrl.mimeType || 'image/webp',
+          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+        });
+        marketingContent.problemStatementsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/problem-statements`;
+      }
+    } else {
+      // Copy existing
+      const attachment = await attachmentService.getAttachmentWithUrl(agent.problemStatementsAttachmentId, agent.starshipId);
+      if (attachment?.s3Key) {
+        await templateRepo.updateProfileImageStorage(targetTemplateId, 'problem_statements', {
+          s3Key: attachment.s3Key,
+          mimeType: attachment.mimeType || 'image/webp',
+          updatedAt: attachment.createdAt || new Date().toISOString(),
+        });
+        marketingContent.problemStatementsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/problem-statements`;
+      }
+    }
+
+    // Capabilities image
+    if (!agent.capabilitiesAttachmentId) {
+      console.log('[AGENT-PUBLICATION] Generating capabilities image...');
+      const imageResult = await profileImageGenerator.generateProfileImage(agent, 'capabilities', {
+        coreCapabilities,
+        domainContext,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      const attachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-profile-${agent.id}-capabilities`,
+        filename: `agent-${agent.slug || agent.id}-capabilities.webp`,
+        buffer: imageResult.buffer,
+        mimeType: imageResult.mimeType,
+      });
+
+      await this.agentRepository.update(agent.id, {
+        capabilitiesAttachmentId: attachment.id,
+      });
+
+      const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
+      if (attachmentWithUrl?.s3Key) {
+        await templateRepo.updateProfileImageStorage(targetTemplateId, 'capabilities', {
+          s3Key: attachmentWithUrl.s3Key,
+          mimeType: attachmentWithUrl.mimeType || 'image/webp',
+          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+        });
+        marketingContent.capabilitiesImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/capabilities`;
+      }
+    } else {
+      const attachment = await attachmentService.getAttachmentWithUrl(agent.capabilitiesAttachmentId, agent.starshipId);
+      if (attachment?.s3Key) {
+        await templateRepo.updateProfileImageStorage(targetTemplateId, 'capabilities', {
+          s3Key: attachment.s3Key,
+          mimeType: attachment.mimeType || 'image/webp',
+          updatedAt: attachment.createdAt || new Date().toISOString(),
+        });
+        marketingContent.capabilitiesImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/capabilities`;
+      }
+    }
+
+    // Try these prompts image
+    if (!agent.tryThesePromptsAttachmentId) {
+      console.log('[AGENT-PUBLICATION] Generating try these prompts image...');
+      const imageResult = await profileImageGenerator.generateProfileImage(agent, 'try_these_prompts', {
+        coreCapabilities,
+        domainContext,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      const attachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-profile-${agent.id}-try_these_prompts`,
+        filename: `agent-${agent.slug || agent.id}-try-these-prompts.webp`,
+        buffer: imageResult.buffer,
+        mimeType: imageResult.mimeType,
+      });
+
+      await this.agentRepository.update(agent.id, {
+        tryThesePromptsAttachmentId: attachment.id,
+      });
+
+      const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
+      if (attachmentWithUrl?.s3Key) {
+        await templateRepo.updateProfileImageStorage(targetTemplateId, 'try_these_prompts', {
+          s3Key: attachmentWithUrl.s3Key,
+          mimeType: attachmentWithUrl.mimeType || 'image/webp',
+          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+        });
+        marketingContent.tryThesePromptsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/try-these-prompts`;
+      }
+    } else {
+      const attachment = await attachmentService.getAttachmentWithUrl(agent.tryThesePromptsAttachmentId, agent.starshipId);
+      if (attachment?.s3Key) {
+        await templateRepo.updateProfileImageStorage(targetTemplateId, 'try_these_prompts', {
+          s3Key: attachment.s3Key,
+          mimeType: attachment.mimeType || 'image/webp',
+          updatedAt: attachment.createdAt || new Date().toISOString(),
+        });
+        marketingContent.tryThesePromptsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/try-these-prompts`;
+      }
+    }
+
+    // Link template to agent (but don't mark as published yet)
+    await this.agentRepository.update(agentId, {
+      publishedTemplateId: targetTemplateId,
+    });
+
+    // Reload agent to get updated attachment IDs and template link
+    const finalAgent = await this.agentRepository.findById(agentId);
+    if (!finalAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return {
+      agent: finalAgent,
+      templateId: targetTemplateId,
+      marketingContent,
+    };
+  }
+
+  /**
+   * Regenerate specific marketing content item
+   */
+  async regenerateMarketingContent(
+    agentId: string,
+    templateId: string,
+    type: 'avatar' | 'problem_statements_text' | 'problem_statements_image' | 'capabilities_image' | 'try_these_prompts_image',
+    adminUserId: string
+  ): Promise<{
+    agent: AgentModel;
+    marketingContent: {
+      avatarUrl?: string;
+      problemStatementsText?: string[];
+      problemStatementsImageUrl?: string;
+      capabilitiesImageUrl?: string;
+      tryThesePromptsImageUrl?: string;
+    };
+  }> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    // Validate admin
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can regenerate marketing content');
+    }
+
+    const starship = await this.starshipRepository.findById(agent.starshipId);
+    if (!starship) {
+      throw new NotFoundError('Starship', agent.starshipId);
+    }
+
+    const runtimeEnv: Record<string, unknown> = {
+      STARSHIP_ID: agent.starshipId,
+      AGENT_ID: agent.id,
+    };
+
+    const executionBundle = await buildAutopilotExecutionBundle({
+      starshipId: agent.starshipId,
+      authUserId: adminUserId,
+      runtimeEnv,
+    });
+
+    const templateRepo = new AgentTemplateRepository();
+    const attachmentService = new AttachmentService();
+    const marketingContentRepo = new MarketingContentRepository();
+    const marketingContent: {
+      avatarUrl?: string;
+      problemStatementsText?: string[];
+      problemStatementsImageUrl?: string;
+      capabilitiesImageUrl?: string;
+      tryThesePromptsImageUrl?: string;
+    } = {};
+
+    if (type === 'avatar') {
+      const avatarGenerator = new AvatarGenerationService();
+      
+      // Generate avatarPrompt if missing
+      let avatarPrompt = agent.avatarPrompt;
+      if (!avatarPrompt) {
+        const mirrorResult = await avatarGenerator.generateMirrorDescription({
+          agentName: agent.name,
+          agentDescription: agent.description,
+          agentModel: agent.model,
+          agentBlueprint: agent.blueprint!,
+          agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),
+          starshipId: agent.starshipId,
+          runtimeEnv,
+          engineConfigFromHost: executionBundle.engineConfig,
+        });
+        avatarPrompt = mirrorResult.description;
+        await this.agentRepository.update(agent.id, { avatarPrompt });
+      }
+
+      // Generate avatar
+      const avatarResult = await avatarGenerator.generateAvatar({
+        subjectName: agent.name,
+        subjectDescription: agent.description,
+        subjectAvatarPrompt: avatarPrompt,
+        starshipId: agent.starshipId,
+        runtimeEnv,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      const attachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-avatar-${agent.id}`,
+        filename: `agent-${agent.slug || agent.id}-avatar.webp`,
+        buffer: avatarResult.buffer,
+        mimeType: avatarResult.mimeType,
+      });
+
+      await this.agentRepository.update(agent.id, {
+        avatarAttachmentId: attachment.id,
+      });
+
+      const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
+      if (attachmentWithUrl?.s3Key) {
+        await templateRepo.updateAvatarStorage(templateId, {
+          avatarS3Key: attachmentWithUrl.s3Key,
+          avatarMimeType: attachmentWithUrl.mimeType || 'image/png',
+          avatarUpdatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+        });
+        marketingContent.avatarUrl = `/api/v1/agent-templates/${templateId}/avatar`;
+      }
+    } else if (type === 'problem_statements_text') {
+      const marketingGenerator = new MarketingContentGenerationService();
+      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+      
+      const statementsResult = await marketingGenerator.generateProblemStatements({
+        agentName: agent.name,
+        agentRole: agent.role,
+        agentDescription: agent.description,
+        agentCategory: agent.category,
+        agentTools: agentTools.map((t) => ({ name: t.name, slug: t.slug, description: t.description })),
+        agentModel: agent.model,
+        agentBlueprint: agent.blueprint!,
+        starshipId: agent.starshipId,
+        runtimeEnv,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      await marketingContentRepo.createOrUpdate({
+        entityType: 'agent_template',
+        entityId: templateId,
+        contentType: 'problem_statements_text',
+        contentFormat: 'text',
+        textContent: JSON.stringify(statementsResult.statements),
+        textFormat: 'json',
+        generationMetadata: { model: statementsResult.model },
+      });
+
+      marketingContent.problemStatementsText = statementsResult.statements;
+    } else {
+      // Profile images
+      const profileImageGenerator = new ProfileImageGenerationService();
+      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
+      
+      let coreCapabilities = '';
+      if (agentTools.length > 0) {
+        coreCapabilities = agentTools.map((t) => t.name || t.slug).join(', ');
+      } else {
+        const parts: string[] = [];
+        if (agent.role) parts.push(agent.role);
+        if (agent.description) {
+          const desc = agent.description.length > 100 ? agent.description.slice(0, 100) + '...' : agent.description;
+          parts.push(desc);
+        }
+        coreCapabilities = parts.join(' — ') || 'general assistance';
+      }
+      if (coreCapabilities.length > 200) {
+        coreCapabilities = coreCapabilities.slice(0, 197) + '...';
+      }
+
+      const domainContext = agent.description
+        ? agent.description.split(/[.!?]/)[0].trim().slice(0, 100)
+        : agent.role || 'general assistance';
+
+      let imageType: 'problem_statements' | 'capabilities' | 'try_these_prompts';
+      let attachmentField: keyof AgentModel;
+      let conversationIdSuffix: string;
+      let filenameSuffix: string;
+      let urlKey: keyof typeof marketingContent;
+
+      if (type === 'problem_statements_image') {
+        imageType = 'problem_statements';
+        attachmentField = 'problemStatementsAttachmentId';
+        conversationIdSuffix = 'problem_statements';
+        filenameSuffix = 'problem-statements';
+        urlKey = 'problemStatementsImageUrl';
+      } else if (type === 'capabilities_image') {
+        imageType = 'capabilities';
+        attachmentField = 'capabilitiesAttachmentId';
+        conversationIdSuffix = 'capabilities';
+        filenameSuffix = 'capabilities';
+        urlKey = 'capabilitiesImageUrl';
+      } else {
+        imageType = 'try_these_prompts';
+        attachmentField = 'tryThesePromptsAttachmentId';
+        conversationIdSuffix = 'try_these_prompts';
+        filenameSuffix = 'try-these-prompts';
+        urlKey = 'tryThesePromptsImageUrl';
+      }
+
+      const imageResult = await profileImageGenerator.generateProfileImage(agent, imageType, {
+        coreCapabilities,
+        domainContext,
+        engineConfigFromHost: executionBundle.engineConfig,
+      });
+
+      const attachment = await attachmentService.createAttachment({
+        starshipId: agent.starshipId,
+        conversationId: `agent-profile-${agent.id}-${conversationIdSuffix}`,
+        filename: `agent-${agent.slug || agent.id}-${filenameSuffix}.webp`,
+        buffer: imageResult.buffer,
+        mimeType: imageResult.mimeType,
+      });
+
+      await this.agentRepository.update(agent.id, {
+        [attachmentField]: attachment.id,
+      });
+
+      const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
+      if (attachmentWithUrl?.s3Key) {
+        await templateRepo.updateProfileImageStorage(templateId, imageType, {
+          s3Key: attachmentWithUrl.s3Key,
+          mimeType: attachmentWithUrl.mimeType || 'image/webp',
+          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+        });
+        
+        const urlMap: Record<string, string> = {
+          problem_statements: `/api/v1/agent-templates/${templateId}/profile-images/problem-statements`,
+          capabilities: `/api/v1/agent-templates/${templateId}/profile-images/capabilities`,
+          try_these_prompts: `/api/v1/agent-templates/${templateId}/profile-images/try-these-prompts`,
+        };
+        (marketingContent as any)[urlKey] = urlMap[imageType];
+      }
+    }
+
+    const finalAgent = await this.agentRepository.findById(agentId);
+    if (!finalAgent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    return {
+      agent: finalAgent,
+      marketingContent,
+    };
+  }
+
+  /**
+   * Update problem statements for a template (before publication)
+   */
+  async updateProblemStatements(templateId: string, statements: string[], adminUserId: string): Promise<{
+    problemStatementsText: string[];
+  }> {
+    // Validate admin
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can update problem statements');
+    }
+
+    const marketingContentRepo = new MarketingContentRepository();
+    
+    await marketingContentRepo.createOrUpdate({
+      entityType: 'agent_template',
+      entityId: templateId,
+      contentType: 'problem_statements_text',
+      contentFormat: 'text',
+      textContent: JSON.stringify(statements),
+      textFormat: 'json',
+    });
+
+    return {
+      problemStatementsText: statements,
+    };
+  }
+
+  /**
+   * Confirm publication: Mark agent as published (template already exists with content)
+   */
+  async confirmPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
+    const agent = await this.agentRepository.findById(agentId);
+    if (!agent) {
+      throw new NotFoundError('Agent', agentId);
+    }
+
+    // Validate admin
+    const userRepo = new UserRepository();
+    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
+    if (!isInstanceAdmin(adminUser)) {
+      throw new ForbiddenError('Only instance admins can confirm agent publication');
+    }
+
+    if (agent.publicationStatus !== 'pending_approval') {
+      throw new ValidationError('Agent is not pending approval');
+    }
+
+    // Determine next version
+    const currentVersion = agent.version || '1.0.0';
+    let nextVersion = agent.publicationRequestedVersion;
+    if (!nextVersion) {
+      const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
+      nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
+    }
+
+    // Verify template exists
+    const templateRepo = new AgentTemplateRepository();
+    const targetTemplateId = agent.publishedTemplateId;
+    if (!targetTemplateId) {
+      throw new ValidationError('Template not found. Please prepare publication first.');
+    }
+
+    const template = await templateRepo.findById(targetTemplateId);
+    if (!template) {
+      throw new NotFoundError('AgentTemplate', targetTemplateId);
+    }
+
+    // Mark agent as published
+    const updated = await this.agentRepository.update(agentId, {
+      version: nextVersion,
+      publicationStatus: 'published',
+      publicationApprovedBy: adminUserId,
+      publicationApprovedAt: new Date().toISOString(),
+      publishedTemplateId: targetTemplateId,
     });
 
     if (!updated) {

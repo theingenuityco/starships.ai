@@ -33,13 +33,10 @@ import type { ConversationState } from '@starships/protocol'
 
 // Lazy-load the blueprint visualizer so the landing-page "embedded" demo doesn't
 // pull in ELK/WebWorker code (which can break when evaluated in the SSR bundle).
-const BlueprintVisualization = dynamic(
-  () => import('@/components/blueprint/BlueprintVisualization').then(m => m.BlueprintVisualization),
-  {
-    ssr: false,
-    loading: () => <div className="h-[320px] w-full rounded-lg bg-muted/20" />,
-  }
-)
+const BlueprintVisualization = dynamic(() => import('@/components/blueprint/BlueprintVisualization').then(m => m.BlueprintVisualization), {
+  ssr: false,
+  loading: () => <div className="h-[320px] w-full rounded-lg bg-muted/20" />,
+})
 
 interface AgentDocumentEditorProps {
   value: AgentFormData
@@ -762,7 +759,6 @@ export function AgentDocumentEditor({
     if (!sameAvatar) changes.push('Avatar')
     if (!sameTools) changes.push('Tools')
     if (!sameBlueprint) changes.push('Blueprint')
-
 
     const differs = !(
       sameName &&
@@ -1636,7 +1632,18 @@ export function AgentDocumentEditor({
                     <BlueprintVisualization
                       blueprint={(() => {
                         try {
-                          return JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                          const parsed = JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                          // Ensure blueprint has valid structure
+                          if (!parsed || typeof parsed !== 'object') {
+                            return { nodes: [], edges: [] } as any
+                          }
+                          if (!Array.isArray(parsed.nodes)) {
+                            parsed.nodes = []
+                          }
+                          if (!Array.isArray(parsed.edges)) {
+                            parsed.edges = []
+                          }
+                          return parsed
                         } catch {
                           return { nodes: [], edges: [] } as any
                         }

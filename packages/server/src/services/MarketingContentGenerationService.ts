@@ -47,9 +47,7 @@ export class MarketingContentGenerationService {
       const parts: string[] = [];
       if (options.agentRole) parts.push(options.agentRole);
       if (options.agentDescription) {
-        const desc = options.agentDescription.length > 100 
-          ? options.agentDescription.slice(0, 100) + '...' 
-          : options.agentDescription;
+        const desc = options.agentDescription.length > 100 ? options.agentDescription.slice(0, 100) + '...' : options.agentDescription;
         parts.push(desc);
       }
       coreCapabilities = parts.join(' — ') || 'general assistance';
@@ -80,7 +78,7 @@ export class MarketingContentGenerationService {
       '- Use conversational, user-first language',
       '- Be empathetic, not negative',
       '- Highlight common frustrations users face',
-      '- Make them relatable and specific to this agent\'s domain',
+      "- Make them relatable and specific to this agent's domain",
       '- Mix formats: some can be questions ("Where do I start?"), some can be statements ("Managing emails is overwhelming...")',
       '- Keep each statement under 200 characters',
       '',
@@ -171,13 +169,11 @@ export class MarketingContentGenerationService {
 
     const llmJson = ExecutionItemUtils.unwrapSingle(items);
     let llmNodeJson: unknown = llmJson;
-    
+
     if (Array.isArray(llmJson)) {
       const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
       if (typeof extracted === 'undefined') {
-        throw new Error(
-          `Problem statements generation returned execution.results but did not include output for nodeRef "llm_1"`
-        );
+        throw new Error(`Problem statements generation returned execution.results but did not include output for nodeRef "llm_1"`);
       }
       llmNodeJson = extracted;
     }

@@ -378,7 +378,7 @@ export class ProfileImageGenerationService {
 
     // Execute the blueprint
     const resultItems = await runner.run(blueprint, exec, engineConfig);
-    
+
     // Extract image from tool result
     // The tool's end node outputs: (lastOutputOf('extract_image') || {}).image
     // Which is: { kind: 'data_url' | 'url', value: string, mimeType?: string }
@@ -388,7 +388,7 @@ export class ProfileImageGenerationService {
     // Extract the actual result from execution items
     // The end node output should be in the resultItems array
     let actualResult: unknown = undefined;
-    
+
     if (Array.isArray(resultItems)) {
       // Find the end node output
       for (const item of resultItems) {
@@ -407,7 +407,7 @@ export class ProfileImageGenerationService {
           }
         }
       }
-      
+
       // Fallback: try unwrapSingle
       if (actualResult === undefined) {
         actualResult = ExecutionItemUtils.unwrapSingle(resultItems);
@@ -424,7 +424,7 @@ export class ProfileImageGenerationService {
         resultItemsType: typeof resultItems,
         resultItemsIsArray: Array.isArray(resultItems),
         resultItemsLength: Array.isArray(resultItems) ? resultItems.length : 0,
-        resultItemsPreview: Array.isArray(resultItems) 
+        resultItemsPreview: Array.isArray(resultItems)
           ? resultItems.slice(0, 2).map((item: any) => ({
               nodeRef: item?.nodeRef,
               hasItems: Array.isArray(item?.items),
@@ -445,11 +445,9 @@ export class ProfileImageGenerationService {
 
     // The image object should be directly in actualResult (from end node output)
     // Try multiple possible locations for the image
-    const imageObj = (actualResult as any).image || 
-                     (actualResult as any).data?.image || 
-                     actualResult;
+    const imageObj = (actualResult as any).image || (actualResult as any).data?.image || actualResult;
     if (!isRecord(imageObj)) {
-      throw new Error(`Tool result missing image field. Result keys: ${Object.keys(toolResult).join(', ')}`);
+      throw new Error(`Tool result missing image field. Result keys: ${Object.keys(actualResult).join(', ')}`);
     }
 
     const kind = typeof imageObj.kind === 'string' ? imageObj.kind : undefined;

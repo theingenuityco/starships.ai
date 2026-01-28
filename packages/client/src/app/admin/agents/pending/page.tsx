@@ -22,6 +22,7 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import Link from 'next/link'
 import type { AgentModel } from '@starships/protocol'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 
 interface RequestedByProfileProps {
   name: string
@@ -377,17 +378,19 @@ export default function PendingAgentsPage(): React.JSX.Element {
                     {/* Main read-only editor */}
                     <div className="flex-1 min-w-0 border border-border/60 rounded-lg bg-background/80">
                       <div className="h-full overflow-auto px-4">
-                        <AgentDocumentEditor
-                          value={selectedAgentFormData}
-                          onChange={() => {
-                            // no-op in read-only mode
-                          }}
-                          onFieldChange={() => {
-                            // no-op in read-only mode
-                          }}
-                          starshipId={selectedAgent.agent.starshipId}
-                          readOnly
-                        />
+                        <ErrorBoundary component="AgentDocumentEditor" fallback={<div className="p-4 text-sm text-muted-foreground">Error loading agent editor. Please try again.</div>}>
+                          <AgentDocumentEditor
+                            value={selectedAgentFormData}
+                            onChange={() => {
+                              // no-op in read-only mode
+                            }}
+                            onFieldChange={() => {
+                              // no-op in read-only mode
+                            }}
+                            starshipId={selectedAgent.agent.starshipId}
+                            readOnly
+                          />
+                        </ErrorBoundary>
                       </div>
                     </div>
 
@@ -570,14 +573,7 @@ export default function PendingAgentsPage(): React.JSX.Element {
             </Dialog>
 
             {/* Prepare Publication Modal */}
-            {selectedAgent && (
-              <AgentPublicationPrepareModal
-                open={isPrepareModalOpen}
-                onOpenChange={setIsPrepareModalOpen}
-                agent={selectedAgent.agent}
-                onComplete={handlePrepareComplete}
-              />
-            )}
+            {selectedAgent && <AgentPublicationPrepareModal open={isPrepareModalOpen} onOpenChange={setIsPrepareModalOpen} agent={selectedAgent.agent} onComplete={handlePrepareComplete} />}
 
             {/* Review & Confirm Modal */}
             {selectedAgent && preparedContent && (

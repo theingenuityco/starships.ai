@@ -1068,7 +1068,7 @@ export class ConversationService {
       return message.content;
     }
 
-    // Load attachments with presigned URLs (1 minute expiry, secured)
+    // Load attachments with presigned URLs (short-lived; safe to embed in a single provider request)
     const attachmentService = new AttachmentService();
     const attachments = await attachmentService.getAttachments(message.attachmentIds, starshipId);
 

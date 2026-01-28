@@ -85,7 +85,7 @@ Shot Specifics:
 - Setting: Modern tech workspace with screens or tools relevant to {{domain_context}}
 - Expression: Confident, professional, focused, welcoming (friendly but not overly casual), looking at camera
 - Background: Solid {{background_color}} color (matching {{category}} category) or subtle gradient
-- Speech Bubble: "Here's what I can do." (exact text, with period)
+- Speech Bubble: "Here's how I can fix it for you." (exact text, with period)
 
 Quality/Style:
 - High-resolution comic strip style
@@ -101,7 +101,7 @@ Negative Constraints:
 - Avoid cluttered backgrounds - keep it simple with solid color or subtle gradient
 - Show active engagement with tools/screens relevant to their role
 - Keep it professional, not overly cartoonish
-- Speech bubble must say exactly "Here's what I can do." (with period) - keep this consistent for all agents
+- Speech bubble must say exactly "Here's how I can fix it for you." (with period) - keep this consistent for all agents
 - Single cohesive image, not multiple panels
 - Ensure composition works well in square format
 - Maintain character consistency with {{name}} avatar
@@ -347,7 +347,15 @@ export class ProfileImageGenerationService {
             blueprint: toolTemplate.blueprint,
           },
         },
-        { ref: 'end_1', type: 'end', name: 'End', description: 'End node', parameters: {} },
+        {
+          ref: 'end_1',
+          type: 'end',
+          name: 'End',
+          description: 'End node',
+          parameters: {
+            output: "{{ lastOutputOf('call_tool') }}",
+          },
+        },
       ],
       edges: [
         { ref: 'e1', from: 'start_1', to: 'prepare_args' },
@@ -387,14 +395,33 @@ export class ProfileImageGenerationService {
     type AnyRecord = Record<string, unknown>;
     const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
-    // Use unwrapSingle() directly - Tool node already handled unwrapping
-    const actualResult = ExecutionItemUtils.unwrapSingle(resultItems);
+    // Extract image from tool result
+    // The wrapper blueprint's end node outputs: lastOutputOf('call_tool')
+    // The Tool node returns ExecutionItem[] (wrapped), so we need to unwrap twice:
+    // 1. Unwrap the wrapper blueprint's end node output (gets Tool node's ExecutionItem[])
+    // 2. Unwrap the Tool node's ExecutionItem[] (gets the image object)
+    const toolNodeResult = ExecutionItemUtils.unwrapSingle(resultItems);
+    
+    // If toolNodeResult is an ExecutionItem array (from Tool node), unwrap it again
+    let actualResult: unknown;
+    if (Array.isArray(toolNodeResult) && toolNodeResult.length > 0 && typeof toolNodeResult[0] === 'object' && 'json' in toolNodeResult[0]) {
+      // Tool node returned ExecutionItem[], unwrap to get the actual result
+      actualResult = ExecutionItemUtils.unwrapSingle(toolNodeResult as any);
+    } else {
+      // Tool node already unwrapped, or End node extracted it differently
+      actualResult = toolNodeResult;
+    }
+
+    type AnyRecord = Record<string, unknown>;
+    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
     if (!isRecord(actualResult)) {
       const debugInfo = {
         actualResultType: typeof actualResult,
         actualResultIsArray: Array.isArray(actualResult),
         actualResultIsNull: actualResult === null,
+        toolNodeResultType: typeof toolNodeResult,
+        toolNodeResultIsArray: Array.isArray(toolNodeResult),
         resultItemsType: typeof resultItems,
         resultItemsIsArray: Array.isArray(resultItems),
         resultItemsLength: Array.isArray(resultItems) ? resultItems.length : 0,

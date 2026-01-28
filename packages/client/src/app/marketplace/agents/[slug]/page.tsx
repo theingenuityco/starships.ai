@@ -56,7 +56,6 @@ function categoryBadgeClass(category: AgentTemplateModel['category']): string {
   return colors[String(category)] || colors.general
 }
 
-
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
   const templates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
   return templates.find(t => t.slug === slug) ?? null
@@ -205,128 +204,121 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
               </div>
 
               {/* Description as separate section below */}
-              {template.description ? (
-                <p className="mt-6 text-sm sm:text-base leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p>
-              ) : null}
+              {template.description ? <p className="mt-6 text-sm sm:text-base leading-relaxed text-muted-foreground max-w-[72ch]">{template.description}</p> : null}
             </section>
 
             {/* Main content grid */}
             <section className="mt-8 pb-10 sm:pb-16">
               <div className="space-y-8">
-                  {/* Problem Statements Section */}
-                  {(problemStatementsImageUrl || problemStatementsText.length > 0) ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                      {/* Problem Statements Image - Left side */}
-                      {problemStatementsImageUrl ? (
-                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
-                          <AgentProfileImage
-                            src={problemStatementsImageUrl}
-                            alt={
-                              problemStatementsText.length > 0
-                                ? `${template.name} understanding user challenges: ${problemStatementsText.slice(0, 3).map(s => `"${s}"`).join(', ')}`
-                                : `${template.name} - The Problem`
-                            }
-                            className="w-full h-auto"
-                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                          />
+                {/* Problem Statements Section */}
+                {problemStatementsImageUrl || problemStatementsText.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                    {/* Problem Statements Image - Left side */}
+                    {problemStatementsImageUrl ? (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                        <AgentProfileImage
+                          src={problemStatementsImageUrl}
+                          alt={
+                            problemStatementsText.length > 0
+                              ? `${template.name} understanding user challenges: ${problemStatementsText
+                                  .slice(0, 3)
+                                  .map(s => `"${s}"`)
+                                  .join(', ')}`
+                              : `${template.name} - The Problem`
+                          }
+                          className="w-full h-auto"
+                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
+                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                      </div>
+                    )}
+
+                    {/* Problem Statements Section - Right side */}
+                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8 h-full flex flex-col">
+                      <div className="flex items-center gap-2 mb-6">
+                        <Icon name="lightbulb" className="h-5 w-5 text-primary" />
+                        <h2 className="text-base font-semibold tracking-tight text-foreground">The Problem</h2>
+                      </div>
+                      {problemStatementsText.length > 0 ? (
+                        <div className="flex-1 flex flex-col justify-between space-y-10">
+                          {problemStatementsText.slice(0, 3).map((statement, index) => (
+                            <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
+                              &quot;{statement}&quot;
+                            </p>
+                          ))}
                         </div>
                       ) : (
-                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
-                          <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                        <div className="prose prose-sm dark:prose-invert max-w-none">
+                          <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">Shows the agent understanding and empathizing with user challenges.</p>
                         </div>
                       )}
+                    </section>
+                  </div>
+                ) : null}
 
-                      {/* Problem Statements Section - Right side */}
-                      <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8 h-full flex flex-col">
-                        <div className="flex items-center gap-2 mb-6">
-                          <Icon name="lightbulb" className="h-5 w-5 text-primary" />
-                          <h2 className="text-base font-semibold tracking-tight text-foreground">The Problem</h2>
-                        </div>
-                        {problemStatementsText.length > 0 ? (
-                          <div className="flex-1 flex flex-col justify-between space-y-10">
-                            {problemStatementsText.slice(0, 3).map((statement, index) => (
-                              <p
-                                key={index}
-                                className={`text-2xl text-foreground leading-relaxed italic ${
-                                  index % 2 === 0 ? 'text-left' : 'text-right'
-                                }`}
-                              >
-                                &quot;{statement}&quot;
-                              </p>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="prose prose-sm dark:prose-invert max-w-none">
-                            <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">
-                              Shows the agent understanding and empathizing with user challenges.
-                            </p>
-                          </div>
-                        )}
-                      </section>
-                    </div>
-                  ) : null}
-
-                  {toolSlugs.length > 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                      {/* Capabilities Section - Left side */}
-                      <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
-                        <div className="flex items-center gap-2 mb-6">
-                          <Icon name="wrench" className="h-5 w-5 text-primary" />
-                          <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {toolSlugs.map(slug => {
-                            const info = toolInfoBySlug.get(slug)
-                            const title = info?.name?.trim() || slug
-                            const desc = info?.description?.trim() || ''
-                            return (
-                              <div
-                                key={slug}
-                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md"
-                              >
-                                <div className="flex items-start gap-3">
-                                  <div className="mt-0.5 flex-shrink-0">
-                                    <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-                                  </div>
-                                  <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-semibold leading-5 text-foreground group-hover:text-primary transition-colors">{title}</div>
-                                    {desc ? (
-                                      <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/90">
-                                        {desc}
-                                      </div>
-                                    ) : null}
-                                  </div>
+                {toolSlugs.length > 0 ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                    {/* Capabilities Section - Left side */}
+                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
+                      <div className="flex items-center gap-2 mb-6">
+                        <Icon name="wrench" className="h-5 w-5 text-primary" />
+                        <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {toolSlugs.map(slug => {
+                          const info = toolInfoBySlug.get(slug)
+                          const title = info?.name?.trim() || slug
+                          const desc = info?.description?.trim() || ''
+                          return (
+                            <div
+                              key={slug}
+                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex-shrink-0">
+                                  <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-semibold leading-5 text-foreground group-hover:text-primary transition-colors">{title}</div>
+                                  {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/90">{desc}</div> : null}
                                 </div>
                               </div>
-                            )
-                          })}
-                        </div>
-                      </section>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </section>
 
-                      {/* Capabilities Image - Right side */}
-                      {capabilitiesImageUrl ? (
-                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
-                          <AgentProfileImage
-                            src={capabilitiesImageUrl}
-                            alt={
-                              toolSlugs.length > 0
-                                ? `${template.name} capabilities: ${toolSlugs.slice(0, 3).map(slug => {
+                    {/* Capabilities Image - Right side */}
+                    {capabilitiesImageUrl ? (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                        <AgentProfileImage
+                          src={capabilitiesImageUrl}
+                          alt={
+                            toolSlugs.length > 0
+                              ? `${template.name} capabilities: ${toolSlugs
+                                  .slice(0, 3)
+                                  .map(slug => {
                                     const info = toolInfoBySlug.get(slug)
                                     return info?.name?.trim() || slug
-                                  }).join(', ')}`
-                                : `${template.name} capabilities`
-                            }
-                            className="w-full h-auto"
-                            style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
-                          />
-                        </div>
-                      ) : (
-                        <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
-                          <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
-                        </div>
-                      )}
-                    </div>
-                  ) : null}
+                                  })
+                                  .join(', ')}`
+                              : `${template.name} capabilities`
+                          }
+                          className="w-full h-auto"
+                          style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
+                        />
+                      </div>
+                    ) : (
+                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
+                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
 
                 {/* Try These Prompts Row - 2 columns */}
                 {Array.isArray(template.previewPrompts) && template.previewPrompts.length > 0 ? (
@@ -338,7 +330,10 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           src={tryThesePromptsImageUrl}
                           alt={
                             template.previewPrompts && template.previewPrompts.length > 0
-                              ? `${template.name} try these prompts: ${template.previewPrompts.slice(0, 3).map(p => `"${p}"`).join(', ')}`
+                              ? `${template.name} try these prompts: ${template.previewPrompts
+                                  .slice(0, 3)
+                                  .map(p => `"${p}"`)
+                                  .join(', ')}`
                               : `${template.name} try these prompts`
                           }
                           className="w-full h-auto"
@@ -367,9 +362,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                               <div className="mt-0.5 flex-shrink-0">
                                 <Icon name="sparkles" className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
                               </div>
-                              <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors flex-1">
-                                {p}
-                              </p>
+                              <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors flex-1">{p}</p>
                             </div>
                           </div>
                         ))}

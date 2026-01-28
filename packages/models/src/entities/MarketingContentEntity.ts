@@ -24,7 +24,6 @@ import {
   IsObject,
   Length,
   Min,
-  Max,
   validate,
   ValidationError,
 } from 'class-validator';

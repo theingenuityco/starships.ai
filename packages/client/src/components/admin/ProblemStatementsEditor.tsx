@@ -59,14 +59,7 @@ export function ProblemStatementsEditor({ statements, onChange, onRegenerate, di
       <div className="flex items-center justify-between">
         <p className="text-xs font-semibold text-muted-foreground">The Problem</p>
         {onRegenerate && (
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={onRegenerate}
-            disabled={disabled}
-            className="h-7 text-xs"
-          >
+          <Button type="button" variant="ghost" size="sm" onClick={onRegenerate} disabled={disabled} className="h-7 text-xs">
             <Icon name="refresh-cw" className="h-3 w-3 mr-1" />
             Regenerate All
           </Button>
@@ -94,23 +87,10 @@ export function ProblemStatementsEditor({ statements, onChange, onRegenerate, di
                   maxLength={200}
                   placeholder="Enter problem statement..."
                 />
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleSave}
-                  disabled={!editValue.trim()}
-                  className="h-8 w-8 p-0"
-                >
+                <Button type="button" size="sm" variant="ghost" onClick={handleSave} disabled={!editValue.trim()} className="h-8 w-8 p-0">
                   <Icon name="check" className="h-4 w-4" />
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={handleCancel}
-                  className="h-8 w-8 p-0"
-                >
+                <Button type="button" size="sm" variant="ghost" onClick={handleCancel} className="h-8 w-8 p-0">
                   <Icon name="x" className="h-4 w-4" />
                 </Button>
               </div>
@@ -119,24 +99,10 @@ export function ProblemStatementsEditor({ statements, onChange, onRegenerate, di
                 <div className="flex-1 rounded-lg border border-border/60 bg-background/50 px-3 py-2 text-sm min-h-[32px] flex items-center">
                   <p className="text-foreground/90">{statement || <span className="text-muted-foreground italic">Empty statement</span>}</p>
                 </div>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleEdit(index)}
-                  disabled={disabled}
-                  className="h-8 w-8 p-0"
-                >
+                <Button type="button" size="sm" variant="ghost" onClick={() => handleEdit(index)} disabled={disabled} className="h-8 w-8 p-0">
                   <Icon name="pencil" className="h-4 w-4" />
                 </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="ghost"
-                  onClick={() => handleDelete(index)}
-                  disabled={disabled}
-                  className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                >
+                <Button type="button" size="sm" variant="ghost" onClick={() => handleDelete(index)} disabled={disabled} className="h-8 w-8 p-0 text-destructive hover:text-destructive">
                   <Icon name="trash" className="h-4 w-4" />
                 </Button>
               </>
@@ -145,14 +111,7 @@ export function ProblemStatementsEditor({ statements, onChange, onRegenerate, di
         ))}
 
         {statements.length < 5 && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleAdd}
-            disabled={disabled}
-            className="w-full h-8 text-xs"
-          >
+          <Button type="button" variant="outline" size="sm" onClick={handleAdd} disabled={disabled} className="w-full h-8 text-xs">
             <Icon name="plus" className="h-3 w-3 mr-1" />
             Add Statement
           </Button>

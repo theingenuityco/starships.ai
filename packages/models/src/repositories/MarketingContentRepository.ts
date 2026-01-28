@@ -4,7 +4,6 @@ import { BaseRepository } from '@/repositories/BaseRepository';
 import type {
   MarketingContentModel,
   CreateMarketingContentRequest,
-  UpdateMarketingContentRequest,
   MarketingContentEntityType,
   MarketingContentType,
 } from '@starships/protocol';

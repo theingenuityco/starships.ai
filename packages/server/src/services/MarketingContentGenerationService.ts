@@ -4,10 +4,9 @@
  * Generates marketing content (problem statements text) for agent templates
  * via LLM using the Autopilot LLM node.
  */
-import { ExecutionItemUtils, LLM, RunnerFactory } from '@starships/autopilot';
-import type { Blueprint, EngineConfig, LlmMessage } from '@starships/autopilot';
+import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import type { AgentModel } from '@starships/protocol';
 
 export type ProblemStatementsGenerationResult = {
   statements: string[];

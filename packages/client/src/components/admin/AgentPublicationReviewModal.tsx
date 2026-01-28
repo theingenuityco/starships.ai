@@ -27,14 +27,7 @@ interface AgentPublicationReviewModalProps {
   onConfirm: () => void
 }
 
-export function AgentPublicationReviewModal({
-  open,
-  onOpenChange,
-  agent,
-  templateId,
-  marketingContent: initialMarketingContent,
-  onConfirm,
-}: AgentPublicationReviewModalProps) {
+export function AgentPublicationReviewModal({ open, onOpenChange, agent, templateId, marketingContent: initialMarketingContent, onConfirm }: AgentPublicationReviewModalProps) {
   // Parse problem statements - backend already returns as array, just like previewPrompts
   const parseProblemStatements = (input: string[] | undefined): string[] => {
     if (!input) return []
@@ -117,14 +110,7 @@ export function AgentPublicationReviewModal({
             <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Avatar</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleRegenerate('avatar')}
-                  disabled={isRegenerating}
-                  className="h-8 text-xs"
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => handleRegenerate('avatar')} disabled={isRegenerating} className="h-8 text-xs">
                   {regeneratingType === 'avatar' ? (
                     <>
                       <LoadingSpinner className="w-3 h-3 mr-1" />
@@ -140,13 +126,7 @@ export function AgentPublicationReviewModal({
               </div>
               {marketingContent.avatarUrl ? (
                 <div className="flex justify-center">
-                  <AgentAvatar
-                    seed={agent.name}
-                    imageUrl={marketingContent.avatarUrl}
-                    size={128}
-                    rounded
-                    className="h-32 w-32 rounded-xl"
-                  />
+                  <AgentAvatar seed={agent.name} imageUrl={marketingContent.avatarUrl} size={128} rounded className="h-32 w-32 rounded-xl" />
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-32 rounded-lg border border-dashed border-border/60 bg-muted/20">
@@ -160,14 +140,7 @@ export function AgentPublicationReviewModal({
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">The Problem</h3>
                 {marketingContent.problemStatementsImageUrl && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleRegenerate('problem_statements_image')}
-                    disabled={isRegenerating}
-                    className="h-8 text-xs"
-                  >
+                  <Button type="button" variant="outline" size="sm" onClick={() => handleRegenerate('problem_statements_image')} disabled={isRegenerating} className="h-8 text-xs">
                     {regeneratingType === 'problem_statements_image' ? (
                       <>
                         <LoadingSpinner className="w-3 h-3 mr-1" />
@@ -190,7 +163,10 @@ export function AgentPublicationReviewModal({
                     src={marketingContent.problemStatementsImageUrl}
                     alt={
                       problemStatements.length > 0
-                        ? `${agent.name} understanding user challenges: ${problemStatements.slice(0, 3).map(s => `"${s}"`).join(', ')}`
+                        ? `${agent.name} understanding user challenges: ${problemStatements
+                            .slice(0, 3)
+                            .map(s => `"${s}"`)
+                            .join(', ')}`
                         : `${agent.name} - The Problem`
                     }
                     className="max-w-full h-auto rounded-lg border border-border/60"
@@ -198,26 +174,14 @@ export function AgentPublicationReviewModal({
                 </div>
               )}
 
-              <ProblemStatementsEditor
-                statements={problemStatements}
-                onChange={setProblemStatements}
-                onRegenerate={() => handleRegenerate('problem_statements_text')}
-                disabled={isRegenerating}
-              />
+              <ProblemStatementsEditor statements={problemStatements} onChange={setProblemStatements} onRegenerate={() => handleRegenerate('problem_statements_text')} disabled={isRegenerating} />
             </div>
 
             {/* Capabilities Image */}
             <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Capabilities Image</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleRegenerate('capabilities_image')}
-                  disabled={isRegenerating}
-                  className="h-8 text-xs"
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => handleRegenerate('capabilities_image')} disabled={isRegenerating} className="h-8 text-xs">
                   {regeneratingType === 'capabilities_image' ? (
                     <>
                       <LoadingSpinner className="w-3 h-3 mr-1" />
@@ -234,11 +198,7 @@ export function AgentPublicationReviewModal({
               {marketingContent.capabilitiesImageUrl ? (
                 <div className="flex justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={marketingContent.capabilitiesImageUrl}
-                    alt="Capabilities"
-                    className="max-w-full h-auto rounded-lg border border-border/60"
-                  />
+                  <img src={marketingContent.capabilitiesImageUrl} alt="Capabilities" className="max-w-full h-auto rounded-lg border border-border/60" />
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-32 rounded-lg border border-dashed border-border/60 bg-muted/20">
@@ -251,14 +211,7 @@ export function AgentPublicationReviewModal({
             <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold">Try These Prompts Image</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleRegenerate('try_these_prompts_image')}
-                  disabled={isRegenerating}
-                  className="h-8 text-xs"
-                >
+                <Button type="button" variant="outline" size="sm" onClick={() => handleRegenerate('try_these_prompts_image')} disabled={isRegenerating} className="h-8 text-xs">
                   {regeneratingType === 'try_these_prompts_image' ? (
                     <>
                       <LoadingSpinner className="w-3 h-3 mr-1" />
@@ -275,11 +228,7 @@ export function AgentPublicationReviewModal({
               {marketingContent.tryThesePromptsImageUrl ? (
                 <div className="flex justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={marketingContent.tryThesePromptsImageUrl}
-                    alt="Try these prompts"
-                    className="max-w-full h-auto rounded-lg border border-border/60"
-                  />
+                  <img src={marketingContent.tryThesePromptsImageUrl} alt="Try these prompts" className="max-w-full h-auto rounded-lg border border-border/60" />
                 </div>
               ) : (
                 <div className="flex items-center justify-center h-32 rounded-lg border border-dashed border-border/60 bg-muted/20">

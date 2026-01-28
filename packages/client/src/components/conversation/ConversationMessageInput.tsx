@@ -1286,7 +1286,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (examplePrompts.length > 0) return examplePrompts
       if (templatePrompts.length > 0) return templatePrompts
       // Final fallback to ensure animated placeholder renders even if backend has no prompts yet
-      return ['Design an agent that researches topics using Wikipedia', 'Create a customer support agent that can help users with common questions', 'Plan an onboarding workflow for new customers']
+      return ['Design an agent that researches topics using Wikipedia', 'Create a customer support agent that can help users with common questions', 'Plan a workflow for new customers']
     }, [examplePrompts, templatePrompts])
 
     // Keep animated hint prompts reactive without re-initializing the TipTap extension

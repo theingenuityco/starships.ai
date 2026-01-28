@@ -23,7 +23,6 @@ export interface UserModel {
   avatar?: string;
   password?: string; // For local authentication
   emailVerified?: boolean; // OAuth email verification
-  onboardingCompleted: boolean; // Mandatory onboarding completion gate
   createdAt: string;
   lastLoginAt?: string; // Last successful login timestamp
 
@@ -42,6 +41,9 @@ export interface UserModel {
   hasPassword: boolean;           // Does user have password auth?
   authMethods: AuthMethod[];      // List of auth methods
   primaryAuthMethod: 'password' | 'oauth'; // Primary login method
+
+  // Onboarding tracking
+  navigationOnboardingCompleted?: boolean; // Has user completed the navigation onboarding tour?
 }
 
 // ============================================================================

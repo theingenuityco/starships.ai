@@ -1387,33 +1387,17 @@ export class ConversationService {
           baseState as Record<string, unknown> | undefined
         );
 
-        // Optional onboarding-only system prompt injection (conversation-scoped).
-        const onboardingSystemPrompt =
-          conversationState &&
-          typeof conversationState === 'object' &&
-          typeof (conversationState as Record<string, unknown>)['onboardingSystemPrompt'] === 'string'
-            ? String((conversationState as Record<string, unknown>)['onboardingSystemPrompt']).trim()
-            : '';
-
-        // Exclude plugins (and any onboarding system prompt) from baseState and conversationState
-        // - plugins are set explicitly from resolvePlugins
-        // - onboardingSystemPrompt is used to augment agent.systemPrompt and should NOT be placed into agent.state
+        // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
         const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
         void _agentPlugins;
-        const {
-          plugins: _conversationPlugins,
-          onboardingSystemPrompt: _onboardingSystemPrompt,
-          ...conversationStateWithoutPlugins
-        } = conversationState as Record<string, unknown>;
+        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } =
+          conversationState as Record<string, unknown>;
         void _conversationPlugins;
-        void _onboardingSystemPrompt;
 
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, onboardingSystemPrompt]
-          .filter(Boolean)
-          .join('\n\n');
+        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
 
         const agentWithTools: AgentParams = {
           ...agentModel,
@@ -1690,9 +1674,6 @@ export class ConversationService {
         string,
         unknown
       >;
-      const onboardingSystemPrompt =
-        typeof conversationState['onboardingSystemPrompt'] === 'string' ? String(conversationState['onboardingSystemPrompt']).trim() : '';
-
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
@@ -1705,23 +1686,16 @@ export class ConversationService {
       // Resolve plugins from conversation state only (agent plugins ignored)
       const plugins = this.resolvePlugins(conversationState as ConversationState | undefined, baseState as AgentState | undefined);
 
-      // Exclude plugins from baseState and conversationState - plugins are set explicitly from resolvePlugins
+      // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
       const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
       void _agentPluginsContinue;
-      const {
-        plugins: _conversationPluginsContinue,
-        onboardingSystemPrompt: _onboardingSystemPromptContinue,
-        ...conversationStateWithoutPlugins
-      } = conversationState;
+      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState;
       void _conversationPluginsContinue;
-      void _onboardingSystemPromptContinue;
 
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, onboardingSystemPrompt]
-        .filter(Boolean)
-        .join('\n\n');
+      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
 
       const agentWithTools: AgentParams = {
         ...agentModel,

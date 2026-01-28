@@ -97,7 +97,6 @@ export class UserService {
       avatar: request.avatar,
       password: hashedPassword,
       emailVerified: request.emailVerified || false,
-      onboardingCompleted: false,
       stripeCustomerId: request.stripeCustomerId,
       hasPassword: !!request.password,
       authMethods: request.password ? ['password' as AuthMethod] : [],
@@ -226,6 +225,30 @@ export class UserService {
     // For now, we allow deletion (DETACH DELETE in repository handles relationships)
 
     return await this.userRepository.delete(userId);
+  }
+
+  /**
+   * Mark navigation onboarding as completed
+   */
+  async markNavigationOnboardingCompleted(userId: string): Promise<UserModel> {
+    // Business validation: User must exist
+    const existingUser = await this.userRepository.findById(userId);
+    if (!existingUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    // Update user with onboarding completion flag
+    const updatedUser = await this.userRepository.update(userId, {
+      navigationOnboardingCompleted: true,
+    });
+
+    if (!updatedUser) {
+      throw new NotFoundError('User', userId);
+    }
+
+    logger.info('[UserService] Navigation onboarding marked as completed', { userId });
+
+    return this.transformUserForResponse(updatedUser, { includePassword: false });
   }
 
   /**

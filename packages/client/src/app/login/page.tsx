@@ -9,6 +9,7 @@ import { Suspense, useState } from 'react'
 import * as React from 'react'
 import { AuthLoadingScreen } from '@/components/ui/simple-loading'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useUserStarships } from '@/hooks/useStarships'
 import { isValidRedirectUrl } from '@/lib/utils'
 import { AuthMarketingPanel } from '@/components/auth/AuthMarketingPanel'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
@@ -27,7 +28,7 @@ function LoginContent() {
   const initialTab = tabParam === 'register' ? 'register' : 'login'
   const [activeTab, setActiveTab] = useState<'login' | 'register'>(initialTab)
 
-  const starshipsLoading = false
+  const { data: starships, isLoading: starshipsLoading } = useUserStarships(user?.id || '', isAuthenticated && !!user?.id)
 
   // Prevent hydration mismatch by only rendering after mount
   React.useEffect(() => {
@@ -77,38 +78,16 @@ function LoginContent() {
         return
       }
 
-      // If the user is authenticated but not onboarded, always route to onboarding.
-      // This avoids deep-link returnUrl redirects bypassing onboarding before initial provisioning.
-      if (user && user.onboardingCompleted === false) {
-        // Exception: invite acceptance must run pre-onboarding, otherwise invite links
-        // require login but never get accepted.
-        const returnUrl = searchParams?.get('returnUrl')
-        if (returnUrl && isValidRedirectUrl(returnUrl)) {
-          try {
-            const u = new URL(returnUrl, typeof window !== 'undefined' ? window.location.origin : 'http://localhost')
-            if (u.pathname === '/accept-invite') {
-              router.push(returnUrl)
-              return
-            }
-          } catch {
-            // ignore
-          }
-        }
-
-        router.push('/onboarding')
-        return
-      }
-
-      // Handle redirect with returnUrl pattern
       const returnUrl = searchParams?.get('returnUrl')
-
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
         router.push(returnUrl)
+      } else if (starships && starships.length > 0) {
+        router.push(`/ship/${starships[0].slug}/conversations`)
       } else {
         router.push('/profile')
       }
     }
-  }, [mounted, isAuthenticated, isLoading, starshipsLoading, router, searchParams, logoutParam, expectedEmail, logout, user])
+  }, [mounted, isAuthenticated, isLoading, starshipsLoading, starships, router, searchParams, logoutParam, expectedEmail, logout])
 
   // Show loading state while checking authentication or mounting
   if (!mounted || isLoading || (isAuthenticated && starshipsLoading) || forcedLogoutRef.current) {

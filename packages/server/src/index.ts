@@ -9,7 +9,7 @@ import * as Sentry from '@sentry/node';
 
 import { autopilot } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { createConnection, migrationRunner, seedUpdateDeployedInstances, seedAgentTemplates, seedToolTemplates } from '@starships/models';
+import { createConnection, migrationRunner, seedUpdateDeployedInstances } from '@starships/models';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express from 'express';
@@ -40,7 +40,6 @@ import scheduleRoutes from '@/routes/schedules';
 import platformSecretRoutes from '@/routes/platform-secrets';
 import connectorTemplateRoutes from '@/routes/connector-templates';
 import subscriptionRoutes from '@/routes/subscriptions';
-import onboardingRoutes from '@/routes/onboarding';
 import starshipInvitesRoutes from '@/routes/starship-invites';
 // import expeditionRoutes from '@/routes/expeditions';
 
@@ -118,7 +117,6 @@ app.use('/api/v1', scheduleRoutes);
 app.use('/api/v1', platformSecretRoutes);
 app.use('/api/v1', connectorTemplateRoutes);
 app.use('/api/v1', subscriptionRoutes);
-app.use('/api/v1', onboardingRoutes);
 app.use('/api/v1', starshipInvitesRoutes);
 
 // Add 404 handler for unmatched routes
@@ -158,12 +156,6 @@ httpServer.listen(PORT, async () => {
     // Initialize complete database schema (includes seeding)
     await migrationRunner.runAllPendingMigrations();
     console.log('✅ Database schema initialized with seed data');
-
-    // Seed agent and tool templates
-    console.log('🌱 Seeding agent and tool templates...');
-    await seedToolTemplates();
-    await seedAgentTemplates();
-    console.log('✅ Templates seeded');
 
     // Version flow: sync deployed instances to latest DB templates.
     // (Intentionally idempotent and should not block startup on failure.)

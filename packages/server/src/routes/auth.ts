@@ -11,7 +11,7 @@ import { validateData } from '@/utils/validation';
 import { generateJWT, generateOAuthState, validateOAuthState, verifyJWT, generateAuthCode, validateAndConsumeAuthCode } from '@/utils/jwt';
 import { EmailSchema, PasswordSchema, OAuthProviderSchema, DisplayNameSchema, IdSchema } from '@/schemas/common';
 import { getEnvConfig } from '@starships/env';
-import { AgentRepository, OnboardingSessionRepository, StarshipRepository, UserRepository } from '@starships/models';
+import { StarshipRepository, UserRepository } from '@starships/models';
 import type { AuthLoginResponse, AuthPasswordResetResponse, AuthPasswordResetConfirmResponse } from '@starships/protocol';
 import type { UserModel } from '@starships/protocol';
 import bcrypt from 'bcrypt';
@@ -22,7 +22,6 @@ import { logger } from '@/utils/logger';
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { rateLimiters } from '@/middleware/rateLimiter';
 import { AgentService } from '@/services/AgentService';
-import { AgentTemplateService } from '@/services/AgentTemplateService';
 import { StarshipService } from '@/services/StarshipService';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 
@@ -38,57 +37,6 @@ function isValidRedirectUrl(url: string): boolean {
   if (/^(javascript|data):/i.test(url)) return false;
   if (url.includes('@')) return false;
   return true;
-}
-
-/**
- * Pre-onboarding-era compatibility:
- * Some existing users already have a starship but were created before onboarding sessions existed.
- *
- * When such a user logs in with `users.onboarding_completed=false`, the client will force `/onboarding`.
- * If the onboarding session doesn't already point at their existing starship, the onboarding flow would
- * incorrectly prompt them to "Create your starship" (and could create a duplicate starship).
- *
- * This helper links an onboarding session to the user's first active starship (best-effort).
- * It intentionally does NOT create a starship or agent (provisioning remains onboarding-only).
- */
-async function ensureOnboardingSessionLinkedToExistingStarship(
-  userId: string,
-  onboardingCompleted: boolean
-): Promise<{ id: string; slug: string; name: string } | null> {
-  // Only do this work for users who are still gated by onboarding.
-  if (onboardingCompleted) return null;
-
-  try {
-    const starshipRepo = new StarshipRepository();
-    const ships = await starshipRepo.findByOwner(userId);
-    const first = ships.find((s) => s.status === 'active') || ships[0];
-    if (!first) return null;
-
-    const sessionRepo = new OnboardingSessionRepository();
-    const session = await sessionRepo.findByUserId(userId);
-
-    // If a session already points at a starship, don't override it.
-    if (!session?.starshipId) {
-      await sessionRepo.upsertForUser(userId, {
-        starshipId: first.id,
-        step: session?.step ?? 'welcome',
-        goals: session?.goals ?? [],
-        selectedConnectorProviders: session?.selectedConnectorProviders ?? [],
-        selectedAgentTemplateIds: session?.selectedAgentTemplateIds ?? [],
-        primaryAgentTemplateId: session?.primaryAgentTemplateId ?? null,
-        completedAt: session?.completedAt ?? null,
-        createdAt: session?.createdAt,
-      });
-    }
-
-    return { id: first.id, slug: first.slug, name: first.name };
-  } catch (error) {
-    logger.warn('[AUTH] Failed to link onboarding session to existing starship (best-effort)', {
-      userId,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    });
-    return null;
-  }
 }
 
 // Zod schemas for validation
@@ -204,15 +152,48 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         emailNotVerified: true,
         message: 'Please verify your email address before signing in.',
         canResendVerification: true,
-        onboardingRequired: true,
       };
 
       return sendSuccess(res, response, 200);
     }
 
-    // IMPORTANT:
-    // We do NOT provision starships/agents during login.
-    // Onboarding is mandatory and is the only place where a starship + default agent (Aria) are created.
+    // Get user's starships for redirect purpose; create default starship + agents if none
+    let firstStarship: { id: string; slug: string; name: string } | null = null;
+    try {
+      const starshipRepo = new StarshipRepository();
+      const userStarships = await starshipRepo.findByOwner(user.id);
+      let ship = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
+
+      if (!ship) {
+        logger.info(`[AUTH] Creating starship for user ${user.email}`);
+        try {
+          ship = await StarshipService.createDefaultStarship(user.id);
+          if (ship) {
+            try {
+              await StarshipService.createInitialAgents(user.id, ship.id);
+              logger.info(`[AUTH] Created initial agents for user ${user.email}`);
+            } catch (agentError) {
+              logger.error('[AUTH] Failed to create initial agents', {
+                userId: user.id,
+                error: agentError instanceof Error ? agentError.message : 'Unknown error',
+              });
+            }
+          }
+        } catch (createError) {
+          logger.error('[AUTH] Failed to create default starship for newly approved user', {
+            userId: user.id,
+            error: createError instanceof Error ? createError.message : 'Unknown error',
+          });
+        }
+      }
+
+      if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
+    } catch (error) {
+      logger.error('[AUTH] Failed to fetch starships for user', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
 
     // Track first login (before updating lastLoginAt)
     const isFirstLogin = !user.lastLoginAt;
@@ -228,7 +209,6 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         userId: user.id,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
-      // Continue with login even if update fails
     }
 
     // Generate JWT token
@@ -237,9 +217,6 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
       email: user.email,
       name: user.displayName || user.email?.split('@')[0],
     });
-
-    const onboardingCompleted = user.onboardingCompleted;
-    const starship = await ensureOnboardingSessionLinkedToExistingStarship(user.id, onboardingCompleted);
 
     sendSuccess(res, {
       user: {
@@ -250,14 +227,12 @@ router.post('/auth/login', rateLimiters.auth, async (req: Request, res: Response
         hasPassword: user.hasPassword || false,
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'password',
-        onboardingCompleted,
-        // Surface instance admin flag without changing other login payload fields
         isInstanceAdmin: user.isInstanceAdmin || false,
+        navigationOnboardingCompleted: user.navigationOnboardingCompleted || false,
       },
       token,
       isFirstLogin,
-      onboardingRequired: !user.onboardingCompleted,
-      starship,
+      starship: firstStarship,
     });
   } catch (error) {
     handleError(error, res, 'user login');
@@ -297,8 +272,8 @@ router.get('/auth/me', async (req: Request, res: Response): Promise<void> => {
       hasPassword: user.hasPassword || false,
       authMethods: user.authMethods || [],
       primaryAuthMethod: user.primaryAuthMethod || 'password',
-      onboardingCompleted: user.onboardingCompleted,
       isInstanceAdmin: user.isInstanceAdmin || false,
+      navigationOnboardingCompleted: user.navigationOnboardingCompleted || false,
     });
   } catch (error) {
     // Token expiration/invalidity is expected when a client holds a stale token.
@@ -648,7 +623,8 @@ router.get('/auth/:provider/callback', async (req: Request, res: Response) => {
     }
 
     const { isLinking, userId, context } = stateValidation;
-    const returnUrlFromState = context && typeof (context as any).returnUrl === 'string' ? ((context as any).returnUrl as string) : undefined;
+    const ctx = context as Record<string, unknown> | null | undefined;
+    const returnUrlFromState = ctx && typeof ctx.returnUrl === 'string' ? (ctx.returnUrl as string) : undefined;
     const safeReturnUrl = returnUrlFromState && isValidRedirectUrl(returnUrlFromState) ? returnUrlFromState : undefined;
 
     // If this is account linking, handle differently
@@ -902,10 +878,44 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
       name: user.displayName || user.email?.split('@')[0],
     });
 
-    const onboardingCompleted = user.onboardingCompleted;
-    const starship = await ensureOnboardingSessionLinkedToExistingStarship(user.id, onboardingCompleted);
+    // Get user's starships for redirect purpose; create default starship + agents if none
+    let firstStarship: { id: string; slug: string; name: string } | null = null;
+    try {
+      const starshipRepo = new StarshipRepository();
+      const userStarships = await starshipRepo.findByOwner(user.id);
+      let ship = userStarships.find((s) => s.status === 'active') || userStarships[0] || null;
 
-    // Return secure response with JWT in body
+      if (!ship) {
+        logger.info(`[OAUTH-EXCHANGE] Creating starship for user ${user.email}`);
+        try {
+          ship = await StarshipService.createDefaultStarship(user.id);
+          if (ship) {
+            try {
+              await StarshipService.createInitialAgents(user.id, ship.id);
+              logger.info(`[OAUTH-EXCHANGE] Created initial agents for user ${user.email}`);
+            } catch (agentError) {
+              logger.error('[OAUTH-EXCHANGE] Failed to create initial agents', {
+                userId: user.id,
+                error: agentError instanceof Error ? agentError.message : 'Unknown error',
+              });
+            }
+          }
+        } catch (createError) {
+          logger.error('[OAUTH-EXCHANGE] Failed to create default starship for user', {
+            userId: user.id,
+            error: createError instanceof Error ? createError.message : 'Unknown error',
+          });
+        }
+      }
+
+      if (ship) firstStarship = { id: ship.id, slug: ship.slug, name: ship.name };
+    } catch (error) {
+      logger.error('[OAUTH-EXCHANGE] Failed to fetch starships for user', {
+        userId: user.id,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+
     sendSuccess(res, {
       user: {
         id: user.id,
@@ -915,13 +925,12 @@ router.post('/auth/oauth/exchange', async (req: Request, res: Response) => {
         hasPassword: user.hasPassword || false,
         authMethods: user.authMethods || [],
         primaryAuthMethod: user.primaryAuthMethod || 'oauth',
-        onboardingCompleted,
         isInstanceAdmin: user.isInstanceAdmin || false,
+        navigationOnboardingCompleted: user.navigationOnboardingCompleted || false,
       },
       token,
       isFirstLogin,
-      onboardingRequired: !user.onboardingCompleted,
-      starship,
+      starship: firstStarship,
     });
   } catch (error) {
     logger.error('[OAUTH-EXCHANGE] Token exchange failed:', {

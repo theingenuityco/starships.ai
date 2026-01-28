@@ -27,11 +27,6 @@ interface ConversationListProps {
 
 type ConversationWithAgents = ConversationModel & { agents: AgentModel[] }
 
-function isOnboardingConversation(conversation: { state?: unknown }): boolean {
-  const state = conversation.state && typeof conversation.state === 'object' ? (conversation.state as any) : null
-  return state?.isOnboardingConversation === true
-}
-
 function CompactConversationAgents({ starshipId, agents }: { starshipId: string; agents: AgentModel[] }) {
   const maxToShow = 2
   const visibleAgents = agents.slice(0, maxToShow)
@@ -134,7 +129,6 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const renderCompactConversation = (conversation: ConversationWithAgents, isChild: boolean) => {
     const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
     const isActive = conversation.id === currentConversationId
-    const isOnboarding = isOnboardingConversation(conversation)
     const agents = conversation.agents
 
     return (
@@ -142,30 +136,15 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         key={conversation.id}
         className={cn(
           'group flex items-center gap-1.5 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
-          isOnboarding
-            ? isActive
-              ? 'text-primary bg-primary/10 border-transparent'
-              : 'text-foreground/90 bg-muted/40 border-transparent hover:bg-muted/60'
-            : isActive
-              ? 'text-primary bg-primary/10 border-transparent'
-              : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+          isActive
+            ? 'text-primary bg-primary/10 border-transparent'
+            : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
         )}
         style={isChild ? { paddingLeft: '1.5rem' } : undefined}
       >
         <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
           <div className="flex items-start justify-between gap-2">
             <div className="flex items-center gap-1 min-w-0">
-              {isOnboarding ? (
-                <Icon
-                  name="zap"
-                  className={cn(
-                    'h-3.5 w-3.5 flex-shrink-0 mt-[1px]',
-                    isActive ? 'text-primary' : 'text-primary/80',
-                    // Subtle special treatment without changing layout or borders
-                    'opacity-90 group-hover:opacity-100 motion-safe:animate-pulse'
-                  )}
-                />
-              ) : null}
               <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{title}</p>
             </div>
           </div>

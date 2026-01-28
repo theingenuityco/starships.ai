@@ -388,32 +388,26 @@ export class ProfileImageGenerationService {
     const resultItems = await runner.run(blueprint, exec, engineConfig);
 
     // Extract image from tool result
-    // The tool's end node outputs: (lastOutputOf('extract_image') || {}).image
-    // Which is: { kind: 'data_url' | 'url', value: string, mimeType?: string }
-    // The Tool node unwraps the nested blueprint's end node output and wraps it in an ExecutionItem
-    // So we can use unwrapSingle() directly to get the end node output (the image object)
+    // The wrapper blueprint's end node outputs: lastOutputOf('call_tool')
+    // lastOutputOf() unwraps ExecutionItems, so it returns the Tool node's unwrapped result
+    // The Tool node wraps its result, so we need to handle both cases:
+    // 1. If End node output is set: lastOutputOf unwraps → we get the image object directly
+    // 2. If End node has no output: Engine returns full execution results → we need to find Tool node result
     type AnyRecord = Record<string, unknown>;
     const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
-    // Extract image from tool result
-    // The wrapper blueprint's end node outputs: lastOutputOf('call_tool')
-    // The Tool node returns ExecutionItem[] (wrapped), so we need to unwrap twice:
-    // 1. Unwrap the wrapper blueprint's end node output (gets Tool node's ExecutionItem[])
-    // 2. Unwrap the Tool node's ExecutionItem[] (gets the image object)
     const toolNodeResult = ExecutionItemUtils.unwrapSingle(resultItems);
     
-    // If toolNodeResult is an ExecutionItem array (from Tool node), unwrap it again
+    // If toolNodeResult is an ExecutionItem array (Tool node's wrapped output), unwrap it again
+    // Otherwise, lastOutputOf already unwrapped it, so toolNodeResult IS the image object
     let actualResult: unknown;
     if (Array.isArray(toolNodeResult) && toolNodeResult.length > 0 && typeof toolNodeResult[0] === 'object' && 'json' in toolNodeResult[0]) {
       // Tool node returned ExecutionItem[], unwrap to get the actual result
       actualResult = ExecutionItemUtils.unwrapSingle(toolNodeResult as any);
     } else {
-      // Tool node already unwrapped, or End node extracted it differently
+      // lastOutputOf already unwrapped it, or End node extracted it correctly
       actualResult = toolNodeResult;
     }
-
-    type AnyRecord = Record<string, unknown>;
-    const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
     if (!isRecord(actualResult)) {
       const debugInfo = {

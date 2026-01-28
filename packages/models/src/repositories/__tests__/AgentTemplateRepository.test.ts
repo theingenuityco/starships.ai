@@ -357,15 +357,21 @@ describe('AgentTemplateRepository', () => {
     it('should update template successfully', async () => {
       const updates = { name: 'Updated Template' };
       const mockUpdatedRaw = createMockRawTemplate(updates);
+      const existingTemplate = createMockRawTemplate({ name: 'Test Template' });
 
       // update() now checks the current name to avoid regenerating slugs unnecessarily
       mockConnection.query
-        // findById() -> SELECT * FROM agent_templates WHERE id = $1
-        .mockResolvedValueOnce([createMockRawTemplate()])
+        // findById() -> SELECT * FROM agent_templates WHERE id = $1 (via findEntityById)
+        .mockResolvedValueOnce([existingTemplate])
         // findById() -> SELECT tt.slug ... (assigned tools)
+        .mockResolvedValueOnce([])
+        // generateUniqueTemplateSlug() -> SELECT id FROM agent_templates WHERE slug = $1
         .mockResolvedValueOnce([])
         // updateEntity() -> UPDATE agent_templates ... RETURNING *
         .mockResolvedValueOnce([mockUpdatedRaw]);
+
+      // Mock queryOne for generateUniqueTemplateSlug slug check
+      mockConnection.queryOne.mockResolvedValue(null);
 
       const result = await repository.update('template-123', updates);
 

@@ -637,14 +637,17 @@ const wrapAnthropicNonStreamAsOneChunk = (
   return gen();
 };
 
-const wrapNonStreamAsOneChunk = (completion: Record<string, unknown>): AsyncIterable<unknown> => {
+const wrapNonStreamAsOneChunk = (
+  completion: Record<string, unknown>,
+  canonicalModel?: string
+): AsyncIterable<unknown> => {
   const choices = Array.isArray(completion.choices) ? completion.choices : [];
   const firstChoice = choices[0] as Record<string, unknown> | undefined;
   const oneChunk = {
     id: completion.id,
     object: completion.object,
     created: completion.created,
-    model: completion.model,
+    model: typeof canonicalModel === 'string' && canonicalModel.trim().length > 0 ? canonicalModel : completion.model,
     usage: completion.usage,
     choices: [
       {
@@ -660,7 +663,7 @@ const wrapNonStreamAsOneChunk = (completion: Record<string, unknown>): AsyncIter
   return gen();
 };
 
-async function* streamSse(resp: Response, signal?: AbortSignal): AsyncIterable<unknown> {
+async function* streamSse(resp: Response, signal?: AbortSignal, canonicalModel?: string): AsyncIterable<unknown> {
   if (!resp.body) {
     throw new Error('Azure AI Foundry response body missing');
   }
@@ -688,7 +691,11 @@ async function* streamSse(resp: Response, signal?: AbortSignal): AsyncIterable<u
         }
         try {
           const parsed = JSON.parse(data);
-          yield parsed;
+          if (parsed && typeof parsed === 'object' && typeof canonicalModel === 'string' && canonicalModel.trim().length > 0) {
+            yield { ...(parsed as Record<string, unknown>), model: canonicalModel };
+          } else {
+            yield parsed;
+          }
         } catch {
           // Ignore malformed chunks; continue streaming.
         }
@@ -721,7 +728,11 @@ async function* streamSse(resp: Response, signal?: AbortSignal): AsyncIterable<u
       if (data !== '[DONE]') {
         try {
           const parsed = JSON.parse(data);
-          yield parsed;
+          if (parsed && typeof parsed === 'object' && typeof canonicalModel === 'string' && canonicalModel.trim().length > 0) {
+            yield { ...(parsed as Record<string, unknown>), model: canonicalModel };
+          } else {
+            yield parsed;
+          }
         } catch {
           // Ignore malformed trailing chunk.
         }
@@ -855,7 +866,7 @@ export async function invokeAzureAiFoundry(
     }
 
     const completion = (await resp.json()) as Record<string, unknown>;
-    return wrapNonStreamAsOneChunk(completion);
+    return wrapNonStreamAsOneChunk(completion, String(request.model || providerModelId));
   }
 
   payload.stream = true;
@@ -891,5 +902,5 @@ export async function invokeAzureAiFoundry(
     throw err;
   }
 
-  return streamSse(resp, options.signal);
+  return streamSse(resp, options.signal, String(request.model || providerModelId));
 }

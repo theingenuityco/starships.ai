@@ -1451,6 +1451,14 @@ export class AgentService {
       });
       await templateRepo.update(createdTemplate.id, { version: nextVersion });
       targetTemplateId = createdTemplate.id;
+
+      // CRITICAL: Set publishedTemplateId immediately after template creation
+      // This ensures idempotency - if preparePublication is called again, it will
+      // see the existing publishedTemplateId and update instead of creating duplicate
+      // Matches main branch pattern where template creation and ID assignment are atomic
+      await this.agentRepository.update(agentId, {
+        publishedTemplateId: targetTemplateId,
+      });
     } else {
       await templateRepo.update(targetTemplateId, {
         name: agent.name,
@@ -1877,12 +1885,8 @@ export class AgentService {
       }
     }
 
-    // Link template to agent (but don't mark as published yet)
-    await this.agentRepository.update(agentId, {
-      publishedTemplateId: targetTemplateId,
-    });
-
     // Reload agent to get updated attachment IDs and template link
+    // Note: publishedTemplateId was already set above when template was created
     const finalAgent = await this.agentRepository.findById(agentId);
     if (!finalAgent) {
       throw new NotFoundError('Agent', agentId);

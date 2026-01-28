@@ -382,39 +382,13 @@ export class ProfileImageGenerationService {
     // Extract image from tool result
     // The tool's end node outputs: (lastOutputOf('extract_image') || {}).image
     // Which is: { kind: 'data_url' | 'url', value: string, mimeType?: string }
+    // The Tool node unwraps the nested blueprint's end node output and wraps it in an ExecutionItem
+    // So we can use unwrapSingle() directly to get the end node output (the image object)
     type AnyRecord = Record<string, unknown>;
     const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
-    // Extract the actual result from execution items
-    // The end node output should be in the resultItems array
-    let actualResult: unknown = undefined;
-
-    if (Array.isArray(resultItems)) {
-      // Find the end node output
-      for (const item of resultItems) {
-        if (item && typeof item === 'object' && 'nodeRef' in item) {
-          const nodeRef = (item as any).nodeRef;
-          if (nodeRef === 'end' || nodeRef === 'end_1') {
-            const items = (item as any).items;
-            if (Array.isArray(items) && items.length > 0) {
-              // Get the last item which should be the output
-              const lastItem = items[items.length - 1];
-              if (lastItem && typeof lastItem === 'object' && 'json' in lastItem) {
-                actualResult = lastItem.json;
-                break;
-              }
-            }
-          }
-        }
-      }
-
-      // Fallback: try unwrapSingle
-      if (actualResult === undefined) {
-        actualResult = ExecutionItemUtils.unwrapSingle(resultItems);
-      }
-    } else {
-      actualResult = resultItems;
-    }
+    // Use unwrapSingle() directly - Tool node already handled unwrapping
+    const actualResult = ExecutionItemUtils.unwrapSingle(resultItems);
 
     if (!isRecord(actualResult)) {
       const debugInfo = {
@@ -424,28 +398,13 @@ export class ProfileImageGenerationService {
         resultItemsType: typeof resultItems,
         resultItemsIsArray: Array.isArray(resultItems),
         resultItemsLength: Array.isArray(resultItems) ? resultItems.length : 0,
-        resultItemsPreview: Array.isArray(resultItems)
-          ? resultItems.slice(0, 2).map((item: any) => ({
-              nodeRef: item?.nodeRef,
-              hasItems: Array.isArray(item?.items),
-              itemsLength: Array.isArray(item?.items) ? item.items.length : 0,
-            }))
-          : undefined,
       };
       throw new Error(`Tool returned invalid result format: ${typeof actualResult}. Debug: ${JSON.stringify(debugInfo, null, 2)}`);
     }
 
-    // The tool's extract_image node returns { ok, model, prompt, referenceImage, image }
-    // But the end node outputs just the image object
-    // However, if there's an error, it might return { ok: false, ... }
-    if (actualResult.ok === false) {
-      const errorMsg = typeof actualResult.error === 'string' ? actualResult.error : 'Unknown error';
-      throw new Error(`Tool execution failed: ${errorMsg}`);
-    }
-
-    // The image object should be directly in actualResult (from end node output)
-    // Try multiple possible locations for the image
-    const imageObj = (actualResult as any).image || (actualResult as any).data?.image || actualResult;
+    // The end node outputs just the image object directly: { kind, value, mimeType? }
+    // actualResult IS the image object (no need to extract from nested structure)
+    const imageObj = actualResult;
     if (!isRecord(imageObj)) {
       throw new Error(`Tool result missing image field. Result keys: ${Object.keys(actualResult).join(', ')}`);
     }

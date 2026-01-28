@@ -41,6 +41,7 @@ import { ProfileImageGenerationService } from './ProfileImageGenerationService';
 import { MarketingContentGenerationService } from './MarketingContentGenerationService';
 import { MarketingContentRepository } from '@starships/models';
 import { buildAutopilotExecutionBundle } from './autopilot-execution-bundle';
+import { getEnvConfig } from '@starships/env';
 
 export interface ConversationRequest {
   agentId: string;
@@ -1546,9 +1547,11 @@ export class AgentService {
       throw new NotFoundError('Starship', agent.starshipId);
     }
 
+    const env = getEnvConfig();
     const runtimeEnv: Record<string, unknown> = {
       STARSHIP_ID: agent.starshipId,
       AGENT_ID: agent.id,
+      SERVER_URL: env.SERVER_URL,
     };
 
     const executionBundle = await buildAutopilotExecutionBundle({
@@ -1734,23 +1737,35 @@ export class AgentService {
 
       const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
       if (attachmentWithUrl?.s3Key) {
+        const updatedAt = attachmentWithUrl.createdAt || new Date().toISOString();
         await templateRepo.updateProfileImageStorage(targetTemplateId, 'problem_statements', {
           s3Key: attachmentWithUrl.s3Key,
           mimeType: attachmentWithUrl.mimeType || 'image/webp',
-          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+          updatedAt,
         });
-        marketingContent.problemStatementsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/problem-statements`;
+        // Fetch updated storage to get the actual updatedAt timestamp for cache-busting
+        const updatedStorage = await templateRepo.getProfileImageStorageById(targetTemplateId, 'problem_statements');
+        const cacheBuster = updatedStorage?.updatedAt 
+          ? new Date(updatedStorage.updatedAt).getTime() 
+          : Date.now();
+        marketingContent.problemStatementsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/problem-statements?v=${cacheBuster}`;
       }
     } else {
       // Copy existing
       const attachment = await attachmentService.getAttachmentWithUrl(agent.problemStatementsAttachmentId, agent.starshipId);
       if (attachment?.s3Key) {
+        const updatedAt = attachment.createdAt || new Date().toISOString();
         await templateRepo.updateProfileImageStorage(targetTemplateId, 'problem_statements', {
           s3Key: attachment.s3Key,
           mimeType: attachment.mimeType || 'image/webp',
-          updatedAt: attachment.createdAt || new Date().toISOString(),
+          updatedAt,
         });
-        marketingContent.problemStatementsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/problem-statements`;
+        // Fetch updated storage to get the actual updatedAt timestamp for cache-busting
+        const updatedStorage = await templateRepo.getProfileImageStorageById(targetTemplateId, 'problem_statements');
+        const cacheBuster = updatedStorage?.updatedAt 
+          ? new Date(updatedStorage.updatedAt).getTime() 
+          : Date.now();
+        marketingContent.problemStatementsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/problem-statements?v=${cacheBuster}`;
       }
     }
 
@@ -1777,22 +1792,34 @@ export class AgentService {
 
       const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
       if (attachmentWithUrl?.s3Key) {
+        const updatedAt = attachmentWithUrl.createdAt || new Date().toISOString();
         await templateRepo.updateProfileImageStorage(targetTemplateId, 'capabilities', {
           s3Key: attachmentWithUrl.s3Key,
           mimeType: attachmentWithUrl.mimeType || 'image/webp',
-          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+          updatedAt,
         });
-        marketingContent.capabilitiesImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/capabilities`;
+        // Fetch updated storage to get the actual updatedAt timestamp for cache-busting
+        const updatedStorage = await templateRepo.getProfileImageStorageById(targetTemplateId, 'capabilities');
+        const cacheBuster = updatedStorage?.updatedAt 
+          ? new Date(updatedStorage.updatedAt).getTime() 
+          : Date.now();
+        marketingContent.capabilitiesImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/capabilities?v=${cacheBuster}`;
       }
     } else {
       const attachment = await attachmentService.getAttachmentWithUrl(agent.capabilitiesAttachmentId, agent.starshipId);
       if (attachment?.s3Key) {
+        const updatedAt = attachment.createdAt || new Date().toISOString();
         await templateRepo.updateProfileImageStorage(targetTemplateId, 'capabilities', {
           s3Key: attachment.s3Key,
           mimeType: attachment.mimeType || 'image/webp',
-          updatedAt: attachment.createdAt || new Date().toISOString(),
+          updatedAt,
         });
-        marketingContent.capabilitiesImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/capabilities`;
+        // Fetch updated storage to get the actual updatedAt timestamp for cache-busting
+        const updatedStorage = await templateRepo.getProfileImageStorageById(targetTemplateId, 'capabilities');
+        const cacheBuster = updatedStorage?.updatedAt 
+          ? new Date(updatedStorage.updatedAt).getTime() 
+          : Date.now();
+        marketingContent.capabilitiesImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/capabilities?v=${cacheBuster}`;
       }
     }
 
@@ -1819,22 +1846,34 @@ export class AgentService {
 
       const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
       if (attachmentWithUrl?.s3Key) {
+        const updatedAt = attachmentWithUrl.createdAt || new Date().toISOString();
         await templateRepo.updateProfileImageStorage(targetTemplateId, 'try_these_prompts', {
           s3Key: attachmentWithUrl.s3Key,
           mimeType: attachmentWithUrl.mimeType || 'image/webp',
-          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+          updatedAt,
         });
-        marketingContent.tryThesePromptsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/try-these-prompts`;
+        // Fetch updated storage to get the actual updatedAt timestamp for cache-busting
+        const updatedStorage = await templateRepo.getProfileImageStorageById(targetTemplateId, 'try_these_prompts');
+        const cacheBuster = updatedStorage?.updatedAt 
+          ? new Date(updatedStorage.updatedAt).getTime() 
+          : Date.now();
+        marketingContent.tryThesePromptsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/try-these-prompts?v=${cacheBuster}`;
       }
     } else {
       const attachment = await attachmentService.getAttachmentWithUrl(agent.tryThesePromptsAttachmentId, agent.starshipId);
       if (attachment?.s3Key) {
+        const updatedAt = attachment.createdAt || new Date().toISOString();
         await templateRepo.updateProfileImageStorage(targetTemplateId, 'try_these_prompts', {
           s3Key: attachment.s3Key,
           mimeType: attachment.mimeType || 'image/webp',
-          updatedAt: attachment.createdAt || new Date().toISOString(),
+          updatedAt,
         });
-        marketingContent.tryThesePromptsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/try-these-prompts`;
+        // Fetch updated storage to get the actual updatedAt timestamp for cache-busting
+        const updatedStorage = await templateRepo.getProfileImageStorageById(targetTemplateId, 'try_these_prompts');
+        const cacheBuster = updatedStorage?.updatedAt 
+          ? new Date(updatedStorage.updatedAt).getTime() 
+          : Date.now();
+        marketingContent.tryThesePromptsImageUrl = `/api/v1/agent-templates/${targetTemplateId}/profile-images/try-these-prompts?v=${cacheBuster}`;
       }
     }
 
@@ -1891,9 +1930,11 @@ export class AgentService {
       throw new NotFoundError('Starship', agent.starshipId);
     }
 
+    const env = getEnvConfig();
     const runtimeEnv: Record<string, unknown> = {
       STARSHIP_ID: agent.starshipId,
       AGENT_ID: agent.id,
+      SERVER_URL: env.SERVER_URL,
     };
 
     const executionBundle = await buildAutopilotExecutionBundle({
@@ -2067,19 +2108,34 @@ export class AgentService {
 
       const attachmentWithUrl = await attachmentService.getAttachmentWithUrl(attachment.id, agent.starshipId);
       if (attachmentWithUrl?.s3Key) {
+        const updatedAt = attachmentWithUrl.createdAt || new Date().toISOString();
         await templateRepo.updateProfileImageStorage(templateId, imageType, {
           s3Key: attachmentWithUrl.s3Key,
           mimeType: attachmentWithUrl.mimeType || 'image/webp',
-          updatedAt: attachmentWithUrl.createdAt || new Date().toISOString(),
+          updatedAt,
         });
         
+        // Fetch updated storage to get the actual updatedAt timestamp
+        const updatedStorage = await templateRepo.getProfileImageStorageById(templateId, imageType);
+        const cacheBuster = updatedStorage?.updatedAt 
+          ? new Date(updatedStorage.updatedAt).getTime() 
+          : Date.now();
+        
         const urlMap: Record<string, string> = {
-          problem_statements: `/api/v1/agent-templates/${templateId}/profile-images/problem-statements`,
-          capabilities: `/api/v1/agent-templates/${templateId}/profile-images/capabilities`,
-          try_these_prompts: `/api/v1/agent-templates/${templateId}/profile-images/try-these-prompts`,
+          problem_statements: `/api/v1/agent-templates/${templateId}/profile-images/problem-statements?v=${cacheBuster}`,
+          capabilities: `/api/v1/agent-templates/${templateId}/profile-images/capabilities?v=${cacheBuster}`,
+          try_these_prompts: `/api/v1/agent-templates/${templateId}/profile-images/try-these-prompts?v=${cacheBuster}`,
         };
         (marketingContent as any)[urlKey] = urlMap[imageType];
       }
+    }
+
+    // Ensure agent.publishedTemplateId is set to the templateId being used
+    // This prevents preparePublication from creating a duplicate template
+    if (agent.publishedTemplateId !== templateId) {
+      await this.agentRepository.update(agentId, {
+        publishedTemplateId: templateId,
+      });
     }
 
     const finalAgent = await this.agentRepository.findById(agentId);

@@ -66,7 +66,7 @@ export class MarketingContentGenerationService {
       : options.agentRole || 'general assistance';
 
     const userPrompt = [
-      `Generate 4-5 user-facing problem statements for an AI agent named "${options.agentName}".`,
+      `Generate exactly 3 user-facing problem statements for an AI agent named "${options.agentName}".`,
       '',
       `Agent Role: ${options.agentRole || 'Assistant'}`,
       `Category: ${options.agentCategory || 'general'}`,
@@ -75,7 +75,7 @@ export class MarketingContentGenerationService {
       `Domain Context: ${domainContext}`,
       '',
       'Requirements:',
-      '- Generate 4-5 problem statements',
+      '- Generate exactly 3 problem statements (no more, no less)',
       '- Each statement should be a complete sentence or short phrase',
       '- Use conversational, user-first language',
       '- Be empathetic, not negative',
@@ -220,7 +220,7 @@ export class MarketingContentGenerationService {
           statements = parsed
             .filter((s) => typeof s === 'string' && s.trim().length > 0)
             .map((s) => String(s).trim())
-            .slice(0, 5); // Max 5 statements
+            .slice(0, 3); // Exactly 3 statements
         }
       }
     } catch (err) {
@@ -241,7 +241,7 @@ export class MarketingContentGenerationService {
           const isStatement = line.length > 20 && line.length < 200;
           return isQuestion || isStatement;
         })
-        .slice(0, 5);
+        .slice(0, 3); // Exactly 3 statements
     }
 
     // Final fallback: generate generic statements
@@ -255,7 +255,7 @@ export class MarketingContentGenerationService {
     }
 
     return {
-      statements: statements.slice(0, 5), // Ensure max 5
+      statements: statements.slice(0, 3), // Exactly 3 statements
       model: options.agentModel,
     };
   }

@@ -43,7 +43,7 @@ Shot Specifics:
 - Expression: Empathetic, understanding, reassuring (warm but not overly casual), looking at camera with genuine concern and understanding
 - Setting: Clean, modern tech workspace with subtle elements relevant to {{domain_context}}, but less cluttered than capabilities image - focus on {{name}} and their understanding expression
 - Background: Solid {{background_color}} color (matching {{category}} category) or subtle gradient
-- Speech Bubble: "I've seen this before" (exact text - same for all agents)
+- Speech Bubble: "Hmm I've seen this before" (exact text - same for all agents)
 
 Quality/Style:
 - High-resolution comic strip style
@@ -65,7 +65,7 @@ Negative Constraints:
 - Ensure composition works well in square format
 - Show {{name}} understanding user pain points in their domain
 - {{name}} must maintain eye contact with the camera/viewer
-- Speech bubble must say exactly "I've seen this before" - keep this consistent for all agents
+- Speech bubble must say exactly "Hmm I've seen this before" - keep this consistent for all agents
 - Avoid making {{name}} look sad or overly concerned - should be understanding and reassuring`,
 
   capabilities: `I want to create 1 square format image (1:1 aspect ratio) for {{name}} showing them actively using their capabilities.
@@ -378,28 +378,76 @@ export class ProfileImageGenerationService {
 
     // Execute the blueprint
     const resultItems = await runner.run(blueprint, exec, engineConfig);
-    const toolResult = ExecutionItemUtils.unwrapSingle(resultItems);
-
+    
     // Extract image from tool result
     // The tool's end node outputs: (lastOutputOf('extract_image') || {}).image
     // Which is: { kind: 'data_url' | 'url', value: string, mimeType?: string }
     type AnyRecord = Record<string, unknown>;
     const isRecord = (v: unknown): v is AnyRecord => !!v && typeof v === 'object' && !Array.isArray(v);
 
-    if (!isRecord(toolResult)) {
-      throw new Error(`Tool returned invalid result format: ${typeof toolResult}`);
+    // Extract the actual result from execution items
+    // The end node output should be in the resultItems array
+    let actualResult: unknown = undefined;
+    
+    if (Array.isArray(resultItems)) {
+      // Find the end node output
+      for (const item of resultItems) {
+        if (item && typeof item === 'object' && 'nodeRef' in item) {
+          const nodeRef = (item as any).nodeRef;
+          if (nodeRef === 'end' || nodeRef === 'end_1') {
+            const items = (item as any).items;
+            if (Array.isArray(items) && items.length > 0) {
+              // Get the last item which should be the output
+              const lastItem = items[items.length - 1];
+              if (lastItem && typeof lastItem === 'object' && 'json' in lastItem) {
+                actualResult = lastItem.json;
+                break;
+              }
+            }
+          }
+        }
+      }
+      
+      // Fallback: try unwrapSingle
+      if (actualResult === undefined) {
+        actualResult = ExecutionItemUtils.unwrapSingle(resultItems);
+      }
+    } else {
+      actualResult = resultItems;
+    }
+
+    if (!isRecord(actualResult)) {
+      const debugInfo = {
+        actualResultType: typeof actualResult,
+        actualResultIsArray: Array.isArray(actualResult),
+        actualResultIsNull: actualResult === null,
+        resultItemsType: typeof resultItems,
+        resultItemsIsArray: Array.isArray(resultItems),
+        resultItemsLength: Array.isArray(resultItems) ? resultItems.length : 0,
+        resultItemsPreview: Array.isArray(resultItems) 
+          ? resultItems.slice(0, 2).map((item: any) => ({
+              nodeRef: item?.nodeRef,
+              hasItems: Array.isArray(item?.items),
+              itemsLength: Array.isArray(item?.items) ? item.items.length : 0,
+            }))
+          : undefined,
+      };
+      throw new Error(`Tool returned invalid result format: ${typeof actualResult}. Debug: ${JSON.stringify(debugInfo, null, 2)}`);
     }
 
     // The tool's extract_image node returns { ok, model, prompt, referenceImage, image }
     // But the end node outputs just the image object
     // However, if there's an error, it might return { ok: false, ... }
-    if (toolResult.ok === false) {
-      const errorMsg = typeof toolResult.error === 'string' ? toolResult.error : 'Unknown error';
+    if (actualResult.ok === false) {
+      const errorMsg = typeof actualResult.error === 'string' ? actualResult.error : 'Unknown error';
       throw new Error(`Tool execution failed: ${errorMsg}`);
     }
 
-    // The image object should be directly in toolResult (from end node output)
-    const imageObj = toolResult.image || toolResult;
+    // The image object should be directly in actualResult (from end node output)
+    // Try multiple possible locations for the image
+    const imageObj = (actualResult as any).image || 
+                     (actualResult as any).data?.image || 
+                     actualResult;
     if (!isRecord(imageObj)) {
       throw new Error(`Tool result missing image field. Result keys: ${Object.keys(toolResult).join(', ')}`);
     }

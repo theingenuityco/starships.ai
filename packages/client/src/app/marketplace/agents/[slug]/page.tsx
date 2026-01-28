@@ -221,7 +221,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
                           <AgentProfileImage
                             src={problemStatementsImageUrl}
-                            alt={`${template.name} problem statements`}
+                            alt={
+                              problemStatementsText.length > 0
+                                ? `${template.name} understanding user challenges: ${problemStatementsText.slice(0, 3).map(s => `"${s}"`).join(', ')}`
+                                : `${template.name} - The Problem`
+                            }
                             className="w-full h-auto"
                             style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
                           />
@@ -236,7 +240,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8 h-full flex flex-col">
                         <div className="flex items-center gap-2 mb-6">
                           <Icon name="lightbulb" className="h-5 w-5 text-primary" />
-                          <h2 className="text-base font-semibold tracking-tight text-foreground">Problem Statements</h2>
+                          <h2 className="text-base font-semibold tracking-tight text-foreground">The Problem</h2>
                         </div>
                         {problemStatementsText.length > 0 ? (
                           <div className="flex-1 flex flex-col justify-between space-y-10">
@@ -304,7 +308,14 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
                           <AgentProfileImage
                             src={capabilitiesImageUrl}
-                            alt={`${template.name} capabilities`}
+                            alt={
+                              toolSlugs.length > 0
+                                ? `${template.name} capabilities: ${toolSlugs.slice(0, 3).map(slug => {
+                                    const info = toolInfoBySlug.get(slug)
+                                    return info?.name?.trim() || slug
+                                  }).join(', ')}`
+                                : `${template.name} capabilities`
+                            }
                             className="w-full h-auto"
                             style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
                           />
@@ -325,7 +336,11 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
                         <AgentProfileImage
                           src={tryThesePromptsImageUrl}
-                          alt={`${template.name} try these prompts`}
+                          alt={
+                            template.previewPrompts && template.previewPrompts.length > 0
+                              ? `${template.name} try these prompts: ${template.previewPrompts.slice(0, 3).map(p => `"${p}"`).join(', ')}`
+                              : `${template.name} try these prompts`
+                          }
                           className="w-full h-auto"
                           style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
                         />

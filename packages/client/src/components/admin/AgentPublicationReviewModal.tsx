@@ -158,7 +158,7 @@ export function AgentPublicationReviewModal({
             {/* Problem Statements */}
             <div className="rounded-lg border border-border/60 bg-card p-4 space-y-3">
               <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold">Problem Statements</h3>
+                <h3 className="text-sm font-semibold">The Problem</h3>
                 {marketingContent.problemStatementsImageUrl && (
                   <Button
                     type="button"
@@ -188,7 +188,11 @@ export function AgentPublicationReviewModal({
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={marketingContent.problemStatementsImageUrl}
-                    alt="Problem statements"
+                    alt={
+                      problemStatements.length > 0
+                        ? `${agent.name} understanding user challenges: ${problemStatements.slice(0, 3).map(s => `"${s}"`).join(', ')}`
+                        : `${agent.name} - The Problem`
+                    }
                     className="max-w-full h-auto rounded-lg border border-border/60"
                   />
                 </div>

@@ -57,7 +57,7 @@ export function ProblemStatementsEditor({ statements, onChange, onRegenerate, di
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between">
-        <p className="text-xs font-semibold text-muted-foreground">Problem Statements</p>
+        <p className="text-xs font-semibold text-muted-foreground">The Problem</p>
         {onRegenerate && (
           <Button
             type="button"

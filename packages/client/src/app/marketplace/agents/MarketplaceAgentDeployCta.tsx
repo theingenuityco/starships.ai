@@ -13,6 +13,9 @@ import { DeploymentConfirmationModal } from '@/components/marketplace/Deployment
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { track } from '@/lib/analytics'
+import api from '@/lib/api'
+import type { AgentToolPermission, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
+import { toast } from 'sonner'
 
 export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplateModel }) {
   const router = useRouter()
@@ -61,16 +64,28 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmDeploy = async () => {
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => {
     if (!primaryStarship) return
     setIsDeploying(true)
     try {
-      await createAgentMutation.mutateAsync({
+      const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
         starshipSlug: primaryStarship.slug,
       })
-      setShowConfirmationModal(false)
+
+      const agentId = (created as any)?.id as string | undefined
+      const toolPermissions = input?.toolPermissions
+      if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
+        const body: UpdateAgentToolPermissionsRequest = {
+          permissions: Object.entries(toolPermissions).map(([toolSlug, permission]) => ({ toolSlug, permission })),
+        }
+        try {
+          await api.put(`/api/v1/agents/${agentId}/tool-permissions`, body)
+        } catch (e: any) {
+          toast.error('Permissions not saved', { description: e?.response?.data?.error || e?.message || 'Agent deployed, but tool permissions could not be updated.' })
+        }
+      }
     } finally {
       setIsDeploying(false)
     }

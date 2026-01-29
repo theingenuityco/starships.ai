@@ -14,6 +14,9 @@ import { useMemo, useState } from 'react'
 import type { AgentTemplateModel } from '@starships/protocol'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
+import api from '@/lib/api'
+import type { AgentToolPermission, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
+import { toast } from 'sonner'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -105,21 +108,31 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   const deployIconName = isAlreadyDeployed ? 'check-circle' : isPublishedFromThisStarship ? 'stars' : 'sparkles'
   const deployDisabled = isAlreadyDeployed || isPublishedFromThisStarship || isDeploying || (isAuthenticated && !starship)
 
-  const handleConfirmDeploy = async () => {
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => {
     if (!starship) {
       return // No starship to deploy to
     }
 
     setIsDeploying(true)
     try {
-      await createAgentMutation.mutateAsync({
+      const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: starship.id,
         starshipSlug: (starship as any)?.slug || undefined,
       })
+      const agentId = (created as any)?.id as string | undefined
+      const toolPermissions = input?.toolPermissions
+      if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
+        const body: UpdateAgentToolPermissionsRequest = {
+          permissions: Object.entries(toolPermissions).map(([toolSlug, permission]) => ({ toolSlug, permission })),
+        }
+        try {
+          await api.put(`/api/v1/agents/${agentId}/tool-permissions`, body)
+        } catch (e: any) {
+          toast.error('Permissions not saved', { description: e?.response?.data?.error || e?.message || 'Agent deployed, but tool permissions could not be updated.' })
+        }
+      }
       onDeploy?.(template)
-    } catch {
-      // Error handling is done in the mutation hook
     } finally {
       setIsDeploying(false)
     }

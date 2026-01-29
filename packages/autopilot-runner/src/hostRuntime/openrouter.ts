@@ -20,7 +20,7 @@ export async function invokeOpenRouter(
   const llmConfig = options.llm;
 
   const timeoutMs =
-    typeof request.timeoutMs === 'number' && Number.isFinite(request.timeoutMs) && request.timeoutMs > 0 ? request.timeoutMs : 120_000;
+    typeof request.timeoutMs === 'number' && Number.isFinite(request.timeoutMs) && request.timeoutMs > 0 ? request.timeoutMs : undefined;
 
   // Prefer host-provided LLM configuration; fall back to process.env for
   // backwards compatibility when running the runner standalone.
@@ -31,17 +31,21 @@ export async function invokeOpenRouter(
     );
   }
 
-  const client = new OpenAI({
+  // IMPORTANT: don't set a default timeout here. If no explicit timeout is provided
+  // by the caller, match the OpenAI SDK's default behavior (same as main).
+  const clientOptions: ConstructorParameters<typeof OpenAI>[0] = {
     apiKey,
     baseURL: llmConfig?.baseUrl ?? 'https://openrouter.ai/api/v1',
-    timeout: timeoutMs,
     maxRetries: 2,
     defaultHeaders: {
       'HTTP-Referer': 'https://starships.ai',
       'X-Title': 'Starships.ai',
       ...(llmConfig?.defaultHeaders ?? {}),
     },
-  });
+    ...(typeof timeoutMs === 'number' ? { timeout: timeoutMs } : {}),
+  };
+
+  const client = new OpenAI(clientOptions);
 
   const summarizeProviderError = (err: unknown): Record<string, unknown> => {
     const e: Record<string, unknown> =
@@ -144,7 +148,7 @@ export async function invokeOpenRouter(
       toolsCount,
       messagesCount: messages.length,
       totalTextChars,
-      timeoutMs,
+      timeoutMs: typeof timeoutMs === 'number' ? timeoutMs : undefined,
     };
   };
 

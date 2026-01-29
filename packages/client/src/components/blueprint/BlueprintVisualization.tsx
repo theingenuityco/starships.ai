@@ -1117,13 +1117,22 @@ function BlueprintFlow({
     // Increment version to track this layout request
     const currentVersion = ++layoutVersion.current
 
-    convertBlueprintToFlow(blueprint, nodesDraggable, nodeSize).then(flowData => {
-      // Only apply if this is still the latest layout request
-      if (currentVersion === layoutVersion.current) {
-        setNodes(flowData.nodes)
-        setEdges(flowData.edges)
-      }
-    })
+    convertBlueprintToFlow(blueprint, nodesDraggable, nodeSize)
+      .then(flowData => {
+        // Only apply if this is still the latest layout request
+        if (currentVersion === layoutVersion.current) {
+          setNodes(flowData.nodes)
+          setEdges(flowData.edges)
+        }
+      })
+      .catch(error => {
+        console.error('[BlueprintFlow] Error converting blueprint to flow:', error)
+        // Set empty nodes/edges on error to prevent crash
+        if (currentVersion === layoutVersion.current) {
+          setNodes([])
+          setEdges([])
+        }
+      })
   }, [JSON.stringify(blueprint.nodes), JSON.stringify(blueprint.edges), nodesDraggable, nodeSize])
 
   // Add selection state to node data
@@ -1222,6 +1231,15 @@ function BlueprintFlow({
   // intercept scroll/zoom so surrounding pages can scroll naturally.
   const isInteractive = nodesDraggable === true
 
+  // Guard against invalid nodes/edges before rendering ReactFlow
+  if (!Array.isArray(nodesWithSelection) || !Array.isArray(edges)) {
+    return (
+      <div className={`h-full w-full border border-muted-foreground/20 rounded-lg flex items-center justify-center ${containerClassName}`}>
+        <p className="text-muted-foreground text-sm">Invalid blueprint data</p>
+      </div>
+    )
+  }
+
   return (
     <div
       ref={containerRef}
@@ -1280,7 +1298,16 @@ export function BlueprintVisualization({
   containerClassName = '',
   containerStyle,
 }: BlueprintVisualizationProps) {
-  if (!blueprint?.nodes || blueprint.nodes.length === 0) {
+  // Validate blueprint structure
+  if (!blueprint || typeof blueprint !== 'object') {
+    return (
+      <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
+        <p className="text-muted-foreground text-sm">Invalid blueprint data</p>
+      </div>
+    )
+  }
+
+  if (!blueprint.nodes || !Array.isArray(blueprint.nodes) || blueprint.nodes.length === 0) {
     return (
       <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
         <p className="text-muted-foreground text-sm">No blueprint nodes to display</p>
@@ -1288,23 +1315,33 @@ export function BlueprintVisualization({
     )
   }
 
-  return (
-    <ReactFlowProvider>
-      <div className={className}>
-        <BlueprintFlow
-          blueprint={blueprint}
-          transparent={transparent}
-          nodesDraggable={nodesDraggable}
-          borderless={borderless}
-          nodeSize={nodeSize}
-          fitViewMaxZoom={fitViewMaxZoom}
-          fitViewMinZoom={fitViewMinZoom}
-          containerClassName={containerClassName}
-          containerStyle={containerStyle}
-        />
+  // Wrap in error boundary to catch d3/reactflow errors
+  try {
+    return (
+      <ReactFlowProvider>
+        <div className={className}>
+          <BlueprintFlow
+            blueprint={blueprint}
+            transparent={transparent}
+            nodesDraggable={nodesDraggable}
+            borderless={borderless}
+            nodeSize={nodeSize}
+            fitViewMaxZoom={fitViewMaxZoom}
+            fitViewMinZoom={fitViewMinZoom}
+            containerClassName={containerClassName}
+            containerStyle={containerStyle}
+          />
+        </div>
+      </ReactFlowProvider>
+    )
+  } catch (error) {
+    console.error('[BlueprintVisualization] Error rendering blueprint:', error)
+    return (
+      <div className={`h-[200px] flex items-center justify-center border border-muted-foreground/20 rounded-lg bg-muted/10 ${className}`}>
+        <p className="text-muted-foreground text-sm">Error rendering blueprint</p>
       </div>
-    </ReactFlowProvider>
-  )
+    )
+  }
 }
 
 export default BlueprintVisualization

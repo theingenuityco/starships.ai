@@ -16,6 +16,12 @@ interface CollapsibleTriggerProps extends React.ButtonHTMLAttributes<HTMLButtonE
 
 interface CollapsibleContentProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode
+  /**
+   * When true, children are not mounted while collapsed.
+   * Useful for heavy / DOM-dependent content (e.g. ReactFlow) that can crash when
+   * initialized in a 0-sized, hidden container.
+   */
+  unmountOnClose?: boolean
 }
 
 interface CollapsibleContextValue {
@@ -86,7 +92,8 @@ const CollapsibleTrigger = React.forwardRef<HTMLButtonElement, CollapsibleTrigge
 })
 CollapsibleTrigger.displayName = 'CollapsibleTrigger'
 
-const CollapsibleContent = React.forwardRef<HTMLDivElement, CollapsibleContentProps>(({ children, className, ...props }, ref) => {
+const CollapsibleContent = React.forwardRef<HTMLDivElement, CollapsibleContentProps>(
+  ({ children, className, unmountOnClose = false, ...props }, ref) => {
   const { isOpen, contentId, triggerId } = useCollapsible()
 
   return (
@@ -104,11 +111,12 @@ const CollapsibleContent = React.forwardRef<HTMLDivElement, CollapsibleContentPr
       {...props}
     >
       <div className="overflow-hidden min-h-0">
-        {children}
+        {unmountOnClose && !isOpen ? null : children}
       </div>
     </div>
   )
-})
+  }
+)
 CollapsibleContent.displayName = 'CollapsibleContent'
 
 export { Collapsible, CollapsibleTrigger, CollapsibleContent }

@@ -4,7 +4,7 @@ import { useMemo, useState } from 'react'
 import Icon from '@/components/primitives/Icon'
 import { toast } from 'sonner'
 
-export function MarketplaceShareLinkCard({ shareUrl }: { shareUrl: string }) {
+export function MarketplaceShareLinkCard({ shareUrl, compact = false }: { shareUrl: string; compact?: boolean }) {
   const [status, setStatus] = useState<'idle' | 'copied' | 'shared'>('idle')
 
   const normalized = useMemo(() => String(shareUrl || '').trim(), [shareUrl])
@@ -62,6 +62,35 @@ export function MarketplaceShareLinkCard({ shareUrl }: { shareUrl: string }) {
     setStatus('copied')
     window.setTimeout(() => setStatus('idle'), 1500)
     toast.success('Link copied')
+  }
+
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={handleShare}
+        disabled={!canCopy}
+        className="inline-flex items-center justify-center gap-2 h-9 px-3 rounded-lg text-xs font-semibold border border-border/60 bg-background/40 hover:bg-accent/60 text-foreground transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+        aria-label="Share link"
+      >
+        {status === 'copied' ? (
+          <>
+            <Icon name="check" className="h-4 w-4" />
+            Copied
+          </>
+        ) : status === 'shared' ? (
+          <>
+            <Icon name="check" className="h-4 w-4" />
+            Shared
+          </>
+        ) : (
+          <>
+            <Icon name="link" className="h-4 w-4" iconOverride={{ type: 'phosphor', component: 'LinkSimple' }} />
+            Share
+          </>
+        )}
+      </button>
+    )
   }
 
   return (

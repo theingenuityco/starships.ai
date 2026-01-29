@@ -251,7 +251,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
             {/* Main content grid */}
             <section className="mt-8 pb-10 sm:pb-16">
-              <div className="space-y-12 sm:space-y-14">
+              <div className="space-y-16 sm:space-y-20">
                 {/* Problem Statements Section */}
                 {hasProblemSection ? (
                   hasProblemImage ? (

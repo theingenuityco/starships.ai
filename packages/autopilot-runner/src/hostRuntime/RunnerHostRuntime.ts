@@ -563,6 +563,132 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
   };
 
   const llm = async (request: LlmHostRequest): Promise<AsyncIterable<unknown>> => {
+    const __getAttachmentPreviewUrls = async (ids: string[]): Promise<Array<{ id: string; previewUrl: string }>> => {
+      const starshipIdRaw = (runtimeEnv as Record<string, unknown>)?.STARSHIP_ID;
+      const starshipId = typeof starshipIdRaw === 'string' && starshipIdRaw.trim().length > 0 ? starshipIdRaw.trim() : '';
+      const serverUrlRaw = (runtimeEnv as Record<string, unknown>)?.SERVER_URL;
+      const serverUrl = typeof serverUrlRaw === 'string' ? serverUrlRaw.trim().replace(/\/+$/, '') : '';
+      if (!serverUrl || !starshipId || !Array.isArray(ids) || ids.length === 0) return [];
+
+      const authHeaders = connectorSessions['starships']?.headers ?? {};
+      const url = `${serverUrl}/api/v1/attachments?ids=${encodeURIComponent(ids.join(','))}&starshipId=${encodeURIComponent(starshipId)}`;
+      const resp = await http({
+        method: 'GET',
+        url,
+        headers: authHeaders as unknown as Record<string, unknown>,
+        timeoutMs: 15000,
+      });
+
+      const body = resp?.body as unknown;
+      const list =
+        Array.isArray(body)
+          ? body
+          : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+            ? ((body as Record<string, unknown>).data as unknown[])
+            : body && typeof body === 'object' && (body as Record<string, unknown>).success === true && Array.isArray((body as Record<string, unknown>).data)
+              ? ((body as Record<string, unknown>).data as unknown[])
+              : [];
+
+      const out: Array<{ id: string; previewUrl: string }> = [];
+      for (const a of list) {
+        if (!a || typeof a !== 'object') continue;
+        const rec = a as Record<string, unknown>;
+        const id = rec.id;
+        const pr = rec.previewUrl;
+        if (typeof id === 'string' && id.trim() && typeof pr === 'string' && pr.trim()) {
+          out.push({ id: id.trim(), previewUrl: pr.trim() });
+        }
+      }
+      return out;
+    };
+
+    // Best-effort: refresh any short-lived presigned attachment URLs embedded in message content blocks.
+    // Some upstream paths (ConversationService.buildMessageContent) generate 60s URLs, which can expire mid-run.
+    const __refreshEmbeddedAttachmentUrls = async (): Promise<void> => {
+      try {
+        const msgs = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
+        if (msgs.length === 0) return;
+
+        const ATTACHMENT_ID_RE = /attachmentId="([^"]+)"/g;
+        const ids: string[] = [];
+        const seen = new Set<string>();
+
+        for (const m of msgs) {
+          if (!m || typeof m !== 'object') continue;
+          const rec = m as Record<string, unknown>;
+          const c = rec.content;
+          if (!Array.isArray(c)) continue;
+          for (const part of c as unknown[]) {
+            if (!part || typeof part !== 'object') continue;
+            const p = part as Record<string, unknown>;
+            if (p.type !== 'text' || typeof p.text !== 'string') continue;
+            const text = p.text;
+            if (!text.includes('attachmentId="')) continue;
+            ATTACHMENT_ID_RE.lastIndex = 0;
+            let match: RegExpExecArray | null;
+            while ((match = ATTACHMENT_ID_RE.exec(text))) {
+              const id = match[1]?.trim();
+              if (id && !seen.has(id)) {
+                seen.add(id);
+                ids.push(id);
+              }
+            }
+          }
+        }
+
+        if (ids.length === 0) return;
+
+        const urlById = new Map<string, string>();
+        const list = await __getAttachmentPreviewUrls(ids);
+        for (const a of list) urlById.set(a.id, a.previewUrl);
+        if (urlById.size === 0) return;
+
+        let replacedImageUrls = 0;
+        let replacedFiles = 0;
+
+        for (const m of msgs) {
+          if (!m || typeof m !== 'object') continue;
+          const rec = m as Record<string, unknown>;
+          const c = rec.content;
+          if (!Array.isArray(c)) continue;
+          let currentAttachmentId: string | undefined;
+          for (const part of c as unknown[]) {
+            if (!part || typeof part !== 'object') continue;
+            const p = part as Record<string, unknown>;
+            if (p.type === 'text' && typeof p.text === 'string' && p.text.includes('attachmentId="')) {
+              ATTACHMENT_ID_RE.lastIndex = 0;
+              const m1 = ATTACHMENT_ID_RE.exec(p.text);
+              const id = m1?.[1]?.trim();
+              if (id) currentAttachmentId = id;
+              continue;
+            }
+            if (p.type === 'image_url' && p.image_url && typeof p.image_url === 'object') {
+              const next = currentAttachmentId ? urlById.get(currentAttachmentId) : undefined;
+              if (next) {
+                (p.image_url as Record<string, unknown>).url = next;
+                replacedImageUrls++;
+              }
+              continue;
+            }
+            if (p.type === 'file' && p.file && typeof p.file === 'object') {
+              const next = currentAttachmentId ? urlById.get(currentAttachmentId) : undefined;
+              if (next && typeof (p.file as Record<string, unknown>).file_data !== 'undefined') {
+                (p.file as Record<string, unknown>).file_data = next;
+                replacedFiles++;
+              }
+              continue;
+            }
+          }
+        }
+
+        void replacedImageUrls;
+        void replacedFiles;
+      } catch {
+        // best-effort: ignore refresh failures
+      }
+    };
+    await __refreshEmbeddedAttachmentUrls();
+
     // Best-effort: If a tool message references attachments but does not include previewUrl,
     // resolve preview URLs via Starships connector so vision-capable providers can see images.
     // This is intentionally implemented at the host runtime layer so it works regardless of runner type.
@@ -571,34 +697,51 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         const msgs = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
         if (msgs.length === 0) return;
 
-        // If the request already contains image_url blocks, do nothing.
-        let alreadyHasImages = false;
+        const MARKER_TEXT = '[Tool produced image attachment(s)]';
+
+        // Strip any previously injected tool-image hint messages so we never reuse expired signed URLs.
+        // We will re-inject fresh preview URLs on every call when attachments are present.
+        let removedHintMessages = 0;
+        const filtered: unknown[] = [];
         for (const m of msgs) {
-          if (!m || typeof m !== 'object') continue;
-          const c = (m as Record<string, unknown>).content;
-          if (!Array.isArray(c)) continue;
-          for (const part of c as unknown[]) {
-            if (!part || typeof part !== 'object') continue;
-            const p = part as Record<string, unknown>;
-            if (p.type === 'image_url') {
-              alreadyHasImages = true;
-              break;
+          if (!m || typeof m !== 'object') {
+            filtered.push(m);
+            continue;
+          }
+          const rec = m as Record<string, unknown>;
+          const role = rec.role;
+          const c = rec.content;
+          if (role === 'user' && Array.isArray(c)) {
+            let hasMarker = false;
+            let hasImageUrl = false;
+            for (const part of c as unknown[]) {
+              if (!part || typeof part !== 'object') continue;
+              const p = part as Record<string, unknown>;
+              if (p.type === 'text' && p.text === MARKER_TEXT) hasMarker = true;
+              if (p.type === 'image_url') hasImageUrl = true;
+            }
+            if (hasMarker && hasImageUrl) {
+              removedHintMessages++;
+              continue;
             }
           }
-          if (alreadyHasImages) break;
+          filtered.push(m);
         }
-        if (alreadyHasImages) return;
+        if (removedHintMessages > 0) {
+          // IMPORTANT: Assign back to request.messages (type assertion on LHS is not reliable)
+          (request as unknown as { messages: unknown[] }).messages = filtered;
+        }
 
         const ids: string[] = [];
         const seen = new Set<string>();
-        for (const m of msgs) {
+        const msgsAfterStrip = Array.isArray(request.messages) ? (request.messages as unknown[]) : [];
+        for (const m of msgsAfterStrip) {
           if (!m || typeof m !== 'object') continue;
           const role = (m as Record<string, unknown>).role;
           if (role !== 'tool') continue;
           const content = (m as Record<string, unknown>).content;
           if (typeof content !== 'string') continue;
           if (!content.includes('"attachments"')) continue;
-          if (content.includes('previewUrl')) continue;
           try {
             const parsed = JSON.parse(content) as unknown;
             if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) continue;
@@ -620,11 +763,14 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
 
         if (ids.length === 0) return;
 
+        const starshipIdRaw = (runtimeEnv as Record<string, unknown>)?.STARSHIP_ID;
+        const starshipId = typeof starshipIdRaw === 'string' && starshipIdRaw.trim().length > 0 ? starshipIdRaw.trim() : '';
+
         // Resolve previewUrl via existing Starships connector endpoint.
         const resp = await connectorAction({
           connector: 'starships',
           action: 'get-attachments-preview-urls',
-          args: { ids: ids.join(',') },
+          args: { ...(starshipId ? { starshipId } : {}), ids: ids.join(',') },
           timeoutMs: 15000,
         });
 
@@ -652,7 +798,7 @@ export function createRunnerHostRuntime(options: RunnerHostRuntimeOptions = {}):
         (request.messages as unknown[]).push({
           role: 'user',
           content: [
-            { type: 'text', text: '[Tool produced image attachment(s)]' },
+            { type: 'text', text: MARKER_TEXT },
             ...previewUrls.slice(0, 8).map((url) => ({ type: 'image_url', image_url: { url } })),
           ],
         });

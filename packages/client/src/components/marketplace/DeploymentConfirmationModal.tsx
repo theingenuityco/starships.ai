@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
 import { useToolTemplates } from '@/hooks/useTemplates'
 
@@ -111,21 +112,18 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
             Confirm {isAgent ? 'Deployment' : 'Installation'}
           </DialogTitle>
-          <DialogDescription>
-            Are you sure you want to {actionText} this {type} to your starship?
-          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-5">
+        <div className="min-h-0 flex-1 overflow-y-auto pr-1 space-y-5">
           {/* Template Info */}
           <div className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm">
-            <div className="flex items-start gap-3">
+            <div className="flex items-start gap-3 min-w-0">
               {isAgent ? (
                 <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shadow-sm">
                   <AgentAvatar seed={template.name} imageUrl={avatarUrl} size={40} rounded />
@@ -148,32 +146,17 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                           v{(template as AgentTemplateModel).version}
                         </Badge>
                       ) : null}
+                      {isAgent && (template as AgentTemplateModel).model ? (
+                        <Badge variant="outline" className="text-xs font-mono">
+                          {(template as AgentTemplateModel).model}
+                        </Badge>
+                      ) : null}
                     </div>
                   </div>
                 </div>
               </div>
             </div>
             {template.description ? <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{template.description}</p> : null}
-          </div>
-
-          {/* Destination + Model */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="text-muted-foreground">Destination</span>
-              <span className="text-muted-foreground">·</span>
-              <Badge variant="secondary" className="font-mono">
-                {starshipName}
-              </Badge>
-            </div>
-            {isAgent && (template as AgentTemplateModel).model ? (
-              <div className="flex items-center gap-2 sm:justify-end">
-                <span className="text-muted-foreground">Model</span>
-                <span className="text-muted-foreground">·</span>
-                <Badge variant="outline" className="font-mono text-xs">
-                  {(template as AgentTemplateModel).model}
-                </Badge>
-              </div>
-            ) : null}
           </div>
 
           {/* Additional Info */}
@@ -192,7 +175,6 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                   <Icon name="wrench" className="h-4 w-4 text-primary" />
                   <div className="text-sm font-semibold">Capabilities</div>
                 </div>
-                <div className="text-xs text-muted-foreground">Set how this agent can use each tool.</div>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -215,8 +197,24 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                             <div className={cn('h-2 w-2 rounded-full', permissionDotClassName(current))} />
                           </div>
                           <div className="min-w-0">
-                            <div className="text-sm font-semibold leading-5 text-foreground truncate">{title}</div>
-                            <div className={cn('mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2', !desc ? 'font-mono' : undefined)}>{desc || slug}</div>
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="text-sm font-semibold leading-5 text-foreground truncate">{title}</div>
+                              <Tooltip delayDuration={250}>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    className="inline-flex items-center justify-center h-6 w-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/40 transition-colors"
+                                    aria-label={`Tool info: ${title}`}
+                                  >
+                                    <Icon name="info" className="h-4 w-4" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top" align="start" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60">
+                                  <div className="font-semibold text-foreground mb-1">{title}</div>
+                                  <div className="text-muted-foreground leading-relaxed">{desc || slug}</div>
+                                </TooltipContent>
+                              </Tooltip>
+                            </div>
                           </div>
                         </div>
 
@@ -278,7 +276,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             ) : (
               <>
                 <Icon name="sparkles" className="w-4 h-4 mr-2" />
-                {isAgent ? 'Deploy' : 'Install'}
+                {isAgent ? `Deploy to ${starshipName}` : 'Install'}
               </>
             )}
           </Button>

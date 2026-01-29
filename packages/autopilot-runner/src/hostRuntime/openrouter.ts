@@ -28,15 +28,20 @@ export async function invokeOpenRouter(
     );
   }
 
-  const client = new OpenAI({
+  // IMPORTANT: don't set a default timeout here. If no explicit timeout is provided
+  // by the caller, match the OpenAI SDK's default behavior (same as main).
+  const clientOptions: ConstructorParameters<typeof OpenAI>[0] = {
     apiKey,
     baseURL: llmConfig?.baseUrl ?? 'https://openrouter.ai/api/v1',
+    maxRetries: 2,
     defaultHeaders: {
       'HTTP-Referer': 'https://starships.ai',
       'X-Title': 'Starships.ai',
       ...(llmConfig?.defaultHeaders ?? {}),
     },
-  });
+  };
+
+  const client = new OpenAI(clientOptions);
 
   const summarizeProviderError = (err: unknown): Record<string, unknown> => {
     const e: Record<string, unknown> =
@@ -68,9 +73,7 @@ export async function invokeOpenRouter(
               : typeof h['x-openrouter-request-id'] === 'string'
                 ? (h['x-openrouter-request-id'] as string)
                 : undefined;
-          })()
-          ;
-
+          })();
     // Provide a safe payload snippet (no prompts); OpenRouter often returns { error: { message, code, ... } }
     let apiErrorSnippet: string | undefined;
     try {
@@ -94,6 +97,22 @@ export async function invokeOpenRouter(
       apiErrorCode,
       apiErrorSnippet,
     };
+  };
+
+  const isRetryableStreamError = (err: unknown): boolean => {
+    if (!err) return false;
+    const e = err as Record<string, unknown> | undefined;
+    const name = typeof e?.name === 'string' ? e.name : undefined;
+    const message = typeof e?.message === 'string' ? e.message : typeof err === 'string' ? err : '';
+    const code = typeof e?.code === 'string' ? e.code : undefined;
+    const msg = message.toLowerCase();
+    return (
+      (typeof name === 'string' && name.toLowerCase().includes('timeout')) ||
+      msg.includes('timed out') ||
+      msg.includes('timeout') ||
+      code === 'ETIMEDOUT' ||
+      code === 'ECONNRESET'
+    );
   };
 
   const summarizeRequestForLogs = (): Record<string, unknown> => {
@@ -316,8 +335,36 @@ export async function invokeOpenRouter(
       request: summarizeRequestForLogs(),
       provider: summarizeProviderError(e),
     });
+
+    // Some providers/models are flaky with SSE streaming and can time out even though
+    // the same request would succeed non-streaming. Fall back to non-stream once.
+    if (!isImageRequest && wantsStream && isRetryableStreamError(e)) {
+      try {
+        const completion = await client.chat.completions.create(
+          {
+            ...(baseRequest as Record<string, unknown>),
+            stream: false,
+          } as unknown as OpenAIChatCompletionCreateParamsNonStreaming,
+          options.signal ? ({ signal: options.signal } as unknown as { signal: AbortSignal }) : undefined
+        );
+        console.warn('[RunnerHostRuntime.llm] Stream failed; fell back to non-stream', {
+          request: summarizeRequestForLogs(),
+          provider: summarizeProviderError(e),
+        });
+        return wrapNonStreamAsOneChunk(completion);
+      } catch (e2: unknown) {
+        if (options.signal?.aborted) {
+          throw new CancelledError('cancelled');
+        }
+        console.error('[RunnerHostRuntime.llm] Provider error (non-stream fallback)', {
+          request: summarizeRequestForLogs(),
+          provider: summarizeProviderError(e2),
+        });
+        throw e2;
+      }
+    }
+
     throw e;
   }
   return stream as AsyncIterable<unknown>;
 }
-

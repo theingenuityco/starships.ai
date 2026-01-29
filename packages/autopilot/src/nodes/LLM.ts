@@ -145,17 +145,16 @@ export class LLM extends BaseNode<LlmParams> {
       });
 
       const body = resp?.body as unknown;
-      const list =
-        Array.isArray(body)
-          ? body
-          : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+      const list = Array.isArray(body)
+        ? body
+        : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+          ? ((body as Record<string, unknown>).data as unknown[])
+          : body &&
+              typeof body === 'object' &&
+              (body as Record<string, unknown>).success === true &&
+              Array.isArray((body as Record<string, unknown>).data)
             ? ((body as Record<string, unknown>).data as unknown[])
-            : body &&
-                typeof body === 'object' &&
-                (body as Record<string, unknown>).success === true &&
-                Array.isArray((body as Record<string, unknown>).data)
-              ? ((body as Record<string, unknown>).data as unknown[])
-              : [];
+            : [];
 
       const out = new Map<string, string>();
       for (const a of list) {

@@ -61,7 +61,7 @@ describe('Tool Templates Test Suite', () => {
     });
 
     it('should have valid categories', () => {
-      const validCategories = ['utility', 'automation', 'analysis', 'communication', 'data'];
+      const validCategories = ['utility', 'automation', 'analysis', 'communication', 'data', 'creative'];
 
       for (const template of ALL_TOOL_TEMPLATES) {
         expect(validCategories).toContain(template.category);

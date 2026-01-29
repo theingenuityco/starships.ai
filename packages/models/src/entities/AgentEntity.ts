@@ -68,6 +68,25 @@ export class AgentEntity implements AgentModel {
   @Length(0, 8000)
   avatarPrompt?: string;
 
+  // Optional profile image attachment IDs (S3-backed images stored via AttachmentService)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  problemStatementsAttachmentId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  capabilitiesAttachmentId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  tryThesePromptsAttachmentId?: string;
+
   @Expose()
   @IsOptional()
   @IsString()

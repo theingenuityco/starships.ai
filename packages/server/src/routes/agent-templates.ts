@@ -236,6 +236,79 @@ router.get('/agent-templates/:id/avatar', async (req: Request, res: Response): P
   }
 });
 
+/**
+ * GET /agent-templates/:id/profile-images/:type (public)
+ * Streams the template profile image from S3 via a server-generated presigned URL.
+ * @param type Profile image type: 'problem-statements' | 'capabilities' | 'try-these-prompts'
+ */
+router.get('/agent-templates/:id/profile-images/:type', async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+        type: z.enum(['problem-statements', 'capabilities', 'try-these-prompts']),
+      }),
+      req.params,
+      res,
+      'template parameter'
+    );
+    if (!paramValidation) return;
+    const { id, type } = paramValidation;
+
+    // Map URL type to database type
+    const typeMap: Record<string, 'problem_statements' | 'capabilities' | 'try_these_prompts'> = {
+      'problem-statements': 'problem_statements',
+      capabilities: 'capabilities',
+      'try-these-prompts': 'try_these_prompts',
+    };
+    const dbType = typeMap[type];
+    if (!dbType) {
+      sendError(res, 'VALIDATION_ERROR', `Invalid profile image type: ${type}`, 400);
+      return;
+    }
+
+    const repo = new AgentTemplateRepository();
+    const storage = await repo.getProfileImageStorageById(id, dbType);
+    if (!storage || !storage.s3Key) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Template profile image not found', 404, {
+        resource: 'agent-template-profile-image',
+        id,
+        type,
+      });
+      return;
+    }
+
+    const url = await generatePresignedUrlInline(storage.s3Key, 60);
+    const response = await fetch(url);
+    if (!response.ok) {
+      sendError(res, 'SERVICE_UNAVAILABLE', 'Failed to fetch template profile image from storage', 500);
+      return;
+    }
+
+    res.setHeader('Content-Type', storage.mimeType || response.headers.get('content-type') || 'image/webp');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+
+    if (storage.updatedAt) {
+      res.setHeader('Last-Modified', new Date(storage.updatedAt).toUTCString());
+    }
+
+    if (response.body) {
+      const reader = response.body.getReader();
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (value) res.write(Buffer.from(value));
+      }
+      res.end();
+    } else {
+      const buf = await response.arrayBuffer();
+      res.send(Buffer.from(buf));
+    }
+  } catch (error) {
+    handleError(error, res, 'fetching template profile image');
+  }
+});
+
 // POST /agent-templates/:templateId/agents - Create agent from template (OpenAPI pattern)
 // NOTE: Despite the param name, this route supports passing either an internal id OR a template slug.
 router.post('/agent-templates/:templateId/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

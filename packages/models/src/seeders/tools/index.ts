@@ -34,6 +34,7 @@ export { suggestConnectorsToolTemplate } from './suggest-connectors';
 export { suggestAgentsToolTemplate } from './suggest-agents';
 export { renderStarshipDetailsToolTemplate } from './render-starship-details';
 export { connectorSearchToolTemplate } from './search-connector';
+export { generateCharacterVariantToolTemplate } from './generate-character-variant';
 
 // Re-export all tool templates as a single array for convenience
 import { calculatorToolTemplate } from './calculator';
@@ -67,6 +68,7 @@ import { suggestConnectorsToolTemplate } from './suggest-connectors';
 import { suggestAgentsToolTemplate } from './suggest-agents';
 import { renderStarshipDetailsToolTemplate } from './render-starship-details';
 import { connectorSearchToolTemplate } from './search-connector';
+import { generateCharacterVariantToolTemplate } from './generate-character-variant';
 
 export const ALL_TOOL_TEMPLATES = [
   calculatorToolTemplate,
@@ -100,4 +102,5 @@ export const ALL_TOOL_TEMPLATES = [
   suggestAgentsToolTemplate,
   renderStarshipDetailsToolTemplate,
   connectorSearchToolTemplate,
+  generateCharacterVariantToolTemplate,
 ];

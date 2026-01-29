@@ -23,6 +23,7 @@ import { getConnection } from '@starships/models';
 import { getEnvConfig } from '@starships/env';
 import Stripe from 'stripe';
 import OpenAI from 'openai';
+import { ensureDefaultChannelForStarship } from '@/utils/default-channel';
 
 const router: Router = Router();
 const envConfig = getEnvConfig();
@@ -99,6 +100,24 @@ router.post('/starships', jwtAuthMiddleware, async (req: Request, res: Response)
       shipClass: 'scout',
     });
     console.log('[STARSHIP-CREATE] Starship created with ID:', starship.id);
+
+    // Ensure the default channel exists for every starship.
+    // If this fails, the starship is not usable (channels UI assumes a default).
+    try {
+      await ensureDefaultChannelForStarship({ starshipId: starship.id, createdByUserId: userId });
+    } catch (e) {
+      console.warn('[STARSHIP-CREATE] Failed to create default channel; rolling back starship', {
+        starshipId: starship.id,
+        error: e instanceof Error ? e.message : String(e),
+      });
+      try {
+        await starshipService.deleteStarship(starship.id);
+      } catch {
+        /* ignore */
+      }
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to create default channel for starship', 500, { starshipId: starship.id });
+      return;
+    }
 
     sendSuccess(
       res,

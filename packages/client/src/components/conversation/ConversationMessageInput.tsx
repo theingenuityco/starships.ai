@@ -4,7 +4,15 @@ import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { CONVERSATION_QUERY_KEYS, useCreateConversation, useConversationStop, useConversationDetail, usePendingToolApprovals, useUpdateConversationState } from '@/hooks/useConversations'
+import {
+  CONVERSATION_QUERY_KEYS,
+  useCreateConversation,
+  useConversationStop,
+  useConversationDetail,
+  usePendingToolApprovals,
+  useStarshipChannels,
+  useUpdateConversationState,
+} from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useLlmModels'
@@ -93,6 +101,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
     const isStarter = !conversationId
+    const { data: channelsData } = useStarshipChannels(starshipId, Boolean(starshipId && conversationId))
+    const isChannelConversation = useMemo(() => {
+      const cid = typeof conversationId === 'string' ? conversationId : ''
+      if (!cid) return false
+      const channels = (channelsData as any)?.channels
+      if (!Array.isArray(channels)) return false
+      return channels.some((c: any) => String(c?.conversationId || '') === cid)
+    }, [channelsData, conversationId])
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -482,7 +498,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       }
 
       // Validation for agent and starship
-      if (!effectiveAgent) {
+      if (!effectiveAgent && !isChannelConversation) {
         resetFlags()
         toast.error('Select an agent', { description: 'Please select an agent to chat.' })
         return
@@ -507,6 +523,12 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let currentConversationId = conversationId
         let createdNewConversation = false
         if (!currentConversationId) {
+          // Starter conversations must be agent-backed (channels are created via the Channels UI).
+          if (!effectiveAgent) {
+            resetFlags()
+            toast.error('Select an agent', { description: 'Please select an agent to chat.' })
+            return
+          }
           const newConversation = await createConversation.mutateAsync({
             title: `Chat with ${formatAgentDisplayName(effectiveAgent)}`,
             starshipId: starshipId,
@@ -535,7 +557,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             createdAt: now,
             updatedAt: now,
             messageType: 'user_input',
-            agentId: effectiveAgent!.id,
+            ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),
           }
           // Seed streamedQuery chunks; sendMessageMutation.onMutate will detect and avoid duplicating this.
           queryClient.setQueryData(['conversations', 'detail', currentConversationId!, 'messages'], (old: any[] | undefined) => {
@@ -601,7 +623,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
         void sendMessageFn({
           conversationId: currentConversationId!,
-          agentId: effectiveAgent!.id,
+          ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),
           content: contentToSend,
           role: 'user',
           starshipId: starshipId!,
@@ -635,6 +657,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       disabled,
       isStreamingEffective,
       selectedAgent,
+      isChannelConversation,
       userId,
       conversationId,
       createConversation,
@@ -757,7 +780,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      if (!promptAgent) return 'Select an agent to assign a task'
+      if (!promptAgent) return isChannelConversation ? 'Message this channel (mention agents with @)' : 'Select an agent to assign a task'
       // Show placeholder even after the conversation has started.
       return `Assign a task to ${promptAgent.name}`
     }
@@ -766,7 +789,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [hasActualContent, setHasActualContent] = useState(false)
 
     // Require balance; server also enforces funds.
-    const hasTargetAgent = Boolean(selectedAgent) || message.trim().startsWith('@')
+    const hasTargetAgent = isChannelConversation ? true : Boolean(selectedAgent) || message.trim().startsWith('@')
     const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units

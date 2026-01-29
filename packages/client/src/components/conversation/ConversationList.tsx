@@ -2,15 +2,19 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useStarshipConversations } from '@/hooks/useConversations'
+import { useCreateChannel, useStarshipChannels, useStarshipConversations } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
-import type { AgentModel, ConversationModel } from '@starships/protocol'
+import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo, useState } from 'react'
 import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Avatar } from '../ui/avatar'
@@ -69,7 +73,14 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   // Override default query options to prevent refetching on route changes
   const { data, isLoading, error } = useStarshipConversations(starshipId, true)
+  const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
+  const createChannel = useCreateChannel()
   const [searchQuery, setSearchQuery] = useState('')
+  const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false)
+  const [newChannelSlug, setNewChannelSlug] = useState('')
+  const [newChannelName, setNewChannelName] = useState('')
+  const [newChannelPrivate, setNewChannelPrivate] = useState(false)
+  const channels = (channelsData?.channels || []) as ChannelModel[]
 
   // Filter conversations based on search and status
   const filteredConversations =
@@ -136,9 +147,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         key={conversation.id}
         className={cn(
           'group flex items-center gap-1.5 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
-          isActive
-            ? 'text-primary bg-primary/10 border-transparent'
-            : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+          isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
         )}
         style={isChild ? { paddingLeft: '1.5rem' } : undefined}
       >
@@ -197,6 +206,60 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     onConversationSelect?.(conversationId)
   }
 
+  const createChannelDialog = (
+    <Dialog open={isCreateChannelOpen} onOpenChange={setIsCreateChannelOpen}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>Create channel</DialogTitle>
+          <DialogDescription>Create a conversation-backed channel for this starship.</DialogDescription>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div className="space-y-1">
+            <Label htmlFor="channel-name">Name</Label>
+            <Input id="channel-name" placeholder="General" value={newChannelName} onChange={e => setNewChannelName(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="channel-slug">Slug</Label>
+            <Input id="channel-slug" placeholder="general" value={newChannelSlug} onChange={e => setNewChannelSlug(e.target.value)} />
+            <p className="text-xs text-muted-foreground">Lowercase letters, numbers, - or _</p>
+          </div>
+          <div className="flex items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <Label htmlFor="channel-private">Private</Label>
+              <p className="text-xs text-muted-foreground">Only explicitly added members can read/write.</p>
+            </div>
+            <Switch id="channel-private" checked={newChannelPrivate} onCheckedChange={setNewChannelPrivate} />
+          </div>
+        </div>
+
+        <DialogFooter className="gap-2">
+          <Button type="button" variant="ghost" onClick={() => setIsCreateChannelOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            type="button"
+            disabled={!newChannelName.trim() || !newChannelSlug.trim() || createChannel.isPending}
+            onClick={async () => {
+              const slug = newChannelSlug.trim().toLowerCase()
+              const name = newChannelName.trim()
+              const created = await createChannel.mutateAsync({ starshipId, slug, name, isPrivate: newChannelPrivate })
+              setIsCreateChannelOpen(false)
+              setNewChannelSlug('')
+              setNewChannelName('')
+              setNewChannelPrivate(false)
+              if (created?.conversationId) {
+                handleConversationClick(String(created.conversationId))
+              }
+            }}
+          >
+            {createChannel.isPending ? 'Creating…' : 'Create'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
   // Compact mode - inline display without header/search
   if (compact) {
     if (isLoading) {
@@ -218,23 +281,69 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     }
 
     return (
-      <div className="space-y-0">
-        {filteredConversations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-6 px-2">
-            <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-            <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
+      <>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-[11px] font-medium text-muted-foreground">Channels</span>
+            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setIsCreateChannelOpen(true)}>
+              <Icon name="plus" className="h-3 w-3 mr-1" />
+              New
+            </Button>
           </div>
-        ) : (
-          <>
-            {roots.map(root => (
-              <div key={root.id}>
-                {renderCompactConversation(root, false)}
-                {(childrenByParent[root.id] || []).map(child => renderCompactConversation(child, true))}
+
+          {channelsLoading ? (
+            <div className="space-y-1">
+              {[1, 2].map(i => (
+                <Skeleton key={i} className="h-8 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : channels.length === 0 ? (
+            <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
+          ) : (
+            <div className="space-y-1">
+              {channels.map(ch => {
+                const isActive = ch.conversationId === currentConversationId
+                const label = ch.slug ? `#${ch.slug}` : ch.name
+                return (
+                  <div
+                    key={ch.conversationId}
+                    className={cn(
+                      'group flex items-center gap-2 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
+                      isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                    )}
+                    onClick={() => handleConversationClick(ch.conversationId)}
+                  >
+                    <span className={cn('font-mono text-[12px]', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                    <div className="flex-1 min-w-0">
+                      <div className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{label}</div>
+                      {ch.isPrivate && <div className="text-[11px] text-muted-foreground">Private</div>}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="pt-1">
+            {filteredConversations.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-6 px-2">
+                <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
               </div>
-            ))}
-          </>
-        )}
-      </div>
+            ) : (
+              <>
+                {roots.map(root => (
+                  <div key={root.id}>
+                    {renderCompactConversation(root, false)}
+                    {(childrenByParent[root.id] || []).map(child => renderCompactConversation(child, true))}
+                  </div>
+                ))}
+              </>
+            )}
+          </div>
+        </div>
+        {createChannelDialog}
+      </>
     )
   }
 
@@ -242,7 +351,13 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="p-3 border-b">
-        <h2 className="text-base font-semibold mb-2">Conversations</h2>
+        <div className="flex items-center justify-between gap-2 mb-2">
+          <h2 className="text-base font-semibold">Conversations</h2>
+          <Button type="button" size="sm" variant="secondary" className="h-8" onClick={() => setIsCreateChannelOpen(true)} disabled={createChannel.isPending}>
+            <Icon name="plus" className="h-4 w-4 mr-1" />
+            New channel
+          </Button>
+        </div>
 
         {/* Search */}
         <div className="relative">
@@ -259,6 +374,49 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       {/* Conversations List */}
       <ScrollArea className="flex-1">
         <div className="p-2">
+          {/* Channels */}
+          <div className="mb-4">
+            <div className="px-2 mb-2 flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground">Channels</p>
+              <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setIsCreateChannelOpen(true)} disabled={createChannel.isPending}>
+                <Icon name="plus" className="h-3 w-3 mr-1" />
+                Create
+              </Button>
+            </div>
+            {channelsLoading ? (
+              <div className="space-y-1 px-2">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-8 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : channels.length === 0 ? (
+              <div className="px-2 py-6 text-center text-xs text-muted-foreground">No channels yet</div>
+            ) : (
+              <div className="space-y-1">
+                {channels.map(ch => {
+                  const isActive = ch.conversationId === currentConversationId
+                  const label = ch.slug ? `#${ch.slug}` : ch.name
+                  return (
+                    <div
+                      key={ch.conversationId}
+                      className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
+                      onClick={() => handleConversationClick(ch.conversationId)}
+                    >
+                      <span className={cn('text-xs font-mono', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
+                          <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-0.5">{ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}</div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
           {Object.keys(groupedConversations).length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 px-4">
               <Icon name="message-square" className="w-12 h-12 text-muted-foreground/30 mb-3" />
@@ -362,6 +520,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
           <span>{filteredConversations.filter(c => c.status === 'active').length} active</span>
         </div>
       </div>
+      {createChannelDialog}
     </div>
   )
 }

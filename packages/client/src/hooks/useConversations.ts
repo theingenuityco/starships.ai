@@ -2,6 +2,7 @@ import api, { getCurrentToken } from '@/lib/api'
 import type {
   ApiResponse,
   AgentModel,
+  ChannelModel,
   ConversationModel,
   ConversationState,
   ConversationStreamEvent,
@@ -11,7 +12,7 @@ import type {
   ToolCallApprovalModel,
 } from '@starships/protocol'
 import { experimental_streamedQuery as streamedQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect, useRef } from 'react'
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
@@ -94,6 +95,11 @@ export const CONVERSATION_QUERY_KEYS = {
   toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
 
+export const CHANNEL_QUERY_KEYS = {
+  all: ['channels'] as const,
+  byStarship: (starshipId: string) => [...CHANNEL_QUERY_KEYS.all, 'starship', starshipId] as const,
+} as const
+
 export type PendingToolCallApproval = ToolCallApprovalModel & {
   toolSlug?: string
   toolName?: string
@@ -143,6 +149,44 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
     enabled: !!starshipId && enabled,
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
     gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000, // No cache in dev, 10 minutes in prod
+  })
+}
+
+export function useStarshipChannels(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: CHANNEL_QUERY_KEYS.byStarship(starshipId),
+    queryFn: async (): Promise<{ channels: ChannelModel[] }> => {
+      const response: FetchResponse<ApiResponse<{ channels: ChannelModel[] }>> = await api.get(`/api/v1/starships/${starshipId}/channels`)
+      return { channels: response.data.data?.channels || [] }
+    },
+    enabled: !!starshipId && enabled,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000,
+  })
+}
+
+export function useCreateChannel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { starshipId: string; slug: string; name: string; isPrivate?: boolean; topic?: string | null }) => {
+      const response: FetchResponse<ApiResponse<{ channel: ChannelModel; conversationId: string }>> = await api.post(
+        `/api/v1/starships/${args.starshipId}/channels`,
+        {
+          slug: args.slug,
+          name: args.name,
+          isPrivate: args.isPrivate,
+          topic: args.topic ?? null,
+        }
+      )
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create channel', { description: errorMessage })
+    },
   })
 }
 
@@ -1322,6 +1366,80 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return null
   }, [chunksRevisionKey])
 
+  type HistoryCursor = { createdAt: string; id: string }
+  const latestSnapshot = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      return { hasMoreBefore: false, oldestCursor: null as HistoryCursor | null, snapshotData: null as ConversationStreamSnapshot | null }
+    }
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i] as any
+      if (c?.type === 'snapshot' && c?.data && typeof c.data === 'object') {
+        const d = c.data as ConversationStreamSnapshot & { hasMoreBefore?: boolean; oldestCursor?: HistoryCursor | null }
+        const hasMoreBefore = Boolean((d as any).hasMoreBefore)
+        const oldestCursorRaw = (d as any).oldestCursor
+        const oldestCursor =
+          oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.createdAt === 'string' && typeof oldestCursorRaw.id === 'string'
+            ? ({ createdAt: oldestCursorRaw.createdAt, id: oldestCursorRaw.id } as HistoryCursor)
+            : null
+        return { hasMoreBefore, oldestCursor, snapshotData: d }
+      }
+    }
+    return { hasMoreBefore: false, oldestCursor: null as HistoryCursor | null, snapshotData: null as ConversationStreamSnapshot | null }
+  }, [chunksRevisionKey])
+
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false)
+  const loadOlder = useCallback(
+    async (args?: { limit?: number }) => {
+      const convId = String(conversationId || '')
+      if (!convId) return
+      const snap = latestSnapshot.snapshotData as any
+      const cursor = latestSnapshot.oldestCursor
+      if (!snap || !cursor) return
+      if (isLoadingOlder) return
+
+      setIsLoadingOlder(true)
+      try {
+        const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 100)))
+        const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${convId}/messages`, {
+          params: {
+            limit,
+            beforeCreatedAt: cursor.createdAt,
+            beforeId: cursor.id,
+          },
+        })
+        const payload = response.data.data as any
+        const older = Array.isArray(payload?.messages) ? (payload.messages as ClientMessage[]) : []
+        const hasMoreBefore = Boolean(payload?.hasMoreBefore)
+        const oldestCursor = payload?.oldestCursor ?? null
+
+        const existingIds = new Set<string>()
+        const snapMsgs: any[] = Array.isArray(snap?.messages) ? snap.messages : []
+        snapMsgs.forEach((m: any) => {
+          if (m?.id != null) existingIds.add(String(m.id))
+        })
+        const olderFiltered = older.filter(m => m?.id != null && !existingIds.has(String(m.id)))
+
+        const nextSnapshot = {
+          ...snap,
+          messages: [...olderFiltered, ...snapMsgs],
+          hasMoreBefore,
+          oldestCursor,
+        }
+
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any) => {
+          if (!Array.isArray(old)) return old
+          return [...old, { type: 'snapshot', data: nextSnapshot }]
+        })
+      } catch (error: any) {
+        const msg = getSafeErrorMessage(error)
+        toast.error('Failed to load older messages', { description: msg })
+      } finally {
+        setIsLoadingOlder(false)
+      }
+    },
+    [conversationId, latestSnapshot, isLoadingOlder, queryClient]
+  )
+
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
@@ -1354,6 +1472,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isAwaitingToolResults,
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
     lastUIAction,
+    hasMoreBefore: latestSnapshot.hasMoreBefore,
+    oldestCursor: latestSnapshot.oldestCursor,
+    isLoadingOlder,
+    loadOlder,
     isFetching: messagesQuery.fetchStatus === 'fetching',
     sendMessage: (data: CreateMessageRequest & { conversationId: string }) => sendMessageMutation.mutateAsync(data),
     isSending: sendMessageMutation.isPending,

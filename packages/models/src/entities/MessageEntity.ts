@@ -114,6 +114,25 @@ export class MessageEntity implements MessageModel {
   @Length(1, 100)
   agentName?: string;
 
+  // Human author identity (user messages only)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  userId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  userName?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  userAvatar?: string;
+
   // File attachments (array of attachment IDs)
   @Expose()
   @IsOptional()

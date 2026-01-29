@@ -18,6 +18,8 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
+  ChannelRepository,
+  ConversationMemberRepository,
   ConversationWidgetRepository,
   MessageRepository,
   StarshipMemberRepository,
@@ -236,6 +238,55 @@ function extractConnectorActionApiError(error: unknown): { code?: string; messag
 
   if (!code && !message && !details) return null;
   return { code, message, details };
+}
+
+/**
+ * Enforce private channel membership (conversation-backed channels).
+ *
+ * Starship collaborators can see starship resources, but private channels are more restrictive:
+ * - owner / instance admin can always access
+ * - otherwise require a row in `conversation_members`
+ */
+async function enforcePrivateChannelMembership(args: {
+  conversationId: string;
+  userId: string;
+  req: Request;
+  res: Response;
+}): Promise<boolean> {
+  try {
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(args.conversationId).catch(() => null);
+    if (!channel || !channel.isPrivate) return true;
+
+    // Instance admin bypass
+    const isAdmin = isInstanceAdmin(args.req.user);
+    if (isAdmin) return true;
+
+    // Owner bypass
+    const starshipService = new StarshipService();
+    const starship = await starshipService.getStarship(channel.starshipId).catch(() => null);
+    if (starship && starship.ownerId === args.userId) return true;
+
+    const memberRepo = new ConversationMemberRepository();
+    const ok = await memberRepo.isMember(args.userId, args.conversationId);
+    if (!ok) {
+      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
+        resource: 'channel',
+        conversationId: args.conversationId,
+      });
+      return false;
+    }
+
+    return true;
+  } catch {
+    // Best-effort: if we cannot evaluate channel membership, fail closed for safety.
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
+      resource: 'channel',
+      conversationId: args.conversationId,
+      reason: 'membership_check_failed',
+    });
+    return false;
+  }
 }
 
 // tool execution uses the same runner config bundle as agent execution
@@ -483,6 +534,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (!(await verifyResourceAccess(convAuth.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
+    if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
 
     // Check if streaming is requested
     const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
@@ -567,8 +621,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const snapshotCursor: string = lastId || qpCursor || lastEventIdHeader || '0-0';
       let cursor: string = snapshotCursor;
 
-      // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
-      const conversationMessages = await conversationService.getConversationMessages(conversationId);
+      // 1) Always send a baseline snapshot from DB (bounded tail + latest known turn status)
+      const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 100 });
+      const conversationMessages = page.messages;
       const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
       const turn: ConversationStreamSnapshot['turn'] =
         latestTurn && typeof latestTurn.id === 'string'
@@ -586,6 +641,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // This fixes a UX bug where refreshing the page mid-stream would lose previously streamed
       // deltas (not yet persisted to DB), and the UI would only show new deltas after reconnect.
       let snapshotMessages = conversationMessages;
+      const hasMoreBefore = page.hasMoreBefore;
+      const oldestCursor = page.oldestCursor;
       const activeTurnId =
         latestTurn &&
         typeof latestTurn.id === 'string' &&
@@ -713,7 +770,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // best-effort only
       }
 
-      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn })}\n\n`);
+      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor })}\n\n`);
 
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.
@@ -800,7 +857,30 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      const messages = await conversationService.getConversationMessages(conversationId, orderValidation.orderDirection);
+      // Keyset pagination (cursor-based). We currently ignore page/offset for this endpoint.
+      const cursorValidation = validateData(
+        z
+          .object({
+            beforeCreatedAt: z.string().datetime().optional(),
+            beforeId: IdSchema.optional(),
+          })
+          .refine((v) => (v.beforeCreatedAt && !v.beforeId ? false : v.beforeId && !v.beforeCreatedAt ? false : true), {
+            message: 'beforeCreatedAt and beforeId must be provided together',
+          }),
+        req.query,
+        res,
+        'message cursor'
+      );
+      if (!cursorValidation) return;
+
+      const page = await conversationService.getConversationMessagesPage({
+        conversationId,
+        limit: paginationValidation.limit,
+        ...(cursorValidation.beforeCreatedAt && cursorValidation.beforeId
+          ? { beforeCreatedAt: cursorValidation.beforeCreatedAt, beforeId: cursorValidation.beforeId }
+          : {}),
+      });
+      const messages = orderValidation.orderDirection === 'desc' ? page.messages.slice().reverse() : page.messages;
 
       // Verify conversation exists
       const conversation = await conversationService.getConversationById(conversationId);
@@ -822,6 +902,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         conversationId,
         messages,
         total: messages.length,
+        hasMoreBefore: page.hasMoreBefore,
+        oldestCursor: page.oldestCursor,
         participants,
         startedAt: conversation.createdAt,
         lastActivityAt: conversation.updatedAt || conversation.createdAt,
@@ -865,6 +947,9 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
       return;
     }
     if (!(await verifyResourceAccess(exists.starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+    if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
 
@@ -935,6 +1020,9 @@ router.post(
         res,
       });
       if (!ok) {
+        return;
+      }
+      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
         return;
       }
 
@@ -1260,6 +1348,7 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1335,6 +1424,7 @@ router.get(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvalsRepo = new ToolCallApprovalRepository();
       const approvals = await approvalsRepo.findPendingByConversation(conversationId);
@@ -1420,6 +1510,7 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1525,6 +1616,9 @@ router.post(
         if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
           return;
         }
+        if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+          return;
+        }
       }
 
       // Resolve starship and wallet, then enforce non-zero balance
@@ -1581,11 +1675,21 @@ router.post(
       // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.
       // If debit fails, delete the message and return 402 (do not start the turn).
       const messageService = new MessageService();
+      // Multi-human support: persist author identity on the message so shared conversations/channels
+      // can render the correct sender (not always “You”).
+      const authUser = req.user as unknown as { id?: string; displayName?: string; email?: string; avatar?: string } | undefined;
+      const authorUserId = typeof authUser?.id === 'string' ? authUser.id : undefined;
+      const authorNameRaw = typeof authUser?.displayName === 'string' ? authUser.displayName : typeof authUser?.email === 'string' ? authUser.email : '';
+      const authorName = authorNameRaw && authorNameRaw.trim().length > 0 ? authorNameRaw.trim() : undefined;
+      const authorAvatar = typeof authUser?.avatar === 'string' && authUser.avatar.trim().length > 0 ? authUser.avatar.trim() : undefined;
       const userMessage = await messageService.createMessage({
         conversationId,
         role: 'user',
         content,
         messageType: 'user_input',
+        ...(authorUserId && { userId: authorUserId }),
+        ...(authorName && { userName: authorName }),
+        ...(authorAvatar && { userAvatar: authorAvatar }),
         ...(agentId && { agentId }),
         ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
       });
@@ -1658,7 +1762,9 @@ router.post(
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
-          const messages = await conversationService.getConversationMessages(conversationId);
+          // Bound sync payload size; client can page older history via GET /conversations/:id/messages.
+          const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 200 });
+          const messages = page.messages;
           // Include the server-authoritative turn status in the sync response.
           // This is critical for delegated conversations (call-agent) where execution can "complete"
           // early because the run is awaiting out-of-band tool approval (turn.status = waiting_for_tools).
@@ -1681,7 +1787,9 @@ router.post(
               status: turn?.status || 'completed',
               streaming: false,
               conversationId,
-              conversation: conversationWithFinalState ? { ...conversationWithFinalState, messages } : null,
+              conversation: conversationWithFinalState
+                ? { ...conversationWithFinalState, messages, hasMoreBefore: page.hasMoreBefore, oldestCursor: page.oldestCursor }
+                : null,
               turn,
               awaitingToolApproval,
             },
@@ -1754,6 +1862,9 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       return;
     }
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+    if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
 

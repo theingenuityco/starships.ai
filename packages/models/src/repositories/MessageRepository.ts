@@ -117,6 +117,9 @@ export class MessageRepository extends BaseRepository {
           ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),
           ...(entity.agentId ? { agentId: entity.agentId } : {}),
           ...(entity.agentName ? { agentName: entity.agentName } : {}),
+          ...(entity.userId ? { userId: entity.userId } : {}),
+          ...(entity.userName ? { userName: entity.userName } : {}),
+          ...(entity.userAvatar ? { userAvatar: entity.userAvatar } : {}),
           ...(entity.attachmentIds ? { attachmentIds: entity.attachmentIds } : {}),
         };
 
@@ -206,6 +209,9 @@ export class MessageRepository extends BaseRepository {
           ...(entity.toolCallId ? { toolCallId: entity.toolCallId } : {}),
           ...(entity.agentId ? { agentId: entity.agentId } : {}),
           ...(entity.agentName ? { agentName: entity.agentName } : {}),
+          ...(entity.userId ? { userId: entity.userId } : {}),
+          ...(entity.userName ? { userName: entity.userName } : {}),
+          ...(entity.userAvatar ? { userAvatar: entity.userAvatar } : {}),
           ...(entity.attachmentIds ? { attachmentIds: entity.attachmentIds } : {}),
         };
 
@@ -238,6 +244,9 @@ export class MessageRepository extends BaseRepository {
             tool_call_id = EXCLUDED.tool_call_id,
             agent_id = EXCLUDED.agent_id,
             agent_name = EXCLUDED.agent_name,
+            user_id = EXCLUDED.user_id,
+            user_name = EXCLUDED.user_name,
+            user_avatar = EXCLUDED.user_avatar,
             attachment_ids = EXCLUDED.attachment_ids
           RETURNING *;
         `;

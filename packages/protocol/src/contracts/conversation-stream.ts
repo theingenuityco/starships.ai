@@ -6,6 +6,14 @@ export type ConversationStreamSnapshot = {
   conversationId: string;
   messages: MessageModel[];
   /**
+   * If true, there are older persisted messages before `oldestCursor`.
+   */
+  hasMoreBefore?: boolean;
+  /**
+   * Cursor for loading older messages (oldest message in the snapshot window).
+   */
+  oldestCursor?: { createdAt: string; id: string } | null;
+  /**
    * Latest known turn for this conversation (server authoritative).
    * When null, no turn exists yet.
    */

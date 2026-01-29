@@ -112,7 +112,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-2xl max-h-[85vh] overflow-hidden">
+      <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
@@ -276,7 +276,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             ) : (
               <>
                 <Icon name="sparkles" className="w-4 h-4 mr-2" />
-                {isAgent ? `Deploy to ${starshipName}` : 'Install'}
+                {isAgent ? 'Deploy' : 'Install'}
               </>
             )}
           </Button>

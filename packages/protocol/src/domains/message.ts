@@ -41,6 +41,17 @@ export interface Message extends Omit<LlmMessage, 'content'> {
   // Agent tracking fields (assistant messages only)
   agentId?: string;
   agentName?: string;
+  /**
+   * Human author identity (user messages only).
+   *
+   * NOTE:
+   * - `role='user'` means “a human-authored message”, but in multi-member contexts
+   *   we must know *which* human authored it.
+   * - These fields are optional for backward compatibility with legacy rows.
+   */
+  userId?: string;
+  userName?: string;
+  userAvatar?: string;
   // File attachments (array of attachment IDs)
   attachmentIds?: string[];
 }

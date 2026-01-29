@@ -15,7 +15,7 @@ import type {
   EngineConfig,
 } from '@starships/autopilot';
 import { NotFoundError, ConflictError, ValidationError } from '@starships/errors';
-import { ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository } from '@starships/models';
+import { ChannelRepository, ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository } from '@starships/models';
 import {
   AgentModel,
   ConversationModel,
@@ -794,6 +794,21 @@ export class ConversationService {
     return this.conversationRepository.getConversationMessages(conversationId, orderDirection);
   }
 
+  async getConversationMessagesPage(args: {
+    conversationId: string;
+    limit: number;
+    beforeCreatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null }> {
+    const page = await this.conversationRepository.getConversationMessagesPage(args);
+    const oldest = page.messages.length > 0 ? page.messages[0] : null;
+    return {
+      messages: page.messages,
+      hasMoreBefore: page.hasMoreBefore,
+      oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
+    };
+  }
+
   /**
    * Delete a conversation and cleanup all associated S3 files
    */
@@ -1297,17 +1312,23 @@ export class ConversationService {
       console.warn('[TITLE] Early generation failed:', err);
     }
 
-    const conversationAgents = await this.getConversationAgents(data.conversationId);
-    if (conversationAgents.length < 1) {
-      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
-    }
-    // Build initial target agents from @mentions in the incoming message; fallback to first agent
-    // Resolve against starship agents and auto-link any newly mentioned agents
     const starship = await this.getConversationStarship(data.conversationId);
     if (!starship) {
       throw new NotFoundError('Starship', 'for conversation');
     }
     const allStarshipAgents = await this.agentRepository.findByStarship(starship.id);
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(data.conversationId).catch(() => null);
+    const isChannel = Boolean(channel);
+
+    const conversationAgents = await this.getConversationAgents(data.conversationId);
+    if (!isChannel && conversationAgents.length < 1) {
+      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
+    }
+
+    // Build initial target agents from @mentions in the incoming message.
+    // - For channels: mention-only; no fallback agent.
+    // - For normal conversations: fallback to the first linked agent.
     const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
     // Auto-link mentioned agents not yet linked
     for (const a of initialTargetsUnlinked) {
@@ -1315,9 +1336,15 @@ export class ConversationService {
         await this.conversationRepository.linkToAgent(data.conversationId, a.id);
       }
     }
-    const initialTargets =
-      initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
-    const agentQueue: AgentModel[] = initialTargets.length > 0 ? initialTargets.slice() : [conversationAgents[0]];
+    const initialTargets = isChannel
+      ? initialTargetsUnlinked
+      : initialTargetsUnlinked.length > 0
+        ? initialTargetsUnlinked
+        : this.extractMentionedAgents(data.content, conversationAgents);
+
+    const agentQueue: AgentModel[] =
+      initialTargets.length > 0 ? initialTargets.slice() : isChannel ? [] : [conversationAgents[0]];
+    const noAgentToRun = isChannel && agentQueue.length === 0;
     const processedAgents: Set<string> = new Set();
     const maxHops = 5; // prevent infinite handoffs per turn
     let hops = 0;
@@ -1337,9 +1364,42 @@ export class ConversationService {
     const conversationState = (latestConversation?.state || {}) as Record<string, unknown>;
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
-    this.suppressCompleteFor.add(data.conversationId);
+    if (!noAgentToRun) {
+      this.suppressCompleteFor.add(data.conversationId);
+    }
 
     try {
+      // Mention-only channels: if there are no @mentions, do not run any agent.
+      // Still complete the turn lifecycle cleanly so clients can exit "responding" state.
+      if (noAgentToRun) {
+        const conversationId = data.conversationId;
+        const turnId = this.currentTurnId.get(conversationId) || turn.id;
+        const at = new Date().toISOString();
+
+        try {
+          await this.turnRepository.updateTurn(turnId, { status: 'completed', completedAt: at });
+        } catch {
+          // best-effort
+        }
+        try {
+          await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'completed', at } });
+        } catch {
+          // best-effort
+        }
+        try {
+          const convo = await this.getConversationById(conversationId);
+          const prev = (convo?.state as ConversationState | undefined) || {};
+          await this.conversationRepository.update(conversationId, {
+            state: { ...prev, turnActive: false, lastCompleteAt: at },
+            updatedAt: at,
+          });
+        } catch {
+          // best-effort
+        }
+
+        this.finalizeTurnState(conversationId);
+        return;
+      }
       // starship already resolved above
 
       const env = getEnvConfig();

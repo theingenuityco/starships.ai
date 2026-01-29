@@ -11,7 +11,14 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversations, usePendingToolApprovalsMulti, useConversationDetail } from '@/hooks/useConversations'
+import {
+  useStarshipChannels,
+  useStarshipConversations,
+  CONVERSATION_QUERY_KEYS,
+  useChildConversations,
+  usePendingToolApprovalsMulti,
+  useConversationDetail,
+} from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -170,12 +177,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const { data: starshipAgentAvatarAttachments = [] } = useMessageAttachments(starshipAgentAvatarAttachmentIds, starshipId)
   const starshipAgentAvatarUrlById = useMemo(() => new Map(starshipAgentAvatarAttachments.map(a => [a.id, a.previewUrl] as const)), [starshipAgentAvatarAttachments])
   const { data: starshipConversationsData } = useStarshipConversations(starshipId || '', true)
+  const { data: starshipChannelsData } = useStarshipChannels(starshipId || '', Boolean(starshipId))
   const { data: currentConversationDetail } = useConversationDetail(currentConversationId ?? null)
   const { data: starshipData } = useStarship(starshipId || '', !!starshipId)
   const setConversationAgentStore = useStarshipUIStore(s => s.setConversationAgent)
   const setPendingConversationId = useStarshipUIStore(s => s.setPendingConversationId)
   const storedConversationAgentId = useStarshipUIStore(s => (currentConversationId ? s.conversations[currentConversationId]?.agentId : undefined))
   const conversationAgentNameById = useStarshipUIStore(s => s.conversations)
+
+  const isChannelConversation = useMemo(() => {
+    const cid = String(currentConversationId || '')
+    if (!cid) return false
+    const chans = (starshipChannelsData as any)?.channels
+    if (!Array.isArray(chans)) return false
+    return chans.some((c: any) => String(c?.conversationId || '') === cid)
+  }, [starshipChannelsData, currentConversationId])
 
   // Child conversation approvals: if any child conversation is awaiting tool approval,
   // show a compact callout above the parent composer.
@@ -722,6 +738,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     useEffect(() => {
       // Always update from messages - they are authoritative
       if (!currentConversationId) return
+      // Channels are mention-driven; do not auto-select an agent from history.
+      if (isChannelConversation) return
       if (!Array.isArray(starshipAgentsData) || starshipAgentsData.length === 0) return
 
       // Track message count for this conversation
@@ -760,7 +778,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           }
         }
       }
-    }, [liveMessages, currentConversationId, starshipAgentsData, selectedAgent, setConversationAgentStore])
+    }, [liveMessages, currentConversationId, isChannelConversation, starshipAgentsData, selectedAgent, setConversationAgentStore])
 
     // Focus input when streaming transitions from true -> false
     useEffect(() => {

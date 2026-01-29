@@ -101,6 +101,8 @@ export function ConversationMessageList({
   const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
+  const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
+  const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
@@ -556,6 +558,20 @@ export function ConversationMessageList({
         }}
       >
         <div className="w-full max-w-4xl mx-auto bg-transparent">
+          {canLoadOlder && (
+            <div className="flex justify-center pb-4">
+              <button
+                type="button"
+                className={cn(
+                  'text-xs px-3 py-1.5 rounded-md border bg-background hover:bg-muted transition-colors',
+                  isLoadingOlder ? 'opacity-60 pointer-events-none' : ''
+                )}
+                onClick={() => (stream as any)?.loadOlder?.({ limit: 100 })}
+              >
+                {isLoadingOlder ? 'Loading…' : 'Load older messages'}
+              </button>
+            </div>
+          )}
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
@@ -850,9 +866,14 @@ const MemoizedMessageBubble = memo(
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
-    const effectiveUserName = userNameOverride ?? userName
+    const messageUserName =
+      typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
+    const messageUserAvatar =
+      typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
+
+    const effectiveUserName = userNameOverride ?? messageUserName ?? userName
     const effectiveUserEmail = userEmailOverride ?? userEmail
-    const effectiveUserAvatar = userAvatarUrlOverride ?? userAvatar
+    const effectiveUserAvatar = userAvatarUrlOverride ?? messageUserAvatar ?? userAvatar
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
     if (isUser) {

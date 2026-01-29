@@ -39,6 +39,9 @@ export class MessageService {
       ...(request.toolCallId && { toolCallId: request.toolCallId }),
       ...(request.agentId && { agentId: request.agentId }),
       ...(request.agentName && { agentName: request.agentName }),
+      ...(request.userId && { userId: request.userId }),
+      ...(request.userName && { userName: request.userName }),
+      ...(request.userAvatar && { userAvatar: request.userAvatar }),
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
     });
 
@@ -69,6 +72,9 @@ export class MessageService {
       ...(request.toolCallId && { toolCallId: request.toolCallId }),
       ...(request.agentId && { agentId: request.agentId }),
       ...(request.agentName && { agentName: request.agentName }),
+      ...(request.userId && { userId: request.userId }),
+      ...(request.userName && { userName: request.userName }),
+      ...(request.userAvatar && { userAvatar: request.userAvatar }),
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
     });
 

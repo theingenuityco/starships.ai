@@ -30,6 +30,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { AgentPublishModal } from './AgentPublishModal'
 import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlugins } from '@/utils/agent-state'
 import type { ConversationState } from '@starships/protocol'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 
 // Lazy-load the blueprint visualizer so the landing-page "embedded" demo doesn't
 // pull in ELK/WebWorker code (which can break when evaluated in the SSR bundle).
@@ -1618,7 +1619,7 @@ export function AgentDocumentEditor({
             <span className="text-xs font-semibold flex-1 text-left">Advanced options</span>
           </div>
         </CollapsibleTrigger>
-        <CollapsibleContent>
+        <CollapsibleContent unmountOnClose>
           <div className="space-y-4 mt-1">
             {/* Blueprint first */}
             {!embedded ? (
@@ -1629,29 +1630,34 @@ export function AgentDocumentEditor({
                     <span className="text-xs font-semibold">Blueprint</span>
                   </div>
                   <div className="flex-1">
-                    <BlueprintVisualization
-                      blueprint={(() => {
-                        try {
-                          const parsed = JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
-                          // Ensure blueprint has valid structure
-                          if (!parsed || typeof parsed !== 'object') {
+                    <ErrorBoundary
+                      component="BlueprintVisualization"
+                      fallback={<div className="h-[320px] w-full rounded-lg border border-border/60 bg-muted/20" />}
+                    >
+                      <BlueprintVisualization
+                        blueprint={(() => {
+                          try {
+                            const parsed = JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                            // Ensure blueprint has valid structure
+                            if (!parsed || typeof parsed !== 'object') {
+                              return { nodes: [], edges: [] } as any
+                            }
+                            if (!Array.isArray(parsed.nodes)) {
+                              parsed.nodes = []
+                            }
+                            if (!Array.isArray(parsed.edges)) {
+                              parsed.edges = []
+                            }
+                            return parsed
+                          } catch {
                             return { nodes: [], edges: [] } as any
                           }
-                          if (!Array.isArray(parsed.nodes)) {
-                            parsed.nodes = []
-                          }
-                          if (!Array.isArray(parsed.edges)) {
-                            parsed.edges = []
-                          }
-                          return parsed
-                        } catch {
-                          return { nodes: [], edges: [] } as any
-                        }
-                      })()}
-                      className="h-[320px]"
-                      transparent
-                      nodesDraggable={false}
-                    />
+                        })()}
+                        className="h-[320px]"
+                        transparent
+                        nodesDraggable={false}
+                      />
+                    </ErrorBoundary>
                   </div>
                 </div>
               </div>

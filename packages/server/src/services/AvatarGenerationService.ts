@@ -21,6 +21,47 @@ export type AvatarGenerationResult = {
 };
 
 export class AvatarGenerationService {
+  private isRetryableLlmError(err: unknown): boolean {
+    if (!err) return false;
+    const msg =
+      err instanceof Error
+        ? err.message
+        : typeof err === 'string'
+          ? err
+          : typeof (err as { message?: unknown } | undefined)?.message === 'string'
+            ? String((err as { message: unknown }).message)
+            : '';
+    if (!msg) return false;
+    return (
+      msg.toLowerCase().includes('timed out') ||
+      msg.toLowerCase().includes('timeout') ||
+      msg.toLowerCase().includes('econnreset') ||
+      msg.toLowerCase().includes('etimedout') ||
+      msg.toLowerCase().includes('all llm provider routes failed')
+    );
+  }
+
+  private async withRetry<T>(fn: () => Promise<T>, options?: { attempts?: number; label?: string }): Promise<T> {
+    const attempts =
+      typeof options?.attempts === 'number' && Number.isFinite(options.attempts) && options.attempts > 0 ? options.attempts : 2;
+    let lastErr: unknown;
+    for (let i = 1; i <= attempts; i++) {
+      try {
+        return await fn();
+      } catch (err) {
+        lastErr = err;
+        if (i >= attempts || !this.isRetryableLlmError(err)) {
+          throw err;
+        }
+        // Best-effort single retry on transient provider/network issues.
+        const label = options?.label ? ` (${options.label})` : '';
+        console.warn(`[AvatarGenerationService] transient LLM error${label}; retrying [${i}/${attempts}]`, err);
+      }
+    }
+    // Should be unreachable.
+    throw lastErr instanceof Error ? lastErr : new Error('Unknown error');
+  }
+
   /**
    * Post-process the model output for avatar usage:
    * - Cap dimensions (avatars are rendered at small sizes in UI)
@@ -61,6 +102,11 @@ export class AvatarGenerationService {
      * into execution.state for template resolution and node validation.
      */
     agentModel: string;
+    /**
+     * Optional timeout for the underlying LLM call (ms). If omitted, the agent blueprint may
+     * default to a host/client timeout that can be too aggressive for OpenRouter.
+     */
+    agentTimeoutMs?: number;
     agentBlueprint: Blueprint;
     agentTools?: unknown[];
     starshipId: string;
@@ -134,6 +180,7 @@ export class AvatarGenerationService {
       name: options.agentName,
       description: options.agentDescription,
       model: options.agentModel,
+      timeout: options.agentTimeoutMs,
       // Encourage creative but consistent identity details
       temperature: 1.1,
       // Hard-disable tool calling by providing no tools
@@ -162,7 +209,10 @@ export class AvatarGenerationService {
     });
 
     const inputMessages: LlmMessage[] = [{ role: 'user', content: user }];
-    const resultItems = await agent.execute(ExecutionItemUtils.wrapSingle(inputMessages));
+    const resultItems = await this.withRetry(() => agent.execute(ExecutionItemUtils.wrapSingle(inputMessages)), {
+      attempts: 2,
+      label: 'mirror_description',
+    });
     const llmJson = ExecutionItemUtils.unwrapSingle(resultItems);
     const firstError = (resultItems as Array<{ error?: unknown }> | undefined)?.[0]?.error;
     if (typeof llmJson === 'undefined' && typeof firstError === 'string' && firstError.length > 0) {
@@ -186,10 +236,31 @@ export class AvatarGenerationService {
       return undefined;
     };
 
+    const extractNodeErrorFromExecutionResults = (value: unknown, nodeRef: string): string | undefined => {
+      if (!Array.isArray(value)) return undefined;
+      for (let i = value.length - 1; i >= 0; i--) {
+        const entry = value[i];
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const last = items[items.length - 1];
+        if (!last || typeof last !== 'object') return undefined;
+        const err = (last as Record<string, unknown>).error;
+        return typeof err === 'string' && err.trim().length > 0 ? err.trim() : undefined;
+      }
+      return undefined;
+    };
+
     let llmNodeJson: unknown = llmJson;
     if (Array.isArray(llmJson)) {
       const extracted = extractNodeJsonFromExecutionResults(llmJson, llmNodeRef);
       if (typeof extracted === 'undefined') {
+        const nodeError = extractNodeErrorFromExecutionResults(llmJson, llmNodeRef);
+        if (nodeError) {
+          throw new Error(`Mirror description agent blueprint failed: ${nodeError}`);
+        }
         throw new Error(
           `Mirror description agent blueprint returned execution.results but did not include output for nodeRef "${llmNodeRef}"`
         );
@@ -325,6 +396,22 @@ export class AvatarGenerationService {
         const first = items[0];
         if (!first || typeof first !== 'object') return undefined;
         return (first as Record<string, unknown>).json;
+      }
+      return undefined;
+    };
+
+    const extractNodeErrorFromExecutionResults = (value: unknown, nodeRef: string): string | undefined => {
+      if (!Array.isArray(value)) return undefined;
+      for (const entry of value) {
+        if (!entry || typeof entry !== 'object') continue;
+        const rec = entry as Record<string, unknown>;
+        if (rec.nodeRef !== nodeRef) continue;
+        const items = rec.items;
+        if (!Array.isArray(items) || items.length === 0) return undefined;
+        const first = items[0];
+        if (!first || typeof first !== 'object') return undefined;
+        const err = (first as Record<string, unknown>).error;
+        return typeof err === 'string' && err.trim().length > 0 ? err.trim() : undefined;
       }
       return undefined;
     };
@@ -469,6 +556,10 @@ export class AvatarGenerationService {
       if (Array.isArray(llmJson)) {
         const extracted = extractNodeJsonFromExecutionResults(llmJson, 'llm_1');
         if (typeof extracted === 'undefined') {
+          const nodeError = extractNodeErrorFromExecutionResults(llmJson, 'llm_1');
+          if (nodeError) {
+            throw new Error(`Avatar generation LLM node failed: ${nodeError}`);
+          }
           const nodeRefs = llmJson
             .map((e) => (e && typeof e === 'object' ? (e as Record<string, unknown>).nodeRef : undefined))
             .filter((x): x is string => typeof x === 'string');

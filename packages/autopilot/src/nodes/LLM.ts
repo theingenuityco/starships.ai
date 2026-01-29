@@ -145,17 +145,16 @@ export class LLM extends BaseNode<LlmParams> {
       });
 
       const body = resp?.body as unknown;
-      const list =
-        Array.isArray(body)
-          ? body
-          : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+      const list = Array.isArray(body)
+        ? body
+        : body && typeof body === 'object' && Array.isArray((body as Record<string, unknown>).data)
+          ? ((body as Record<string, unknown>).data as unknown[])
+          : body &&
+              typeof body === 'object' &&
+              (body as Record<string, unknown>).success === true &&
+              Array.isArray((body as Record<string, unknown>).data)
             ? ((body as Record<string, unknown>).data as unknown[])
-            : body &&
-                typeof body === 'object' &&
-                (body as Record<string, unknown>).success === true &&
-                Array.isArray((body as Record<string, unknown>).data)
-              ? ((body as Record<string, unknown>).data as unknown[])
-              : [];
+            : [];
 
       const out = new Map<string, string>();
       for (const a of list) {
@@ -329,6 +328,7 @@ export class LLM extends BaseNode<LlmParams> {
         frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
         presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
         reasoning: params.reasoning,
+        timeoutMs: typeof params.timeout === 'number' ? params.timeout : undefined,
         ...(typeof streamFlag === 'boolean' ? { stream: streamFlag } : {}),
         ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
         ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),

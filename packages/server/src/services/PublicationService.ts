@@ -98,9 +98,7 @@ export class PublicationService {
   } {
     return {
       temperature:
-        typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature)
-          ? agent.temperature
-          : DEFAULT_AGENT_TEMPERATURE,
+        typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature) ? agent.temperature : DEFAULT_AGENT_TEMPERATURE,
       maxTokens:
         typeof agent.maxTokens === 'number' && !Number.isNaN(agent.maxTokens)
           ? Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, agent.maxTokens))
@@ -115,10 +113,7 @@ export class PublicationService {
   /**
    * Ensure template exists and is up-to-date
    */
-  private async ensureTemplate(
-    agent: AgentModel,
-    nextVersion: string
-  ): Promise<{ templateId: string; created: boolean }> {
+  private async ensureTemplate(agent: AgentModel, nextVersion: string): Promise<{ templateId: string; created: boolean }> {
     const templateRepo = new AgentTemplateRepository();
     const { temperature, maxTokens, timeout } = this.sanitizeNumericFields(agent);
 
@@ -260,10 +255,7 @@ export class PublicationService {
     try {
       const templateRepo = new AgentTemplateRepository();
       const existingAvatar = await templateRepo.getAvatarStorageById(templateId);
-      const existingAttachment = await this.attachmentService.getAttachmentWithUrl(
-        agent.avatarAttachmentId,
-        agent.starshipId
-      );
+      const existingAttachment = await this.attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
 
       const toMs = (s?: string) => {
         if (!s) return NaN;
@@ -275,9 +267,7 @@ export class PublicationService {
       const attachmentCreatedMs = toMs(existingAttachment?.createdAt);
       const shouldUpdateAvatar =
         !existingAvatar?.avatarS3Key ||
-        (Number.isFinite(templateAvatarMs) &&
-          Number.isFinite(attachmentCreatedMs) &&
-          attachmentCreatedMs > templateAvatarMs) ||
+        (Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs) && attachmentCreatedMs > templateAvatarMs) ||
         (!Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs));
 
       if (shouldUpdateAvatar && existingAttachment?.s3Key) {
@@ -469,10 +459,12 @@ export class PublicationService {
     // 1. Ensure avatar exists (auto-generate if missing)
     if (!agent.avatarPrompt || !agent.avatarAttachmentId) {
       console.log('[PUBLICATION] Auto-generating avatar...');
+      const { timeout: safeTimeout } = this.sanitizeNumericFields(agent);
       const mirrorResult = await this.avatarGenerationService.generateMirrorDescription({
         agentName: agent.name,
         agentDescription: agent.description,
         agentModel: agent.model,
+        agentTimeoutMs: safeTimeout,
         agentBlueprint: agent.blueprint!,
         agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),
         starshipId: agent.starshipId,
@@ -554,9 +546,7 @@ export class PublicationService {
       try {
         const parsed = JSON.parse(existingProblemStatements.textContent || '[]');
         if (Array.isArray(parsed)) {
-          marketingContent.problemStatementsText = parsed.filter(
-            (s): s is string => typeof s === 'string' && s.trim().length > 0
-          );
+          marketingContent.problemStatementsText = parsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
         }
       } catch (err) {
         console.warn('[PUBLICATION] Failed to parse existing problem statements:', err);
@@ -582,9 +572,7 @@ export class PublicationService {
       coreCapabilities = coreCapabilities.slice(0, 197) + '...';
     }
 
-    const domainContext = agent.description
-      ? agent.description.split(/[.!?]/)[0].trim().slice(0, 100)
-      : agent.role || 'general assistance';
+    const domainContext = agent.description ? agent.description.split(/[.!?]/)[0].trim().slice(0, 100) : agent.role || 'general assistance';
 
     // Generate missing profile images
     if (!agent.problemStatementsAttachmentId) {
@@ -1021,7 +1009,11 @@ export class PublicationService {
   /**
    * Update problem statements for a template
    */
-  async updateProblemStatements(templateId: string, statements: string[], adminUserId: string): Promise<{
+  async updateProblemStatements(
+    templateId: string,
+    statements: string[],
+    adminUserId: string
+  ): Promise<{
     problemStatementsText: string[];
   }> {
     const adminUser = (await this.userRepository.findById(adminUserId)) as UserModel | null;

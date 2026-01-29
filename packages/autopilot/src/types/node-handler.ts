@@ -41,6 +41,13 @@ export interface LlmHostRequest {
   presencePenalty?: number;
   reasoning?: unknown;
   /**
+   * Optional host-side request timeout in milliseconds.
+   *
+   * This should be enforced by the host runtime / provider client (not by workflows),
+   * and is typically derived from the LLM node's `timeout` parameter.
+   */
+  timeoutMs?: number;
+  /**
    * Optional streaming control.
    *
    * - When true/omitted: host may stream tokens/chunks.

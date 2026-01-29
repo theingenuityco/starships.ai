@@ -254,6 +254,11 @@ export function AgentDocumentEditor({
     if (p === 'ask') return 'hover:bg-amber-500/10 focus:bg-amber-500/10'
     return 'hover:bg-red-500/10 focus:bg-red-500/10'
   }
+  const permissionMenuItemSelectedClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'bg-emerald-500/10'
+    if (p === 'ask') return 'bg-amber-500/10'
+    return 'bg-red-500/10'
+  }
   const permissionMenuIconClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
     if (p === 'allow') return 'text-emerald-500'
     if (p === 'ask') return 'text-amber-500'
@@ -1698,7 +1703,11 @@ export function AgentDocumentEditor({
                           {permissionOptions.map(opt => (
                             <DropdownMenuItem
                               key={opt.value}
-                              className={cn('cursor-pointer', permissionMenuItemClassName(opt.value))}
+                              className={cn(
+                                'cursor-pointer',
+                                permissionMenuItemClassName(opt.value),
+                                opt.value === current && permissionMenuItemSelectedClassName(opt.value)
+                              )}
                               onClick={() => {
                                 if (disabled) return
                                 setPermissionMutation.mutate({ toolSlug: tool.slug, permission: opt.value })
@@ -1708,7 +1717,7 @@ export function AgentDocumentEditor({
                                 <div className="flex items-center gap-2">
                                   <Icon name={opt.icon} className={cn('h-4 w-4', permissionMenuIconClassName(opt.value))} />
                                   <span className="text-sm font-medium">{opt.label}</span>
-                                  {opt.value === current ? <Icon name="check" className="h-4 w-4 ml-auto text-primary" /> : <span className="ml-auto" />}
+                                  <span className="ml-auto" />
                                 </div>
                                 <div className="text-xs text-muted-foreground">{opt.description}</div>
                               </div>

@@ -249,6 +249,16 @@ export function AgentDocumentEditor({
     if (p === 'ask') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
     return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
   }
+  const permissionMenuItemClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'hover:bg-emerald-500/10 focus:bg-emerald-500/10'
+    if (p === 'ask') return 'hover:bg-amber-500/10 focus:bg-amber-500/10'
+    return 'hover:bg-red-500/10 focus:bg-red-500/10'
+  }
+  const permissionMenuIconClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'text-emerald-500'
+    if (p === 'ask') return 'text-amber-500'
+    return 'text-red-500'
+  }
   const permissionDotClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
     if (p === 'allow') return 'bg-emerald-500/70'
     if (p === 'ask') return 'bg-amber-500/70'
@@ -1688,7 +1698,7 @@ export function AgentDocumentEditor({
                           {permissionOptions.map(opt => (
                             <DropdownMenuItem
                               key={opt.value}
-                              className="cursor-pointer focus:bg-muted/40"
+                              className={cn('cursor-pointer', permissionMenuItemClassName(opt.value))}
                               onClick={() => {
                                 if (disabled) return
                                 setPermissionMutation.mutate({ toolSlug: tool.slug, permission: opt.value })
@@ -1696,7 +1706,7 @@ export function AgentDocumentEditor({
                             >
                               <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-2">
-                                  <Icon name={opt.icon} className="h-4 w-4 text-muted-foreground" />
+                                  <Icon name={opt.icon} className={cn('h-4 w-4', permissionMenuIconClassName(opt.value))} />
                                   <span className="text-sm font-medium">{opt.label}</span>
                                   {opt.value === current ? <Icon name="check" className="h-4 w-4 ml-auto text-primary" /> : <span className="ml-auto" />}
                                 </div>

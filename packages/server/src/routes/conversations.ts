@@ -21,6 +21,7 @@ import {
   ChannelRepository,
   ConversationMemberRepository,
   ConversationWidgetRepository,
+  getConnection,
   MessageRepository,
   StarshipMemberRepository,
   ToolCallApprovalRepository,
@@ -183,7 +184,6 @@ async function verifyResourceAccess200(args: {
   } else {
     // owner/admin access allowed
   }
- 
 
   return true;
 }
@@ -320,9 +320,7 @@ type ToolResultAttachmentError = {
   reason: string;
 };
 
-type ParseBase64ImageDataUrlResult =
-  | { ok: true; mimeType: string; buffer: Buffer }
-  | { ok: false; reason: string };
+type ParseBase64ImageDataUrlResult = { ok: true; mimeType: string; buffer: Buffer } | { ok: false; reason: string };
 
 function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number; maxDataUrlChars: number }): ParseBase64ImageDataUrlResult {
   if (typeof dataUrl !== 'string') return { ok: false, reason: 'not_a_string' };
@@ -1679,7 +1677,8 @@ router.post(
       // can render the correct sender (not always “You”).
       const authUser = req.user as unknown as { id?: string; displayName?: string; email?: string; avatar?: string } | undefined;
       const authorUserId = typeof authUser?.id === 'string' ? authUser.id : undefined;
-      const authorNameRaw = typeof authUser?.displayName === 'string' ? authUser.displayName : typeof authUser?.email === 'string' ? authUser.email : '';
+      const authorNameRaw =
+        typeof authUser?.displayName === 'string' ? authUser.displayName : typeof authUser?.email === 'string' ? authUser.email : '';
       const authorName = authorNameRaw && authorNameRaw.trim().length > 0 ? authorNameRaw.trim() : undefined;
       const authorAvatar = typeof authUser?.avatar === 'string' && authUser.avatar.trim().length > 0 ? authUser.avatar.trim() : undefined;
       const userMessage = await messageService.createMessage({
@@ -2130,6 +2129,28 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
     }
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
+    }
+
+    // Prevent deleting the starship's default channel conversation.
+    // Stored at the starship level to make the invariant explicit.
+    try {
+      const conn = getConnection();
+      const row = await conn.queryOne<{ default_channel_conversation_id: string | null }>(
+        `SELECT default_channel_conversation_id
+           FROM starships
+          WHERE id = $1`,
+        [conversation.starshipId]
+      );
+      const defaultId = row?.default_channel_conversation_id ? String(row.default_channel_conversation_id) : '';
+      if (defaultId && defaultId === conversationId) {
+        sendError(res, 'ACCESS_DENIED', 'Cannot delete the default channel for a starship', 403, {
+          conversationId,
+          starshipId: conversation.starshipId,
+        });
+        return;
+      }
+    } catch {
+      // Pre-migration compatibility: if the column doesn't exist yet, do not block.
     }
 
     const deleted = await conversationService.deleteConversation(conversationId);

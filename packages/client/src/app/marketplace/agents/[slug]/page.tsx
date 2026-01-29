@@ -200,7 +200,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             </div>
 
             {/* Hero header */}
-            <section className="mt-4 sm:mt-6">
+            <section className="mt-4 sm:mt-6 mb-10 sm:mb-12">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
                 <div className="flex items-start gap-4 min-w-0 flex-1">
                   <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg flex-shrink-0">

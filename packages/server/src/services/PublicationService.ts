@@ -459,12 +459,10 @@ export class PublicationService {
     // 1. Ensure avatar exists (auto-generate if missing)
     if (!agent.avatarPrompt || !agent.avatarAttachmentId) {
       console.log('[PUBLICATION] Auto-generating avatar...');
-      const { timeout: safeTimeout } = this.sanitizeNumericFields(agent);
       const mirrorResult = await this.avatarGenerationService.generateMirrorDescription({
         agentName: agent.name,
         agentDescription: agent.description,
         agentModel: agent.model,
-        agentTimeoutMs: safeTimeout,
         agentBlueprint: agent.blueprint!,
         agentTools: await this.agentRepository.getAgentTools(agent.id, agent.starshipId),
         starshipId: agent.starshipId,

@@ -102,11 +102,6 @@ export class AvatarGenerationService {
      * into execution.state for template resolution and node validation.
      */
     agentModel: string;
-    /**
-     * Optional timeout for the underlying LLM call (ms). If omitted, the agent blueprint may
-     * default to a host/client timeout that can be too aggressive for OpenRouter.
-     */
-    agentTimeoutMs?: number;
     agentBlueprint: Blueprint;
     agentTools?: unknown[];
     starshipId: string;
@@ -180,7 +175,6 @@ export class AvatarGenerationService {
       name: options.agentName,
       description: options.agentDescription,
       model: options.agentModel,
-      timeout: options.agentTimeoutMs,
       // Encourage creative but consistent identity details
       temperature: 1.1,
       // Hard-disable tool calling by providing no tools

@@ -328,7 +328,6 @@ export class LLM extends BaseNode<LlmParams> {
         frequencyPenalty: typeof params.frequencyPenalty === 'number' ? params.frequencyPenalty : undefined,
         presencePenalty: typeof params.presencePenalty === 'number' ? params.presencePenalty : undefined,
         reasoning: params.reasoning,
-        timeoutMs: typeof params.timeout === 'number' ? params.timeout : undefined,
         ...(typeof streamFlag === 'boolean' ? { stream: streamFlag } : {}),
         ...(Array.isArray(modalities) && modalities.length > 0 ? { modalities } : {}),
         ...(imageConfig && typeof imageConfig === 'object' ? { imageConfig } : {}),

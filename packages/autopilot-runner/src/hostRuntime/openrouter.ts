@@ -19,9 +19,6 @@ export async function invokeOpenRouter(
 ): Promise<AsyncIterable<unknown>> {
   const llmConfig = options.llm;
 
-  const timeoutMs =
-    typeof request.timeoutMs === 'number' && Number.isFinite(request.timeoutMs) && request.timeoutMs > 0 ? request.timeoutMs : undefined;
-
   // Prefer host-provided LLM configuration; fall back to process.env for
   // backwards compatibility when running the runner standalone.
   const apiKey = llmConfig?.apiKey ?? process.env.OPENROUTER_API_KEY;
@@ -42,7 +39,6 @@ export async function invokeOpenRouter(
       'X-Title': 'Starships.ai',
       ...(llmConfig?.defaultHeaders ?? {}),
     },
-    ...(typeof timeoutMs === 'number' ? { timeout: timeoutMs } : {}),
   };
 
   const client = new OpenAI(clientOptions);
@@ -148,7 +144,6 @@ export async function invokeOpenRouter(
       toolsCount,
       messagesCount: messages.length,
       totalTextChars,
-      timeoutMs: typeof timeoutMs === 'number' ? timeoutMs : undefined,
     };
   };
 

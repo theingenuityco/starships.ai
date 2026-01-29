@@ -10,18 +10,11 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Input } from '@/components/ui/input'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '@/lib/api'
-import type { AgentModel, ApiResponse, StarshipAgentToolPermissionModel, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
+import type { ApiResponse } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
 import type { ToolModel } from '@starships/protocol'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useStarshipAgents } from '@/hooks/useAgents'
-import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { cn } from '@/lib/utils'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import { Avatar } from '@/components/ui/avatar'
-import AgentAvatar from '@/components/animated/AgentAvatar'
-import { useMessageAttachments } from '@/hooks/useFileUpload'
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { useAuth } from '@/hooks/useAuth'
 import { JsonImportExportButtons } from '@/components/importExport/JsonImportExportButtons'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -73,21 +66,15 @@ export default function StarshipToolsPage(): React.JSX.Element {
     },
     onMutate: async tool => {
       await queryClient.cancelQueries({ queryKey: ['starship-tools', starshipId] as const })
-      await queryClient.cancelQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
 
       const prevTools = queryClient.getQueryData<ToolModel[]>(['starship-tools', starshipId] as const)
-      const prevPerms = queryClient.getQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const)
 
       queryClient.setQueryData<ToolModel[]>(['starship-tools', starshipId] as const, old => {
         const next = Array.isArray(old) ? old : []
         return next.filter(t => t.id !== tool.id)
       })
-      queryClient.setQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const, old => {
-        const next = Array.isArray(old) ? old : []
-        return next.filter(r => r.toolSlug !== tool.slug)
-      })
 
-      return { prevTools, prevPerms }
+      return { prevTools }
     },
     onSuccess: (_data, tool) => {
       toast.success('Tool deleted successfully!', {
@@ -96,7 +83,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
     },
     onError: (error: any, _tool, ctx) => {
       if (ctx?.prevTools) queryClient.setQueryData(['starship-tools', starshipId] as const, ctx.prevTools)
-      if (ctx?.prevPerms) queryClient.setQueryData(['starship-agent-tool-permissions', starshipId] as const, ctx.prevPerms)
 
       // Extract error message - handle both object and string formats (match agent delete pattern)
       let errorMessage = 'Failed to delete tool'
@@ -113,7 +99,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
       setShowDeleteConfirm(false)
       setToolToDelete(null)
       await queryClient.invalidateQueries({ queryKey: ['starship-tools', starshipId] as const })
-      await queryClient.invalidateQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
     },
   })
 
@@ -132,9 +117,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
     await deleteToolMutation.mutateAsync(toolToDelete)
   }
 
-  // Fetch agents oldest-first from the API so column ordering is server-defined.
-  const { data: starshipAgents = [], isLoading: agentsLoading } = useStarshipAgents(starshipId, !!starshipId, { order: 'ASC' })
-
   const { data: starshipTools = [], isLoading: starshipToolsLoading } = useQuery({
     queryKey: ['starship-tools', starshipId] as const,
     queryFn: async (): Promise<ToolModel[]> => {
@@ -144,69 +126,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
     },
     enabled: !!starshipId,
     staleTime: 30 * 1000,
-  })
-
-  const { data: permissionRows = [], isLoading: permissionsLoading } = useQuery({
-    queryKey: ['starship-agent-tool-permissions', starshipId] as const,
-    queryFn: async (): Promise<StarshipAgentToolPermissionModel[]> => {
-      if (!starshipId) return []
-      const response: FetchResponse<ApiResponse<StarshipAgentToolPermissionModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agent-tool-permissions`)
-      return response.data.data || []
-    },
-    enabled: !!starshipId,
-    staleTime: 10 * 1000,
-  })
-
-  const agentAvatarAttachmentIds = useMemo(() => {
-    const ids =
-      (Array.isArray(starshipAgents) ? starshipAgents : []).map(a => (a as any)?.avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0) ??
-      []
-    return Array.from(new Set(ids))
-  }, [starshipAgents])
-
-  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
-
-  const agentAvatarUrlById = useMemo(() => {
-    const map = new Map<string, string>()
-    for (const a of agentAvatarAttachments) {
-      if (a.previewUrl) map.set(a.id, a.previewUrl)
-    }
-    return map
-  }, [agentAvatarAttachments])
-
-  const setPermissionMutation = useMutation({
-    mutationFn: async (input: { agentId: string; toolSlug: string; permission: StarshipAgentToolPermissionModel['permission'] }) => {
-      const body: UpdateAgentToolPermissionsRequest = { permissions: [{ toolSlug: input.toolSlug, permission: input.permission }] }
-      await api.put(`/api/v1/agents/${input.agentId}/tool-permissions`, body)
-      return input
-    },
-    onMutate: async input => {
-      await queryClient.cancelQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
-
-      const prev = queryClient.getQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const)
-      queryClient.setQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const, old => {
-        const next = Array.isArray(old) ? [...old] : []
-        const idx = next.findIndex(r => r.agentId === input.agentId && r.toolSlug === input.toolSlug)
-        if (idx >= 0) {
-          next[idx] = { ...next[idx], permission: input.permission }
-        } else {
-          // toolId isn't required for the UI map; keep it empty for optimistic row
-          next.push({ agentId: input.agentId, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
-        }
-        return next
-      })
-
-      return { prev }
-    },
-    onError: (_err, _input, ctx) => {
-      if (ctx?.prev) {
-        queryClient.setQueryData(['starship-agent-tool-permissions', starshipId] as const, ctx.prev)
-      }
-    },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
-      await queryClient.invalidateQueries({ queryKey: ['starship-tools', starshipId] as const })
-    },
   })
 
   const filteredTools = useMemo(() => {
@@ -219,55 +138,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
       return name.includes(q) || slugv.includes(q) || desc.includes(q)
     })
   }, [starshipTools, search])
-
-  const permissionByAgentId = useMemo(() => {
-    const map = new Map<string, Map<string, StarshipAgentToolPermissionModel['permission']>>()
-    for (const row of permissionRows) {
-      if (!row?.agentId || !row?.toolSlug) continue
-      const inner = map.get(row.agentId) ?? new Map<string, StarshipAgentToolPermissionModel['permission']>()
-      inner.set(row.toolSlug, row.permission)
-      map.set(row.agentId, inner)
-    }
-    return map
-  }, [permissionRows])
-
-  const assignedToolSlugsByAgentId = useMemo(() => {
-    const map = new Map<string, Set<string>>()
-    for (const row of permissionRows) {
-      if (!row?.agentId || !row?.toolSlug) continue
-      const set = map.get(row.agentId) ?? new Set<string>()
-      set.add(row.toolSlug)
-      map.set(row.agentId, set)
-    }
-    return map
-  }, [permissionRows])
-
-  const PERMISSION_ORDER = ['allow', 'ask', 'deny'] as const
-  const permissionLabel = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'Allow'
-    if (p === 'ask') return 'Ask first'
-    return 'Deny'
-  }
-  const permissionDescription = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'Agent can trigger this tool without confirmation.'
-    if (p === 'ask') return 'Agent can trigger this tool, but you will be asked to confirm.'
-    return 'Agent cannot trigger this tool.'
-  }
-  const permissionIconName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'check-circle'
-    if (p === 'ask') return 'help-circle'
-    return 'x-circle'
-  }
-  const permissionBadgeClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
-    if (p === 'allow') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-    if (p === 'ask') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-    return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
-  }
-  const nextPermission = (p: StarshipAgentToolPermissionModel['permission']): StarshipAgentToolPermissionModel['permission'] => {
-    const idx = PERMISSION_ORDER.indexOf(p as any)
-    const nextIdx = idx >= 0 ? (idx + 1) % PERMISSION_ORDER.length : 0
-    return PERMISSION_ORDER[nextIdx]
-  }
 
   return (
     <PageLayout>
@@ -297,7 +167,7 @@ export default function StarshipToolsPage(): React.JSX.Element {
             )}
 
             <section aria-labelledby="tools-list">
-              {starshipToolsLoading || agentsLoading || permissionsLoading ? (
+              {starshipToolsLoading ? (
                 <div className="space-y-2">
                   {[1, 2, 3].map(i => (
                     <Skeleton key={i} className="h-16 w-full" />
@@ -310,14 +180,6 @@ export default function StarshipToolsPage(): React.JSX.Element {
                   </div>
                   <p className="text-base text-muted-foreground mb-3">No tools installed</p>
                   <p className="text-sm text-muted-foreground">Install tools from the Marketplace to get started.</p>
-                </div>
-              ) : starshipAgents.length === 0 ? (
-                <div className="text-center py-10 bg-muted/5 border border-dashed border-muted rounded-lg">
-                  <div className="w-16 h-16 bg-muted/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Icon name="bot" className="w-8 h-8 text-muted-foreground" />
-                  </div>
-                  <p className="text-base text-muted-foreground mb-3">No agents deployed</p>
-                  <p className="text-sm text-muted-foreground">Create an agent to configure tool permissions.</p>
                 </div>
               ) : (
                 <>
@@ -336,168 +198,54 @@ export default function StarshipToolsPage(): React.JSX.Element {
 
                   {filteredTools.length > 0 ? (
                     <div className="rounded-2xl border border-border/40 frosted-glass-card shadow-frosted-lg overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="min-w-max w-full border-separate border-spacing-0">
-                          <thead>
-                            <tr>
-                              <th
-                                scope="col"
-                                className={cn(
-                                  'sticky top-0 left-0 z-30 bg-background/90 backdrop-blur',
-                                  'text-left text-xs font-semibold text-muted-foreground',
-                                  'px-4 py-3 border-b border-r border-border/30 w-[260px] min-w-[260px]'
-                                )}
+                      <div className="divide-y divide-border/30">
+                        {filteredTools.map(tool => (
+                          <div key={tool.id} className="flex items-start justify-between gap-4 px-4 py-4">
+                            <div className="min-w-0">
+                              <button
+                                type="button"
+                                className="text-sm font-semibold text-foreground text-left hover:underline truncate"
+                                onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
+                                title={`Open tool: ${tool.name}`}
                               >
-                                Tools
-                              </th>
-                              {starshipAgents.map((agent: AgentModel) => (
-                                <th
-                                  key={agent.id}
-                                  scope="col"
-                                  className={cn(
-                                    'sticky top-0 z-20 bg-background/90 backdrop-blur',
-                                    'text-left text-xs font-semibold text-muted-foreground',
-                                    'px-4 py-3 border-b border-l border-border/30 w-[220px] min-w-[220px] max-w-[220px]'
-                                  )}
-                                >
-                                  <button
-                                    type="button"
-                                    className="w-full text-left hover:text-foreground transition-colors"
-                                    onClick={() => router.push(`/ship/${slug}/agent/${agent.slug}`)}
-                                    title={`Open agent: ${formatAgentDisplayName(agent)}`}
-                                  >
-                                    <div className="flex items-center gap-2 min-w-0">
-                                      <Avatar className="h-8 w-8 ring-1 ring-border/40 rounded-full shrink-0">
-                                        <AgentAvatar seed={agent.name || agent.slug || 'Agent'} imageUrl={agentAvatarUrlById.get((agent as any)?.avatarAttachmentId)} size={32} rounded />
-                                      </Avatar>
-                                      <div className="min-w-0">
-                                        <div className="truncate text-sm font-semibold text-foreground">{formatAgentDisplayName(agent)}</div>
-                                        <div className="truncate text-xs font-mono text-muted-foreground">{agent.slug}</div>
-                                      </div>
-                                    </div>
-                                  </button>
-                                </th>
-                              ))}
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {filteredTools.map(tool => {
-                              return (
-                                <tr key={tool.id} className="group">
-                                  <td className={cn('sticky left-0 z-10 bg-background/70 backdrop-blur', 'px-4 py-3 border-b border-r border-border/30 align-middle w-[260px] min-w-[260px]')}>
-                                    <div className="flex flex-col gap-1">
-                                      <div className="flex items-start justify-between gap-2">
-                                        <button
-                                          type="button"
-                                          className="text-sm font-semibold text-foreground text-left hover:underline min-w-0 flex-1 truncate"
-                                          onClick={() => router.push(`/ship/${slug}/tool/${tool.slug}`)}
-                                          title={`Open tool: ${tool.name}`}
-                                        >
-                                          {tool.name}
-                                        </button>
+                                {tool.name}
+                              </button>
+                              <div className="mt-1 text-xs font-mono text-muted-foreground truncate">{tool.slug}</div>
+                              {tool.description ? <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{tool.description}</div> : null}
+                            </div>
 
-                                        {isInstanceAdmin && (
-                                          <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                              <Button type="button" size="sm" variant="ghost" className="h-7 w-7 p-0 rounded-full" onClick={e => e.stopPropagation()} title="Tool actions">
-                                                <Icon name="dots-vertical" className="h-4 w-4" />
-                                              </Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent align="end" className="w-40" onClick={e => e.stopPropagation()}>
-                                              <DropdownMenuItem
-                                                onClick={e => {
-                                                  e.stopPropagation()
-                                                  void exportToolJson(tool)
-                                                }}
-                                                className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
-                                              >
-                                                <Icon name="download" className="w-4 h-4 text-muted-foreground" />
-                                                <span>Export JSON</span>
-                                              </DropdownMenuItem>
-                                              <DropdownMenuSeparator />
-                                              <DropdownMenuItem
-                                                onClick={e => {
-                                                  e.stopPropagation()
-                                                  handleRequestDeleteTool(tool)
-                                                }}
-                                                className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 focus:bg-destructive/10"
-                                              >
-                                                <Icon name="trash" className="w-4 h-4" />
-                                                <span>Delete tool</span>
-                                              </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
-                                        )}
-                                      </div>
-                                      <div className="text-xs text-muted-foreground font-mono">{tool.slug}</div>
-                                    </div>
-                                  </td>
-                                  {starshipAgents.map(agent => {
-                                    const isAssigned = assignedToolSlugsByAgentId.get(agent.id)?.has(tool.slug) ?? false
-                                    const p = permissionByAgentId.get(agent.id)?.get(tool.slug) ?? ('allow' as StarshipAgentToolPermissionModel['permission'])
-                                    const isUpdating = setPermissionMutation.isPending
-                                    const next = nextPermission(p)
-                                    return (
-                                      <td key={`${tool.id}:${agent.id}`} className="px-4 py-3 border-b border-l border-border/30 align-middle w-[220px] min-w-[220px] max-w-[220px]">
-                                        <Tooltip delayDuration={250}>
-                                          <TooltipTrigger asChild>
-                                            {/* Use a span wrapper so tooltip still works when the inner button is disabled */}
-                                            <span className={cn('inline-flex', (isUpdating || !isAssigned) && 'cursor-not-allowed')}>
-                                              <button
-                                                type="button"
-                                                disabled={isUpdating || !isAssigned}
-                                                onClick={() => {
-                                                  if (!isAssigned) return
-                                                  setPermissionMutation.mutate({ agentId: agent.id, toolSlug: tool.slug, permission: next })
-                                                }}
-                                                className={cn('inline-flex items-center justify-start', (isUpdating || !isAssigned) && 'opacity-60')}
-                                                aria-label={
-                                                  isAssigned
-                                                    ? `Permission for agent ${formatAgentDisplayName(agent)} on tool ${tool.name}. Current: ${permissionLabel(p)}. Click to change to ${permissionLabel(next)}.`
-                                                    : `Tool ${tool.name} is not assigned to agent ${formatAgentDisplayName(agent)}`
-                                                }
-                                              >
-                                                {isAssigned ? (
-                                                  <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(p))}>
-                                                    <span className="inline-flex items-center gap-1.5">
-                                                      <Icon name={permissionIconName(p)} className="h-3.5 w-3.5" />
-                                                      <span>{permissionLabel(p)}</span>
-                                                    </span>
-                                                  </Badge>
-                                                ) : (
-                                                  <Badge variant="outline" className="whitespace-nowrap text-muted-foreground border-border/40">
-                                                    Not assigned
-                                                  </Badge>
-                                                )}
-                                              </button>
-                                            </span>
-                                          </TooltipTrigger>
-                                          <TooltipContent
-                                            side="right"
-                                            align="start"
-                                            className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-popover text-popover-foreground border border-border/60"
-                                          >
-                                            {isAssigned ? (
-                                              <div className="space-y-1">
-                                                <div className="font-medium">{permissionDescription(p)}</div>
-                                                <div className="italic text-muted-foreground">Click to change to {permissionLabel(next)}.</div>
-                                              </div>
-                                            ) : (
-                                              <div className="space-y-1">
-                                                <div className="font-medium">This tool is not assigned to the agent.</div>
-                                                <div className="italic text-muted-foreground">Assign the tool to enable permissions.</div>
-                                              </div>
-                                            )}
-                                          </TooltipContent>
-                                        </Tooltip>
-                                      </td>
-                                    )
-                                  })}
-                                </tr>
-                              )
-                            })}
-                          </tbody>
-                        </table>
+                            {isInstanceAdmin ? (
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                  <Button type="button" size="sm" variant="ghost" className="h-8 w-8 p-0 rounded-full" title="Tool actions">
+                                    <Icon name="dots-vertical" className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="w-40">
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      void exportToolJson(tool)
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer hover:bg-primary/10 focus:bg-primary/10"
+                                  >
+                                    <Icon name="download" className="w-4 h-4 text-muted-foreground" />
+                                    <span>Export JSON</span>
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={() => {
+                                      handleRequestDeleteTool(tool)
+                                    }}
+                                    className="flex items-center gap-2 cursor-pointer text-destructive focus:text-destructive hover:bg-destructive/10 focus:bg-destructive/10"
+                                  >
+                                    <Icon name="trash" className="w-4 h-4" />
+                                    <span>Delete tool</span>
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            ) : null}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   ) : (

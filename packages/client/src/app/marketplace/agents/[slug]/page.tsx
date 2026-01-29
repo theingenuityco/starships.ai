@@ -56,6 +56,36 @@ function categoryBadgeClass(category: AgentTemplateModel['category']): string {
   return colors[String(category)] || colors.general
 }
 
+type CapabilityPermission = 'allow' | 'ask' | 'deny'
+
+function inferCapabilityPermission(info: ToolTemplateModel | undefined): CapabilityPermission {
+  // Marketplace pages have no starship-specific permission matrix.
+  // We infer a conservative "ask" when a tool clearly requires user configuration.
+  if (!info) return 'allow'
+  if (info.requiresApiKey) return 'ask'
+  const requiredConfigCount = Array.isArray(info.configurationFields) ? info.configurationFields.filter(f => !!f?.required).length : 0
+  if (requiredConfigCount > 0) return 'ask'
+  return 'allow'
+}
+
+function permissionDotClassName(p: CapabilityPermission): string {
+  if (p === 'allow') return 'bg-emerald-500/70 group-hover:bg-emerald-500'
+  if (p === 'ask') return 'bg-amber-500/70 group-hover:bg-amber-500'
+  return 'bg-red-500/70 group-hover:bg-red-500'
+}
+
+function permissionHoverBorderClassName(p: CapabilityPermission): string {
+  if (p === 'allow') return 'hover:border-emerald-500/30'
+  if (p === 'ask') return 'hover:border-amber-500/30'
+  return 'hover:border-red-500/30'
+}
+
+function permissionHoverTitleClassName(p: CapabilityPermission): string {
+  if (p === 'allow') return 'group-hover:text-emerald-700 dark:group-hover:text-emerald-300'
+  if (p === 'ask') return 'group-hover:text-amber-700 dark:group-hover:text-amber-300'
+  return 'group-hover:text-red-700 dark:group-hover:text-red-300'
+}
+
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
   const templates = await fetchPublicAgentTemplates({ revalidateSeconds: revalidate })
   return templates.find(t => t.slug === slug) ?? null
@@ -272,17 +302,18 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           const info = toolInfoBySlug.get(slug)
                           const title = info?.name?.trim() || slug
                           const desc = info?.description?.trim() || ''
+                          const permission = inferCapabilityPermission(info)
                           return (
                             <div
                               key={slug}
-                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md"
+                              className={`group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 transition-all duration-200 p-4 hover:shadow-md ${permissionHoverBorderClassName(permission)}`}
                             >
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
-                                  <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
+                                  <div className={`h-2 w-2 rounded-full transition-colors ${permissionDotClassName(permission)}`} />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-semibold leading-5 text-foreground group-hover:text-primary transition-colors">{title}</div>
+                                  <div className={`text-sm font-semibold leading-5 text-foreground transition-colors ${permissionHoverTitleClassName(permission)}`}>{title}</div>
                                   {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/90">{desc}</div> : null}
                                 </div>
                               </div>

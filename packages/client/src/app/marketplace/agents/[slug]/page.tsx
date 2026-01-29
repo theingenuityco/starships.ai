@@ -251,7 +251,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
             {/* Main content grid */}
             <section className="mt-8 pb-10 sm:pb-16">
-              <div className="space-y-8">
+              <div className="space-y-12 sm:space-y-14">
                 {/* Problem Statements Section */}
                 {hasProblemSection ? (
                   hasProblemImage ? (
@@ -460,7 +460,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             </section>
 
             {/* Bottom Deploy Section */}
-            <section className="mt-8 pb-10 sm:pb-16 border-t border-border/60 pt-8">
+            <section className="mt-10 sm:mt-12 pb-10 sm:pb-16 pt-2">
               <div className="max-w-2xl mx-auto text-center">
                 <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Ready to get started?</h2>
                 <p className="text-sm text-muted-foreground mb-6">Add this agent to your starship and start using it right away.</p>

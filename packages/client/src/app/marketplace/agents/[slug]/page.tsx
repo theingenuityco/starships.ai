@@ -303,7 +303,10 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                             const desc = info?.description?.trim() || ''
                             const permission = inferCapabilityPermission(info)
                             return (
-                              <div key={slug} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4">
+                              <div
+                                key={slug}
+                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
+                              >
                                 <div className="flex items-start gap-3">
                                   <div className="mt-0.5 flex-shrink-0">
                                     <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
@@ -352,7 +355,10 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           const desc = info?.description?.trim() || ''
                           const permission = inferCapabilityPermission(info)
                           return (
-                            <div key={slug} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4">
+                            <div
+                              key={slug}
+                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
+                            >
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
                                   <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
@@ -399,7 +405,10 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         </div>
                         <div className="grid grid-cols-1 gap-3">
                           {previewPrompts.map((p, idx) => (
-                            <div key={idx} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer">
+                            <div
+                              key={idx}
+                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
+                            >
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
                                   <Icon name="sparkles" className="h-4 w-4 text-primary" />
@@ -419,7 +428,10 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       </div>
                       <div className="grid grid-cols-1 gap-3">
                         {previewPrompts.map((p, idx) => (
-                          <div key={idx} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer">
+                          <div
+                            key={idx}
+                            className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
+                          >
                             <div className="flex items-start gap-3">
                               <div className="mt-0.5 flex-shrink-0">
                                 <Icon name="sparkles" className="h-4 w-4 text-primary" />

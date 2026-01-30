@@ -11,6 +11,12 @@ import { nanoid } from 'nanoid';
 export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
   try {
+    const getRows = <T>(result: unknown): T[] => {
+      if (Array.isArray(result)) return result as T[];
+      const anyRes = result as { rows?: unknown };
+      return Array.isArray(anyRes?.rows) ? (anyRes.rows as T[]) : [];
+    };
+
     await client.query(`
       ALTER TABLE starships
         ADD COLUMN IF NOT EXISTS default_channel_conversation_id VARCHAR(255) NULL;
@@ -44,17 +50,18 @@ export async function up(client: Client): Promise<void> {
     // Backfill existing starships:
     // - If #general already exists, store it as default.
     // - Otherwise create a new conversation-backed channel and store it.
-    const starships = await client.query<{ id: string }>(
+    const starshipsRes = await client.query<{ id: string }>(
       `SELECT id
          FROM starships
         WHERE default_channel_conversation_id IS NULL`
     );
+    const starships = getRows<{ id: string }>(starshipsRes);
 
-    for (const s of starships.rows) {
+    for (const s of starships) {
       const starshipId = String(s.id);
 
       // Prefer an existing #general channel if present
-      const existing = await client.query<{ conversation_id: string }>(
+      const existingRes = await client.query<{ conversation_id: string }>(
         `SELECT conversation_id
            FROM channels
           WHERE starship_id = $1
@@ -62,10 +69,11 @@ export async function up(client: Client): Promise<void> {
           LIMIT 1`,
         [starshipId]
       );
+      const existing = getRows<{ conversation_id: string }>(existingRes);
 
       let conversationId: string;
-      if (existing.rows.length > 0) {
-        conversationId = String(existing.rows[0]!.conversation_id);
+      if (existing.length > 0) {
+        conversationId = String(existing[0]!.conversation_id);
       } else {
         conversationId = nanoid();
         await client.query(

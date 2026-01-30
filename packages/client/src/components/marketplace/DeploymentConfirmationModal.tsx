@@ -185,10 +185,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                     const desc = info?.description?.trim() || ''
                     const current = toolPermissions[slug] ?? 'ask'
                     return (
-                      <div
-                        key={slug}
-                        className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4"
-                      >
+                      <div key={slug} className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">
                             <div className="mt-1.5 flex-shrink-0">
@@ -207,11 +204,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                                       <Icon name="info" iconOverride={{ type: 'phosphor', component: 'Info' }} className="h-4 w-4" />
                                     </button>
                                   </TooltipTrigger>
-                                  <TooltipContent
-                                    side="top"
-                                    align="start"
-                                    className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-card text-card-foreground border border-border/60 z-[1004]"
-                                  >
+                                  <TooltipContent side="top" align="start" className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-card text-card-foreground border border-border/60 z-[1004]">
                                     <div className="text-muted-foreground leading-relaxed">{desc || slug}</div>
                                   </TooltipContent>
                                 </Tooltip>

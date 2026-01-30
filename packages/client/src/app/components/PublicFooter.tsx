@@ -54,4 +54,3 @@ export function PublicFooter(props: { fromPath?: string }) {
     </footer>
   )
 }
-

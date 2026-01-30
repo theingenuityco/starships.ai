@@ -70,21 +70,9 @@ function inferCapabilityPermission(info: ToolTemplateModel | undefined): Capabil
 }
 
 function permissionDotClassName(p: CapabilityPermission): string {
-  if (p === 'allow') return 'bg-emerald-500/70 group-hover:bg-emerald-500'
-  if (p === 'ask') return 'bg-amber-500/70 group-hover:bg-amber-500'
-  return 'bg-red-500/70 group-hover:bg-red-500'
-}
-
-function permissionHoverBorderClassName(p: CapabilityPermission): string {
-  if (p === 'allow') return 'hover:border-emerald-500/30'
-  if (p === 'ask') return 'hover:border-amber-500/30'
-  return 'hover:border-red-500/30'
-}
-
-function permissionHoverTitleClassName(p: CapabilityPermission): string {
-  if (p === 'allow') return 'group-hover:text-emerald-700 dark:group-hover:text-emerald-300'
-  if (p === 'ask') return 'group-hover:text-amber-700 dark:group-hover:text-amber-300'
-  return 'group-hover:text-red-700 dark:group-hover:text-red-300'
+  if (p === 'allow') return 'bg-emerald-500'
+  if (p === 'ask') return 'bg-amber-500'
+  return 'bg-red-500'
 }
 
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
@@ -317,15 +305,15 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                             return (
                               <div
                                 key={slug}
-                                className={`group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 transition-all duration-200 p-4 hover:shadow-md ${permissionHoverBorderClassName(permission)}`}
+                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
                               >
                                 <div className="flex items-start gap-3">
                                   <div className="mt-0.5 flex-shrink-0">
-                                    <div className={`h-2 w-2 rounded-full transition-colors ${permissionDotClassName(permission)}`} />
+                                    <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
                                   </div>
                                   <div className="min-w-0 flex-1">
-                                    <div className={`text-sm font-semibold leading-5 text-foreground transition-colors ${permissionHoverTitleClassName(permission)}`}>{title}</div>
-                                    {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/90">{desc}</div> : null}
+                                    <div className="text-sm font-semibold leading-5 text-foreground">{title}</div>
+                                    {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">{desc}</div> : null}
                                   </div>
                                 </div>
                               </div>
@@ -369,15 +357,15 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           return (
                             <div
                               key={slug}
-                              className={`group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 transition-all duration-200 p-4 hover:shadow-md ${permissionHoverBorderClassName(permission)}`}
+                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
                             >
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
-                                  <div className={`h-2 w-2 rounded-full transition-colors ${permissionDotClassName(permission)}`} />
+                                  <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
                                 </div>
                                 <div className="min-w-0 flex-1">
-                                  <div className={`text-sm font-semibold leading-5 text-foreground transition-colors ${permissionHoverTitleClassName(permission)}`}>{title}</div>
-                                  {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/90">{desc}</div> : null}
+                                  <div className="text-sm font-semibold leading-5 text-foreground">{title}</div>
+                                  {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">{desc}</div> : null}
                                 </div>
                               </div>
                             </div>
@@ -419,13 +407,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           {previewPrompts.map((p, idx) => (
                             <div
                               key={idx}
-                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md cursor-pointer"
+                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
                             >
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
-                                  <Icon name="sparkles" className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
+                                  <Icon name="sparkles" className="h-4 w-4 text-primary" />
                                 </div>
-                                <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors flex-1">{p}</p>
+                                <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
                               </div>
                             </div>
                           ))}
@@ -442,13 +430,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         {previewPrompts.map((p, idx) => (
                           <div
                             key={idx}
-                            className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md cursor-pointer"
+                            className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
                           >
                             <div className="flex items-start gap-3">
                               <div className="mt-0.5 flex-shrink-0">
-                                <Icon name="sparkles" className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
+                                <Icon name="sparkles" className="h-4 w-4 text-primary" />
                               </div>
-                              <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors flex-1">{p}</p>
+                              <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
                             </div>
                           </div>
                         ))}
@@ -460,11 +448,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             </section>
 
             {/* Bottom Deploy Section */}
-            <section className="mt-10 sm:mt-12 pb-10 sm:pb-16 pt-2">
+            <section className="mt-6 sm:mt-8 pb-10 sm:pb-16 pt-2">
               <div className="max-w-2xl mx-auto text-center">
                 <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Ready to get started?</h2>
                 <p className="text-sm text-muted-foreground mb-6">Add this agent to your starship and start using it right away.</p>
-                <MarketplaceAgentDeployCta template={template} />
+                <div className="flex justify-center">
+                  <MarketplaceAgentDeployCta template={template} />
+                </div>
               </div>
             </section>
           </div>

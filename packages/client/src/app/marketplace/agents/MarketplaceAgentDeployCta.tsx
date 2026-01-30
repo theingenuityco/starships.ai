@@ -94,9 +94,17 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
   return (
     <>
       {isAlreadyDeployed ? (
-        <div className="relative inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
-          <Icon name="check-circle" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+        <div className="flex items-center gap-3">
+          <div className="relative inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
+            <Icon name="check-circle" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+          </div>
+          {primaryStarship?.slug ? (
+            <Button variant="primaryOutline" size="sm" className="h-10 gap-2" onClick={() => router.push(`/ship/${primaryStarship.slug}`)}>
+              <Icon name="message-square" className="h-4 w-4" />
+              Start chat
+            </Button>
+          ) : null}
         </div>
       ) : (
         <Button onClick={handleDeployClick} disabled={deployDisabled} className="h-10">

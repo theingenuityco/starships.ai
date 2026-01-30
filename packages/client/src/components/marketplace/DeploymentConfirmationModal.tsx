@@ -187,10 +187,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                     return (
                       <div
                         key={slug}
-                        className={cn(
-                          'group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4 transition-all duration-200',
-                          'hover:from-background/60 hover:to-background/40 hover:border-border/70 hover:shadow-md'
-                        )}
+                        className="group relative rounded-xl border border-border/60 bg-gradient-to-br from-background/50 to-background/30 p-4"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-start gap-3 min-w-0">

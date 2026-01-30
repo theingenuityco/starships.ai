@@ -21,6 +21,7 @@ import {
   ChannelRepository,
   ConversationMemberRepository,
   ConversationWidgetRepository,
+  DirectMessageRepository,
   getConnection,
   MessageRepository,
   StarshipMemberRepository,
@@ -289,6 +290,49 @@ async function enforcePrivateChannelMembership(args: {
   }
 }
 
+/**
+ * Enforce direct message membership (conversation-backed DMs).
+ *
+ * Starship collaborators can see starship resources, but DMs are always restricted:
+ * - instance admin can always access
+ * - otherwise require a row in `conversation_members`
+ */
+async function enforceDirectMessageMembership(args: {
+  conversationId: string;
+  userId: string;
+  req: Request;
+  res: Response;
+}): Promise<boolean> {
+  try {
+    const dmRepo = new DirectMessageRepository();
+    const dm = await dmRepo.findByConversationId(args.conversationId).catch(() => null);
+    if (!dm) return true;
+
+    // Instance admin bypass
+    const isAdmin = isInstanceAdmin(args.req.user);
+    if (isAdmin) return true;
+
+    const memberRepo = new ConversationMemberRepository();
+    const ok = await memberRepo.isMember(args.userId, args.conversationId);
+    if (!ok) {
+      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
+        resource: 'direct_message',
+        conversationId: args.conversationId,
+      });
+      return false;
+    }
+    return true;
+  } catch {
+    // Best-effort: if we cannot evaluate DM membership, fail closed for safety.
+    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
+      resource: 'direct_message',
+      conversationId: args.conversationId,
+      reason: 'membership_check_failed',
+    });
+    return false;
+  }
+}
+
 // tool execution uses the same runner config bundle as agent execution
 
 async function executeToolBlueprint(args: {
@@ -533,6 +577,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       return;
     }
     if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
 
@@ -950,6 +997,9 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
     if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
 
     await conversationService.stopConversation(conversationId);
     sendSuccess(res, { status: 'stopped', conversationId }, 200);
@@ -1021,6 +1071,9 @@ router.post(
         return;
       }
       if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+        return;
+      }
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
         return;
       }
 
@@ -1347,6 +1400,7 @@ router.post(
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
       if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1423,6 +1477,7 @@ router.get(
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
       if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvalsRepo = new ToolCallApprovalRepository();
       const approvals = await approvalsRepo.findPendingByConversation(conversationId);
@@ -1968,6 +2023,7 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
         starshipId: IdSchema,
         agentSlug: z.string().min(1).max(255).optional(),
         agentId: IdSchema.optional(),
+        parentConversationId: IdSchema.optional(),
       }),
       req.body,
       res,
@@ -2019,15 +2075,68 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
       resolvedAgentId = agent.id;
     }
 
-    const conversationService = new ConversationService();
-    // Build payload for conversation creation, normalizing agentId and dropping agentSlug
-    const createPayload = {
-      ...req.body,
-      agentId: resolvedAgentId ?? bodyValidation.agentId,
-    };
-    delete createPayload.agentSlug;
+    // No-stray enforcement:
+    // - Child conversations (parentConversationId set) are allowed as nested threads.
+    // - Top-level conversations must be either a DM (agent provided) or a Channel (via channels API).
+    const parentConversationId = bodyValidation.parentConversationId;
+    const effectiveAgentId = resolvedAgentId ?? bodyValidation.agentId;
+    if (!isInternal && !parentConversationId && !effectiveAgentId) {
+      sendError(res, 'VALIDATION_ERROR', 'Top-level conversations must be created as a channel or a direct message', 400, {
+        hint: 'Use POST /starships/:starshipId/channels or POST /starships/:starshipId/direct-messages',
+      });
+      return;
+    }
 
-    const conversation = await conversationService.createConversation(createPayload);
+    const conversationService = new ConversationService();
+    // For external callers creating top-level agent chats, create/reuse a DM instead of a raw conversation.
+    if (!isInternal && !parentConversationId && effectiveAgentId && authUserId) {
+      const dmRepo = new DirectMessageRepository();
+      const existingDm = await dmRepo.findUserAgentDm(bodyValidation.starshipId, authUserId, effectiveAgentId).catch(() => null);
+      if (existingDm) {
+        const existingConversation = await conversationService.getConversationById(existingDm.conversationId);
+        if (existingConversation) {
+          sendSuccess(res, existingConversation, 200);
+          return;
+        }
+      }
+
+      const conversation = await conversationService.createConversation({
+        title: bodyValidation.title || 'New Conversation',
+        status: 'active',
+        starshipId: bodyValidation.starshipId,
+        agentId: effectiveAgentId,
+        parentConversationId,
+      });
+
+      await dmRepo
+        .create({
+          conversationId: conversation.id,
+          starshipId: bodyValidation.starshipId,
+          dmType: 'user_agent',
+          userId: authUserId,
+          agentId: effectiveAgentId,
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt ?? conversation.createdAt,
+        })
+        .catch(() => null);
+
+      const memberRepo = new ConversationMemberRepository();
+      await memberRepo
+        .createOrIgnoreMember({ conversationId: conversation.id, userId: authUserId, role: 'admin', createdBy: authUserId })
+        .catch(() => null);
+
+      sendSuccess(res, conversation, 201);
+      return;
+    }
+
+    // Otherwise, fall back to raw conversation creation (internal/scheduled or nested).
+    const conversation = await conversationService.createConversation({
+      title: bodyValidation.title || 'New Conversation',
+      status: 'active',
+      starshipId: bodyValidation.starshipId,
+      agentId: effectiveAgentId,
+      parentConversationId,
+    });
 
     sendSuccess(res, conversation, 201);
   } catch (error) {

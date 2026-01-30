@@ -11,6 +11,7 @@ export { PlatformSecretEntity } from './entities/PlatformSecretEntity';
 export { ConnectorEntity } from './entities/ConnectorEntity';
 export { ConnectorTemplateEntity } from './entities/ConnectorTemplateEntity';
 export { ChannelEntity } from './entities/ChannelEntity';
+export { DirectMessageEntity } from './entities/DirectMessageEntity';
 export { MessageEntity } from './entities/MessageEntity';
 export { OAuthAccountEntity } from './entities/OAuthAccountEntity';
 export { OAuthAuthCodeEntity } from './entities/OAuthAuthCodeEntity';
@@ -44,6 +45,7 @@ export { PlatformSecretRepository } from './repositories/PlatformSecretRepositor
 export { ConnectorTemplateRepository } from './repositories/ConnectorTemplateRepository';
 export { ConnectorRepository } from './repositories/ConnectorRepository';
 export { ChannelRepository } from './repositories/ChannelRepository';
+export { DirectMessageRepository } from './repositories/DirectMessageRepository';
 export { MessageRepository } from './repositories/MessageRepository';
 export { OAuthAccountRepository } from './repositories/OAuthAccountRepository';
 export { OAuthAuthCodeRepository } from './repositories/OAuthAuthCodeRepository';

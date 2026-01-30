@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useCreateChannel, useStarshipChannels, useStarshipConversations } from '@/hooks/useConversations'
+import { useChildConversations, useCreateChannel, useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
@@ -29,38 +29,18 @@ interface ConversationListProps {
   compact?: boolean
 }
 
-type ConversationWithAgents = ConversationModel & { agents: AgentModel[] }
-
-function CompactConversationAgents({ starshipId, agents }: { starshipId: string; agents: AgentModel[] }) {
-  const maxToShow = 2
-  const visibleAgents = agents.slice(0, maxToShow)
-  const remaining = agents.length - visibleAgents.length
-
+function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent: AgentModel | null }) {
   const avatarAttachmentIds = useMemo(() => {
-    return visibleAgents.map(a => a.avatarAttachmentId).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-  }, [visibleAgents])
+    const id = agent?.avatarAttachmentId
+    return typeof id === 'string' && id.trim().length > 0 ? [id] : []
+  }, [agent?.avatarAttachmentId])
   const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
-  const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
-
-  const agentNamesText = useMemo(() => {
-    const names = visibleAgents.map(a => formatAgentDisplayName(a)).filter(Boolean)
-    const base = names.join(', ')
-    return remaining > 0 ? `${base} +${remaining}` : base
-  }, [visibleAgents, remaining])
-
-  if (!agents.length) return null
+  const previewUrl = avatarAttachments?.[0]?.previewUrl
 
   return (
-    <div className="mt-1 flex items-center gap-1 text-muted-foreground group-hover:text-foreground min-w-0" style={{ fontSize: '12px' }}>
-      <div className="flex items-center gap-1 flex-shrink-0">
-        {visibleAgents.map(agent => (
-          <Avatar key={agent.id} className="h-3.5 w-3.5 ring-1 ring-border/40">
-            <AgentAvatar seed={agent.name} imageUrl={agent.avatarAttachmentId ? avatarUrlById.get(agent.avatarAttachmentId) : undefined} size={14} rounded />
-          </Avatar>
-        ))}
-      </div>
-      <span className="truncate min-w-0">{agentNamesText}</span>
-    </div>
+    <Avatar className="h-5 w-5 ring-1 ring-border/40">
+      <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
+    </Avatar>
   )
 }
 
@@ -71,8 +51,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   // Get conversationId directly from params - no prop needed
   const currentConversationId = params.conversationId as string | undefined
 
-  // Override default query options to prevent refetching on route changes
-  const { data, isLoading, error } = useStarshipConversations(starshipId, true)
+  const { data: dmData, isLoading: dmsLoading, error: dmsError } = useStarshipDirectMessages(starshipId, true)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const createChannel = useCreateChannel()
   const [searchQuery, setSearchQuery] = useState('')
@@ -82,84 +61,40 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
   const channels = (channelsData?.channels || []) as ChannelModel[]
 
-  // Filter conversations based on search and status
-  const filteredConversations =
-    data?.conversations?.filter(conv => {
-      // Exclude archived conversations from the UI
-      if (conv.status === 'archived') return false
-      if (!searchQuery) return true
-      const title = conv.title || `Conversation ${conv.id.slice(0, 8)}`
-      return title.toLowerCase().includes(searchQuery.toLowerCase())
-    }) || ([] as ConversationWithAgents[])
+  const oldConversationsChannel = useMemo(() => channels.find(c => String(c.slug || '').toLowerCase() === 'old-conversations') || null, [channels])
+  const oldConversationsChannelId = oldConversationsChannel?.conversationId ? String(oldConversationsChannel.conversationId) : null
+  const { data: oldConversationsChildren = [], isLoading: oldChildrenLoading } = useChildConversations(oldConversationsChannelId, Boolean(oldConversationsChannelId))
 
-  // Build parent/child tree: root conversations and their children
-  const roots: ConversationWithAgents[] = []
-  const childrenByParent: Record<string, ConversationWithAgents[]> = {}
+  const directMessages = (dmData?.directMessages || []) as DirectMessageListItem[]
+  const filteredDirectMessages = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase()
+    const base = directMessages.filter(it => Boolean(it?.dm?.conversationId))
+    if (!q) return base
+    return base.filter(it => {
+      const agentName = it.agent ? formatAgentDisplayName(it.agent) : ''
+      const title = it.conversation?.title || ''
+      return agentName.toLowerCase().includes(q) || title.toLowerCase().includes(q)
+    })
+  }, [directMessages, searchQuery])
 
-  for (const conv of filteredConversations) {
-    const parentId = conv.parentConversationId
-    if (parentId) {
-      if (!childrenByParent[parentId]) {
-        childrenByParent[parentId] = []
-      }
-      childrenByParent[parentId].push(conv)
-    } else {
-      roots.push(conv)
-    }
-  }
-
-  // Group root conversations by date for full view
-  const groupedConversations = roots.reduce(
-    (groups, conv) => {
-      const date = new Date(conv.createdAt)
-      const today = new Date()
-      const yesterday = new Date(today)
-      yesterday.setDate(yesterday.getDate() - 1)
-      const lastWeek = new Date(today)
-      lastWeek.setDate(lastWeek.getDate() - 7)
-
-      let groupKey = 'Older'
-      if (date.toDateString() === today.toDateString()) {
-        groupKey = 'Today'
-      } else if (date.toDateString() === yesterday.toDateString()) {
-        groupKey = 'Yesterday'
-      } else if (date > lastWeek) {
-        groupKey = 'This Week'
-      }
-
-      if (!groups[groupKey]) {
-        groups[groupKey] = []
-      }
-      groups[groupKey].push(conv)
-      return groups
-    },
-    {} as Record<string, ConversationModel[]>
-  )
-
-  // Helper render function for compact list (flat, but with visual indentation for children)
-  const renderCompactConversation = (conversation: ConversationWithAgents, isChild: boolean) => {
-    const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
-    const isActive = conversation.id === currentConversationId
-    const agents = conversation.agents
+  const renderCompactDirectMessage = (it: DirectMessageListItem) => {
+    const conversationId = String(it.dm.conversationId)
+    const isActive = conversationId === currentConversationId
+    const label = it.agent ? formatAgentDisplayName(it.agent) : it.conversation?.title || `DM ${conversationId.slice(0, 8)}`
 
     return (
       <div
-        key={conversation.id}
+        key={conversationId}
         className={cn(
-          'group flex items-center gap-1.5 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
+          'group flex items-center gap-2 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
           isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
         )}
-        style={isChild ? { paddingLeft: '1.5rem' } : undefined}
+        onClick={() => handleConversationClick(conversationId)}
       >
-        <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleConversationClick(conversation.id)}>
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-1 min-w-0">
-              <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{title}</p>
-            </div>
-          </div>
-          <CompactConversationAgents starshipId={starshipId} agents={agents} />
+        <DirectMessageAvatar starshipId={starshipId} agent={it.agent} />
+        <div className="flex-1 min-w-0">
+          <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{label}</p>
         </div>
-        {/* Delete button - appears on hover */}
         {onConversationDelete && (
           <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
             <DropdownMenu modal={false}>
@@ -187,7 +122,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                   onClick={e => {
                     e.preventDefault()
                     e.stopPropagation()
-                    onConversationDelete(conversation.id)
+                    onConversationDelete(conversationId)
                   }}
                 >
                   <Icon name="trash" className="mr-2 h-3 w-3" />
@@ -262,7 +197,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   // Compact mode - inline display without header/search
   if (compact) {
-    if (isLoading) {
+    if (dmsLoading) {
       return (
         <div className="space-y-1">
           {[1, 2, 3].map(i => (
@@ -272,10 +207,10 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       )
     }
 
-    if (error) {
+    if (dmsError) {
       return (
         <div className="flex flex-col items-center justify-center py-8 px-2">
-          <p className="text-muted-foreground text-xs text-center">Failed to load conversations</p>
+          <p className="text-muted-foreground text-xs text-center">Failed to load direct messages</p>
         </div>
       )
     }
@@ -304,20 +239,54 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               {channels.map(ch => {
                 const isActive = ch.conversationId === currentConversationId
                 const label = ch.slug ? `#${ch.slug}` : ch.name
+                const isOld = String(ch.slug || '').toLowerCase() === 'old-conversations'
                 return (
-                  <div
-                    key={ch.conversationId}
-                    className={cn(
-                      'group flex items-center gap-2 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
-                      isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
-                    )}
-                    onClick={() => handleConversationClick(ch.conversationId)}
-                  >
-                    <span className={cn('font-mono text-[12px]', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
-                    <div className="flex-1 min-w-0">
-                      <div className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{label}</div>
-                      {ch.isPrivate && <div className="text-[11px] text-muted-foreground">Private</div>}
+                  <div key={ch.conversationId}>
+                    <div
+                      className={cn(
+                        'group flex items-center gap-2 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
+                        isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                      )}
+                      onClick={() => handleConversationClick(ch.conversationId)}
+                    >
+                      <span className={cn('font-mono text-[12px]', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                      <div className="flex-1 min-w-0">
+                        <div className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{label}</div>
+                        {ch.isPrivate && <div className="text-[11px] text-muted-foreground">Private</div>}
+                      </div>
                     </div>
+
+                    {/* Legacy threads under #old-conversations */}
+                    {isOld && (oldChildrenLoading || oldConversationsChildren.length > 0) && (
+                      <div className="mt-1 space-y-1 pl-6 border-l border-dashed border-border/60">
+                        {oldChildrenLoading ? (
+                          <>
+                            {[1, 2].map(i => (
+                              <Skeleton key={i} className="h-7 w-full rounded-lg" />
+                            ))}
+                          </>
+                        ) : (
+                          (oldConversationsChildren as Array<ConversationModel & { agents: AgentModel[] }>).map(child => {
+                            const childTitle = child.title || `Conversation ${child.id.slice(0, 8)}`
+                            const childActive = child.id === currentConversationId
+                            return (
+                              <div
+                                key={child.id}
+                                className={cn(
+                                  'group flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-all',
+                                  'hover:bg-muted/40',
+                                  childActive && 'bg-muted/70 shadow-sm'
+                                )}
+                                onClick={() => handleConversationClick(child.id)}
+                              >
+                                <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Old</span>
+                                <span className={cn('truncate flex-1', childActive && 'text-primary font-medium')}>{childTitle}</span>
+                              </div>
+                            )
+                          })
+                        )}
+                      </div>
+                    )}
                   </div>
                 )
               })}
@@ -325,20 +294,13 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
           )}
 
           <div className="pt-1">
-            {filteredConversations.length === 0 ? (
+            {filteredDirectMessages.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 px-2">
                 <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                <p className="text-muted-foreground text-xs text-center">No conversations yet</p>
+                <p className="text-muted-foreground text-xs text-center">No direct messages yet</p>
               </div>
             ) : (
-              <>
-                {roots.map(root => (
-                  <div key={root.id}>
-                    {renderCompactConversation(root, false)}
-                    {(childrenByParent[root.id] || []).map(child => renderCompactConversation(child, true))}
-                  </div>
-                ))}
-              </>
+              <>{filteredDirectMessages.map(it => renderCompactDirectMessage(it))}</>
             )}
           </div>
         </div>
@@ -352,7 +314,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       {/* Header */}
       <div className="p-3 border-b">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <h2 className="text-base font-semibold">Conversations</h2>
+          <h2 className="text-base font-semibold">Messages</h2>
           <Button type="button" size="sm" variant="secondary" className="h-8" onClick={() => setIsCreateChannelOpen(true)} disabled={createChannel.isPending}>
             <Icon name="plus" className="h-4 w-4 mr-1" />
             New channel
@@ -396,20 +358,62 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                 {channels.map(ch => {
                   const isActive = ch.conversationId === currentConversationId
                   const label = ch.slug ? `#${ch.slug}` : ch.name
+                  const isOld = String(ch.slug || '').toLowerCase() === 'old-conversations'
                   return (
-                    <div
-                      key={ch.conversationId}
-                      className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
-                      onClick={() => handleConversationClick(ch.conversationId)}
-                    >
-                      <span className={cn('text-xs font-mono', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
-                          <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}</span>
+                    <div key={ch.conversationId}>
+                      <div
+                        className={cn(
+                          'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
+                          'hover:bg-muted/50',
+                          isActive && 'bg-muted/70 shadow-sm'
+                        )}
+                        onClick={() => handleConversationClick(ch.conversationId)}
+                      >
+                        <span className={cn('text-xs font-mono', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
+                            <span className="text-[10px] text-muted-foreground">
+                              {formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            {ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}
+                          </div>
                         </div>
-                        <div className="flex items-center gap-2 mt-0.5">{ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}</div>
                       </div>
+
+                      {/* Legacy threads under #old-conversations */}
+                      {isOld && (oldChildrenLoading || oldConversationsChildren.length > 0) && (
+                        <div className="mt-1 space-y-1 pl-6 border-l border-dashed border-border/60">
+                          {oldChildrenLoading ? (
+                            <>
+                              {[1, 2, 3].map(i => (
+                                <Skeleton key={i} className="h-8 w-full rounded-lg" />
+                              ))}
+                            </>
+                          ) : (
+                            (oldConversationsChildren as Array<ConversationModel & { agents: AgentModel[] }>).map(child => {
+                              const childTitle = child.title || `Conversation ${child.id.slice(0, 8)}`
+                              const childActive = child.id === currentConversationId
+                              return (
+                                <div
+                                  key={child.id}
+                                  className={cn(
+                                    'group flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-all',
+                                    'hover:bg-muted/40',
+                                    childActive && 'bg-muted/70 shadow-sm'
+                                  )}
+                                  onClick={() => handleConversationClick(child.id)}
+                                >
+                                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Old</span>
+                                  <span className={cn('truncate flex-1', childActive && 'text-primary font-medium')}>{childTitle}</span>
+                                </div>
+                              )
+                            })
+                          )}
+                        </div>
+                      )}
                     </div>
                   )
                 })}
@@ -417,107 +421,78 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             )}
           </div>
 
-          {Object.keys(groupedConversations).length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4">
-              <Icon name="message-square" className="w-12 h-12 text-muted-foreground/30 mb-3" />
-              <p className="text-muted-foreground text-sm text-center">No conversations yet</p>
-              <p className="text-muted-foreground/70 text-xs text-center mt-1">Start a new conversation to get started</p>
+          <div className="mb-4">
+            <div className="px-2 mb-2 flex items-center justify-between">
+              <p className="text-xs font-medium text-muted-foreground">Direct messages</p>
             </div>
-          ) : (
-            <div className="space-y-4">
-              {['Today', 'Yesterday', 'This Week', 'Older'].map(groupKey => {
-                const conversations = groupedConversations[groupKey]
-                if (!conversations || conversations.length === 0) return null
-
-                return (
-                  <div key={groupKey}>
-                    <p className="text-xs font-medium text-muted-foreground px-2 mb-2">{groupKey}</p>
-                    <div className="space-y-1">
-                      {conversations.map((conversation: ConversationModel) => {
-                        const title = conversation.title || `Conversation ${conversation.id.slice(0, 8)}`
-                        const isActive = conversation.id === currentConversationId
-
-                        const children = childrenByParent[conversation.id] || []
-
-                        return (
-                          <div key={conversation.id}>
-                            <div
-                              className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
-                              onClick={() => handleConversationClick(conversation.id)}
+            {dmsLoading ? (
+              <div className="space-y-1 px-2">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-8 w-full rounded-lg" />
+                ))}
+              </div>
+            ) : filteredDirectMessages.length === 0 ? (
+              <div className="px-2 py-6 text-center text-xs text-muted-foreground">No direct messages yet</div>
+            ) : (
+              <div className="space-y-1">
+                {filteredDirectMessages.map(it => {
+                  const conversationId = String(it.dm.conversationId)
+                  const isActive = conversationId === currentConversationId
+                  const label = it.agent ? formatAgentDisplayName(it.agent) : it.conversation?.title || `DM ${conversationId.slice(0, 8)}`
+                  const updatedAt = it.conversation?.updatedAt || it.conversation?.createdAt || it.dm.updatedAt || it.dm.createdAt
+                  return (
+                    <div
+                      key={conversationId}
+                      className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
+                      onClick={() => handleConversationClick(conversationId)}
+                    >
+                      <DirectMessageAvatar starshipId={starshipId} agent={it.agent} />
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between mb-1 gap-2">
+                          <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
+                          {updatedAt && (
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(new Date(updatedAt), {
+                                addSuffix: false,
+                              })}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      {onConversationDelete && (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
+                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Icon name="dots-vertical" className="h-4 w-4" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuItem
+                              className="text-destructive"
+                              onClick={e => {
+                                e.stopPropagation()
+                                onConversationDelete(conversationId)
+                              }}
                             >
-                              {/* Conversation Info */}
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center justify-between mb-1">
-                                  <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{title}</p>
-                                  <span className="text-xs text-muted-foreground">
-                                    {formatDistanceToNow(new Date(conversation.updatedAt || conversation.createdAt), {
-                                      addSuffix: false,
-                                    })}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-2 mt-1">{conversation.status === 'archived' && <span className="text-xs bg-muted px-1.5 py-0.5 rounded">Archived</span>}</div>
-                              </div>
-
-                              {/* Actions Menu */}
-                              {onConversationDelete && (
-                                <DropdownMenu>
-                                  <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                                      <Icon name="dots-vertical" className="h-4 w-4" />
-                                    </Button>
-                                  </DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end" className="w-48">
-                                    <DropdownMenuItem
-                                      className="text-destructive"
-                                      onClick={e => {
-                                        e.stopPropagation()
-                                        onConversationDelete(conversation.id)
-                                      }}
-                                    >
-                                      <Icon name="trash" className="mr-2 h-4 w-4" />
-                                      Delete
-                                    </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                </DropdownMenu>
-                              )}
-                            </div>
-
-                            {/* Child conversations */}
-                            {children.length > 0 && (
-                              <div className="mt-1 space-y-1 pl-6 border-l border-dashed border-border/60">
-                                {children.map(child => {
-                                  const childTitle = child.title || `Conversation ${child.id.slice(0, 8)}`
-                                  const childActive = child.id === currentConversationId
-                                  return (
-                                    <div
-                                      key={child.id}
-                                      className={cn('group flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-all', 'hover:bg-muted/40', childActive && 'bg-muted/70 shadow-sm')}
-                                      onClick={() => handleConversationClick(child.id)}
-                                    >
-                                      <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Child</span>
-                                      <span className={cn('truncate flex-1', childActive && 'text-primary font-medium')}>{childTitle}</span>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })}
+                              <Icon name="trash" className="mr-2 h-4 w-4" />
+                              Delete
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      )}
                     </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
+                  )
+                })}
+              </div>
+            )}
+          </div>
         </div>
       </ScrollArea>
 
       {/* Footer Stats */}
       <div className="p-4 border-t frosted-glass-light">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{filteredConversations.length} conversations</span>
-          <span>{filteredConversations.filter(c => c.status === 'active').length} active</span>
+          <span>{filteredDirectMessages.length} direct messages</span>
         </div>
       </div>
       {createChannelDialog}

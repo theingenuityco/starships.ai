@@ -27,6 +27,7 @@ export * from './domains/auth';
 export * from './domains/channel';
 export * from './domains/conversation';
 export * from './domains/conversation-state';
+export * from './domains/direct-message';
 export * from './domains/message';
 export * from './domains/starship';
 export * from './domains/connector-secrets';

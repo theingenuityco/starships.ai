@@ -213,9 +213,9 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                                   <TooltipContent
                                     side="top"
                                     align="start"
-                                    className="max-w-xs p-3 text-xs rounded-lg shadow-xl bg-slate-900 dark:bg-slate-800 text-slate-100 border border-slate-700 z-[1004]"
+                                    className="max-w-xs p-2 text-xs rounded-xl shadow-frosted-lg bg-card text-card-foreground border border-border/60 z-[1004]"
                                   >
-                                    <div className="leading-relaxed">{desc || slug}</div>
+                                    <div className="text-muted-foreground leading-relaxed">{desc || slug}</div>
                                   </TooltipContent>
                                 </Tooltip>
                               </div>

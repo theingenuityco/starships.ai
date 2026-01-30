@@ -1273,18 +1273,6 @@ export function AgentDocumentEditor({
 
               {/* Text stack to the right of avatar/name */}
               <div className="flex flex-col gap-2">
-                {/* Save indicator */}
-                <div className="flex items-center gap-1 text-xs font-medium">
-                  {isAutosaving ? (
-                    <Icon name="loading" className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                  ) : hasSaveError ? (
-                    <Icon name="alert-triangle" className="w-3.5 h-3.5 text-red-500" />
-                  ) : (
-                    <Icon name="check-circle" className="w-3.5 h-3.5 text-emerald-500" />
-                  )}
-                  <span className={cn('text-muted-foreground', hasSaveError && 'text-red-500')}>{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'Saved'}</span>
-                </div>
-
                 {/* Status, Version & Last updated */}
                 <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
                   <Badge variant="outline" className={cn('whitespace-nowrap border font-medium', publicationBadgeClassName(publicationStatus))}>
@@ -1321,6 +1309,18 @@ export function AgentDocumentEditor({
           {!readOnly && (
             <div className="flex flex-col gap-1 items-start sm:items-end">
               <div className="flex flex-wrap items-center gap-2">
+                {agentId && (
+                  <div className="flex items-center gap-1 text-xs font-medium">
+                    {isAutosaving ? (
+                      <Icon name="loading" className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+                    ) : hasSaveError ? (
+                      <Icon name="alert-triangle" className="w-3.5 h-3.5 text-red-500" />
+                    ) : (
+                      <Icon name="check-circle" className="w-3.5 h-3.5 text-emerald-500" />
+                    )}
+                    <span className={cn('text-muted-foreground', hasSaveError && 'text-red-500')}>{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'Saved'}</span>
+                  </div>
+                )}
                 {hasExistingAgent && (
                   <Button
                     type="button"
@@ -1838,12 +1838,14 @@ export function AgentDocumentEditor({
                 </Button>
               </div>
             ) : null}
-            <div className="text-[11px] text-muted-foreground flex items-center justify-end">
-              <span>
-                {(value.previewPrompts || []).length}
-                /10
-              </span>
-            </div>
+            {!isTemplateAgent && (
+              <div className="text-[11px] text-muted-foreground flex items-center justify-end">
+                <span>
+                  {(value.previewPrompts || []).length}
+                  /10
+                </span>
+              </div>
+            )}
           </div>
         </CardContent>
       </Card>

@@ -4,7 +4,6 @@ import Link from 'next/link'
 
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
-import BackToTop from '@/app/components/BackToTop'
 import { track } from '@/lib/analytics'
 
 export function PublicFooter(props: { fromPath?: string }) {
@@ -49,7 +48,6 @@ export function PublicFooter(props: { fromPath?: string }) {
             <Button variant="ghost" size="sm" asChild onClick={() => track({ type: 'public_footer_link_clicked', fromPath, destination: '/terms' })}>
               <Link href="/terms">Terms &amp; Conditions</Link>
             </Button>
-            <BackToTop />
           </div>
         </div>
       </div>

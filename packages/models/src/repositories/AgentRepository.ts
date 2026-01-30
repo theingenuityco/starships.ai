@@ -525,10 +525,22 @@ export class AgentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+        // 1) Look up by tool instance slug on starship (tools.slug)
+        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
           toolSlug,
           starshipId,
         ]);
+        // 2) If not found, client may have sent a template slug (e.g. from DeploymentConfirmationModal assignedToolSlugs).
+        //    Resolve tool on this starship that was created from a template with that slug.
+        if (!toolResult?.id) {
+          toolResult = await connection.queryOne<{ id: string }>(
+            `SELECT t.id FROM tools t
+             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
+             WHERE tt.slug = $1 AND t.starship_id = $2
+             LIMIT 1`,
+            [toolSlug, starshipId]
+          );
+        }
         if (!toolResult?.id) {
           throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
         }

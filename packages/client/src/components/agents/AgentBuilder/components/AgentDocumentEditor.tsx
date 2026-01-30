@@ -86,18 +86,6 @@ export function AgentDocumentEditor({
 }: AgentDocumentEditorProps) {
   const { data: llmModels, isLoading: isLoadingModels } = useLlmModels()
   const queryClient = useQueryClient()
-  const publicationBadgeClassName = (s: string): string => {
-    if (s === 'published') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
-    if (s === 'pending_approval') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
-    if (s === 'rejected') return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
-    return 'border-border/60 bg-muted/20 text-muted-foreground'
-  }
-  const formatPublicationStatus = (s: string): string =>
-    String(s || '')
-      .split('_')
-      .filter(Boolean)
-      .map(w => w.charAt(0).toUpperCase() + w.slice(1))
-      .join(' ')
   // Track whether the user explicitly changed the Reasoning dropdown.
   // Important: we must NOT mutate agent reasoning/blueprint just by opening the editor.
   const reasoningDirtyRef = useRef<boolean>(false)
@@ -1273,17 +1261,34 @@ export function AgentDocumentEditor({
 
               {/* Text stack to the right of avatar/name */}
               <div className="flex flex-col gap-2">
+                {/* Save indicator */}
+                <div className="flex items-center gap-1 text-xs font-medium">
+                  <div className="w-3 h-3 flex items-center justify-center">
+                    <div className={cn('w-2 h-2 rounded-full animate-pulse', isAutosaving ? 'bg-amber-400' : hasSaveError ? 'bg-red-400' : 'bg-emerald-400')} />
+                  </div>
+                  <span className="text-muted-foreground">{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'All changes saved'}</span>
+                </div>
+
                 {/* Status, Version & Last updated */}
                 <div className="flex flex-wrap items-center gap-3 text-xs font-medium">
-                  <Badge variant="outline" className={cn('whitespace-nowrap border font-medium', publicationBadgeClassName(publicationStatus))}>
-                    <span className="inline-flex items-center gap-1.5">
-                      <Icon
-                        name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
-                        className="w-3.5 h-3.5"
-                      />
-                      <span>{formatPublicationStatus(publicationStatus)}</span>
-                    </span>
-                  </Badge>
+                  <span
+                    className={cn(
+                      'inline-flex items-center gap-1 font-medium',
+                      publicationStatus === 'published'
+                        ? 'text-emerald-500'
+                        : publicationStatus === 'pending_approval'
+                          ? 'text-amber-500'
+                          : publicationStatus === 'rejected'
+                            ? 'text-red-500'
+                            : 'text-muted-foreground'
+                    )}
+                  >
+                    <Icon
+                      name={publicationStatus === 'published' ? 'check-circle' : publicationStatus === 'pending_approval' ? 'clock' : publicationStatus === 'rejected' ? 'x-circle' : 'info'}
+                      className="w-3 h-3"
+                    />
+                    <span className="capitalize">{publicationStatus.replace('_', ' ')}</span>
+                  </span>
                   {fullAgent?.version && (
                     <span className="inline-flex items-center gap-1 text-muted-foreground font-mono">
                       <Icon name="hash" className="w-3 h-3" />v{fullAgent.version}
@@ -1292,7 +1297,7 @@ export function AgentDocumentEditor({
                   {fullAgent?.updatedAt && (
                     <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">
                       <Icon name="clock" className="w-3 h-3" />
-                      <span>Updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
+                      <span>Last updated {formatUpdatedAt(fullAgent.updatedAt)}</span>
                     </div>
                   )}
                 </div>
@@ -1309,18 +1314,6 @@ export function AgentDocumentEditor({
           {!readOnly && (
             <div className="flex flex-col gap-1 items-start sm:items-end">
               <div className="flex flex-wrap items-center gap-2">
-                {agentId && (
-                  <div className="flex items-center gap-1 text-xs font-medium">
-                    {isAutosaving ? (
-                      <Icon name="loading" className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
-                    ) : hasSaveError ? (
-                      <Icon name="alert-triangle" className="w-3.5 h-3.5 text-red-500" />
-                    ) : (
-                      <Icon name="check-circle" className="w-3.5 h-3.5 text-emerald-500" />
-                    )}
-                    <span className={cn('text-muted-foreground', hasSaveError && 'text-red-500')}>{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'Saved'}</span>
-                  </div>
-                )}
                 {hasExistingAgent && (
                   <Button
                     type="button"
@@ -1749,13 +1742,13 @@ export function AgentDocumentEditor({
                     <li
                       key={idx}
                       className={cn(
-                        'group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 transition-all duration-200',
-                        promptsEditable && 'hover:from-background/60 hover:to-background/40 hover:border-primary/30 hover:shadow-md'
+                        'group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4',
+                        promptsEditable && 'transition-colors'
                       )}
                     >
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex-shrink-0">
-                          <Icon name="sparkles" className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
+                          <Icon name="sparkles" className="h-4 w-4 text-primary" />
                         </div>
 
                         <div className="min-w-0 flex-1">
@@ -1763,7 +1756,7 @@ export function AgentDocumentEditor({
                             <Input
                               className={cn(
                                 'h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0',
-                                'text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors'
+                                'text-sm leading-relaxed text-foreground'
                               )}
                               value={prompt}
                               onChange={e => {
@@ -1778,7 +1771,7 @@ export function AgentDocumentEditor({
                               placeholder="Add a prompt…"
                             />
                           ) : (
-                            <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors">{prompt}</p>
+                            <p className="text-sm leading-relaxed text-foreground">{prompt}</p>
                           )}
                         </div>
 

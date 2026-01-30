@@ -13,6 +13,9 @@ import { DeploymentConfirmationModal } from '@/components/marketplace/Deployment
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
 import { track } from '@/lib/analytics'
+import api from '@/lib/api'
+import type { AgentToolPermission, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
+import { toast } from 'sonner'
 
 export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplateModel }) {
   const router = useRouter()
@@ -61,16 +64,28 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmDeploy = async () => {
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => {
     if (!primaryStarship) return
     setIsDeploying(true)
     try {
-      await createAgentMutation.mutateAsync({
+      const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
         starshipSlug: primaryStarship.slug,
       })
-      setShowConfirmationModal(false)
+
+      const agentId = (created as any)?.id as string | undefined
+      const toolPermissions = input?.toolPermissions
+      if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
+        const body: UpdateAgentToolPermissionsRequest = {
+          permissions: Object.entries(toolPermissions).map(([toolSlug, permission]) => ({ toolSlug, permission })),
+        }
+        try {
+          await api.put(`/api/v1/agents/${agentId}/tool-permissions`, body)
+        } catch (e: any) {
+          toast.error('Permissions not saved', { description: e?.response?.data?.error || e?.message || 'Agent deployed, but tool permissions could not be updated.' })
+        }
+      }
     } finally {
       setIsDeploying(false)
     }
@@ -79,9 +94,17 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
   return (
     <>
       {isAlreadyDeployed ? (
-        <div className="relative flex items-center justify-center gap-1.5 h-10 px-4 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
-          <Icon name="check-circle" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+        <div className="flex items-center gap-3">
+          <div className="relative inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
+            <Icon name="check-circle" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
+          </div>
+          {primaryStarship?.slug ? (
+            <Button variant="primaryOutline" size="sm" className="h-10 gap-2" onClick={() => router.push(`/ship/${primaryStarship.slug}`)}>
+              <Icon name="message-square" className="h-4 w-4" />
+              Start chat
+            </Button>
+          ) : null}
         </div>
       ) : (
         <Button onClick={handleDeployClick} disabled={deployDisabled} className="h-10">
@@ -102,4 +125,3 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     </>
   )
 }
-

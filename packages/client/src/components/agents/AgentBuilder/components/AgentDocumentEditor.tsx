@@ -16,7 +16,7 @@ import { AGENT_CATEGORIES } from '../constants'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { StandardSelect } from './StandardSelect'
-import { useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api, { getCurrentToken } from '@/lib/api'
 import type { ToolModel, ApiResponse, AgentModel, AgentTemplateModel, UpdateAgentRequest } from '@starships/protocol'
 import type { FetchResponse } from '@/lib/types'
@@ -31,6 +31,9 @@ import { AgentPublishModal } from './AgentPublishModal'
 import { areStatesEqual, shouldSkipStateUpdateToPreservePlugins, baseStateHasPlugins } from '@/utils/agent-state'
 import type { ConversationState } from '@starships/protocol'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import type { StarshipAgentToolPermissionModel, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 
 // Lazy-load the blueprint visualizer so the landing-page "embedded" demo doesn't
 // pull in ELK/WebWorker code (which can break when evaluated in the SSR bundle).
@@ -157,10 +160,14 @@ export function AgentDocumentEditor({
   // Local input state for adding preview prompts
   const [newPreviewPrompt, setNewPreviewPrompt] = useState('')
 
-  // Check if this is a template-based agent (has sourceTemplateId) - these are read-only
+  // Marketplace-deployed agents are template-based (they have sourceTemplateId).
+  // For these, we hide certain "builder-only" sections like System Prompt and Advanced options.
   const isTemplateAgent = useMemo(() => {
-    return !!fullAgent?.sourceTemplateId
-  }, [fullAgent?.sourceTemplateId])
+    return !!(providedAgent?.sourceTemplateId || fullAgent?.sourceTemplateId)
+  }, [providedAgent?.sourceTemplateId, fullAgent?.sourceTemplateId])
+
+  const promptsEditable = !(isTemplateAgent || readOnly)
+  const agentIdForPermissions = (providedAgent?.id || providedAgentId || fullAgent?.id || null) as string | null
 
   // Update mutation for template agents
   const updateMutation = useUpdateAgentFromTemplate()
@@ -174,6 +181,123 @@ export function AgentDocumentEditor({
     },
     enabled: !!starshipId,
     staleTime: 30 * 1000,
+  })
+
+  // Tool permissions (reuse the same starship-scoped rows as the Tools tab, but filter to this agent)
+  const { data: permissionRows = [] } = useQuery({
+    queryKey: ['starship-agent-tool-permissions', starshipId] as const,
+    queryFn: async (): Promise<StarshipAgentToolPermissionModel[]> => {
+      if (!starshipId) return []
+      const response: FetchResponse<ApiResponse<StarshipAgentToolPermissionModel[]>> = await api.get(`/api/v1/starships/${starshipId}/agent-tool-permissions`)
+      return response.data.data || []
+    },
+    enabled: !!starshipId,
+    staleTime: 10 * 1000,
+  })
+
+  const permissionByToolSlug = useMemo(() => {
+    const map = new Map<string, StarshipAgentToolPermissionModel['permission']>()
+    if (!agentIdForPermissions) return map
+    for (const row of permissionRows || []) {
+      if (!row?.agentId || !row?.toolSlug) continue
+      if (row.agentId !== agentIdForPermissions) continue
+      map.set(row.toolSlug, row.permission)
+    }
+    return map
+  }, [permissionRows, agentIdForPermissions])
+
+  const assignedToolModels = useMemo(() => {
+    const slugs = Array.isArray(value?.assignedToolSlugs) ? (value.assignedToolSlugs as string[]) : []
+    if (!slugs.length) return [] as ToolModel[]
+    const bySlug = new Map<string, ToolModel>()
+    for (const t of Array.isArray(starshipTools) ? starshipTools : []) {
+      if (t?.slug) bySlug.set(t.slug, t)
+    }
+    return slugs.map(s => bySlug.get(s)).filter((t): t is ToolModel => !!t)
+  }, [value?.assignedToolSlugs, starshipTools])
+
+  const PERMISSION_ORDER = ['allow', 'ask', 'deny'] as const
+  const permissionLabel = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'Allow'
+    if (p === 'ask') return 'Ask first'
+    return 'Deny'
+  }
+  const permissionDescription = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'Agent can trigger this tool without confirmation.'
+    if (p === 'ask') return 'Agent can trigger this tool, but you will be asked to confirm.'
+    return 'Agent cannot trigger this tool.'
+  }
+  const permissionIconName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'check-circle'
+    if (p === 'ask') return 'help-circle'
+    return 'x-circle'
+  }
+  const permissionBadgeClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+    if (p === 'ask') return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300'
+    return 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-300'
+  }
+  const permissionMenuItemClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'hover:bg-emerald-500/10 focus:bg-emerald-500/10'
+    if (p === 'ask') return 'hover:bg-amber-500/10 focus:bg-amber-500/10'
+    return 'hover:bg-red-500/10 focus:bg-red-500/10'
+  }
+  const permissionMenuItemSelectedClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'bg-emerald-500/10'
+    if (p === 'ask') return 'bg-amber-500/10'
+    return 'bg-red-500/10'
+  }
+  const permissionMenuIconClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'text-emerald-500'
+    if (p === 'ask') return 'text-amber-500'
+    return 'text-red-500'
+  }
+  const permissionDotClassName = (p: StarshipAgentToolPermissionModel['permission']): string => {
+    if (p === 'allow') return 'bg-emerald-500/70'
+    if (p === 'ask') return 'bg-amber-500/70'
+    return 'bg-red-500/70'
+  }
+  const permissionOptions: Array<{
+    value: StarshipAgentToolPermissionModel['permission']
+    label: string
+    description: string
+    icon: string
+  }> = [
+    { value: 'allow', label: 'Allow', description: permissionDescription('allow'), icon: permissionIconName('allow') },
+    { value: 'ask', label: 'Ask first', description: permissionDescription('ask'), icon: permissionIconName('ask') },
+    { value: 'deny', label: 'Deny', description: permissionDescription('deny'), icon: permissionIconName('deny') },
+  ]
+
+  const setPermissionMutation = useMutation({
+    mutationFn: async (input: { toolSlug: string; permission: StarshipAgentToolPermissionModel['permission'] }) => {
+      if (!agentIdForPermissions) throw new Error('Missing agent id')
+      const body: UpdateAgentToolPermissionsRequest = { permissions: [{ toolSlug: input.toolSlug, permission: input.permission }] }
+      await api.put(`/api/v1/agents/${agentIdForPermissions}/tool-permissions`, body)
+      return input
+    },
+    onMutate: async (input: { toolSlug: string; permission: StarshipAgentToolPermissionModel['permission'] }) => {
+      if (!agentIdForPermissions) return
+      await queryClient.cancelQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
+      const prev = queryClient.getQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const)
+      queryClient.setQueryData<StarshipAgentToolPermissionModel[]>(['starship-agent-tool-permissions', starshipId] as const, old => {
+        const next = Array.isArray(old) ? [...old] : []
+        const idx = next.findIndex(r => r.agentId === agentIdForPermissions && r.toolSlug === input.toolSlug)
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], permission: input.permission }
+        } else {
+          // toolId isn't required for this UI; keep it empty for optimistic row
+          next.push({ agentId: agentIdForPermissions, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
+        }
+        return next
+      })
+      return { prev }
+    },
+    onError: (_err: unknown, _input: unknown, ctx: { prev?: StarshipAgentToolPermissionModel[] } | undefined) => {
+      if (ctx?.prev) queryClient.setQueryData(['starship-agent-tool-permissions', starshipId] as const, ctx.prev)
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['starship-agent-tool-permissions', starshipId] as const })
+    },
   })
   const selectedToolSlugs = value.assignedToolSlugs || []
   const allToolOptions = useMemo(() => {
@@ -1310,270 +1434,375 @@ export function AgentDocumentEditor({
         />
       ) : null}
 
-      {/* Quick selectors + core fields */}
-      <div className="space-y-2 mb-4">
-        {/* Name */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-              <Icon name="id-card" className="w-4 h-4" />
-              <span className="text-xs font-semibold">Name</span>
+      {/* Core configuration */}
+      <Card className="rounded-2xl border-border/50 shadow-sm">
+        <CardHeader className="pb-3">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle className="text-base flex items-center gap-2">
+                <Icon name="settings" className="h-4 w-4 text-primary" />
+                Agent configuration
+              </CardTitle>
             </div>
-            <div className="w-full sm:w-[260px]">
-              <Input
-                id="agent-name"
-                value={value.name}
-                onChange={e => onFieldChange?.('name', e.target.value)}
-                placeholder="Agent name"
-                disabled={isTemplateAgent || readOnly}
-                className={cn('text-sm h-7', selectLikeFieldClass)}
-              />
-            </div>
+            {isTemplateAgent ? (
+              <Badge variant="outline" className="border-border/60 bg-muted/30 text-foreground">
+                Marketplace
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="border-border/60 bg-muted/20 text-muted-foreground">
+                Custom
+              </Badge>
+            )}
           </div>
-        </div>
+        </CardHeader>
 
-        {/* Role */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-              <Icon name="user-cog" className="w-4 h-4" />
-              <span className="text-xs font-semibold">Role</span>
-            </div>
-            <div className="w-full sm:w-[260px]">
-              <Input
-                value={value.role}
-                onChange={e => onFieldChange?.('role', e.target.value)}
-                placeholder='e.g. "Customer Support Agent"'
-                disabled={isTemplateAgent || readOnly}
-                className={cn('text-sm h-7', selectLikeFieldClass)}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Category section */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-              <Icon name="tag" className="w-4 h-4" />
-              <span className="text-xs font-semibold">Category</span>
-            </div>
-            <div className="w-full sm:w-[260px]">
-              <StandardSelect
-                mode="single"
-                aria-label="Change category"
-                disabled={isTemplateAgent || readOnly}
-                value={value.category}
-                options={AGENT_CATEGORIES.map(cat => ({
-                  value: cat,
-                  label: (
-                    <span className="flex items-center gap-2">
-                      <span className={cn('h-2 w-2 rounded-full', getCategoryDotColor(cat as any))} />
-                      <span className="capitalize">{cat}</span>
-                    </span>
-                  ),
-                  keywords: cat,
-                }))}
-                placeholder="Select a category"
-                triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'cursor-not-allowed')}
-                onChange={cat => {
-                  onChange({ ...value, category: (cat as AgentFormData['category']) ?? value.category })
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Model section */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-              <Icon name="cpu" className="w-4 h-4" />
-              <span className="text-xs font-semibold">Model</span>
-            </div>
-            <div className="w-full sm:w-[260px]">
-              <StandardSelect
-                mode="single"
-                aria-label="Select model"
-                disabled={isLoadingModels || isTemplateAgent || readOnly}
-                value={value.model}
-                options={availableModels.map(m => ({
-                  value: m,
-                  label: <span className="font-mono text-xs">{m}</span>,
-                  keywords: m,
-                }))}
-                placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'}
-                searchPlaceholder="Search models..."
-                emptyLabel={isLoadingModels ? 'Loading models…' : 'No models found.'}
-                triggerClassName="w-full"
-                onChange={m => {
-                  if (typeof m === 'string') {
-                    onFieldChange?.('model', m)
-                  }
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Tools section */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-              <Icon name="wrench" className="w-4 h-4" />
-              <span className="text-xs font-semibold">Assigned Tools</span>
-            </div>
-            <div className="w-full sm:w-[260px]">
-              <StandardSelect
-                mode="multiple"
-                aria-label="Select tools"
-                disabled={isTemplateAgent || readOnly}
-                value={selectedToolSlugs}
-                options={allToolOptions.map(slug => ({
-                  value: slug,
-                  label: (
-                    <span className="flex items-center gap-2">
-                      <Icon name="wrench" className="w-3 h-3" />
-                      <span className="font-mono text-xs">{slug}</span>
-                    </span>
-                  ),
-                  keywords: slug,
-                }))}
-                placeholder="Select tools"
-                searchPlaceholder="Search tools..."
-                emptyLabel="No tools found."
-                triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
-                renderTriggerLabel={({ selectedOptions }) => {
-                  if (!selectedOptions.length) {
-                    return <span className="text-xs text-muted-foreground">{isTemplateAgent || readOnly ? 'No tools assigned' : 'Select tools'}</span>
-                  }
-                  const values = selectedOptions.map(opt => String(opt.value))
-                  let label: string
-                  if (values.length <= 3) {
-                    label = values.join(', ')
-                  } else {
-                    label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
-                  }
-                  return <span className="text-xs font-mono truncate max-w-full">{label}</span>
-                }}
-                onOptionToggle={(slug, wasSelected) => {
-                  if (isTemplateAgent || readOnly) return
-                  void handleToggleTool(slug, wasSelected)
-                }}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Description */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-2">
-              <Icon name="file-text" className="w-4 h-4" />
-              <span className="text-xs font-semibold">Description</span>
-            </div>
-            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-              <Textarea
-                value={value.description}
-                onChange={e => onFieldChange?.('description', e.target.value)}
-                placeholder="Write a clear description."
-                className={cn('text-sm min-h-[80px] resize-none', selectLikeFieldClass)}
-                disabled={isTemplateAgent || readOnly}
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* System Prompt */}
-        <div className="border-b border-border/10 pb-2">
-          <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
-            <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-2">
-              <Icon name="sparkles" className="w-4 h-4" />
-              <span className="text-xs font-semibold">System Prompt</span>
-            </div>
-            <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
-              <Textarea
-                ref={systemPromptTextareaRef}
-                value={value.systemPrompt}
-                onChange={e => {
-                  onFieldChange?.('systemPrompt', e.target.value)
-                  try {
-                    e.currentTarget.style.height = 'auto'
-                    const nextHeight = Math.max(e.currentTarget.scrollHeight, 200)
-                    e.currentTarget.style.height = `${nextHeight}px`
-                  } catch {
-                    // ignore
-                  }
-                }}
-                placeholder="Define the agent's character, mission, and behavior..."
-                className={cn('text-sm min-h-[200px] resize-none overflow-hidden', selectLikeFieldClass)}
-                disabled={isTemplateAgent || readOnly}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Examples (Preview Prompts) */}
-      <div className="border-b border-border/10 pb-2 mt-2">
-        <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
-          <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
-            <Icon name="list-bullet" className="w-4 h-4" />
-            <span className="text-xs font-semibold">Examples</span>
-          </div>
-          <div className="flex-1">
-            <div className="space-y-2">
-              <div className="space-y-1">
-                {(value.previewPrompts || []).length === 0 ? (
-                  <p className="text-xs text-muted-foreground italic">No preview prompts yet. Add a few examples to help users get started.</p>
-                ) : (
-                  <ul className="space-y-2">
-                    {(value.previewPrompts || []).map((prompt, idx) => (
-                      <li key={idx} className="flex items-start gap-2">
-                        <Input
-                          className={cn('text-sm flex-1 h-7', selectLikeFieldClass)}
-                          value={prompt}
-                          disabled={isTemplateAgent || readOnly}
-                          onChange={e => {
-                            const next = [...(value.previewPrompts || [])]
-                            next[idx] = e.target.value
-                            const cleaned = next
-                              .map(s => s.trim())
-                              .filter(Boolean)
-                              .slice(0, 10)
-                            onFieldChange?.('previewPrompts', cleaned)
-                          }}
-                          placeholder="Example: Help me draft a customer support reply…"
-                        />
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={isTemplateAgent || readOnly}
-                          className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                          onClick={() => {
-                            const next = (value.previewPrompts || []).filter((_, i) => i !== idx)
-                            onFieldChange?.('previewPrompts', next)
-                          }}
-                        >
-                          <Icon name="x" className="w-3 h-3" />
-                        </Button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+        <CardContent className="space-y-3">
+          {/* Name */}
+          <div className="border-b border-border/10 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                <Icon name="id-card" className="w-4 h-4" />
+                <span className="text-xs font-semibold">Name</span>
               </div>
+              <div className="w-full sm:w-[260px]">
+                <Input
+                  id="agent-name"
+                  value={value.name}
+                  onChange={e => onFieldChange?.('name', e.target.value)}
+                  placeholder="Agent name"
+                  disabled={isTemplateAgent || readOnly}
+                  className={cn('text-sm h-9', selectLikeFieldClass)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Role */}
+          <div className="border-b border-border/10 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                <Icon name="user-cog" className="w-4 h-4" />
+                <span className="text-xs font-semibold">Role</span>
+              </div>
+              <div className="w-full sm:w-[260px]">
+                <Input
+                  value={value.role}
+                  onChange={e => onFieldChange?.('role', e.target.value)}
+                  placeholder='e.g. "Customer Support Agent"'
+                  disabled={isTemplateAgent || readOnly}
+                  className={cn('text-sm h-9', selectLikeFieldClass)}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Category section */}
+          <div className="border-b border-border/10 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                <Icon name="tag" className="w-4 h-4" />
+                <span className="text-xs font-semibold">Category</span>
+              </div>
+              <div className="w-full sm:w-[260px]">
+                <StandardSelect
+                  mode="single"
+                  aria-label="Change category"
+                  disabled={isTemplateAgent || readOnly}
+                  value={value.category}
+                  options={AGENT_CATEGORIES.map(cat => ({
+                    value: cat,
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <span className={cn('h-2 w-2 rounded-full', getCategoryDotColor(cat as any))} />
+                        <span className="capitalize">{cat}</span>
+                      </span>
+                    ),
+                    keywords: cat,
+                  }))}
+                  placeholder="Select a category"
+                  triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'cursor-not-allowed')}
+                  onChange={cat => {
+                    onChange({ ...value, category: (cat as AgentFormData['category']) ?? value.category })
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Model section */}
+          <div className="border-b border-border/10 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                <Icon name="cpu" className="w-4 h-4" />
+                <span className="text-xs font-semibold">Model</span>
+              </div>
+              <div className="w-full sm:w-[260px]">
+                <StandardSelect
+                  mode="single"
+                  aria-label="Select model"
+                  disabled={isLoadingModels || isTemplateAgent || readOnly}
+                  value={value.model}
+                  options={availableModels.map(m => ({
+                    value: m,
+                    label: <span className="font-mono text-xs">{m}</span>,
+                    keywords: m,
+                  }))}
+                  placeholder={isLoadingModels ? 'Loading models...' : 'Select a model'}
+                  searchPlaceholder="Search models..."
+                  emptyLabel={isLoadingModels ? 'Loading models…' : 'No models found.'}
+                  triggerClassName="w-full"
+                  onChange={m => {
+                    if (typeof m === 'string') {
+                      onFieldChange?.('model', m)
+                    }
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Tools section */}
+          <div className="border-b border-border/10 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                <Icon name="wrench" className="w-4 h-4" />
+                <span className="text-xs font-semibold">Assigned Tools</span>
+              </div>
+              <div className="w-full sm:w-[260px]">
+                <StandardSelect
+                  mode="multiple"
+                  aria-label="Select tools"
+                  disabled={isTemplateAgent || readOnly}
+                  value={selectedToolSlugs}
+                  options={allToolOptions.map(slug => ({
+                    value: slug,
+                    label: (
+                      <span className="flex items-center gap-2">
+                        <Icon name="wrench" className="w-3 h-3" />
+                        <span className="font-mono text-xs">{slug}</span>
+                      </span>
+                    ),
+                    keywords: slug,
+                  }))}
+                  placeholder="Select tools"
+                  searchPlaceholder="Search tools..."
+                  emptyLabel="No tools found."
+                  triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
+                  renderTriggerLabel={({ selectedOptions }) => {
+                    if (!selectedOptions.length) {
+                      return <span className="text-xs text-muted-foreground">{isTemplateAgent || readOnly ? 'No tools assigned' : 'Select tools'}</span>
+                    }
+                    const values = selectedOptions.map(opt => String(opt.value))
+                    let label: string
+                    if (values.length <= 3) {
+                      label = values.join(', ')
+                    } else {
+                      label = `${values[0]}, ${values[1]} and ${values.length - 2} others`
+                    }
+                    return <span className="text-xs font-mono truncate max-w-full">{label}</span>
+                  }}
+                  onOptionToggle={(slug, wasSelected) => {
+                    if (isTemplateAgent || readOnly) return
+                    void handleToggleTool(slug, wasSelected)
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* Description */}
+          <div className="border-b border-border/10 pb-2">
+            <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+              <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-2">
+                <Icon name="file-text" className="w-4 h-4" />
+                <span className="text-xs font-semibold">Description</span>
+              </div>
+              <div className={cn('flex-1', (isTemplateAgent || readOnly) && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+                <Textarea
+                  value={value.description}
+                  onChange={e => onFieldChange?.('description', e.target.value)}
+                  placeholder="Write a clear description."
+                  className={cn('text-sm min-h-[80px] resize-none', selectLikeFieldClass)}
+                  disabled={isTemplateAgent || readOnly}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* System prompt moved under Advanced settings */}
+        </CardContent>
+      </Card>
+
+      {/* Capabilities (tool permissions) */}
+      <Card className="rounded-2xl border-border/50 shadow-sm mt-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Icon name="wrench" className="h-4 w-4 text-primary" />
+            Capabilities
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          {!agentIdForPermissions ? (
+            <div className="text-sm text-muted-foreground">Save the agent to configure tool permissions.</div>
+          ) : assignedToolModels.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border/50 bg-muted/10 p-4 text-sm text-muted-foreground">No tools assigned. Assign tools above to configure permissions.</div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {assignedToolModels.map(tool => {
+                const current = permissionByToolSlug.get(tool.slug) ?? ('allow' as StarshipAgentToolPermissionModel['permission'])
+                const disabled = readOnly || setPermissionMutation.isPending
+                const toolSecondary = (tool.description || '').trim() || tool.slug
+                return (
+                  <div
+                    key={tool.slug}
+                    className="group relative rounded-xl border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <div className="mt-1.5 flex-shrink-0">
+                          <div className={cn('h-2 w-2 rounded-full', permissionDotClassName(current))} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold leading-5 text-foreground truncate">{tool.name || tool.slug}</div>
+                          <div className={cn('mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2', !tool.description ? 'font-mono' : undefined)}>{toolSecondary}</div>
+                        </div>
+                      </div>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <span className={cn('inline-flex', disabled && 'cursor-not-allowed')}>
+                            <button
+                              type="button"
+                              disabled={disabled}
+                              className={cn('inline-flex items-center', disabled && 'opacity-70')}
+                              aria-label={`Tool permission for ${tool.slug}: ${permissionLabel(current)}. Open menu to change.`}
+                            >
+                              <Badge variant="outline" className={cn('whitespace-nowrap border', permissionBadgeClassName(current))}>
+                                <span className="inline-flex items-center gap-1.5">
+                                  <Icon name={permissionIconName(current)} className="h-3.5 w-3.5" />
+                                  <span>{permissionLabel(current)}</span>
+                                  <Icon name="chevron-down" className="h-3.5 w-3.5 opacity-70" />
+                                </span>
+                              </Badge>
+                            </button>
+                          </span>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-64">
+                          {permissionOptions.map(opt => (
+                            <DropdownMenuItem
+                              key={opt.value}
+                              className={cn('cursor-pointer', permissionMenuItemClassName(opt.value), opt.value === current && permissionMenuItemSelectedClassName(opt.value))}
+                              onClick={() => {
+                                if (disabled) return
+                                setPermissionMutation.mutate({ toolSlug: tool.slug, permission: opt.value })
+                              }}
+                            >
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-2">
+                                  <Icon name={opt.icon} className={cn('h-4 w-4', permissionMenuIconClassName(opt.value))} />
+                                  <span className="text-sm font-medium">{opt.label}</span>
+                                  <span className="ml-auto" />
+                                </div>
+                                <div className="text-xs text-muted-foreground">{opt.description}</div>
+                              </div>
+                            </DropdownMenuItem>
+                          ))}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Try these prompts (Preview Prompts) */}
+      <Card className="rounded-2xl border-border/50 shadow-sm mt-6">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Icon name="message-square" className="h-4 w-4 text-primary" />
+            Try these prompts
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-3">
+            <div className="space-y-1">
+              {(value.previewPrompts || []).length === 0 ? (
+                <div className="rounded-xl border border-dashed border-border/50 bg-muted/10 p-4 text-xs text-muted-foreground">
+                  No prompts yet. Add 3–5 prompts to show what this agent is best at.
+                </div>
+              ) : (
+                <ul className="grid grid-cols-1 gap-3">
+                  {(value.previewPrompts || []).map((prompt, idx) => (
+                    <li
+                      key={idx}
+                      className={cn(
+                        'group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4',
+                        promptsEditable && 'transition-colors'
+                      )}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 flex-shrink-0">
+                          <Icon name="sparkles" className="h-4 w-4 text-primary" />
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          {promptsEditable ? (
+                            <Input
+                              className={cn(
+                                'h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0',
+                                'text-sm leading-relaxed text-foreground'
+                              )}
+                              value={prompt}
+                              onChange={e => {
+                                const next = [...(value.previewPrompts || [])]
+                                next[idx] = e.target.value
+                                const cleaned = next
+                                  .map(s => s.trim())
+                                  .filter(Boolean)
+                                  .slice(0, 10)
+                                onFieldChange?.('previewPrompts', cleaned)
+                              }}
+                              placeholder="Add a prompt…"
+                            />
+                          ) : (
+                            <p className="text-sm leading-relaxed text-foreground">{prompt}</p>
+                          )}
+                        </div>
+
+                        {promptsEditable ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-full text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                            onClick={() => {
+                              const next = (value.previewPrompts || []).filter((_, i) => i !== idx)
+                              onFieldChange?.('previewPrompts', next)
+                            }}
+                            aria-label="Remove prompt"
+                          >
+                            <Icon name="x" className="w-3 h-3" />
+                          </Button>
+                        ) : null}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            {promptsEditable ? (
               <div className="flex items-center gap-2">
                 <Input
-                  className={cn('text-sm flex-1 h-7', selectLikeFieldClass)}
-                  placeholder="Add a sample user prompt…"
+                  className={cn('text-sm flex-1 h-9', selectLikeFieldClass)}
+                  placeholder="Add a prompt…"
                   value={newPreviewPrompt}
-                  disabled={isTemplateAgent || readOnly}
                   onChange={e => setNewPreviewPrompt(e.target.value)}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                       e.preventDefault()
-                      if (isTemplateAgent || readOnly) return
                       const trimmed = newPreviewPrompt.trim()
                       const existing = value.previewPrompts || []
                       if (!trimmed || existing.length >= 10) return
@@ -1585,10 +1814,9 @@ export function AgentDocumentEditor({
                 <Button
                   type="button"
                   size="sm"
-                  className="h-7 px-2 rounded-lg text-[11px]"
-                  disabled={isTemplateAgent || readOnly || !newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
+                  className="h-9 px-3 rounded-xl text-[11px]"
+                  disabled={!newPreviewPrompt.trim() || (value.previewPrompts || []).length >= 10}
                   onClick={() => {
-                    if (isTemplateAgent || readOnly) return
                     const trimmed = newPreviewPrompt.trim()
                     const existing = value.previewPrompts || []
                     if (!trimmed || existing.length >= 10) return
@@ -1599,167 +1827,199 @@ export function AgentDocumentEditor({
                   Add
                 </Button>
               </div>
-              <div className="text-[10px] text-muted-foreground flex items-center justify-between">
-                <span>These appear as example prompts in the chat input when this agent is mentioned.</span>
+            ) : null}
+            {!isTemplateAgent && (
+              <div className="text-[11px] text-muted-foreground flex items-center justify-end">
                 <span>
                   {(value.previewPrompts || []).length}
                   /10
                 </span>
               </div>
-            </div>
+            )}
           </div>
-        </div>
-      </div>
+        </CardContent>
+      </Card>
 
-      {/* Advanced options (includes Blueprint) */}
-      <Collapsible defaultOpen={false} className="border-b border-border/10 pb-2 mt-2">
-        <CollapsibleTrigger className="w-full">
-          <div className="flex items-center gap-2 px-3 py-1.5 text-muted-foreground">
-            <Icon name="sliders-horizontal" className="w-4 h-4" />
-            <span className="text-xs font-semibold flex-1 text-left">Advanced options</span>
-          </div>
-        </CollapsibleTrigger>
-        <CollapsibleContent unmountOnClose>
-          <div className="space-y-4 mt-1">
-            {/* Blueprint first */}
-            {!embedded ? (
-              <div>
-                <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
-                  <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
-                    <Icon name="network" className="w-4 h-4" />
-                    <span className="text-xs font-semibold">Blueprint</span>
+      {/* Advanced options (includes Blueprint) — private/custom agents only */}
+      {!isTemplateAgent ? (
+        <Card className="rounded-2xl border-border/50 shadow-sm mt-6 overflow-hidden">
+          <Collapsible defaultOpen={false}>
+            <CollapsibleTrigger className="w-full">
+              <div className="flex items-center gap-2 px-6 py-4 text-muted-foreground hover:text-foreground transition-colors">
+                <Icon name="sliders-horizontal" className="w-4 h-4 text-primary" />
+                <span className="text-base font-semibold flex-1 text-left">Advanced settings</span>
+                <Icon name="chevron-down" className="w-4 h-4 text-muted-foreground transition-transform [[data-state=open]>&]:rotate-180" />
+              </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent unmountOnClose>
+              <div className="space-y-4 border-t border-border/30 p-6 pt-4">
+                {/* Blueprint first */}
+                {!embedded ? (
+                  <div>
+                    <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                      <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
+                        <Icon name="network" className="w-4 h-4" />
+                        <span className="text-xs font-semibold">Blueprint</span>
+                      </div>
+                      <div className="flex-1">
+                        <ErrorBoundary component="BlueprintVisualization" fallback={<div className="h-[320px] w-full rounded-lg border border-border/60 bg-muted/20" />}>
+                          <BlueprintVisualization
+                            blueprint={(() => {
+                              try {
+                                const parsed = JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
+                                // Ensure blueprint has valid structure
+                                if (!parsed || typeof parsed !== 'object') {
+                                  return { nodes: [], edges: [] } as any
+                                }
+                                if (!Array.isArray(parsed.nodes)) {
+                                  parsed.nodes = []
+                                }
+                                if (!Array.isArray(parsed.edges)) {
+                                  parsed.edges = []
+                                }
+                                return parsed
+                              } catch {
+                                return { nodes: [], edges: [] } as any
+                              }
+                            })()}
+                            className="h-[320px]"
+                            transparent
+                            nodesDraggable={false}
+                          />
+                        </ErrorBoundary>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex-1">
-                    <ErrorBoundary
-                      component="BlueprintVisualization"
-                      fallback={<div className="h-[320px] w-full rounded-lg border border-border/60 bg-muted/20" />}
-                    >
-                      <BlueprintVisualization
-                        blueprint={(() => {
-                          try {
-                            const parsed = JSON.parse(value.blueprint || '{"nodes":[],"edges":[]}')
-                            // Ensure blueprint has valid structure
-                            if (!parsed || typeof parsed !== 'object') {
-                              return { nodes: [], edges: [] } as any
-                            }
-                            if (!Array.isArray(parsed.nodes)) {
-                              parsed.nodes = []
-                            }
-                            if (!Array.isArray(parsed.edges)) {
-                              parsed.edges = []
-                            }
-                            return parsed
-                          } catch {
-                            return { nodes: [], edges: [] } as any
-                          }
-                        })()}
-                        className="h-[320px]"
-                        transparent
-                        nodesDraggable={false}
+                ) : null}
+
+                {/* Then numeric advanced controls */}
+                <div className="space-y-2 border-t border-border/10 pt-2">
+                  {/* Reasoning */}
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                    <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
+                      <Icon name="brain" className="w-4 h-4" />
+                      <span className="text-xs font-semibold">Reasoning</span>
+                    </div>
+                    <div className="flex-1">
+                      <div className="w-full sm:w-[260px]">
+                        <StandardSelect
+                          aria-label="Select reasoning effort"
+                          disabled={readOnly}
+                          value={value.reasoning}
+                          options={[
+                            { value: 'none', label: <span className="text-xs text-muted-foreground">None</span>, keywords: 'none off disabled' },
+                            { value: 'low', label: <span className="text-xs">Low</span>, keywords: 'low' },
+                            { value: 'medium', label: <span className="text-xs">Medium</span>, keywords: 'medium' },
+                            { value: 'high', label: <span className="text-xs">High</span>, keywords: 'high' },
+                          ]}
+                          placeholder="Select reasoning"
+                          triggerClassName={cn('w-full', readOnly && 'opacity-60 cursor-not-allowed')}
+                          onChange={val => {
+                            if (typeof val !== 'string') return
+                            if (readOnly) return
+
+                            const nextEffort = val as AgentFormData['reasoning']
+                            reasoningDirtyRef.current = true
+                            onFieldChange?.('reasoning', nextEffort as any)
+                          }}
+                        />
+                      </div>
+                      <p className="text-[10px] text-muted-foreground mt-1">Controls the model’s reasoning effort (when supported).</p>
+                    </div>
+                  </div>
+
+                  {/* Temperature */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                      <span className="text-xs font-semibold">Temperature</span>
+                    </div>
+                    <div className="w-full sm:w-[260px]">
+                      <Input
+                        id="agent-temperature"
+                        type="number"
+                        min="0"
+                        max="2"
+                        step="0.1"
+                        value={value.temperature}
+                        onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
+                        disabled={readOnly}
+                        className={cn('text-sm h-7', selectLikeFieldClass)}
                       />
-                    </ErrorBoundary>
+                    </div>
+                  </div>
+
+                  {/* Max Tokens */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                      <span className="text-xs font-semibold">Max Tokens</span>
+                    </div>
+                    <div className="w-full sm:w-[260px]">
+                      <Input
+                        id="agent-max-tokens"
+                        type="number"
+                        min="1"
+                        step="1"
+                        value={value.maxTokens}
+                        onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
+                        disabled={readOnly}
+                        className={cn('text-sm h-7', selectLikeFieldClass)}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Timeout */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                    <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
+                      <span className="text-xs font-semibold">Timeout (ms)</span>
+                    </div>
+                    <div className="w-full sm:w-[260px]">
+                      <Input
+                        id="agent-timeout"
+                        type="number"
+                        min="1000"
+                        step="1000"
+                        value={value.timeout}
+                        onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
+                        disabled={readOnly}
+                        className={cn('text-sm h-7', selectLikeFieldClass)}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* System prompt (advanced) */}
+                <div className="space-y-2 border-t border-border/10 pt-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-2">
+                    <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-2">
+                      <Icon name="sparkles" className="w-4 h-4" />
+                      <span className="text-xs font-semibold">System prompt</span>
+                    </div>
+                    <div className={cn('flex-1', readOnly && 'opacity-60 pointer-events-none cursor-not-allowed')}>
+                      <Textarea
+                        ref={systemPromptTextareaRef}
+                        value={value.systemPrompt}
+                        onChange={e => {
+                          onFieldChange?.('systemPrompt', e.target.value)
+                          try {
+                            e.currentTarget.style.height = 'auto'
+                            const nextHeight = Math.max(e.currentTarget.scrollHeight, 200)
+                            e.currentTarget.style.height = `${nextHeight}px`
+                          } catch {
+                            // ignore
+                          }
+                        }}
+                        placeholder="Define the agent's character, mission, and behavior..."
+                        className={cn('text-sm min-h-[200px] resize-none overflow-hidden', selectLikeFieldClass)}
+                        disabled={readOnly}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
-            ) : null}
-
-            {/* Then numeric advanced controls */}
-            <div className="space-y-2 border-t border-border/10 pt-2">
-              {/* Reasoning */}
-              <div className="flex flex-col sm:flex-row sm:items-start gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto pt-0 sm:pt-1">
-                  <Icon name="brain" className="w-4 h-4" />
-                  <span className="text-xs font-semibold">Reasoning</span>
-                </div>
-                <div className="flex-1">
-                  <div className="w-full sm:w-[260px]">
-                    <StandardSelect
-                      aria-label="Select reasoning effort"
-                      disabled={isTemplateAgent || readOnly}
-                      value={value.reasoning}
-                      options={[
-                        { value: 'none', label: <span className="text-xs text-muted-foreground">None</span>, keywords: 'none off disabled' },
-                        { value: 'low', label: <span className="text-xs">Low</span>, keywords: 'low' },
-                        { value: 'medium', label: <span className="text-xs">Medium</span>, keywords: 'medium' },
-                        { value: 'high', label: <span className="text-xs">High</span>, keywords: 'high' },
-                      ]}
-                      placeholder="Select reasoning"
-                      triggerClassName={cn('w-full', (isTemplateAgent || readOnly) && 'opacity-60 cursor-not-allowed')}
-                      onChange={val => {
-                        if (typeof val !== 'string') return
-                        if (isTemplateAgent || readOnly) return
-
-                        const nextEffort = val as AgentFormData['reasoning']
-                        reasoningDirtyRef.current = true
-                        onFieldChange?.('reasoning', nextEffort as any)
-                      }}
-                    />
-                  </div>
-                  <p className="text-[10px] text-muted-foreground mt-1">Controls the model’s reasoning effort (when supported).</p>
-                </div>
-              </div>
-
-              {/* Temperature */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-                  <span className="text-xs font-semibold">Temperature</span>
-                </div>
-                <div className="w-full sm:w-[260px]">
-                  <Input
-                    id="agent-temperature"
-                    type="number"
-                    min="0"
-                    max="2"
-                    step="0.1"
-                    value={value.temperature}
-                    onChange={e => onFieldChange?.('temperature', parseFloat(e.target.value) || 0)}
-                    disabled={isTemplateAgent || readOnly}
-                    className={cn('text-sm h-7', selectLikeFieldClass)}
-                  />
-                </div>
-              </div>
-
-              {/* Max Tokens */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-                  <span className="text-xs font-semibold">Max Tokens</span>
-                </div>
-                <div className="w-full sm:w-[260px]">
-                  <Input
-                    id="agent-max-tokens"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={value.maxTokens}
-                    onChange={e => onFieldChange?.('maxTokens', parseInt(e.target.value, 10) || 2048)}
-                    disabled={isTemplateAgent || readOnly}
-                    className={cn('text-sm h-7', selectLikeFieldClass)}
-                  />
-                </div>
-              </div>
-
-              {/* Timeout */}
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 px-3">
-                <div className="flex items-center gap-2 text-muted-foreground w-full sm:min-w-[160px] sm:w-auto">
-                  <span className="text-xs font-semibold">Timeout (ms)</span>
-                </div>
-                <div className="w-full sm:w-[260px]">
-                  <Input
-                    id="agent-timeout"
-                    type="number"
-                    min="1000"
-                    step="1000"
-                    value={value.timeout}
-                    onChange={e => onFieldChange?.('timeout', parseInt(e.target.value, 10) || 60000)}
-                    disabled={isTemplateAgent || readOnly}
-                    className={cn('text-sm h-7', selectLikeFieldClass)}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-        </CollapsibleContent>
-      </Collapsible>
+            </CollapsibleContent>
+          </Collapsible>
+        </Card>
+      ) : null}
 
       {/* Category & Icon removed: now controlled via the badge selector above */}
     </div>

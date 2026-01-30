@@ -10,6 +10,7 @@ import Icon from '@/components/primitives/Icon'
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
 import { AgentProfileImage } from '@/components/marketplace/AgentProfileImage'
+import { PublicFooter } from '@/app/components/PublicFooter'
 
 // Public marketing page: cacheable at the edge with ISR.
 export const dynamic = 'force-static'
@@ -54,6 +55,24 @@ function categoryBadgeClass(category: AgentTemplateModel['category']): string {
     utility: 'bg-gradient-to-r from-teal-500/10 to-teal-500/20 text-teal-700 dark:text-teal-300 border-teal-500/30',
   }
   return colors[String(category)] || colors.general
+}
+
+type CapabilityPermission = 'allow' | 'ask' | 'deny'
+
+function inferCapabilityPermission(info: ToolTemplateModel | undefined): CapabilityPermission {
+  // Marketplace pages have no starship-specific permission matrix.
+  // We infer a conservative "ask" when a tool clearly requires user configuration.
+  if (!info) return 'allow'
+  if (info.requiresApiKey) return 'ask'
+  const requiredConfigCount = Array.isArray(info.configurationFields) ? info.configurationFields.filter(f => !!f?.required).length : 0
+  if (requiredConfigCount > 0) return 'ask'
+  return 'allow'
+}
+
+function permissionDotClassName(p: CapabilityPermission): string {
+  if (p === 'allow') return 'bg-emerald-500'
+  if (p === 'ask') return 'bg-amber-500'
+  return 'bg-red-500'
 }
 
 async function getTemplateBySlug(slug: string): Promise<AgentTemplateModel | null> {
@@ -131,6 +150,17 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
   const capabilitiesImageUrl = template.capabilitiesImageUrl
   const tryThesePromptsImageUrl = template.tryThesePromptsImageUrl
   const problemStatementsText = Array.isArray(template.problemStatementsText) ? template.problemStatementsText : []
+  const previewPrompts = Array.isArray(template.previewPrompts) ? template.previewPrompts : []
+
+  const hasProblemImage = !!problemStatementsImageUrl
+  const hasProblemText = problemStatementsText.length > 0
+  const hasProblemSection = hasProblemImage || hasProblemText
+
+  const hasCapabilitiesImage = !!capabilitiesImageUrl
+  const hasCapabilitiesSection = toolSlugs.length > 0
+
+  const hasTryPrompts = previewPrompts.length > 0
+  const hasTryPromptsImage = !!tryThesePromptsImageUrl
 
   return (
     <>
@@ -158,7 +188,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             </div>
 
             {/* Hero header */}
-            <section className="mt-4 sm:mt-6">
+            <section className="mt-4 sm:mt-6 mb-10 sm:mb-12">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
                 <div className="flex items-start gap-4 min-w-0 flex-1">
                   <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg flex-shrink-0">
@@ -209,17 +239,17 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
 
             {/* Main content grid */}
             <section className="mt-8 pb-10 sm:pb-16">
-              <div className="space-y-8">
+              <div className="space-y-16 sm:space-y-20">
                 {/* Problem Statements Section */}
-                {problemStatementsImageUrl || problemStatementsText.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
-                    {/* Problem Statements Image - Left side */}
-                    {problemStatementsImageUrl ? (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                {hasProblemSection ? (
+                  hasProblemImage ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+                      {/* Problem Statements Image */}
+                      <div className="rounded-lg border border-border/40 overflow-hidden">
                         <AgentProfileImage
-                          src={problemStatementsImageUrl}
+                          src={problemStatementsImageUrl as string}
                           alt={
-                            problemStatementsText.length > 0
+                            hasProblemText
                               ? `${template.name} understanding user challenges: ${problemStatementsText
                                   .slice(0, 3)
                                   .map(s => `"${s}"`)
@@ -230,73 +260,72 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
                         />
                       </div>
-                    ) : (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
-                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
-                      </div>
-                    )}
 
-                    {/* Problem Statements Section - Right side */}
-                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8 h-full flex flex-col">
-                      <div className="flex items-center gap-2 mb-6">
-                        <Icon name="lightbulb" className="h-5 w-5 text-primary" />
-                        <h2 className="text-base font-semibold tracking-tight text-foreground">The Problem</h2>
+                      {/* Problem Statements Text (no outer card background) */}
+                      {hasProblemText ? (
+                        <section className="h-full flex flex-col justify-between px-1 sm:px-2 py-2">
+                          <div className="flex-1 flex flex-col justify-between space-y-10">
+                            {problemStatementsText.slice(0, 3).map((statement, index) => (
+                              <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
+                                &quot;{statement}&quot;
+                              </p>
+                            ))}
+                          </div>
+                        </section>
+                      ) : null}
+                    </div>
+                  ) : hasProblemText ? (
+                    <section className="px-1 sm:px-2 py-2">
+                      <div className="flex flex-col space-y-10">
+                        {problemStatementsText.slice(0, 3).map((statement, index) => (
+                          <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
+                            &quot;{statement}&quot;
+                          </p>
+                        ))}
                       </div>
-                      {problemStatementsText.length > 0 ? (
-                        <div className="flex-1 flex flex-col justify-between space-y-10">
-                          {problemStatementsText.slice(0, 3).map((statement, index) => (
-                            <p key={index} className={`text-2xl text-foreground leading-relaxed italic ${index % 2 === 0 ? 'text-left' : 'text-right'}`}>
-                              &quot;{statement}&quot;
-                            </p>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="prose prose-sm dark:prose-invert max-w-none">
-                          <p className="text-sm sm:text-base leading-relaxed text-muted-foreground">Shows the agent understanding and empathizing with user challenges.</p>
-                        </div>
-                      )}
                     </section>
-                  </div>
+                  ) : null
                 ) : null}
 
-                {toolSlugs.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                    {/* Capabilities Section - Left side */}
-                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
-                      <div className="flex items-center gap-2 mb-6">
-                        <Icon name="wrench" className="h-5 w-5 text-primary" />
-                        <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
-                      </div>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        {toolSlugs.map(slug => {
-                          const info = toolInfoBySlug.get(slug)
-                          const title = info?.name?.trim() || slug
-                          const desc = info?.description?.trim() || ''
-                          return (
-                            <div
-                              key={slug}
-                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md"
-                            >
-                              <div className="flex items-start gap-3">
-                                <div className="mt-0.5 flex-shrink-0">
-                                  <div className="h-2 w-2 rounded-full bg-primary/60 group-hover:bg-primary transition-colors" />
-                                </div>
-                                <div className="min-w-0 flex-1">
-                                  <div className="text-sm font-semibold leading-5 text-foreground group-hover:text-primary transition-colors">{title}</div>
-                                  {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2 group-hover:text-muted-foreground/90">{desc}</div> : null}
+                {hasCapabilitiesSection ? (
+                  hasCapabilitiesImage ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                      {/* Capabilities */}
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Icon name="wrench" className="h-5 w-5 text-primary" />
+                          <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          {toolSlugs.map(slug => {
+                            const info = toolInfoBySlug.get(slug)
+                            const title = info?.name?.trim() || slug
+                            const desc = info?.description?.trim() || ''
+                            const permission = inferCapabilityPermission(info)
+                            return (
+                              <div
+                                key={slug}
+                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div className="mt-0.5 flex-shrink-0">
+                                    <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
+                                  </div>
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-semibold leading-5 text-foreground">{title}</div>
+                                    {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">{desc}</div> : null}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          )
-                        })}
-                      </div>
-                    </section>
+                            )
+                          })}
+                        </div>
+                      </section>
 
-                    {/* Capabilities Image - Right side */}
-                    {capabilitiesImageUrl ? (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                      {/* Capabilities Image */}
+                      <div className="rounded-lg border border-border/40 overflow-hidden">
                         <AgentProfileImage
-                          src={capabilitiesImageUrl}
+                          src={capabilitiesImageUrl as string}
                           alt={
                             toolSlugs.length > 0
                               ? `${template.name} capabilities: ${toolSlugs
@@ -312,25 +341,52 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
                         />
                       </div>
-                    ) : (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
-                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
+                    </div>
+                  ) : (
+                    <section className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <Icon name="wrench" className="h-5 w-5 text-primary" />
+                        <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
                       </div>
-                    )}
-                  </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {toolSlugs.map(slug => {
+                          const info = toolInfoBySlug.get(slug)
+                          const title = info?.name?.trim() || slug
+                          const desc = info?.description?.trim() || ''
+                          const permission = inferCapabilityPermission(info)
+                          return (
+                            <div
+                              key={slug}
+                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex-shrink-0">
+                                  <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <div className="text-sm font-semibold leading-5 text-foreground">{title}</div>
+                                  {desc ? <div className="mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2">{desc}</div> : null}
+                                </div>
+                              </div>
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </section>
+                  )
                 ) : null}
 
                 {/* Try These Prompts Row - 2 columns */}
-                {Array.isArray(template.previewPrompts) && template.previewPrompts.length > 0 ? (
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                    {/* Try These Prompts Image - Left side */}
-                    {tryThesePromptsImageUrl ? (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden">
+                {hasTryPrompts ? (
+                  hasTryPromptsImage ? (
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                      {/* Try These Prompts Image */}
+                      <div className="rounded-lg border border-border/40 overflow-hidden">
                         <AgentProfileImage
-                          src={tryThesePromptsImageUrl}
+                          src={tryThesePromptsImageUrl as string}
                           alt={
-                            template.previewPrompts && template.previewPrompts.length > 0
-                              ? `${template.name} try these prompts: ${template.previewPrompts
+                            previewPrompts.length > 0
+                              ? `${template.name} try these prompts: ${previewPrompts
                                   .slice(0, 3)
                                   .map(p => `"${p}"`)
                                   .join(', ')}`
@@ -340,50 +396,72 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           style={{ width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
                         />
                       </div>
-                    ) : (
-                      <div className="rounded-lg border border-border/60 bg-card backdrop-blur-sm shadow-sm overflow-hidden flex items-center justify-center min-h-[200px]">
-                        <div className="text-muted-foreground text-sm">{initials || 'AI'}</div>
-                      </div>
-                    )}
 
-                    {/* Try These Prompts Section - Right side */}
-                    <section className="rounded-xl border border-border/60 bg-card backdrop-blur-sm shadow-lg p-6 sm:p-8">
-                      <div className="flex items-center gap-2 mb-6">
+                      {/* Try These Prompts */}
+                      <section className="space-y-4">
+                        <div className="flex items-center gap-2">
+                          <Icon name="message-square" className="h-5 w-5 text-primary" />
+                          <h2 className="text-base font-semibold tracking-tight text-foreground">Try these prompts</h2>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3">
+                          {previewPrompts.map((p, idx) => (
+                            <div
+                              key={idx}
+                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
+                            >
+                              <div className="flex items-start gap-3">
+                                <div className="mt-0.5 flex-shrink-0">
+                                  <Icon name="sparkles" className="h-4 w-4 text-primary" />
+                                </div>
+                                <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+                    </div>
+                  ) : (
+                    <section className="space-y-4">
+                      <div className="flex items-center gap-2">
                         <Icon name="message-square" className="h-5 w-5 text-primary" />
                         <h2 className="text-base font-semibold tracking-tight text-foreground">Try these prompts</h2>
                       </div>
                       <div className="grid grid-cols-1 gap-3">
-                        {template.previewPrompts.map((p, idx) => (
+                        {previewPrompts.map((p, idx) => (
                           <div
                             key={idx}
-                            className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 hover:from-background/60 hover:to-background/40 hover:border-primary/30 transition-all duration-200 p-4 hover:shadow-md cursor-pointer"
+                            className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
                           >
                             <div className="flex items-start gap-3">
                               <div className="mt-0.5 flex-shrink-0">
-                                <Icon name="sparkles" className="h-4 w-4 text-primary/60 group-hover:text-primary transition-colors" />
+                                <Icon name="sparkles" className="h-4 w-4 text-primary" />
                               </div>
-                              <p className="text-sm leading-relaxed text-foreground/90 group-hover:text-foreground transition-colors flex-1">{p}</p>
+                              <p className="text-sm leading-relaxed text-foreground flex-1">{p}</p>
                             </div>
                           </div>
                         ))}
                       </div>
                     </section>
-                  </div>
+                  )
                 ) : null}
               </div>
             </section>
 
             {/* Bottom Deploy Section */}
-            <section className="mt-8 pb-10 sm:pb-16 border-t border-border/60 pt-8">
+            <section className="mt-6 sm:mt-8 pb-10 sm:pb-16 pt-2">
               <div className="max-w-2xl mx-auto text-center">
                 <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Ready to get started?</h2>
                 <p className="text-sm text-muted-foreground mb-6">Add this agent to your starship and start using it right away.</p>
-                <MarketplaceAgentDeployCta template={template} />
+                <div className="flex justify-center">
+                  <MarketplaceAgentDeployCta template={template} />
+                </div>
               </div>
             </section>
           </div>
         </div>
       </main>
+
+      <PublicFooter fromPath={`/marketplace/agents/${encodeURIComponent(template.slug)}`} />
     </>
   )
 }

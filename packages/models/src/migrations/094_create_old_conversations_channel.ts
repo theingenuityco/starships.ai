@@ -17,11 +17,17 @@ import { nanoid } from 'nanoid';
 export async function up(client: Client): Promise<void> {
   await client.query('BEGIN');
   try {
+    const getRows = <T>(result: unknown): T[] => {
+      if (Array.isArray(result)) return result as T[];
+      const anyRes = result as { rows?: unknown };
+      return Array.isArray(anyRes?.rows) ? (anyRes.rows as T[]) : [];
+    };
+
     const slug = 'old-conversations';
     const name = 'Old conversations';
 
     // Find starships that have any non-channel conversations (legacy), excluding the default channel itself.
-    const starships = await client.query<{ starship_id: string; default_channel_conversation_id: string | null }>(`
+    const starshipsRes = await client.query<{ starship_id: string; default_channel_conversation_id: string | null }>(`
       SELECT
         s.id as starship_id,
         s.default_channel_conversation_id
@@ -38,13 +44,14 @@ export async function up(client: Client): Promise<void> {
          LIMIT 1
       )
     `);
+    const starships = getRows<{ starship_id: string; default_channel_conversation_id: string | null }>(starshipsRes);
 
-    for (const row of starships.rows) {
+    for (const row of starships) {
       const starshipId = String(row.starship_id);
       const defaultChannelId = row.default_channel_conversation_id ? String(row.default_channel_conversation_id) : null;
 
       // If the channel already exists, reuse it.
-      const existing = await client.query<{ conversation_id: string }>(
+      const existingRes = await client.query<{ conversation_id: string }>(
         `SELECT conversation_id
            FROM channels
           WHERE starship_id = $1
@@ -52,10 +59,11 @@ export async function up(client: Client): Promise<void> {
           LIMIT 1`,
         [starshipId, slug]
       );
+      const existing = getRows<{ conversation_id: string }>(existingRes);
 
       let legacyChannelConversationId: string;
-      if (existing.rows.length > 0) {
-        legacyChannelConversationId = String(existing.rows[0]!.conversation_id);
+      if (existing.length > 0) {
+        legacyChannelConversationId = String(existing[0]!.conversation_id);
       } else {
         legacyChannelConversationId = nanoid();
         await client.query(

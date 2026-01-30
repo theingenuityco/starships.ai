@@ -1282,9 +1282,7 @@ export function AgentDocumentEditor({
                   ) : (
                     <Icon name="check-circle" className="w-3.5 h-3.5 text-emerald-500" />
                   )}
-                  <span className={cn('text-muted-foreground', hasSaveError && 'text-red-500')}>
-                    {isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'Saved'}
-                  </span>
+                  <span className={cn('text-muted-foreground', hasSaveError && 'text-red-500')}>{isAutosaving ? 'Saving…' : hasSaveError ? 'Save failed' : 'Saved'}</span>
                 </div>
 
                 {/* Status, Version & Last updated */}
@@ -1703,11 +1701,7 @@ export function AgentDocumentEditor({
                           {permissionOptions.map(opt => (
                             <DropdownMenuItem
                               key={opt.value}
-                              className={cn(
-                                'cursor-pointer',
-                                permissionMenuItemClassName(opt.value),
-                                opt.value === current && permissionMenuItemSelectedClassName(opt.value)
-                              )}
+                              className={cn('cursor-pointer', permissionMenuItemClassName(opt.value), opt.value === current && permissionMenuItemSelectedClassName(opt.value))}
                               onClick={() => {
                                 if (disabled) return
                                 setPermissionMutation.mutate({ toolSlug: tool.slug, permission: opt.value })

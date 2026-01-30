@@ -43,7 +43,7 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
   const { data: starships = [] } = useUserStarships(userId || '', !!userId && !targetStarshipId)
   const primaryStarship = starships[0] // Use first starship by default
   const { data: explicitStarship } = useStarship(String(targetStarshipId || ''), !!targetStarshipId && !!isAuthenticated)
-  const starship = targetStarshipId ? explicitStarship ?? { id: targetStarshipId, slug: '', name: '' } : primaryStarship
+  const starship = targetStarshipId ? (explicitStarship ?? { id: targetStarshipId, slug: '', name: '' }) : primaryStarship
 
   // Get deployed agents to check if this template is already deployed
   const { data: deployedAgents = [] } = useStarshipAgents(starship?.id || '', !!starship)

@@ -117,4 +117,3 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     </>
   )
 }
-

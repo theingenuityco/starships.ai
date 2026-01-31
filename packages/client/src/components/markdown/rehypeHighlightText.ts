@@ -28,8 +28,10 @@ function escapeRegex(str: string): string {
   return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+const MAX_HIGHLIGHT_TERM_LENGTH = 200
+
 export function rehypeHighlightText(options: { highlightTerm?: string }) {
-  const term = options?.highlightTerm?.trim()
+  const term = (options?.highlightTerm?.trim() ?? '').slice(0, MAX_HIGHLIGHT_TERM_LENGTH)
   if (!term) return () => {}
 
   const escaped = escapeRegex(term)

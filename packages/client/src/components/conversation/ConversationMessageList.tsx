@@ -563,10 +563,11 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
-  // In-chat search: one entry per occurrence (so "Avatar" 5 times = 5 positions, not 2 messages). Case-insensitive.
+  // In-chat search: one entry per occurrence (so "Avatar" 5 times = 5 positions, not 2 messages). Case-insensitive. Cap term length to avoid ReDoS.
+  const MAX_SEARCH_TERM_LENGTH = 200
   const matchingPositions = useMemo(() => {
     if (!highlightTerm) return []
-    const q = highlightTerm.trim().toLowerCase()
+    const q = highlightTerm.trim().toLowerCase().slice(0, MAX_SEARCH_TERM_LENGTH)
     if (!q) return []
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const positions: { messageId: string }[] = []
@@ -617,10 +618,10 @@ export function ConversationMessageList({
   }, [selectedMatchIndex, matchingPositions])
 
   // Build sidebar results (one per message) and report to parent.
-  // Snippets are built from plain text (strip full message then slice) so we never show ** etc.
+  // Snippets are built from plain text (strip full message then slice) so we never show ** etc. Cap term length to avoid ReDoS.
   const searchResultsForSidebar = useMemo(() => {
     if (!highlightTerm) return null
-    const q = highlightTerm.toLowerCase().trim()
+    const q = highlightTerm.toLowerCase().trim().slice(0, MAX_SEARCH_TERM_LENGTH)
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const results: import('./conversationSearch').SearchResult[] = []
     let firstIndexInPositions = 0
@@ -934,10 +935,12 @@ interface ConversationMessageBubbleProps {
   highlightTerm?: string
 }
 
-/** Renders plain text with optional search term highlighted (for user bubbles that don't use markdown). Case-insensitive. */
+const HIGHLIGHT_TERM_MAX_LENGTH = 200
+
+/** Renders plain text with optional search term highlighted (for user bubbles that don't use markdown). Case-insensitive. Cap term length to avoid ReDoS. */
 function renderTextWithHighlight(text: string, term: string | undefined): ReactNode {
   if (!term || term.trim() === '') return text
-  const t = term.trim()
+  const t = term.trim().slice(0, HIGHLIGHT_TERM_MAX_LENGTH)
   const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
   const tLower = t.toLowerCase()

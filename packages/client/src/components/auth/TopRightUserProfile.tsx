@@ -114,6 +114,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
               }}
               className="pl-7 pr-7 h-8 text-xs w-full"
               aria-label="Search in conversation"
+              autoComplete="off"
             />
             {searchContext!.searchInputValue ? (
               <button

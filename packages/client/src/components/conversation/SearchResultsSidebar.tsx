@@ -6,9 +6,11 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import type { SearchResult } from './conversationSearch'
 
+const MAX_SEARCH_TERM_LENGTH = 200
+
 function snippetWithHighlight(snippet: string, term: string | undefined): React.ReactNode {
   if (!term || term.trim() === '') return snippet
-  const t = term.trim()
+  const t = term.trim().slice(0, MAX_SEARCH_TERM_LENGTH)
   const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   const parts = snippet.split(new RegExp(`(${escaped})`, 'gi'))
   const tLower = t.toLowerCase()
@@ -47,7 +49,7 @@ export interface SearchResultsSidebarProps {
 
 export function SearchResultsSidebar({ query, results, onSelectResult, onClose, className }: SearchResultsSidebarProps) {
   return (
-    <div className={cn('flex flex-col w-full min-w-[320px] max-w-[400px] border-l border-border bg-background flex-shrink-0', className)} role="region" aria-label="Search results">
+    <div className={cn('flex flex-col w-[360px] min-w-[360px] max-w-[360px] border-l border-border bg-background flex-shrink-0', className)} role="region" aria-label="Search results">
       <div className="flex-shrink-0 border-b border-border px-3 py-2 flex flex-col gap-2">
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onClose} aria-label="Close search">

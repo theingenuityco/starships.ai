@@ -180,7 +180,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     setSubmittedQuery('')
     setSearchResults([])
     setSelectedMatchIndex(null)
-  }, [currentConversationId])
+  }, [currentConversationId, setSubmittedQuery])
 
   const closeSearchSidebar = useCallback(() => {
     setSubmittedQuery('')
@@ -202,12 +202,17 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [submittedQuery, closeSearchSidebar])
 
-  // Close search sidebar when user clicks outside it (e.g. on main chat area)
+  // Close search sidebar when user clicks outside it (e.g. on main chat area). Exclude navbar search input so clicking it doesn't close the sidebar.
   useEffect(() => {
     if (!submittedQuery.trim()) return
     const handleClick = (e: MouseEvent) => {
       const target = e.target as Node
-      if (searchSidebarRef.current && !searchSidebarRef.current.contains(target)) {
+      const navbarSearch = document.querySelector('[aria-label="Search in conversation"]')
+      if (
+        searchSidebarRef.current &&
+        !searchSidebarRef.current.contains(target) &&
+        (!navbarSearch || !navbarSearch.contains(target))
+      ) {
         closeSearchSidebar()
       }
     }

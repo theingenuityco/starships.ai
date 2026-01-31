@@ -75,6 +75,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false)
   const [isChannelsExpanded, setIsChannelsExpanded] = useState(true)
+  const [isDirectMessagesExpanded, setIsDirectMessagesExpanded] = useState(true)
   const [newChannelSlug, setNewChannelSlug] = useState('')
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
@@ -126,16 +127,36 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       <div
         key={t.key}
         className={cn(
-          'group flex items-center gap-2 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
+          'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
           isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
           isBusy && 'opacity-70 pointer-events-none'
         )}
+        style={{
+          justifyContent: 'flex-start',
+          transition: 'background-color 0.15s ease',
+          cursor: 'pointer',
+          minHeight: '32px',
+          fontSize: '14px',
+        }}
         onClick={() => handleDmTargetClick(t)}
       >
-        {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
-        <div className="flex-1 min-w-0">
-          <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{label}</p>
+        <div
+          className="flex-shrink-0"
+          style={{
+            width: '1.25rem',
+            height: '1.25rem',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            margin: 0,
+            pointerEvents: 'none',
+          }}
+        >
+          {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
         </div>
+        <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1', isActive && 'text-primary')} style={{ fontSize: '14px', marginLeft: '0.375rem' }}>
+          {label}
+        </span>
       </div>
     )
   }
@@ -331,15 +352,48 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             </div>
           ) : null}
 
-          <div className="pt-1">
-            {dmTargets.length === 0 ? (
-              <div className="flex flex-col items-center justify-center py-6 px-2">
-                <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
+          <div className="pt-2 space-y-2">
+            <div className="w-full flex items-center justify-between h-8">
+              <button
+                type="button"
+                className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                style={{ justifyContent: 'flex-start' }}
+                onClick={() => setIsDirectMessagesExpanded(v => !v)}
+                aria-expanded={isDirectMessagesExpanded}
+                aria-controls="sidebar-direct-messages-list"
+              >
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    width: '1.25rem',
+                    height: '1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: 0,
+                    marginRight: '0.25rem',
+                  }}
+                >
+                  <Icon name={isDirectMessagesExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-wide">Direct messages</span>
+              </button>
+              {/* spacer to align with Channels "+" column */}
+              <div className="w-6 h-6" />
+            </div>
+
+            {isDirectMessagesExpanded ? (
+              <div id="sidebar-direct-messages-list">
+                {dmTargets.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-6 px-2">
+                    <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
+                    <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                )}
               </div>
-            ) : (
-              <>{dmTargets.map(t => renderCompactDmTarget(t))}</>
-            )}
+            ) : null}
           </div>
         </div>
         {createChannelDialog}

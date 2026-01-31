@@ -81,6 +81,7 @@ export { migrateDocTools } from './scripts/migrate-doc-tools';
 
 // Utilities
 export { generateRandomSuffix, generateUniqueAgentSlug, generateSimpleAgentSlug } from './utils/slugGenerator';
+export { extractRequiredConnectorProviders } from './utils/extractRequiredConnectorProviders';
 
 // Shared agent defaults
 export {

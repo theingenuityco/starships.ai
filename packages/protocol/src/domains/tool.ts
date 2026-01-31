@@ -39,6 +39,9 @@ export interface ToolTemplateModel extends ToolParams {
   // Versioning
   version: string; // Semantic version (e.g., '1.0.2')
 
+  /** Connector providers used by this tool's blueprint (connector_action nodes) */
+  requiredConnectorProviders?: string[];
+
   // Template preview
   exampleUsage?: string; // Example of how to use the tool
 
@@ -98,6 +101,9 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
   // Versioning fields
   version: string; // Semantic version (e.g., '1.0.2')
   templateSnapshotAt?: string; // When tool last synced with template
+
+  /** Connector providers used by this tool's blueprint (connector_action nodes) */
+  requiredConnectorProviders?: string[];
   // Update availability info (populated in listing endpoints)
   updateInfo?: {
     needsUpdate: boolean;
@@ -140,6 +146,7 @@ export interface ToolModel extends Omit<ToolParams, 'parameters' | 'blueprint'> 
 export interface CreateToolTemplateRequest extends Omit<ToolParams, 'slug'> {
   category: ToolTemplateCategory;
   version?: string; // Semantic version (defaults to '1.0.0' if not provided)
+  requiredConnectorProviders?: string[]; // Server computes from blueprint when not provided
   exampleUsage?: string;
   requiresApiKey?: boolean;
   configurationFields?: Array<{
@@ -180,6 +187,8 @@ export interface CreateToolRequest extends Omit<ToolParams, 'slug' | 'parameters
   publishedTemplateId?: string;
   version?: string; // Semantic version (defaults to '1.0.0' if not provided)
   templateSnapshotAt?: string; // When tool was created/synced from template
+  /** Connector providers (typically copied from template) */
+  requiredConnectorProviders?: string[];
 }
 
 /**

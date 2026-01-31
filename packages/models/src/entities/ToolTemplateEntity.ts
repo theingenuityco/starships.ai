@@ -96,6 +96,13 @@ export class ToolTemplateEntity implements ToolTemplateModel {
   @Length(1, 20)
   version!: string; // Semantic version (e.g., '1.0.2')
 
+  /** Connector providers used by this tool's blueprint (connector_action nodes) */
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  requiredConnectorProviders?: string[];
+
   // Template preview
   @Expose()
   @IsOptional()

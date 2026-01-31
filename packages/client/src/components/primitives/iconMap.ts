@@ -53,6 +53,8 @@ const map: Record<string, ResolvedIcon> = {
   'message-square': { type: 'phosphor', component: 'ChatCircleText' },
   'message-circle-more': { type: 'phosphor', component: 'ChatCircleDots' },
   chat: { type: 'phosphor', component: 'Chat' },
+  // Thread / replies
+  thread: { type: 'phosphor', component: 'Chats' },
   // Send / paper plane
   send: { type: 'phosphor', component: 'PaperPlaneTilt' },
   // Stop (square)

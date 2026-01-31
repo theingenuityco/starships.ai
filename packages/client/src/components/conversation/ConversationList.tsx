@@ -74,6 +74,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const { userId: authUserId } = useAuthContext()
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false)
+  const [isChannelsExpanded, setIsChannelsExpanded] = useState(true)
   const [newChannelSlug, setNewChannelSlug] = useState('')
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
@@ -232,8 +233,15 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     return (
       <>
         <div className="space-y-2">
-          <div className="w-full flex items-center justify-between">
-            <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-1.5" style={{ justifyContent: 'flex-start' }}>
+          <div className="w-full flex items-center justify-between h-8">
+            <button
+              type="button"
+              className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+              style={{ justifyContent: 'flex-start' }}
+              onClick={() => setIsChannelsExpanded(v => !v)}
+              aria-expanded={isChannelsExpanded}
+              aria-controls="sidebar-channels-list"
+            >
               <div
                 className="flex-shrink-0"
                 style={{
@@ -243,78 +251,85 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                   alignItems: 'center',
                   justifyContent: 'center',
                   margin: 0,
-                  marginRight: '0.375rem',
+                  marginRight: '0.25rem',
                 }}
               >
-                <span className="font-mono text-xs">#</span>
+                <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
               </div>
-              <span className="font-medium" style={{ fontSize: '14px' }}>
-                Channels
-              </span>
-            </div>
+              <span className="text-[11px] font-semibold uppercase tracking-wide">Channels</span>
+            </button>
 
-            <Button type="button" size="sm" variant="ghost" className="h-7 w-7 px-0 ml-1 text-xs" onClick={() => setIsCreateChannelOpen(true)} aria-label="Create channel">
-              <Icon name="plus" className="h-4 w-4" />
-            </Button>
+            <button
+              type="button"
+              onClick={() => setIsCreateChannelOpen(true)}
+              className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+              aria-label="Create channel"
+            >
+              <Icon name="plus" className="w-4 h-4" />
+            </button>
           </div>
 
-          {channelsLoading ? (
-            <div className="space-y-1">
-              {[1, 2].map(i => (
-                <Skeleton key={i} className="h-8 w-full rounded-lg" />
-              ))}
-            </div>
-          ) : channels.length === 0 ? (
-            <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
-          ) : (
-            <div className="space-y-1">
-              {channels.map(ch => {
-                const isActive = ch.conversationId === currentConversationId
-                const label = ch.name || ch.slug
-                return (
-                  <div key={ch.conversationId}>
-                    <div
-                      className={cn(
-                        'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
-                        isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
-                      )}
-                      style={{
-                        justifyContent: 'flex-start',
-                        transition: 'background-color 0.15s ease',
-                        cursor: 'pointer',
-                        minHeight: '32px',
-                        fontSize: '14px',
-                      }}
-                      onClick={() => handleConversationClick(ch.conversationId)}
-                    >
-                      <div
-                        className="flex-shrink-0"
-                        style={{
-                          width: '1.25rem',
-                          height: '1.25rem',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          margin: 0,
-                          pointerEvents: 'none',
-                        }}
-                      >
-                        <span className={cn('font-mono text-xs', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
-                      </div>
-                      <span
-                        className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1', isActive && 'text-primary')}
-                        style={{ fontSize: '14px', marginLeft: '0.375rem' }}
-                      >
-                        {label}
-                      </span>
-                    </div>
+          {isChannelsExpanded ? (
+            <div id="sidebar-channels-list">
+              {channelsLoading ? (
+                <div className="space-y-1">
+                  {[1, 2].map(i => (
+                    <Skeleton key={i} className="h-8 w-full rounded-lg" />
+                  ))}
+                </div>
+              ) : channels.length === 0 ? (
+                <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
+              ) : (
+                <div className="space-y-1">
+                  {channels.map(ch => {
+                    const isActive = ch.conversationId === currentConversationId
+                    const label = ch.name || ch.slug
+                    return (
+                      <div key={ch.conversationId}>
+                        <div
+                          className={cn(
+                            'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
+                            isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                          )}
+                          style={{
+                            justifyContent: 'flex-start',
+                            transition: 'background-color 0.15s ease',
+                            cursor: 'pointer',
+                            minHeight: '32px',
+                            fontSize: '14px',
+                          }}
+                          onClick={() => handleConversationClick(ch.conversationId)}
+                        >
+                          <div
+                            className="flex-shrink-0"
+                            style={{
+                              width: '1.25rem',
+                              height: '1.25rem',
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                              margin: 0,
+                              pointerEvents: 'none',
+                            }}
+                          >
+                            <span className={cn('font-mono text-[14px] leading-none', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                          </div>
+                          <span
+                            className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1', isActive && 'text-primary')}
+                            style={{ fontSize: '14px', marginLeft: '0.375rem' }}
+                          >
+                            {label}
+                          </span>
+                        </div>
 
-                    {/* Forum channels render threads in the main panel (no nested sidebar list). */}
-                  </div>
-                )
-              })}
+                        {/* Forum channels render threads in the main panel (no nested sidebar list). */}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
-          )}
+          ) : null}
 
           <div className="pt-1">
             {dmTargets.length === 0 ? (

@@ -9,7 +9,6 @@ import { StarshipRail } from '@/components/navigation/StarshipRail'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnboardingTour'
-import { useDeleteConversation } from '@/hooks/useConversations'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
@@ -52,8 +51,6 @@ export function Navigation(props: NavigationProps) {
   const [navigationStarshipSlug, setNavigationStarshipSlug] = useState<string | null>(null)
   // Ref for click outside detection
   const sidebarRef = useRef<HTMLDivElement>(null)
-  // Ref for conversation history container
-  const conversationHistoryRef = useRef<HTMLDivElement>(null)
 
   // Ref for collapse timeout to keep logo stable during collapse animation
   const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -162,53 +159,12 @@ export function Navigation(props: NavigationProps) {
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
 
-  // Conversation action handlers - memoized to prevent unnecessary re-renders
-  const deleteConversationMutation = useDeleteConversation()
-
-  // Extract current conversation ID from pathname
-  const currentConversationId = useMemo(() => {
-    if (pathname.startsWith('/ship/')) {
-      const pathParts = pathname.split('/')
-      // Check if path matches /ship/<slug>/conversations/<conversationId>
-      if (pathParts.length >= 5 && pathParts[3] === 'conversations' && pathParts[4]) {
-        return pathParts[4]
-      }
-    }
-    return null
-  }, [pathname])
-
-  const handleConversationDelete = useCallback(
-    async (conversationId: string) => {
-      try {
-        await deleteConversationMutation.mutateAsync(conversationId)
-
-        // If we're currently viewing the deleted conversation, redirect to conversations page
-        if (currentConversationId === conversationId && starshipSlug) {
-          router.push(`/ship/${starshipSlug}/conversations`)
-        }
-      } catch (error) {
-        // Error handling is done in the mutation hook
-      }
-    },
-    [deleteConversationMutation, currentConversationId, starshipSlug, router]
-  )
-
   // Handle new conversation - memoized
   const handleNewConversation = useCallback(() => {
     if (!starshipSlug) return
     router.push(`/ship/${starshipSlug}/conversations`)
     if (isMobile && onClose) onClose()
   }, [router, starshipSlug, isMobile, onClose])
-
-  // Handle conversation selection - memoized
-  const handleConversationSelect = useCallback(
-    (conversationId: string) => {
-      if (!starshipSlug) return
-      router.push(`/ship/${starshipSlug}/conversations/${conversationId}`)
-      if (isMobile && onClose) onClose()
-    },
-    [router, starshipSlug, isMobile, onClose]
-  )
 
   // Handle logo click - memoized
   const handleLogoClick = useCallback(() => {
@@ -380,14 +336,7 @@ export function Navigation(props: NavigationProps) {
         onClick={handleSidebarBackgroundClick}
       >
         {/* Discord-style starship rail */}
-        {isAuthenticated ? (
-          <StarshipRail
-            starships={userStarships ?? []}
-            activeSlug={activeStarshipSlug}
-            onSelect={handleStarshipSelect as any}
-            onCreate={() => router.push('/profile')}
-          />
-        ) : null}
+        {isAuthenticated ? <StarshipRail starships={userStarships ?? []} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/profile')} /> : null}
 
         <div
           className="flex flex-col pb-2 transition-all duration-300 ease-in-out"
@@ -491,34 +440,18 @@ export function Navigation(props: NavigationProps) {
             </div>
           </div>
 
-          {/* Conversation History List - Recents - only when expanded and data is available */}
+          {/* Channels + Direct messages */}
           {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
-            <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col px-2">
-              {/* Recents header - styled to match nav items (icon + label spacing) */}
-              <div className="w-full">
-                <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-1.5" style={{ justifyContent: 'flex-start' }}>
-                  <div
-                    className="flex-shrink-0"
-                    style={{
-                      width: '1.25rem',
-                      height: '1.25rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: 0,
-                      marginRight: '0.375rem',
-                    }}
-                  >
-                    <Icon name="history" className="w-4 h-4" />
-                  </div>
-                  <span className="font-medium" style={{ fontSize: '14px' }}>
-                    Recents
-                  </span>
-                </div>
-              </div>
+            <div className="flex-1 min-h-0 flex flex-col px-2">
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="pb-2 space-y-1">
-                  <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
+                  <ConversationList
+                    starshipId={starshipData.id}
+                    compact={true}
+                    onConversationSelect={() => {
+                      if (isMobile && onClose) onClose()
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -532,9 +465,7 @@ export function Navigation(props: NavigationProps) {
       </motion.div>
 
       {/* Navigation Onboarding Tour */}
-      {isAuthenticated && starshipSlug && (
-        <NavigationOnboardingTour starshipSlug={starshipSlug} navigationItemRefs={navigationItemRefs} />
-      )}
+      {isAuthenticated && starshipSlug && <NavigationOnboardingTour starshipSlug={starshipSlug} navigationItemRefs={navigationItemRefs} />}
     </>
   )
 }

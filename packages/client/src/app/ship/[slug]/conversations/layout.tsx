@@ -3,6 +3,7 @@
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useCreateConversation, useLinkMessageToConversation } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
 import type { MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -14,12 +15,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const router = useRouter()
   const searchParams = useSearchParams()
   const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
-  const [threadConversationId, setThreadConversationId] = useState<string | null>(null)
   const [threadAgent, setThreadAgent] = useState<Agent | null>(null)
   const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
-  const [threadDraft, setThreadDraft] = useState<{ parentConversationId: string; title: string } | null>(null)
-  const [threadParentConversationId, setThreadParentConversationId] = useState<string | null>(null)
-  const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
+  const lastThreadConversationIdRef = useRef<string | null>(null)
+
+  const createConversation = useCreateConversation()
+  const linkMessageToConversation = useLinkMessageToConversation()
 
   // Desktop thread pane width (draggable resizer)
   const THREAD_PANE_WIDTH_STORAGE_KEY = 'starships.threadPaneWidthPx'
@@ -117,6 +118,37 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
 
+  const threadConversationId = useMemo(() => {
+    const raw = searchParams.get('thread')
+    const v = typeof raw === 'string' ? raw.trim() : ''
+    return v.length > 0 ? v : null
+  }, [searchParams])
+
+  const setThreadConversationIdInUrl = useCallback(
+    (conversationId: string | null) => {
+      const next = new URLSearchParams(searchParams.toString())
+      if (conversationId) next.set('thread', conversationId)
+      else next.delete('thread')
+      const qs = next.toString()
+      // Preserve the current route (including /conversations/:conversationId) and other query params.
+      const basePath = routeParams.conversationId ? `/ship/${routeParams.slug}/conversations/${routeParams.conversationId}` : `/ship/${routeParams.slug}/conversations`
+      // Avoid clearing pinned message/agent when *we* open/close the thread via URL updates.
+      lastThreadConversationIdRef.current = conversationId
+      router.push(qs ? `${basePath}?${qs}` : basePath)
+    },
+    [router, routeParams.conversationId, routeParams.slug, searchParams]
+  )
+
+  useEffect(() => {
+    // If thread id changes via back/forward / manual URL edits, clear per-thread ephemeral state.
+    const prev = lastThreadConversationIdRef.current
+    if (prev !== threadConversationId) {
+      lastThreadConversationIdRef.current = threadConversationId
+      setThreadPinnedFirstMessage(null)
+      setThreadAgent(null)
+    }
+  }, [threadConversationId])
+
   // Redirect to marketplace immediately if onboarding should start BUT we're not on step 5
   // Step 5 needs to show the conversations page, so we allow it to render
   useEffect(() => {
@@ -129,13 +161,14 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   // Must be called before any early returns to satisfy React Hooks rules
   const handleConversationChange = useCallback(
     (newConversationId: string | null) => {
+      const qs = searchParams.toString()
       if (newConversationId) {
-        router.push(`/ship/${routeParams.slug}/conversations/${newConversationId}`)
+        router.push(qs ? `/ship/${routeParams.slug}/conversations/${newConversationId}?${qs}` : `/ship/${routeParams.slug}/conversations/${newConversationId}`)
       } else {
-        router.push(`/ship/${routeParams.slug}/conversations`)
+        router.push(qs ? `/ship/${routeParams.slug}/conversations?${qs}` : `/ship/${routeParams.slug}/conversations`)
       }
     },
-    [router, routeParams.slug]
+    [router, routeParams.slug, searchParams]
   )
 
   // Don't render conversations interface if we're redirecting to onboarding (but allow step 5)
@@ -160,20 +193,50 @@ export default function ConversationsLayout({ children }: { children: React.Reac
           conversationId={routeParams.conversationId || null}
           onConversationChange={handleConversationChange}
           onOpenThread={({ conversationId, defaultAgent, linkedMessage, parentConversationId }) => {
-            setThreadConversationId(conversationId)
             setThreadAgent(prev => prev ?? defaultAgent)
             setThreadPinnedFirstMessage(linkedMessage ?? null)
-            setThreadParentConversationId(parentConversationId ?? null)
-            if (!conversationId && linkedMessage && parentConversationId) {
+
+            // If we already have a thread conversation id, open it via URL param.
+            if (conversationId) {
+              setThreadConversationIdInUrl(conversationId)
+              return
+            }
+
+            // Draft thread opening (no conversationId yet): eagerly create + link, then open via URL param.
+            if (linkedMessage && parentConversationId) {
               const raw = String((linkedMessage as any)?.content ?? '')
                 .trim()
                 .replace(/\s+/g, ' ')
               const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
               const title = snippet ? `Thread: ${snippet}` : 'New thread'
-              setThreadDraftTitle(title)
-              setThreadDraft({ parentConversationId, title })
-            } else {
-              setThreadDraft(null)
+
+              createConversation.mutate(
+                {
+                  starshipId: starshipData.id,
+                  title,
+                  parentConversationId,
+                  agentId: typeof (defaultAgent as any)?.id === 'string' ? String((defaultAgent as any).id) : undefined,
+                  agentSlug: typeof (defaultAgent as any)?.slug === 'string' ? String((defaultAgent as any).slug) : undefined,
+                },
+                {
+                  onSuccess: conv => {
+                    const newId = String((conv as any)?.id || '').trim()
+                    if (!newId) return
+
+                    // Best-effort: persist the thread link immediately.
+                    const messageId = String((linkedMessage as any)?.id || '').trim()
+                    if (messageId) {
+                      linkMessageToConversation.mutate({
+                        messageId,
+                        linkedConversationId: newId,
+                        conversationId: parentConversationId,
+                      })
+                    }
+
+                    setThreadConversationIdInUrl(newId)
+                  },
+                }
+              )
             }
           }}
           initialAgentId={routeParams.agentIdOrSlug}
@@ -182,7 +245,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       </div>
 
       {/* Thread split pane (desktop/tablet) */}
-      {threadConversationId || threadDraft ? (
+      {threadConversationId ? (
         <>
           {/* Draggable resize handle (desktop/tablet) */}
           <div
@@ -219,18 +282,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
               pinnedFirstMessage={threadPinnedFirstMessage}
               selectedAgent={(threadAgent as any) ?? null}
               onAgentChange={setThreadAgent as any}
-              draftParentConversationId={threadDraft?.parentConversationId ?? threadParentConversationId ?? null}
-              draftTitle={threadDraft?.title ?? threadDraftTitle ?? null}
               onThreadCreated={cid => {
-                setThreadConversationId(cid)
-                setThreadDraft(null)
+                setThreadConversationIdInUrl(cid)
               }}
               onClose={() => {
-                setThreadConversationId(null)
                 setThreadPinnedFirstMessage(null)
-                setThreadDraft(null)
-                setThreadParentConversationId(null)
-                setThreadDraftTitle(null)
+                setThreadAgent(null)
+                setThreadConversationIdInUrl(null)
               }}
             />
           </aside>
@@ -238,7 +296,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       ) : null}
 
       {/* Thread in-flow pane (mobile) */}
-      {threadConversationId || threadDraft ? (
+      {threadConversationId ? (
         <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border/60 bg-background min-w-0">
           <ThreadPane
             starshipId={starshipData.id}
@@ -247,18 +305,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
             pinnedFirstMessage={threadPinnedFirstMessage}
             selectedAgent={(threadAgent as any) ?? null}
             onAgentChange={setThreadAgent as any}
-            draftParentConversationId={threadDraft?.parentConversationId ?? threadParentConversationId ?? null}
-            draftTitle={threadDraft?.title ?? threadDraftTitle ?? null}
             onThreadCreated={cid => {
-              setThreadConversationId(cid)
-              setThreadDraft(null)
+              setThreadConversationIdInUrl(cid)
             }}
             onClose={() => {
-              setThreadConversationId(null)
               setThreadPinnedFirstMessage(null)
-              setThreadDraft(null)
-              setThreadParentConversationId(null)
-              setThreadDraftTitle(null)
+              setThreadAgent(null)
+              setThreadConversationIdInUrl(null)
             }}
           />
         </aside>

@@ -97,7 +97,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   if (!conversationId || !isDataReady) {
     return (
       <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
-        <div className="px-4 py-3.5">
+        <div className="px-4 pt-3.5 pb-1">
           <div className="max-w-4xl">
             <div className="flex items-center justify-between gap-4">
               {/* Title and metadata (stacked) - exact structural match */}
@@ -225,7 +225,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
       }
       className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
     >
-      <div className="px-4 py-3.5">
+      <div className="px-4 pt-3.5 pb-1">
         <div className="max-w-4xl">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}

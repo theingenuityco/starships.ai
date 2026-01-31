@@ -156,6 +156,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
+  const searchSidebarRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
   const [hasWelcomeExited, setHasWelcomeExited] = useState<boolean>(false)
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
@@ -180,6 +181,39 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     setSearchResults([])
     setSelectedMatchIndex(null)
   }, [currentConversationId])
+
+  const closeSearchSidebar = useCallback(() => {
+    setSubmittedQuery('')
+    setSearchResults([])
+    setSelectedMatchIndex(null)
+    searchContext?.setSearchInputValue?.('')
+  }, [setSubmittedQuery, searchContext])
+
+  // Close search sidebar on Escape
+  useEffect(() => {
+    if (!submittedQuery.trim()) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeSearchSidebar()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [submittedQuery, closeSearchSidebar])
+
+  // Close search sidebar when user clicks outside it (e.g. on main chat area)
+  useEffect(() => {
+    if (!submittedQuery.trim()) return
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as Node
+      if (searchSidebarRef.current && !searchSidebarRef.current.contains(target)) {
+        closeSearchSidebar()
+      }
+    }
+    document.addEventListener('click', handleClick)
+    return () => document.removeEventListener('click', handleClick)
+  }, [submittedQuery, closeSearchSidebar])
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -857,7 +891,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         {/* Messages Area */}
         {showMessagesArea ? (
           <div className={cn('flex flex-1 min-h-0', submittedQuery.trim() && 'flex-row')}>
-            <div className={cn('flex flex-col flex-1 min-w-0', submittedQuery.trim() && 'min-w-0')}>
+            <div className={cn('relative flex flex-col flex-1 min-w-0', submittedQuery.trim() && 'min-w-0')}>
               <ConversationSummaryBar
                 conversationId={currentConversationId}
                 starshipId={starshipId}
@@ -890,17 +924,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               <StreamSideEffects />
             </div>
             {submittedQuery.trim() ? (
-              <SearchResultsSidebar
-                query={submittedQuery}
-                results={searchResults}
-                onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
-                onClose={() => {
-                  setSubmittedQuery('')
-                  setSearchResults([])
-                  setSelectedMatchIndex(null)
-                  searchContext?.setSearchInputValue?.('')
-                }}
-              />
+              <div ref={searchSidebarRef}>
+                <SearchResultsSidebar
+                  query={submittedQuery}
+                  results={searchResults}
+                  onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
+                  onClose={closeSearchSidebar}
+                />
+              </div>
             ) : null}
           </div>
         ) : null}

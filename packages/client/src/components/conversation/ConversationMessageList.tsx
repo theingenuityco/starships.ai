@@ -13,7 +13,7 @@ import { useConversationStreamContextOptional } from '@/hooks/ConversationStream
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
-import { stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
+import { buildPlainTextSnippet } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -616,30 +616,27 @@ export function ConversationMessageList({
     }
   }, [selectedMatchIndex, matchingPositions])
 
-  // Build sidebar results (one per message) and report to parent
+  // Build sidebar results (one per message) and report to parent.
+  // Snippets are built from plain text (strip full message then slice) so we never show ** etc.
   const searchResultsForSidebar = useMemo(() => {
     if (!highlightTerm) return null
-    const q = highlightTerm.toLowerCase()
+    const q = highlightTerm.toLowerCase().trim()
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const results: import('./conversationSearch').SearchResult[] = []
     let firstIndexInPositions = 0
     for (const msg of renderMessages) {
       const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
       const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
-      const searchable = `${content} ${reasoning}`.toLowerCase()
+      const fullText = `${content} ${reasoning}`.trim()
+      const searchable = fullText.toLowerCase()
       const matches = searchable.match(new RegExp(escaped, 'g'))
       const count = matches ? matches.length : 0
       if (count === 0) continue
-      const contentLower = (content + ' ' + reasoning).toLowerCase()
-      const firstMatchIdx = contentLower.indexOf(q)
-      const snippetStart = Math.max(0, firstMatchIdx - 50)
-      const snippetEnd = Math.min(contentLower.length, firstMatchIdx + 80)
-      const rawSnippet = (content + ' ' + reasoning).slice(snippetStart, snippetEnd).trim()
-      const contentSnippet = stripMarkdownToPlainText(rawSnippet || content.slice(0, 120))
+      const contentSnippet = buildPlainTextSnippet(fullText || content, highlightTerm)
       results.push({
         messageId: msg.id,
         role: msg.role,
-        contentSnippet: contentSnippet || stripMarkdownToPlainText(content.slice(0, 120)),
+        contentSnippet: contentSnippet || buildPlainTextSnippet(content, highlightTerm),
         timestamp: (msg as ExtendedMessage).createdAt,
         occurrenceCount: count,
         firstMatchIndexInPositions: firstIndexInPositions,
@@ -672,7 +669,7 @@ export function ConversationMessageList({
 
   return (
     <div className={cn('h-full flex flex-col', className)}>
-      {showSearchBar && (
+      {showSearchBar && !hideSearchInput && (
         <div className="flex-shrink-0 border-b px-4 py-2 flex items-center gap-2 bg-background/95">
           {!hideSearchInput && (
             <>
@@ -751,7 +748,7 @@ export function ConversationMessageList({
       )}
       <div
         ref={scrollContainerRef}
-        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-2' : 'pt-2', scrollClassName)}
+        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-5', scrollClassName)}
         style={{ paddingBottom: bottomPaddingPx ?? 160 }}
         onScroll={() => {
           const container = scrollContainerRef.current

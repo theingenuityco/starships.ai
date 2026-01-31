@@ -73,7 +73,7 @@ export function SearchResultsSidebar({
             <Icon name="x" className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center justify-between mt-2">
+        <div className="flex items-center justify-between mt-4 mb-1.5 px-0">
           <span className="text-xs font-medium text-foreground">
             {results.length} {results.length === 1 ? 'Result' : 'Results'}
           </span>

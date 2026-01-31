@@ -54,6 +54,12 @@ export interface Message extends Omit<LlmMessage, 'content'> {
   userAvatar?: string;
   // File attachments (array of attachment IDs)
   attachmentIds?: string[];
+
+  /**
+   * Optional: link this message to a separate conversation.
+   * Used for generic "thread preview" / "index post" messages in channels.
+   */
+  linkedConversationId?: string;
 }
 
 /**

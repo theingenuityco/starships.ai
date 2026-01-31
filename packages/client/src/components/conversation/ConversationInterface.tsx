@@ -5,20 +5,14 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
+import { ForumChannelView } from '@/components/conversation/ForumChannelView'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import {
-  useStarshipChannels,
-  useStarshipConversations,
-  CONVERSATION_QUERY_KEYS,
-  useChildConversations,
-  usePendingToolApprovalsMulti,
-  useConversationDetail,
-} from '@/hooks/useConversations'
+import { useStarshipChannels, useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversations, usePendingToolApprovalsMulti, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -193,11 +187,25 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     return chans.some((c: any) => String(c?.conversationId || '') === cid)
   }, [starshipChannelsData, currentConversationId])
 
+  const currentChannel = useMemo(() => {
+    const cid = String(currentConversationId || '')
+    if (!cid) return null
+    const chans = (starshipChannelsData as any)?.channels
+    if (!Array.isArray(chans)) return null
+    return chans.find((c: any) => String(c?.conversationId || '') === cid) || null
+  }, [starshipChannelsData, currentConversationId])
+
+  const isForumChannel = useMemo(() => {
+    const t = typeof (currentChannel as any)?.channelType === 'string' ? String((currentChannel as any).channelType) : ''
+    return t.trim().toLowerCase() === 'forum'
+  }, [currentChannel])
+
   // Child conversation approvals: if any child conversation is awaiting tool approval,
   // show a compact callout above the parent composer.
-  const { data: childConversations = [] } = useChildConversations(currentConversationId, Boolean(currentConversationId))
+  const shouldCheckChildApprovals = Boolean(currentConversationId && !isForumChannel)
+  const { data: childConversations = [] } = useChildConversations(currentConversationId, shouldCheckChildApprovals)
   const childConversationIds = useMemo(() => (Array.isArray(childConversations) ? childConversations.map((c: any) => String(c.id)).filter(Boolean) : []), [childConversations])
-  const { byConversationId: pendingApprovalsByChildId } = usePendingToolApprovalsMulti(childConversationIds, Boolean(currentConversationId && childConversationIds.length > 0))
+  const { byConversationId: pendingApprovalsByChildId } = usePendingToolApprovalsMulti(childConversationIds, Boolean(shouldCheckChildApprovals && childConversationIds.length > 0))
   const childWithPendingApproval = useMemo(() => {
     if (!Array.isArray(childConversations) || childConversations.length === 0) return null
     const withPending = childConversations
@@ -842,6 +850,21 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           </div>
           <p className="text-muted-foreground">Please sign in to start a conversation</p>
         </div>
+      </div>
+    )
+  }
+
+  // Forum channel view (cards/threads, no chat timeline).
+  if (isForumChannel && currentConversationId) {
+    return (
+      <div className="relative flex flex-col h-screen">
+        <ForumChannelView
+          starshipId={starshipId}
+          channelConversationId={currentConversationId}
+          channelSlug={typeof (currentChannel as any)?.slug === 'string' ? String((currentChannel as any).slug) : null}
+          channelName={typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null}
+          starshipSlug={starshipSlug ?? null}
+        />
       </div>
     )
   }

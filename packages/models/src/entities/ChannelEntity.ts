@@ -6,7 +6,7 @@
 
 import type { ChannelModel } from '@starships/protocol';
 import { Expose } from 'class-transformer';
-import { IsBoolean, IsISO8601, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
+import { IsBoolean, IsISO8601, IsIn, IsOptional, IsString, Length, validate, ValidationError } from 'class-validator';
 
 export class ChannelEntity implements ChannelModel {
   @Expose()
@@ -32,6 +32,11 @@ export class ChannelEntity implements ChannelModel {
   @Expose()
   @IsBoolean()
   isPrivate!: boolean;
+
+  @Expose()
+  @IsString()
+  @IsIn(['chat', 'forum'])
+  channelType!: 'chat' | 'forum';
 
   @Expose()
   @IsOptional()
@@ -61,6 +66,7 @@ export class ChannelEntity implements ChannelModel {
         slug: dataRecord.slug || '',
         name: dataRecord.name || '',
         isPrivate: Boolean(dataRecord.isPrivate),
+        channelType: (dataRecord.channelType as 'chat' | 'forum' | undefined) ?? 'chat',
         topic: (dataRecord.topic as string | null | undefined) ?? null,
         createdAt: dataRecord.createdAt || new Date().toISOString(),
         updatedAt: dataRecord.updatedAt || new Date().toISOString(),
@@ -81,4 +87,3 @@ export class ChannelEntity implements ChannelModel {
     }
   }
 }
-

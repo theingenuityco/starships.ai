@@ -562,10 +562,7 @@ export function ConversationMessageList({
             <div className="flex justify-center pb-4">
               <button
                 type="button"
-                className={cn(
-                  'text-xs px-3 py-1.5 rounded-md border bg-background hover:bg-muted transition-colors',
-                  isLoadingOlder ? 'opacity-60 pointer-events-none' : ''
-                )}
+                className={cn('text-xs px-3 py-1.5 rounded-md border bg-background hover:bg-muted transition-colors', isLoadingOlder ? 'opacity-60 pointer-events-none' : '')}
                 onClick={() => (stream as any)?.loadOlder?.({ limit: 100 })}
               >
                 {isLoadingOlder ? 'Loading…' : 'Load older messages'}
@@ -599,8 +596,7 @@ export function ConversationMessageList({
                   sizeVariant={sizeVariant}
                 />
                 {(() => {
-                  const widgets =
-                    message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
+                  const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
                   if (widgets.length === 0) return null
                   return (
                     <div className="flex justify-start">
@@ -649,24 +645,11 @@ export function ConversationMessageList({
             <div className="flex justify-start">
               {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
                 <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
-                  <div
-                    className={cn(
-                      'flex-shrink-0 mt-1',
-                      sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6'
-                    )}
-                    aria-hidden="true"
-                  />
+                  <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <div
-                      className={cn(
-                        'flex items-center gap-2 leading-relaxed text-muted-foreground',
-                        sizeVariant === 'hero' ? 'text-base' : 'text-sm'
-                      )}
-                    >
+                    <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
                       <TypingDots />
-                      <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>
-                        Typing...
-                      </span>
+                      <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
                     </div>
                   </div>
                 </div>
@@ -797,33 +780,32 @@ function extractWidgetResults(uiActions: unknown): WidgetResult[] {
 
   const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
 
-  const outRaw: Array<WidgetResult | null> = actions
-    .map((ua, index) => {
-      if (!ua || ua.action !== 'render_widget') return null
-      const payload = ua.payload
-      if (!payload || !isRecord(payload)) return null
-      const widget = payload['widget']
-      if (!isRecord(widget)) return null
+  const outRaw: Array<WidgetResult | null> = actions.map((ua, index) => {
+    if (!ua || ua.action !== 'render_widget') return null
+    const payload = ua.payload
+    if (!payload || !isRecord(payload)) return null
+    const widget = payload['widget']
+    if (!isRecord(widget)) return null
 
-      const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
-      const props = widget['props']
-      if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
-      if (!props || typeof props !== 'object') return null
+    const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
+    const props = widget['props']
+    if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
+    if (!props || typeof props !== 'object') return null
 
-      const id =
-        (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
-        (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
-        `ui-widget-${index}`
+    const id =
+      (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
+      (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
+      `ui-widget-${index}`
 
-      return {
-        id,
-        widgetType,
-        props: props as Record<string, unknown>,
-        name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
-        description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
-        index,
-      } satisfies WidgetResult
-    })
+    return {
+      id,
+      widgetType,
+      props: props as Record<string, unknown>,
+      name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
+      description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
+      index,
+    } satisfies WidgetResult
+  })
   const out = outRaw.filter((w): w is WidgetResult => w !== null)
 
   // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
@@ -866,15 +848,28 @@ const MemoizedMessageBubble = memo(
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
-    const messageUserName =
-      typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
-    const messageUserAvatar =
-      typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
+    const messageUserName = typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
+    const messageUserAvatar = typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
 
     const effectiveUserName = userNameOverride ?? messageUserName ?? userName
     const effectiveUserEmail = userEmailOverride ?? userEmail
     const effectiveUserAvatar = userAvatarUrlOverride ?? messageUserAvatar ?? userAvatar
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
+
+    // Generic: allow any message to link to another conversation (thread preview/index post)
+    const linkedConversationId = useMemo(() => {
+      const anyMsg = message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+      return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null
+    }, [message])
+
+    const linkedConversationHref = useMemo(() => {
+      if (!linkedConversationId) return null
+      if (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0) {
+        return `/ship/${encodeURIComponent(starshipSlug)}/conversations/${encodeURIComponent(linkedConversationId)}`
+      }
+      return null
+    }, [linkedConversationId, starshipSlug])
 
     if (isUser) {
       // When the "user" is being overridden to represent an agent (e.g. Aria in landing demos),
@@ -893,7 +888,9 @@ const MemoizedMessageBubble = memo(
           <div className="flex justify-end">
             <div className={cn('flex w-full sm:w-auto items-end max-w-full sm:max-w-[70%]', userRowClass)}>
               <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
-                <div className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}>
+                <div
+                  className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}
+                >
                   <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{message.content}</div>
                   {message.sending && (
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
@@ -937,8 +934,7 @@ const MemoizedMessageBubble = memo(
 
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
-      const userProfileHref =
-        typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
+      const userProfileHref = typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
 
       return (
         <div className="flex justify-start w-full">
@@ -997,6 +993,15 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
+              {linkedConversationHref && message.role !== 'user' && (
+                <div className="mt-2 flex">
+                  <Link href={linkedConversationHref}>
+                    <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
+                      Open thread
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1043,6 +1048,15 @@ const MemoizedMessageBubble = memo(
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                 />
+                {linkedConversationHref && message.role !== 'user' && (
+                  <div className="mt-2 flex">
+                    <Link href={linkedConversationHref}>
+                      <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
+                        Open thread
+                      </Button>
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -1098,6 +1112,15 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
+              {linkedConversationHref && message.role !== 'user' && (
+                <div className="mt-2 flex">
+                  <Link href={linkedConversationHref}>
+                    <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
+                      Open thread
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1110,6 +1133,13 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    {
+      const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const nextAny = nextProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const prevLink = prevAny?.linkedConversationId ?? prevAny?.linked_conversation_id
+      const nextLink = nextAny?.linkedConversationId ?? nextAny?.linked_conversation_id
+      if (String(prevLink ?? '') !== String(nextLink ?? '')) return false
+    }
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
 

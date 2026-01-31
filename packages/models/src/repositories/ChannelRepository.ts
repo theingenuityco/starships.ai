@@ -12,7 +12,9 @@ export class ChannelRepository extends BaseRepository {
     return this.executeWithErrorHandling(
       async () => {
         const connection = this.getConnection();
-        const row = await connection.queryOne<Record<string, unknown>>('SELECT * FROM channels WHERE conversation_id = $1', [conversationId]);
+        const row = await connection.queryOne<Record<string, unknown>>('SELECT * FROM channels WHERE conversation_id = $1', [
+          conversationId,
+        ]);
         return row ? fromDatabase(ChannelEntity, row) : null;
       },
       'findByConversationId',
@@ -47,6 +49,7 @@ export class ChannelRepository extends BaseRepository {
           slug: args.slug,
           name: args.name,
           isPrivate: Boolean(args.isPrivate),
+          channelType: (args.channelType as 'chat' | 'forum' | undefined) ?? 'chat',
           ...(args.topic !== undefined ? { topic: args.topic } : {}),
           createdAt: now,
           updatedAt: now,
@@ -74,4 +77,3 @@ export class ChannelRepository extends BaseRepository {
     );
   }
 }
-

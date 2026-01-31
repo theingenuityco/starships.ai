@@ -8,7 +8,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
-const TOTAL_STEPS = 4
+const TOTAL_STEPS = 6
 
 export interface OnboardingStep {
   step: number
@@ -46,6 +46,20 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     label: 'Schedules',
     description: 'Automate agents to run tasks at a specific time and date.',
     icon: 'clock',
+  },
+  {
+    step: 5,
+    route: '/conversations', // This will be replaced with actual starship slug (sidebar section lives on all starship pages)
+    label: 'Channels',
+    description: 'Channels are shared spaces for your team and agents.',
+    icon: 'hash',
+  },
+  {
+    step: 6,
+    route: '/conversations', // This will be replaced with actual starship slug (sidebar section lives on all starship pages)
+    label: 'Direct messages',
+    description: 'Direct messages are private 1:1 chats with agents or teammates.',
+    icon: 'message-square',
   },
 ]
 
@@ -108,7 +122,7 @@ export function useNavigationOnboarding() {
         description: errorMessage,
       })
       
-      // DON'T reset state - keep user on step 5 so they can retry manually
+      // DON'T reset state - keep user on the final step so they can retry manually
     },
   })
 

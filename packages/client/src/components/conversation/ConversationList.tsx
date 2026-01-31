@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useCreateChannel, useCreateDirectMessage, useStarshipChannels } from '@/hooks/useConversations'
+import { useCreateChannel, useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
@@ -67,10 +67,10 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const currentConversationId = params.conversationId as string | undefined
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
+  const { data: directMessagesData } = useStarshipDirectMessages(starshipId, true)
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const createChannel = useCreateChannel()
-  const createDirectMessage = useCreateDirectMessage()
   const { userId: authUserId } = useAuthContext()
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false)
@@ -120,7 +120,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   const renderCompactDmTarget = (t: DmTarget) => {
     const label = t.label
-    const isBusy = createDirectMessage.isPending
+    const isBusy = false
     const isActive = false
 
     return (
@@ -163,16 +163,66 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     onConversationSelect?.(conversationId)
   }
 
-  const handleDmTargetClick = async (t: DmTarget) => {
-    const title = (t.label || '').trim()
-    const created = await createDirectMessage.mutateAsync(
-      t.kind === 'agent'
-        ? { starshipId, agentId: t.agent.id, title }
-        : { starshipId, peerUserId: t.user.userId, title }
-    )
-    if (created?.conversationId) {
-      handleConversationClick(String(created.conversationId))
+  const existingDmConversationIdByAgentId = useMemo(() => {
+    const list = (directMessagesData?.directMessages || []) as DirectMessageListItem[]
+    const map = new Map<string, string>()
+    for (const item of list) {
+      const dm: any = (item as any)?.dm
+      if (!dm || dm.dmType !== 'user_agent') continue
+      const agentId = typeof dm.agentId === 'string' ? String(dm.agentId) : ''
+      const cid = typeof dm.conversationId === 'string' ? String(dm.conversationId) : ''
+      if (agentId && cid) map.set(agentId, cid)
     }
+    return map
+  }, [directMessagesData?.directMessages])
+
+  const existingDmConversationIdByPeerUserId = useMemo(() => {
+    const list = (directMessagesData?.directMessages || []) as DirectMessageListItem[]
+    const map = new Map<string, string>()
+    for (const item of list) {
+      const dm: any = (item as any)?.dm
+      if (!dm || dm.dmType !== 'user_user') continue
+      const peer: any = (item as any)?.peerUser
+      const peerId = typeof peer?.id === 'string' ? String(peer.id) : ''
+      const cid = typeof dm.conversationId === 'string' ? String(dm.conversationId) : ''
+      if (peerId && cid) map.set(peerId, cid)
+    }
+    return map
+  }, [directMessagesData?.directMessages])
+
+  const openDraftDm = (args: { dmType: 'user_agent' | 'user_user'; agentId?: string; peerUserId?: string; peerLabel?: string; peerAvatar?: string }) => {
+    const sp = new URLSearchParams()
+    sp.set('dm', 'draft')
+    sp.set('dmType', args.dmType)
+    if (args.agentId) sp.set('agentId', args.agentId)
+    if (args.peerUserId) sp.set('peerUserId', args.peerUserId)
+    if (args.peerLabel) sp.set('peerLabel', args.peerLabel)
+    if (args.peerAvatar) sp.set('peerAvatar', args.peerAvatar)
+    router.push(`/ship/${slug}/conversations?${sp.toString()}`)
+  }
+
+  const handleDmTargetClick = async (t: DmTarget) => {
+    // If an existing DM conversation exists, open it immediately (shows history).
+    // Otherwise, open a draft DM view (no conversation yet) and create it on first send.
+    if (t.kind === 'agent') {
+      const existing = existingDmConversationIdByAgentId.get(String(t.agent.id))
+      if (existing) {
+        handleConversationClick(existing)
+        return
+      }
+      openDraftDm({ dmType: 'user_agent', agentId: String(t.agent.id) })
+      return
+    }
+
+    const peerId = String(t.user.userId)
+    const existing = existingDmConversationIdByPeerUserId.get(peerId)
+    if (existing) {
+      handleConversationClick(existing)
+      return
+    }
+    const peerLabel = (t.user.displayName || t.user.email || 'User').trim()
+    const peerAvatar = typeof (t.user as any)?.avatar === 'string' ? String((t.user as any).avatar) : ''
+    openDraftDm({ dmType: 'user_user', peerUserId: peerId, peerLabel, peerAvatar: peerAvatar || undefined })
   }
 
   const createChannelDialog = (
@@ -483,7 +533,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             ) : (
               <div className="space-y-1">
                 {dmTargets.map(t => {
-                  const isBusy = createDirectMessage.isPending
+                  const isBusy = false
                   const label = t.label
                   return (
                     <div

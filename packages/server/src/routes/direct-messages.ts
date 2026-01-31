@@ -53,7 +53,7 @@ router.get('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (r
       if (dm.dmType === 'user_user') {
         const a = dm.userAId ? String(dm.userAId) : '';
         const b = dm.userBId ? String(dm.userBId) : '';
-        const peerId = a && b ? (a === authUserId ? b : a) : a || b;
+        const peerId: string = a && b ? (a === authUserId ? b : a) : a || b;
         if (peerId && peerId !== authUserId) {
           const u = await userService.getUserById(peerId).catch(() => null);
           if (u) {

@@ -1,4 +1,5 @@
 import { getRandomStarshipName } from '@/utils/starshipNames';
+import { ensureDefaultChannelForStarship } from '@/utils/default-channel';
 import { ConflictError, NotFoundError } from '@starships/errors';
 import { AgentRepository, StarshipMemberRepository, StarshipRepository, UserRepository } from '@starships/models';
 import type { AgentModel, AuthUser, StarshipModel, UpdateStarshipRequest } from '@starships/protocol';
@@ -71,6 +72,20 @@ export class StarshipService {
     } catch (err) {
       // Log and continue - starship creation should not fail due to wallet issues
       console.error('[STARSHIP-SERVICE] Failed to create wallet for starship:', starship.id, err);
+    }
+
+    // Ensure every starship has a default public channel (e.g. #lobby).
+    // This must succeed; otherwise the starship isn't usable in the channels UI.
+    try {
+      await ensureDefaultChannelForStarship({ starshipId: starship.id, createdByUserId: data.ownerId });
+    } catch (err) {
+      console.error('[STARSHIP-SERVICE] Failed to create default channel for starship; rolling back:', starship.id, err);
+      try {
+        await this.starshipRepository.delete(starship.id);
+      } catch {
+        /* ignore */
+      }
+      throw err;
     }
 
     return starship;

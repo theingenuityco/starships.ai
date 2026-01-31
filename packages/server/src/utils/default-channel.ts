@@ -2,11 +2,11 @@ import { ChannelRepository, getConnection } from '@starships/models';
 import type { ChannelModel } from '@starships/protocol';
 import { ConversationService } from '@/services/ConversationService';
 
-const DEFAULT_CHANNEL_SLUG = 'general';
-const DEFAULT_CHANNEL_NAME = 'General';
+const DEFAULT_CHANNEL_SLUG = 'lobby';
+const DEFAULT_CHANNEL_NAME = 'Lobby';
 
 /**
- * Ensure every starship has a default public channel (#general).
+ * Ensure every starship has a default public channel (#lobby).
  *
  * Idempotent:
  * - If it already exists, returns it.
@@ -57,7 +57,7 @@ export async function ensureDefaultChannelForStarship(args: {
       name: String(existing.name),
       isPrivate: Boolean(existing.is_private),
       channelType:
-        String((existing as any).channel_type || 'chat')
+        String(existing.channel_type || 'chat')
           .trim()
           .toLowerCase() === 'forum'
           ? 'forum'
@@ -138,7 +138,7 @@ export async function ensureDefaultChannelForStarship(args: {
       name: String(winner.name),
       isPrivate: Boolean(winner.is_private),
       channelType:
-        String((winner as any).channel_type || 'chat')
+        String(winner.channel_type || 'chat')
           .trim()
           .toLowerCase() === 'forum'
           ? 'forum'

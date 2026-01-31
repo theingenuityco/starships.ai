@@ -232,11 +232,29 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     return (
       <>
         <div className="space-y-2">
-          <div className="flex items-center justify-between px-1">
-            <span className="text-[11px] font-medium text-muted-foreground">Channels</span>
-            <Button type="button" size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={() => setIsCreateChannelOpen(true)}>
-              <Icon name="plus" className="h-3 w-3 mr-1" />
-              New
+          <div className="w-full flex items-center justify-between">
+            <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-1.5" style={{ justifyContent: 'flex-start' }}>
+              <div
+                className="flex-shrink-0"
+                style={{
+                  width: '1.25rem',
+                  height: '1.25rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  margin: 0,
+                  marginRight: '0.375rem',
+                }}
+              >
+                <span className="font-mono text-xs">#</span>
+              </div>
+              <span className="font-medium" style={{ fontSize: '14px' }}>
+                Channels
+              </span>
+            </div>
+
+            <Button type="button" size="sm" variant="ghost" className="h-7 w-7 px-0 ml-1 text-xs" onClick={() => setIsCreateChannelOpen(true)} aria-label="Create channel">
+              <Icon name="plus" className="h-4 w-4" />
             </Button>
           </div>
 
@@ -252,21 +270,43 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             <div className="space-y-1">
               {channels.map(ch => {
                 const isActive = ch.conversationId === currentConversationId
-                const label = ch.slug ? `#${ch.slug}` : ch.name
+                const label = ch.name || ch.slug
                 return (
                   <div key={ch.conversationId}>
                     <div
                       className={cn(
-                        'group flex items-center gap-2 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
+                        'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
                         isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
                       )}
+                      style={{
+                        justifyContent: 'flex-start',
+                        transition: 'background-color 0.15s ease',
+                        cursor: 'pointer',
+                        minHeight: '32px',
+                        fontSize: '14px',
+                      }}
                       onClick={() => handleConversationClick(ch.conversationId)}
                     >
-                      <span className={cn('font-mono text-[12px]', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
-                      <div className="flex-1 min-w-0">
-                        <div className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{label}</div>
-                        {ch.isPrivate && <div className="text-[11px] text-muted-foreground">Private</div>}
+                      <div
+                        className="flex-shrink-0"
+                        style={{
+                          width: '1.25rem',
+                          height: '1.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          margin: 0,
+                          pointerEvents: 'none',
+                        }}
+                      >
+                        <span className={cn('font-mono text-xs', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
                       </div>
+                      <span
+                        className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1', isActive && 'text-primary')}
+                        style={{ fontSize: '14px', marginLeft: '0.375rem' }}
+                      >
+                        {label}
+                      </span>
                     </div>
 
                     {/* Forum channels render threads in the main panel (no nested sidebar list). */}
@@ -340,7 +380,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               <div className="space-y-1">
                 {channels.map(ch => {
                   const isActive = ch.conversationId === currentConversationId
-                  const label = ch.slug ? `#${ch.slug}` : ch.name
+                  const label = ch.name || ch.slug
                   return (
                     <div key={ch.conversationId}>
                       <div

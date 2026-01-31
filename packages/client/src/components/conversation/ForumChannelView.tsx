@@ -28,10 +28,10 @@ export function ForumChannelView(props: { starshipId: string; channelConversatio
   }, [children])
 
   const label = useMemo(() => {
-    const slug = String(props.channelSlug || '').trim()
-    if (slug) return `#${slug}`
     const name = String(props.channelName || '').trim()
-    return name || 'Forum'
+    if (name) return name
+    const slug = String(props.channelSlug || '').trim()
+    return slug || 'Forum'
   }, [props.channelName, props.channelSlug])
 
   const onOpenChild = (conversationId: string) => {
@@ -54,7 +54,7 @@ export function ForumChannelView(props: { starshipId: string; channelConversatio
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <span className="font-mono text-sm text-muted-foreground">#</span>
-            <h2 className="text-base font-medium truncate">{label.replace(/^#/, '')}</h2>
+            <h2 className="text-base font-medium truncate">{label}</h2>
             <span className="text-xs text-muted-foreground border border-border/60 rounded-full px-2 py-0.5">Forum</span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">Threads are separate conversations. Create a thread to start.</p>

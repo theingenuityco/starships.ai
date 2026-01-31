@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { TypingDots } from '@/components/ui/TypingDots'
 import Link from 'next/link'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 
 interface ConversationMessageListProps {
@@ -29,6 +29,11 @@ interface ConversationMessageListProps {
   scrollClassName?: string
   /** When true, show a per-message action to start/open a thread (child conversation). */
   enableChannelMessageThreads?: boolean
+  /**
+   * When provided, thread navigation will open inside the current page (e.g. right-side pane)
+   * instead of changing the route.
+   */
+  onOpenThread?: (conversationId: string) => void
   /**
    * Optional override for the "user" identity (useful for demo / internal chats on landing).
    * If omitted, the component uses the signed-in user's info via `useAuth()`.
@@ -76,6 +81,7 @@ export function ConversationMessageList({
   className,
   scrollClassName,
   enableChannelMessageThreads = false,
+  onOpenThread,
   userNameOverride,
   userEmailOverride,
   userAvatarUrlOverride,
@@ -90,7 +96,6 @@ export function ConversationMessageList({
   sizeVariant = 'default',
   hideTurnActionButtons = false,
 }: ConversationMessageListProps) {
-  const router = useRouter()
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
     const raw = (params as any)?.slug
@@ -129,13 +134,12 @@ export function ConversationMessageList({
     async (args: { messageId: string; linkedConversationId: string | null; messageText?: string }) => {
       const sid = typeof starshipId === 'string' ? starshipId : ''
       const parentConversationId = typeof conversationId === 'string' ? conversationId : ''
-      const shipSlug = typeof starshipSlug === 'string' ? starshipSlug : ''
       if (!enableChannelMessageThreads) return
-      if (!sid || !parentConversationId || !shipSlug) return
+      if (!sid || !parentConversationId) return
 
       const existing = typeof args.linkedConversationId === 'string' ? args.linkedConversationId.trim() : ''
       if (existing) {
-        router.push(`/ship/${encodeURIComponent(shipSlug)}/conversations/${encodeURIComponent(existing)}`)
+        if (onOpenThread) onOpenThread(existing)
         return
       }
 
@@ -160,12 +164,12 @@ export function ConversationMessageList({
         if (!childId) return
 
         await linkMessageToConversation.mutateAsync({ messageId, linkedConversationId: childId, conversationId: parentConversationId })
-        router.push(`/ship/${encodeURIComponent(shipSlug)}/conversations/${encodeURIComponent(childId)}`)
+        if (onOpenThread) onOpenThread(childId)
       } finally {
         setThreadBusyMessageId(prev => (prev === messageId ? null : prev))
       }
     },
-    [conversationId, createConversation, enableChannelMessageThreads, linkMessageToConversation, router, starshipId, starshipSlug]
+    [conversationId, createConversation, enableChannelMessageThreads, linkMessageToConversation, onOpenThread, starshipId]
   )
 
   // Scroll container reference
@@ -1087,7 +1091,7 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
-              {linkedConversationHref && message.role !== 'user' && (
+              {!enableChannelMessageThreads && linkedConversationHref && message.role !== 'user' && (
                 <div className="mt-2 flex">
                   <Link href={linkedConversationHref}>
                     <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
@@ -1143,7 +1147,7 @@ const MemoizedMessageBubble = memo(
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                 />
-                {linkedConversationHref && message.role !== 'user' && (
+                {!enableChannelMessageThreads && linkedConversationHref && message.role !== 'user' && (
                   <div className="mt-2 flex">
                     <Link href={linkedConversationHref}>
                       <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
@@ -1208,7 +1212,7 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
-              {linkedConversationHref && message.role !== 'user' && (
+              {!enableChannelMessageThreads && linkedConversationHref && message.role !== 'user' && (
                 <div className="mt-2 flex">
                   <Link href={linkedConversationHref}>
                     <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">

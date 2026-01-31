@@ -22,6 +22,7 @@ import {
   TurnRepository,
   LlmModelRepository,
   DirectMessageRepository,
+  getConnection,
 } from '@starships/models';
 import {
   AgentModel,
@@ -749,6 +750,130 @@ export class ConversationService {
    */
   async getConversationsByStarshipWithAgents(starshipId: string): Promise<Array<ConversationModel & { agents: AgentModel[] }>> {
     return this.conversationRepository.findByStarshipWithAgents(starshipId);
+  }
+
+  async getChildConversationsPage(args: {
+    parentConversationId: string;
+    limit: number;
+    beforeUpdatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ conversations: Array<ConversationModel & { agents: AgentModel[] }>; hasMoreBefore: boolean; oldestCursor: { updatedAt: string; id: string } | null }> {
+    // IMPORTANT:
+    // Do NOT rely on newly-added methods in @starships/models at runtime here. In dev, the server
+    // imports the built `@starships/models` package, and new methods may not exist until rebuilt.
+    //
+    // So we implement this pagination via direct SQL using the shared connection.
+    const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+    const pageSize = limit + 1;
+
+    const useCursor =
+      typeof args.beforeUpdatedAt === 'string' &&
+      typeof args.beforeId === 'string' &&
+      args.beforeUpdatedAt.trim().length > 0 &&
+      args.beforeId.trim().length > 0;
+
+    const conn = getConnection();
+
+    const convRows = await conn.query<Record<string, unknown>>(
+      useCursor
+        ? `
+          SELECT *
+          FROM conversations
+          WHERE parent_conversation_id = $1
+            AND (
+              updated_at < $2::timestamptz
+              OR (updated_at = $2::timestamptz AND id < $3::text)
+            )
+          ORDER BY updated_at DESC, id DESC
+          LIMIT $4
+        `
+        : `
+          SELECT *
+          FROM conversations
+          WHERE parent_conversation_id = $1
+          ORDER BY updated_at DESC, id DESC
+          LIMIT $2
+        `,
+      useCursor ? [args.parentConversationId, args.beforeUpdatedAt, args.beforeId, pageSize] : [args.parentConversationId, pageSize]
+    );
+
+    const hasMoreBefore = convRows.length > limit;
+    const trimmed = convRows.slice(0, limit);
+
+    const toIso = (v: unknown): string => {
+      if (v == null) return '';
+      if (v instanceof Date) return v.toISOString();
+      if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+      if (typeof v === 'string') {
+        const t = Date.parse(v);
+        return Number.isFinite(t) ? new Date(t).toISOString() : v;
+      }
+      // Common failure mode: pg returns Date-like objects that stringify to a non-ISO format.
+      // Fall back to Date parsing when possible.
+      try {
+        const s = String(v);
+        const t = Date.parse(s);
+        return Number.isFinite(t) ? new Date(t).toISOString() : s;
+      } catch {
+        return '';
+      }
+    };
+
+    const snakeToCamel = (s: string): string => s.replace(/_([a-z0-9])/g, (_, c: string) => c.toUpperCase());
+    const toCamelObject = (row: Record<string, unknown>): Record<string, unknown> => {
+      const out: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(row)) {
+        out[snakeToCamel(k)] = v;
+      }
+      return out;
+    };
+
+    const conversations = trimmed
+      .map((r) => toCamelObject(r) as Record<string, unknown>)
+      .map((c) => ({
+        ...c,
+        // Ensure cursor fields are always valid ISO datetime strings
+        createdAt: toIso(c.createdAt),
+        updatedAt: toIso((c as any).updatedAt ?? (c as any).createdAt),
+      })) as unknown as ConversationModel[];
+    const conversationIds = conversations
+      .map((c: any) => (typeof c?.id === 'string' ? String(c.id) : ''))
+      .filter((id) => id && id.trim().length > 0);
+
+    const agentsByConversationId = new Map<string, AgentModel[]>();
+    if (conversationIds.length > 0) {
+      const agentRows = await conn.query<Record<string, unknown>>(
+        `SELECT ca.conversation_id, a.*
+         FROM conversation_agents ca
+         INNER JOIN agents a ON a.id = ca.agent_id
+         WHERE ca.conversation_id = ANY($1::text[])
+         ORDER BY a.name`,
+        [conversationIds]
+      );
+
+      for (const row of agentRows) {
+        const rawConversationId = (row as any).conversation_id;
+        const conversationId = typeof rawConversationId === 'string' ? rawConversationId : '';
+        if (!conversationId) continue;
+
+        // Drop the join column, then camel-case the remaining agent columns.
+        const { conversation_id: _conversationId, ...agentRow } = row as Record<string, unknown> & { conversation_id?: unknown };
+        const agent = toCamelObject(agentRow) as unknown as AgentModel;
+        const list = agentsByConversationId.get(conversationId) || [];
+        list.push(agent);
+        agentsByConversationId.set(conversationId, list);
+      }
+    }
+
+    const withAgents = conversations.map((c: any) => ({
+      ...(c as ConversationModel),
+      agents: agentsByConversationId.get(String(c.id)) || [],
+    })) as Array<ConversationModel & { agents: AgentModel[] }>;
+
+    const oldest = withAgents.length > 0 ? withAgents[withAgents.length - 1] : null;
+    const updatedAt = oldest ? toIso((oldest as any)?.updatedAt || (oldest as any)?.createdAt || '') : '';
+
+    return { conversations: withAgents, hasMoreBefore, oldestCursor: oldest && updatedAt ? { updatedAt, id: String(oldest.id) } : null };
   }
 
   /**

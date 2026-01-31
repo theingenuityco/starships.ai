@@ -11,7 +11,7 @@ import type {
   MessageModel,
   ToolCallApprovalModel,
 } from '@starships/protocol'
-import { experimental_streamedQuery as streamedQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { experimental_streamedQuery as streamedQuery, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
@@ -91,6 +91,8 @@ export const CONVERSATION_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (id: string) => [...CONVERSATION_QUERY_KEYS.all, 'detail', id] as const,
   children: (parentConversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children'] as const,
+  childrenPaged: (parentConversationId: string, limit?: number) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children', 'paged', String(limit ?? '')] as const,
+  childrenPendingApprovals: (parentConversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children', 'pending-approvals'] as const,
   messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
   toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
@@ -272,13 +274,162 @@ export function useChildConversations(parentConversationId: string | null, enabl
     queryFn: async (): Promise<Array<ConversationModel & { agents: AgentModel[] }>> => {
       const id = String(parentConversationId || '')
       if (!id) return []
-      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(`/api/v1/conversations/${id}/children`)
-      return response.data.data || []
+      // Back-compat: older servers returned a raw array; newer servers return a paginated payload.
+      const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${id}/children`, { params: { limit: 200 } })
+      const data = response.data.data
+      if (Array.isArray(data)) return data || []
+      const list = Array.isArray(data?.conversations) ? (data.conversations as Array<ConversationModel & { agents: AgentModel[] }>) : []
+      return list
     },
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 10_000,
     gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
     refetchOnWindowFocus: true,
   })
+}
+
+export function useChildConversationsPaged(
+  parentConversationId: string | null,
+  args?: { enabled?: boolean; limit?: number }
+): {
+  conversations: Array<ConversationModel & { agents: AgentModel[] }>
+  hasMoreBefore: boolean
+  oldestCursor: { updatedAt: string; id: string } | null
+  isLoading: boolean
+  isFetching: boolean
+  isFetchingNextPage: boolean
+  fetchNextPage: () => Promise<unknown>
+  refetch: () => Promise<unknown>
+} {
+  const enabled = Boolean(parentConversationId && (args?.enabled ?? true))
+  const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 50)))
+
+  type Cursor = { updatedAt: string; id: string }
+  const toIso = (v: unknown): string => {
+    if (v == null) return ''
+    if (v instanceof Date) return v.toISOString()
+    if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString()
+    if (typeof v === 'string') {
+      const t = Date.parse(v)
+      return Number.isFinite(t) ? new Date(t).toISOString() : v
+    }
+    try {
+      const s = String(v)
+      const t = Date.parse(s)
+      return Number.isFinite(t) ? new Date(t).toISOString() : s
+    } catch {
+      return ''
+    }
+  }
+  type Page = {
+    parentConversationId: string
+    conversations: Array<ConversationModel & { agents: AgentModel[] }>
+    hasMoreBefore: boolean
+    oldestCursor: Cursor | null
+  }
+
+  const q = useInfiniteQuery<Page>({
+    queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.childrenPaged(parentConversationId, limit) : (['__noop__'] as const),
+    enabled,
+    initialPageParam: null as Cursor | null,
+    queryFn: async ({ pageParam }): Promise<Page> => {
+      const id = String(parentConversationId || '')
+      if (!id) return { parentConversationId: '', conversations: [], hasMoreBefore: false, oldestCursor: null }
+
+      const cursor = pageParam as Cursor | null
+      const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${id}/children`, {
+        params: {
+          limit,
+          ...(cursor ? { beforeUpdatedAt: cursor.updatedAt, beforeId: cursor.id } : null),
+        },
+      })
+      const data = response.data.data
+      const conversations = Array.isArray(data?.conversations) ? (data.conversations as Array<ConversationModel & { agents: AgentModel[] }>) : []
+      const hasMoreBefore = Boolean(data?.hasMoreBefore)
+      const oldestCursorRaw = data?.oldestCursor
+      const oldestCursor =
+        oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.updatedAt === 'string' && typeof oldestCursorRaw.id === 'string'
+          ? ({ updatedAt: toIso(oldestCursorRaw.updatedAt), id: oldestCursorRaw.id } as Cursor)
+          : null
+      return { parentConversationId: id, conversations, hasMoreBefore, oldestCursor }
+    },
+    getNextPageParam: lastPage => {
+      if (!lastPage?.hasMoreBefore) return undefined
+      return lastPage.oldestCursor ?? undefined
+    },
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 10_000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const pages = Array.isArray(q.data?.pages) ? q.data!.pages : []
+  const conversations = pages.flatMap(p => (Array.isArray(p?.conversations) ? p.conversations : []))
+  const lastPage = pages.length > 0 ? pages[pages.length - 1] : null
+
+  return {
+    conversations,
+    hasMoreBefore: Boolean(lastPage?.hasMoreBefore),
+    oldestCursor: (lastPage?.oldestCursor as Cursor | null) ?? null,
+    isLoading: q.isLoading,
+    isFetching: q.fetchStatus === 'fetching',
+    isFetchingNextPage: q.isFetchingNextPage,
+    fetchNextPage: () => q.fetchNextPage(),
+    refetch: () => q.refetch(),
+  }
+}
+
+export function useChildConversationsPendingApprovals(
+  parentConversationId: string | null,
+  args?: { enabled?: boolean; limit?: number }
+): {
+  children: Array<{ id: string; updatedAt: string; pendingCount: number; agentName: string }>
+  hasMoreBefore: boolean
+  oldestCursor: { updatedAt: string; id: string } | null
+  isLoading: boolean
+  isFetching: boolean
+  refetch: () => Promise<unknown>
+} {
+  const enabled = Boolean(parentConversationId && (args?.enabled ?? true))
+  const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 10)))
+
+  type Cursor = { updatedAt: string; id: string }
+  type Payload = {
+    parentConversationId: string
+    children: Array<{ id: string; updatedAt: string; pendingCount: number; agentName: string }>
+    hasMoreBefore: boolean
+    oldestCursor: Cursor | null
+  }
+
+  const q = useQuery({
+    queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.childrenPendingApprovals(parentConversationId) : (['__noop__'] as const),
+    enabled,
+    queryFn: async (): Promise<Payload> => {
+      const id = String(parentConversationId || '')
+      if (!id) return { parentConversationId: '', children: [], hasMoreBefore: false, oldestCursor: null }
+      const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${id}/children/pending-approvals`, { params: { limit } })
+      const data = response.data.data
+      const children = Array.isArray(data?.children) ? (data.children as Payload['children']) : []
+      const hasMoreBefore = Boolean(data?.hasMoreBefore)
+      const oldestCursorRaw = data?.oldestCursor
+      const oldestCursor =
+        oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.updatedAt === 'string' && typeof oldestCursorRaw.id === 'string'
+          ? ({ updatedAt: oldestCursorRaw.updatedAt, id: oldestCursorRaw.id } as Cursor)
+          : null
+      return { parentConversationId: id, children, hasMoreBefore, oldestCursor }
+    },
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5_000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const payload = (q.data as any) as Payload | undefined
+  return {
+    children: Array.isArray(payload?.children) ? payload!.children : [],
+    hasMoreBefore: Boolean(payload?.hasMoreBefore),
+    oldestCursor: (payload?.oldestCursor as any) ?? null,
+    isLoading: q.isLoading,
+    isFetching: q.fetchStatus === 'fetching',
+    refetch: () => q.refetch(),
+  }
 }
 
 /**

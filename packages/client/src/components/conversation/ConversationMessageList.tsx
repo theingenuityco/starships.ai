@@ -6,7 +6,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -351,6 +351,9 @@ export function ConversationMessageList({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  // Per-conversation “snap-to-bottom once content exists” state.
+  // This prevents the initial “render at top then jump to bottom” when messages load.
+  const bottomSnapStateRef = useRef<{ key: string; didSnapOnceContentExists: boolean } | null>(null)
 
   // In-chat search: local input value (typed); submitted query from parent drives highlight and sidebar
   const [searchInputValue, setSearchInputValue] = useState('')
@@ -851,12 +854,30 @@ export function ConversationMessageList({
     shouldShowGapLoader,
   ])
 
-  // Initialize near-bottom status on mount / when container ref becomes available.
-  useEffect(() => {
+  // Bottom anchoring (layout phase): when messages/gap-loader first appear for a conversation,
+  // snap to the bottom BEFORE paint so there’s no visible scroll “jump”.
+  useLayoutEffect(() => {
     const container = scrollContainerRef.current
     if (!container) return
-    isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
-  }, [])
+
+    const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id) : ''
+    const snapKey = `${String(conversationId ?? 'none')}|${pinnedId}`
+
+    if (!bottomSnapStateRef.current || bottomSnapStateRef.current.key !== snapKey) {
+      bottomSnapStateRef.current = { key: snapKey, didSnapOnceContentExists: false }
+      lastMessageCountRef.current = displayMessages.length
+    }
+
+    const hasContent = renderMessages.length > 0 || shouldShowGapLoader || Boolean(pinnedFirstMessage)
+    if (!bottomSnapStateRef.current.didSnapOnceContentExists && hasContent) {
+      // Snap-to-bottom (no animation).
+      container.scrollTop = container.scrollHeight
+      isNearBottomRef.current = true
+      bottomSnapStateRef.current.didSnapOnceContentExists = true
+      // Prevent the “new messages arrived” effect from immediately re-triggering.
+      lastMessageCountRef.current = displayMessages.length
+    }
+  }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
 
   // Optimized auto-scroll with debouncing (now supports streaming progress).
   useEffect(() => {
@@ -889,7 +910,8 @@ export function ConversationMessageList({
     if (shouldShowGapLoader) {
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
-        scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' })
+        // Keep it unanimated to avoid visible “scrolling down” on load.
+        scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'auto' })
       })
     }
   }, [shouldShowGapLoader])
@@ -1115,68 +1137,70 @@ export function ConversationMessageList({
               </button>
             </div>
           )}
-          {showChannelHero ? (
-            <ChannelHero
-              channelName={channelName}
-              conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
-              bottomAlign={shouldBottomAlignChannelHero}
-            />
-          ) : null}
-          {renderMessages.map((message, idx) => {
-            const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
-            const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
-            const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
-            const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
-            const userKey = (m: any): string | null => {
-              if (!m || String(m?.role ?? '') !== 'user') return null
-              const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
-              if (uid) return `id:${uid}`
-              const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
-              if (un) return `name:${un}`
-              const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
-              if (ua) return `avatar:${ua}`
-              // Backward-compat: treat unknown human author as the same person.
-              return 'unknown'
-            }
-            const prevUserKey = prev ? userKey(prev) : null
-            const currUserKey = userKey(message)
-            const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
-            const startsNewGroup = (() => {
-              if (!prev) return false
-              if (message.role === 'assistant') return Boolean(showAssistantAvatar)
-              if (message.role === 'user') return !isConsecutiveUser
-              return prev.role !== message.role
-            })()
-            const isFirstMessage = idx === 0
-            const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
-            const isCurrentMatch = message.id === currentMatchMessageId
+          {/* Bottom-anchored content: keep the newest messages pinned to the bottom when the list is short. */}
+          <div className="mt-auto">
+            {showChannelHero ? (
+              <ChannelHero
+                channelName={channelName}
+                conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
+                bottomAlign={shouldBottomAlignChannelHero}
+              />
+            ) : null}
+            {renderMessages.map((message, idx) => {
+              const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
+              const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+              const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
+              const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
+              const userKey = (m: any): string | null => {
+                if (!m || String(m?.role ?? '') !== 'user') return null
+                const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+                if (uid) return `id:${uid}`
+                const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
+                if (un) return `name:${un}`
+                const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
+                if (ua) return `avatar:${ua}`
+                // Backward-compat: treat unknown human author as the same person.
+                return 'unknown'
+              }
+              const prevUserKey = prev ? userKey(prev) : null
+              const currUserKey = userKey(message)
+              const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
+              const startsNewGroup = (() => {
+                if (!prev) return false
+                if (message.role === 'assistant') return Boolean(showAssistantAvatar)
+                if (message.role === 'user') return !isConsecutiveUser
+                return prev.role !== message.role
+              })()
+              const isFirstMessage = idx === 0
+              const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
+              const isCurrentMatch = message.id === currentMatchMessageId
 
-            return (
-              <Fragment key={message.id}>
-                <div
-                  ref={el => {
-                    messageRefs.current[message.id] = el
-                  }}
-                  data-message-id={message.id}
-                  className={cn(
-                    messageHasMatch && 'rounded-lg transition-colors',
-                    messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
-                    messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
-                  )}
-                >
-                  <MemoizedMessageBubble
-                    message={message}
-                    agentName={message.agentName || agentName}
-                    agentSlug={agentSlug}
-                    starshipSlug={starshipSlug}
-                    agentAvatarUrl={agentAvatarUrl}
-                    isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                    starshipId={starshipId}
-                    enableChannelMessageThreads={enableChannelMessageThreads}
-                    onThreadAction={handleThreadAction}
-                    showAssistantAvatar={showAssistantAvatar}
-                    isConsecutiveUser={isConsecutiveUser}
-                    startsNewGroup={startsNewGroup}
+              return (
+                <Fragment key={message.id}>
+                  <div
+                    ref={el => {
+                      messageRefs.current[message.id] = el
+                    }}
+                    data-message-id={message.id}
+                    className={cn(
+                      messageHasMatch && 'rounded-lg transition-colors',
+                      messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
+                      messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
+                    )}
+                  >
+                    <MemoizedMessageBubble
+                      message={message}
+                      agentName={message.agentName || agentName}
+                      agentSlug={agentSlug}
+                      starshipSlug={starshipSlug}
+                      agentAvatarUrl={agentAvatarUrl}
+                      isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                      starshipId={starshipId}
+                      enableChannelMessageThreads={enableChannelMessageThreads}
+                      onThreadAction={handleThreadAction}
+                      showAssistantAvatar={showAssistantAvatar}
+                      isConsecutiveUser={isConsecutiveUser}
+                      startsNewGroup={startsNewGroup}
                     isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
                     suppressLinkedConversationCard={suppressLinkedConversationCard}
                     userNameOverride={userNameOverride}
@@ -1231,47 +1255,48 @@ export function ConversationMessageList({
                       </div>
                     )
                   })()}
-                </div>
-              </Fragment>
-            )
-          })}
-          {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
-          {shouldShowGapLoader && (
-            <div className="flex justify-start">
-              {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
-                <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
-                  <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
-                  <div className="min-w-0 flex-1">
-                    <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
-                      <TypingDots />
-                      <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
+                  </div>
+                </Fragment>
+              )
+            })}
+            {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
+            {shouldShowGapLoader && (
+              <div className="flex justify-start">
+                {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
+                  <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
+                    <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
+                        <TypingDots />
+                        <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                    <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
-                  </div>
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <div className="mb-1 text-sm font-bold text-foreground">
-                      {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
-                        <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
-                          {(agentName || 'Assistant').trim()}
-                        </Link>
-                      ) : (
-                        <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
-                      )}
+                ) : (
+                  <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                      <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
                     </div>
-                    <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                      <TypingDots />
-                      <span className="text-sm leading-relaxed">Typing...</span>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <div className="mb-1 text-sm font-bold text-foreground">
+                        {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
+                          <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
+                            {(agentName || 'Assistant').trim()}
+                          </Link>
+                        ) : (
+                          <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
+                        <TypingDots />
+                        <span className="text-sm leading-relaxed">Typing...</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>

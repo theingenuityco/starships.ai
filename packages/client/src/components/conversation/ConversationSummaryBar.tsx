@@ -16,9 +16,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 
-export type ConversationParticipantItem =
-  | { kind: 'human'; key: string; label: string; avatarUrl?: string }
-  | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
+export type ConversationParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
@@ -344,12 +342,7 @@ export function ConversationSummaryBar({
   // Show placeholder if: no conversationId, no currentConversation, or data is still loading
   if (!conversationId || !isDataReady) {
     renderedPlaceholderForConversationRef.current = true
-    const effectiveFallbackTitle =
-      typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0
-        ? fallbackTitle.trim()
-        : !conversationId
-          ? 'Draft'
-          : 'Loading...'
+    const effectiveFallbackTitle = typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0 ? fallbackTitle.trim() : !conversationId ? 'Draft' : 'Loading...'
     const effectiveFallbackSubtitle = typeof fallbackSubtitle === 'string' && fallbackSubtitle.trim().length > 0 ? fallbackSubtitle.trim() : null
     const isDraftHeader = !conversationId
     const hasDraftParticipants = isDraftHeader && effectiveParticipantItems.length > 0
@@ -416,9 +409,7 @@ export function ConversationSummaryBar({
                                   )
                                 })}
                               </div>
-                              {effectiveParticipantItems.length > 3 ? (
-                                <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span>
-                              ) : null}
+                              {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
                             </button>
                           </PopoverTrigger>
                           <PopoverContent
@@ -637,9 +628,7 @@ export function ConversationSummaryBar({
                               )
                             })}
                           </div>
-                          {effectiveParticipantItems.length > 3 ? (
-                            <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span>
-                          ) : null}
+                          {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
                         </button>
                       </PopoverTrigger>
                       <PopoverContent

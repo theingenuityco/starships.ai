@@ -413,16 +413,15 @@ export function Navigation(props: NavigationProps) {
           {/* Channels + Direct messages */}
           {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
             <div className="flex-1 min-h-0 flex flex-col px-2">
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="pb-2 space-y-1">
-                  <ConversationList
-                    starshipId={starshipData.id}
-                    compact={true}
-                    onConversationSelect={() => {
-                      if (isMobile && onClose) onClose()
-                    }}
-                  />
-                </div>
+              {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
+              <div className="flex-1 min-h-0 overflow-hidden pb-2">
+                <ConversationList
+                  starshipId={starshipData.id}
+                  compact={true}
+                  onConversationSelect={() => {
+                    if (isMobile && onClose) onClose()
+                  }}
+                />
               </div>
             </div>
           )}

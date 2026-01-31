@@ -241,7 +241,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       {isThreadPaneOpen ? (
         <>
           {/* Draggable resize handle (desktop/tablet) */}
-          <div className="hidden md:flex relative h-full w-[2px] flex-shrink-0 bg-border">
+          <div className="hidden md:flex relative h-full w-[1px] flex-shrink-0 bg-border">
             {/* Invisible drag hit-area (keep resizing easy without a thick visual divider) */}
             <div
               className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"

@@ -121,7 +121,7 @@ export function ThreadPane(props: {
                 ? Number((selectedAgent as any).maxTokens)
                 : null
           }
-          fallbackTitle={draftTitle ?? 'Thread'}
+          fallbackTitle={draftTitle ?? 'New thread'}
           fallbackSubtitle={effectiveConversationId ? undefined : 'Draft (not saved)'}
           participantsOverride={draftParticipants}
           rightSlot={

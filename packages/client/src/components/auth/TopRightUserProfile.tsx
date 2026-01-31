@@ -3,9 +3,11 @@
 import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { UserProfile } from '@/components/auth/UserProfile'
 import Icon from '@/components/primitives/Icon'
+import { useConversationSearch } from '@/components/conversation/ConversationSearchContext'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/hooks/useAuth'
@@ -17,8 +19,12 @@ import { useCallback, useMemo } from 'react'
 export function TopRightUserProfile(): React.JSX.Element | null {
   const pathname = usePathname()
   const router = useRouter()
+  const searchContext = useConversationSearch()
   const { isAuthenticated, user, logout, userName, userEmail, userAvatar } = useAuth()
   const { getSelectedStarshipId } = useSelectedStarship()
+
+  const isShipPage = typeof pathname === 'string' && pathname.startsWith('/ship/')
+  const showNavbarSearch = isShipPage && searchContext != null
 
   const { data: userStarships } = useUserStarships(user?.id || '', !!user?.id && isAuthenticated)
 
@@ -49,12 +55,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
   const activeStarshipSlug = starshipFromList?.slug ?? pathStarshipSlug ?? null
   const activeStarshipName = starshipFromList?.name ?? starshipBySlug?.name ?? null
 
-  const canManageBilling = Boolean(
-    isAuthenticated &&
-      user?.id &&
-      activeStarshipId &&
-      (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id)
-  )
+  const canManageBilling = Boolean(isAuthenticated && user?.id && activeStarshipId && (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id))
 
   const { data: wallet, isLoading: walletLoading } = useWallet(activeStarshipId || '', Boolean(activeStarshipId && canManageBilling))
 
@@ -96,6 +97,40 @@ export function TopRightUserProfile(): React.JSX.Element | null {
   return (
     <div className="fixed top-4 right-4 z-[60]">
       <div className="flex items-center gap-3">
+        {showNavbarSearch ? (
+          <div className="relative min-w-[100px] w-[140px] max-w-[160px] flex-shrink-0">
+            <Icon name="search" className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+            <Input
+              type="text"
+              placeholder="Find in chat"
+              value={searchContext!.searchInputValue}
+              onChange={e => searchContext!.setSearchInputValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  const q = searchContext!.searchInputValue.trim()
+                  if (q) searchContext!.setSubmittedQuery(q)
+                }
+              }}
+              className="pl-7 pr-7 h-8 text-xs w-full"
+              aria-label="Search in conversation"
+              autoComplete="off"
+            />
+            {searchContext!.searchInputValue ? (
+              <button
+                type="button"
+                onClick={() => {
+                  searchContext!.setSearchInputValue('')
+                  searchContext!.setSubmittedQuery('')
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <Icon name="x" className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         {canManageBilling ? (
           <Button
             type="button"
@@ -107,16 +142,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
           >
             <Icon name="coins" className="w-4 h-4" />
             <span className="min-w-0">
-              <BalanceStatusIndicator
-                valueClassName="text-xs"
-                wallet={wallet}
-                isLoading={walletLoading}
-                variant="minimal"
-                showDot={false}
-                showUnit={false}
-                inheritTextColor
-                className="min-w-0"
-              />
+              <BalanceStatusIndicator valueClassName="text-xs" wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
             </span>
           </Button>
         ) : null}

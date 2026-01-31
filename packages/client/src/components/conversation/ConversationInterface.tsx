@@ -5,6 +5,9 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
+import { SearchResultsSidebar } from '@/components/conversation/SearchResultsSidebar'
+import { useConversationSearch } from '@/components/conversation/ConversationSearchContext'
+import type { SearchResult } from '@/components/conversation/conversationSearch'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -153,12 +156,51 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
+  const searchSidebarRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
   const [hasWelcomeExited, setHasWelcomeExited] = useState<boolean>(false)
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
   const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
+
+  // Discord-style search: use context when available (navbar search), else local state
+  const searchContext = useConversationSearch()
+  const [localSubmittedQuery, setLocalSubmittedQuery] = useState<string>('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [selectedMatchIndex, setSelectedMatchIndex] = useState<number | null>(null)
+
+  const submittedQuery = searchContext?.submittedQuery ?? localSubmittedQuery
+  const setSubmittedQuery = searchContext?.setSubmittedQuery ?? setLocalSubmittedQuery
+  const hideSearchInputInList = searchContext != null
+
+  // Clear search when conversation changes
+  useEffect(() => {
+    setLocalSubmittedQuery('')
+    setSubmittedQuery('')
+    setSearchResults([])
+    setSelectedMatchIndex(null)
+  }, [currentConversationId, setSubmittedQuery])
+
+  const closeSearchSidebar = useCallback(() => {
+    setSubmittedQuery('')
+    setSearchResults([])
+    setSelectedMatchIndex(null)
+    searchContext?.setSearchInputValue?.('')
+  }, [setSubmittedQuery, searchContext])
+
+  // Close search sidebar on Escape
+  useEffect(() => {
+    if (!submittedQuery.trim()) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeSearchSidebar()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [submittedQuery, closeSearchSidebar])
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -835,25 +877,50 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
         {/* Messages Area */}
         {showMessagesArea ? (
-          <>
-            <ConversationSummaryBar
-              conversationId={currentConversationId}
-              starshipId={starshipId}
-              modelId={selectedAgent?.model ?? null}
-              maxTokens={
-                typeof (selectedAgent as any)?.maxTokens === 'number'
-                  ? (selectedAgent as any).maxTokens
-                  : typeof (selectedAgent as any)?.maxTokens === 'string'
-                    ? Number((selectedAgent as any).maxTokens)
-                    : null
-              }
-            />
-            <div className="relative flex-1 min-h-0">
-              <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
+          <div className={cn('flex flex-1 min-h-0', submittedQuery.trim() && 'flex-row')}>
+            <div className={cn('relative flex flex-col flex-1 min-w-0', submittedQuery.trim() && 'min-w-0')}>
+              <ConversationSummaryBar
+                conversationId={currentConversationId}
+                starshipId={starshipId}
+                modelId={selectedAgent?.model ?? null}
+                maxTokens={
+                  typeof (selectedAgent as any)?.maxTokens === 'number'
+                    ? (selectedAgent as any).maxTokens
+                    : typeof (selectedAgent as any)?.maxTokens === 'string'
+                      ? Number((selectedAgent as any).maxTokens)
+                      : null
+                }
+              />
+              <div className="relative flex-1 min-h-0">
+                <ConversationMessageList
+                  conversationId={currentConversationId}
+                  starshipId={starshipId}
+                  bottomPaddingPx={inputHeight + 24}
+                  submittedQuery={submittedQuery.trim() || undefined}
+                  onSearchSubmit={q => {
+                    setSubmittedQuery(q)
+                    setSearchResults([])
+                    setSelectedMatchIndex(null)
+                  }}
+                  onSearchResults={setSearchResults}
+                  selectedMatchIndex={selectedMatchIndex}
+                  hideSearchInput={hideSearchInputInList}
+                />
+              </div>
+              {/* Single place for stream-dependent side-effects */}
+              <StreamSideEffects />
             </div>
-            {/* Single place for stream-dependent side-effects */}
-            <StreamSideEffects />
-          </>
+            {submittedQuery.trim() ? (
+              <div ref={searchSidebarRef} className="flex flex-col min-h-0 h-full">
+                <SearchResultsSidebar
+                  query={submittedQuery}
+                  results={searchResults}
+                  onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
+                  onClose={closeSearchSidebar}
+                />
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}

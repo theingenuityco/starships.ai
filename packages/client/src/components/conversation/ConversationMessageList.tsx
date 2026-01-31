@@ -6,16 +6,18 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState, Fragment } from 'react'
+import { useEffect, useMemo, useRef, memo, useState, Fragment, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
+import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -65,6 +67,16 @@ interface ConversationMessageListProps {
   sizeVariant?: 'default' | 'hero' | 'delegation'
   /** When true, hide the copy and download turn-action buttons (e.g. for landing demos). */
   hideTurnActionButtons?: boolean
+  /** Submitted search query (runs search and opens sidebar). When set, used for highlight and matching. */
+  submittedQuery?: string
+  /** Called when user submits search (Enter or Search button). */
+  onSearchSubmit?: (query: string) => void
+  /** Called when search results are computed (for sidebar). */
+  onSearchResults?: (results: import('./conversationSearch').SearchResult[]) => void
+  /** When set (e.g. from sidebar result click), scroll to this match index. */
+  selectedMatchIndex?: number | null
+  /** When true, hide the search input (e.g. when search is in navbar) and show only Prev/Next. */
+  hideSearchInput?: boolean
 }
 
 export function ConversationMessageList({
@@ -86,6 +98,11 @@ export function ConversationMessageList({
   isAwaitingToolResultsOverride,
   sizeVariant = 'default',
   hideTurnActionButtons = false,
+  submittedQuery: submittedQueryProp,
+  onSearchSubmit,
+  onSearchResults,
+  selectedMatchIndex,
+  hideSearchInput = false,
 }: ConversationMessageListProps) {
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
@@ -118,6 +135,15 @@ export function ConversationMessageList({
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  // In-chat search: local input value (typed); submitted query from parent drives highlight and sidebar
+  const [searchInputValue, setSearchInputValue] = useState('')
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0)
+  const submittedQuery = submittedQueryProp ?? ''
+  const highlightTerm = submittedQuery.trim() || undefined
+  // Normalize query by stripping markdown so "The last **Avatar** movie" matches content "The last Avatar movie".
+  const normalizedHighlightTerm = highlightTerm ? (stripMarkdownToPlainText(highlightTerm).trim() || undefined) : undefined
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -539,12 +565,191 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
+  // In-chat search: one entry per occurrence (so "Avatar" 5 times = 5 positions, not 2 messages). Case-insensitive. Cap term length to avoid ReDoS. Use normalized term so markdown in query matches plain content.
+  const MAX_SEARCH_TERM_LENGTH = 200
+  const matchingPositions = useMemo(() => {
+    if (!normalizedHighlightTerm) return []
+    const q = normalizedHighlightTerm.trim().toLowerCase().slice(0, MAX_SEARCH_TERM_LENGTH)
+    if (!q) return []
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const positions: { messageId: string }[] = []
+    for (const msg of renderMessages) {
+      const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
+      const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
+      // Strip markdown from content so "The last **Avatar** movie" in message matches query "the last avatar movie"
+      const plainContent = stripMarkdownToPlainText(`${content} ${reasoning}`)
+      const searchable = plainContent.toLowerCase()
+      const matches = searchable.match(new RegExp(escaped, 'g'))
+      const count = matches ? matches.length : 0
+      for (let i = 0; i < count; i++) {
+        positions.push({ messageId: msg.id })
+      }
+    }
+    return positions
+  }, [renderMessages, normalizedHighlightTerm])
+
+  // Clamp current match index when query or matches change
+  useEffect(() => {
+    if (matchingPositions.length === 0) {
+      setCurrentMatchIndex(0)
+      return
+    }
+    setCurrentMatchIndex(i => Math.min(i, matchingPositions.length - 1))
+  }, [matchingPositions.length, submittedQuery])
+
+  // Scroll to current match when user clicks Prev/Next (main bar)
+  useEffect(() => {
+    if (matchingPositions.length === 0 || currentMatchIndex < 0) return
+    const messageId = matchingPositions[currentMatchIndex]?.messageId
+    if (!messageId) return
+    const el = messageRefs.current[messageId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only scroll when user changes match index (Prev/Next)
+  }, [currentMatchIndex])
+
+  // When sidebar result is clicked: sync selectedMatchIndex and scroll to that message
+  useEffect(() => {
+    if (selectedMatchIndex == null || matchingPositions.length === 0) return
+    const messageId = matchingPositions[selectedMatchIndex]?.messageId
+    if (!messageId) return
+    setCurrentMatchIndex(selectedMatchIndex)
+    const el = messageRefs.current[messageId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [selectedMatchIndex, matchingPositions])
+
+  // Build sidebar results (one per message) and report to parent.
+  // Snippets are built from plain text (strip full message then slice) so we never show ** etc. Cap term length to avoid ReDoS. Use normalized term for matching.
+  const searchResultsForSidebar = useMemo(() => {
+    if (!normalizedHighlightTerm) return null
+    const q = normalizedHighlightTerm.toLowerCase().trim().slice(0, MAX_SEARCH_TERM_LENGTH)
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const results: import('./conversationSearch').SearchResult[] = []
+    let firstIndexInPositions = 0
+    for (const msg of renderMessages) {
+      const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
+      const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
+      const fullText = `${content} ${reasoning}`.trim()
+      // Strip markdown so "The last **Avatar** movie" in message matches query "the last avatar movie"
+      const plainFullText = stripMarkdownToPlainText(fullText)
+      const searchable = plainFullText.toLowerCase()
+      const matches = searchable.match(new RegExp(escaped, 'g'))
+      const count = matches ? matches.length : 0
+      if (count === 0) continue
+      const contentSnippet = buildPlainTextSnippet(plainFullText || content, normalizedHighlightTerm)
+      results.push({
+        messageId: msg.id,
+        role: msg.role,
+        contentSnippet: contentSnippet || buildPlainTextSnippet(plainFullText || content, normalizedHighlightTerm),
+        timestamp: (msg as ExtendedMessage).createdAt,
+        occurrenceCount: count,
+        firstMatchIndexInPositions: firstIndexInPositions,
+        agentName: msg.role === 'assistant' ? ((msg as ExtendedMessage).agentName ?? agentName) : undefined,
+      })
+      firstIndexInPositions += count
+    }
+    return results
+  }, [normalizedHighlightTerm, renderMessages, agentName])
+
+  useEffect(() => {
+    if (searchResultsForSidebar != null && onSearchResults) {
+      onSearchResults(searchResultsForSidebar)
+    }
+  }, [searchResultsForSidebar, onSearchResults])
+
+  // Message IDs that contain at least one match (so we can highlight the whole message bubble)
+  const messageIdsWithMatch = useMemo(() => new Set(matchingPositions.map(p => p.messageId)), [matchingPositions])
+
   if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
 
+  const hasSearchMatches = matchingPositions.length > 0
+  const showSearchBar = sizeVariant === 'default' && renderMessages.length > 0
+  const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
+
   return (
     <div className={cn('h-full flex flex-col', className)}>
+      {showSearchBar && !hideSearchInput && (
+        <div className="flex-shrink-0 border-b px-4 py-2 flex items-center gap-2 bg-background/95">
+          {!hideSearchInput && (
+            <>
+              <div className="relative flex-1 min-w-0">
+                <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                <Input
+                  type="text"
+                  placeholder="Search in conversation..."
+                  value={searchInputValue}
+                  onChange={e => setSearchInputValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const q = searchInputValue.trim()
+                      if (q) onSearchSubmit?.(q)
+                    }
+                  }}
+                  className="pl-8 pr-8 h-8 text-xs"
+                  aria-label="Search in conversation"
+                />
+                {searchInputValue && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchInputValue('')
+                      onSearchSubmit?.('')
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <Icon name="x" className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {onSearchSubmit && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-8 flex-shrink-0 text-xs"
+                  onClick={() => {
+                    const q = searchInputValue.trim()
+                    if (q) onSearchSubmit(q)
+                  }}
+                  aria-label="Search"
+                >
+                  Search
+                </Button>
+              )}
+            </>
+          )}
+          {highlightTerm && (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+                onClick={() => setCurrentMatchIndex(i => (i <= 0 ? matchingPositions.length - 1 : i - 1))}
+                disabled={!hasSearchMatches}
+                aria-label="Previous match"
+              >
+                <Icon name="caret-up" className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+                onClick={() => setCurrentMatchIndex(i => (i >= matchingPositions.length - 1 ? 0 : i + 1))}
+                disabled={!hasSearchMatches}
+                aria-label="Next match"
+              >
+                <Icon name="caret-down" className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      )}
       <div
         ref={scrollContainerRef}
         className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
@@ -560,71 +765,85 @@ export function ConversationMessageList({
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
             const isFirstMessage = idx === 0
+            const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
+            const isCurrentMatch = message.id === currentMatchMessageId
 
             return (
               <Fragment key={message.id}>
-                <MemoizedMessageBubble
-                  message={message}
-                  agentName={message.agentName || agentName}
-                  agentSlug={agentSlug}
-                  starshipSlug={starshipSlug}
-                  agentAvatarUrl={agentAvatarUrl}
-                  isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                  starshipId={starshipId}
-                  showAssistantAvatar={showAssistantAvatar}
-                  isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
-                  userNameOverride={userNameOverride}
-                  userEmailOverride={userEmailOverride}
-                  userAvatarUrlOverride={userAvatarUrlOverride}
-                  userAvatarSeedOverride={userAvatarSeedOverride}
-                  userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
-                  isAwaitingToolResults={isAwaitingToolResults}
-                  isLastMessage={idx === renderMessages.length - 1}
-                  sizeVariant={sizeVariant}
-                />
-                {(() => {
-                  const widgets =
-                    message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
-                  if (widgets.length === 0) return null
-                  return (
-                    <div className="flex justify-start">
-                      <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
-                        {/* Spacer to match avatar width */}
-                        <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
-                        <div className="flex-1 w-full">
-                          <div className="space-y-4 mt-3 w-full max-w-none">
-                            {widgets.map(widget => (
-                              <div key={widget.id} className="w-full max-w-none mb-4">
-                                {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
-                                {widget.widgetType !== 'StarshipDetails' && (
-                                  <div className="text-sm w-full mb-4">
-                                    <div className="flex items-baseline gap-1">
-                                      <span className="font-medium">{widget.name}</span>
+                <div
+                  ref={el => {
+                    messageRefs.current[message.id] = el
+                  }}
+                  data-message-id={message.id}
+                  className={cn(
+                    messageHasMatch && 'rounded-lg transition-colors',
+                    messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
+                    messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
+                  )}
+                >
+                  <MemoizedMessageBubble
+                    message={message}
+                    agentName={message.agentName || agentName}
+                    agentSlug={agentSlug}
+                    starshipSlug={starshipSlug}
+                    agentAvatarUrl={agentAvatarUrl}
+                    isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                    starshipId={starshipId}
+                    showAssistantAvatar={showAssistantAvatar}
+                    isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
+                    userNameOverride={userNameOverride}
+                    userEmailOverride={userEmailOverride}
+                    userAvatarUrlOverride={userAvatarUrlOverride}
+                    userAvatarSeedOverride={userAvatarSeedOverride}
+                    userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                    isAwaitingToolResults={isAwaitingToolResults}
+                    isLastMessage={idx === renderMessages.length - 1}
+                    sizeVariant={sizeVariant}
+                    highlightTerm={normalizedHighlightTerm}
+                  />
+                  {(() => {
+                    const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
+                    if (widgets.length === 0) return null
+                    return (
+                      <div className="flex justify-start">
+                        <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
+                          {/* Spacer to match avatar width */}
+                          <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
+                          <div className="flex-1 w-full">
+                            <div className="space-y-4 mt-3 w-full max-w-none">
+                              {widgets.map(widget => (
+                                <div key={widget.id} className="w-full max-w-none mb-4">
+                                  {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
+                                  {widget.widgetType !== 'StarshipDetails' && (
+                                    <div className="text-sm w-full mb-4">
+                                      <div className="flex items-baseline gap-1">
+                                        <span className="font-medium">{widget.name}</span>
+                                      </div>
+                                      {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
                                     </div>
-                                    {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
-                                  </div>
-                                )}
+                                  )}
 
-                                {/* Widget visualization - minimal styling, full width */}
-                                {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
-                                <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                  <InlineWidgetRenderer
-                                    widget={{
-                                      widgetType: widget.widgetType,
-                                      props: widget.props,
-                                    }}
-                                    compactMode={true}
-                                    className="w-full"
-                                  />
+                                  {/* Widget visualization - minimal styling, full width */}
+                                  {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
+                                  <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                    <InlineWidgetRenderer
+                                      widget={{
+                                        widgetType: widget.widgetType,
+                                        props: widget.props,
+                                      }}
+                                      compactMode={true}
+                                      className="w-full"
+                                    />
+                                  </div>
                                 </div>
-                              </div>
-                            ))}
+                              ))}
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  )
-                })()}
+                    )
+                  })()}
+                </div>
               </Fragment>
             )
           })}
@@ -633,24 +852,11 @@ export function ConversationMessageList({
             <div className="flex justify-start">
               {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
                 <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
-                  <div
-                    className={cn(
-                      'flex-shrink-0 mt-1',
-                      sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6'
-                    )}
-                    aria-hidden="true"
-                  />
+                  <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
                   <div className="min-w-0 flex-1">
-                    <div
-                      className={cn(
-                        'flex items-center gap-2 leading-relaxed text-muted-foreground',
-                        sizeVariant === 'hero' ? 'text-base' : 'text-sm'
-                      )}
-                    >
+                    <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
                       <TypingDots />
-                      <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>
-                        Typing...
-                      </span>
+                      <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
                     </div>
                   </div>
                 </div>
@@ -731,6 +937,32 @@ interface ConversationMessageBubbleProps {
   isAwaitingToolResults?: boolean
   isLastMessage?: boolean
   sizeVariant?: 'default' | 'hero' | 'delegation'
+  /** When set, highlight this search term in message content (in-chat search). */
+  highlightTerm?: string
+}
+
+const HIGHLIGHT_TERM_MAX_LENGTH = 200
+
+/** Renders plain text with optional search term highlighted (for user bubbles that don't use markdown). Case-insensitive. Cap term length to avoid ReDoS. */
+function renderTextWithHighlight(text: string, term: string | undefined): ReactNode {
+  if (!term || term.trim() === '') return text
+  const t = term.trim().slice(0, HIGHLIGHT_TERM_MAX_LENGTH)
+  const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+  const tLower = t.toLowerCase()
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === tLower ? (
+          <mark key={i} className="bg-amber-200/70 dark:bg-amber-400/50 rounded px-0.5 font-medium">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  )
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -781,33 +1013,32 @@ function extractWidgetResults(uiActions: unknown): WidgetResult[] {
 
   const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
 
-  const outRaw: Array<WidgetResult | null> = actions
-    .map((ua, index) => {
-      if (!ua || ua.action !== 'render_widget') return null
-      const payload = ua.payload
-      if (!payload || !isRecord(payload)) return null
-      const widget = payload['widget']
-      if (!isRecord(widget)) return null
+  const outRaw: Array<WidgetResult | null> = actions.map((ua, index) => {
+    if (!ua || ua.action !== 'render_widget') return null
+    const payload = ua.payload
+    if (!payload || !isRecord(payload)) return null
+    const widget = payload['widget']
+    if (!isRecord(widget)) return null
 
-      const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
-      const props = widget['props']
-      if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
-      if (!props || typeof props !== 'object') return null
+    const widgetType = typeof widget['widgetType'] === 'string' ? widget['widgetType'] : ''
+    const props = widget['props']
+    if (!widgetType || !KNOWN_WIDGET_TYPES.has(widgetType)) return null
+    if (!props || typeof props !== 'object') return null
 
-      const id =
-        (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
-        (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
-        `ui-widget-${index}`
+    const id =
+      (typeof widget['id'] === 'string' && widget['id'].trim().length > 0 ? widget['id'] : '') ||
+      (typeof payload['toolCallId'] === 'string' && String(payload['toolCallId']).trim().length > 0 ? String(payload['toolCallId']) : '') ||
+      `ui-widget-${index}`
 
-      return {
-        id,
-        widgetType,
-        props: props as Record<string, unknown>,
-        name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
-        description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
-        index,
-      } satisfies WidgetResult
-    })
+    return {
+      id,
+      widgetType,
+      props: props as Record<string, unknown>,
+      name: typeof widget['name'] === 'string' && widget['name'].trim().length > 0 ? widget['name'] : 'Widget',
+      description: typeof widget['description'] === 'string' ? widget['description'] : undefined,
+      index,
+    } satisfies WidgetResult
+  })
   const out = outRaw.filter((w): w is WidgetResult => w !== null)
 
   // Safety net: ensure stable unique keys even if upstream accidentally duplicates actions.
@@ -842,6 +1073,7 @@ const MemoizedMessageBubble = memo(
     isAwaitingToolResults = false,
     isLastMessage = false,
     sizeVariant = 'default',
+    highlightTerm,
   }: ConversationMessageBubbleProps) {
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
@@ -872,8 +1104,10 @@ const MemoizedMessageBubble = memo(
           <div className="flex justify-end">
             <div className={cn('flex w-full sm:w-auto items-end max-w-full sm:max-w-[70%]', userRowClass)}>
               <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
-                <div className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}>
-                  <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{message.content}</div>
+                <div
+                  className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}
+                >
+                  <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{renderTextWithHighlight(message.content, highlightTerm)}</div>
                   {message.sending && (
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
                       <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
@@ -916,8 +1150,7 @@ const MemoizedMessageBubble = memo(
 
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
-      const userProfileHref =
-        typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
+      const userProfileHref = typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
 
       return (
         <div className="flex justify-start w-full">
@@ -975,6 +1208,7 @@ const MemoizedMessageBubble = memo(
                 starshipId={starshipId}
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
+                highlightTerm={highlightTerm}
               />
             </div>
           </div>
@@ -1021,6 +1255,7 @@ const MemoizedMessageBubble = memo(
                   starshipId={starshipId}
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
+                  highlightTerm={highlightTerm}
                 />
               </div>
             </div>
@@ -1076,6 +1311,7 @@ const MemoizedMessageBubble = memo(
                 starshipId={starshipId}
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
+                highlightTerm={highlightTerm}
               />
             </div>
           </div>
@@ -1140,6 +1376,9 @@ const MemoizedMessageBubble = memo(
     const prevUiActions = (prevProps.message as ExtendedMessage).uiActions?.length ?? 0
     const nextUiActions = (nextProps.message as ExtendedMessage).uiActions?.length ?? 0
     if (prevUiActions !== nextUiActions) return false
+
+    // Re-render when in-chat search highlight term changes
+    if ((prevProps.highlightTerm || '') !== (nextProps.highlightTerm || '')) return false
 
     return true
   }

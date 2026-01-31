@@ -16,6 +16,8 @@ interface GetMarkdownComponentsOptions {
   copiedStates?: Record<string, boolean>
   onCopyCodeBlock?: (code: string, blockId: string) => void
   onCopyTable?: (tableContent: string, tableId: string, tableHtml?: string) => void
+  /** When set, wrap matching substrings in <mark> for in-chat search highlight */
+  highlightTerm?: string
 }
 
 // Helper function to convert table DOM structure to plain text table
@@ -125,8 +127,20 @@ function TableWithCopy({
   )
 }
 
-export function getMarkdownComponents({ theme, enableLinkPreview = true, messageId = 'md', copiedStates = {}, onCopyCodeBlock, onCopyTable }: GetMarkdownComponentsOptions) {
-  return {
+function escapeRegex(str: string): string {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function getMarkdownComponents({
+  theme,
+  enableLinkPreview = true,
+  messageId = 'md',
+  copiedStates = {},
+  onCopyCodeBlock,
+  onCopyTable,
+  highlightTerm: _highlightTerm,
+}: GetMarkdownComponentsOptions) {
+  const base = {
     p: ({ children }: any) => <p className="mb-2 last:mb-0 leading-relaxed">{children}</p>,
 
     a: ({ href, children }: any) => (
@@ -201,6 +215,7 @@ export function getMarkdownComponents({ theme, enableLinkPreview = true, message
     h3: ({ children }: any) => <h3 className="text-base font-medium mt-3 mb-2 first:mt-0">{children}</h3>,
     hr: () => <hr className="border-t-2 border-border my-6" />,
   }
+  return base
 }
 
 interface MarkdownContentProps {

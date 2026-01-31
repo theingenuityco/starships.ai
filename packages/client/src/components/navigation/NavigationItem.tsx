@@ -21,7 +21,19 @@ interface NavigationItemProps {
   isOnboardingHighlighted?: boolean
 }
 
-export function NavigationItem({ href, label, icon, isActive, showLabels = false, expanded = false, onClick, special = false, onItemClick, itemRef, isOnboardingHighlighted = false }: NavigationItemProps) {
+export function NavigationItem({
+  href,
+  label,
+  icon,
+  isActive,
+  showLabels = false,
+  expanded = false,
+  onClick,
+  special = false,
+  onItemClick,
+  itemRef,
+  isOnboardingHighlighted = false,
+}: NavigationItemProps) {
   const router = useRouter()
 
   const handleClick = useCallback(
@@ -88,7 +100,6 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
         transition: 'background-color 0.15s ease',
         cursor: 'pointer',
         minHeight: '32px',
-        fontSize: '14px',
       }}
     >
       {StableIcon}
@@ -99,8 +110,7 @@ export function NavigationItem({ href, label, icon, isActive, showLabels = false
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -8 }}
             transition={{ duration: 0.12, ease: [0.4, 0, 0.2, 1] }}
-            className="whitespace-nowrap pointer-events-none font-medium"
-            style={{ fontSize: '14px', marginLeft: '0.375rem' }}
+            className="whitespace-nowrap pointer-events-none font-medium ml-1.5"
           >
             {label}
           </motion.span>

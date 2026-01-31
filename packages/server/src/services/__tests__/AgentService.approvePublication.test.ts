@@ -23,7 +23,14 @@ jest.mock('@/services/ConnectorSecretService', () => ({
   ConnectorSecretService: jest.fn().mockImplementation(() => ({})),
 }));
 
+jest.mock('@/services/PublicationService', () => ({
+  PublicationService: jest.fn().mockImplementation(() => ({
+    approvePublication: jest.fn(),
+  })),
+}));
+
 import { AgentService } from '@/services/AgentService';
+import { PublicationService } from '@/services/PublicationService';
 import {
   AgentRepository,
   AgentTemplateRepository,
@@ -126,17 +133,15 @@ describe('AgentService.approvePublication', () => {
 
     mockAgentRepo.update.mockResolvedValue({ id: 'agent_1234567', publicationStatus: 'published' });
 
+    const mockPublicationService = {
+      approvePublication: jest.fn().mockResolvedValue({ id: 'agent_1234567', publicationStatus: 'published' }),
+    };
+    (PublicationService as unknown as jest.Mock).mockImplementation(() => mockPublicationService);
+
     const svc = new AgentService();
     await svc.approvePublication('agent_1234567', 'admin_1234567');
 
-    expect(mockToolTemplateRepo.update).toHaveBeenCalledWith(
-      'tool_tpl_1234567',
-      expect.objectContaining({
-        name: 'New Tool Name',
-      })
-    );
-
-    // Ensure the AgentTemplate junction-table update is written by ids (canonical) and is not slug-derived.
-    expect(mockTemplateRepo.setToolTemplateRelationshipsByIds).toHaveBeenCalledWith('agent_tpl_1234567', ['tool_tpl_1234567']);
+    // Verify that PublicationService.approvePublication was called
+    expect(mockPublicationService.approvePublication).toHaveBeenCalledWith('agent_1234567', 'admin_1234567');
   });
 });

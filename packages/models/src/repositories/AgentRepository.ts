@@ -154,10 +154,11 @@ export class AgentRepository extends BaseRepository {
   private async agentSlugExistsOnStarship(starshipId: string, slug: string, excludeId?: string): Promise<boolean> {
     const connection = this.getConnection();
     if (excludeId) {
-      const row = await connection.queryOne<{ id: string }>(
-        'SELECT id FROM agents WHERE starship_id = $1 AND slug = $2 AND id <> $3',
-        [starshipId, slug, excludeId]
-      );
+      const row = await connection.queryOne<{ id: string }>('SELECT id FROM agents WHERE starship_id = $1 AND slug = $2 AND id <> $3', [
+        starshipId,
+        slug,
+        excludeId,
+      ]);
       return !!row?.id;
     }
     const row = await connection.queryOne<{ id: string }>('SELECT id FROM agents WHERE starship_id = $1 AND slug = $2', [starshipId, slug]);
@@ -525,10 +526,22 @@ export class AgentRepository extends BaseRepository {
         }
 
         const connection = this.getConnection();
-        const toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+        // 1) Look up by tool instance slug on starship (tools.slug)
+        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
           toolSlug,
           starshipId,
         ]);
+        // 2) If not found, client may have sent a template slug (e.g. from DeploymentConfirmationModal assignedToolSlugs).
+        //    Resolve tool on this starship that was created from a template with that slug.
+        if (!toolResult?.id) {
+          toolResult = await connection.queryOne<{ id: string }>(
+            `SELECT t.id FROM tools t
+             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
+             WHERE tt.slug = $1 AND t.starship_id = $2
+             LIMIT 1`,
+            [toolSlug, starshipId]
+          );
+        }
         if (!toolResult?.id) {
           throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
         }
@@ -847,7 +860,7 @@ export class AgentRepository extends BaseRepository {
 
         const connection = this.getConnection();
         const placeholders = toolIds.map((_, idx) => `$${idx + 2}`).join(', ');
-        
+
         const results = await connection.query<{ tool_id: string; agent_count: string }>(
           `SELECT at.tool_id, COUNT(DISTINCT at.agent_id) as agent_count
            FROM agent_tools at
@@ -862,7 +875,7 @@ export class AgentRepository extends BaseRepository {
         for (const row of results) {
           countMap.set(row.tool_id, parseInt(row.agent_count, 10) || 0);
         }
-        
+
         // Set count to 0 for tools not in results
         for (const toolId of toolIds) {
           if (!countMap.has(toolId)) {
@@ -1031,38 +1044,38 @@ export class AgentRepository extends BaseRepository {
         // User-added tools (without sourceTemplateId) are preserved.
         if (template.assignedToolSlugs && template.assignedToolSlugs.length > 0) {
           const toolRepo = new ToolRepository();
-          
+
           // Get current tools linked to this agent
           const currentTools = await this.getAgentTools(agentId, agent.starshipId);
-          
+
           // Build a set of template slugs that should be linked to this agent
           const requiredToolSlugs = new Set(template.assignedToolSlugs);
-          
+
           // Batch fetch tool template information for all template-sourced tools
           // This avoids N+1 queries when looking up template slugs
-          const templateSourcedTools = currentTools.filter(t => t.sourceTemplateId);
-          const uniqueTemplateIds = [...new Set(templateSourcedTools.map(t => t.sourceTemplateId).filter(Boolean))];
-          
+          const templateSourcedTools = currentTools.filter((t) => t.sourceTemplateId);
+          const uniqueTemplateIds = [...new Set(templateSourcedTools.map((t) => t.sourceTemplateId).filter(Boolean))];
+
           const connection = this.getConnection();
           const toolTemplateMap = new Map<string, string>(); // templateId -> templateSlug
-          
+
           if (uniqueTemplateIds.length > 0) {
             const placeholders = uniqueTemplateIds.map((_, idx) => `$${idx + 1}`).join(', ');
             const templateRows = await connection.query<{ id: string; slug: string }>(
               `SELECT id, slug FROM tool_templates WHERE id IN (${placeholders})`,
               uniqueTemplateIds as string[]
             );
-            
+
             for (const row of templateRows) {
               if (row.id && row.slug) {
                 toolTemplateMap.set(row.id, row.slug);
               }
             }
           }
-          
+
           // Build a map of currently linked tools by their source template slug
           const currentToolsByTemplateSlug = new Map<string, string>(); // templateSlug -> toolId
-          
+
           for (const tool of templateSourcedTools) {
             if (tool.sourceTemplateId) {
               const templateSlug = toolTemplateMap.get(tool.sourceTemplateId);
@@ -1071,7 +1084,7 @@ export class AgentRepository extends BaseRepository {
               }
             }
           }
-          
+
           // Remove tools that are no longer in the template (only template-sourced tools)
           const toolsToRemove: Array<{ slug: string; id: string }> = [];
           for (const [templateSlug, toolId] of currentToolsByTemplateSlug.entries()) {
@@ -1079,22 +1092,22 @@ export class AgentRepository extends BaseRepository {
               toolsToRemove.push({ slug: templateSlug, id: toolId });
             }
           }
-          
+
           if (toolsToRemove.length > 0) {
             // Batch count agent usage for all tools to be removed (avoids N+1 queries)
-            const toolIdsToRemove = toolsToRemove.map(t => t.id);
+            const toolIdsToRemove = toolsToRemove.map((t) => t.id);
             const usageCountMap = await this.batchCountAgentsUsingTools(toolIdsToRemove, agent.starshipId);
-            
+
             for (const { slug: templateSlug, id: toolId } of toolsToRemove) {
               try {
                 const agentCount = usageCountMap.get(toolId) || 0;
-                
+
                 if (agentCount > 1) {
                   // Other agents are using this tool - just remove the relationship
                   await this.removeToolRelationship(agentId, toolId);
                   console.log(
                     `[AgentRepository] Removed tool '${templateSlug}' from agent ${agentId} (no longer in template). ` +
-                    `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
+                      `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
                   );
                 } else if (agentCount === 1) {
                   // This is the only agent using this tool. Since it is no longer in the template,
@@ -1103,7 +1116,7 @@ export class AgentRepository extends BaseRepository {
                   if (deleted) {
                     console.log(
                       `[AgentRepository] Deleted tool '${templateSlug}' (${toolId}) from starship ${agent.starshipId} ` +
-                      `because it was no longer in template and had no other agent users`
+                        `because it was no longer in template and had no other agent users`
                     );
                   } else {
                     // Defensive: if delete reports false, fall back to just unlinking.
@@ -1114,9 +1127,7 @@ export class AgentRepository extends BaseRepository {
                   }
                 } else {
                   // agentCount is 0 or unexpected - tool might not be linked
-                  console.warn(
-                    `[AgentRepository] Tool '${templateSlug}' (${toolId}) has unexpected agent count: ${agentCount}`
-                  );
+                  console.warn(`[AgentRepository] Tool '${templateSlug}' (${toolId}) has unexpected agent count: ${agentCount}`);
                 }
               } catch (error) {
                 console.error(`[AgentRepository] Failed to remove tool '${templateSlug}' from agent ${agentId}:`, error);
@@ -1151,22 +1162,22 @@ export class AgentRepository extends BaseRepository {
           // Template has no assigned tools - remove all template-sourced tools from agent
           const toolRepo = new ToolRepository();
           const currentTools = await this.getAgentTools(agentId, agent.starshipId);
-          const templateSourcedTools = currentTools.filter(t => t.sourceTemplateId);
-          
+          const templateSourcedTools = currentTools.filter((t) => t.sourceTemplateId);
+
           if (templateSourcedTools.length > 0) {
             // Batch count agent usage for all tools to be removed (avoids N+1 queries)
-            const toolIds = templateSourcedTools.map(t => t.id);
+            const toolIds = templateSourcedTools.map((t) => t.id);
             const usageCountMap = await this.batchCountAgentsUsingTools(toolIds, agent.starshipId);
-            
+
             for (const tool of templateSourcedTools) {
               try {
                 const agentCount = usageCountMap.get(tool.id) || 0;
-                
+
                 if (agentCount > 1) {
                   await this.removeToolRelationship(agentId, tool.id);
                   console.log(
                     `[AgentRepository] Removed template-sourced tool '${tool.name}' from agent ${agentId} (template has no tools). ` +
-                    `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
+                      `Tool kept in starship (used by ${agentCount - 1} other agent(s))`
                   );
                 } else if (agentCount === 1) {
                   // This is the only agent using this template-sourced tool. Since the template has no tools,
@@ -1175,7 +1186,7 @@ export class AgentRepository extends BaseRepository {
                   if (deleted) {
                     console.log(
                       `[AgentRepository] Deleted template-sourced tool '${tool.name}' (${tool.id}) from starship ${agent.starshipId} ` +
-                      `because template has no tools and it had no other agent users`
+                        `because template has no tools and it had no other agent users`
                     );
                   } else {
                     // Defensive: if delete reports false, fall back to just unlinking.
@@ -1185,9 +1196,7 @@ export class AgentRepository extends BaseRepository {
                     );
                   }
                 } else {
-                  console.warn(
-                    `[AgentRepository] Tool '${tool.name}' (${tool.id}) has unexpected agent count: ${agentCount}`
-                  );
+                  console.warn(`[AgentRepository] Tool '${tool.name}' (${tool.id}) has unexpected agent count: ${agentCount}`);
                 }
               } catch (error) {
                 console.error(`[AgentRepository] Failed to remove tool '${tool.name}' from agent ${agentId}:`, error);

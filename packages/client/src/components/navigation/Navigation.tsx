@@ -142,8 +142,6 @@ export function Navigation(props: NavigationProps) {
         isConnectorsRoute: false,
         isAgentsRoute: false,
         isAgentBuilderRoute: false,
-        isToolsRoute: false,
-        isToolBuilderRoute: false,
         isSchedulesRoute: false,
       }
     }
@@ -151,13 +149,11 @@ export function Navigation(props: NavigationProps) {
       isConnectorsRoute: pathname.startsWith(`/ship/${starshipSlug}/connectors`),
       isAgentsRoute: pathname.startsWith(`/ship/${starshipSlug}/agents`),
       isAgentBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/agent/`),
-      isToolsRoute: pathname.startsWith(`/ship/${starshipSlug}/tools`),
-      isToolBuilderRoute: pathname.startsWith(`/ship/${starshipSlug}/tool/`),
       isSchedulesRoute: pathname.startsWith(`/ship/${starshipSlug}/schedules`),
     }
   }, [pathname, starshipSlug])
 
-  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isToolsRoute, isToolBuilderRoute, isSchedulesRoute } = routeChecks
+  const { isConnectorsRoute, isAgentsRoute, isAgentBuilderRoute, isSchedulesRoute } = routeChecks
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
@@ -280,7 +276,6 @@ export function Navigation(props: NavigationProps) {
             },
           ]
         : []),
-      ...(isAuthenticated && starshipSlug ? [{ href: `/ship/${starshipSlug}/tools`, label: 'Tools', icon: 'wrench', isActive: isToolsRoute || isToolBuilderRoute }] : []),
       ...(isAuthenticated && isInstanceAdmin
         ? [
             {
@@ -292,21 +287,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [
-      isAuthenticated,
-      starshipSlug,
-      isAgentsRoute,
-      isAgentBuilderRoute,
-      isToolsRoute,
-      isToolBuilderRoute,
-      pathname,
-      isSchedulesRoute,
-      isConnectorsRoute,
-      handleNewConversation,
-      starshipData?.id,
-      isInstanceAdmin,
-      getOnboardingHighlight,
-    ]
+    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, handleNewConversation, starshipData?.id, isInstanceAdmin, getOnboardingHighlight]
   )
 
   const handleSidebarBackgroundClick = useCallback(

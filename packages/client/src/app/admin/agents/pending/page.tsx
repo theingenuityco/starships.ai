@@ -14,11 +14,15 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
 import { usePendingAgents, useApproveAgentPublication, useRejectAgentPublication, usePendingAgentTools, type PendingAgentSummary } from '@/hooks/useAdminAgents'
+import { AgentPublicationPrepareModal } from '@/components/admin/AgentPublicationPrepareModal'
+import { AgentPublicationReviewModal } from '@/components/admin/AgentPublicationReviewModal'
 import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components/AgentDocumentEditor'
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import Link from 'next/link'
+import type { AgentModel } from '@starships/protocol'
+import { ErrorBoundary } from '@/components/ui/error-boundary'
 
 interface RequestedByProfileProps {
   name: string
@@ -70,6 +74,19 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
   const [selectedAgent, setSelectedAgent] = useState<PendingAgentSummary | null>(null)
   const [isDetailOpen, setIsDetailOpen] = useState(false)
+  const [isPrepareModalOpen, setIsPrepareModalOpen] = useState(false)
+  const [isReviewModalOpen, setIsReviewModalOpen] = useState(false)
+  const [preparedContent, setPreparedContent] = useState<{
+    agent: AgentModel
+    templateId: string
+    marketingContent: {
+      avatarUrl?: string
+      problemStatementsText?: string[]
+      problemStatementsImageUrl?: string
+      capabilitiesImageUrl?: string
+      tryThesePromptsImageUrl?: string
+    }
+  } | null>(null)
 
   const selectedAgentAvatarAttachmentId = selectedAgent?.agent.avatarAttachmentId
   const selectedAgentStarshipId = selectedAgent?.agent.starshipId
@@ -136,8 +153,31 @@ export default function PendingAgentsPage(): React.JSX.Element {
 
   const handleApproveSelected = () => {
     if (!selectedAgent) return
-    handleApprove(selectedAgent.agent.id)
+    setIsPrepareModalOpen(true)
+  }
+
+  const handlePrepareComplete = (result: {
+    agent: AgentModel
+    templateId: string
+    marketingContent: {
+      avatarUrl?: string
+      problemStatementsText?: string[]
+      problemStatementsImageUrl?: string
+      capabilitiesImageUrl?: string
+      tryThesePromptsImageUrl?: string
+    }
+  }) => {
+    setPreparedContent(result)
+    setIsPrepareModalOpen(false)
+    setIsReviewModalOpen(true)
+  }
+
+  const handleReviewConfirm = () => {
+    setIsReviewModalOpen(false)
+    setPreparedContent(null)
     closeAgentDetails()
+    // Refresh the list
+    // The confirm mutation will handle invalidation
   }
 
   const handleRejectSelected = () => {
@@ -338,17 +378,19 @@ export default function PendingAgentsPage(): React.JSX.Element {
                     {/* Main read-only editor */}
                     <div className="flex-1 min-w-0 border border-border/60 rounded-lg bg-background/80">
                       <div className="h-full overflow-auto px-4">
-                        <AgentDocumentEditor
-                          value={selectedAgentFormData}
-                          onChange={() => {
-                            // no-op in read-only mode
-                          }}
-                          onFieldChange={() => {
-                            // no-op in read-only mode
-                          }}
-                          starshipId={selectedAgent.agent.starshipId}
-                          readOnly
-                        />
+                        <ErrorBoundary component="AgentDocumentEditor" fallback={<div className="p-4 text-sm text-muted-foreground">Error loading agent editor. Please try again.</div>}>
+                          <AgentDocumentEditor
+                            value={selectedAgentFormData}
+                            onChange={() => {
+                              // no-op in read-only mode
+                            }}
+                            onFieldChange={() => {
+                              // no-op in read-only mode
+                            }}
+                            starshipId={selectedAgent.agent.starshipId}
+                            readOnly
+                          />
+                        </ErrorBoundary>
                       </div>
                     </div>
 
@@ -529,6 +571,21 @@ export default function PendingAgentsPage(): React.JSX.Element {
                 )}
               </DialogContent>
             </Dialog>
+
+            {/* Prepare Publication Modal */}
+            {selectedAgent && <AgentPublicationPrepareModal open={isPrepareModalOpen} onOpenChange={setIsPrepareModalOpen} agent={selectedAgent.agent} onComplete={handlePrepareComplete} />}
+
+            {/* Review & Confirm Modal */}
+            {selectedAgent && preparedContent && (
+              <AgentPublicationReviewModal
+                open={isReviewModalOpen}
+                onOpenChange={setIsReviewModalOpen}
+                agent={preparedContent.agent}
+                templateId={preparedContent.templateId}
+                marketingContent={preparedContent.marketingContent}
+                onConfirm={handleReviewConfirm}
+              />
+            )}
           </div>
         </div>
       </div>

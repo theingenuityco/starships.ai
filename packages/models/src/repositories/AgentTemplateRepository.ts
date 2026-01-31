@@ -3,12 +3,16 @@ import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
 import { BaseRepository } from '@/repositories/BaseRepository';
+import { MarketingContentRepository } from '@/repositories/MarketingContentRepository';
 import { generateUniqueSlugRandomSuffix } from '@/utils/slugGenerator';
 import type { AgentTemplateModel, CreateAgentTemplateRequest, UpdateAgentTemplateRequest, ToolTemplateModel } from '@starships/protocol';
 
 export class AgentTemplateRepository extends BaseRepository {
+  private marketingContentRepo: MarketingContentRepository;
+
   constructor() {
     super('AgentTemplateRepository');
+    this.marketingContentRepo = new MarketingContentRepository();
   }
 
   /**
@@ -299,28 +303,18 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
-   * INTERNAL: Load template avatar storage fields.
+   * INTERNAL: Load template avatar storage fields from marketing_content table.
    * These fields are not exposed in the public AgentTemplateModel returned by findById/findAll.
    */
   async getAvatarStorageById(id: string): Promise<{ avatarS3Key?: string; avatarMimeType?: string; avatarUpdatedAt?: string } | null> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        const row = await connection.queryOne<{
-          avatar_s3_key?: string | null;
-          avatar_mime_type?: string | null;
-          avatar_updated_at?: Date | string | null;
-        }>(
-          `SELECT avatar_s3_key, avatar_mime_type, avatar_updated_at
-           FROM agent_templates
-           WHERE id = $1`,
-          [id]
-        );
-        if (!row) return null;
+        const content = await this.marketingContentRepo.findByEntityAndType('agent_template', id, 'avatar');
+        if (!content || !content.s3Key) return null;
         return {
-          avatarS3Key: row.avatar_s3_key ?? undefined,
-          avatarMimeType: row.avatar_mime_type ?? undefined,
-          avatarUpdatedAt: row.avatar_updated_at ? new Date(row.avatar_updated_at).toISOString() : undefined,
+          avatarS3Key: content.s3Key,
+          avatarMimeType: content.mimeType,
+          avatarUpdatedAt: content.updatedAt,
         };
       },
       'getAvatarStorageById',
@@ -330,7 +324,7 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
-   * INTERNAL: Update template avatar storage fields.
+   * INTERNAL: Update template avatar storage fields in marketing_content table.
    */
   async updateAvatarStorage(
     id: string,
@@ -338,16 +332,15 @@ export class AgentTemplateRepository extends BaseRepository {
   ): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
-        const connection = this.getConnection();
-        await connection.query(
-          `UPDATE agent_templates
-           SET avatar_s3_key = $2,
-               avatar_mime_type = $3,
-               avatar_updated_at = $4,
-               updated_at = NOW()
-           WHERE id = $1`,
-          [id, updates.avatarS3Key, updates.avatarMimeType, updates.avatarUpdatedAt]
-        );
+        await this.marketingContentRepo.createOrUpdate({
+          entityType: 'agent_template',
+          entityId: id,
+          contentType: 'avatar',
+          contentFormat: 'image',
+          s3Key: updates.avatarS3Key,
+          mimeType: updates.avatarMimeType,
+          metadata: { updatedAt: updates.avatarUpdatedAt },
+        });
         return true;
       },
       'updateAvatarStorage',
@@ -356,17 +349,146 @@ export class AgentTemplateRepository extends BaseRepository {
     );
   }
 
-  private toPublicModel(model: AgentTemplateModel & Record<string, unknown>): AgentTemplateModel {
-    const hasAvatar = typeof model.avatarS3Key === 'string' && String(model.avatarS3Key).length > 0;
-    const avatarUrl = hasAvatar ? `/api/v1/agent-templates/${model.id}/avatar` : undefined;
-    const avatarUpdatedAt =
-      typeof model.avatarUpdatedAt === 'string' && model.avatarUpdatedAt.length > 0 ? model.avatarUpdatedAt : undefined;
+  /**
+   * INTERNAL: Get template profile image storage by type from marketing_content table.
+   * @param id Template ID
+   * @param type Profile image type: 'problem_statements' | 'capabilities' | 'try_these_prompts'
+   */
+  async getProfileImageStorageById(
+    id: string,
+    type: 'problem_statements' | 'capabilities' | 'try_these_prompts'
+  ): Promise<{ s3Key?: string; mimeType?: string; updatedAt?: string } | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        // Map database type to marketing_content content type
+        const contentTypeMap: Record<string, 'problem_statements_image' | 'capabilities_image' | 'try_these_prompts_image'> = {
+          problem_statements: 'problem_statements_image',
+          capabilities: 'capabilities_image',
+          try_these_prompts: 'try_these_prompts_image',
+        };
 
-    // Never expose raw S3 pointers to clients
+        const contentType = contentTypeMap[type];
+        if (!contentType) {
+          throw new Error(`Invalid profile image type: ${type}`);
+        }
+
+        const content = await this.marketingContentRepo.findByEntityAndType('agent_template', id, contentType);
+        if (!content || !content.s3Key) return null;
+        return {
+          s3Key: content.s3Key,
+          mimeType: content.mimeType,
+          updatedAt: content.updatedAt,
+        };
+      },
+      'getProfileImageStorageById',
+      'AgentTemplate',
+      id
+    );
+  }
+
+  /**
+   * INTERNAL: Update template profile image storage fields in marketing_content table.
+   * @param id Template ID
+   * @param type Profile image type: 'problem_statements' | 'capabilities' | 'try_these_prompts'
+   * @param updates Storage updates
+   */
+  async updateProfileImageStorage(
+    id: string,
+    type: 'problem_statements' | 'capabilities' | 'try_these_prompts',
+    updates: { s3Key: string; mimeType: string; updatedAt: string }
+  ): Promise<boolean> {
+    return this.executeWithErrorHandling(
+      async () => {
+        // Map database type to marketing_content content type
+        const contentTypeMap: Record<string, 'problem_statements_image' | 'capabilities_image' | 'try_these_prompts_image'> = {
+          problem_statements: 'problem_statements_image',
+          capabilities: 'capabilities_image',
+          try_these_prompts: 'try_these_prompts_image',
+        };
+
+        const contentType = contentTypeMap[type];
+        if (!contentType) {
+          throw new Error(`Invalid profile image type: ${type}`);
+        }
+
+        await this.marketingContentRepo.createOrUpdate({
+          entityType: 'agent_template',
+          entityId: id,
+          contentType,
+          contentFormat: 'image',
+          s3Key: updates.s3Key,
+          mimeType: updates.mimeType,
+          metadata: { updatedAt: updates.updatedAt },
+        });
+        return true;
+      },
+      'updateProfileImageStorage',
+      'AgentTemplate',
+      id
+    );
+  }
+
+  private async toPublicModel(model: AgentTemplateModel & Record<string, unknown>): Promise<AgentTemplateModel> {
+    const templateId = String(model.id);
+    
+    // Fetch all marketing content for this template
+    const allContent = await this.marketingContentRepo.findByEntity('agent_template', templateId);
+    const contentMap = new Map(allContent.map(c => [c.contentType, c]));
+
+    // Avatar
+    const avatarContent = contentMap.get('avatar');
+    const avatarUrl = avatarContent?.s3Key ? `/api/v1/agent-templates/${templateId}/avatar` : undefined;
+    const avatarUpdatedAt = avatarContent?.updatedAt;
+
+    // Profile images
+    const problemStatementsContent = contentMap.get('problem_statements_image');
+    const problemStatementsImageUrl = problemStatementsContent?.s3Key
+      ? `/api/v1/agent-templates/${templateId}/profile-images/problem-statements`
+      : undefined;
+    const problemStatementsUpdatedAt = problemStatementsContent?.updatedAt;
+
+    const capabilitiesContent = contentMap.get('capabilities_image');
+    const capabilitiesImageUrl = capabilitiesContent?.s3Key
+      ? `/api/v1/agent-templates/${templateId}/profile-images/capabilities`
+      : undefined;
+    const capabilitiesUpdatedAt = capabilitiesContent?.updatedAt;
+
+    const tryThesePromptsContent = contentMap.get('try_these_prompts_image');
+    const tryThesePromptsImageUrl = tryThesePromptsContent?.s3Key
+      ? `/api/v1/agent-templates/${templateId}/profile-images/try-these-prompts`
+      : undefined;
+    const tryThesePromptsUpdatedAt = tryThesePromptsContent?.updatedAt;
+
+    // Problem statements text
+    const problemStatementsTextContent = contentMap.get('problem_statements_text');
+    let problemStatementsText: string[] | undefined;
+    if (problemStatementsTextContent?.textContent) {
+      try {
+        const parsed = JSON.parse(problemStatementsTextContent.textContent);
+        if (Array.isArray(parsed)) {
+          // Ensure all items are strings (defensive, same as previewPrompts handling)
+          problemStatementsText = parsed.filter((s): s is string => typeof s === 'string' && s.trim().length > 0);
+        }
+      } catch {
+        // Invalid JSON, ignore
+      }
+    }
+
+    // Never expose raw S3 pointers or sensitive configuration to clients
     /* eslint-disable @typescript-eslint/no-unused-vars */
     const {
       avatarS3Key: _k,
       avatarMimeType: _m,
+      avatarUpdatedAt: _au,
+      problemStatementsS3Key: _ps3k,
+      problemStatementsMimeType: _ps3m,
+      problemStatementsUpdatedAt: _psu,
+      capabilitiesS3Key: _cs3k,
+      capabilitiesMimeType: _cs3m,
+      capabilitiesUpdatedAt: _cu,
+      tryThesePromptsS3Key: _ttps3k,
+      tryThesePromptsMimeType: _ttps3m,
+      tryThesePromptsUpdatedAt: _ttpu,
       // Never expose sensitive agent configuration on marketplace/public template responses
       systemPrompt: _systemPrompt,
       blueprint: _blueprint,
@@ -383,6 +505,13 @@ export class AgentTemplateRepository extends BaseRepository {
       ...(rest as AgentTemplateModel),
       ...(avatarUrl ? { avatarUrl } : {}),
       ...(avatarUpdatedAt ? { avatarUpdatedAt } : {}),
+      ...(problemStatementsImageUrl ? { problemStatementsImageUrl } : {}),
+      ...(problemStatementsUpdatedAt ? { problemStatementsUpdatedAt } : {}),
+      ...(capabilitiesImageUrl ? { capabilitiesImageUrl } : {}),
+      ...(capabilitiesUpdatedAt ? { capabilitiesUpdatedAt } : {}),
+      ...(tryThesePromptsImageUrl ? { tryThesePromptsImageUrl } : {}),
+      ...(tryThesePromptsUpdatedAt ? { tryThesePromptsUpdatedAt } : {}),
+      ...(problemStatementsText ? { problemStatementsText } : {}),
     };
   }
 
@@ -442,11 +571,13 @@ export class AgentTemplateRepository extends BaseRepository {
           }
         }
 
-        return templates.map((t) =>
-          this.toPublicModel({
-            ...t,
-            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
-          } as AgentTemplateModel & Record<string, unknown>)
+        return Promise.all(
+          templates.map((t) =>
+            this.toPublicModel({
+              ...t,
+              assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
+            } as AgentTemplateModel & Record<string, unknown>)
+          )
         );
       },
       'findAll',
@@ -481,7 +612,7 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const assignedToolSlugs = toolResults.map((result) => result.slug);
 
-        return this.toPublicModel({
+        return await this.toPublicModel({
           ...baseTemplate,
           assignedToolSlugs,
         } as AgentTemplateModel & Record<string, unknown>);
@@ -502,7 +633,7 @@ export class AgentTemplateRepository extends BaseRepository {
         const result = await this.resolveTemplateRowBySlug(slug);
         if (!result) return null;
         const template = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
-        return this.toPublicModel(template);
+        return await this.toPublicModel(template);
       },
       'findBySlug',
       'AgentTemplate',
@@ -701,11 +832,13 @@ export class AgentTemplateRepository extends BaseRepository {
         const templateIds = templates.map((t) => String(t.id)).filter((id) => typeof id === 'string' && id.trim().length > 0);
         const assignedToolSlugsByTemplateId = await this.getAssignedToolSlugsByTemplateIds(templateIds);
 
-        return templates.map((t) =>
-          this.toPublicModel({
-            ...t,
-            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
-          } as AgentTemplateModel & Record<string, unknown>)
+        return Promise.all(
+          templates.map((t) =>
+            this.toPublicModel({
+              ...t,
+              assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
+            } as AgentTemplateModel & Record<string, unknown>)
+          )
         );
       },
       'findByCategory',
@@ -813,11 +946,13 @@ export class AgentTemplateRepository extends BaseRepository {
         const templateIds = templates.map((t) => String(t.id)).filter((id) => typeof id === 'string' && id.trim().length > 0);
         const assignedToolSlugsByTemplateId = await this.getAssignedToolSlugsByTemplateIds(templateIds);
 
-        return templates.map((t) =>
-          this.toPublicModel({
-            ...t,
-            assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
-          } as AgentTemplateModel & Record<string, unknown>)
+        return Promise.all(
+          templates.map((t) =>
+            this.toPublicModel({
+              ...t,
+              assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
+            } as AgentTemplateModel & Record<string, unknown>)
+          )
         );
       },
       'searchTemplates',

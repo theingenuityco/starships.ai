@@ -28,7 +28,12 @@ export default function ShipLayout({ children }: LayoutProps) {
     const channelSlug = typeof routeChannelSlug === 'string' ? routeChannelSlug.trim().toLowerCase() : ''
     if (!channelSlug) return undefined
     const channels = channelsData?.channels ?? []
-    const match = channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === channelSlug)
+    const match = channels.find(
+      (ch: any) =>
+        String(ch?.slug || '')
+          .trim()
+          .toLowerCase() === channelSlug
+    )
     const cid = match?.conversationId ? String(match.conversationId) : ''
     return cid || undefined
   })()

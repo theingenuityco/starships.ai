@@ -1039,8 +1039,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                     // - If started from an assistant message: use that agent as the thread default (if resolvable)
                     // - If started from any other message: no default agent
                     const lm = linkedMessage ?? null
-                    const lmAgentId = lm?.role === 'assistant' ? lm.agentId ?? null : null
-                    const defaultAgent = lmAgentId ? starshipAgentsData.find(a => a.id === lmAgentId) ?? null : null
+                    const lmAgentId = lm?.role === 'assistant' ? (lm.agentId ?? null) : null
+                    const defaultAgent = lmAgentId ? (starshipAgentsData.find(a => a.id === lmAgentId) ?? null) : null
                     onOpenThread?.({ conversationId, defaultAgent, linkedMessage: lm, parentConversationId: parentConversationId ?? null })
                   }}
                 />
@@ -1050,12 +1050,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             </div>
             {submittedQuery.trim() ? (
               <div ref={searchSidebarRef} className="flex flex-col min-h-0 h-full">
-                <SearchResultsSidebar
-                  query={submittedQuery}
-                  results={searchResults}
-                  onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
-                  onClose={closeSearchSidebar}
-                />
+                <SearchResultsSidebar query={submittedQuery} results={searchResults} onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)} onClose={closeSearchSidebar} />
               </div>
             ) : null}
           </div>

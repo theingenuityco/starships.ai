@@ -136,7 +136,7 @@ export function useCreateAgentFromTemplate() {
       // Extract error message with better handling for ValidationError
       let errorMessage = 'Failed to deploy agent'
       let isValidationError = false
-      
+
       if (error?.response?.data?.error) {
         // Handle structured error response from server
         const serverError = error.response.data.error
@@ -149,12 +149,12 @@ export function useCreateAgentFromTemplate() {
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       // Only log unexpected errors to console to avoid noise
       if (!isValidationError || error?.response?.status !== 400) {
         console.error('Agent deployment error:', error)
       }
-      
+
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })

@@ -13,7 +13,12 @@ export default function StarshipOverviewPage({ params }: { params: { slug: strin
 
   const defaultChannelSlug = useMemo(() => {
     const channels = channelsData?.channels ?? []
-    const lobby = channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === 'lobby')
+    const lobby = channels.find(
+      (ch: any) =>
+        String(ch?.slug || '')
+          .trim()
+          .toLowerCase() === 'lobby'
+    )
     const lobbySlug = lobby?.slug ? String(lobby.slug) : ''
     if (lobbySlug) return lobbySlug
 

@@ -139,12 +139,25 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
 
-  const normalizedChannelSlug = useMemo(() => String(routeParams.channelSlug || '').trim().toLowerCase(), [routeParams.channelSlug])
+  const normalizedChannelSlug = useMemo(
+    () =>
+      String(routeParams.channelSlug || '')
+        .trim()
+        .toLowerCase(),
+    [routeParams.channelSlug]
+  )
 
   const activeChannel = useMemo(() => {
     const channels = channelsData?.channels ?? []
     if (!normalizedChannelSlug) return null
-    return channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === normalizedChannelSlug) ?? null
+    return (
+      channels.find(
+        (ch: any) =>
+          String(ch?.slug || '')
+            .trim()
+            .toLowerCase() === normalizedChannelSlug
+      ) ?? null
+    )
   }, [channelsData?.channels, normalizedChannelSlug])
 
   const activeConversationId = useMemo(() => {
@@ -172,9 +185,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       else next.delete('thread')
       const qs = next.toString()
       const basePath =
-        routeParams.channelSlug && String(routeParams.channelSlug).trim()
-          ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(String(routeParams.channelSlug))}`
-          : `/ship/${routeParams.slug}`
+        routeParams.channelSlug && String(routeParams.channelSlug).trim() ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(String(routeParams.channelSlug))}` : `/ship/${routeParams.slug}`
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
     [router, routeParams.channelSlug, routeParams.slug, searchParams]
@@ -247,7 +258,12 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   const pickAutoChannelSlug = useMemo(() => {
     const channels = channelsData?.channels ?? []
-    const lobby = channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === 'lobby')
+    const lobby = channels.find(
+      (ch: any) =>
+        String(ch?.slug || '')
+          .trim()
+          .toLowerCase() === 'lobby'
+    )
     const lobbySlug = lobby?.slug ? String(lobby.slug) : ''
     if (lobbySlug) return lobbySlug
 
@@ -276,17 +292,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
     hasAutoNavigatedRef.current = true
     router.replace('/marketplace')
-  }, [
-    shouldShowOnboarding,
-    starshipData?.id,
-    routeParams.channelSlug,
-    routeParams.slug,
-    isDraftDm,
-    router,
-    pickAutoChannelSlug,
-    channelsLoading,
-    searchParams,
-  ])
+  }, [shouldShowOnboarding, starshipData?.id, routeParams.channelSlug, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
   // If the channel slug is invalid (no matching channel), redirect to default channel.
   useEffect(() => {
@@ -450,4 +456,3 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     </div>
   )
 }
-

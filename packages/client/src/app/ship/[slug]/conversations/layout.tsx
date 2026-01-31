@@ -233,7 +233,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const pickAutoChannelSlug = useMemo(() => {
     const channels = channelsData?.channels ?? []
-    const lobby = channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === 'lobby')
+    const lobby = channels.find(
+      (ch: any) =>
+        String(ch?.slug || '')
+          .trim()
+          .toLowerCase() === 'lobby'
+    )
     const lobbySlug = lobby?.slug ? String(lobby.slug) : ''
     if (lobbySlug) return lobbySlug
 
@@ -266,27 +271,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       const sp = new URLSearchParams(searchParams.toString())
       sp.delete('agent')
       const qs = sp.toString()
-      router.replace(
-        qs
-          ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
-          : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
-      )
+      router.replace(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`)
       return
     }
     // Nothing to open (should be rare now that starships have default channels) → send to marketplace.
     hasAutoNavigatedRef.current = true
     router.replace('/marketplace')
-  }, [
-    shouldShowOnboarding,
-    starshipData?.id,
-    routeParams.conversationId,
-    routeParams.slug,
-    isDraftDm,
-    router,
-    pickAutoChannelSlug,
-    channelsLoading,
-    searchParams,
-  ])
+  }, [shouldShowOnboarding, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
   // If the user is on /conversations/:id but that id is a channel-backed conversation, redirect to /channels/:channelSlug.
   useEffect(() => {
@@ -300,15 +291,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
         ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlugForCurrentConversationId)}?${qs}`
         : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlugForCurrentConversationId)}`
     )
-  }, [
-    channelSlugForCurrentConversationId,
-    channelsLoading,
-    routeParams.conversationId,
-    routeParams.slug,
-    router,
-    searchParams,
-    starshipData?.id,
-  ])
+  }, [channelSlugForCurrentConversationId, channelsLoading, routeParams.conversationId, routeParams.slug, router, searchParams, starshipData?.id])
 
   // Handle conversation change from ConversationInterface
   // Must be called before any early returns to satisfy React Hooks rules
@@ -383,8 +366,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
             const nextPinned = linkedMessage ?? null
 
             // Preserve the existing selection ONLY when re-opening the same thread; otherwise reset.
-            const nextAgent =
-              nextThreadKey === threadKey ? (threadAgent ?? defaultAgent ?? null) : (defaultAgent ?? null)
+            const nextAgent = nextThreadKey === threadKey ? (threadAgent ?? defaultAgent ?? null) : (defaultAgent ?? null)
 
             pendingThreadStateRef.current = {
               threadKey: nextThreadKey,

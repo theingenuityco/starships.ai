@@ -2,6 +2,7 @@ import api, { getCurrentToken } from '@/lib/api'
 import type {
   ApiResponse,
   AgentModel,
+  ChannelModel,
   ConversationModel,
   ConversationState,
   ConversationStreamEvent,
@@ -11,7 +12,7 @@ import type {
   ToolCallApprovalModel,
 } from '@starships/protocol'
 import { experimental_streamedQuery as streamedQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect, useRef } from 'react'
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
@@ -94,6 +95,51 @@ export const CONVERSATION_QUERY_KEYS = {
   toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
 
+export const CHANNEL_QUERY_KEYS = {
+  all: ['channels'] as const,
+  byStarship: (starshipId: string) => [...CHANNEL_QUERY_KEYS.all, 'starship', starshipId] as const,
+} as const
+
+export const DIRECT_MESSAGE_QUERY_KEYS = {
+  all: ['direct-messages'] as const,
+  byStarship: (starshipId: string) => [...DIRECT_MESSAGE_QUERY_KEYS.all, 'starship', starshipId] as const,
+} as const
+
+type ConversationMessagesResponseData = {
+  conversationId: string
+  messages: MessageModel[]
+  total: number
+  hasMoreBefore?: boolean
+  oldestCursor?: { createdAt: string; id: string } | null
+  participants?: string[]
+  startedAt?: string
+  lastActivityAt?: string
+  agents?: AgentModel[]
+  turnActive?: boolean
+  lastCompleteAt?: string | null
+}
+
+// Local DM model until protocol dist typings are available in-editor.
+// (The server contract is stable: dmType + peer fields + timestamps.)
+export type DirectMessageModel = {
+  conversationId: string
+  starshipId: string
+  dmType: 'user_agent' | 'user_user'
+  userId?: string | null
+  agentId?: string | null
+  userAId?: string | null
+  userBId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type DirectMessageListItem = {
+  dm: DirectMessageModel
+  conversation: ConversationModel | null
+  agent: AgentModel | null
+  peerUser?: { id: string; displayName?: string | null; email?: string | null; avatar?: string | null } | null
+}
+
 export type PendingToolCallApproval = ToolCallApprovalModel & {
   toolSlug?: string
   toolName?: string
@@ -112,7 +158,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { title?: string; starshipId: string; agentSlug?: string }): Promise<ConversationModel> => {
+    mutationFn: async (data: { title?: string; starshipId: string; agentSlug?: string; agentId?: string; parentConversationId?: string }): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },
@@ -121,6 +167,9 @@ export function useCreateConversation() {
       if (variables.starshipId) {
         queryClient.invalidateQueries({
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId),
+        })
+        queryClient.invalidateQueries({
+          queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(variables.starshipId),
         })
       }
     },
@@ -143,6 +192,76 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
     enabled: !!starshipId && enabled,
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
     gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000, // No cache in dev, 10 minutes in prod
+  })
+}
+
+export function useStarshipChannels(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: CHANNEL_QUERY_KEYS.byStarship(starshipId),
+    queryFn: async (): Promise<{ channels: ChannelModel[] }> => {
+      const response: FetchResponse<ApiResponse<{ channels: ChannelModel[] }>> = await api.get(`/api/v1/starships/${starshipId}/channels`)
+      return { channels: response.data.data?.channels || [] }
+    },
+    enabled: !!starshipId && enabled,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000,
+  })
+}
+
+export function useStarshipDirectMessages(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(starshipId),
+    queryFn: async (): Promise<{ directMessages: DirectMessageListItem[] }> => {
+      const response: FetchResponse<ApiResponse<{ directMessages: DirectMessageListItem[] }>> = await api.get(`/api/v1/starships/${starshipId}/direct-messages`)
+      return { directMessages: response.data.data?.directMessages || [] }
+    },
+    enabled: !!starshipId && enabled,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000,
+  })
+}
+
+export function useCreateDirectMessage() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { starshipId: string; agentSlug?: string; agentId?: string; peerUserId?: string; title?: string }) => {
+      const response: FetchResponse<ApiResponse<{ dm: DirectMessageModel; conversationId: string }>> = await api.post(`/api/v1/starships/${args.starshipId}/direct-messages`, {
+        agentSlug: args.agentSlug,
+        agentId: args.agentId,
+        peerUserId: args.peerUserId,
+        title: args.title,
+      })
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(variables.starshipId) })
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create direct message', { description: errorMessage })
+    },
+  })
+}
+
+export function useCreateChannel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { starshipId: string; slug: string; name: string; isPrivate?: boolean; topic?: string | null }) => {
+      const response: FetchResponse<ApiResponse<{ channel: ChannelModel; conversationId: string }>> = await api.post(`/api/v1/starships/${args.starshipId}/channels`, {
+        slug: args.slug,
+        name: args.name,
+        isPrivate: args.isPrivate,
+        topic: args.topic ?? null,
+      })
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create channel', { description: errorMessage })
+    },
   })
 }
 
@@ -190,7 +309,9 @@ export function usePendingToolApprovals(conversationId: string | null, enabled: 
  */
 export function usePendingToolApprovalsMulti(conversationIds: string[], enabled: boolean = true) {
   const ids = Array.isArray(conversationIds) ? conversationIds.filter(Boolean).map(String) : []
-  const uniqueIds = useMemo(() => Array.from(new Set(ids)), [ids.join('|')])
+  // Normalize + stabilize ids to avoid churn (and extra network calls) if the caller provides
+  // the same set in a different order across renders.
+  const uniqueIds = useMemo(() => Array.from(new Set(ids)).sort(), [ids.join('|')])
 
   const results = useQueries({
     queries: uniqueIds.map(conversationId => ({
@@ -206,8 +327,13 @@ export function usePendingToolApprovalsMulti(conversationIds: string[], enabled:
       // Keep parent UI in sync with child approvals without requiring reload.
       // Child conversations publish tool-approval UI actions on their own stream, not the parent’s.
       // So the parent must poll these lightweight endpoints while it’s open.
-      refetchInterval: enabled ? 2_000 : false,
-      refetchIntervalInBackground: true,
+      //
+      // IMPORTANT:
+      // This endpoint is cheap, but polling per-child-conversation every 2s scales poorly
+      // and looks like a runaway loop in the network panel. Prefer a slower cadence and
+      // never poll in the background.
+      refetchInterval: enabled ? 15_000 : false,
+      refetchIntervalInBackground: false,
     })),
   })
 
@@ -360,15 +486,76 @@ export function useDeleteMessage() {
   })
 }
 
+// Link a message to a child conversation (used for channel "threads")
+export function useLinkMessageToConversation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (args: { messageId: string; linkedConversationId: string; conversationId?: string }) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.put(`/api/v1/messages/${args.messageId}`, {
+        linkedConversationId: args.linkedConversationId,
+      })
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      const conversationId = typeof variables.conversationId === 'string' ? variables.conversationId : ''
+      const messageId = String(variables.messageId || '').trim()
+      const linkedConversationId = String(variables.linkedConversationId || '').trim()
+
+      // IMPORTANT:
+      // The channel timeline is primarily updated via SSE append events and does not emit "message updated"
+      // events when we mutate linkedConversationId. So we patch the local stream cache to reflect the
+      // new link immediately, ensuring the UI shows the correct "Open thread" icon for *all* messages.
+      if (conversationId && messageId && linkedConversationId) {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
+          if (!Array.isArray(old)) return old
+          return old.map((chunk: any) => {
+            if (!chunk || typeof chunk !== 'object') return chunk
+
+            // Back-compat local pre-seed event
+            if (chunk.type === 'append' && chunk.message && chunk.message.id === messageId) {
+              return { ...chunk, message: { ...chunk.message, linkedConversationId } }
+            }
+
+            // Snapshot event
+            if (chunk.type === 'snapshot' && chunk.data && Array.isArray(chunk.data.messages)) {
+              const nextMsgs = chunk.data.messages.map((m: any) => (m && m.id === messageId ? { ...m, linkedConversationId } : m))
+              return { ...chunk, data: { ...chunk.data, messages: nextMsgs } }
+            }
+
+            // Standard append event
+            if (chunk.type === 'message.append' && chunk.data && chunk.data.message && chunk.data.message.id === messageId) {
+              return { ...chunk, data: { ...chunk.data, message: { ...chunk.data.message, linkedConversationId } } }
+            }
+
+            return chunk
+          })
+        })
+      }
+
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } else {
+        // Fallback: invalidate broadly (MessageModel may not always include conversationId in caches)
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.all })
+      }
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create thread', { description: errorMessage })
+    },
+  })
+}
+
 // Get conversation agents (for agent restoration on refresh)
 export function useConversationAgents(conversationId: string | null) {
   return useQuery({
     queryKey: [...CONVERSATION_QUERY_KEYS.messages(conversationId!), 'agents'],
-    queryFn: async (): Promise<any[]> => {
-      const response: FetchResponse<any> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
+    queryFn: async (): Promise<AgentModel[]> => {
+      const response: FetchResponse<ApiResponse<ConversationMessagesResponseData>> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
         params: { limit: 1, page: 1 }, // We only need agents, not all messages
       })
-      return response.data.data.agents || []
+      return response.data.data?.agents || []
     },
     enabled: !!conversationId,
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
@@ -1322,6 +1509,126 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return null
   }, [chunksRevisionKey])
 
+  // Consume non-render UI actions that should update query caches.
+  //
+  // Why:
+  // Some UI actions (like `conversation_title_updated`) are emitted on the conversation's SSE stream,
+  // but the UI component showing the title (e.g. a linked thread card elsewhere) relies on cached
+  // `useConversationDetail()` data. Without invalidation, the title can remain stale for up to the
+  // query staleTime.
+  const lastProcessedUIActionKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!lastUIAction) return
+    try {
+      const key = JSON.stringify(lastUIAction)
+      if (lastProcessedUIActionKeyRef.current === key) return
+      lastProcessedUIActionKeyRef.current = key
+
+      const action = typeof (lastUIAction as any)?.action === 'string' ? String((lastUIAction as any).action) : ''
+      const payload = (lastUIAction as any)?.payload
+
+      switch (action) {
+        case 'tool_approval_required':
+        case 'tool_approval_resolved': {
+          const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
+          if (cid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(cid) })
+          break
+        }
+        case 'conversation_title_updated': {
+          const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
+          if (cid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
+          if (starshipId) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
+          break
+        }
+        case 'child_conversation_created': {
+          const parentId = typeof payload?.parentConversationId === 'string' ? String(payload.parentConversationId) : ''
+          const sid = typeof payload?.starshipId === 'string' ? String(payload.starshipId) : starshipId || ''
+          if (sid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
+          if (parentId) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.children(parentId) })
+          break
+        }
+        default:
+          break
+      }
+    } catch {
+      // ignore UI action parsing failures
+    }
+  }, [lastUIAction, queryClient, starshipId])
+
+  type HistoryCursor = { createdAt: string; id: string }
+  const latestSnapshot = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      return { hasMoreBefore: false, oldestCursor: null as HistoryCursor | null, snapshotData: null as ConversationStreamSnapshot | null }
+    }
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i] as any
+      if (c?.type === 'snapshot' && c?.data && typeof c.data === 'object') {
+        const d = c.data as ConversationStreamSnapshot & { hasMoreBefore?: boolean; oldestCursor?: HistoryCursor | null }
+        const hasMoreBefore = Boolean((d as any).hasMoreBefore)
+        const oldestCursorRaw = (d as any).oldestCursor
+        const oldestCursor =
+          oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.createdAt === 'string' && typeof oldestCursorRaw.id === 'string'
+            ? ({ createdAt: oldestCursorRaw.createdAt, id: oldestCursorRaw.id } as HistoryCursor)
+            : null
+        return { hasMoreBefore, oldestCursor, snapshotData: d }
+      }
+    }
+    return { hasMoreBefore: false, oldestCursor: null as HistoryCursor | null, snapshotData: null as ConversationStreamSnapshot | null }
+  }, [chunksRevisionKey])
+
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false)
+  const loadOlder = useCallback(
+    async (args?: { limit?: number }) => {
+      const convId = String(conversationId || '')
+      if (!convId) return
+      const snap = latestSnapshot.snapshotData as any
+      const cursor = latestSnapshot.oldestCursor
+      if (!snap || !cursor) return
+      if (isLoadingOlder) return
+
+      setIsLoadingOlder(true)
+      try {
+        const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 100)))
+        const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${convId}/messages`, {
+          params: {
+            limit,
+            beforeCreatedAt: cursor.createdAt,
+            beforeId: cursor.id,
+          },
+        })
+        const payload = response.data.data as any
+        const older = Array.isArray(payload?.messages) ? (payload.messages as ClientMessage[]) : []
+        const hasMoreBefore = Boolean(payload?.hasMoreBefore)
+        const oldestCursor = payload?.oldestCursor ?? null
+
+        const existingIds = new Set<string>()
+        const snapMsgs: any[] = Array.isArray(snap?.messages) ? snap.messages : []
+        snapMsgs.forEach((m: any) => {
+          if (m?.id != null) existingIds.add(String(m.id))
+        })
+        const olderFiltered = older.filter(m => m?.id != null && !existingIds.has(String(m.id)))
+
+        const nextSnapshot = {
+          ...snap,
+          messages: [...olderFiltered, ...snapMsgs],
+          hasMoreBefore,
+          oldestCursor,
+        }
+
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any) => {
+          if (!Array.isArray(old)) return old
+          return [...old, { type: 'snapshot', data: nextSnapshot }]
+        })
+      } catch (error: any) {
+        const msg = getSafeErrorMessage(error)
+        toast.error('Failed to load older messages', { description: msg })
+      } finally {
+        setIsLoadingOlder(false)
+      }
+    },
+    [conversationId, latestSnapshot, isLoadingOlder, queryClient]
+  )
+
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
@@ -1354,6 +1661,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isAwaitingToolResults,
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
     lastUIAction,
+    hasMoreBefore: latestSnapshot.hasMoreBefore,
+    oldestCursor: latestSnapshot.oldestCursor,
+    isLoadingOlder,
+    loadOlder,
     isFetching: messagesQuery.fetchStatus === 'fetching',
     sendMessage: (data: CreateMessageRequest & { conversationId: string }) => sendMessageMutation.mutateAsync(data),
     isSending: sendMessageMutation.isPending,

@@ -121,6 +121,9 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         starshipSlug: (starship as any)?.slug || undefined,
       })
       const agentId = (created as any)?.id as string | undefined
+      const agentSlug = (created as any)?.slug as string | undefined
+      const starshipSlugOrId =
+        ((created as any)?._starshipSlug as string | undefined) || ((starship as any)?.slug as string | undefined) || starship.id
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -133,6 +136,13 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         }
       }
       onDeploy?.(template)
+
+      // Marketplace UX: after deploy, take the user to the correct starship (chat).
+      // Guarded so uses of this card outside the marketplace don't unexpectedly navigate.
+      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+        const q = agentSlug ? `?agent=${encodeURIComponent(agentSlug)}` : ''
+        router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/conversations${q}`)
+      }
     } finally {
       setIsDeploying(false)
     }

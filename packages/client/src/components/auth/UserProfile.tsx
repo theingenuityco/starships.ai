@@ -7,6 +7,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 
 import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarImage } from '@/components/ui/avatar'
+import { isImageUrl } from '@/lib/isImageUrl'
 
 import { usePathname, useRouter } from 'next/navigation'
 import React from 'react'
@@ -36,12 +37,6 @@ export const UserProfile = React.memo(function UserProfile({ mode = 'expanded', 
   const { user, userName, userEmail, isAuthenticated, logout, userAvatar, isInstanceAdmin } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
-
-  const isImageUrl = (value?: string | null): boolean => {
-    if (!value || typeof value !== 'string') return false
-    const trimmed = value.trim()
-    return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
-  }
 
   const handleGoToSettings = (): void => {
     // Only navigate when current route contains a starship slug

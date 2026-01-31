@@ -80,6 +80,8 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         starshipSlug: primaryStarship.slug,
       })
       const agentId = (created as any)?.id as string | undefined
+      const agentSlug = (created as any)?.slug as string | undefined
+      const starshipSlugOrId = ((created as any)?._starshipSlug as string | undefined) || primaryStarship.slug || primaryStarship.id
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -93,6 +95,12 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       }
       onDeploy?.(template)
       onOpenChange(false)
+
+      // Marketplace UX: after deploy, take the user to the correct starship (chat).
+      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+        const q = agentSlug ? `?agent=${encodeURIComponent(agentSlug)}` : ''
+        router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/conversations${q}`)
+      }
     } catch {
       // handled by hook
     } finally {

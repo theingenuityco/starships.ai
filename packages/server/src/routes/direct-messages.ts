@@ -152,15 +152,30 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
         agentId: agent.id,
       });
 
-      const dm = await dmRepo.create({
-        conversationId: conversation.id,
-        starshipId: params.starshipId,
-        dmType: 'user_agent',
-        userId: authUserId,
-        agentId: agent.id,
-        createdAt: conversation.createdAt,
-        updatedAt: conversation.updatedAt ?? conversation.createdAt,
-      });
+      let dm: DirectMessageModel;
+      try {
+        dm = await dmRepo.create({
+          conversationId: conversation.id,
+          starshipId: params.starshipId,
+          dmType: 'user_agent',
+          userId: authUserId,
+          agentId: agent.id,
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt ?? conversation.createdAt,
+        });
+      } catch (e) {
+        // Race condition safety:
+        // Another request may have created this DM after our "existing" check but before our INSERT.
+        // The DB uniqueness index will reject the insert; in that case, return the existing DM and
+        // best-effort delete the now-orphaned conversation we created.
+        const winner = await dmRepo.findUserAgentDm(params.starshipId, authUserId, agent.id).catch(() => null);
+        if (winner) {
+          void conversationService.deleteConversation(conversation.id).catch(() => undefined);
+          sendSuccess(res, { dm: winner, conversationId: winner.conversationId }, 200);
+          return;
+        }
+        throw e;
+      }
 
       await memberRepo.createOrIgnoreMember({
         conversationId: conversation.id,
@@ -226,15 +241,27 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
       starshipId: params.starshipId,
     });
 
-    const dm = await dmRepo.create({
-      conversationId: conversation.id,
-      starshipId: params.starshipId,
-      dmType: 'user_user',
-      userAId,
-      userBId,
-      createdAt: conversation.createdAt,
-      updatedAt: conversation.updatedAt ?? conversation.createdAt,
-    });
+    let dm: DirectMessageModel;
+    try {
+      dm = await dmRepo.create({
+        conversationId: conversation.id,
+        starshipId: params.starshipId,
+        dmType: 'user_user',
+        userAId,
+        userBId,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt ?? conversation.createdAt,
+      });
+    } catch (e) {
+      // Race condition safety: see user↔agent path above.
+      const winner = await dmRepo.findUserUserDm(params.starshipId, userAId, userBId).catch(() => null);
+      if (winner) {
+        void conversationService.deleteConversation(conversation.id).catch(() => undefined);
+        sendSuccess(res, { dm: winner, conversationId: winner.conversationId }, 200);
+        return;
+      }
+      throw e;
+    }
 
     // Add both users to the backing conversation so listing + access checks work.
     await memberRepo.createOrIgnoreMember({

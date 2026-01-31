@@ -23,6 +23,8 @@ interface ConversationSummaryBarProps {
   modelId?: string | null
   /** Optional override for the max token budget (used as denominator). */
   maxTokens?: number | null
+  /** Optional prefix shown before the title (e.g. "#" for channels). */
+  titlePrefix?: ReactNode
   /** Optional right-side content (e.g. controls). */
   rightSlot?: ReactNode
   /** Optional third-line content under the metadata row (e.g. agent selector). */
@@ -54,7 +56,7 @@ function initialsFromName(name?: string | null): string {
   )
 }
 
-export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens, rightSlot, thirdLineSlot, fallbackTitle, fallbackSubtitle }: ConversationSummaryBarProps) {
+export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens, titlePrefix, rightSlot, thirdLineSlot, fallbackTitle, fallbackSubtitle }: ConversationSummaryBarProps) {
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const { isInstanceAdmin } = useAuth()
   const showTokens = expertMode
@@ -314,9 +316,16 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 {/* Title - exact match */}
-                <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">
-                  <span className="opacity-50">{effectiveFallbackTitle}</span>
-                </h3>
+                <div className="flex items-center gap-2 min-w-0">
+                  {titlePrefix ? (
+                    <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
+                      {titlePrefix}
+                    </span>
+                  ) : null}
+                  <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">
+                    <span className="opacity-50">{effectiveFallbackTitle}</span>
+                  </h3>
+                </div>
                 {/* Agents + updated row - exact structural match with same classes */}
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
                   {/* Agent placeholder - matches exact structure */}
@@ -440,6 +449,11 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
               {/* Title */}
               <div className="flex items-center gap-2 min-w-0">
+                {titlePrefix ? (
+                  <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
+                    {titlePrefix}
+                  </span>
+                ) : null}
                 <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
               </div>
 

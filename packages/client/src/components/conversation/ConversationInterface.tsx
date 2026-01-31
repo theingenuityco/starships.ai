@@ -202,24 +202,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [submittedQuery, closeSearchSidebar])
 
-  // Close search sidebar when user clicks outside it (e.g. on main chat area). Exclude navbar search input so clicking it doesn't close the sidebar.
-  useEffect(() => {
-    if (!submittedQuery.trim()) return
-    const handleClick = (e: MouseEvent) => {
-      const target = e.target as Node
-      const navbarSearch = document.querySelector('[aria-label="Search in conversation"]')
-      if (
-        searchSidebarRef.current &&
-        !searchSidebarRef.current.contains(target) &&
-        (!navbarSearch || !navbarSearch.contains(target))
-      ) {
-        closeSearchSidebar()
-      }
-    }
-    document.addEventListener('click', handleClick)
-    return () => document.removeEventListener('click', handleClick)
-  }, [submittedQuery, closeSearchSidebar])
-
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
   const starshipAgentAvatarAttachmentIds = useMemo(() => {

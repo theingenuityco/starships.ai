@@ -198,7 +198,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     if (args.peerUserId) sp.set('peerUserId', args.peerUserId)
     if (args.peerLabel) sp.set('peerLabel', args.peerLabel)
     if (args.peerAvatar) sp.set('peerAvatar', args.peerAvatar)
-    router.push(`/ship/${slug}/conversations?${sp.toString()}`)
+    router.push(`/ship/${slug}/dm?${sp.toString()}`)
   }
 
   const handleDmTargetClick = async (t: DmTarget) => {

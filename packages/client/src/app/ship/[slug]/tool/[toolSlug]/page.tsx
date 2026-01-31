@@ -62,7 +62,7 @@ export default function ToolBuilderPage(): React.JSX.Element | null {
     if (conversationId) {
       router.push(`/ship/${slug}/conversations/${conversationId}`)
     } else {
-      router.push(`/ship/${slug}/conversations`)
+      router.push(`/ship/${slug}`)
     }
   }
 

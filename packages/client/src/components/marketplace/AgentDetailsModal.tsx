@@ -98,8 +98,11 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
 
       // Marketplace UX: after deploy, take the user to the correct starship (chat).
       if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
-        const q = agentSlug ? `?agent=${encodeURIComponent(agentSlug)}` : ''
-        router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/conversations${q}`)
+        if (agentId) {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+        } else {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
+        }
       }
     } catch {
       // handled by hook

@@ -231,15 +231,24 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return dm === 'draft'
   }, [searchParams])
 
-  const pickAutoConversationId = useMemo(() => {
+  const pickAutoChannelSlug = useMemo(() => {
     const channels = channelsData?.channels ?? []
     const lobby = channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === 'lobby')
-    const lobbyConversationId = lobby?.conversationId ? String(lobby.conversationId) : ''
-    if (lobbyConversationId) return lobbyConversationId
+    const lobbySlug = lobby?.slug ? String(lobby.slug) : ''
+    if (lobbySlug) return lobbySlug
 
-    const firstChannelConversationId = channels.length > 0 ? String((channels[0] as any)?.conversationId || '') : ''
-    return firstChannelConversationId || null
+    const firstSlug = channels.length > 0 ? String((channels[0] as any)?.slug || '') : ''
+    return firstSlug || null
   }, [channelsData?.channels])
+
+  const channelSlugForCurrentConversationId = useMemo(() => {
+    const cid = typeof routeParams.conversationId === 'string' ? String(routeParams.conversationId) : ''
+    if (!cid) return null
+    const channels = channelsData?.channels ?? []
+    const match = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
+    const slug = match?.slug ? String(match.slug) : ''
+    return slug || null
+  }, [channelsData?.channels, routeParams.conversationId])
 
   const hasAutoNavigatedRef = useRef(false)
   useEffect(() => {
@@ -251,13 +260,17 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
     // Always open the default channel (lobby), falling back to first channel.
     if (channelsLoading) return
-    if (pickAutoConversationId) {
+    if (pickAutoChannelSlug) {
       hasAutoNavigatedRef.current = true
       // Preserve query params (e.g. thread), but drop agent to prevent "starter" behaviors.
       const sp = new URLSearchParams(searchParams.toString())
       sp.delete('agent')
       const qs = sp.toString()
-      router.replace(qs ? `/ship/${routeParams.slug}/conversations/${pickAutoConversationId}?${qs}` : `/ship/${routeParams.slug}/conversations/${pickAutoConversationId}`)
+      router.replace(
+        qs
+          ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
+          : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
+      )
       return
     }
     // Nothing to open (should be rare now that starships have default channels) → send to marketplace.
@@ -270,9 +283,31 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     routeParams.slug,
     isDraftDm,
     router,
-    pickAutoConversationId,
+    pickAutoChannelSlug,
     channelsLoading,
     searchParams,
+  ])
+
+  // If the user is on /conversations/:id but that id is a channel-backed conversation, redirect to /channels/:channelSlug.
+  useEffect(() => {
+    if (!starshipData?.id) return
+    if (channelsLoading) return
+    if (!routeParams.conversationId) return
+    if (!channelSlugForCurrentConversationId) return
+    const qs = searchParams.toString()
+    router.replace(
+      qs
+        ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlugForCurrentConversationId)}?${qs}`
+        : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlugForCurrentConversationId)}`
+    )
+  }, [
+    channelSlugForCurrentConversationId,
+    channelsLoading,
+    routeParams.conversationId,
+    routeParams.slug,
+    router,
+    searchParams,
+    starshipData?.id,
   ])
 
   // Handle conversation change from ConversationInterface
@@ -289,12 +324,20 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       sp.delete('peerAvatar')
       const qs = sp.toString()
       if (newConversationId) {
-        router.push(qs ? `/ship/${routeParams.slug}/conversations/${newConversationId}?${qs}` : `/ship/${routeParams.slug}/conversations/${newConversationId}`)
+        const cid = String(newConversationId)
+        const channels = channelsData?.channels ?? []
+        const match = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
+        const channelSlug = match?.slug ? String(match.slug) : ''
+        if (channelSlug) {
+          router.push(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}`)
+          return
+        }
+        router.push(qs ? `/ship/${routeParams.slug}/conversations/${cid}?${qs}` : `/ship/${routeParams.slug}/conversations/${cid}`)
       } else {
         router.push(qs ? `/ship/${routeParams.slug}?${qs}` : `/ship/${routeParams.slug}`)
       }
     },
-    [router, routeParams.slug, searchParams]
+    [channelsData?.channels, router, routeParams.slug, searchParams]
   )
 
   // Don't render conversations interface if we're redirecting to onboarding

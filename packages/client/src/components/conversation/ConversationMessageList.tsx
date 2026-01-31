@@ -275,30 +275,125 @@ export function ConversationMessageList({
         return String((a as any)?.id ?? '').localeCompare(String((b as any)?.id ?? ''))
       })
 
-    // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
-    // IMPORTANT: For assistant messages with tool calls, deduplicate by (id + toolCallIds) to preserve
-    // multiple assistant messages with the same id but different tool calls
-    const seenIds = new Set<string>()
-    const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
-    for (const m of sortedMessages) {
-      const key = m.id != null ? String(m.id) : null
-      if (key) {
-        // For assistant messages with tool calls, create a composite key to preserve messages with different tool calls
-        if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
-          const toolCallIds = m.toolCalls
-            .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
-            .filter(Boolean)
-            .join(',')
-          const compositeKey = `${key}:${toolCallIds}`
-          if (seenIds.has(compositeKey)) continue
-          seenIds.add(compositeKey)
-        } else {
-          if (seenIds.has(key)) continue
-          seenIds.add(key)
+    // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps.
+    //
+    // IMPORTANT:
+    // We intentionally dedupe by message id ONLY (not id+toolCallIds). Treating toolCallIds as part
+    // of the identity can accidentally render multiple copies of the *same* assistant message while
+    // its toolCalls are being incrementally updated (e.g. ids/arguments arriving later), which looks
+    // like a "pending tool call" repeating forever.
+    const mergeToolCalls = (a?: LlmToolCall[], b?: LlmToolCall[]): LlmToolCall[] | undefined => {
+      const aa = Array.isArray(a) ? a : []
+      const bb = Array.isArray(b) ? b : []
+      if (aa.length === 0 && bb.length === 0) return undefined
+      const map = new Map<string, LlmToolCall>()
+      const keyOf = (tc: any, idx: number): string => {
+        const id = tc?.id ?? tc?.call_id ?? tc?.toolCallId
+        if (id != null && String(id).trim().length > 0) return `id:${String(id)}`
+        const name = tc?.function?.name
+        if (typeof name === 'string' && name.trim().length > 0) return `name:${name.trim()}`
+        return `idx:${idx}`
+      }
+      // Prefer the later update (b) when keys overlap.
+      aa.forEach((tc, idx) => map.set(keyOf(tc as any, idx), tc))
+      bb.forEach((tc, idx) => map.set(keyOf(tc as any, idx), tc))
+      return Array.from(map.values())
+    }
+
+    const mergeToolResults = (a?: any[], b?: any[]): any[] | undefined => {
+      const aa = Array.isArray(a) ? a : []
+      const bb = Array.isArray(b) ? b : []
+      if (aa.length === 0 && bb.length === 0) return undefined
+      const map = new Map<string, any>()
+      const keyOf = (tr: any, idx: number): string => {
+        const id = tr?.id ?? tr?.toolCallId ?? tr?.call_id
+        if (id != null && String(id).trim().length > 0) return `id:${String(id)}`
+        return `idx:${idx}`
+      }
+      aa.forEach((tr, idx) => map.set(keyOf(tr, idx), tr))
+      bb.forEach((tr, idx) => map.set(keyOf(tr, idx), tr))
+      return Array.from(map.values())
+    }
+
+    const mergeUiActions = (a?: any[], b?: any[]): any[] | undefined => {
+      const aa = Array.isArray(a) ? a : []
+      const bb = Array.isArray(b) ? b : []
+      if (aa.length === 0 && bb.length === 0) return undefined
+      const map = new Map<string, any>()
+      const keyOf = (ua: any, idx: number): string => {
+        const action = typeof ua?.action === 'string' ? ua.action : ''
+        const widgetId = ua?.payload?.widget?.id ?? ua?.payload?.toolCallId ?? ''
+        if (action && widgetId) return `${action}:${String(widgetId)}`
+        // Fallback: stringify a small stable prefix
+        try {
+          return `${action}:${JSON.stringify(ua).slice(0, 128)}`
+        } catch {
+          return `idx:${idx}`
         }
       }
-      uniqueMessages.push(m)
+      aa.forEach((ua, idx) => map.set(keyOf(ua, idx), ua))
+      bb.forEach((ua, idx) => map.set(keyOf(ua, idx), ua))
+      return Array.from(map.values())
     }
+
+    const mergeMessage = (prev: ExtendedMessage, next: ExtendedMessage): ExtendedMessage => {
+      const mergedToolCalls = mergeToolCalls(prev.toolCalls, next.toolCalls)
+      const mergedToolResults = mergeToolResults((prev as any).toolResults, (next as any).toolResults)
+      const mergedUiActions = mergeUiActions((prev as any).uiActions, (next as any).uiActions)
+
+      const pickLonger = <T,>(pa?: T[], pb?: T[]): T[] | undefined => {
+        const aLen = Array.isArray(pa) ? pa.length : 0
+        const bLen = Array.isArray(pb) ? pb.length : 0
+        if (aLen === 0 && bLen === 0) return undefined
+        return bLen >= aLen ? (pb as T[]) : (pa as T[])
+      }
+
+      const merged: ExtendedMessage = {
+        ...prev,
+        ...next,
+        // Preserve "true" streaming/sending flags if either version had them.
+        streaming: Boolean((prev as any).streaming || (next as any).streaming),
+        sending: Boolean((prev as any).sending || (next as any).sending),
+        toolCalls: mergedToolCalls,
+        ...(mergedToolResults ? { toolResults: mergedToolResults } : null),
+        ...(mergedUiActions ? { uiActions: mergedUiActions } : null),
+        chunks: pickLonger((prev as any).chunks, (next as any).chunks),
+        reasoningChunks: pickLonger((prev as any).reasoningChunks, (next as any).reasoningChunks),
+      }
+
+      // Prefer non-empty content/reasoning if the newer version is empty.
+      try {
+        const prevContent = typeof prev.content === 'string' ? prev.content : ''
+        const nextContent = typeof next.content === 'string' ? next.content : ''
+        if (prevContent.trim().length > 0 && nextContent.trim().length === 0) merged.content = prevContent
+      } catch {}
+      try {
+        const prevReason = typeof (prev as any).reasoning === 'string' ? String((prev as any).reasoning) : ''
+        const nextReason = typeof (next as any).reasoning === 'string' ? String((next as any).reasoning) : ''
+        if (prevReason.trim().length > 0 && nextReason.trim().length === 0) (merged as any).reasoning = prevReason
+      } catch {}
+
+      return merged
+    }
+
+    const uniqueById = new Map<string, ExtendedMessage>()
+    for (const m of sortedMessages) {
+      const id = m?.id != null ? String(m.id) : ''
+      // Messages should always have an id, but be defensive.
+      const key = id && id.trim().length > 0 ? id : `__noid__:${uniqueById.size}`
+      const prev = uniqueById.get(key)
+      const next = m as ExtendedMessage
+      if (!prev) {
+        uniqueById.set(key, next)
+        continue
+      }
+      // Merge and re-insert to ensure we keep the most up-to-date copy.
+      const merged = mergeMessage(prev, next)
+      uniqueById.delete(key)
+      uniqueById.set(key, merged)
+    }
+
+    const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = Array.from(uniqueById.values())
 
     // Collapse temp user + assistant shells followed by concrete messages from server (UI-level safety if merging missed)
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []

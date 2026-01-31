@@ -309,9 +309,9 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     const effectiveFallbackSubtitle = typeof fallbackSubtitle === 'string' && fallbackSubtitle.trim().length > 0 ? fallbackSubtitle.trim() : null
 
     return (
-      <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
+      <div className="sticky top-0 z-10 bg-card/95 supports-[backdrop-filter]:bg-card/80 backdrop-blur border-b border-border/60">
         <div className="px-4 py-3.5">
-          <div className="max-w-4xl">
+          <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
@@ -440,10 +440,10 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
               ease: [0.25, 0.46, 0.45, 0.94],
             }
       }
-      className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
+      className="sticky top-0 z-10 bg-card/95 supports-[backdrop-filter]:bg-card/80 backdrop-blur border-b border-border/60"
     >
       <div className="px-4 py-3.5">
-        <div className="max-w-4xl">
+        <div className="w-full">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">

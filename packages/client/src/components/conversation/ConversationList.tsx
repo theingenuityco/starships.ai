@@ -329,7 +329,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                               pointerEvents: 'none',
                             }}
                           >
-                            <span className={cn('font-mono text-sm leading-none', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                            <Icon name="hash" className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
                           </div>
                           <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1 ml-1.5', isActive && 'text-primary')}>{label}</span>
                         </div>

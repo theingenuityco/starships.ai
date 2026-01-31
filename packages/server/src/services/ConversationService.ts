@@ -1283,7 +1283,15 @@ export class ConversationService {
       const convo = await this.getConversationById(data.conversationId);
       if (convo) {
         const t = (convo.title || '').trim().toLowerCase();
-        const needs = !t || t === 'new conversation' || t.startsWith('chat with ');
+        // Titles that are just placeholders should be replaced by an LLM-generated title
+        // on the first real user message.
+        const needs =
+          !t ||
+          t === 'new conversation' ||
+          t === 'new thread' ||
+          t.startsWith('chat with ') ||
+          t.startsWith('thread:') ||
+          t.startsWith('thread ');
 
         if (needs) {
           const star = await this.getConversationStarship(data.conversationId);

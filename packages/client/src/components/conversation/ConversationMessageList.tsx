@@ -8,7 +8,7 @@ import type { MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useMemo, useRef, memo, Fragment, useCallback } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -20,6 +20,73 @@ import { TypingDots } from '@/components/ui/TypingDots'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
+
+function LinkedConversationCard({
+  linkedConversationId,
+  linkedConversationHref,
+  enableChannelMessageThreads,
+  onThreadAction,
+  message,
+}: {
+  linkedConversationId: string | null
+  linkedConversationHref: string | null
+  enableChannelMessageThreads: boolean
+  onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
+  message: MessageModel
+}) {
+  const { data: conversation } = useConversationDetail(linkedConversationId)
+  const { data: agents = [] } = useConversationAgents(linkedConversationId)
+
+  if (!linkedConversationId) return null
+
+  const rawTitle = String((conversation as any)?.title ?? '').trim()
+  const title = rawTitle || `Conversation ${linkedConversationId.slice(0, 8)}`
+
+  const agentNames = (Array.isArray(agents) ? agents : []).map(a => String((a as any)?.name || (a as any)?.slug || '').trim()).filter(Boolean)
+
+  const participants = agentNames.length === 0 ? '—' : agentNames.length <= 3 ? agentNames.join(', ') : `${agentNames.slice(0, 3).join(', ')} +${agentNames.length - 3}`
+
+  const cardInner = (
+    <div className="w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-foreground truncate">{title}</p>
+          <p className="text-xs text-muted-foreground mt-1 truncate">{`Participants: ${participants}`}</p>
+        </div>
+        <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+      </div>
+    </div>
+  )
+
+  // In channel mode, open the thread pane (no navigation).
+  if (enableChannelMessageThreads) {
+    return (
+      <div className="mt-2 w-full">
+        <button
+          type="button"
+          className="group text-left w-full"
+          onClick={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            onThreadAction?.({ messageId: message.id, linkedConversationId, messageText: message.content, linkedMessage: message })
+          }}
+        >
+          {cardInner}
+        </button>
+      </div>
+    )
+  }
+
+  // Non-channel mode: link to the child conversation route.
+  if (!linkedConversationHref) return null
+  return (
+    <div className="mt-2 w-full">
+      <Link href={linkedConversationHref} className="block group w-full">
+        {cardInner}
+      </Link>
+    </div>
+  )
+}
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -626,6 +693,20 @@ export function ConversationMessageList({
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+            const userKey = (m: any): string | null => {
+              if (!m || String(m?.role ?? '') !== 'user') return null
+              const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+              if (uid) return `id:${uid}`
+              const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
+              if (un) return `name:${un}`
+              const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
+              if (ua) return `avatar:${ua}`
+              // Backward-compat: treat unknown human author as the same person.
+              return 'unknown'
+            }
+            const prevUserKey = prev ? userKey(prev) : null
+            const currUserKey = userKey(message)
+            const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
             const isFirstMessage = idx === 0
 
             return (
@@ -641,6 +722,7 @@ export function ConversationMessageList({
                   enableChannelMessageThreads={enableChannelMessageThreads}
                   onThreadAction={handleThreadAction}
                   showAssistantAvatar={showAssistantAvatar}
+                  isConsecutiveUser={isConsecutiveUser}
                   isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
                   userNameOverride={userNameOverride}
                   userEmailOverride={userEmailOverride}
@@ -775,6 +857,8 @@ interface ConversationMessageBubbleProps {
   enableChannelMessageThreads?: boolean
   onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
   showAssistantAvatar?: boolean
+  /** True when the previous rendered message row was also a user message. */
+  isConsecutiveUser?: boolean
   /**
    * If true, apply the same top spacing a first user message gets (mt-6)
    * so assistant-first conversations don't look "pinned" to the top.
@@ -891,6 +975,7 @@ const MemoizedMessageBubble = memo(
     enableChannelMessageThreads = false,
     onThreadAction,
     showAssistantAvatar = true,
+    isConsecutiveUser = false,
     isFirstMessage = false,
     userNameOverride,
     userEmailOverride,
@@ -905,6 +990,7 @@ const MemoizedMessageBubble = memo(
     const isDelegation = sizeVariant === 'delegation'
     const avatarSize = isHero ? 40 : isDelegation ? 24 : 32
     const avatarClass = isHero ? 'w-10 h-10' : isDelegation ? 'w-6 h-6' : 'w-8 h-8'
+    const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
@@ -955,6 +1041,7 @@ const MemoizedMessageBubble = memo(
     }, [enableChannelMessageThreads, linkedConversationId, message.content, message.id, onThreadAction])
 
     if (isUser) {
+      const isConsecutiveSameUser = Boolean(isConsecutiveUser)
       // When the "user" is being overridden to represent an agent (e.g. Aria in landing demos),
       // prefer an explicitly-provided avatar URL (if any). Otherwise fall back to the seeded agent avatar.
       // Never fall back to the signed-in user's avatar when a seed override is present.
@@ -964,7 +1051,8 @@ const MemoizedMessageBubble = memo(
 
       if (isHero || isDelegation) {
         // User message: Neutral bubble on the right (landing demos)
-        const userRowClass = isDelegation ? 'mb-4 mt-3 gap-2' : 'mb-4 mt-6 gap-3 mr-6'
+        // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
+        const userRowClass = isDelegation ? cn('mb-1 gap-2', isConsecutiveSameUser ? 'mt-1' : 'mt-3') : cn('mb-1 gap-3 mr-6', isConsecutiveSameUser ? 'mt-2' : 'mt-6')
         const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
         return (
@@ -981,35 +1069,47 @@ const MemoizedMessageBubble = memo(
                     </div>
                   )}
                 </div>
+                <LinkedConversationCard
+                  linkedConversationId={linkedConversationId}
+                  linkedConversationHref={linkedConversationHref}
+                  enableChannelMessageThreads={enableChannelMessageThreads}
+                  onThreadAction={onThreadAction}
+                  message={message}
+                />
               </div>
-              <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
-                {shouldUseExplicitUserAvatar ? (
-                  <AvatarImage
-                    src={explicitUserAvatarUrl!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : userAvatarSeedOverride ? (
-                  <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
-                ) : shouldUseAuthedUserAvatar ? (
-                  <AvatarImage
-                    src={effectiveUserAvatar!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : null}
-                <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                  {fallbackVariant === 'user-icon' ? (
-                    <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
-                  ) : (
-                    initialsFromName(effectiveUserName || effectiveUserEmail)
-                  )}
-                </AvatarFallback>
-              </Avatar>
+              {isConsecutiveSameUser ? (
+                // Only reserve width, not height (prevents "blank gap" under short consecutive messages)
+                <div className={cn('flex-shrink-0 mt-1', avatarWidthClass)} aria-hidden="true" />
+              ) : (
+                <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
+                  {shouldUseExplicitUserAvatar ? (
+                    <AvatarImage
+                      src={explicitUserAvatarUrl!}
+                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      className="rounded-full object-cover"
+                    />
+                  ) : userAvatarSeedOverride ? (
+                    <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
+                  ) : shouldUseAuthedUserAvatar ? (
+                    <AvatarImage
+                      src={effectiveUserAvatar!}
+                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      className="rounded-full object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {fallbackVariant === 'user-icon' ? (
+                      <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
+                    ) : (
+                      initialsFromName(effectiveUserName || effectiveUserEmail)
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+              )}
             </div>
           </div>
         )
@@ -1021,41 +1121,57 @@ const MemoizedMessageBubble = memo(
 
       return (
         <div className="flex justify-start w-full">
-          <div className="group mb-2 mt-4 flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] py-2 -mx-2">
-            <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
-              {shouldUseExplicitUserAvatar ? (
-                <AvatarImage
-                  src={explicitUserAvatarUrl!}
-                  alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  className="rounded-full object-cover"
-                />
-              ) : userAvatarSeedOverride ? (
-                <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-              ) : shouldUseAuthedUserAvatar ? (
-                <AvatarImage
-                  src={effectiveUserAvatar!}
-                  alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  className="rounded-full object-cover"
-                />
-              ) : null}
-              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                {fallbackVariant === 'user-icon' ? (
-                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
-                ) : (
-                  initialsFromName(effectiveUserName || effectiveUserEmail)
-                )}
-              </AvatarFallback>
-            </Avatar>
+          <div
+            className={cn(
+              // Match assistant row layout: no outer vertical padding/margins (ConversationMessageContent controls spacing)
+              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'py-0',
+              // Keep a little top spacing when a user message starts a conversation chunk
+              // (No negative margins; we handle tight stacking by not reserving avatar height below.)
+              isConsecutiveSameUser ? 'mt-1' : 'mt-4'
+            )}
+          >
+            {isConsecutiveSameUser ? (
+              // Only reserve width, not height (prevents "inflated" spacing between short consecutive user messages)
+              <div className="flex-shrink-0 w-10 mt-1" aria-hidden="true" />
+            ) : (
+              <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
+                {shouldUseExplicitUserAvatar ? (
+                  <AvatarImage
+                    src={explicitUserAvatarUrl!}
+                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="rounded-full object-cover"
+                  />
+                ) : userAvatarSeedOverride ? (
+                  <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                ) : shouldUseAuthedUserAvatar ? (
+                  <AvatarImage
+                    src={effectiveUserAvatar!}
+                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="rounded-full object-cover"
+                  />
+                ) : null}
+                <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {fallbackVariant === 'user-icon' ? (
+                    <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
+                  ) : (
+                    initialsFromName(effectiveUserName || effectiveUserEmail)
+                  )}
+                </AvatarFallback>
+              </Avatar>
+            )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
-              <div className="mb-0 text-sm font-bold font-mono text-foreground">
-                <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                  {userDisplayName}
-                </Link>
-              </div>
+              {!isConsecutiveSameUser && (
+                <div className="mb-0 text-sm font-bold font-mono text-foreground">
+                  <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                    {userDisplayName}
+                  </Link>
+                </div>
+              )}
               <ConversationMessageContent
                 content={message.content}
                 messageId={message.id}
@@ -1077,15 +1193,13 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
-              {!enableChannelMessageThreads && linkedConversationHref && message.role !== 'user' && (
-                <div className="mt-2 flex">
-                  <Link href={linkedConversationHref}>
-                    <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
-                      Open thread
-                    </Button>
-                  </Link>
-                </div>
-              )}
+              <LinkedConversationCard
+                linkedConversationId={linkedConversationId}
+                linkedConversationHref={linkedConversationHref}
+                enableChannelMessageThreads={enableChannelMessageThreads}
+                onThreadAction={onThreadAction}
+                message={message}
+              />
             </div>
           </div>
         </div>
@@ -1133,15 +1247,13 @@ const MemoizedMessageBubble = memo(
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                 />
-                {!enableChannelMessageThreads && linkedConversationHref && message.role !== 'user' && (
-                  <div className="mt-2 flex">
-                    <Link href={linkedConversationHref}>
-                      <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
-                        Open thread
-                      </Button>
-                    </Link>
-                  </div>
-                )}
+                <LinkedConversationCard
+                  linkedConversationId={linkedConversationId}
+                  linkedConversationHref={linkedConversationHref}
+                  enableChannelMessageThreads={enableChannelMessageThreads}
+                  onThreadAction={onThreadAction}
+                  message={message}
+                />
               </div>
             </div>
           </div>
@@ -1198,15 +1310,13 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
-              {!enableChannelMessageThreads && linkedConversationHref && message.role !== 'user' && (
-                <div className="mt-2 flex">
-                  <Link href={linkedConversationHref}>
-                    <Button type="button" size="sm" variant="secondary" className="h-7 text-xs">
-                      Open thread
-                    </Button>
-                  </Link>
-                </div>
-              )}
+              <LinkedConversationCard
+                linkedConversationId={linkedConversationId}
+                linkedConversationHref={linkedConversationHref}
+                enableChannelMessageThreads={enableChannelMessageThreads}
+                onThreadAction={onThreadAction}
+                message={message}
+              />
             </div>
           </div>
         </div>
@@ -1227,6 +1337,7 @@ const MemoizedMessageBubble = memo(
       if (String(prevLink ?? '') !== String(nextLink ?? '')) return false
     }
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
+    if (Boolean(prevProps.isConsecutiveUser) !== Boolean(nextProps.isConsecutiveUser)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
 
     // Re-render when agent label changes (post-reload agent restoration)

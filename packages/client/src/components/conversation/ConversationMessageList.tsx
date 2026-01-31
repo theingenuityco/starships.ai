@@ -351,8 +351,7 @@ export function ConversationMessageList({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  // Per-conversation “snap-to-bottom once content exists” state.
-  // This prevents the initial “render at top then jump to bottom” when messages load.
+  // Per-conversation “snap-to-bottom once content exists” state (prevents initial top->bottom jump).
   const bottomSnapStateRef = useRef<{ key: string; didSnapOnceContentExists: boolean } | null>(null)
 
   // In-chat search: local input value (typed); submitted query from parent drives highlight and sidebar
@@ -854,6 +853,13 @@ export function ConversationMessageList({
     shouldShowGapLoader,
   ])
 
+  // Initialize near-bottom status on mount / when container ref becomes available.
+  useEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+    isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
+  }, [])
+
   // Bottom anchoring (layout phase): when messages/gap-loader first appear for a conversation,
   // snap to the bottom BEFORE paint so there’s no visible scroll “jump”.
   useLayoutEffect(() => {
@@ -865,17 +871,22 @@ export function ConversationMessageList({
 
     if (!bottomSnapStateRef.current || bottomSnapStateRef.current.key !== snapKey) {
       bottomSnapStateRef.current = { key: snapKey, didSnapOnceContentExists: false }
-      lastMessageCountRef.current = displayMessages.length
+      // Treat this as a fresh timeline for scroll-behavior decisions.
+      lastMessageCountRef.current = 0
     }
 
     const hasContent = renderMessages.length > 0 || shouldShowGapLoader || Boolean(pinnedFirstMessage)
     if (!bottomSnapStateRef.current.didSnapOnceContentExists && hasContent) {
-      // Snap-to-bottom (no animation).
+      // IMPORTANT:
+      // Tailwind `scroll-smooth` (scroll-behavior: smooth) can cause even scrollTop assignment to animate.
+      // Temporarily disable smooth behavior so the initial anchor is instantaneous.
+      const prevInlineScrollBehavior = container.style.scrollBehavior
+      container.style.scrollBehavior = 'auto'
       container.scrollTop = container.scrollHeight
+      // Restore any inline style after we've applied the snap.
+      container.style.scrollBehavior = prevInlineScrollBehavior
       isNearBottomRef.current = true
       bottomSnapStateRef.current.didSnapOnceContentExists = true
-      // Prevent the “new messages arrived” effect from immediately re-triggering.
-      lastMessageCountRef.current = displayMessages.length
     }
   }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
 
@@ -885,17 +896,22 @@ export function ConversationMessageList({
 
     const container = scrollContainerRef.current
     const isActivelyStreaming = isAssistantStreaming || !!activeRenderedStreamingAssistantId || shouldShowGapLoader
+    const shouldStickToBottom = isNearBottomRef.current
 
     // Only scroll if user is near bottom (as last reported by onScroll) or new messages arrived.
     // NOTE: during streaming, content grows without a scroll event; keeping a ref avoids losing the lock.
-    if (isNearBottomRef.current || displayMessages.length > lastMessageCountRef.current || shouldShowGapLoader) {
+    //
+    if (shouldStickToBottom) {
+      const messagesIncreased = displayMessages.length > lastMessageCountRef.current
+      const requestedBehavior: ScrollBehavior = messagesIncreased ? 'auto' : isActivelyStreaming ? 'auto' : 'smooth'
+
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
         scrollContainerRef.current.scrollTo({
           top: scrollContainerRef.current.scrollHeight,
           // Prefer immediate scroll during streaming to avoid "lagging behind" effect.
-          behavior: displayMessages.length === lastMessageCountRef.current ? (isActivelyStreaming ? 'auto' : 'smooth') : 'auto',
+          behavior: requestedBehavior,
         })
       })
     }
@@ -907,10 +923,10 @@ export function ConversationMessageList({
   // either initially or while waiting after tool results.
   useEffect(() => {
     if (!scrollContainerRef.current) return
-    if (shouldShowGapLoader) {
+    if (shouldShowGapLoader && isNearBottomRef.current) {
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
-        // Keep it unanimated to avoid visible “scrolling down” on load.
+        // Keep it unanimated to avoid visible “scrolling” on load.
         scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'auto' })
       })
     }
@@ -1027,7 +1043,7 @@ export function ConversationMessageList({
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
 
   return (
-    <div className={cn('h-full flex flex-col', className)}>
+    <div className={cn('h-full min-h-0 flex flex-col', className)}>
       {showSearchBar && !hideSearchInput && (
         <div className="flex-shrink-0 border-b px-4 py-2 flex items-center gap-2 bg-background/95">
           {!hideSearchInput && (
@@ -1107,7 +1123,12 @@ export function ConversationMessageList({
       )}
       <div
         ref={scrollContainerRef}
-        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
+        className={cn(
+          // Do NOT use `scroll-smooth` here; it causes the initial bottom anchor to animate (looks like top->bottom jump).
+          'flex-1 min-h-0 overflow-y-auto px-4',
+          sizeVariant === 'delegation' ? 'pt-3' : 'pt-6',
+          scrollClassName
+        )}
         // When the channel is empty, we want the hero to "sit" near the bottom like Slack.
         // The normal bottom padding is intentionally large (to avoid message overlap with the composer),
         // but that padding makes an empty-state hero float too high.
@@ -1122,7 +1143,7 @@ export function ConversationMessageList({
           className={cn(
             'w-full bg-transparent',
             contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none',
-            // Allows empty-channel hero to "sit" near bottom like Slack.
+            // Allows the timeline to sit at the bottom when short.
             'min-h-full flex flex-col'
           )}
         >
@@ -1137,7 +1158,7 @@ export function ConversationMessageList({
               </button>
             </div>
           )}
-          {/* Bottom-anchored content: keep the newest messages pinned to the bottom when the list is short. */}
+
           <div className="mt-auto">
             {showChannelHero ? (
               <ChannelHero
@@ -1201,64 +1222,65 @@ export function ConversationMessageList({
                       showAssistantAvatar={showAssistantAvatar}
                       isConsecutiveUser={isConsecutiveUser}
                       startsNewGroup={startsNewGroup}
-                    isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
-                    suppressLinkedConversationCard={suppressLinkedConversationCard}
-                    userNameOverride={userNameOverride}
-                    userEmailOverride={userEmailOverride}
-                    userAvatarUrlOverride={userAvatarUrlOverride}
-                    userAvatarSeedOverride={userAvatarSeedOverride}
-                    userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
-                    isAwaitingToolResults={isAwaitingToolResults}
-                    isLastMessage={idx === renderMessages.length - 1}
-                    sizeVariant={sizeVariant}
-                    highlightTerm={normalizedHighlightTerm}
-                  />
-                  {(() => {
-                    const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
-                    if (widgets.length === 0) return null
-                    return (
-                      <div className="flex justify-start">
-                        <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
-                          {/* Spacer to match avatar width */}
-                          <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
-                          <div className="flex-1 w-full">
-                            <div className="space-y-4 mt-3 w-full max-w-none">
-                              {widgets.map(widget => (
-                                <div key={widget.id} className="w-full max-w-none mb-4">
-                                  {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
-                                  {widget.widgetType !== 'StarshipDetails' && (
-                                    <div className="text-sm w-full mb-4">
-                                      <div className="flex items-baseline gap-1">
-                                        <span className="font-medium">{widget.name}</span>
+                      isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
+                      suppressLinkedConversationCard={suppressLinkedConversationCard}
+                      userNameOverride={userNameOverride}
+                      userEmailOverride={userEmailOverride}
+                      userAvatarUrlOverride={userAvatarUrlOverride}
+                      userAvatarSeedOverride={userAvatarSeedOverride}
+                      userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                      isAwaitingToolResults={isAwaitingToolResults}
+                      isLastMessage={idx === renderMessages.length - 1}
+                      sizeVariant={sizeVariant}
+                      highlightTerm={normalizedHighlightTerm}
+                    />
+                    {(() => {
+                      const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
+                      if (widgets.length === 0) return null
+                      return (
+                        <div className="flex justify-start">
+                          <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
+                            {/* Spacer to match avatar width */}
+                            <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
+                            <div className="flex-1 w-full">
+                              <div className="space-y-4 mt-3 w-full max-w-none">
+                                {widgets.map(widget => (
+                                  <div key={widget.id} className="w-full max-w-none mb-4">
+                                    {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
+                                    {widget.widgetType !== 'StarshipDetails' && (
+                                      <div className="text-sm w-full mb-4">
+                                        <div className="flex items-baseline gap-1">
+                                          <span className="font-medium">{widget.name}</span>
+                                        </div>
+                                        {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
                                       </div>
-                                      {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {/* Widget visualization - minimal styling, full width */}
-                                  {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
-                                  <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                    <InlineWidgetRenderer
-                                      widget={{
-                                        widgetType: widget.widgetType,
-                                        props: widget.props,
-                                      }}
-                                      compactMode={true}
-                                      className="w-full"
-                                    />
+                                    {/* Widget visualization - minimal styling, full width */}
+                                    {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
+                                    <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                      <InlineWidgetRenderer
+                                        widget={{
+                                          widgetType: widget.widgetType,
+                                          props: widget.props,
+                                        }}
+                                        compactMode={true}
+                                        className="w-full"
+                                      />
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    )
-                  })()}
+                      )
+                    })()}
                   </div>
                 </Fragment>
               )
             })}
+
             {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
             {shouldShowGapLoader && (
               <div className="flex justify-start">

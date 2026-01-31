@@ -10,9 +10,11 @@ import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnboardingTour'
+import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import { useWallet } from '@/hooks/useWallet'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -159,6 +161,10 @@ export function Navigation(props: NavigationProps) {
 
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
+
+  const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
+
+  const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
   // Handle new conversation - memoized
   const handleNewConversation = useCallback(() => {
@@ -463,19 +469,66 @@ export function Navigation(props: NavigationProps) {
 
           {/* Bottom controls */}
           <div className="px-2 pt-2 flex-shrink-0">
-            <div className={isExpanded ? 'w-full' : 'flex justify-center'}>
-              {isExpanded ? (
-                <UserProfileMenu expanded />
-              ) : (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div>
-                      <UserProfileMenu />
+            <div className="flex flex-col gap-1">
+              {isAuthenticated && starshipData?.id ? (
+                isExpanded ? (
+                  <button
+                    type="button"
+                    disabled={!canManageBilling || !activeStarshipSlug}
+                    onClick={() => {
+                      if (!activeStarshipSlug) return
+                      router.push(`/ship/${activeStarshipSlug}/settings/billing`)
+                    }}
+                    className="h-9 w-full flex items-center gap-2 rounded-lg px-2 text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label="View credits and billing"
+                  >
+                    <span className="flex-1 text-left text-[13px] font-medium">Credits</span>
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="coins" className="h-3.5 w-3.5" />
+                      <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
                     </div>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">Account</TooltipContent>
-                </Tooltip>
-              )}
+                  </button>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={!canManageBilling || !activeStarshipSlug}
+                        onClick={() => {
+                          if (!activeStarshipSlug) return
+                          router.push(`/ship/${activeStarshipSlug}/settings/billing`)
+                        }}
+                        className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                        aria-label="View credits and billing"
+                      >
+                        <Icon name="coins" className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Credits</span>
+                        <Icon name="coins" className="h-3.5 w-3.5" />
+                        <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              ) : null}
+
+              <div className={isExpanded ? 'w-full' : 'flex justify-center'}>
+                {isExpanded ? (
+                  <UserProfileMenu expanded />
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <UserProfileMenu />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Account</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
             </div>
           </div>
 

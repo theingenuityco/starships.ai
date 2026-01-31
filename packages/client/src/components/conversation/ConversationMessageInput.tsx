@@ -530,7 +530,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Resolve agent to send to: prefer explicit leading @handle in content, else selectedAgent.
       // (No enforcement: the editor content is not mutated/prefilled anymore.)
       // For mention-only threads, ignore selectedAgent and require a mention every time.
-      let effectiveAgent: AgentModel | null | undefined = isMentionOnlyThread ? null : selectedAgent ?? null
+      let effectiveAgent: AgentModel | null | undefined = isMentionOnlyThread ? null : (selectedAgent ?? null)
       let contentToSend = messageToSend
       if (!isDraftUserUserDm) {
         // Also support plain-text leading @handle for safety
@@ -581,8 +581,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (!currentConversationId) {
           // Draft DM flow: create/resolve the DM conversation on first send.
           if (draftDirectMessageTarget && (draftDirectMessageTarget.dmType === 'user_agent' || draftDirectMessageTarget.dmType === 'user_user')) {
-            const dmTitle =
-              typeof draftDirectMessageTarget.title === 'string' && draftDirectMessageTarget.title.trim().length > 0 ? draftDirectMessageTarget.title.trim() : undefined
+            const dmTitle = typeof draftDirectMessageTarget.title === 'string' && draftDirectMessageTarget.title.trim().length > 0 ? draftDirectMessageTarget.title.trim() : undefined
 
             const created = await createDirectMessage.mutateAsync({
               starshipId,
@@ -601,96 +600,96 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             sendConversationId = currentConversationId
             createdNewConversation = true
           } else {
-          // Starter conversations must be agent-backed (channels are created via the Channels UI).
-          if (!effectiveAgent) {
-            resetFlags()
-            toast.error('Select an agent', { description: 'Please select an agent to chat.' })
-            return
-          }
-          const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
-          const title = (() => {
-            const override = typeof newConversationTitleOverride === 'string' ? newConversationTitleOverride.trim() : ''
-            if (override) return override
-            return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(effectiveAgent)}`
-          })()
-          const newConversation = await createConversation.mutateAsync(
-            isThreadCreate
-              ? {
-                  title,
-                  starshipId: starshipId,
-                  parentConversationId: newConversationParentConversationId!.trim(),
-                  // IMPORTANT: threads are not channels; server requires at least one linked agent.
-                  agentSlug: effectiveAgent.slug,
-                }
-              : {
-                  title,
-                  starshipId: starshipId,
-                  agentSlug: effectiveAgent.slug,
-                }
-          )
-          currentConversationId = newConversation.id
-          sendConversationId = currentConversationId
-          createdNewConversation = true
-
-          // If this was a draft-thread create, persist the "linked message" now (only on first reply).
-          try {
-            const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
-            const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
-            if (parentId && msgId) {
-              await linkMessageToConversation.mutateAsync({ messageId: msgId, linkedConversationId: currentConversationId, conversationId: parentId })
+            // Starter conversations must be agent-backed (channels are created via the Channels UI).
+            if (!effectiveAgent) {
+              resetFlags()
+              toast.error('Select an agent', { description: 'Please select an agent to chat.' })
+              return
             }
-          } catch {}
+            const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
+            const title = (() => {
+              const override = typeof newConversationTitleOverride === 'string' ? newConversationTitleOverride.trim() : ''
+              if (override) return override
+              return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(effectiveAgent)}`
+            })()
+            const newConversation = await createConversation.mutateAsync(
+              isThreadCreate
+                ? {
+                    title,
+                    starshipId: starshipId,
+                    parentConversationId: newConversationParentConversationId!.trim(),
+                    // IMPORTANT: threads are not channels; server requires at least one linked agent.
+                    agentSlug: effectiveAgent.slug,
+                  }
+                : {
+                    title,
+                    starshipId: starshipId,
+                    agentSlug: effectiveAgent.slug,
+                  }
+            )
+            currentConversationId = newConversation.id
+            sendConversationId = currentConversationId
+            createdNewConversation = true
 
-          // Seed hidden thread context into the NEW thread conversation so the agent sees the linked message.
-          // This message is not shown in the UI (ConversationMessageList filters it out).
-          try {
-            const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
-            const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
-            const sourceContent = typeof linkMessageToNewConversation?.content === 'string' ? linkMessageToNewConversation.content : ''
-            if (parentId && msgId && sourceContent.trim().length > 0) {
-              const createdAt = typeof linkMessageToNewConversation?.createdAt === 'string' ? linkMessageToNewConversation.createdAt : ''
-              const role = typeof linkMessageToNewConversation?.role === 'string' ? linkMessageToNewConversation.role : ''
-              const userName = typeof linkMessageToNewConversation?.userName === 'string' ? linkMessageToNewConversation.userName : ''
-              const agentName = typeof linkMessageToNewConversation?.agentName === 'string' ? linkMessageToNewConversation.agentName : ''
-              const attachmentIds = Array.isArray(linkMessageToNewConversation?.attachmentIds) ? linkMessageToNewConversation.attachmentIds : []
+            // If this was a draft-thread create, persist the "linked message" now (only on first reply).
+            try {
+              const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+              const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+              if (parentId && msgId) {
+                await linkMessageToConversation.mutateAsync({ messageId: msgId, linkedConversationId: currentConversationId, conversationId: parentId })
+              }
+            } catch {}
 
-              const seedContent = [
-                '[THREAD_CONTEXT_SEED]',
-                'Thread context seed (system instruction). Use this as upstream context for the thread.',
-                '',
-                `Source conversation id: ${parentId}`,
-                `Source message id: ${msgId}`,
-                role ? `Source role: ${role}` : null,
-                userName ? `Source userName: ${userName}` : null,
-                agentName ? `Source agentName: ${agentName}` : null,
-                createdAt ? `Source createdAt: ${createdAt}` : null,
-                attachmentIds.length > 0 ? `Source attachmentIds: ${attachmentIds.join(', ')}` : null,
-                '',
-                'Source message content:',
-                '"""',
-                sourceContent,
-                '"""',
-              ]
-                .filter(Boolean)
-                .join('\n')
+            // Seed hidden thread context into the NEW thread conversation so the agent sees the linked message.
+            // This message is not shown in the UI (ConversationMessageList filters it out).
+            try {
+              const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+              const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+              const sourceContent = typeof linkMessageToNewConversation?.content === 'string' ? linkMessageToNewConversation.content : ''
+              if (parentId && msgId && sourceContent.trim().length > 0) {
+                const createdAt = typeof linkMessageToNewConversation?.createdAt === 'string' ? linkMessageToNewConversation.createdAt : ''
+                const role = typeof linkMessageToNewConversation?.role === 'string' ? linkMessageToNewConversation.role : ''
+                const userName = typeof linkMessageToNewConversation?.userName === 'string' ? linkMessageToNewConversation.userName : ''
+                const agentName = typeof linkMessageToNewConversation?.agentName === 'string' ? linkMessageToNewConversation.agentName : ''
+                const attachmentIds = Array.isArray(linkMessageToNewConversation?.attachmentIds) ? linkMessageToNewConversation.attachmentIds : []
 
-              await api.post('/api/v1/messages', {
-                role: 'system',
-                content: seedContent,
-                starshipId: starshipId,
-                conversationId: currentConversationId,
-                messageType: 'system_instruction',
-                metadata: {
-                  thread_context_seed: true,
-                  sourceConversationId: parentId,
-                  sourceMessageId: msgId,
-                },
-              })
-            }
-          } catch {}
+                const seedContent = [
+                  '[THREAD_CONTEXT_SEED]',
+                  'Thread context seed (system instruction). Use this as upstream context for the thread.',
+                  '',
+                  `Source conversation id: ${parentId}`,
+                  `Source message id: ${msgId}`,
+                  role ? `Source role: ${role}` : null,
+                  userName ? `Source userName: ${userName}` : null,
+                  agentName ? `Source agentName: ${agentName}` : null,
+                  createdAt ? `Source createdAt: ${createdAt}` : null,
+                  attachmentIds.length > 0 ? `Source attachmentIds: ${attachmentIds.join(', ')}` : null,
+                  '',
+                  'Source message content:',
+                  '"""',
+                  sourceContent,
+                  '"""',
+                ]
+                  .filter(Boolean)
+                  .join('\n')
 
-          // Apply pending web browsing preference if enabled
-          await applyPendingWebBrowsing(currentConversationId)
+                await api.post('/api/v1/messages', {
+                  role: 'system',
+                  content: seedContent,
+                  starshipId: starshipId,
+                  conversationId: currentConversationId,
+                  messageType: 'system_instruction',
+                  metadata: {
+                    thread_context_seed: true,
+                    sourceConversationId: parentId,
+                    sourceMessageId: msgId,
+                  },
+                })
+              }
+            } catch {}
+
+            // Apply pending web browsing preference if enabled
+            await applyPendingWebBrowsing(currentConversationId)
           }
         }
         sendConversationId = currentConversationId!

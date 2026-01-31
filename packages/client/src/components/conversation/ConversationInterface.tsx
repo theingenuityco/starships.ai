@@ -6,6 +6,9 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { ForumChannelView } from '@/components/conversation/ForumChannelView'
+import { SearchResultsSidebar } from '@/components/conversation/SearchResultsSidebar'
+import { useConversationSearch } from '@/components/conversation/ConversationSearchContext'
+import type { SearchResult } from '@/components/conversation/conversationSearch'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -172,12 +175,51 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Measure floating input height to reserve scroll space and prevent overlap with the floating composer
   const inputContainerRef = useRef<HTMLDivElement>(null)
+  const searchSidebarRef = useRef<HTMLDivElement>(null)
   const [inputHeight, setInputHeight] = useState<number>(160)
   const [hasWelcomeExited, setHasWelcomeExited] = useState<boolean>(false)
   const [isHeightFrozen, setIsHeightFrozen] = useState<boolean>(false)
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
   const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
+
+  // Discord-style search: use context when available (navbar search), else local state
+  const searchContext = useConversationSearch()
+  const [localSubmittedQuery, setLocalSubmittedQuery] = useState<string>('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [selectedMatchIndex, setSelectedMatchIndex] = useState<number | null>(null)
+
+  const submittedQuery = searchContext?.submittedQuery ?? localSubmittedQuery
+  const setSubmittedQuery = searchContext?.setSubmittedQuery ?? setLocalSubmittedQuery
+  const hideSearchInputInList = searchContext != null
+
+  // Clear search when conversation changes
+  useEffect(() => {
+    setLocalSubmittedQuery('')
+    setSubmittedQuery('')
+    setSearchResults([])
+    setSelectedMatchIndex(null)
+  }, [currentConversationId, setSubmittedQuery])
+
+  const closeSearchSidebar = useCallback(() => {
+    setSubmittedQuery('')
+    setSearchResults([])
+    setSelectedMatchIndex(null)
+    searchContext?.setSearchInputValue?.('')
+  }, [setSubmittedQuery, searchContext])
+
+  // Close search sidebar on Escape
+  useEffect(() => {
+    if (!submittedQuery.trim()) return
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault()
+        closeSearchSidebar()
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [submittedQuery, closeSearchSidebar])
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -898,7 +940,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           onCreateDraftThread={() => {
             // Open a draft thread in the thread pane without persisting a conversation yet.
             // The conversation is created on the first message send from the thread composer.
-                  const defaultAgent = selectedAgent ?? pickDefaultAgent(starshipAgentsData as AgentModel[])
+            const defaultAgent = selectedAgent ?? pickDefaultAgent(starshipAgentsData as AgentModel[])
             onOpenThread?.({ conversationId: null, defaultAgent, linkedMessage: null, parentConversationId: currentConversationId })
           }}
         />
@@ -913,88 +955,109 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
         {/* Messages Area */}
         {showMessagesArea ? (
-          <>
-            <ConversationSummaryBar
-              conversationId={currentConversationId}
-              starshipId={starshipId}
-              titlePrefix={isChannelConversation ? <Icon name="hash" className="h-5 w-5" /> : null}
-              fallbackTitle={
-                draftDm
-                  ? draftDm.dmType === 'user_agent'
-                    ? (() => {
-                        const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || ''))
-                        return a ? formatAgentDisplayName(a) : 'Direct message'
-                      })()
-                    : draftDm.peerLabel || 'Direct message'
-                  : undefined
-              }
-              fallbackSubtitle={draftDm && !currentConversationId ? 'Draft (not saved)' : undefined}
-              participantsOverride={
-                draftDm && !currentConversationId
-                  ? [
-                      {
-                        kind: 'human',
-                        key: `human:${String(authUser?.id || userId || 'me')}`,
-                        label: String(authUser?.name || authUser?.email || 'You'),
-                        ...(authUser?.avatar ? { avatarUrl: String(authUser.avatar) } : null),
-                      },
-                      ...(draftDm.dmType === 'user_agent'
-                        ? (() => {
-                            const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || ''))
-                            const label = a ? formatAgentDisplayName(a) : 'Agent'
-                            const seed = a ? String(a?.name || a?.slug || a?.id || label) : 'agent'
-                            const avatarAttachmentId = a && typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId) : null
-                            return [
-                              {
-                                kind: 'agent',
-                                key: `agent:${String(draftDm.agentId || label)}`,
-                                label,
-                                seed,
-                                ...(avatarAttachmentId ? { avatarAttachmentId } : null),
-                              } as const,
-                            ]
-                          })()
-                        : [
-                            {
-                              kind: 'human',
-                              key: `human:${String(draftDm.peerUserId || draftDm.peerLabel || 'peer')}`,
-                              label: String(draftDm.peerLabel || 'User'),
-                              ...(draftDm.peerAvatar ? { avatarUrl: String(draftDm.peerAvatar) } : null),
-                            } as const,
-                          ]),
-                    ]
-                  : null
-              }
-              modelId={selectedAgent?.model ?? null}
-              maxTokens={
-                typeof (selectedAgent as any)?.maxTokens === 'number'
-                  ? (selectedAgent as any).maxTokens
-                  : typeof (selectedAgent as any)?.maxTokens === 'string'
-                    ? Number((selectedAgent as any).maxTokens)
-                    : null
-              }
-            />
-            <div className="relative flex-1 min-h-0">
-              <ConversationMessageList
+          <div className={cn('flex flex-1 min-h-0', submittedQuery.trim() && 'flex-row')}>
+            <div className={cn('relative flex flex-col flex-1 min-w-0', submittedQuery.trim() && 'min-w-0')}>
+              <ConversationSummaryBar
                 conversationId={currentConversationId}
                 starshipId={starshipId}
-                bottomPaddingPx={inputHeight + 24}
-                enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
-                messagesOverride={draftDm && !currentConversationId ? [] : undefined}
-                onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
-                  // Thread default agent rules:
-                  // - If started from an assistant message: use that agent as the thread default (if resolvable)
-                  // - If started from any other message: no default agent
-                  const lm = linkedMessage ?? null
-                  const lmAgentId = lm?.role === 'assistant' ? lm.agentId ?? null : null
-                  const defaultAgent = lmAgentId ? starshipAgentsData.find(a => a.id === lmAgentId) ?? null : null
-                  onOpenThread?.({ conversationId, defaultAgent, linkedMessage: lm, parentConversationId: parentConversationId ?? null })
-                }}
+                titlePrefix={isChannelConversation ? <Icon name="hash" className="h-5 w-5" /> : null}
+                fallbackTitle={
+                  draftDm
+                    ? draftDm.dmType === 'user_agent'
+                      ? (() => {
+                          const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || ''))
+                          return a ? formatAgentDisplayName(a) : 'Direct message'
+                        })()
+                      : draftDm.peerLabel || 'Direct message'
+                    : undefined
+                }
+                fallbackSubtitle={draftDm && !currentConversationId ? 'Draft (not saved)' : undefined}
+                participantsOverride={
+                  draftDm && !currentConversationId
+                    ? [
+                        {
+                          kind: 'human',
+                          key: `human:${String(authUser?.id || userId || 'me')}`,
+                          label: String(authUser?.name || authUser?.email || 'You'),
+                          ...(authUser?.avatar ? { avatarUrl: String(authUser.avatar) } : null),
+                        },
+                        ...(draftDm.dmType === 'user_agent'
+                          ? (() => {
+                              const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || ''))
+                              const label = a ? formatAgentDisplayName(a) : 'Agent'
+                              const seed = a ? String(a?.name || a?.slug || a?.id || label) : 'agent'
+                              const avatarAttachmentId = a && typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId) : null
+                              return [
+                                {
+                                  kind: 'agent',
+                                  key: `agent:${String(draftDm.agentId || label)}`,
+                                  label,
+                                  seed,
+                                  ...(avatarAttachmentId ? { avatarAttachmentId } : null),
+                                } as const,
+                              ]
+                            })()
+                          : [
+                              {
+                                kind: 'human',
+                                key: `human:${String(draftDm.peerUserId || draftDm.peerLabel || 'peer')}`,
+                                label: String(draftDm.peerLabel || 'User'),
+                                ...(draftDm.peerAvatar ? { avatarUrl: String(draftDm.peerAvatar) } : null),
+                              } as const,
+                            ]),
+                      ]
+                    : null
+                }
+                modelId={selectedAgent?.model ?? null}
+                maxTokens={
+                  typeof (selectedAgent as any)?.maxTokens === 'number'
+                    ? (selectedAgent as any).maxTokens
+                    : typeof (selectedAgent as any)?.maxTokens === 'string'
+                      ? Number((selectedAgent as any).maxTokens)
+                      : null
+                }
               />
+              <div className="relative flex-1 min-h-0">
+                <ConversationMessageList
+                  conversationId={currentConversationId}
+                  starshipId={starshipId}
+                  bottomPaddingPx={inputHeight + 24}
+                  enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
+                  messagesOverride={draftDm && !currentConversationId ? [] : undefined}
+                  submittedQuery={submittedQuery.trim() || undefined}
+                  onSearchSubmit={q => {
+                    setSubmittedQuery(q)
+                    setSearchResults([])
+                    setSelectedMatchIndex(null)
+                  }}
+                  onSearchResults={setSearchResults}
+                  selectedMatchIndex={selectedMatchIndex}
+                  hideSearchInput={hideSearchInputInList}
+                  onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
+                    // Thread default agent rules:
+                    // - If started from an assistant message: use that agent as the thread default (if resolvable)
+                    // - If started from any other message: no default agent
+                    const lm = linkedMessage ?? null
+                    const lmAgentId = lm?.role === 'assistant' ? lm.agentId ?? null : null
+                    const defaultAgent = lmAgentId ? starshipAgentsData.find(a => a.id === lmAgentId) ?? null : null
+                    onOpenThread?.({ conversationId, defaultAgent, linkedMessage: lm, parentConversationId: parentConversationId ?? null })
+                  }}
+                />
+              </div>
+              {/* Single place for stream-dependent side-effects */}
+              <StreamSideEffects />
             </div>
-            {/* Single place for stream-dependent side-effects */}
-            <StreamSideEffects />
-          </>
+            {submittedQuery.trim() ? (
+              <div ref={searchSidebarRef} className="flex flex-col min-h-0 h-full">
+                <SearchResultsSidebar
+                  query={submittedQuery}
+                  results={searchResults}
+                  onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
+                  onClose={closeSearchSidebar}
+                />
+              </div>
+            ) : null}
+          </div>
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}

@@ -16,6 +16,7 @@ import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import remarkGfm from 'remark-gfm'
 import { getMarkdownComponents, tableToMarkdown } from '@/components/markdown/markdownComponents'
+import { rehypeHighlightText } from '@/components/markdown/rehypeHighlightText'
 import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
@@ -303,6 +304,8 @@ interface MessageContentProps {
    * When omitted, uses "text-sm leading-relaxed prose prose-sm".
    */
   contentTextClass?: string
+  /** When set, highlight this search term in the message content (in-chat search). */
+  highlightTerm?: string
 }
 
 type ToolResultLike = {
@@ -413,6 +416,7 @@ export function ConversationMessageContent({
   isAwaitingToolResults = false,
   isLastMessage = false,
   contentTextClass,
+  highlightTerm,
 }: MessageContentProps) {
   const resolvedContentClass = contentTextClass ?? 'text-sm leading-relaxed prose prose-sm'
   const { theme } = useTheme()
@@ -962,8 +966,17 @@ export function ConversationMessageContent({
 
   // Shared markdown components for consistent rendering across app
   const markdownComponents = useMemo(
-    () => getMarkdownComponents({ theme, enableLinkPreview, messageId, copiedStates, onCopyCodeBlock: handleCopyCodeBlock, onCopyTable: handleCopyTable }),
-    [theme, enableLinkPreview, messageId, copiedStates]
+    () =>
+      getMarkdownComponents({
+        theme,
+        enableLinkPreview,
+        messageId,
+        copiedStates,
+        onCopyCodeBlock: handleCopyCodeBlock,
+        onCopyTable: handleCopyTable,
+        highlightTerm,
+      }),
+    [theme, enableLinkPreview, messageId, copiedStates, highlightTerm]
   )
 
   const rawDisplayContent = String(displayContent ?? '')
@@ -1003,7 +1016,7 @@ export function ConversationMessageContent({
                 'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
               )}
             >
-              <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>
                 {rawDisplayContent}
               </ReactMarkdown>
             </div>
@@ -1050,7 +1063,7 @@ export function ConversationMessageContent({
                   <div className="pb-2">
                     <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
                       <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                        <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>
                           {String(displayReasoning ?? '')}
                         </ReactMarkdown>
                       </div>

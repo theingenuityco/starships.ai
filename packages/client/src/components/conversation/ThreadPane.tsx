@@ -47,16 +47,19 @@ export function ThreadPane(props: {
           <ConversationMessageList conversationId={conversationId} starshipId={starshipId} bottomPaddingPx={180} />
         </div>
 
-        <div className="border-t border-border/60 px-3 py-2">
-          <ConversationMessageInput
-            selectedAgent={selectedAgent}
-            starshipId={starshipId}
-            conversationId={conversationId}
-            disabled={false}
-            minimal={true}
-            onAgentChange={onAgentChange}
-            starshipSlug={starshipSlug}
-          />
+        {/* Match the main conversation interface "docked composer" spacing/structure */}
+        <div className="px-4 pb-4 pt-2">
+          <div className="w-full pointer-events-auto opacity-100 relative" data-message-input>
+            <ConversationMessageInput
+              selectedAgent={selectedAgent}
+              starshipId={starshipId}
+              conversationId={conversationId}
+              disabled={false}
+              minimal={true}
+              onAgentChange={onAgentChange}
+              starshipSlug={starshipSlug}
+            />
+          </div>
         </div>
       </div>
     </ConversationStreamProvider>

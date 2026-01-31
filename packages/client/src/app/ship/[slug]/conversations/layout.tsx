@@ -60,7 +60,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   return (
     <div className="h-screen w-full flex flex-col md:flex-row min-w-0">
-      <div className="flex-1 min-w-0 h-full">
+      <div
+        className="flex-1 min-w-0 h-full"
+        style={{
+          ['--conversation-right-gutter' as any]: threadConversationId ? '16px' : '52px',
+        }}
+      >
         <ConversationInterface
           starshipId={starshipData.id}
           conversationId={routeParams.conversationId || null}

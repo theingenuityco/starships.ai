@@ -658,7 +658,7 @@ export function ConversationMessageList({
                   if (widgets.length === 0) return null
                   return (
                     <div className="flex justify-start">
-                      <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
+                      <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
                         {/* Spacer to match avatar width */}
                         <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
                         <div className="flex-1 w-full">
@@ -712,7 +712,7 @@ export function ConversationMessageList({
                   </div>
                 </div>
               ) : (
-                <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                   <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                     <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
                   </div>
@@ -1035,7 +1035,7 @@ const MemoizedMessageBubble = memo(
 
       return (
         <div className="flex justify-start w-full">
-          <div className="group mb-2 mt-4 flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] py-2 -mx-2">
+          <div className="group mb-2 mt-4 flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] py-2 -mx-2">
             <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
               {shouldUseExplicitUserAvatar ? (
                 <AvatarImage
@@ -1166,7 +1166,7 @@ const MemoizedMessageBubble = memo(
         <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : '')}>
           <div
             className={cn(
-              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] -mx-2',
+              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
               // Remove the outside vertical gap between consecutive message rows.
               'py-0',
               !showAssistantAvatar && '-mt-1'

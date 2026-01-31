@@ -67,7 +67,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const currentConversationId = params.conversationId as string | undefined
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
-  const { data: directMessagesData } = useStarshipDirectMessages(starshipId, true)
+  const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const createChannel = useCreateChannel()
@@ -120,7 +120,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   const renderCompactDmTarget = (t: DmTarget) => {
     const label = t.label
-    const isBusy = false
+    const isBusy = directMessagesLoading
     const isActive = false
 
     return (
@@ -202,6 +202,10 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   }
 
   const handleDmTargetClick = async (t: DmTarget) => {
+    // Prevent race conditions: if DMs haven't loaded yet, we don't know whether a DM exists.
+    // Clicking during this window can open draft views and later create duplicate DMs.
+    if (directMessagesLoading) return
+
     // If an existing DM conversation exists, open it immediately (shows history).
     // Otherwise, open a draft DM view (no conversation yet) and create it on first send.
     if (t.kind === 'agent') {
@@ -520,7 +524,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             <div className="px-2 mb-2 flex items-center justify-between">
               <p className="text-xs font-medium text-muted-foreground">Direct messages</p>
             </div>
-            {agentsLoading || membersLoading ? (
+            {agentsLoading || membersLoading || directMessagesLoading ? (
               <div className="space-y-1 px-2">
                 {[1, 2, 3].map(i => (
                   <Skeleton key={i} className="h-8 w-full rounded-lg" />
@@ -533,7 +537,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             ) : (
               <div className="space-y-1">
                 {dmTargets.map(t => {
-                  const isBusy = false
+                  const isBusy = directMessagesLoading
                   const label = t.label
                   return (
                     <div

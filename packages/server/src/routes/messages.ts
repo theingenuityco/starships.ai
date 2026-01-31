@@ -3,6 +3,7 @@ import { MessageService } from '@/services/MessageService';
 import { ConversationService } from '@/services/ConversationService';
 import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
+import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -89,6 +90,19 @@ router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response):
       });
       return;
     }
+
+    // Enforce membership rules for restricted conversations (private channels + DMs).
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    )
+      return;
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
     const messageService = new MessageService();
     const created = await messageService.createMessage({

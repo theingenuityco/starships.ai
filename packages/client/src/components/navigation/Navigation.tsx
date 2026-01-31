@@ -6,6 +6,7 @@ import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
+import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnboardingTour'
@@ -339,7 +340,7 @@ export function Navigation(props: NavigationProps) {
         {isAuthenticated ? <StarshipRail starships={userStarships ?? []} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/profile')} /> : null}
 
         <div
-          className="flex flex-col pb-2 transition-all duration-300 ease-in-out"
+          className="flex flex-col pb-3 transition-all duration-300 ease-in-out"
           style={{
             width: isExpanded ? '16rem' : '3.5rem',
             height: '100%',
@@ -348,7 +349,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="px-2 pt-7 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="px-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
             <div
               className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
@@ -460,7 +461,25 @@ export function Navigation(props: NavigationProps) {
           {/* Spacer to push content toward bottom when needed */}
           {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
 
-          {/* Profile moved to global top-right header (see `TopRightUserProfile`) */}
+          {/* Bottom controls */}
+          <div className="px-2 pt-2 flex-shrink-0">
+            <div className={isExpanded ? 'w-full' : 'flex justify-center'}>
+              {isExpanded ? (
+                <UserProfileMenu expanded />
+              ) : (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div>
+                      <UserProfileMenu />
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">Account</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          </div>
+
+          {/* Profile lives in bottom controls */}
         </div>
       </motion.div>
 

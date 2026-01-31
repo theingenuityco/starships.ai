@@ -421,6 +421,7 @@ export function Navigation(props: NavigationProps) {
               <div className="flex-1 min-h-0 overflow-hidden pb-2">
                 <ConversationList
                   starshipId={starshipData.id}
+                  starshipSlug={activeStarshipSlug || undefined}
                   compact={true}
                   onboardingChannelsAnchorRef={channelsRef}
                   onboardingDirectMessagesAnchorRef={directMessagesRef}

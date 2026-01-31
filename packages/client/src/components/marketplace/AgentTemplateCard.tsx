@@ -115,15 +115,26 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
     setIsDeploying(true)
     try {
+      const safeStarshipPathSegment = (candidates: Array<unknown>): string | null => {
+        for (const c of candidates) {
+          if (typeof c !== 'string') continue
+          const raw = c.trim()
+          if (!raw) continue
+          const lowered = raw.toLowerCase()
+          if (lowered === 'undefined' || lowered === 'null') continue
+          return raw
+        }
+        return null
+      }
+
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: starship.id,
-        starshipSlug: (starship as any)?.slug || undefined,
+        starshipSlug: safeStarshipPathSegment([(starship as any)?.slug]) ?? undefined,
       })
       const agentId = (created as any)?.id as string | undefined
       const agentSlug = (created as any)?.slug as string | undefined
-      const starshipSlugOrId =
-        ((created as any)?._starshipSlug as string | undefined) || ((starship as any)?.slug as string | undefined) || starship.id
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, (starship as any)?.slug, starship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {

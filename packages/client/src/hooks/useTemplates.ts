@@ -102,7 +102,14 @@ export function useCreateAgentFromTemplate() {
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/agent-templates/${templateId}/agents`, {
         starshipId,
       })
-      return { ...response.data.data, _starshipSlug: starshipSlug }
+      const cleanStarshipSlug = (() => {
+        const raw = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
+        if (!raw) return undefined
+        const lowered = raw.toLowerCase()
+        if (lowered === 'undefined' || lowered === 'null') return undefined
+        return raw
+      })()
+      return { ...response.data.data, _starshipSlug: cleanStarshipSlug }
     },
     onSuccess: (agent, variables) => {
       // Invalidate agent queries to refresh lists

@@ -68,15 +68,27 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     if (!primaryStarship) return
     setIsDeploying(true)
     try {
+      const safeStarshipPathSegment = (candidates: Array<unknown>): string | null => {
+        for (const c of candidates) {
+          if (typeof c !== 'string') continue
+          const raw = c.trim()
+          if (!raw) continue
+          const lowered = raw.toLowerCase()
+          if (lowered === 'undefined' || lowered === 'null') continue
+          return raw
+        }
+        return null
+      }
+
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
-        starshipSlug: primaryStarship.slug,
+        starshipSlug: safeStarshipPathSegment([primaryStarship.slug]) ?? undefined,
       })
 
       const agentId = (created as any)?.id as string | undefined
       const agentSlug = (created as any)?.slug as string | undefined
-      const starshipSlugOrId = ((created as any)?._starshipSlug as string | undefined) || primaryStarship.slug || primaryStarship.id
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, primaryStarship.slug, primaryStarship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {

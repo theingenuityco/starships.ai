@@ -254,8 +254,16 @@ export function ConversationSummaryBar({
         })
       } else if (dm?.dmType === 'user_user') {
         const peer: any = (dmItem as any)?.peerUser
-        const peerId = typeof peer?.id === 'string' ? String(peer.id) : typeof dm?.userAId === 'string' && String(dm.userAId) !== String(authUserId || '') ? String(dm.userAId) : typeof dm?.userBId === 'string' ? String(dm.userBId) : null
-        const peerLabel = (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
+        const peerId =
+          typeof peer?.id === 'string'
+            ? String(peer.id)
+            : typeof dm?.userAId === 'string' && String(dm.userAId) !== String(authUserId || '')
+              ? String(dm.userAId)
+              : typeof dm?.userBId === 'string'
+                ? String(dm.userBId)
+                : null
+        const peerLabel =
+          (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
         const peerAvatar = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
         addHuman({ id: peerId ?? null, label: peerLabel, avatarUrl: peerAvatar })
       }

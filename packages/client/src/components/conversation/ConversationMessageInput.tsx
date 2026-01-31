@@ -11,6 +11,7 @@ import {
   useConversationDetail,
   usePendingToolApprovals,
   useStarshipChannels,
+  useLinkMessageToConversation,
   useUpdateConversationState,
 } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
@@ -49,6 +50,18 @@ interface ConversationMessageInputProps {
   starshipId: string
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
+  /**
+   * Optional: when creating a new conversation (conversationId is null), create it as a child of this parent conversation.
+   * Used for "draft threads" opened from a channel message.
+   */
+  newConversationParentConversationId?: string | null
+  /** Optional: override the title used when creating a new conversation. */
+  newConversationTitleOverride?: string | null
+  /**
+   * Optional: after creating a new conversation, link an existing parent message to it (persisted on server).
+   * Used to persist the thread link only when the user sends the first reply in the draft thread.
+   */
+  linkMessageToNewConversation?: { parentConversationId: string; messageId: string } | null
   onMessageSent?: () => void // Simplified callback for UI state updates
   onToggleToolForm?: () => void // Callback to toggle tool form drawer
   isToolFormOpen?: boolean // Current state of tool form drawer
@@ -79,6 +92,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       conversationId,
       onConversationStart,
+      newConversationParentConversationId,
+      newConversationTitleOverride,
+      linkMessageToNewConversation,
       onMessageSent,
       // onToggleToolForm,
       // isToolFormOpen = false,
@@ -141,6 +157,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const clearEditorRef = useRef<() => void>(() => {})
 
     const createConversation = useCreateConversation()
+    const linkMessageToConversation = useLinkMessageToConversation()
     const { data: starshipForPerms } = useStarshipBySlug(starshipSlug || '', Boolean(starshipSlug))
     const canManageBilling = Boolean(isInstanceAdmin || (userId && starshipForPerms?.ownerId === userId))
     const { data: wallet, isLoading } = useWallet(starshipId, Boolean(starshipId && canManageBilling))
@@ -529,14 +546,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             toast.error('Select an agent', { description: 'Please select an agent to chat.' })
             return
           }
-          const newConversation = await createConversation.mutateAsync({
-            title: `Chat with ${formatAgentDisplayName(effectiveAgent)}`,
-            starshipId: starshipId,
-            agentSlug: effectiveAgent.slug,
-          })
+          const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
+          const title = (() => {
+            const override = typeof newConversationTitleOverride === 'string' ? newConversationTitleOverride.trim() : ''
+            if (override) return override
+            return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(effectiveAgent)}`
+          })()
+          const newConversation = await createConversation.mutateAsync(
+            isThreadCreate
+              ? {
+                  title,
+                  starshipId: starshipId,
+                  parentConversationId: newConversationParentConversationId!.trim(),
+                  // IMPORTANT: threads are not channels; server requires at least one linked agent.
+                  agentSlug: effectiveAgent.slug,
+                }
+              : {
+                  title,
+                  starshipId: starshipId,
+                  agentSlug: effectiveAgent.slug,
+                }
+          )
           currentConversationId = newConversation.id
           sendConversationId = currentConversationId
           createdNewConversation = true
+
+          // If this was a draft-thread create, persist the "linked message" now (only on first reply).
+          try {
+            const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+            const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+            if (parentId && msgId) {
+              await linkMessageToConversation.mutateAsync({ messageId: msgId, linkedConversationId: currentConversationId, conversationId: parentId })
+            }
+          } catch {}
 
           // Apply pending web browsing preference if enabled
           await applyPendingWebBrowsing(currentConversationId)
@@ -661,6 +703,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       userId,
       conversationId,
       createConversation,
+      linkMessageToConversation,
+      linkMessageToNewConversation,
+      newConversationParentConversationId,
+      newConversationTitleOverride,
       onConversationStart,
       onMessageSent,
       sendMessageFn,
@@ -714,14 +760,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           // Create conversation if one doesn't exist
           let currentConversationId = conversationId
           if (!currentConversationId) {
-            const newConversation = await createConversation.mutateAsync({
-              title: `Chat with ${formatAgentDisplayName(selectedAgent)}`,
-              starshipId: starshipId,
-              agentSlug: selectedAgent.slug,
-            })
+            const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
+            const title = (() => {
+              const override = typeof newConversationTitleOverride === 'string' ? newConversationTitleOverride.trim() : ''
+              if (override) return override
+              return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(selectedAgent)}`
+            })()
+            const newConversation = await createConversation.mutateAsync(
+              isThreadCreate
+                ? {
+                    title,
+                    starshipId: starshipId,
+                    parentConversationId: newConversationParentConversationId!.trim(),
+                    // IMPORTANT: threads are not channels; server requires at least one linked agent.
+                    agentSlug: selectedAgent.slug,
+                  }
+                : {
+                    title,
+                    starshipId: starshipId,
+                    agentSlug: selectedAgent.slug,
+                  }
+            )
             currentConversationId = newConversation.id
             sendConversationId = currentConversationId
             createdNewConversation = true
+
+            // If this was a draft-thread create, persist the "linked message" now (only on first reply).
+            try {
+              const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+              const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+              if (parentId && msgId) {
+                await linkMessageToConversation.mutateAsync({ messageId: msgId, linkedConversationId: currentConversationId, conversationId: parentId })
+              }
+            } catch {}
 
             // Apply pending web browsing preference if enabled
             await applyPendingWebBrowsing(currentConversationId)
@@ -768,7 +839,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           streamingRef.current = false
         }
       },
-      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, applyPendingWebBrowsing]
+      [
+        sending,
+        disabled,
+        isStreamingEffective,
+        selectedAgent,
+        userId,
+        conversationId,
+        createConversation,
+        linkMessageToConversation,
+        linkMessageToNewConversation,
+        newConversationParentConversationId,
+        newConversationTitleOverride,
+        onConversationStart,
+        onMessageSent,
+        sendMessageFn,
+        starshipId,
+        applyPendingWebBrowsing,
+      ]
     )
 
     // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present

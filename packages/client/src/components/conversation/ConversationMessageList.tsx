@@ -43,9 +43,7 @@ function LinkedConversationCard({
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title =
-    rawTitle ||
-    (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
+  const title = rawTitle || (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
   const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
 

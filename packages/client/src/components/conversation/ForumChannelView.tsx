@@ -53,7 +53,7 @@ export function ForumChannelView(props: { starshipId: string; channelConversatio
       <div className="px-6 py-4 border-b border-border/60 flex items-center justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-muted-foreground">#</span>
+            <Icon name="hash" className="h-4 w-4 text-muted-foreground" />
             <h2 className="text-base font-medium truncate">{label}</h2>
             <span className="text-xs text-muted-foreground border border-border/60 rounded-full px-2 py-0.5">Forum</span>
           </div>

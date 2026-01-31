@@ -447,7 +447,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                         className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
                         onClick={() => handleConversationClick(ch.conversationId)}
                       >
-                        <span className={cn('text-xs font-mono', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                        <Icon name="hash" className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>

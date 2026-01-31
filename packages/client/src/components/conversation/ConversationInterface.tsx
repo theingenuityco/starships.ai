@@ -881,6 +881,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             <ConversationSummaryBar
               conversationId={currentConversationId}
               starshipId={starshipId}
+              titlePrefix={isChannelConversation ? <Icon name="hash" className="h-4 w-4" /> : null}
               modelId={selectedAgent?.model ?? null}
               maxTokens={
                 typeof (selectedAgent as any)?.maxTokens === 'number'

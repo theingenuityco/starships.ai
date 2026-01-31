@@ -17,6 +17,7 @@ const map: Record<string, ResolvedIcon> = {
 
   // Common → Phosphor
   search: { type: 'phosphor', component: 'MagnifyingGlass' },
+  hash: { type: 'phosphor', component: 'Hash' },
   user: { type: 'phosphor', component: 'User' },
   users: { type: 'phosphor', component: 'Users' },
   'user-minus': { type: 'phosphor', component: 'UserMinus' },

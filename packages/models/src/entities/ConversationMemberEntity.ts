@@ -73,4 +73,3 @@ export class ConversationMemberEntity implements ConversationMemberModel {
     }
   }
 }
-

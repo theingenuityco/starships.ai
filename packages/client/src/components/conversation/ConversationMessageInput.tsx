@@ -278,27 +278,27 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       async (approval: any) => {
         const approvalId = String(approval?.id ?? '')
         if (!conversationId || !approvalId || submittingToolApprovalId === approvalId) return
-      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+        // Optimistically hide immediately for snappy UX; refetch will reconcile.
         setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(approvalId))
         setSubmittingToolApprovalId(approvalId)
-      // Immediate UX feedback (do not wait for server-side tool execution).
-      toast.success('Tool approved')
-      try {
+        // Immediate UX feedback (do not wait for server-side tool execution).
+        toast.success('Tool approved')
+        try {
           await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approvalId}/approve`)
-        // IMPORTANT: do NOT await message invalidation here. The messages query is SSE-backed and may never "settle",
-        // which would delay UX feedback like toasts until navigation/unmount.
-        void refreshPendingToolApprovals(conversationId)
-      } catch (e: any) {
-        setOptimisticallyHiddenApprovalIds(prev => {
-          const next = new Set(prev)
+          // IMPORTANT: do NOT await message invalidation here. The messages query is SSE-backed and may never "settle",
+          // which would delay UX feedback like toasts until navigation/unmount.
+          void refreshPendingToolApprovals(conversationId)
+        } catch (e: any) {
+          setOptimisticallyHiddenApprovalIds(prev => {
+            const next = new Set(prev)
             next.delete(approvalId)
-          return next
-        })
-        const msg = e?.message ? String(e.message) : 'Failed to approve tool'
-        toast.error('Failed to approve tool', { description: msg })
-      } finally {
+            return next
+          })
+          const msg = e?.message ? String(e.message) : 'Failed to approve tool'
+          toast.error('Failed to approve tool', { description: msg })
+        } finally {
           setSubmittingToolApprovalId(cur => (cur === approvalId ? null : cur))
-      }
+        }
       },
       [conversationId, submittingToolApprovalId, queryClient, refreshPendingToolApprovals]
     )
@@ -309,33 +309,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (!conversationId || !approvalId || submittingToolApprovalId === approvalId) return
         const agentId = String(approval?.agentId || '')
         const toolSlug = String(approval?.toolSlug || (approval as any)?.toolSlug || '')
-      if (!agentId || !toolSlug) {
-        toast.error('Cannot always-allow', { description: 'Missing agentId or tool slug.' })
-        return
-      }
+        if (!agentId || !toolSlug) {
+          toast.error('Cannot always-allow', { description: 'Missing agentId or tool slug.' })
+          return
+        }
 
-      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+        // Optimistically hide immediately for snappy UX; refetch will reconcile.
         setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(approvalId))
         setSubmittingToolApprovalId(approvalId)
-      // Immediate UX feedback (permission + execution may still fail; we handle errors separately).
-      toast.success('Always allow enabled')
-      try {
-        // 1) Flip permission to allow so future calls don't require approval
-        await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
-        // 2) Approve this pending tool call
+        // Immediate UX feedback (permission + execution may still fail; we handle errors separately).
+        toast.success('Always allow enabled')
+        try {
+          // 1) Flip permission to allow so future calls don't require approval
+          await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
+          // 2) Approve this pending tool call
           await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approvalId}/approve`)
-        void refreshPendingToolApprovals(conversationId)
-      } catch (e: any) {
-        setOptimisticallyHiddenApprovalIds(prev => {
-          const next = new Set(prev)
+          void refreshPendingToolApprovals(conversationId)
+        } catch (e: any) {
+          setOptimisticallyHiddenApprovalIds(prev => {
+            const next = new Set(prev)
             next.delete(approvalId)
-          return next
-        })
-        const msg = e?.message ? String(e.message) : 'Failed to set always-allow'
-        toast.error('Failed to set always-allow', { description: msg })
-      } finally {
+            return next
+          })
+          const msg = e?.message ? String(e.message) : 'Failed to set always-allow'
+          toast.error('Failed to set always-allow', { description: msg })
+        } finally {
           setSubmittingToolApprovalId(cur => (cur === approvalId ? null : cur))
-      }
+        }
       },
       [conversationId, submittingToolApprovalId, queryClient, refreshPendingToolApprovals]
     )
@@ -344,24 +344,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       async (approval: any) => {
         const approvalId = String(approval?.id ?? '')
         if (!conversationId || !approvalId || submittingToolApprovalId === approvalId) return
-      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+        // Optimistically hide immediately for snappy UX; refetch will reconcile.
         setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(approvalId))
         setSubmittingToolApprovalId(approvalId)
-      toast.message('Tool denied')
-      try {
+        toast.message('Tool denied')
+        try {
           await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approvalId}/deny`)
-        void refreshPendingToolApprovals(conversationId)
-      } catch (e: any) {
-        setOptimisticallyHiddenApprovalIds(prev => {
-          const next = new Set(prev)
+          void refreshPendingToolApprovals(conversationId)
+        } catch (e: any) {
+          setOptimisticallyHiddenApprovalIds(prev => {
+            const next = new Set(prev)
             next.delete(approvalId)
-          return next
-        })
-        const msg = e?.message ? String(e.message) : 'Failed to deny tool'
-        toast.error('Failed to deny tool', { description: msg })
-      } finally {
+            return next
+          })
+          const msg = e?.message ? String(e.message) : 'Failed to deny tool'
+          toast.error('Failed to deny tool', { description: msg })
+        } finally {
           setSubmittingToolApprovalId(cur => (cur === approvalId ? null : cur))
-      }
+        }
       },
       [conversationId, submittingToolApprovalId, queryClient, refreshPendingToolApprovals]
     )

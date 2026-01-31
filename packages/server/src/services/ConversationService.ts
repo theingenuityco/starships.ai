@@ -1342,8 +1342,7 @@ export class ConversationService {
         ? initialTargetsUnlinked
         : this.extractMentionedAgents(data.content, conversationAgents);
 
-    const agentQueue: AgentModel[] =
-      initialTargets.length > 0 ? initialTargets.slice() : isChannel ? [] : [conversationAgents[0]];
+    const agentQueue: AgentModel[] = initialTargets.length > 0 ? initialTargets.slice() : isChannel ? [] : [conversationAgents[0]];
     const noAgentToRun = isChannel && agentQueue.length === 0;
     const processedAgents: Set<string> = new Set();
     const maxHops = 5; // prevent infinite handoffs per turn
@@ -1450,8 +1449,7 @@ export class ConversationService {
         // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
         const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
         void _agentPlugins;
-        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } =
-          conversationState as Record<string, unknown>;
+        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
         void _conversationPlugins;
 
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.

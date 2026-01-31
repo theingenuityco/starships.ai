@@ -279,7 +279,8 @@ export class ConversationRepository extends BaseRepository {
         const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
         const pageSize = limit + 1;
 
-        const useCursor = typeof args.beforeCreatedAt === 'string' && typeof args.beforeId === 'string' && args.beforeCreatedAt && args.beforeId;
+        const useCursor =
+          typeof args.beforeCreatedAt === 'string' && typeof args.beforeId === 'string' && args.beforeCreatedAt && args.beforeId;
 
         const rows = await connection.query<Record<string, unknown>>(
           useCursor

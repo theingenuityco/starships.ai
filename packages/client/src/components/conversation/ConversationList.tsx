@@ -27,6 +27,8 @@ import { useAuthContext } from '@/providers/auth-provider'
 
 interface ConversationListProps {
   starshipId: string
+  /** Starship slug to use for navigation when not on a /ship/:slug route (e.g. /marketplace). */
+  starshipSlug?: string
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
@@ -64,6 +66,7 @@ type DmTarget = { kind: 'agent'; key: string; label: string; agent: AgentModel }
 
 export function ConversationList({
   starshipId,
+  starshipSlug,
   onConversationDelete,
   onConversationSelect,
   compact = false,
@@ -73,9 +76,11 @@ export function ConversationList({
 }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
-  const slug = params.slug as string
-  // Get conversationId directly from params - no prop needed
+  const slugFromParams = typeof (params as any)?.slug === 'string' ? String((params as any).slug) : ''
+  const slug = (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? starshipSlug.trim() : slugFromParams) || ''
+  // Current selection can come from either /conversations/:conversationId (DMs) or /channels/:channelSlug (channels).
   const currentConversationId = params.conversationId as string | undefined
+  const currentChannelSlug = params.channelSlug as string | undefined
 
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
@@ -170,8 +175,15 @@ export function ConversationList({
   }
 
   const handleConversationClick = (conversationId: string) => {
-    router.push(`/ship/${slug}/conversations/${conversationId}`)
+    if (!slug) return
+    router.push(`/ship/${slug}/conversations/${encodeURIComponent(conversationId)}`)
     onConversationSelect?.(conversationId)
+  }
+
+  const handleChannelClick = (channelSlug: string) => {
+    if (!slug) return
+    router.push(`/ship/${slug}/channels/${encodeURIComponent(channelSlug)}`)
+    onConversationSelect?.(channelSlug)
   }
 
   const existingDmConversationIdByAgentId = useMemo(() => {
@@ -202,6 +214,7 @@ export function ConversationList({
   }, [directMessagesData?.directMessages])
 
   const openDraftDm = (args: { dmType: 'user_agent' | 'user_user'; agentId?: string; peerUserId?: string; peerLabel?: string; peerAvatar?: string }) => {
+    if (!slug) return
     const sp = new URLSearchParams()
     sp.set('dm', 'draft')
     sp.set('dmType', args.dmType)
@@ -282,8 +295,9 @@ export function ConversationList({
               setNewChannelSlug('')
               setNewChannelName('')
               setNewChannelPrivate(false)
+              // Canonical: navigate by channel slug (not conversationId).
               if (created?.conversationId) {
-                handleConversationClick(String(created.conversationId))
+                handleChannelClick(slug)
               }
             }}
           >
@@ -375,7 +389,9 @@ export function ConversationList({
                 ) : (
                   <div className="space-y-1">
                     {channels.map(ch => {
-                      const isActive = ch.conversationId === currentConversationId
+                      const isActive = currentChannelSlug
+                        ? String(ch.slug || '').trim().toLowerCase() === String(currentChannelSlug || '').trim().toLowerCase()
+                        : ch.conversationId === currentConversationId
                       const label = ch.name || ch.slug
                       return (
                         <div key={ch.conversationId}>
@@ -390,7 +406,7 @@ export function ConversationList({
                               cursor: 'pointer',
                               minHeight: '32px',
                             }}
-                            onClick={() => handleConversationClick(ch.conversationId)}
+                            onClick={() => handleChannelClick(String(ch.slug))}
                           >
                             <div
                               className="flex-shrink-0"
@@ -529,13 +545,15 @@ export function ConversationList({
             ) : (
               <div className="space-y-1">
                 {channels.map(ch => {
-                  const isActive = ch.conversationId === currentConversationId
+                  const isActive = currentChannelSlug
+                    ? String(ch.slug || '').trim().toLowerCase() === String(currentChannelSlug || '').trim().toLowerCase()
+                    : ch.conversationId === currentConversationId
                   const label = ch.name || ch.slug
                   return (
                     <div key={ch.conversationId}>
                       <div
                         className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
-                        onClick={() => handleConversationClick(ch.conversationId)}
+                        onClick={() => handleChannelClick(String(ch.slug))}
                       >
                         <Icon name="hash" className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
                         <div className="flex-1 min-w-0">

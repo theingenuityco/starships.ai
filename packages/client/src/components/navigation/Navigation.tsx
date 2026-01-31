@@ -117,7 +117,7 @@ export function Navigation(props: NavigationProps) {
       }
       // If we're in a specific conversation, don't carry the conversationId across starships.
       // It may not exist / be accessible in the destination starship.
-      if (p.includes('/conversations/')) {
+      if (p.includes('/conversations/') || p.includes('/channels/')) {
         return `/ship/${nextSlug}`
       }
       const parts = p.split('/')
@@ -421,6 +421,7 @@ export function Navigation(props: NavigationProps) {
               <div className="flex-1 min-h-0 overflow-hidden pb-2">
                 <ConversationList
                   starshipId={starshipData.id}
+                  starshipSlug={activeStarshipSlug || undefined}
                   compact={true}
                   onboardingChannelsAnchorRef={channelsRef}
                   onboardingDirectMessagesAnchorRef={directMessagesRef}

@@ -15,7 +15,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth, useAuthUser } from '@/hooks/useAuth'
 import { useStarshipAgents } from '@/hooks/useAgents'
-import { useStarshipChannels, useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversations, usePendingToolApprovalsMulti, useConversationDetail } from '@/hooks/useConversations'
+import { useStarshipChannels, useStarshipConversations, CONVERSATION_QUERY_KEYS, useChildConversationsPendingApprovals, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
@@ -276,28 +276,23 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Child conversation approvals: if any child conversation is awaiting tool approval,
   // show a compact callout above the parent composer.
   const shouldCheckChildApprovals = Boolean(currentConversationId && !isForumChannel)
-  const { data: childConversations = [] } = useChildConversations(currentConversationId, shouldCheckChildApprovals)
-  const childConversationIds = useMemo(() => (Array.isArray(childConversations) ? childConversations.map((c: any) => String(c.id)).filter(Boolean) : []), [childConversations])
-  const { byConversationId: pendingApprovalsByChildId } = usePendingToolApprovalsMulti(childConversationIds, Boolean(shouldCheckChildApprovals && childConversationIds.length > 0))
-  const childWithPendingApproval = useMemo(() => {
-    if (!Array.isArray(childConversations) || childConversations.length === 0) return null
-    const withPending = childConversations
-      .map((c: any) => {
-        const id = String(c?.id || '')
-        const pending = (pendingApprovalsByChildId[id] || []) as any[]
-        const updatedAt = typeof c?.updatedAt === 'string' ? c.updatedAt : typeof c?.createdAt === 'string' ? c.createdAt : ''
-        const agentFromList = Array.isArray(c?.agents) && c.agents.length > 0 ? c.agents[0] : null
-        const agentName =
-          (agentFromList ? formatAgentDisplayName(agentFromList) : '') ||
-          (conversationAgentNameById && conversationAgentNameById[id]?.agentName ? String(conversationAgentNameById[id]?.agentName) : '') ||
-          'A child agent'
-        return { conversation: c, id, pendingCount: pending.length, updatedAt, agentName }
-      })
-      .filter(x => x.id && x.pendingCount > 0)
-    if (withPending.length === 0) return null
-    withPending.sort((a, b) => Date.parse(b.updatedAt || '0') - Date.parse(a.updatedAt || '0'))
-    return withPending[0]
-  }, [childConversations, pendingApprovalsByChildId, conversationAgentNameById])
+  const { children: childPendingApprovals = [] } = useChildConversationsPendingApprovals(currentConversationId, {
+    enabled: shouldCheckChildApprovals,
+    limit: 10,
+  })
+  const childWithPendingApprovalResolved = useMemo(() => {
+    if (!Array.isArray(childPendingApprovals) || childPendingApprovals.length === 0) return null
+    const best = childPendingApprovals
+      .filter(x => x && typeof x.id === 'string' && x.id.trim().length > 0 && Number(x.pendingCount) > 0)
+      .sort((a, b) => Date.parse(String(b.updatedAt || '0')) - Date.parse(String(a.updatedAt || '0')))[0]
+    if (!best) return null
+    const id = String(best.id)
+    const agentName =
+      String(best.agentName || '').trim() ||
+      (conversationAgentNameById && conversationAgentNameById[id]?.agentName ? String(conversationAgentNameById[id]?.agentName) : '') ||
+      'A child agent'
+    return { id, pendingCount: Number(best.pendingCount) || 0, agentName }
+  }, [childPendingApprovals, conversationAgentNameById])
 
   // Build suggestion cards from the selected agent's preview/example prompts
   const agentSuggestionCards = useMemo(() => {
@@ -1021,6 +1016,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 <ConversationMessageList
                   conversationId={currentConversationId}
                   starshipId={starshipId}
+                  channelName={isChannelConversation ? (typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null) : null}
                   bottomPaddingPx={inputHeight + 24}
                   enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}
@@ -1038,8 +1034,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                     // - If started from an assistant message: use that agent as the thread default (if resolvable)
                     // - If started from any other message: no default agent
                     const lm = linkedMessage ?? null
-                    const lmAgentId = lm?.role === 'assistant' ? lm.agentId ?? null : null
-                    const defaultAgent = lmAgentId ? starshipAgentsData.find(a => a.id === lmAgentId) ?? null : null
+                    const lmAgentId = lm?.role === 'assistant' ? (lm.agentId ?? null) : null
+                    const defaultAgent = lmAgentId ? (starshipAgentsData.find(a => a.id === lmAgentId) ?? null) : null
                     onOpenThread?.({ conversationId, defaultAgent, linkedMessage: lm, parentConversationId: parentConversationId ?? null })
                   }}
                 />
@@ -1049,12 +1045,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             </div>
             {submittedQuery.trim() ? (
               <div ref={searchSidebarRef} className="flex flex-col min-h-0 h-full">
-                <SearchResultsSidebar
-                  query={submittedQuery}
-                  results={searchResults}
-                  onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
-                  onClose={closeSearchSidebar}
-                />
+                <SearchResultsSidebar query={submittedQuery} results={searchResults} onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)} onClose={closeSearchSidebar} />
               </div>
             ) : null}
           </div>
@@ -1081,14 +1072,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               </div>
 
               <div key="message-input">
-                {childWithPendingApproval && (
+                {childWithPendingApprovalResolved && (
                   <ChildConversationApprovalCallout
-                    title={String((childWithPendingApproval as any)?.agentName || 'A child agent')}
-                    pendingCount={childWithPendingApproval.pendingCount}
+                    title={String((childWithPendingApprovalResolved as any)?.agentName || 'A child agent')}
+                    pendingCount={childWithPendingApprovalResolved.pendingCount}
                     disabled={!starshipSlug}
                     onOpenChildConversation={() => {
                       if (!starshipSlug) return
-                      router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(childWithPendingApproval.id)}`)
+                      router.push(`/ship/${starshipSlug}/conversations/${encodeURIComponent(childWithPendingApprovalResolved.id)}`)
                     }}
                   />
                 )}

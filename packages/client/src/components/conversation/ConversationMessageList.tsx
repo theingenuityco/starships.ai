@@ -61,7 +61,7 @@ function LinkedConversationCard({
   // In channel mode, open the thread pane (no navigation).
   if (enableChannelMessageThreads) {
     return (
-      <div className="mt-2 w-full">
+      <div className="mt-2 mb-2 w-full -mx-2">
         <button
           type="button"
           className="group text-left w-full"
@@ -80,7 +80,7 @@ function LinkedConversationCard({
   // Non-channel mode: link to the child conversation route.
   if (!linkedConversationHref) return null
   return (
-    <div className="mt-2 w-full">
+    <div className="mt-2 mb-2 w-full -mx-2">
       <Link href={linkedConversationHref} className="block group w-full">
         {cardInner}
       </Link>

@@ -1494,6 +1494,52 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return null
   }, [chunksRevisionKey])
 
+  // Consume non-render UI actions that should update query caches.
+  //
+  // Why:
+  // Some UI actions (like `conversation_title_updated`) are emitted on the conversation's SSE stream,
+  // but the UI component showing the title (e.g. a linked thread card elsewhere) relies on cached
+  // `useConversationDetail()` data. Without invalidation, the title can remain stale for up to the
+  // query staleTime.
+  const lastProcessedUIActionKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!lastUIAction) return
+    try {
+      const key = JSON.stringify(lastUIAction)
+      if (lastProcessedUIActionKeyRef.current === key) return
+      lastProcessedUIActionKeyRef.current = key
+
+      const action = typeof (lastUIAction as any)?.action === 'string' ? String((lastUIAction as any).action) : ''
+      const payload = (lastUIAction as any)?.payload
+
+      switch (action) {
+        case 'tool_approval_required':
+        case 'tool_approval_resolved': {
+          const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
+          if (cid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(cid) })
+          break
+        }
+        case 'conversation_title_updated': {
+          const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
+          if (cid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
+          if (starshipId) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
+          break
+        }
+        case 'child_conversation_created': {
+          const parentId = typeof payload?.parentConversationId === 'string' ? String(payload.parentConversationId) : ''
+          const sid = typeof payload?.starshipId === 'string' ? String(payload.starshipId) : starshipId || ''
+          if (sid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
+          if (parentId) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.children(parentId) })
+          break
+        }
+        default:
+          break
+      }
+    } catch {
+      // ignore UI action parsing failures
+    }
+  }, [lastUIAction, queryClient, starshipId])
+
   type HistoryCursor = { createdAt: string; id: string }
   const latestSnapshot = useMemo(() => {
     if (!Array.isArray(chunks) || chunks.length === 0) {

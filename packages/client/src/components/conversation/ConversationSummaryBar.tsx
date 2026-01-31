@@ -294,6 +294,9 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
 
   // Track if this is the initial mount to prevent animation on page reload
   const isInitialMountRef = useRef(true)
+  // If we ever rendered the loading header for this conversationId,
+  // don't animate the "real" header in from the top when data arrives.
+  const renderedPlaceholderForConversationRef = useRef(false)
   useEffect(() => {
     // Mark initial mount as complete after a short delay
     const timer = setTimeout(() => {
@@ -302,11 +305,24 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     return () => clearTimeout(timer)
   }, [])
 
+  // Reset placeholder tracking when switching conversations.
+  useEffect(() => {
+    renderedPlaceholderForConversationRef.current = false
+  }, [conversationId])
+
   // Reserve space even when loading to prevent layout shift
   // Show placeholder if: no conversationId, no currentConversation, or data is still loading
   if (!conversationId || !isDataReady) {
-    const effectiveFallbackTitle = typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0 ? fallbackTitle.trim() : 'Loading...'
+    renderedPlaceholderForConversationRef.current = true
+    const effectiveFallbackTitle =
+      typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0
+        ? fallbackTitle.trim()
+        : !conversationId
+          ? 'Draft'
+          : 'Loading...'
     const effectiveFallbackSubtitle = typeof fallbackSubtitle === 'string' && fallbackSubtitle.trim().length > 0 ? fallbackSubtitle.trim() : null
+    // Draft threads intentionally do not fetch participants/metadata until the first message persists the conversation.
+    const isDraftHeader = !conversationId && (Boolean(fallbackTitle) || Boolean(fallbackSubtitle))
 
     return (
       <div className="sticky top-0 z-10 bg-card/95 supports-[backdrop-filter]:bg-card/80 backdrop-blur border-b border-border/60">
@@ -327,28 +343,58 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                   </h3>
                 </div>
                 {/* Agents + updated row - exact structural match with same classes */}
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                  {/* Agent placeholder - matches exact structure */}
-                  <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                    <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                      <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
-                    </Avatar>
-                    <span className="truncate font-medium leading-none opacity-50">Loading...</span>
-                  </div>
-                  {/* Separator and updated text - exact match */}
-                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                    <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
-                  </span>
-                  {showTokens ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
+                  {isDraftHeader ? (
                     <>
-                      {/* Token indicator placeholder (reserved space) */}
+                      {/* Draft placeholder uses the same structure as the loaded header to preserve height */}
+                      <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                        <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                          <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
+                            <div className="h-4 w-4 rounded-full bg-muted/30" />
+                          </Avatar>
+                          <span className="truncate font-medium leading-none opacity-70">Draft</span>
+                        </div>
+                      </div>
                       <span className="inline-flex items-center gap-2 whitespace-nowrap">
                         <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                        <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
+                        <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
                       </span>
+                      {showTokens ? (
+                        <>
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/20" aria-hidden="true" />
+                          </span>
+                        </>
+                      ) : null}
                     </>
-                  ) : null}
+                  ) : (
+                    <>
+                      {/* Agent placeholder - matches exact structure */}
+                      <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                        <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                          <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                            <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                          </Avatar>
+                          <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                        </div>
+                      </div>
+                      {/* Separator and updated text - exact match */}
+                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                        <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                        <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
+                      </span>
+                      {showTokens ? (
+                        <>
+                          {/* Token indicator placeholder (reserved space) */}
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
+                          </span>
+                        </>
+                      ) : null}
+                    </>
+                  )}
                 </div>
 
                 {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
@@ -429,10 +475,10 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   return (
     <motion.div
       key={animationKey}
-      initial={isInitialMountRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
+      initial={isInitialMountRef.current || renderedPlaceholderForConversationRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={
-        isInitialMountRef.current
+        isInitialMountRef.current || renderedPlaceholderForConversationRef.current
           ? { duration: 0 }
           : {
               duration: 0.5,
@@ -473,7 +519,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                         <button
                           type="button"
                           ref={participantsTriggerRef}
-                          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                           aria-label={`Participants: ${participantsLabel}`}
                           title={participantsLabel}
                           onPointerEnter={openParticipantsPopover}
@@ -483,20 +529,20 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                             setParticipantsOpen(true)
                           }}
                         >
-                          <div className="flex items-center -space-x-2">
+                          <div className="flex items-center -space-x-1.5">
                             {participantItems.slice(0, 3).map(p => {
                               if (p.kind === 'agent') {
                                 const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                                 return (
-                                  <div key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                                    <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={24} rounded />
+                                  <div key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                    <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
                                   </div>
                                 )
                               }
                               return (
-                                <Avatar key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                                <Avatar key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
                                   {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                                  <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                  <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                                 </Avatar>
                               )
                             })}

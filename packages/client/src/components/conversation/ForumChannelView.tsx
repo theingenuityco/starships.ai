@@ -3,19 +3,26 @@
 import Icon from '@/components/primitives/Icon'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useChildConversations, useCreateConversation } from '@/hooks/useConversations'
+import { useChildConversations } from '@/hooks/useConversations'
 import type { AgentModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
 import { useMemo } from 'react'
 
-export function ForumChannelView(props: { starshipId: string; channelConversationId: string; channelSlug?: string | null; channelName?: string | null; starshipSlug?: string | null }) {
+export function ForumChannelView(props: {
+  starshipId: string
+  channelConversationId: string
+  channelSlug?: string | null
+  channelName?: string | null
+  starshipSlug?: string | null
+  /** Open a draft thread (no persistence until first message). */
+  onCreateDraftThread?: () => void
+}) {
   const router = useRouter()
   const params = useParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
 
   const { data: children = [], isLoading } = useChildConversations(props.channelConversationId, true)
-  const createConversation = useCreateConversation()
 
   const sortedChildren = useMemo(() => {
     const list = Array.isArray(children) ? children.slice() : []
@@ -39,13 +46,15 @@ export function ForumChannelView(props: { starshipId: string; channelConversatio
     router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(conversationId)}`)
   }
 
-  const onCreateThread = async () => {
-    const created = await createConversation.mutateAsync({
-      starshipId: props.starshipId,
-      title: 'New thread',
-      parentConversationId: props.channelConversationId,
-    })
-    if (created?.id) onOpenChild(String(created.id))
+  const onCreateThread = () => {
+    // Prefer opening a draft thread pane (no persistence until first message).
+    if (props.onCreateDraftThread) {
+      props.onCreateDraftThread()
+      return
+    }
+    // Fallback: if no handler was provided, navigate to the channel route (no create).
+    if (!effectiveStarshipSlug) return
+    router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(props.channelConversationId)}?thread=draft`)
   }
 
   return (
@@ -59,9 +68,9 @@ export function ForumChannelView(props: { starshipId: string; channelConversatio
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">Threads are separate conversations. Create a thread to start.</p>
         </div>
-        <Button type="button" size="sm" onClick={onCreateThread} disabled={createConversation.isPending || !effectiveStarshipSlug}>
+        <Button type="button" size="sm" onClick={onCreateThread} disabled={!effectiveStarshipSlug}>
           <Icon name="plus" className="h-4 w-4 mr-1" />
-          {createConversation.isPending ? 'Creating…' : 'New thread'}
+          New thread
         </Button>
       </div>
 
@@ -79,7 +88,7 @@ export function ForumChannelView(props: { starshipId: string; channelConversatio
             </div>
             <p className="text-sm text-foreground">No threads yet</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-sm">This channel is a forum. Create a thread to start a new conversation.</p>
-            <Button className="mt-4" type="button" onClick={onCreateThread} disabled={createConversation.isPending || !effectiveStarshipSlug}>
+            <Button className="mt-4" type="button" onClick={onCreateThread} disabled={!effectiveStarshipSlug}>
               <Icon name="plus" className="h-4 w-4 mr-1" />
               New thread
             </Button>

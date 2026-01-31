@@ -865,6 +865,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           channelSlug={typeof (currentChannel as any)?.slug === 'string' ? String((currentChannel as any).slug) : null}
           channelName={typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null}
           starshipSlug={starshipSlug ?? null}
+          onCreateDraftThread={() => {
+            // Open a draft thread in the thread pane without persisting a conversation yet.
+            // The conversation is created on the first message send from the thread composer.
+            const defaultAgent = (selectedAgent ?? pickDefaultAgent(starshipAgentsData as any)) as any
+            onOpenThread?.({ conversationId: null, defaultAgent, linkedMessage: null, parentConversationId: currentConversationId })
+          }}
         />
       </div>
     )

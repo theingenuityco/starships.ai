@@ -40,13 +40,13 @@ function LinkedConversationCard({
 }) {
   const { data: conversation } = useConversationDetail(linkedConversationId)
   const { data: agents = [] } = useConversationAgents(linkedConversationId)
-
-  if (!linkedConversationId) return null
+  const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
-  const title = rawTitle || `Conversation ${linkedConversationId.slice(0, 8)}`
+  const title =
+    rawTitle ||
+    (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
 
-  const agentList = (Array.isArray(agents) ? agents : []) as any[]
   const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
 
   const avatarAttachmentIds = useMemo(() => {
@@ -62,6 +62,7 @@ function LinkedConversationCard({
     queryKey: ['conversations', 'participants-preview', linkedConversationId],
     enabled: Boolean(linkedConversationId),
     queryFn: async () => {
+      if (!linkedConversationId) return null
       const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 50 } })
       return (resp as any)?.data?.data ?? null
     },
@@ -112,6 +113,10 @@ function LinkedConversationCard({
     if (labels.length <= 3) return labels.join(', ')
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
   }, [participantItems])
+
+  // IMPORTANT: Don't early-return before hooks, or we can change hook ordering
+  // between renders when `linkedConversationId` flips from null -> string.
+  if (!linkedConversationId) return null
 
   const cardInner = (
     <div className="w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3">

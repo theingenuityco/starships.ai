@@ -19,7 +19,6 @@ import { AGENT_QUERY_KEYS, useAgent, useStarshipAgents } from '@/hooks/useAgents
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useAuth } from '@/hooks/useAuth'
 import { Badge } from '@/components/ui/badge'
-import { Breadcrumb, BreadcrumbItem, BreadcrumbLink, BreadcrumbList, BreadcrumbPage, BreadcrumbSeparator } from '@/components/ui/breadcrumb'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'

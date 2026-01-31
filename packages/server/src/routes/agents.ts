@@ -12,9 +12,11 @@ import { verifyStarshipAccess, verifyResourceAccess } from '@/middleware/verify-
 import { StarshipService } from '@/services/StarshipService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { AvatarGenerationService } from '@/services/AvatarGenerationService';
+import { ProfileImageGenerationService } from '@/services/ProfileImageGenerationService';
 import { AttachmentService } from '@/services/AttachmentService';
 import { ImportExportService } from '@/services/ImportExportService';
 import { triggerNextRevalidate } from '@/utils/nextRevalidate';
+import { buildAutopilotExecutionBundle } from '@/services/autopilot-execution-bundle';
 
 const router: Router = Router();
 
@@ -111,6 +113,11 @@ const UpdateAgentSchema = z.object({
   previewPrompts: PreviewPromptsSchema.optional(),
   starshipId: z.string().min(1, 'Starship ID is required').optional(),
   state: z.record(z.string(), z.unknown()).optional(), // Allow state updates (e.g., for plugins)
+  avatarAttachmentId: z.string().min(1).max(255).optional(),
+  avatarPrompt: z.string().max(8000).optional(),
+  problemStatementsAttachmentId: z.string().min(1).max(255).optional(),
+  capabilitiesAttachmentId: z.string().min(1).max(255).optional(),
+  tryThesePromptsAttachmentId: z.string().min(1).max(255).optional(),
 });
 
 const StarshipAssignmentSchema = z.object({
@@ -520,6 +527,13 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
     const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
     if (!hasAccess) return;
 
+    // Build engine config with modelRoutes so the remote runner can route the agent's model.
+    const { engineConfig: engineConfigFromHost } = await buildAutopilotExecutionBundle({
+      starshipId: agent.starshipId,
+      authUserId: req.user!.id,
+      runtimeEnv: { STARSHIP_ID: agent.starshipId },
+    });
+
     // Ensure we have an agent-authored "mirror" description saved for this agent.
     const generator = new AvatarGenerationService();
     let avatarPrompt = agent.avatarPrompt;
@@ -542,6 +556,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
             ? ((agent.state as { tools: unknown[] }).tools as unknown[])
             : [],
         starshipId: agent.starshipId,
+        engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
       });
       avatarPrompt = mirrorResult.description;
       // Persist on agent for future avatar generations
@@ -554,6 +569,7 @@ router.post('/agents/:id/avatar/generate', jwtAuthMiddleware, async (req: Reques
       subjectDescription: agent.description,
       subjectAvatarPrompt: avatarPrompt,
       starshipId: agent.starshipId,
+      engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
     });
 
     // Store as attachment (auth-scoped)
@@ -617,6 +633,198 @@ router.delete('/agents/:id/avatar', jwtAuthMiddleware, async (req: Request, res:
     sendSuccess(res, { agent: updated });
   } catch (error) {
     handleError(error, res, 'deleting agent avatar');
+  }
+});
+
+/**
+ * POST /agents/:id/profile-images/generate
+ * Generates a profile image (Problem Statements, Capabilities, or Try These Prompts)
+ * via OpenRouter image model and stores it as an attachment.
+ */
+router.post('/agents/:id/profile-images/generate', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+    const { id: agentId } = paramValidation;
+
+    const bodyValidation = validateData(
+      z.object({
+        type: z.enum(['problem_statements', 'capabilities', 'try_these_prompts']),
+      }),
+      (req.body ?? {}) as unknown,
+      res,
+      'profile image generation options'
+    );
+    if (!bodyValidation) return;
+    const { type } = bodyValidation;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    // Access check: caller must have access to the agent's starship
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    // Require avatarPrompt for profile image generation
+    if (!agent.avatarPrompt || agent.avatarPrompt.trim().length === 0) {
+      sendError(
+        res,
+        'VALIDATION_ERROR',
+        'Avatar prompt is required. Please generate an avatar first, or use "Reset & Generate" on the avatar.',
+        400
+      );
+      return;
+    }
+
+    // Fetch tools to build core capabilities
+    const tools = await agentService.getAgentTools(agentId, agent.starshipId);
+    let coreCapabilities: string;
+    if (tools.length > 0) {
+      coreCapabilities = tools.map((t) => t.name || t.slug).join(', ');
+    } else {
+      // Fallback: use role + description
+      const parts: string[] = [];
+      if (agent.role) parts.push(agent.role);
+      if (agent.description) {
+        const desc = agent.description.length > 100 ? agent.description.slice(0, 100) + '...' : agent.description;
+        parts.push(desc);
+      }
+      coreCapabilities = parts.join(' — ') || 'general assistance';
+    }
+
+    // Truncate if too long
+    if (coreCapabilities.length > 200) {
+      coreCapabilities = coreCapabilities.slice(0, 197) + '...';
+    }
+
+    // Build domain context
+    let domainContext: string;
+    if (agent.description) {
+      const firstSentence = agent.description.split(/[.!?]/)[0].trim();
+      if (firstSentence.length > 0 && firstSentence.length <= 100) {
+        domainContext = firstSentence;
+      } else {
+        domainContext = agent.description.slice(0, 100).trim();
+      }
+    } else {
+      domainContext = agent.role || 'general assistance';
+    }
+
+    // Build engine config with modelRoutes so the remote runner can route the image model.
+    const { engineConfig: engineConfigFromHost } = await buildAutopilotExecutionBundle({
+      starshipId: agent.starshipId,
+      authUserId: req.user!.id,
+      runtimeEnv: { STARSHIP_ID: agent.starshipId },
+    });
+
+    // Generate profile image
+    const generator = new ProfileImageGenerationService();
+    const gen = await generator.generateProfileImage(agent, type, {
+      coreCapabilities,
+      domainContext,
+      engineConfigFromHost: engineConfigFromHost as Record<string, unknown>,
+    });
+
+    // Store as attachment (auth-scoped)
+    const attachmentService = new AttachmentService();
+    const typeSlug = type.replace(/_/g, '-');
+    const filename = `agent-${agent.slug || agent.id}-${typeSlug}.${
+      gen.mimeType.includes('webp') ? 'webp' : gen.mimeType.includes('png') ? 'png' : gen.mimeType.includes('jpeg') ? 'jpg' : 'img'
+    }`;
+    const attachment = await attachmentService.createAttachment({
+      starshipId: agent.starshipId,
+      conversationId: `agent-profile-${agent.id}-${type}`,
+      filename,
+      mimeType: gen.mimeType,
+      buffer: gen.buffer,
+    });
+
+    // Map type to field name
+    const fieldMap: Record<string, keyof Pick<AgentModel, 'problemStatementsAttachmentId' | 'capabilitiesAttachmentId' | 'tryThesePromptsAttachmentId'>> = {
+      problem_statements: 'problemStatementsAttachmentId',
+      capabilities: 'capabilitiesAttachmentId',
+      try_these_prompts: 'tryThesePromptsAttachmentId',
+    };
+
+    const fieldName = fieldMap[type];
+    if (!fieldName) {
+      sendError(res, 'VALIDATION_ERROR', `Invalid type: ${type}`, 400);
+      return;
+    }
+
+    // Persist link on agent
+    const updated = await agentService.updateAgent(agent.id, { [fieldName]: attachment.id });
+
+    sendSuccess(res, {
+      agent: updated,
+      attachment,
+    });
+  } catch (error) {
+    handleError(error, res, 'generating profile image');
+  }
+});
+
+/**
+ * DELETE /agents/:id/profile-images/:type
+ * Removes the stored profile image reference (and deletes the attachment).
+ */
+router.delete('/agents/:id/profile-images/:type', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(
+      z.object({
+        id: IdSchema,
+        type: z.enum(['problem_statements', 'capabilities', 'try_these_prompts']),
+      }),
+      req.params,
+      res,
+      'agent and type parameters'
+    );
+    if (!paramValidation) return;
+    const { id: agentId, type } = paramValidation;
+
+    const agentService = new AgentService();
+    const agent = await agentService.getAgent(agentId);
+    if (!agent) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', id: agentId });
+      return;
+    }
+
+    const hasAccess = await verifyResourceAccess(agent.starshipId, req.user!.id, 'agent', agentId, res);
+    if (!hasAccess) return;
+
+    // Map type to field name
+    const fieldMap: Record<string, keyof Pick<AgentModel, 'problemStatementsAttachmentId' | 'capabilitiesAttachmentId' | 'tryThesePromptsAttachmentId'>> = {
+      problem_statements: 'problemStatementsAttachmentId',
+      capabilities: 'capabilitiesAttachmentId',
+      try_these_prompts: 'tryThesePromptsAttachmentId',
+    };
+
+    const fieldName = fieldMap[type];
+    if (!fieldName) {
+      sendError(res, 'VALIDATION_ERROR', `Invalid type: ${type}`, 400);
+      return;
+    }
+
+    const attachmentId = agent[fieldName];
+    if (attachmentId) {
+      const attachmentService = new AttachmentService();
+      try {
+        await attachmentService.deleteAttachment(attachmentId, agent.starshipId);
+      } catch (e) {
+        // Non-fatal; proceed to detach
+        console.warn('[AGENT-PROFILE-IMAGE] Failed to delete attachment:', e instanceof Error ? e.message : String(e));
+      }
+    }
+
+    const updated = await agentService.updateAgent(agent.id, { [fieldName]: undefined });
+
+    sendSuccess(res, { agent: updated });
+  } catch (error) {
+    handleError(error, res, 'deleting profile image');
   }
 });
 
@@ -770,7 +978,121 @@ router.get('/admin/agents/:id/tools', async (req: Request, res: Response): Promi
   }
 });
 
-// POST /admin/agents/:id/approve - Approve pending agent publication
+// POST /agents/:id/publication/prepare - Prepare publication (generate missing marketing content)
+router.post('/agents/:id/publication/prepare', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const result = await agentService.preparePublication(agentId, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Marketing content prepared',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error preparing publication:', error);
+    handleError(error, res, 'preparing publication');
+  }
+});
+
+// POST /agents/:id/publication/regenerate - Regenerate specific marketing content item
+router.post('/agents/:id/publication/regenerate', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const bodyValidation = validateData(
+      z.object({
+        templateId: IdSchema,
+        type: z.enum(['avatar', 'problem_statements_text', 'problem_statements_image', 'capabilities_image', 'try_these_prompts_image']),
+      }),
+      req.body,
+      res,
+      'regenerate request'
+    );
+    if (!bodyValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const { templateId, type } = bodyValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const result = await agentService.regenerateMarketingContent(agentId, templateId, type, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Marketing content regenerated',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error regenerating marketing content:', error);
+    handleError(error, res, 'regenerating marketing content');
+  }
+});
+
+// PUT /agents/:id/publication/problem-statements - Update problem statements
+router.put('/agents/:id/publication/problem-statements', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const bodyValidation = validateData(
+      z.object({
+        templateId: IdSchema,
+        statements: z.array(z.string().min(1).max(200)).min(1).max(5),
+      }),
+      req.body,
+      res,
+      'problem statements update'
+    );
+    if (!bodyValidation) return;
+
+    const { templateId, statements } = bodyValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const result = await agentService.updateProblemStatements(templateId, statements, adminUserId);
+
+    sendSuccess(res, {
+      message: 'Problem statements updated',
+      ...result,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error updating problem statements:', error);
+    handleError(error, res, 'updating problem statements');
+  }
+});
+
+// POST /agents/:id/publication/confirm - Confirm publication (final step)
+router.post('/agents/:id/publication/confirm', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
+    if (!paramValidation) return;
+
+    const { id: agentId } = paramValidation;
+    const adminUserId = req.user!.id;
+
+    const agentService = new AgentService();
+    const updated = await agentService.confirmPublication(agentId, adminUserId);
+
+    // Refresh marketing/marketplace ISR immediately (keep SEO, avoid staleness).
+    triggerNextRevalidate({ tags: ['public-agent-templates'] });
+
+    sendSuccess(res, {
+      message: 'Agent publication confirmed',
+      agent: updated,
+    });
+  } catch (error) {
+    console.error('[AGENTS] Error confirming publication:', error);
+    handleError(error, res, 'confirming publication');
+  }
+});
+
+// POST /admin/agents/:id/approve - Approve pending agent publication (legacy - now uses two-step flow)
 router.post('/admin/agents/:id/approve', async (req: Request, res: Response): Promise<void> => {
   try {
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'agent parameter');
@@ -780,7 +1102,9 @@ router.post('/admin/agents/:id/approve', async (req: Request, res: Response): Pr
     const adminUserId = req.user!.id;
 
     const agentService = new AgentService();
-    const updated = await agentService.approvePublication(agentId, adminUserId);
+    // For backwards compatibility, prepare then confirm
+    await agentService.preparePublication(agentId, adminUserId);
+    const updated = await agentService.confirmPublication(agentId, adminUserId);
 
     // Refresh marketing/marketplace ISR immediately (keep SEO, avoid staleness).
     triggerNextRevalidate({ tags: ['public-agent-templates'] });

@@ -15,6 +15,9 @@ import { useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateAgentFromTemplate } from '@/hooks/useTemplates'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { track } from '@/lib/analytics'
+import api from '@/lib/api'
+import type { AgentToolPermission, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
+import { toast } from 'sonner'
 
 interface AgentDetailsModalProps {
   template: AgentTemplateModel | null
@@ -66,16 +69,28 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
     setShowConfirmationModal(true)
   }
 
-  const handleConfirmDeploy = async () => {
+  const handleConfirmDeploy = async (input?: { toolPermissions?: Record<string, AgentToolPermission> }) => {
     if (!template) return
     if (!primaryStarship) return
     setIsDeploying(true)
     try {
-      await createAgentMutation.mutateAsync({
+      const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
         starshipSlug: primaryStarship.slug,
       })
+      const agentId = (created as any)?.id as string | undefined
+      const toolPermissions = input?.toolPermissions
+      if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
+        const body: UpdateAgentToolPermissionsRequest = {
+          permissions: Object.entries(toolPermissions).map(([toolSlug, permission]) => ({ toolSlug, permission })),
+        }
+        try {
+          await api.put(`/api/v1/agents/${agentId}/tool-permissions`, body)
+        } catch (e: any) {
+          toast.error('Permissions not saved', { description: e?.response?.data?.error || e?.message || 'Agent deployed, but tool permissions could not be updated.' })
+        }
+      }
       onDeploy?.(template)
       onOpenChange(false)
     } catch {

@@ -35,7 +35,7 @@ import type {
 import { MessageService } from './MessageService';
 import { ConnectorSecretService } from './ConnectorSecretService';
 import { isInstanceAdmin } from '../utils/auth-helpers';
-import { AttachmentService } from './AttachmentService';
+import { PublicationService } from './PublicationService';
 
 export interface ConversationRequest {
   agentId: string;
@@ -807,13 +807,12 @@ export class AgentService {
   }
 
   // ============================================================================
-  // PUBLICATION WORKFLOW
+  // PUBLICATION WORKFLOW (delegated to PublicationService)
   // ============================================================================
 
   /**
    * Request publication for an agent (owner or instance admin)
-   * Moves agent from draft/rejected to pending_approval and records
-   * the desired version bump and changelog.
+   * Delegates to PublicationService for cleaner separation of concerns.
    */
   async requestPublication(
     agentId: string,
@@ -824,445 +823,87 @@ export class AgentService {
       toolOverrides?: { toolId: string; versionBump: 'patch' | 'minor' | 'major'; changelog: string }[];
     }
   ): Promise<AgentModel> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    // Deployed marketplace agents cannot be modified/published directly; copy first.
-    this.assertAgentIsEditable(agent, 'publish');
-
-    // Enforce that only the owner of the agent's starship or an instance admin
-    // can request publication. Routes already gate this, but we repeat the
-    // check here for defense-in-depth in case the service is called directly.
-    const userRepo = new UserRepository();
-    const user = (await userRepo.findById(userId)) as UserModel | null;
-    const isAdmin = isInstanceAdmin(user);
-
-    if (!isAdmin) {
-      const starship = await this.starshipRepository.findById(agent.starshipId);
-      if (!starship || starship.ownerId !== userId) {
-        throw new ForbiddenError('You do not have permission to request publication for this agent');
-      }
-    }
-
-    if (agent.publicationStatus === 'pending_approval') {
-      throw new ValidationError('Agent is already pending approval');
-    }
-
-    // For agents that have already been promoted into a template (publishedTemplateId),
-    // allow requesting publication again so a new version can be reviewed.
-    // We intentionally no longer enforce a strict diff check between the agent and its
-    // published template here because important changes (like tool assignments or other
-    // relationships) may not be reflected in the core template fields alone.
-    if (agent.publicationStatus === 'published') {
-      if (!agent.publishedTemplateId) {
-        throw new ValidationError('Agent is already published');
-      }
-
-      const templateRepo = new AgentTemplateRepository();
-      const template = await templateRepo.findById(agent.publishedTemplateId);
-      if (!template) {
-        throw new NotFoundError('AgentTemplate', agent.publishedTemplateId);
-      }
-    }
-
-    // Optionally record per-tool publication metadata for this request.
-    const toolOverrides = options.toolOverrides || [];
-    if (toolOverrides.length > 0) {
-      const toolRepo = new ToolRepository();
-      const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-      const agentToolIds = new Set(agentTools.map((t) => t.id));
-
-      for (const override of toolOverrides) {
-        try {
-          const tool = await toolRepo.findById(override.toolId);
-          if (!tool) continue;
-          // Ensure the tool belongs to the same starship and is actually assigned to this agent
-          if (tool.starshipId !== agent.starshipId || !agentToolIds.has(tool.id)) continue;
-
-          const currentToolVersion = tool.version || '1.0.0';
-          const match = currentToolVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
-          let requestedToolVersion = currentToolVersion;
-
-          if (match) {
-            const major = Number(match[1]);
-            const minor = Number(match[2]);
-            const patch = Number(match[3]);
-
-            switch (override.versionBump) {
-              case 'patch':
-                requestedToolVersion = `${major}.${minor}.${patch + 1}`;
-                break;
-              case 'minor':
-                requestedToolVersion = `${major}.${minor + 1}.0`;
-                break;
-              case 'major':
-                requestedToolVersion = `${major + 1}.0.0`;
-                break;
-            }
-          } else {
-            requestedToolVersion = '1.0.0';
-          }
-
-          // If the tool is already pending approval, update metadata directly rather than
-          // failing with "already pending" error. This handles re-publication requests
-          // and tools that got stuck in pending_approval from previous flows.
-          if (tool.publicationStatus === 'pending_approval') {
-            await toolRepo.update(tool.id, {
-              publicationRequestedBy: userId,
-              publicationVersionBump: override.versionBump,
-              publicationRequestedVersion: requestedToolVersion,
-              publicationChangelog: override.changelog,
-            });
-          } else {
-            await toolRepo.requestPublicationAtomic(tool.id, {
-              publicationStatus: 'pending_approval',
-              publicationRequestedBy: userId,
-              publicationVersionBump: override.versionBump,
-              publicationRequestedVersion: requestedToolVersion,
-              publicationChangelog: override.changelog,
-            });
-          }
-        } catch (err) {
-          // Tool override failures should not block agent publication request; just log.
-          console.error('[AGENT-PUBLICATION] Failed to record tool override for publish request:', err);
-        }
-      }
-    }
-
-    // Determine requested version for the agent based on current version and bump type
-    const currentVersion = agent.version || '1.0.0';
-    const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
-    let requestedVersion = currentVersion;
-
-    if (match) {
-      const major = Number(match[1]);
-      const minor = Number(match[2]);
-      const patch = Number(match[3]);
-
-      switch (options.versionBump) {
-        case 'patch':
-          requestedVersion = `${major}.${minor}.${patch + 1}`;
-          break;
-        case 'minor':
-          requestedVersion = `${major}.${minor + 1}.0`;
-          break;
-        case 'major':
-          requestedVersion = `${major + 1}.0.0`;
-          break;
-      }
-    } else {
-      // Fallback for malformed versions
-      requestedVersion = '1.0.0';
-    }
-
-    return await this.agentRepository.requestPublicationAtomic(agentId, {
-      publicationStatus: 'pending_approval',
-      publicationRequestedBy: userId,
-      publicationVersionBump: options.versionBump,
-      publicationRequestedVersion: requestedVersion,
-      publicationChangelog: options.changelog,
-    });
+    const publicationService = new PublicationService();
+    return await publicationService.requestPublication(agentId, userId, options);
   }
 
   /**
    * Approve publication for an agent (instance admin only)
-   * Moves agent from pending_approval to published, and promotes agent → template.
+   * Delegates to PublicationService.
    */
   async approvePublication(agentId: string, adminUserId: string): Promise<AgentModel> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    // Validate that the caller is an instance admin. The admin routes already
-    // enforce this, but we re-check here to prevent misuse if the service is
-    // ever invoked outside the HTTP layer.
-    const userRepo = new UserRepository();
-    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
-    if (!isInstanceAdmin(adminUser)) {
-      throw new ForbiddenError('Only instance admins can approve agent publication');
-    }
-
-    if (agent.publicationStatus !== 'pending_approval') {
-      throw new ValidationError('Agent is not pending approval');
-    }
-
-    // 1. Determine next version:
-    // - Prefer owner-requested version from publish-request flow
-    // - Fallback to simple minor bump for backwards compatibility
-    const currentVersion = agent.version || '1.0.0';
-    let nextVersion = agent.publicationRequestedVersion;
-
-    if (!nextVersion) {
-      const match = currentVersion.match(/^(\d+)\.(\d+)\.(\d+)/);
-      nextVersion = match != null ? `${match[1]}.${Number(match[2]) + 1}.0` : '1.0.0';
-    }
-
-    // 2. Determine target template (publishedTemplateId or new template)
-    //    and sanitize numeric fields to satisfy template validation constraints.
-    const safeTemperature =
-      typeof agent.temperature === 'number' && !Number.isNaN(agent.temperature) ? agent.temperature : DEFAULT_AGENT_TEMPERATURE;
-    const safeMaxTokens =
-      typeof agent.maxTokens === 'number' && !Number.isNaN(agent.maxTokens)
-        ? Math.min(MAX_AGENT_MAX_TOKENS, Math.max(MIN_AGENT_MAX_TOKENS, agent.maxTokens))
-        : undefined;
-    const safeTimeout =
-      typeof agent.timeout === 'number' && !Number.isNaN(agent.timeout)
-        ? Math.min(MAX_AGENT_TIMEOUT_MS, Math.max(MIN_AGENT_TIMEOUT_MS, agent.timeout))
-        : DEFAULT_AGENT_TIMEOUT_MS;
-
-    const templateRepo = new AgentTemplateRepository();
-    let targetTemplateId = agent.publishedTemplateId;
-
-    if (targetTemplateId) {
-      const existingTemplate = await templateRepo.findById(targetTemplateId);
-      if (!existingTemplate) {
-        // If the referenced template no longer exists, drop the link and create a new one
-        targetTemplateId = undefined;
-      }
-    }
-
-    if (!targetTemplateId) {
-      // Create a new template from this agent
-      const createdTemplate = await templateRepo.create({
-        name: agent.name,
-        // IMPORTANT:
-        // Do NOT reuse instance slugs for marketplace templates.
-        // Instance slugs include random suffixes for uniqueness; template slugs should be
-        // stable + human-readable and will be derived from the template name.
-        description: agent.description,
-        role: agent.role || 'Assistant',
-        // Prefer the agent's category when present; fall back to "general"
-        category: agent.category ?? 'general',
-        model: agent.model,
-        temperature: safeTemperature,
-        maxTokens: safeMaxTokens,
-        reasoning: agent.reasoning,
-        timeout: safeTimeout,
-        systemPrompt: agent.systemPrompt,
-        state: agent.state!,
-        blueprint: agent.blueprint!,
-        icon: undefined,
-        previewPrompts: agent.previewPrompts,
-        // Tools will be synchronized below based on the agent's assigned tools
-        assignedToolSlugs: [],
-      });
-
-      // Align template version with the bumped agent version
-      await templateRepo.update(createdTemplate.id, { version: nextVersion });
-      targetTemplateId = createdTemplate.id;
-    } else {
-      // Update existing template from this agent
-      await templateRepo.update(targetTemplateId, {
-        name: agent.name,
-        description: agent.description,
-        role: agent.role || 'Assistant',
-        // Only update category if the agent has one explicitly set
-        category: agent.category ?? 'general',
-        model: agent.model,
-        temperature: safeTemperature,
-        maxTokens: safeMaxTokens,
-        reasoning: agent.reasoning,
-        timeout: safeTimeout,
-        systemPrompt: agent.systemPrompt,
-        state: agent.state,
-        blueprint: agent.blueprint,
-        previewPrompts: agent.previewPrompts,
-        version: nextVersion,
-      });
-      // 3a. After creating the template, we will also sync assigned tools below.
-    }
-
-    // 3. Sync tools: ensure each assigned tool has a ToolTemplate and propagate
-    //    those tool template slugs onto the AgentTemplate as assignedToolSlugs.
-    if (targetTemplateId) {
-      try {
-        const toolRepo = new ToolRepository();
-        const toolTemplateRepo = new ToolTemplateRepository();
-
-        // Load all tools currently assigned to this agent for its starship
-        const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-
-        const toolTemplateIds: string[] = [];
-
-        for (const tool of agentTools as ToolModel[]) {
-          // Only consider non-draft tools with a complete definition
-          const hasParams =
-            // Tools can be valid/publishable even with **no parameters**.
-            // Treat any object-typed JSON schema as acceptable (properties may be empty or omitted).
-            !!tool.parameters && tool.parameters.type === 'object';
-          const hasBlueprint = !!(
-            tool.blueprint &&
-            typeof (tool.blueprint as { nodes?: unknown }).nodes !== 'undefined' &&
-            Array.isArray((tool.blueprint as { nodes?: unknown[] }).nodes)
-          );
-
-          if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
-
-          let templateId = tool.publishedTemplateId;
-
-          // Determine next tool version, honoring any publicationRequestedVersion from the request flow
-          const nextToolVersion = tool.publicationRequestedVersion || tool.version || '1.0.0';
-
-          if (templateId) {
-            const existingTemplate = await toolTemplateRepo.findById(templateId);
-            if (existingTemplate) {
-              // Update existing template from this tool
-              await toolTemplateRepo.update(templateId, {
-                name: tool.name,
-                description: tool.description,
-                parameters: tool.parameters,
-                blueprint: tool.blueprint,
-                transforms: tool.transforms,
-                mutations: tool.mutations,
-                condition: tool.condition,
-                version: nextToolVersion,
-              });
-            } else {
-              // Stale reference – drop it and treat as new template
-              templateId = undefined;
-            }
-          }
-
-          if (!templateId) {
-            // Create a new ToolTemplate from this tool instance
-            const createdTemplate = await toolTemplateRepo.create({
-              name: tool.name,
-              // IMPORTANT:
-              // Do NOT reuse instance slugs for marketplace templates.
-              // Instance slugs include random suffixes for uniqueness; template slugs should be
-              // stable + human-readable and will be derived from the template name.
-              description: tool.description,
-              category: 'utility',
-              parameters: tool.parameters!,
-              blueprint: tool.blueprint!,
-              transforms: tool.transforms,
-              mutations: tool.mutations,
-              condition: tool.condition,
-              version: nextToolVersion,
-            });
-
-            templateId = createdTemplate.id;
-          }
-
-          // Link tool back to its template, bump version and clear publication metadata
-          await toolRepo.update(tool.id, {
-            version: nextToolVersion,
-            publishedTemplateId: templateId,
-            // Clear publication workflow state so tool is no longer "pending"
-            publicationStatus: 'published',
-            publicationApprovedBy: adminUserId,
-            publicationApprovedAt: new Date().toISOString(),
-          });
-
-          if (templateId && !toolTemplateIds.includes(templateId)) {
-            toolTemplateIds.push(templateId);
-          }
-        }
-
-        // Always synchronize tool assignments onto the AgentTemplate, even when empty.
-        // Canonical truth is the junction table; write relations by tool_template_id (slug-free).
-        await templateRepo.setToolTemplateRelationshipsByIds(targetTemplateId, toolTemplateIds);
-      } catch (err) {
-        // Tool synchronization should never block agent publication; log and continue.
-        console.error('[AGENT-PUBLICATION] Failed to synchronize tools for agent template:', err);
-      }
-    }
-
-    // 3b. Ensure template has a public avatar
-    if (targetTemplateId) {
-      try {
-        const templateRepoInternal = new AgentTemplateRepository();
-        const existingAvatar = await templateRepoInternal.getAvatarStorageById(targetTemplateId);
-        const hasAvatar = !!existingAvatar?.avatarS3Key;
-
-        // Only reuse an existing agent avatar if present.
-        // If the agent has no avatar, do NOT generate one during approval.
-        //
-        // IMPORTANT: For re-publish flows, we should also refresh the template avatar
-        // when the agent's avatar is newer than what's currently stored on the template.
-        if (agent.avatarAttachmentId) {
-          const attachmentService = new AttachmentService();
-          const existingAttachment = await attachmentService.getAttachmentWithUrl(agent.avatarAttachmentId, agent.starshipId);
-
-          const toMs = (s?: string) => {
-            if (!s) return NaN;
-            const t = new Date(s).getTime();
-            return Number.isFinite(t) ? t : NaN;
-          };
-
-          const templateAvatarMs = toMs(existingAvatar?.avatarUpdatedAt);
-          const attachmentCreatedMs = toMs(existingAttachment?.createdAt);
-          const shouldUpdateAvatar =
-            !hasAvatar ||
-            (Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs) && attachmentCreatedMs > templateAvatarMs) ||
-            (!Number.isFinite(templateAvatarMs) && Number.isFinite(attachmentCreatedMs));
-
-          if (shouldUpdateAvatar && existingAttachment?.s3Key) {
-            await templateRepoInternal.updateAvatarStorage(targetTemplateId, {
-              avatarS3Key: existingAttachment.s3Key,
-              avatarMimeType: existingAttachment.mimeType || 'image/png',
-              // Use the attachment creation time when available so client diffs can compare reliably.
-              avatarUpdatedAt: existingAttachment.createdAt || new Date().toISOString(),
-            });
-          }
-        }
-      } catch (err) {
-        console.error('[AGENT-PUBLICATION] Failed to ensure template avatar:', err);
-      }
-    }
-
-    // 4. Persist publication metadata on agent
-    const updated = await this.agentRepository.update(agentId, {
-      version: nextVersion,
-      publicationStatus: 'published',
-      publicationApprovedBy: adminUserId,
-      publicationApprovedAt: new Date().toISOString(),
-      publishedTemplateId: targetTemplateId,
-    });
-
-    if (!updated) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    return updated;
+    const publicationService = new PublicationService();
+    return await publicationService.approvePublication(agentId, adminUserId);
   }
 
   /**
    * Reject publication for an agent (instance admin only)
-   * Moves agent from pending_approval to rejected.
+   * Delegates to PublicationService.
    */
   async rejectPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
-    const agent = await this.agentRepository.findById(agentId);
-    if (!agent) {
-      throw new NotFoundError('Agent', agentId);
-    }
+    const publicationService = new PublicationService();
+    return await publicationService.rejectPublication(agentId, adminUserId);
+  }
 
-    // Validate that the caller is an instance admin. The admin routes already
-    // enforce this, but we re-check here to prevent misuse if the service is
-    // ever invoked outside the HTTP layer.
-    const userRepo = new UserRepository();
-    const adminUser = (await userRepo.findById(adminUserId)) as UserModel | null;
-    if (!isInstanceAdmin(adminUser)) {
-      throw new ForbiddenError('Only instance admins can reject agent publication');
-    }
+  /**
+   * Prepare publication: Generate missing marketing content and return preview
+   * Delegates to PublicationService.
+   */
+  async preparePublication(agentId: string, adminUserId: string): Promise<{
+    agent: AgentModel;
+    templateId: string;
+    marketingContent: {
+      avatarUrl?: string;
+      problemStatementsText?: string[];
+      problemStatementsImageUrl?: string;
+      capabilitiesImageUrl?: string;
+      tryThesePromptsImageUrl?: string;
+    };
+  }> {
+    const publicationService = new PublicationService();
+    return await publicationService.preparePublication(agentId, adminUserId);
+  }
 
-    if (agent.publicationStatus !== 'pending_approval') {
-      throw new ValidationError('Agent is not pending approval');
-    }
+  /**
+   * Regenerate specific marketing content item
+   * Delegates to PublicationService.
+   */
+  async regenerateMarketingContent(
+    agentId: string,
+    templateId: string,
+    type: 'avatar' | 'problem_statements_text' | 'problem_statements_image' | 'capabilities_image' | 'try_these_prompts_image',
+    adminUserId: string
+  ): Promise<{
+    agent: AgentModel;
+    marketingContent: {
+      avatarUrl?: string;
+      problemStatementsText?: string[];
+      problemStatementsImageUrl?: string;
+      capabilitiesImageUrl?: string;
+      tryThesePromptsImageUrl?: string;
+    };
+  }> {
+    const publicationService = new PublicationService();
+    return await publicationService.regenerateMarketingContent(agentId, templateId, type, adminUserId);
+  }
 
-    const updated = await this.agentRepository.update(agentId, {
-      publicationStatus: 'rejected',
-      publicationApprovedBy: adminUserId,
-      publicationApprovedAt: new Date().toISOString(),
-    });
+  /**
+   * Update problem statements for a template (before publication)
+   * Delegates to PublicationService.
+   */
+  async updateProblemStatements(templateId: string, statements: string[], adminUserId: string): Promise<{
+    problemStatementsText: string[];
+  }> {
+    const publicationService = new PublicationService();
+    return await publicationService.updateProblemStatements(templateId, statements, adminUserId);
+  }
 
-    if (!updated) {
-      throw new NotFoundError('Agent', agentId);
-    }
-
-    return updated;
+  /**
+   * Confirm publication: Mark agent as published (template already exists with content)
+   * Delegates to PublicationService.
+   */
+  async confirmPublication(agentId: string, adminUserId: string): Promise<AgentModel> {
+    const publicationService = new PublicationService();
+    return await publicationService.confirmPublication(agentId, adminUserId);
   }
 }

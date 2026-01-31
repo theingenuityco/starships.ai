@@ -248,25 +248,16 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       {threadConversationId ? (
         <>
           {/* Draggable resize handle (desktop/tablet) */}
-          <div
-            className="hidden md:flex relative h-full w-4 flex-shrink-0 cursor-col-resize select-none group bg-muted/20 hover:bg-muted/30 transition-colors"
-            role="separator"
-            aria-orientation="vertical"
-            aria-label="Resize thread pane"
-            onPointerDown={handleThreadResizePointerDown}
-            title="Drag to resize"
-          >
-            {/* Divider line */}
-            <div className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-border/80 group-hover:bg-border transition-colors" />
-
-            {/* Grabber (makes draggable intent obvious) */}
-            <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div className="flex flex-col items-center justify-center gap-1 rounded-md bg-background/60 px-1.5 py-2 ring-1 ring-border/70 shadow-sm backdrop-blur-sm transition-colors group-hover:ring-border">
-                <div className="h-1 w-1 rounded-full bg-foreground/30" />
-                <div className="h-1 w-1 rounded-full bg-foreground/30" />
-                <div className="h-1 w-1 rounded-full bg-foreground/30" />
-              </div>
-            </div>
+          <div className="hidden md:flex relative h-full w-px flex-shrink-0 bg-border/60">
+            {/* Invisible drag hit-area (keep resizing easy without a thick visual divider) */}
+            <div
+              className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize thread pane"
+              onPointerDown={handleThreadResizePointerDown}
+              title="Drag to resize"
+            />
           </div>
 
           <aside

@@ -66,6 +66,14 @@ interface ConversationMessageListProps {
   sizeVariant?: 'default' | 'hero' | 'delegation'
   /** When true, hide the copy and download turn-action buttons (e.g. for landing demos). */
   hideTurnActionButtons?: boolean
+  /** Submitted search query (runs search and opens sidebar). When set, used for highlight and matching. */
+  submittedQuery?: string
+  /** Called when user submits search (Enter or Search button). */
+  onSearchSubmit?: (query: string) => void
+  /** Called when search results are computed (for sidebar). */
+  onSearchResults?: (results: import('./conversationSearch').SearchResult[]) => void
+  /** When set (e.g. from sidebar result click), scroll to this match index. */
+  selectedMatchIndex?: number | null
 }
 
 export function ConversationMessageList({
@@ -87,6 +95,10 @@ export function ConversationMessageList({
   isAwaitingToolResultsOverride,
   sizeVariant = 'default',
   hideTurnActionButtons = false,
+  submittedQuery: submittedQueryProp,
+  onSearchSubmit,
+  onSearchResults,
+  selectedMatchIndex,
 }: ConversationMessageListProps) {
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
@@ -121,9 +133,11 @@ export function ConversationMessageList({
   const lastMessageCountRef = useRef(0)
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
 
-  // In-chat search: query and current match index (for Prev/Next)
-  const [searchQuery, setSearchQuery] = useState('')
+  // In-chat search: local input value (typed); submitted query from parent drives highlight and sidebar
+  const [searchInputValue, setSearchInputValue] = useState('')
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0)
+  const submittedQuery = submittedQueryProp ?? ''
+  const highlightTerm = submittedQuery.trim() || undefined
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -546,7 +560,6 @@ export function ConversationMessageList({
   }, [shouldShowGapLoader])
 
   // In-chat search: one entry per occurrence (so "Avatar" 5 times = 5 positions, not 2 messages). Case-insensitive.
-  const highlightTerm = searchQuery.trim() || undefined
   const matchingPositions = useMemo(() => {
     if (!highlightTerm) return []
     const q = highlightTerm.trim().toLowerCase()
@@ -573,9 +586,9 @@ export function ConversationMessageList({
       return
     }
     setCurrentMatchIndex(i => Math.min(i, matchingPositions.length - 1))
-  }, [matchingPositions.length, searchQuery])
+  }, [matchingPositions.length, submittedQuery])
 
-  // Scroll to current match when user clicks Prev/Next (not on every keystroke)
+  // Scroll to current match when user clicks Prev/Next (main bar)
   useEffect(() => {
     if (matchingPositions.length === 0 || currentMatchIndex < 0) return
     const messageId = matchingPositions[currentMatchIndex]?.messageId
@@ -587,17 +600,69 @@ export function ConversationMessageList({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- only scroll when user changes match index (Prev/Next)
   }, [currentMatchIndex])
 
+  // When sidebar result is clicked: sync selectedMatchIndex and scroll to that message
+  useEffect(() => {
+    if (selectedMatchIndex == null || matchingPositions.length === 0) return
+    const messageId = matchingPositions[selectedMatchIndex]?.messageId
+    if (!messageId) return
+    setCurrentMatchIndex(selectedMatchIndex)
+    const el = messageRefs.current[messageId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [selectedMatchIndex, matchingPositions])
+
+  // Build sidebar results (one per message) and report to parent
+  const searchResultsForSidebar = useMemo(() => {
+    if (!highlightTerm) return null
+    const q = highlightTerm.toLowerCase()
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const results: import('./conversationSearch').SearchResult[] = []
+    let firstIndexInPositions = 0
+    for (const msg of renderMessages) {
+      const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
+      const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
+      const searchable = `${content} ${reasoning}`.toLowerCase()
+      const matches = searchable.match(new RegExp(escaped, 'g'))
+      const count = matches ? matches.length : 0
+      if (count === 0) continue
+      const contentLower = (content + ' ' + reasoning).toLowerCase()
+      const firstMatchIdx = contentLower.indexOf(q)
+      const snippetStart = Math.max(0, firstMatchIdx - 50)
+      const snippetEnd = Math.min(contentLower.length, firstMatchIdx + 80)
+      const contentSnippet = (content + ' ' + reasoning).slice(snippetStart, snippetEnd).trim()
+      results.push({
+        messageId: msg.id,
+        role: msg.role,
+        contentSnippet: contentSnippet || content.slice(0, 120),
+        timestamp: (msg as ExtendedMessage).createdAt,
+        occurrenceCount: count,
+        firstMatchIndexInPositions: firstIndexInPositions,
+        agentName: msg.role === 'assistant' ? (msg as ExtendedMessage).agentName ?? agentName : undefined,
+      })
+      firstIndexInPositions += count
+    }
+    return results
+  }, [highlightTerm, renderMessages, agentName])
+
+  useEffect(() => {
+    if (searchResultsForSidebar != null && onSearchResults) {
+      onSearchResults(searchResultsForSidebar)
+    }
+  }, [searchResultsForSidebar, onSearchResults])
+
+  // Message IDs that contain at least one match (so we can highlight the whole message bubble)
+  const messageIdsWithMatch = useMemo(
+    () => new Set(matchingPositions.map(p => p.messageId)),
+    [matchingPositions]
+  )
+
   if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
 
   const hasSearchMatches = matchingPositions.length > 0
   const showSearchBar = sizeVariant === 'default' && renderMessages.length > 0
-  // Message IDs that contain at least one match (so we can highlight the whole message bubble)
-  const messageIdsWithMatch = useMemo(
-    () => new Set(matchingPositions.map(p => p.messageId)),
-    [matchingPositions]
-  )
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
 
   return (
@@ -609,19 +674,24 @@ export function ConversationMessageList({
             <Input
               type="text"
               placeholder="Search in conversation..."
-              value={searchQuery}
-              onChange={e => {
-                setSearchQuery(e.target.value)
-                setCurrentMatchIndex(0)
+              value={searchInputValue}
+              onChange={e => setSearchInputValue(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') {
+                  e.preventDefault()
+                  const q = searchInputValue.trim()
+                  if (q) onSearchSubmit?.(q)
+                }
               }}
               className="pl-8 pr-8 h-8 text-xs"
+              aria-label="Search in conversation"
             />
-            {searchQuery && (
+            {searchInputValue && (
               <button
                 type="button"
                 onClick={() => {
-                  setSearchQuery('')
-                  setCurrentMatchIndex(0)
+                  setSearchInputValue('')
+                  onSearchSubmit?.('')
                 }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                 aria-label="Clear search"
@@ -630,6 +700,20 @@ export function ConversationMessageList({
               </button>
             )}
           </div>
+          {onSearchSubmit && (
+            <Button
+              variant="default"
+              size="sm"
+              className="h-8 flex-shrink-0 text-xs"
+              onClick={() => {
+                const q = searchInputValue.trim()
+                if (q) onSearchSubmit(q)
+              }}
+              aria-label="Search"
+            >
+              Search
+            </Button>
+          )}
           {highlightTerm && (
             <>
               <span className="text-xs text-muted-foreground whitespace-nowrap">

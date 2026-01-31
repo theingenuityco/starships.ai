@@ -5,6 +5,8 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput, ConversationMessageInputRef } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
+import { SearchResultsSidebar } from '@/components/conversation/SearchResultsSidebar'
+import type { SearchResult } from '@/components/conversation/conversationSearch'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
@@ -159,6 +161,18 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const heightUnfreezeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
   const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
+
+  // Discord-style search: submitted query opens right sidebar; results and selection for jump-to
+  const [submittedQuery, setSubmittedQuery] = useState<string>('')
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [selectedMatchIndex, setSelectedMatchIndex] = useState<number | null>(null)
+
+  // Clear search when conversation changes
+  useEffect(() => {
+    setSubmittedQuery('')
+    setSearchResults([])
+    setSelectedMatchIndex(null)
+  }, [currentConversationId])
 
   // Get agents data from starship
   const { data: starshipAgentsData = [] } = useStarshipAgents(starshipId || '')
@@ -835,25 +849,51 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
         {/* Messages Area */}
         {showMessagesArea ? (
-          <>
-            <ConversationSummaryBar
-              conversationId={currentConversationId}
-              starshipId={starshipId}
-              modelId={selectedAgent?.model ?? null}
-              maxTokens={
-                typeof (selectedAgent as any)?.maxTokens === 'number'
-                  ? (selectedAgent as any).maxTokens
-                  : typeof (selectedAgent as any)?.maxTokens === 'string'
-                    ? Number((selectedAgent as any).maxTokens)
-                    : null
-              }
-            />
-            <div className="relative flex-1 min-h-0">
-              <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
+          <div className={cn('flex flex-1 min-h-0', submittedQuery.trim() && 'flex-row')}>
+            <div className={cn('flex flex-col flex-1 min-w-0', submittedQuery.trim() && 'min-w-0')}>
+              <ConversationSummaryBar
+                conversationId={currentConversationId}
+                starshipId={starshipId}
+                modelId={selectedAgent?.model ?? null}
+                maxTokens={
+                  typeof (selectedAgent as any)?.maxTokens === 'number'
+                    ? (selectedAgent as any).maxTokens
+                    : typeof (selectedAgent as any)?.maxTokens === 'string'
+                      ? Number((selectedAgent as any).maxTokens)
+                      : null
+                }
+              />
+              <div className="relative flex-1 min-h-0">
+                <ConversationMessageList
+                  conversationId={currentConversationId}
+                  starshipId={starshipId}
+                  bottomPaddingPx={inputHeight + 24}
+                  submittedQuery={submittedQuery.trim() || undefined}
+                  onSearchSubmit={q => {
+                    setSubmittedQuery(q)
+                    setSearchResults([])
+                    setSelectedMatchIndex(null)
+                  }}
+                  onSearchResults={setSearchResults}
+                  selectedMatchIndex={selectedMatchIndex}
+                />
+              </div>
+              {/* Single place for stream-dependent side-effects */}
+              <StreamSideEffects />
             </div>
-            {/* Single place for stream-dependent side-effects */}
-            <StreamSideEffects />
-          </>
+            {submittedQuery.trim() ? (
+              <SearchResultsSidebar
+                query={submittedQuery}
+                results={searchResults}
+                onSelectResult={(_messageId, matchIndex) => setSelectedMatchIndex(matchIndex)}
+                onClose={() => {
+                  setSubmittedQuery('')
+                  setSearchResults([])
+                  setSelectedMatchIndex(null)
+                }}
+              />
+            ) : null}
+          </div>
         ) : null}
 
         {/* Input Container - anchored from the top on welcome, bottom section during conversation */}

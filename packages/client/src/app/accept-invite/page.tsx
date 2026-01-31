@@ -99,7 +99,7 @@ export default function AcceptInvitePage() {
     void acceptInvite
       .mutateAsync(inviteToken)
       .then(starship => {
-        router.replace(`/ship/${encodeURIComponent(starship.slug)}/conversations`)
+        router.replace(`/ship/${encodeURIComponent(starship.slug)}`)
       })
       .catch(() => {
         // errors are surfaced via toast; keep page visible for retry

@@ -8,7 +8,7 @@ import type { AgentModel, ChannelModel, ConversationModel } from '@starships/pro
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type RefObject } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
@@ -30,6 +30,9 @@ interface ConversationListProps {
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
+  onboardingChannelsAnchorRef?: RefObject<HTMLDivElement | null>
+  onboardingDirectMessagesAnchorRef?: RefObject<HTMLDivElement | null>
+  onboardingHighlight?: 'channels' | 'directMessages' | null
 }
 
 function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent: AgentModel | null }) {
@@ -59,7 +62,15 @@ function HumanAvatar({ user }: { user: StarshipMemberListItem }) {
 
 type DmTarget = { kind: 'agent'; key: string; label: string; agent: AgentModel } | { kind: 'user'; key: string; label: string; user: StarshipMemberListItem }
 
-export function ConversationList({ starshipId, onConversationDelete, onConversationSelect, compact = false }: ConversationListProps) {
+export function ConversationList({
+  starshipId,
+  onConversationDelete,
+  onConversationSelect,
+  compact = false,
+  onboardingChannelsAnchorRef,
+  onboardingDirectMessagesAnchorRef,
+  onboardingHighlight = null,
+}: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
@@ -198,7 +209,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
     if (args.peerUserId) sp.set('peerUserId', args.peerUserId)
     if (args.peerLabel) sp.set('peerLabel', args.peerLabel)
     if (args.peerAvatar) sp.set('peerAvatar', args.peerAvatar)
-    router.push(`/ship/${slug}/conversations?${sp.toString()}`)
+    router.push(`/ship/${slug}/dm?${sp.toString()}`)
   }
 
   const handleDmTargetClick = async (t: DmTarget) => {
@@ -305,101 +316,125 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
     return (
       <>
-        <div className="space-y-2">
-          <div className="w-full flex items-center justify-between h-8">
-            <button
-              type="button"
-              className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
-              style={{ justifyContent: 'flex-start' }}
-              onClick={() => setIsChannelsExpanded(v => !v)}
-              aria-expanded={isChannelsExpanded}
-              aria-controls="sidebar-channels-list"
-            >
-              <div
-                className="flex-shrink-0"
-                style={{
-                  width: '1.25rem',
-                  height: '1.25rem',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  margin: 0,
-                  marginRight: '0.25rem',
-                }}
+        <div className="flex flex-col h-full min-h-0">
+          {/* Channels */}
+          <div
+            className={cn(
+              'flex flex-col min-h-0 rounded-lg',
+              isChannelsExpanded ? 'flex-1' : 'flex-none',
+              onboardingHighlight === 'channels' &&
+                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+            )}
+          >
+            <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8">
+              <button
+                type="button"
+                className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
+                style={{ justifyContent: 'flex-start' }}
+                onClick={() => setIsChannelsExpanded(v => !v)}
+                aria-expanded={isChannelsExpanded}
+                aria-controls="sidebar-channels-list"
               >
-                <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
-              </div>
-              <span className="text-[11px] font-semibold uppercase tracking-wide">Channels</span>
-            </button>
+                <div
+                  className="flex-shrink-0"
+                  style={{
+                    width: '1.25rem',
+                    height: '1.25rem',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    margin: 0,
+                    marginRight: '0.25rem',
+                  }}
+                >
+                  <Icon name={isChannelsExpanded ? 'chevron-down' : 'chevron-right'} className="w-4 h-4" />
+                </div>
+                <span className="text-[11px] font-semibold uppercase tracking-wide">Channels</span>
+              </button>
 
-            <button
-              type="button"
-              onClick={() => setIsCreateChannelOpen(true)}
-              className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              aria-label="Create channel"
-            >
-              <Icon name="plus" className="w-4 h-4" />
-            </button>
+              <button
+                type="button"
+                onClick={() => setIsCreateChannelOpen(true)}
+                className="inline-flex items-center justify-center w-6 h-6 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                aria-label="Create channel"
+              >
+                <Icon name="plus" className="w-4 h-4" />
+              </button>
+            </div>
+
+            {isChannelsExpanded ? (
+              <div id="sidebar-channels-list" className="min-h-0 flex-1 overflow-y-auto pr-1">
+                {channelsLoading ? (
+                  <div className="space-y-1">
+                    {[1, 2].map(i => (
+                      <Skeleton key={i} className="h-8 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : channels.length === 0 ? (
+                  <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
+                ) : (
+                  <div className="space-y-1">
+                    {channels.map(ch => {
+                      const isActive = ch.conversationId === currentConversationId
+                      const label = ch.name || ch.slug
+                      return (
+                        <div key={ch.conversationId}>
+                          <div
+                            className={cn(
+                              'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
+                              isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+                            )}
+                            style={{
+                              justifyContent: 'flex-start',
+                              transition: 'background-color 0.15s ease',
+                              cursor: 'pointer',
+                              minHeight: '32px',
+                            }}
+                            onClick={() => handleConversationClick(ch.conversationId)}
+                          >
+                            <div
+                              className="flex-shrink-0"
+                              style={{
+                                width: '1.25rem',
+                                height: '1.25rem',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                margin: 0,
+                                pointerEvents: 'none',
+                              }}
+                            >
+                              <Icon name="hash" className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
+                            </div>
+                            <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1 ml-1.5', isActive && 'text-primary')}>{label}</span>
+                          </div>
+
+                          {/* Forum channels render threads in the main panel (no nested sidebar list). */}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            ) : null}
           </div>
 
-          {isChannelsExpanded ? (
-            <div id="sidebar-channels-list">
-              {channelsLoading ? (
-                <div className="space-y-1">
-                  {[1, 2].map(i => (
-                    <Skeleton key={i} className="h-8 w-full rounded-lg" />
-                  ))}
-                </div>
-              ) : channels.length === 0 ? (
-                <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
-              ) : (
-                <div className="space-y-1">
-                  {channels.map(ch => {
-                    const isActive = ch.conversationId === currentConversationId
-                    const label = ch.name || ch.slug
-                    return (
-                      <div key={ch.conversationId}>
-                        <div
-                          className={cn(
-                            'group relative rounded-lg flex items-center border w-full h-8 cursor-pointer text-sm px-2',
-                            isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
-                          )}
-                          style={{
-                            justifyContent: 'flex-start',
-                            transition: 'background-color 0.15s ease',
-                            cursor: 'pointer',
-                            minHeight: '32px',
-                          }}
-                          onClick={() => handleConversationClick(ch.conversationId)}
-                        >
-                          <div
-                            className="flex-shrink-0"
-                            style={{
-                              width: '1.25rem',
-                              height: '1.25rem',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              margin: 0,
-                              pointerEvents: 'none',
-                            }}
-                          >
-                            <Icon name="hash" className={cn('h-4 w-4', isActive ? 'text-primary' : 'text-muted-foreground')} />
-                          </div>
-                          <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1 ml-1.5', isActive && 'text-primary')}>{label}</span>
-                        </div>
+          <div className="h-2" />
 
-                        {/* Forum channels render threads in the main panel (no nested sidebar list). */}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          ) : null}
-
-          <div className="pt-2 space-y-2">
-            <div className="w-full flex items-center justify-between h-8">
+          {/* Direct messages */}
+          <div
+            className={cn(
+              'flex flex-col min-h-0 rounded-lg',
+              isDirectMessagesExpanded ? 'flex-1' : 'flex-none',
+              onboardingHighlight === 'directMessages' &&
+                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+            )}
+          >
+            <div
+              ref={onboardingDirectMessagesAnchorRef}
+              data-onboarding-anchor="direct-messages"
+              className="w-full flex items-center justify-between h-8"
+            >
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -429,7 +464,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             </div>
 
             {isDirectMessagesExpanded ? (
-              <div id="sidebar-direct-messages-list">
+              <div id="sidebar-direct-messages-list" className="min-h-0 flex-1 overflow-y-auto pr-1">
                 {dmTargets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />

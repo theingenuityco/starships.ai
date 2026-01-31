@@ -25,7 +25,7 @@ export default function ProfilePage(): React.JSX.Element {
 
     // If user has starships, redirect to the first one
     if (starships && starships.length > 0) {
-      router.replace(`/ship/${starships[0].slug}/conversations`)
+      router.replace(`/ship/${starships[0].slug}`)
     }
     // Else: stay on profile and show "no starships" message (e.g. OAuth users without auto-provisioning)
   }, [authLoading, starshipsLoading, isAuthenticated, starships, router])

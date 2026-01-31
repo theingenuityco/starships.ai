@@ -113,7 +113,12 @@ export function Navigation(props: NavigationProps) {
     (nextSlug: string): string => {
       const p = typeof pathname === 'string' ? pathname : ''
       if (!p.startsWith('/ship/')) {
-        return `/ship/${nextSlug}/conversations`
+        return `/ship/${nextSlug}`
+      }
+      // If we're in a specific conversation, don't carry the conversationId across starships.
+      // It may not exist / be accessible in the destination starship.
+      if (p.includes('/conversations/')) {
+        return `/ship/${nextSlug}`
       }
       const parts = p.split('/')
       // /ship/<slug>/...
@@ -121,7 +126,7 @@ export function Navigation(props: NavigationProps) {
         parts[2] = nextSlug
         return parts.join('/')
       }
-      return `/ship/${nextSlug}/conversations`
+      return `/ship/${nextSlug}`
     },
     [pathname]
   )
@@ -162,13 +167,6 @@ export function Navigation(props: NavigationProps) {
 
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
-  // Handle new conversation - memoized
-  const handleNewConversation = useCallback(() => {
-    if (!starshipSlug) return
-    router.push(`/ship/${starshipSlug}/conversations`)
-    if (isMobile && onClose) onClose()
-  }, [router, starshipSlug, isMobile, onClose])
-
   // Handle logo click - memoized
   const handleLogoClick = useCallback(() => {
     // Trigger animation
@@ -187,19 +185,21 @@ export function Navigation(props: NavigationProps) {
   }, [isExpanded, handleLogoClick])
 
   // Create refs for navigation items (for onboarding positioning)
-  const newChatRef = useRef<HTMLDivElement>(null)
   const exploreAgentsRef = useRef<HTMLDivElement>(null)
   const myAgentsRef = useRef<HTMLDivElement>(null)
   const connectorsRef = useRef<HTMLDivElement>(null)
   const schedulesRef = useRef<HTMLDivElement>(null)
+  const channelsRef = useRef<HTMLDivElement>(null)
+  const directMessagesRef = useRef<HTMLDivElement>(null)
 
   const navigationItemRefs = useMemo(() => {
     const refs = new Map<string, React.RefObject<HTMLDivElement | null>>()
-    refs.set('New Chat', newChatRef)
     refs.set('Explore Agents', exploreAgentsRef)
     refs.set('My Agents', myAgentsRef)
     refs.set('Connectors', connectorsRef)
     refs.set('Schedules', schedulesRef)
+    refs.set('Channels', channelsRef)
+    refs.set('Direct messages', directMessagesRef)
     return refs
   }, [])
 
@@ -218,20 +218,6 @@ export function Navigation(props: NavigationProps) {
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
-      ...(isAuthenticated && starshipSlug
-        ? [
-            {
-              href: '#',
-              label: 'New Chat',
-              icon: 'plus',
-              isActive: false,
-              onClick: handleNewConversation,
-              special: true,
-              itemRef: newChatRef,
-              isOnboardingHighlighted: getOnboardingHighlight('New Chat'),
-            },
-          ]
-        : []),
       {
         href: `/marketplace`,
         label: 'Explore Agents',
@@ -287,7 +273,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, handleNewConversation, starshipData?.id, isInstanceAdmin, getOnboardingHighlight]
+    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight]
   )
 
   const handleSidebarBackgroundClick = useCallback(
@@ -431,16 +417,20 @@ export function Navigation(props: NavigationProps) {
           {/* Channels + Direct messages */}
           {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
             <div className="flex-1 min-h-0 flex flex-col px-2">
-              <div className="flex-1 min-h-0 overflow-y-auto">
-                <div className="pb-2 space-y-1">
-                  <ConversationList
-                    starshipId={starshipData.id}
-                    compact={true}
-                    onConversationSelect={() => {
-                      if (isMobile && onClose) onClose()
-                    }}
-                  />
-                </div>
+              {/* Keep the sidebar itself non-scrollable; each section handles its own scroll */}
+              <div className="flex-1 min-h-0 overflow-hidden pb-2">
+                <ConversationList
+                  starshipId={starshipData.id}
+                  compact={true}
+                  onboardingChannelsAnchorRef={channelsRef}
+                  onboardingDirectMessagesAnchorRef={directMessagesRef}
+                  onboardingHighlight={
+                    currentStepInfo?.label === 'Channels' ? 'channels' : currentStepInfo?.label === 'Direct messages' ? 'directMessages' : null
+                  }
+                  onConversationSelect={() => {
+                    if (isMobile && onClose) onClose()
+                  }}
+                />
               </div>
             </div>
           )}

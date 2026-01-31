@@ -1516,7 +1516,8 @@ const MemoizedMessageBubble = memo(
       if (isHero || isDelegation) {
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
-        const userRowClass = isDelegation ? cn('mb-1 gap-2', isConsecutiveSameUser ? 'mt-1' : 'mt-3') : cn('mb-1 gap-3 mr-6', isConsecutiveSameUser ? 'mt-2' : 'mt-6')
+        // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
+        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3 mr-6', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
         const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
         return (
@@ -1595,7 +1596,7 @@ const MemoizedMessageBubble = memo(
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
-              isConsecutiveSameUser ? 'mt-1' : 'mt-4'
+              isConsecutiveSameUser ? 'mt-0' : 'mt-4'
             )}
           >
             {isConsecutiveSameUser ? (
@@ -1647,6 +1648,7 @@ const MemoizedMessageBubble = memo(
                 extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={false}
+                compact={isConsecutiveSameUser}
                 className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}

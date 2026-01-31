@@ -288,7 +288,10 @@ export class ConversationRepository extends BaseRepository {
               SELECT *
               FROM messages
               WHERE conversation_id = $1
-                AND (created_at, id) < ($2::timestamptz, $3::text)
+                AND (
+                  created_at < $2::timestamptz
+                  OR (created_at = $2::timestamptz AND id < $3::text)
+                )
               ORDER BY created_at DESC, id DESC
               LIMIT $4
             `

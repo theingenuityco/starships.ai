@@ -41,7 +41,7 @@ function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent:
   const previewUrl = avatarAttachments?.[0]?.previewUrl
 
   return (
-    <Avatar className="h-5 w-5 ring-1 ring-border/40">
+    <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
       <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
     </Avatar>
   )
@@ -50,9 +50,9 @@ function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent:
 function HumanAvatar({ user }: { user: StarshipMemberListItem }) {
   const fallback = (user.displayName || user.email || '?').trim().slice(0, 1).toUpperCase()
   return (
-    <Avatar className="h-5 w-5 ring-1 ring-border/40">
-      {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} /> : null}
-      <AvatarFallback className="text-[10px] font-medium">{fallback}</AvatarFallback>
+    <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
+      {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
     </Avatar>
   )
 }
@@ -136,7 +136,6 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
           transition: 'background-color 0.15s ease',
           cursor: 'pointer',
           minHeight: '32px',
-          fontSize: '14px',
         }}
         onClick={() => handleDmTargetClick(t)}
       >
@@ -154,9 +153,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         >
           {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
         </div>
-        <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1', isActive && 'text-primary')} style={{ fontSize: '14px', marginLeft: '0.375rem' }}>
-          {label}
-        </span>
+        <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1 ml-1.5', isActive && 'text-primary')}>{label}</span>
       </div>
     )
   }
@@ -301,7 +298,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               ) : channels.length === 0 ? (
                 <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
               ) : (
-                <div className="space-y-1">
+                <div className="space-y-2">
                   {channels.map(ch => {
                     const isActive = ch.conversationId === currentConversationId
                     const label = ch.name || ch.slug
@@ -317,7 +314,6 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                             transition: 'background-color 0.15s ease',
                             cursor: 'pointer',
                             minHeight: '32px',
-                            fontSize: '14px',
                           }}
                           onClick={() => handleConversationClick(ch.conversationId)}
                         >
@@ -333,14 +329,9 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                               pointerEvents: 'none',
                             }}
                           >
-                            <span className={cn('font-mono text-[14px] leading-none', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
+                            <span className={cn('font-mono text-sm leading-none', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
                           </div>
-                          <span
-                            className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1', isActive && 'text-primary')}
-                            style={{ fontSize: '14px', marginLeft: '0.375rem' }}
-                          >
-                            {label}
-                          </span>
+                          <span className={cn('whitespace-nowrap pointer-events-none font-medium truncate min-w-0 flex-1 ml-1.5', isActive && 'text-primary')}>{label}</span>
                         </div>
 
                         {/* Forum channels render threads in the main panel (no nested sidebar list). */}
@@ -390,7 +381,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  <div className="space-y-2">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
                 )}
               </div>
             ) : null}
@@ -406,7 +397,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       {/* Header */}
       <div className="p-3 border-b">
         <div className="flex items-center justify-between gap-2 mb-2">
-          <h2 className="text-base font-semibold">Messages</h2>
+          <h2 className="text-sm font-semibold">Messages</h2>
           <Button type="button" size="sm" variant="secondary" className="h-8" onClick={() => setIsCreateChannelOpen(true)} disabled={createChannel.isPending}>
             <Icon name="plus" className="h-4 w-4 mr-1" />
             New channel

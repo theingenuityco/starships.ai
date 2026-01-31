@@ -991,7 +991,8 @@ export function ConversationMessageList({
   }
 
   const hasSearchMatches = matchingPositions.length > 0
-  const showSearchBar = sizeVariant === 'default' && renderMessages.length > 0
+  // Search input UI intentionally disabled for now.
+  const showSearchBar = false
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
 
   return (

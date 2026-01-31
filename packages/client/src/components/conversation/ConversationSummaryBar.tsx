@@ -1,8 +1,7 @@
 'use client'
 
 import AgentAvatar from '@/components/animated/AgentAvatar'
-import Icon from '@/components/primitives/Icon'
-import { Avatar } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
@@ -11,8 +10,10 @@ import { useModelContextLength } from '@/hooks/useLlmModels'
 import { cn } from '@/lib/utils'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useAuth } from '@/hooks/useAuth'
+import api from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'motion/react'
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useRef, type ReactNode } from 'react'
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
@@ -21,6 +22,14 @@ interface ConversationSummaryBarProps {
   modelId?: string | null
   /** Optional override for the max token budget (used as denominator). */
   maxTokens?: number | null
+  /** Optional right-side content (e.g. controls). */
+  rightSlot?: ReactNode
+  /** Optional third-line content under the metadata row (e.g. agent selector). */
+  thirdLineSlot?: ReactNode
+  /** Optional title to show when `conversationId` is null (e.g. draft thread). */
+  fallbackTitle?: string
+  /** Optional subtitle to show when `conversationId` is null (e.g. "Draft (not saved)"). */
+  fallbackSubtitle?: string
 }
 
 interface ConversationAgent {
@@ -32,7 +41,19 @@ interface ConversationAgent {
   avatarAttachmentId?: string
 }
 
-export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens }: ConversationSummaryBarProps) {
+function initialsFromName(name?: string | null): string {
+  if (!name || typeof name !== 'string') return 'U'
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  if (parts.length === 0) return 'U'
+  return (
+    parts
+      .map(p => p[0]?.toUpperCase())
+      .filter(Boolean)
+      .join('') || 'U'
+  )
+}
+
+export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens, rightSlot, thirdLineSlot, fallbackTitle, fallbackSubtitle }: ConversationSummaryBarProps) {
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const { isInstanceAdmin } = useAuth()
   const showTokens = expertMode
@@ -44,16 +65,110 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
   const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
-  const maxToShow = 4
-  const visibleAgents = agents.slice(0, maxToShow)
-  const remaining = agents.length - visibleAgents.length
-
   const avatarAttachmentIds = useMemo(() => {
-    return visibleAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-  }, [visibleAgents])
+    const ids = agents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    return Array.from(new Set(ids))
+  }, [agents])
   const hasAvatarIds = avatarAttachmentIds.length > 0
   const { data: avatarAttachments = [], isLoading: isLoadingAvatars } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  // Include human participants by sampling recent message authors (matches thread card behavior).
+  // The conversation detail endpoint does not currently include members/users.
+  const { data: participantsPreview } = useQuery({
+    queryKey: ['conversations', 'participants-preview', conversationId],
+    enabled: Boolean(conversationId),
+    queryFn: async () => {
+      const cid = String(conversationId || '')
+      if (!cid) return null
+      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, { params: { limit: 50 } })
+      return (resp as any)?.data?.data ?? null
+    },
+    staleTime: 60_000,
+  })
+
+  type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
+
+  const participantItems = useMemo<ParticipantItem[]>(() => {
+    type ParticipantWithSeen = (ParticipantItem & { lastSeenAt: number }) | null
+    const byKey = new Map<string, ParticipantItem & { lastSeenAt: number }>()
+
+    const upsert = (next: ParticipantItem, lastSeenAt: number) => {
+      const prev = byKey.get(next.key)
+      if (!prev) {
+        byKey.set(next.key, { ...(next as any), lastSeenAt })
+        return
+      }
+      const prevSeen = typeof (prev as any).lastSeenAt === 'number' ? (prev as any).lastSeenAt : 0
+      const mergedSeen = Math.max(prevSeen, lastSeenAt)
+      // Prefer richer metadata (e.g. avatarUrl) as we learn it.
+      byKey.set(next.key, { ...(prev as any), ...(next as any), lastSeenAt: mergedSeen })
+    }
+
+    const parseSeenAt = (m: any): number => {
+      const raw = typeof m?.createdAt === 'string' ? m.createdAt : typeof m?.updatedAt === 'string' ? m.updatedAt : null
+      const t = raw ? Date.parse(raw) : NaN
+      return Number.isFinite(t) ? t : 0
+    }
+
+    // Humans: derive from recent messages' user identity fields.
+    const msgs = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
+    for (const m of msgs) {
+      const role = String(m?.role ?? '')
+      const seenAt = parseSeenAt(m)
+
+      if (role === 'user') {
+        const userId = typeof m?.userId === 'string' ? String(m.userId).trim() : ''
+        const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
+        const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
+
+        const label = userName || (userId ? `User ${userId.slice(0, 6)}` : 'User')
+        const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
+        upsert({ kind: 'human', key, label, ...(userAvatar ? { avatarUrl: userAvatar } : null) }, seenAt)
+      }
+
+      if (role === 'assistant') {
+        const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
+        const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
+        const label = agentName || (agentId ? `Agent ${agentId.slice(0, 6)}` : 'Agent')
+        const key = `agent:${agentId || label}`
+        const seed = agentName || agentId || label
+        const fromList = agentId ? (agents as any[]).find(a => String((a as any)?.id || '') === agentId) : null
+        const avatarAttachmentId = typeof (fromList as any)?.avatarAttachmentId === 'string' ? String((fromList as any).avatarAttachmentId).trim() : ''
+        upsert({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) }, seenAt)
+      }
+    }
+
+    // Agents: from the agents list.
+    for (let idx = 0; idx < agents.length; idx++) {
+      const a = agents[idx]
+      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
+      const label = String((a as any)?.name || (a as any)?.slug || id || `Agent ${idx + 1}`).trim() || `Agent ${idx + 1}`
+      const key = `agent:${id || label}`
+      const seed = String((a as any)?.name || (a as any)?.slug || id || `agent-${idx}`).trim() || `agent-${idx}`
+      const aid = typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId).trim() : ''
+      // Keep agents that haven't spoken yet; they sort after active participants.
+      upsert({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) }, 0)
+    }
+
+    const sorted = Array.from(byKey.values()).filter(Boolean) as Array<Exclude<ParticipantWithSeen, null>>
+
+    sorted.sort((a, b) => {
+      const da = typeof (a as any).lastSeenAt === 'number' ? (a as any).lastSeenAt : 0
+      const db = typeof (b as any).lastSeenAt === 'number' ? (b as any).lastSeenAt : 0
+      if (db !== da) return db - da
+      return String((a as any).label || '').localeCompare(String((b as any).label || ''))
+    })
+
+    return sorted.map(({ lastSeenAt: _lastSeenAt, ...rest }: any) => rest) as ParticipantItem[]
+  }, [agents, participantsPreview])
+
+  const participantsLabel = useMemo(() => {
+    const labels = participantItems.map(p => p.label).filter(Boolean)
+    if (labels.length === 0) return 'No participants'
+    if (labels.length <= 3) return labels.join(', ')
+    return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
+  }, [participantItems])
 
   // Token indicator: utilization (server totals) vs max (model context window)
   const usageConversationId = showTokens ? conversationId : null
@@ -95,6 +210,9 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   // Reserve space even when loading to prevent layout shift
   // Show placeholder if: no conversationId, no currentConversation, or data is still loading
   if (!conversationId || !isDataReady) {
+    const effectiveFallbackTitle = typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0 ? fallbackTitle.trim() : 'Loading...'
+    const effectiveFallbackSubtitle = typeof fallbackSubtitle === 'string' && fallbackSubtitle.trim().length > 0 ? fallbackSubtitle.trim() : null
+
     return (
       <div className="sticky top-0 z-10 bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
         <div className="px-4 py-3.5">
@@ -104,7 +222,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 {/* Title - exact match */}
                 <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">
-                  <span className="opacity-50">Loading...</span>
+                  <span className="opacity-50">{effectiveFallbackTitle}</span>
                 </h3>
                 {/* Agents + updated row - exact structural match with same classes */}
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
@@ -118,31 +236,23 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                   {/* Separator and updated text - exact match */}
                   <span className="inline-flex items-center gap-2 whitespace-nowrap">
                     <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                    <span className="font-medium leading-none opacity-50">Updated just now</span>
+                    <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
                   </span>
                   {showTokens ? (
                     <>
                       {/* Token indicator placeholder (reserved space) */}
                       <span className="inline-flex items-center gap-2 whitespace-nowrap">
                         <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
-                          <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
-                          <span className="opacity-50 font-medium tabular-nums">—/—</span>
-                        </span>
+                        <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
                       </span>
-                      {showCost ? (
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
-                            <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
-                            <span className="opacity-50 font-medium tabular-nums">$—</span>
-                          </span>
-                        </span>
-                      ) : null}
                     </>
                   ) : null}
                 </div>
+
+                {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
               </div>
+
+              {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
             </div>
           </div>
         </div>
@@ -168,7 +278,6 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  const formatCompactTokens = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
   const ctx = typeof maxContextTokens === 'number' && Number.isFinite(maxContextTokens) && maxContextTokens > 0 ? maxContextTokens : null
   const overrideMax = typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : null
   const max = ctx ?? overrideMax ?? fallbackMaxTokens
@@ -180,34 +289,40 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     return `$${v.toFixed(2)}`
   }
 
-  const CostPill = () => (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px] bg-muted/60 border-border/50 text-muted-foreground" title={`${formatUSD2(totalCost)} spent`}>
-      <Icon name="coins" className="h-3 w-3 text-amber-500" />
-      <span className="font-semibold tabular-nums text-foreground">{formatUSD2(totalCost)}</span>
-    </span>
-  )
+  const TokensRadial = () => {
+    if (!max || pct == null) return null
 
-  const TokensPill = () => (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px]',
-        isOver ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-muted/60 border-border/50 text-muted-foreground'
-      )}
-      title={max ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens` : `${totalTokens.toLocaleString()} tokens`}
-    >
-      <Icon name="sparkles" className={cn('h-3 w-3', isOver ? 'text-destructive' : 'text-primary')} />
-      <span className={cn('font-semibold tabular-nums', isOver ? 'text-destructive' : 'text-foreground')}>
-        {formatCompactTokens(totalTokens)}/{max ? formatCompactTokens(max) : '—'}
+    const size = 16
+    const stroke = 2
+    const r = (size - stroke) / 2
+    const c = 2 * Math.PI * r
+    const clamped = Math.max(0, Math.min(100, pct))
+    const offset = c * (1 - clamped / 100)
+    const center = size / 2
+
+    const title = showCost ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens • ${formatUSD2(totalCost)} spent` : `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens`
+
+    return (
+      <span className="inline-flex items-center" aria-label={title} title={title}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-hidden="true" focusable="false">
+          <circle cx={center} cy={center} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted-foreground/25" />
+          <circle
+            cx={center}
+            cy={center}
+            r={r}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={stroke}
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${center} ${center})`}
+            className={cn(isOver ? 'text-destructive' : 'text-primary')}
+          />
+        </svg>
       </span>
-      {max ? (
-        <span className="ml-1 inline-flex items-center">
-          <span className="w-14 h-1.5 rounded-full bg-border/50 overflow-hidden">
-            <span className={cn('block h-full', isOver ? 'bg-destructive' : 'bg-primary')} style={{ width: `${pct ?? 0}%` }} />
-          </span>
-        </span>
-      ) : null}
-    </span>
-  )
+    )
+  }
 
   return (
     <motion.div
@@ -237,17 +352,29 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
 
               {/* Agents + updated row */}
               <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                {agents.length > 0 ? (
+                {participantItems.length > 0 ? (
                   <>
-                    {visibleAgents.map(agent => (
-                      <div key={agent.id ?? agent.slug ?? agent.name} className="inline-flex items-center gap-1.5 max-w-[14rem]" title={formatAgentDisplayName(agent)}>
-                        <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                          <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={16} />
-                        </Avatar>
-                        <span className="truncate font-medium leading-none">{formatAgentDisplayName(agent)}</span>
-                      </div>
-                    ))}
-                    {remaining > 0 ? <span className="text-muted-foreground/70">+{remaining}</span> : null}
+                    {/* Participants (overlapping avatars) */}
+                    <div className="flex items-center -space-x-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
+                      {participantItems.slice(0, 3).map(p => {
+                        if (p.kind === 'agent') {
+                          const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                          return (
+                            <div key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                              <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={24} rounded />
+                            </div>
+                          )
+                        }
+                        return (
+                          <Avatar key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                          </Avatar>
+                        )
+                      })}
+                    </div>
+
+                    {participantItems.length > 3 ? <span className="text-muted-foreground/70">and {participantItems.length - 3} more</span> : null}
 
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <span aria-hidden="true" className="h-3 w-px bg-border/60" />
@@ -259,15 +386,8 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                       <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <TokensPill />
+                          <TokensRadial />
                         </span>
-
-                        {showCost ? (
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <CostPill />
-                          </span>
-                        ) : null}
                       </>
                     ) : null}
                   </>
@@ -278,20 +398,18 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                       <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <TokensPill />
+                          <TokensRadial />
                         </span>
-                        {showCost ? (
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <CostPill />
-                          </span>
-                        ) : null}
                       </>
                     ) : null}
                   </>
                 )}
               </div>
+
+              {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
             </div>
+
+            {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
           </div>
         </div>
       </div>

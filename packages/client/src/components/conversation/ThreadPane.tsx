@@ -1,9 +1,9 @@
 'use client'
 
 import Icon from '@/components/primitives/Icon'
-import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
+import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import { useConversationAgents } from '@/hooks/useConversations'
 import type { AgentModel } from '@starships/protocol'
@@ -43,26 +43,33 @@ export function ThreadPane(props: {
   return (
     <ConversationStreamProvider conversationId={effectiveConversationId} starshipId={starshipId}>
       <div className={className ?? 'flex flex-col h-full min-h-0'}>
-        <div className="px-4 py-3 border-b border-border/60 flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-semibold">Thread</h3>
-              {effectiveConversationId ? <span className="text-xs text-muted-foreground">in a side pane</span> : <span className="text-xs text-muted-foreground">draft (not saved)</span>}
-            </div>
-          </div>
-          <div className="min-w-0 flex items-center gap-2">
-            <AgentSelector selectedAgent={selectedAgent as any} onAgentChange={onAgentChange as any} starshipId={starshipId} compact={true} />
-            <button
-              type="button"
-              className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
-              onClick={onClose}
-              aria-label="Close thread"
-              title="Close thread"
-            >
-              <Icon name="x" className="h-4 w-4" />
-            </button>
-          </div>
-        </div>
+        <ConversationSummaryBar
+          conversationId={effectiveConversationId}
+          starshipId={starshipId}
+          modelId={(selectedAgent as any)?.model ?? null}
+          maxTokens={
+            typeof (selectedAgent as any)?.maxTokens === 'number'
+              ? (selectedAgent as any).maxTokens
+              : typeof (selectedAgent as any)?.maxTokens === 'string'
+                ? Number((selectedAgent as any).maxTokens)
+                : null
+          }
+          fallbackTitle={draftTitle ?? 'Thread'}
+          fallbackSubtitle={effectiveConversationId ? undefined : 'Draft (not saved)'}
+          rightSlot={
+            <>
+              <button
+                type="button"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors"
+                onClick={onClose}
+                aria-label="Close thread"
+                title="Close thread"
+              >
+                <Icon name="x" className="h-4 w-4" />
+              </button>
+            </>
+          }
+        />
 
         <div className="flex-1 min-h-0">
           <ConversationMessageList conversationId={effectiveConversationId} starshipId={starshipId} bottomPaddingPx={180} pinnedFirstMessage={pinnedFirstMessage ?? null} />

@@ -42,6 +42,11 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     return Math.max(min, Math.min(max, next))
   }, [])
 
+  const clampThreadPaneWidthPxRef = useRef(clampThreadPaneWidthPx)
+  useEffect(() => {
+    clampThreadPaneWidthPxRef.current = clampThreadPaneWidthPx
+  }, [clampThreadPaneWidthPx])
+
   useEffect(() => {
     // Initialize from localStorage (or sensible defaults per breakpoint).
     try {
@@ -68,10 +73,10 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
   useEffect(() => {
     // Clamp on viewport resize so the handle can't push content offscreen.
     if (typeof window === 'undefined') return
-    const onResize = () => setThreadPaneWidthPx(prev => clampThreadPaneWidthPx(prev))
+    const onResize = () => setThreadPaneWidthPx(prev => clampThreadPaneWidthPxRef.current(prev))
     window.addEventListener('resize', onResize)
     return () => window.removeEventListener('resize', onResize)
-  }, [clampThreadPaneWidthPx])
+  }, [])
 
   useEffect(() => {
     // Safety: if the user navigates away mid-drag, ensure we clean up listeners and restore user-select.
@@ -133,7 +138,7 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       slug: params.slug as string,
       channelSlug: params.channelSlug as string | undefined,
     }),
-    [params.slug, params.channelSlug, searchParams]
+    [params.slug, params.channelSlug]
   )
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
@@ -272,26 +277,42 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
   }, [channelsData?.channels])
 
   const hasAutoNavigatedRef = useRef(false)
+  const pendingAutoNavigateHrefRef = useRef<string | null>(null)
   useEffect(() => {
-    if (hasAutoNavigatedRef.current) return
     if (shouldShowOnboarding) return
     if (!starshipData?.id) return
     if (routeParams.channelSlug) return
     if (isDraftDm) return
 
     if (channelsLoading) return
-    if (pickAutoChannelSlug) {
-      hasAutoNavigatedRef.current = true
-      // Preserve query params (e.g. thread), but drop agent to prevent "starter" behaviors.
-      const sp = new URLSearchParams(searchParams.toString())
-      sp.delete('agent')
-      const qs = sp.toString()
-      router.replace(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`)
-      return
-    }
+    if (hasAutoNavigatedRef.current) return
 
-    hasAutoNavigatedRef.current = true
-    router.replace('/marketplace')
+    // Preserve query params (e.g. thread), but drop agent to prevent "starter" behaviors.
+    const sp = new URLSearchParams(searchParams.toString())
+    sp.delete('agent')
+    const qs = sp.toString()
+
+    const href = pickAutoChannelSlug
+      ? qs
+        ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
+        : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
+      : '/marketplace'
+
+    // StrictMode/concurrent safety: schedule navigation and cancel it if this effect is cleaned up
+    // before it gets to run (e.g. dev double-invocation).
+    if (pendingAutoNavigateHrefRef.current === href) return
+    pendingAutoNavigateHrefRef.current = href
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      if (pendingAutoNavigateHrefRef.current !== href) return
+      hasAutoNavigatedRef.current = true
+      router.replace(href)
+    })
+    return () => {
+      cancelled = true
+      if (pendingAutoNavigateHrefRef.current === href) pendingAutoNavigateHrefRef.current = null
+    }
   }, [shouldShowOnboarding, starshipData?.id, routeParams.channelSlug, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
   // If the channel slug is invalid (no matching channel), redirect to default channel.
@@ -303,7 +324,17 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     if (!pickAutoChannelSlug) return
     const sp = new URLSearchParams(searchParams.toString())
     const qs = sp.toString()
-    router.replace(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`)
+    const href = qs
+      ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
+      : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
+    let cancelled = false
+    queueMicrotask(() => {
+      if (cancelled) return
+      router.replace(href)
+    })
+    return () => {
+      cancelled = true
+    }
   }, [activeChannel, channelsLoading, pickAutoChannelSlug, routeParams.channelSlug, routeParams.slug, router, searchParams, starshipData?.id])
 
   // Handle conversation change from ConversationInterface:

@@ -291,6 +291,10 @@ function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number;
   if (mimeTypeRaw.length > 64) return { ok: false, reason: 'mime_too_long' };
   if (!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(mimeTypeRaw)) return { ok: false, reason: 'invalid_mime' };
   const mimeType = mimeTypeRaw.toLowerCase();
+  // Avoid accepting "active content" image types (e.g. SVG) and keep the surface area small.
+  // This is used for tool-result attachments, so we only allow common raster formats.
+  const allowedMimeTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']);
+  if (!allowedMimeTypes.has(mimeType)) return { ok: false, reason: 'unsupported_mime' };
 
   let b64 = dataUrl.slice(markerIdx + base64Marker.length);
   if (!b64) return { ok: false, reason: 'empty_base64' };
@@ -304,6 +308,8 @@ function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number;
       return { ok: false, reason: 'base64_contains_whitespace' };
     }
   }
+
+  if (b64.length % 4 !== 0) return { ok: false, reason: 'invalid_base64_length' };
 
   // Validate base64 characters and padding placement in a single pass (linear time).
   let paddingCount = 0;

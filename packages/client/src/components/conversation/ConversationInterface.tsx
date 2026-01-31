@@ -6,6 +6,7 @@ import { ConversationMessageInput, ConversationMessageInputRef } from '@/compone
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { SearchResultsSidebar } from '@/components/conversation/SearchResultsSidebar'
+import { useConversationSearch } from '@/components/conversation/ConversationSearchContext'
 import type { SearchResult } from '@/components/conversation/conversationSearch'
 import { AgentSelector } from '@/components/conversation/AgentSelector'
 import { Avatar } from '@/components/ui/avatar'
@@ -162,13 +163,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   const [dockOffsetPx, setDockOffsetPx] = useState<number>(0)
   const [showAllSuggestions, setShowAllSuggestions] = useState<boolean>(false)
 
-  // Discord-style search: submitted query opens right sidebar; results and selection for jump-to
-  const [submittedQuery, setSubmittedQuery] = useState<string>('')
+  // Discord-style search: use context when available (navbar search), else local state
+  const searchContext = useConversationSearch()
+  const [localSubmittedQuery, setLocalSubmittedQuery] = useState<string>('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [selectedMatchIndex, setSelectedMatchIndex] = useState<number | null>(null)
 
+  const submittedQuery = searchContext?.submittedQuery ?? localSubmittedQuery
+  const setSubmittedQuery = searchContext?.setSubmittedQuery ?? setLocalSubmittedQuery
+  const hideSearchInputInList = searchContext != null
+
   // Clear search when conversation changes
   useEffect(() => {
+    setLocalSubmittedQuery('')
     setSubmittedQuery('')
     setSearchResults([])
     setSelectedMatchIndex(null)
@@ -876,6 +883,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                   }}
                   onSearchResults={setSearchResults}
                   selectedMatchIndex={selectedMatchIndex}
+                  hideSearchInput={hideSearchInputInList}
                 />
               </div>
               {/* Single place for stream-dependent side-effects */}
@@ -890,6 +898,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                   setSubmittedQuery('')
                   setSearchResults([])
                   setSelectedMatchIndex(null)
+                  searchContext?.setSearchInputValue?.('')
                 }}
               />
             ) : null}

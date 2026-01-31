@@ -13,6 +13,7 @@ import { useConversationStreamContextOptional } from '@/hooks/ConversationStream
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
+import { stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -74,6 +75,8 @@ interface ConversationMessageListProps {
   onSearchResults?: (results: import('./conversationSearch').SearchResult[]) => void
   /** When set (e.g. from sidebar result click), scroll to this match index. */
   selectedMatchIndex?: number | null
+  /** When true, hide the search input (e.g. when search is in navbar) and show only Prev/Next. */
+  hideSearchInput?: boolean
 }
 
 export function ConversationMessageList({
@@ -99,6 +102,7 @@ export function ConversationMessageList({
   onSearchSubmit,
   onSearchResults,
   selectedMatchIndex,
+  hideSearchInput = false,
 }: ConversationMessageListProps) {
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
@@ -630,11 +634,12 @@ export function ConversationMessageList({
       const firstMatchIdx = contentLower.indexOf(q)
       const snippetStart = Math.max(0, firstMatchIdx - 50)
       const snippetEnd = Math.min(contentLower.length, firstMatchIdx + 80)
-      const contentSnippet = (content + ' ' + reasoning).slice(snippetStart, snippetEnd).trim()
+      const rawSnippet = (content + ' ' + reasoning).slice(snippetStart, snippetEnd).trim()
+      const contentSnippet = stripMarkdownToPlainText(rawSnippet || content.slice(0, 120))
       results.push({
         messageId: msg.id,
         role: msg.role,
-        contentSnippet: contentSnippet || content.slice(0, 120),
+        contentSnippet: contentSnippet || stripMarkdownToPlainText(content.slice(0, 120)),
         timestamp: (msg as ExtendedMessage).createdAt,
         occurrenceCount: count,
         firstMatchIndexInPositions: firstIndexInPositions,
@@ -669,56 +674,57 @@ export function ConversationMessageList({
     <div className={cn('h-full flex flex-col', className)}>
       {showSearchBar && (
         <div className="flex-shrink-0 border-b px-4 py-2 flex items-center gap-2 bg-background/95">
-          <div className="relative flex-1 min-w-0">
-            <Icon name="magnifying-glass" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <Input
-              type="text"
-              placeholder="Search in conversation..."
-              value={searchInputValue}
-              onChange={e => setSearchInputValue(e.target.value)}
-              onKeyDown={e => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  const q = searchInputValue.trim()
-                  if (q) onSearchSubmit?.(q)
-                }
-              }}
-              className="pl-8 pr-8 h-8 text-xs"
-              aria-label="Search in conversation"
-            />
-            {searchInputValue && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchInputValue('')
-                  onSearchSubmit?.('')
-                }}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                aria-label="Clear search"
-              >
-                <Icon name="x" className="h-3.5 w-3.5" />
-              </button>
-            )}
-          </div>
-          {onSearchSubmit && (
-            <Button
-              variant="default"
-              size="sm"
-              className="h-8 flex-shrink-0 text-xs"
-              onClick={() => {
-                const q = searchInputValue.trim()
-                if (q) onSearchSubmit(q)
-              }}
-              aria-label="Search"
-            >
-              Search
-            </Button>
+          {!hideSearchInput && (
+            <>
+              <div className="relative flex-1 min-w-0">
+                <Icon name="search" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
+                <Input
+                  type="text"
+                  placeholder="Search in conversation..."
+                  value={searchInputValue}
+                  onChange={e => setSearchInputValue(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      const q = searchInputValue.trim()
+                      if (q) onSearchSubmit?.(q)
+                    }
+                  }}
+                  className="pl-8 pr-8 h-8 text-xs"
+                  aria-label="Search in conversation"
+                />
+                {searchInputValue && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSearchInputValue('')
+                      onSearchSubmit?.('')
+                    }}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Clear search"
+                  >
+                    <Icon name="x" className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+              {onSearchSubmit && (
+                <Button
+                  variant="default"
+                  size="sm"
+                  className="h-8 flex-shrink-0 text-xs"
+                  onClick={() => {
+                    const q = searchInputValue.trim()
+                    if (q) onSearchSubmit(q)
+                  }}
+                  aria-label="Search"
+                >
+                  Search
+                </Button>
+              )}
+            </>
           )}
           {highlightTerm && (
             <>
-              <span className="text-xs text-muted-foreground whitespace-nowrap">
-                {hasSearchMatches ? `${currentMatchIndex + 1} of ${matchingPositions.length}` : 'No matches'}
-              </span>
               <Button
                 variant="ghost"
                 size="icon"
@@ -745,7 +751,7 @@ export function ConversationMessageList({
       )}
       <div
         ref={scrollContainerRef}
-        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
+        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-2' : 'pt-2', scrollClassName)}
         style={{ paddingBottom: bottomPaddingPx ?? 160 }}
         onScroll={() => {
           const container = scrollContainerRef.current

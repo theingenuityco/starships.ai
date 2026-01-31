@@ -62,10 +62,7 @@ export function SearchResultsSidebar({
       aria-label="Search results"
     >
       <div className="flex-shrink-0 border-b border-border px-3 py-2 flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <div className="flex-1 min-w-0 rounded-md bg-muted/50 px-2 py-1.5 text-xs text-muted-foreground truncate">
-            {query || 'Search...'}
-          </div>
+        <div className="flex items-center justify-end gap-2">
           <Button
             variant="ghost"
             size="icon"
@@ -76,7 +73,7 @@ export function SearchResultsSidebar({
             <Icon name="x" className="h-4 w-4" />
           </Button>
         </div>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mt-2">
           <span className="text-xs font-medium text-foreground">
             {results.length} {results.length === 1 ? 'Result' : 'Results'}
           </span>

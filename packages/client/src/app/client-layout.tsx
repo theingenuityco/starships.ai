@@ -4,6 +4,7 @@ import Icon from '@/components/primitives/Icon'
 
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
 import { TopRightUserProfile } from '@/components/auth/TopRightUserProfile'
+import { ConversationSearchProvider } from '@/components/conversation/ConversationSearchContext'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
@@ -235,8 +236,9 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     <JwtAuthGate>
       <StarTheme>
         <EmailChangeToastHandler />
-        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-          {showTopRightUserProfile ? <TopRightUserProfile /> : null}
+        <ConversationSearchProvider>
+          <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+            {showTopRightUserProfile ? <TopRightUserProfile /> : null}
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
             <>
@@ -271,7 +273,8 @@ export function ClientLayout({ children }: ClientLayoutProps) {
 
           {/* Main Content Area - takes remaining space */}
           <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
-        </div>
+          </div>
+        </ConversationSearchProvider>
       </StarTheme>
     </JwtAuthGate>
   )

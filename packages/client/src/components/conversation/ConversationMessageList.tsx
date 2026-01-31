@@ -194,6 +194,12 @@ interface ConversationMessageListProps {
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
+  /**
+   * Controls the maximum width of the inner message column.
+   * - 'constrained' (default): center a readable column (max-w-4xl)
+   * - 'full': allow messages to expand to the full available width
+   */
+  contentWidth?: 'constrained' | 'full'
   /** When true, show a per-message action to start/open a thread (child conversation). */
   enableChannelMessageThreads?: boolean
   /**
@@ -252,6 +258,7 @@ export function ConversationMessageList({
   bottomPaddingPx,
   className,
   scrollClassName,
+  contentWidth = 'constrained',
   enableChannelMessageThreads = false,
   onOpenThread,
   pinnedFirstMessage,
@@ -873,7 +880,7 @@ export function ConversationMessageList({
           isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
         }}
       >
-        <div className="w-full max-w-4xl mx-auto bg-transparent">
+        <div className={cn('w-full bg-transparent', contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none')}>
           {canLoadOlder && (
             <div className="flex justify-center pb-4">
               <button

@@ -255,7 +255,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
           </div>
 
           <aside
-            className="hidden md:flex h-full flex-shrink-0 bg-background min-w-0"
+            className="hidden md:block h-full flex-shrink-0 bg-background min-w-0"
             style={{
               width: threadPaneWidthPx,
             }}
@@ -279,6 +279,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
                 setThreadDraftTitle(null)
                 setThreadConversationIdInUrl(null)
               }}
+              className="w-full min-w-0"
             />
           </aside>
         </>

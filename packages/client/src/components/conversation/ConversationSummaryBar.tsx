@@ -16,6 +16,10 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 
+export type ConversationParticipantItem =
+  | { kind: 'human'; key: string; label: string; avatarUrl?: string }
+  | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
+
 interface ConversationSummaryBarProps {
   conversationId: string | null
   starshipId: string
@@ -33,6 +37,11 @@ interface ConversationSummaryBarProps {
   fallbackTitle?: string
   /** Optional subtitle to show when `conversationId` is null (e.g. "Draft (not saved)"). */
   fallbackSubtitle?: string
+  /**
+   * Optional participants override (useful for draft headers before a conversation exists).
+   * When set, these participants will be used for the header avatars/list.
+   */
+  participantsOverride?: ConversationParticipantItem[] | null
 }
 
 interface ConversationAgent {
@@ -56,7 +65,18 @@ function initialsFromName(name?: string | null): string {
   )
 }
 
-export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens, titlePrefix, rightSlot, thirdLineSlot, fallbackTitle, fallbackSubtitle }: ConversationSummaryBarProps) {
+export function ConversationSummaryBar({
+  conversationId,
+  starshipId,
+  modelId,
+  maxTokens,
+  titlePrefix,
+  rightSlot,
+  thirdLineSlot,
+  fallbackTitle,
+  fallbackSubtitle,
+  participantsOverride,
+}: ConversationSummaryBarProps) {
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const { isInstanceAdmin } = useAuth()
   const showTokens = expertMode
@@ -68,10 +88,17 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
   const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
+  const overrideAvatarAttachmentIds = useMemo(() => {
+    const list = Array.isArray(participantsOverride) ? participantsOverride : []
+    return list
+      .filter(p => p && p.kind === 'agent')
+      .map(p => (typeof p.avatarAttachmentId === 'string' ? p.avatarAttachmentId.trim() : ''))
+      .filter(Boolean)
+  }, [participantsOverride])
   const avatarAttachmentIds = useMemo(() => {
     const ids = agents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-    return Array.from(new Set(ids))
-  }, [agents])
+    return Array.from(new Set([...ids, ...overrideAvatarAttachmentIds]))
+  }, [agents, overrideAvatarAttachmentIds])
   const hasAvatarIds = avatarAttachmentIds.length > 0
   const { data: avatarAttachments = [], isLoading: isLoadingAvatars } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
@@ -90,13 +117,11 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     staleTime: 60_000,
   })
 
-  type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
+  const participantItemsFromConversation = useMemo<ConversationParticipantItem[]>(() => {
+    type ParticipantWithSeen = (ConversationParticipantItem & { lastSeenAt: number }) | null
+    const byKey = new Map<string, ConversationParticipantItem & { lastSeenAt: number }>()
 
-  const participantItems = useMemo<ParticipantItem[]>(() => {
-    type ParticipantWithSeen = (ParticipantItem & { lastSeenAt: number }) | null
-    const byKey = new Map<string, ParticipantItem & { lastSeenAt: number }>()
-
-    const upsert = (next: ParticipantItem, lastSeenAt: number) => {
+    const upsert = (next: ConversationParticipantItem, lastSeenAt: number) => {
       const prev = byKey.get(next.key)
       if (!prev) {
         byKey.set(next.key, { ...(next as any), lastSeenAt })
@@ -163,15 +188,20 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
       return String((a as any).label || '').localeCompare(String((b as any).label || ''))
     })
 
-    return sorted.map(({ lastSeenAt: _lastSeenAt, ...rest }: any) => rest) as ParticipantItem[]
+    return sorted.map(({ lastSeenAt: _lastSeenAt, ...rest }: any) => rest) as ConversationParticipantItem[]
   }, [agents, participantsPreview])
 
+  const effectiveParticipantItems = useMemo(() => {
+    if (Array.isArray(participantsOverride) && participantsOverride.length > 0) return participantsOverride
+    return participantItemsFromConversation
+  }, [participantItemsFromConversation, participantsOverride])
+
   const participantsLabel = useMemo(() => {
-    const labels = participantItems.map(p => p.label).filter(Boolean)
+    const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
     if (labels.length === 0) return 'No participants'
     if (labels.length <= 3) return labels.join(', ')
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
-  }, [participantItems])
+  }, [effectiveParticipantItems])
 
   const [participantsOpen, setParticipantsOpen] = useState(false)
   const participantsHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -231,7 +261,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
   }, [clearParticipantsHoverTimers])
 
   const ParticipantsPopup = () => {
-    const labels = participantItems.map(p => p.label).filter(Boolean)
+    const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
     if (labels.length === 0) return null
     return (
       <div className="w-full">
@@ -240,7 +270,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
         </div>
         <div className="-mx-1 my-1 h-px bg-muted" />
         <div className="max-h-72 overflow-y-auto overflow-x-hidden p-1">
-          {participantItems.map(p => (
+          {effectiveParticipantItems.map(p => (
             <div
               key={p.key}
               className="group relative rounded-lg flex items-center gap-2 w-full h-8 px-2 text-[13px] font-medium border border-transparent cursor-default text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted"
@@ -321,8 +351,8 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
           ? 'Draft'
           : 'Loading...'
     const effectiveFallbackSubtitle = typeof fallbackSubtitle === 'string' && fallbackSubtitle.trim().length > 0 ? fallbackSubtitle.trim() : null
-    // Draft threads intentionally do not fetch participants/metadata until the first message persists the conversation.
-    const isDraftHeader = !conversationId && (Boolean(fallbackTitle) || Boolean(fallbackSubtitle))
+    const isDraftHeader = !conversationId
+    const hasDraftParticipants = isDraftHeader && effectiveParticipantItems.length > 0
 
     return (
       <div className="sticky top-0 z-10 bg-card/95 supports-[backdrop-filter]:bg-card/80 backdrop-blur border-b border-border/60">
@@ -332,13 +362,13 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 {/* Title - exact match */}
-                <div className="flex items-center gap-2 min-w-0">
+                <div className="flex items-center gap-2 min-w-0 w-full">
                   {titlePrefix ? (
                     <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
                       {titlePrefix}
                     </span>
                   ) : null}
-                  <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">
+                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">
                     <span className="opacity-50">{effectiveFallbackTitle}</span>
                   </h3>
                 </div>
@@ -346,15 +376,75 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
                   {isDraftHeader ? (
                     <>
-                      {/* Draft placeholder uses the same structure as the loaded header to preserve height */}
-                      <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
-                        <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                          <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
-                            <div className="h-4 w-4 rounded-full bg-muted/30" />
-                          </Avatar>
-                          <span className="truncate font-medium leading-none opacity-70">Draft</span>
+                      {hasDraftParticipants ? (
+                        <Popover
+                          open={participantsOpen}
+                          onOpenChange={next => {
+                            clearParticipantsHoverTimers()
+                            setParticipantsOpen(next)
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              ref={participantsTriggerRef}
+                              className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              aria-label={`Participants: ${participantsLabel}`}
+                              title={participantsLabel}
+                              onPointerEnter={openParticipantsPopover}
+                              onPointerLeave={handleParticipantsTriggerPointerLeave}
+                              onFocus={() => {
+                                clearParticipantsHoverTimers()
+                                setParticipantsOpen(true)
+                              }}
+                            >
+                              <div className="flex items-center -space-x-1.5">
+                                {effectiveParticipantItems.slice(0, 3).map(p => {
+                                  if (p.kind === 'agent') {
+                                    const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                                    return (
+                                      <div key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
+                                      </div>
+                                    )
+                                  }
+                                  return (
+                                    <Avatar key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                    </Avatar>
+                                  )
+                                })}
+                              </div>
+                              {effectiveParticipantItems.length > 3 ? (
+                                <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span>
+                              ) : null}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            ref={participantsContentRef}
+                            side="bottom"
+                            align="start"
+                            sideOffset={8}
+                            className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
+                            onOpenAutoFocus={e => e.preventDefault()}
+                            onCloseAutoFocus={e => e.preventDefault()}
+                            onPointerEnter={openParticipantsPopover}
+                            onPointerLeave={handleParticipantsContentPointerLeave}
+                          >
+                            <ParticipantsPopup />
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                          <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                            <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
+                              <div className="h-4 w-4 rounded-full bg-muted/30" />
+                            </Avatar>
+                            <span className="truncate font-medium leading-none opacity-70">Draft</span>
+                          </div>
                         </div>
-                      </div>
+                      )}
                       <span className="inline-flex items-center gap-2 whitespace-nowrap">
                         <span aria-hidden="true" className="h-3 w-px bg-border/60" />
                         <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
@@ -494,18 +584,18 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
               {/* Title */}
-              <div className="flex items-center gap-2 min-w-0">
+              <div className="flex items-center gap-2 min-w-0 w-full">
                 {titlePrefix ? (
                   <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
                     {titlePrefix}
                   </span>
                 ) : null}
-                <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
+                <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
               </div>
 
               {/* Agents + updated row */}
               <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                {participantItems.length > 0 ? (
+                {effectiveParticipantItems.length > 0 ? (
                   <>
                     {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
                     <Popover
@@ -530,7 +620,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                           }}
                         >
                           <div className="flex items-center -space-x-1.5">
-                            {participantItems.slice(0, 3).map(p => {
+                            {effectiveParticipantItems.slice(0, 3).map(p => {
                               if (p.kind === 'agent') {
                                 const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                                 return (
@@ -547,7 +637,9 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                               )
                             })}
                           </div>
-                          {participantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {participantItems.length - 3} more</span> : null}
+                          {effectiveParticipantItems.length > 3 ? (
+                            <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span>
+                          ) : null}
                         </button>
                       </PopoverTrigger>
                       <PopoverContent

@@ -3,9 +3,11 @@
 import Icon from '@/components/primitives/Icon'
 import { ConversationMessageInput } from '@/components/conversation/ConversationMessageInput'
 import { ConversationMessageList } from '@/components/conversation/ConversationMessageList'
-import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
+import { ConversationSummaryBar, type ConversationParticipantItem } from '@/components/conversation/ConversationSummaryBar'
 import { ConversationStreamProvider } from '@/hooks/ConversationStreamContext'
 import { useConversationAgents } from '@/hooks/useConversations'
+import { useAuth } from '@/hooks/useAuth'
+import { cn } from '@/lib/utils'
 import type { AgentModel } from '@starships/protocol'
 import type { MessageModel } from '@starships/protocol'
 import { useMemo } from 'react'
@@ -26,6 +28,7 @@ export function ThreadPane(props: {
   className?: string
 }) {
   const { starshipId, starshipSlug, conversationId, pinnedFirstMessage, draftParentConversationId, draftTitle, onThreadCreated, selectedAgent, onAgentChange, onClose, className } = props
+  const { userId, userName, userEmail, userAvatar } = useAuth()
 
   // Safety/repair:
   // Threads are not channels. The server rejects messages for non-channel conversations with 0 linked agents.
@@ -40,9 +43,73 @@ export function ThreadPane(props: {
 
   const effectiveConversationId = isBrokenThread ? null : conversationId
 
+  const draftParticipants = useMemo<ConversationParticipantItem[] | null>(() => {
+    if (effectiveConversationId) return null
+
+    const items: ConversationParticipantItem[] = []
+    const seen = new Set<string>()
+
+    const addHuman = (args: { id?: string | null; name?: string | null; avatarUrl?: string | null }) => {
+      const id = typeof args.id === 'string' ? args.id.trim() : ''
+      const name = typeof args.name === 'string' ? args.name.trim() : ''
+      const avatarUrl = typeof args.avatarUrl === 'string' ? args.avatarUrl.trim() : ''
+      const label = name || (id ? `User ${id.slice(0, 6)}` : 'User')
+      const key = id ? `human:${id}` : name ? `human:name:${name}` : `human:unknown:${label}`
+      if (seen.has(key)) return
+      seen.add(key)
+      items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
+    }
+
+    const addAgent = (args: { id?: string | null; name?: string | null; slug?: string | null; avatarAttachmentId?: string | null }) => {
+      const id = typeof args.id === 'string' ? args.id.trim() : ''
+      const name = typeof args.name === 'string' ? args.name.trim() : ''
+      const slug = typeof args.slug === 'string' ? args.slug.trim() : ''
+      const label = name || slug || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')
+      const key = `agent:${id || label}`
+      if (seen.has(key)) return
+      seen.add(key)
+      const seed = name || slug || id || label
+      const avatarAttachmentId = typeof args.avatarAttachmentId === 'string' ? args.avatarAttachmentId.trim() : ''
+      items.push({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) })
+    }
+
+    // 1) Message author ("who the message belongs to")
+    if (pinnedFirstMessage) {
+      const role = typeof (pinnedFirstMessage as any)?.role === 'string' ? String((pinnedFirstMessage as any).role) : ''
+      if (role === 'user') {
+        addHuman({
+          id: typeof (pinnedFirstMessage as any)?.userId === 'string' ? String((pinnedFirstMessage as any).userId) : null,
+          name: typeof (pinnedFirstMessage as any)?.userName === 'string' ? String((pinnedFirstMessage as any).userName) : null,
+          avatarUrl: typeof (pinnedFirstMessage as any)?.userAvatar === 'string' ? String((pinnedFirstMessage as any).userAvatar) : null,
+        })
+      } else if (role === 'assistant') {
+        addAgent({
+          id: typeof (pinnedFirstMessage as any)?.agentId === 'string' ? String((pinnedFirstMessage as any).agentId) : null,
+          name: typeof (pinnedFirstMessage as any)?.agentName === 'string' ? String((pinnedFirstMessage as any).agentName) : null,
+          avatarAttachmentId: null,
+        })
+      }
+    }
+
+    // 2) Thread initiator (current user)
+    addHuman({ id: userId ?? null, name: userName ?? userEmail ?? null, avatarUrl: userAvatar ?? null })
+
+    // 3) Selected agent (who will respond in the thread)
+    if (selectedAgent) {
+      addAgent({
+        id: typeof (selectedAgent as any)?.id === 'string' ? String((selectedAgent as any).id) : null,
+        name: typeof (selectedAgent as any)?.name === 'string' ? String((selectedAgent as any).name) : null,
+        slug: typeof (selectedAgent as any)?.slug === 'string' ? String((selectedAgent as any).slug) : null,
+        avatarAttachmentId: typeof (selectedAgent as any)?.avatarAttachmentId === 'string' ? String((selectedAgent as any).avatarAttachmentId) : null,
+      })
+    }
+
+    return items.length > 0 ? items : null
+  }, [effectiveConversationId, pinnedFirstMessage, selectedAgent, userAvatar, userEmail, userId, userName])
+
   return (
     <ConversationStreamProvider conversationId={effectiveConversationId} starshipId={starshipId}>
-      <div className={className ?? 'flex flex-col h-full min-h-0'}>
+      <div className={cn('flex flex-col h-full min-h-0 w-full min-w-0', className)}>
         <ConversationSummaryBar
           conversationId={effectiveConversationId}
           starshipId={starshipId}
@@ -56,6 +123,7 @@ export function ThreadPane(props: {
           }
           fallbackTitle={draftTitle ?? 'Thread'}
           fallbackSubtitle={effectiveConversationId ? undefined : 'Draft (not saved)'}
+          participantsOverride={draftParticipants}
           rightSlot={
             <>
               <button
@@ -72,7 +140,13 @@ export function ThreadPane(props: {
         />
 
         <div className="flex-1 min-h-0">
-          <ConversationMessageList conversationId={effectiveConversationId} starshipId={starshipId} bottomPaddingPx={180} pinnedFirstMessage={pinnedFirstMessage ?? null} />
+          <ConversationMessageList
+            conversationId={effectiveConversationId}
+            starshipId={starshipId}
+            bottomPaddingPx={180}
+            pinnedFirstMessage={pinnedFirstMessage ?? null}
+            contentWidth="full"
+          />
         </div>
 
         {/* Match the main conversation interface "docked composer" spacing/structure */}

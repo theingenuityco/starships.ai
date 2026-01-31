@@ -162,13 +162,6 @@ export function Navigation(props: NavigationProps) {
 
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
-  // Handle new conversation - memoized
-  const handleNewConversation = useCallback(() => {
-    if (!starshipSlug) return
-    router.push(`/ship/${starshipSlug}/conversations`)
-    if (isMobile && onClose) onClose()
-  }, [router, starshipSlug, isMobile, onClose])
-
   // Handle logo click - memoized
   const handleLogoClick = useCallback(() => {
     // Trigger animation
@@ -187,7 +180,6 @@ export function Navigation(props: NavigationProps) {
   }, [isExpanded, handleLogoClick])
 
   // Create refs for navigation items (for onboarding positioning)
-  const newChatRef = useRef<HTMLDivElement>(null)
   const exploreAgentsRef = useRef<HTMLDivElement>(null)
   const myAgentsRef = useRef<HTMLDivElement>(null)
   const connectorsRef = useRef<HTMLDivElement>(null)
@@ -195,7 +187,6 @@ export function Navigation(props: NavigationProps) {
 
   const navigationItemRefs = useMemo(() => {
     const refs = new Map<string, React.RefObject<HTMLDivElement | null>>()
-    refs.set('New Chat', newChatRef)
     refs.set('Explore Agents', exploreAgentsRef)
     refs.set('My Agents', myAgentsRef)
     refs.set('Connectors', connectorsRef)
@@ -218,20 +209,6 @@ export function Navigation(props: NavigationProps) {
   // Include Recents in the same hierarchy when collapsed
   const mainNavigationItems = useMemo(
     () => [
-      ...(isAuthenticated && starshipSlug
-        ? [
-            {
-              href: '#',
-              label: 'New Chat',
-              icon: 'plus',
-              isActive: false,
-              onClick: handleNewConversation,
-              special: true,
-              itemRef: newChatRef,
-              isOnboardingHighlighted: getOnboardingHighlight('New Chat'),
-            },
-          ]
-        : []),
       {
         href: `/marketplace`,
         label: 'Explore Agents',
@@ -287,7 +264,7 @@ export function Navigation(props: NavigationProps) {
           ]
         : []),
     ],
-    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, handleNewConversation, starshipData?.id, isInstanceAdmin, getOnboardingHighlight]
+    [isAuthenticated, starshipSlug, isAgentsRoute, isAgentBuilderRoute, pathname, isSchedulesRoute, isConnectorsRoute, starshipData?.id, isInstanceAdmin, getOnboardingHighlight]
   )
 
   const handleSidebarBackgroundClick = useCallback(

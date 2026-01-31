@@ -189,6 +189,8 @@ export function Navigation(props: NavigationProps) {
   const myAgentsRef = useRef<HTMLDivElement>(null)
   const connectorsRef = useRef<HTMLDivElement>(null)
   const schedulesRef = useRef<HTMLDivElement>(null)
+  const channelsRef = useRef<HTMLDivElement>(null)
+  const directMessagesRef = useRef<HTMLDivElement>(null)
 
   const navigationItemRefs = useMemo(() => {
     const refs = new Map<string, React.RefObject<HTMLDivElement | null>>()
@@ -196,6 +198,8 @@ export function Navigation(props: NavigationProps) {
     refs.set('My Agents', myAgentsRef)
     refs.set('Connectors', connectorsRef)
     refs.set('Schedules', schedulesRef)
+    refs.set('Channels', channelsRef)
+    refs.set('Direct messages', directMessagesRef)
     return refs
   }, [])
 
@@ -418,6 +422,11 @@ export function Navigation(props: NavigationProps) {
                 <ConversationList
                   starshipId={starshipData.id}
                   compact={true}
+                  onboardingChannelsAnchorRef={channelsRef}
+                  onboardingDirectMessagesAnchorRef={directMessagesRef}
+                  onboardingHighlight={
+                    currentStepInfo?.label === 'Channels' ? 'channels' : currentStepInfo?.label === 'Direct messages' ? 'directMessages' : null
+                  }
                   onConversationSelect={() => {
                     if (isMobile && onClose) onClose()
                   }}

@@ -8,7 +8,7 @@ import type { AgentModel, ChannelModel, ConversationModel } from '@starships/pro
 import { formatDistanceToNow } from 'date-fns'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, type RefObject } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu'
@@ -30,6 +30,9 @@ interface ConversationListProps {
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
+  onboardingChannelsAnchorRef?: RefObject<HTMLDivElement | null>
+  onboardingDirectMessagesAnchorRef?: RefObject<HTMLDivElement | null>
+  onboardingHighlight?: 'channels' | 'directMessages' | null
 }
 
 function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent: AgentModel | null }) {
@@ -59,7 +62,15 @@ function HumanAvatar({ user }: { user: StarshipMemberListItem }) {
 
 type DmTarget = { kind: 'agent'; key: string; label: string; agent: AgentModel } | { kind: 'user'; key: string; label: string; user: StarshipMemberListItem }
 
-export function ConversationList({ starshipId, onConversationDelete, onConversationSelect, compact = false }: ConversationListProps) {
+export function ConversationList({
+  starshipId,
+  onConversationDelete,
+  onConversationSelect,
+  compact = false,
+  onboardingChannelsAnchorRef,
+  onboardingDirectMessagesAnchorRef,
+  onboardingHighlight = null,
+}: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
   const slug = params.slug as string
@@ -307,8 +318,15 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       <>
         <div className="flex flex-col h-full min-h-0">
           {/* Channels */}
-          <div className={cn('flex flex-col min-h-0', isChannelsExpanded ? 'flex-1' : 'flex-none')}>
-            <div className="w-full flex items-center justify-between h-8">
+          <div
+            className={cn(
+              'flex flex-col min-h-0 rounded-lg',
+              isChannelsExpanded ? 'flex-1' : 'flex-none',
+              onboardingHighlight === 'channels' &&
+                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+            )}
+          >
+            <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -404,8 +422,19 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
           <div className="h-2" />
 
           {/* Direct messages */}
-          <div className={cn('flex flex-col min-h-0', isDirectMessagesExpanded ? 'flex-1' : 'flex-none')}>
-            <div className="w-full flex items-center justify-between h-8">
+          <div
+            className={cn(
+              'flex flex-col min-h-0 rounded-lg',
+              isDirectMessagesExpanded ? 'flex-1' : 'flex-none',
+              onboardingHighlight === 'directMessages' &&
+                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+            )}
+          >
+            <div
+              ref={onboardingDirectMessagesAnchorRef}
+              data-onboarding-anchor="direct-messages"
+              className="w-full flex items-center justify-between h-8"
+            >
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}

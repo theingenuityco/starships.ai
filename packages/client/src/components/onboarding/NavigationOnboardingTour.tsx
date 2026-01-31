@@ -61,13 +61,17 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
       return '/marketplace'
     }
 
-    // Steps 2-4 need starship slug
+    // Steps 2+ need starship slug
     if (!starshipSlug) return null
 
     const routeMap: Record<number, string> = {
       2: `/ship/${starshipSlug}/connectors`,
       3: `/ship/${starshipSlug}/agents`,
       4: `/ship/${starshipSlug}/schedules`,
+      // Steps 5-6 ("Channels" + "Direct messages") anchor to sidebar sections, which are visible on starship pages.
+      // Keep the user on the schedules page (last starship page in this tour) for consistency.
+      5: `/ship/${starshipSlug}/schedules`,
+      6: `/ship/${starshipSlug}/schedules`,
     }
 
     return routeMap[step.step] || null
@@ -104,6 +108,8 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
       2: 'Connectors',
       3: 'My Agents',
       4: 'Schedules',
+      5: 'Channels',
+      6: 'Direct messages',
     }
 
     const refKey = refKeyMap[currentStepInfo.step]
@@ -123,7 +129,7 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
     // Calculate position using utility function
     const position = calculatePopupPosition(element, {
       popupWidth: 320,
-      popupHeight: 200,
+      popupHeight: 220,
     })
 
     setPopupPosition(position)

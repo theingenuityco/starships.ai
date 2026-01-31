@@ -192,6 +192,8 @@ function LinkedConversationCard({
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  /** Optional channel name when the conversation is a channel (used for empty-state hero). */
+  channelName?: string | null
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
@@ -266,6 +268,7 @@ interface ConversationMessageListProps {
 export function ConversationMessageList({
   conversationId,
   starshipId,
+  channelName,
   bottomPaddingPx,
   className,
   scrollClassName,
@@ -308,6 +311,8 @@ export function ConversationMessageList({
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
+
+  const { data: conversationDetail } = useConversationDetail(conversationId)
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
@@ -991,6 +996,9 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
+  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage)
+  const shouldBottomAlignChannelHero = Boolean(showChannelHero && renderMessages.length === 0 && !shouldShowGapLoader)
+
   const hasSearchMatches = matchingPositions.length > 0
   // Search input UI intentionally disabled for now.
   const showSearchBar = false
@@ -1078,14 +1086,24 @@ export function ConversationMessageList({
       <div
         ref={scrollContainerRef}
         className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
-        style={{ paddingBottom: bottomPaddingPx ?? 160 }}
+        // When the channel is empty, we want the hero to "sit" near the bottom like Slack.
+        // The normal bottom padding is intentionally large (to avoid message overlap with the composer),
+        // but that padding makes an empty-state hero float too high.
+        style={{ paddingBottom: shouldBottomAlignChannelHero ? 32 : (bottomPaddingPx ?? 160) }}
         onScroll={() => {
           const container = scrollContainerRef.current
           if (!container) return
           isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
         }}
       >
-        <div className={cn('w-full bg-transparent', contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none')}>
+        <div
+          className={cn(
+            'w-full bg-transparent',
+            contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none',
+            // Allows empty-channel hero to "sit" near bottom like Slack.
+            'min-h-full flex flex-col'
+          )}
+        >
           {canLoadOlder && (
             <div className="flex justify-center pb-4">
               <button
@@ -1097,6 +1115,13 @@ export function ConversationMessageList({
               </button>
             </div>
           )}
+          {showChannelHero ? (
+            <ChannelHero
+              channelName={channelName}
+              conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
+              bottomAlign={shouldBottomAlignChannelHero}
+            />
+          ) : null}
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
@@ -1885,6 +1910,47 @@ function EmptyState() {
           <p className="text-muted-foreground">Select an agent and start your conversation</p>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ChannelHero({
+  channelName,
+  conversationTitle,
+  bottomAlign,
+}: {
+  channelName?: string | null
+  conversationTitle: string | null
+  bottomAlign: boolean
+}) {
+  const displayName =
+    (typeof channelName === 'string' && channelName.trim().length > 0 ? channelName.trim() : null) ||
+    (typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : null) ||
+    'Channel'
+  const displayHashed = `#${displayName.replace(/^#/, '')}`
+
+  return (
+    <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
+      <div className="max-w-3xl">
+        <div className="flex items-start gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center flex-shrink-0">
+            <Icon name="hash" className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
+            <p className="text-muted-foreground mt-1 leading-relaxed">
+              This is the beginning of {displayHashed}. Send a message to start a conversation.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div
+        role="separator"
+        aria-hidden="true"
+        // Match ConversationSummaryBar's `border-b border-border` (same thickness + color),
+        // but with a left-weighted fade (transparent → solid border → transparent).
+        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
+      />
     </div>
   )
 }

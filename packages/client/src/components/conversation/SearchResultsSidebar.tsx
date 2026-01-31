@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import type { SearchResult } from './conversationSearch'
+import { stripMarkdownToPlainText } from './conversationSearch'
 
 const MAX_SEARCH_TERM_LENGTH = 200
 
@@ -49,7 +50,7 @@ export interface SearchResultsSidebarProps {
 
 export function SearchResultsSidebar({ query, results, onSelectResult, onClose, className }: SearchResultsSidebarProps) {
   return (
-    <div className={cn('flex flex-col w-[360px] min-w-[360px] max-w-[360px] border-l border-border bg-background flex-shrink-0', className)} role="region" aria-label="Search results">
+    <div className={cn('flex flex-col h-full min-h-0 w-[360px] min-w-[360px] max-w-[360px] border-l border-border bg-background flex-shrink-0', className)} role="region" aria-label="Search results">
       <div className="flex-shrink-0 border-b border-border px-3 py-2 flex flex-col gap-2">
         <div className="flex items-center justify-end gap-2">
           <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={onClose} aria-label="Close search">
@@ -85,7 +86,7 @@ export function SearchResultsSidebar({ query, results, onSelectResult, onClose, 
                         {r.timestamp && <span className="text-xs text-muted-foreground">{formatTimestamp(r.timestamp)}</span>}
                         {r.occurrenceCount > 1 && <span className="text-xs text-muted-foreground">{r.occurrenceCount} matches</span>}
                       </div>
-                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words">{snippetWithHighlight(r.contentSnippet, query)}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2 break-words">{snippetWithHighlight(r.contentSnippet, stripMarkdownToPlainText(query))}</p>
                     </div>
                   </div>
                 </button>

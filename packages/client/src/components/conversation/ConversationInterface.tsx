@@ -929,7 +929,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               <StreamSideEffects />
             </div>
             {submittedQuery.trim() ? (
-              <div ref={searchSidebarRef}>
+              <div ref={searchSidebarRef} className="flex flex-col min-h-0 h-full">
                 <SearchResultsSidebar
                   query={submittedQuery}
                   results={searchResults}

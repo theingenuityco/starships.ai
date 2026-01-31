@@ -13,7 +13,7 @@ import { useConversationStreamContextOptional } from '@/hooks/ConversationStream
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useAuth } from '@/hooks/useAuth'
-import { buildPlainTextSnippet } from '@/components/conversation/conversationSearch'
+import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
@@ -142,6 +142,8 @@ export function ConversationMessageList({
   const [currentMatchIndex, setCurrentMatchIndex] = useState(0)
   const submittedQuery = submittedQueryProp ?? ''
   const highlightTerm = submittedQuery.trim() || undefined
+  // Normalize query by stripping markdown so "The last **Avatar** movie" matches content "The last Avatar movie".
+  const normalizedHighlightTerm = highlightTerm ? (stripMarkdownToPlainText(highlightTerm).trim() || undefined) : undefined
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -563,18 +565,20 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
-  // In-chat search: one entry per occurrence (so "Avatar" 5 times = 5 positions, not 2 messages). Case-insensitive. Cap term length to avoid ReDoS.
+  // In-chat search: one entry per occurrence (so "Avatar" 5 times = 5 positions, not 2 messages). Case-insensitive. Cap term length to avoid ReDoS. Use normalized term so markdown in query matches plain content.
   const MAX_SEARCH_TERM_LENGTH = 200
   const matchingPositions = useMemo(() => {
-    if (!highlightTerm) return []
-    const q = highlightTerm.trim().toLowerCase().slice(0, MAX_SEARCH_TERM_LENGTH)
+    if (!normalizedHighlightTerm) return []
+    const q = normalizedHighlightTerm.trim().toLowerCase().slice(0, MAX_SEARCH_TERM_LENGTH)
     if (!q) return []
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const positions: { messageId: string }[] = []
     for (const msg of renderMessages) {
       const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
       const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
-      const searchable = `${content} ${reasoning}`.toLowerCase()
+      // Strip markdown from content so "The last **Avatar** movie" in message matches query "the last avatar movie"
+      const plainContent = stripMarkdownToPlainText(`${content} ${reasoning}`)
+      const searchable = plainContent.toLowerCase()
       const matches = searchable.match(new RegExp(escaped, 'g'))
       const count = matches ? matches.length : 0
       for (let i = 0; i < count; i++) {
@@ -582,7 +586,7 @@ export function ConversationMessageList({
       }
     }
     return positions
-  }, [renderMessages, highlightTerm])
+  }, [renderMessages, normalizedHighlightTerm])
 
   // Clamp current match index when query or matches change
   useEffect(() => {
@@ -618,10 +622,10 @@ export function ConversationMessageList({
   }, [selectedMatchIndex, matchingPositions])
 
   // Build sidebar results (one per message) and report to parent.
-  // Snippets are built from plain text (strip full message then slice) so we never show ** etc. Cap term length to avoid ReDoS.
+  // Snippets are built from plain text (strip full message then slice) so we never show ** etc. Cap term length to avoid ReDoS. Use normalized term for matching.
   const searchResultsForSidebar = useMemo(() => {
-    if (!highlightTerm) return null
-    const q = highlightTerm.toLowerCase().trim().slice(0, MAX_SEARCH_TERM_LENGTH)
+    if (!normalizedHighlightTerm) return null
+    const q = normalizedHighlightTerm.toLowerCase().trim().slice(0, MAX_SEARCH_TERM_LENGTH)
     const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
     const results: import('./conversationSearch').SearchResult[] = []
     let firstIndexInPositions = 0
@@ -629,15 +633,17 @@ export function ConversationMessageList({
       const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
       const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
       const fullText = `${content} ${reasoning}`.trim()
-      const searchable = fullText.toLowerCase()
+      // Strip markdown so "The last **Avatar** movie" in message matches query "the last avatar movie"
+      const plainFullText = stripMarkdownToPlainText(fullText)
+      const searchable = plainFullText.toLowerCase()
       const matches = searchable.match(new RegExp(escaped, 'g'))
       const count = matches ? matches.length : 0
       if (count === 0) continue
-      const contentSnippet = buildPlainTextSnippet(fullText || content, highlightTerm)
+      const contentSnippet = buildPlainTextSnippet(plainFullText || content, normalizedHighlightTerm)
       results.push({
         messageId: msg.id,
         role: msg.role,
-        contentSnippet: contentSnippet || buildPlainTextSnippet(content, highlightTerm),
+        contentSnippet: contentSnippet || buildPlainTextSnippet(plainFullText || content, normalizedHighlightTerm),
         timestamp: (msg as ExtendedMessage).createdAt,
         occurrenceCount: count,
         firstMatchIndexInPositions: firstIndexInPositions,
@@ -646,7 +652,7 @@ export function ConversationMessageList({
       firstIndexInPositions += count
     }
     return results
-  }, [highlightTerm, renderMessages, agentName])
+  }, [normalizedHighlightTerm, renderMessages, agentName])
 
   useEffect(() => {
     if (searchResultsForSidebar != null && onSearchResults) {
@@ -793,7 +799,7 @@ export function ConversationMessageList({
                     isAwaitingToolResults={isAwaitingToolResults}
                     isLastMessage={idx === renderMessages.length - 1}
                     sizeVariant={sizeVariant}
-                    highlightTerm={highlightTerm}
+                    highlightTerm={normalizedHighlightTerm}
                   />
                   {(() => {
                     const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []

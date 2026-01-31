@@ -98,7 +98,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
     <div className="fixed top-4 right-4 z-[60]">
       <div className="flex items-center gap-3">
         {showNavbarSearch ? (
-          <div className="relative w-[140px] max-w-[160px] flex-shrink-0">
+          <div className="relative min-w-[100px] w-[140px] max-w-[160px] flex-shrink-0">
             <Icon name="search" className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none z-10" />
             <Input
               type="text"

@@ -240,11 +240,11 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
         <div className="space-y-4">
           <div className="space-y-1">
             <Label htmlFor="channel-name">Name</Label>
-            <Input id="channel-name" placeholder="General" value={newChannelName} onChange={e => setNewChannelName(e.target.value)} />
+            <Input id="channel-name" placeholder="Lobby" value={newChannelName} onChange={e => setNewChannelName(e.target.value)} />
           </div>
           <div className="space-y-1">
             <Label htmlFor="channel-slug">Slug</Label>
-            <Input id="channel-slug" placeholder="general" value={newChannelSlug} onChange={e => setNewChannelSlug(e.target.value)} />
+            <Input id="channel-slug" placeholder="lobby" value={newChannelSlug} onChange={e => setNewChannelSlug(e.target.value)} />
             <p className="text-xs text-muted-foreground">Lowercase letters, numbers, - or _</p>
           </div>
           <div className="flex items-center justify-between gap-3">

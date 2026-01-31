@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid';
  * Migration 092: Persist starship default channel + backfill existing starships
  *
  * - Adds `starships.default_channel_conversation_id`
- * - Backfills: ensures every starship has a public `#general` channel
+ * - Backfills: ensures every starship has a public `#lobby` channel
  * - Adds FK to prevent deleting the default channel conversation
  */
 export async function up(client: Client): Promise<void> {
@@ -48,7 +48,7 @@ export async function up(client: Client): Promise<void> {
     `);
 
     // Backfill existing starships:
-    // - If #general already exists, store it as default.
+    // - If #lobby already exists, store it as default.
     // - Otherwise create a new conversation-backed channel and store it.
     const starshipsRes = await client.query<{ id: string }>(
       `SELECT id
@@ -60,12 +60,12 @@ export async function up(client: Client): Promise<void> {
     for (const s of starships) {
       const starshipId = String(s.id);
 
-      // Prefer an existing #general channel if present
+      // Prefer an existing #lobby channel if present
       const existingRes = await client.query<{ conversation_id: string }>(
         `SELECT conversation_id
            FROM channels
           WHERE starship_id = $1
-            AND lower(slug) = 'general'
+            AND lower(slug) = 'lobby'
           LIMIT 1`,
         [starshipId]
       );
@@ -79,11 +79,11 @@ export async function up(client: Client): Promise<void> {
         await client.query(
           `INSERT INTO conversations (id, title, status, state, starship_id, created_at, updated_at)
            VALUES ($1, $2, 'active', '{}'::jsonb, $3, NOW(), NOW())`,
-          [conversationId, 'General', starshipId]
+          [conversationId, 'Lobby', starshipId]
         );
         await client.query(
           `INSERT INTO channels (conversation_id, starship_id, slug, name, is_private, topic, created_at, updated_at)
-           VALUES ($1, $2, 'general', 'General', false, NULL, NOW(), NOW())`,
+           VALUES ($1, $2, 'lobby', 'Lobby', false, NULL, NOW(), NOW())`,
           [conversationId, starshipId]
         );
       }

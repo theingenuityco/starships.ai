@@ -6,12 +6,12 @@ import { nanoid } from 'nanoid';
  * Create a per-starship "#old-conversations" channel for starships that have legacy conversations,
  * and re-parent legacy conversations under it.
  *
- * This provides a single, explicit place to find pre-channels history without relying on DMs or #general.
+ * This provides a single, explicit place to find pre-channels history without relying on DMs or the default channel (#lobby).
  *
  * Notes:
- * - We do NOT touch existing channels (including #general).
+ * - We do NOT touch existing channels (including the default channel, e.g. #lobby).
  * - We primarily target conversations that are not channels.
- * - We also migrate conversations that were previously nested under #general by earlier migrations
+ * - We also migrate conversations that were previously nested under the default channel by earlier migrations
  *   (parent_conversation_id = starships.default_channel_conversation_id).
  */
 export async function up(client: Client): Promise<void> {
@@ -80,7 +80,7 @@ export async function up(client: Client): Promise<void> {
 
       // Re-parent legacy conversations under the new channel.
       // - Move any root legacy conversations (parent NULL)
-      // - Also move any conversations currently nested directly under #general (defaultChannelId),
+      // - Also move any conversations currently nested directly under the default channel (defaultChannelId),
       //   because they are considered "legacy history" by this strategy.
       await client.query(
         `

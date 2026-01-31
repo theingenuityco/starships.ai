@@ -209,10 +209,11 @@ export function useStarshipDirectMessages(starshipId: string, enabled: boolean =
 export function useCreateDirectMessage() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async (args: { starshipId: string; agentSlug?: string; agentId?: string; title?: string }) => {
+    mutationFn: async (args: { starshipId: string; agentSlug?: string; agentId?: string; peerUserId?: string; title?: string }) => {
       const response: FetchResponse<ApiResponse<{ dm: DirectMessageModel; conversationId: string }>> = await api.post(`/api/v1/starships/${args.starshipId}/direct-messages`, {
         agentSlug: args.agentSlug,
         agentId: args.agentId,
+        peerUserId: args.peerUserId,
         title: args.title,
       })
       return response.data.data

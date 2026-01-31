@@ -31,6 +31,29 @@ export class DirectMessageRepository extends BaseRepository {
     );
   }
 
+  async findUserUserDm(starshipId: string, userAId: string, userBId: string): Promise<DirectMessageModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<Record<string, unknown>>(
+          `
+          SELECT *
+            FROM direct_messages
+           WHERE starship_id = $1
+             AND dm_type = 'user_user'
+             AND user_a_id = $2
+             AND user_b_id = $3
+           LIMIT 1
+          `,
+          [starshipId, userAId, userBId]
+        );
+        return row ? fromDatabase(DirectMessageEntity, row) : null;
+      },
+      'findUserUserDm',
+      'DirectMessage'
+    );
+  }
+
   async findByConversationId(conversationId: string): Promise<DirectMessageModel | null> {
     return this.executeWithErrorHandling(
       async () => {

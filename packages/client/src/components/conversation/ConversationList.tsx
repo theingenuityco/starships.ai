@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useCreateChannel, useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useCreateChannel, useCreateDirectMessage, useStarshipChannels } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
@@ -17,10 +17,13 @@ import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
 import { ScrollArea } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
-import { Avatar } from '../ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
+import { useAuthContext } from '@/providers/auth-provider'
 
 interface ConversationListProps {
   starshipId: string
@@ -44,6 +47,18 @@ function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent:
   )
 }
 
+function HumanAvatar({ user }: { user: StarshipMemberListItem }) {
+  const fallback = (user.displayName || user.email || '?').trim().slice(0, 1).toUpperCase()
+  return (
+    <Avatar className="h-5 w-5 ring-1 ring-border/40">
+      {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} /> : null}
+      <AvatarFallback className="text-[10px] font-medium">{fallback}</AvatarFallback>
+    </Avatar>
+  )
+}
+
+type DmTarget = { kind: 'agent'; key: string; label: string; agent: AgentModel } | { kind: 'user'; key: string; label: string; user: StarshipMemberListItem }
+
 export function ConversationList({ starshipId, onConversationDelete, onConversationSelect, compact = false }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
@@ -51,9 +66,12 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   // Get conversationId directly from params - no prop needed
   const currentConversationId = params.conversationId as string | undefined
 
-  const { data: dmData, isLoading: dmsLoading, error: dmsError } = useStarshipDirectMessages(starshipId, true)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipId, true)
+  const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
+  const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const createChannel = useCreateChannel()
+  const createDirectMessage = useCreateDirectMessage()
+  const { userId: authUserId } = useAuthContext()
   const [searchQuery, setSearchQuery] = useState('')
   const [isCreateChannelOpen, setIsCreateChannelOpen] = useState(false)
   const [newChannelSlug, setNewChannelSlug] = useState('')
@@ -61,73 +79,62 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
   const channels = (channelsData?.channels || []) as ChannelModel[]
 
-  const directMessages = (dmData?.directMessages || []) as DirectMessageListItem[]
-  const filteredDirectMessages = useMemo(() => {
+  const dmTargets = useMemo<DmTarget[]>(() => {
     const q = searchQuery.trim().toLowerCase()
-    const base = directMessages.filter(it => Boolean(it?.dm?.conversationId))
-    if (!q) return base
-    return base.filter(it => {
-      const agentName = it.agent ? formatAgentDisplayName(it.agent) : ''
-      const title = it.conversation?.title || ''
-      return agentName.toLowerCase().includes(q) || title.toLowerCase().includes(q)
-    })
-  }, [directMessages, searchQuery])
+    const agents = Array.isArray(agentsData) ? (agentsData as AgentModel[]) : []
+    const members = (membersData?.members || []) as StarshipMemberListItem[]
 
-  const renderCompactDirectMessage = (it: DirectMessageListItem) => {
-    const conversationId = String(it.dm.conversationId)
-    const isActive = conversationId === currentConversationId
-    const label = it.agent ? formatAgentDisplayName(it.agent) : it.conversation?.title || `DM ${conversationId.slice(0, 8)}`
+    const agentTargets: DmTarget[] = agents.map(a => ({
+      kind: 'agent',
+      key: `agent:${a.id}`,
+      label: formatAgentDisplayName(a),
+      agent: a,
+    }))
+
+    const memberTargets: DmTarget[] = members
+      .filter(m => String(m.userId) !== String(authUserId || ''))
+      .map(m => ({
+        kind: 'user',
+        key: `user:${m.userId}`,
+        label: m.displayName || m.email || 'User',
+        user: m,
+      }))
+
+    const all = [...agentTargets, ...memberTargets]
+    const filtered = q
+      ? all.filter(t => {
+          const label = (t.label || '').toLowerCase()
+          const extra = t.kind === 'user' ? (t.user.email || '').toLowerCase() : (t.agent.slug || '').toLowerCase()
+          return label.includes(q) || extra.includes(q)
+        })
+      : all
+
+    // Stable ordering: agents first, then humans; alpha within group
+    return filtered.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'agent' ? -1 : 1
+      return a.label.localeCompare(b.label)
+    })
+  }, [agentsData, membersData?.members, authUserId, searchQuery])
+
+  const renderCompactDmTarget = (t: DmTarget) => {
+    const label = t.label
+    const isBusy = createDirectMessage.isPending
+    const isActive = false
 
     return (
       <div
-        key={conversationId}
+        key={t.key}
         className={cn(
           'group flex items-center gap-2 py-2 pl-2 pr-1.5 rounded-lg transition-colors text-xs relative border cursor-pointer',
-          isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted'
+          isActive ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-muted',
+          isBusy && 'opacity-70 pointer-events-none'
         )}
-        onClick={() => handleConversationClick(conversationId)}
+        onClick={() => handleDmTargetClick(t)}
       >
-        <DirectMessageAvatar starshipId={starshipId} agent={it.agent} />
+        {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
         <div className="flex-1 min-w-0">
           <p className={cn('text-[12px] font-medium truncate leading-tight', isActive && 'text-primary')}>{label}</p>
         </div>
-        {onConversationDelete && (
-          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
-            <DropdownMenu modal={false}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="h-5 w-5 p-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  onMouseDown={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                  }}
-                  type="button"
-                >
-                  <Icon name="dots-vertical" className="h-3 w-3" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-40" side="left" sideOffset={8}>
-                <DropdownMenuItem
-                  className="text-destructive focus:text-destructive"
-                  onClick={e => {
-                    e.preventDefault()
-                    e.stopPropagation()
-                    onConversationDelete(conversationId)
-                  }}
-                >
-                  <Icon name="trash" className="mr-2 h-3 w-3" />
-                  <span className="text-xs">Delete</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        )}
       </div>
     )
   }
@@ -135,6 +142,17 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const handleConversationClick = (conversationId: string) => {
     router.push(`/ship/${slug}/conversations/${conversationId}`)
     onConversationSelect?.(conversationId)
+  }
+
+  const handleDmTargetClick = async (t: DmTarget) => {
+    const created = await createDirectMessage.mutateAsync(
+      t.kind === 'agent'
+        ? { starshipId, agentId: t.agent.id, title: `DM • ${formatAgentDisplayName(t.agent)}` }
+        : { starshipId, peerUserId: t.user.userId, title: `DM • ${t.user.displayName || t.user.email || 'User'}` }
+    )
+    if (created?.conversationId) {
+      handleConversationClick(String(created.conversationId))
+    }
   }
 
   const createChannelDialog = (
@@ -193,7 +211,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
 
   // Compact mode - inline display without header/search
   if (compact) {
-    if (dmsLoading) {
+    if (agentsLoading || membersLoading) {
       return (
         <div className="space-y-1">
           {[1, 2, 3].map(i => (
@@ -203,10 +221,10 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       )
     }
 
-    if (dmsError) {
+    if (agentsError || membersError) {
       return (
         <div className="flex flex-col items-center justify-center py-8 px-2">
-          <p className="text-muted-foreground text-xs text-center">Failed to load direct messages</p>
+          <p className="text-muted-foreground text-xs text-center">Failed to load direct message targets</p>
         </div>
       )
     }
@@ -259,13 +277,13 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
           )}
 
           <div className="pt-1">
-            {filteredDirectMessages.length === 0 ? (
+            {dmTargets.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-6 px-2">
                 <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
-                <p className="text-muted-foreground text-xs text-center">No direct messages yet</p>
+                <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
               </div>
             ) : (
-              <>{filteredDirectMessages.map(it => renderCompactDirectMessage(it))}</>
+              <>{dmTargets.map(t => renderCompactDmTarget(t))}</>
             )}
           </div>
         </div>
@@ -351,61 +369,33 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
             <div className="px-2 mb-2 flex items-center justify-between">
               <p className="text-xs font-medium text-muted-foreground">Direct messages</p>
             </div>
-            {dmsLoading ? (
+            {agentsLoading || membersLoading ? (
               <div className="space-y-1 px-2">
                 {[1, 2, 3].map(i => (
                   <Skeleton key={i} className="h-8 w-full rounded-lg" />
                 ))}
               </div>
-            ) : filteredDirectMessages.length === 0 ? (
-              <div className="px-2 py-6 text-center text-xs text-muted-foreground">No direct messages yet</div>
+            ) : agentsError || membersError ? (
+              <div className="px-2 py-6 text-center text-xs text-muted-foreground">Failed to load direct message targets</div>
+            ) : dmTargets.length === 0 ? (
+              <div className="px-2 py-6 text-center text-xs text-muted-foreground">No one to message yet</div>
             ) : (
               <div className="space-y-1">
-                {filteredDirectMessages.map(it => {
-                  const conversationId = String(it.dm.conversationId)
-                  const isActive = conversationId === currentConversationId
-                  const label = it.agent ? formatAgentDisplayName(it.agent) : it.conversation?.title || `DM ${conversationId.slice(0, 8)}`
-                  const updatedAt = it.conversation?.updatedAt || it.conversation?.createdAt || it.dm.updatedAt || it.dm.createdAt
+                {dmTargets.map(t => {
+                  const isBusy = createDirectMessage.isPending
+                  const label = t.label
                   return (
                     <div
-                      key={conversationId}
-                      className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
-                      onClick={() => handleConversationClick(conversationId)}
+                      key={t.key}
+                      className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isBusy && 'opacity-70 pointer-events-none')}
+                      onClick={() => handleDmTargetClick(t)}
                     >
-                      <DirectMessageAvatar starshipId={starshipId} agent={it.agent} />
+                      {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1 gap-2">
-                          <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
-                          {updatedAt && (
-                            <span className="text-xs text-muted-foreground">
-                              {formatDistanceToNow(new Date(updatedAt), {
-                                addSuffix: false,
-                              })}
-                            </span>
-                          )}
+                          <p className={cn('text-sm font-medium truncate')}>{label}</p>
                         </div>
                       </div>
-                      {onConversationDelete && (
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild onClick={e => e.stopPropagation()}>
-                            <Button variant="ghost" size="sm" className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Icon name="dots-vertical" className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-48">
-                            <DropdownMenuItem
-                              className="text-destructive"
-                              onClick={e => {
-                                e.stopPropagation()
-                                onConversationDelete(conversationId)
-                              }}
-                            >
-                              <Icon name="trash" className="mr-2 h-4 w-4" />
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      )}
                     </div>
                   )
                 })}
@@ -418,7 +408,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
       {/* Footer Stats */}
       <div className="p-4 border-t frosted-glass-light">
         <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span>{filteredDirectMessages.length} direct messages</span>
+          <span>{dmTargets.length} people</span>
         </div>
       </div>
       {createChannelDialog}

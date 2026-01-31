@@ -27,6 +27,8 @@ interface ConversationSummaryBarProps {
   maxTokens?: number | null
   /** Optional prefix shown before the title (e.g. "#" for channels). */
   titlePrefix?: ReactNode
+  /** Optional right-side content aligned to the title row (far right of the title container). */
+  titleRightSlot?: ReactNode
   /** Optional right-side content (e.g. controls). */
   rightSlot?: ReactNode
   /** Optional third-line content under the metadata row (e.g. agent selector). */
@@ -81,6 +83,7 @@ export function ConversationSummaryBar({
   modelId,
   maxTokens,
   titlePrefix,
+  titleRightSlot,
   rightSlot,
   thirdLineSlot,
   fallbackTitle,
@@ -430,20 +433,21 @@ export function ConversationSummaryBar({
     return (
       <div className="sticky top-0 z-10 border-b border-border bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
         <div className="px-4 pt-3.5 pb-3">
-          <div className="max-w-4xl">
+          <div className="w-full">
             <div className="flex items-center justify-between gap-4">
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 {/* Title - exact match */}
-                <div className="flex items-center gap-2 min-w-0 w-full">
+                <div className="flex items-baseline gap-2 min-w-0 w-full">
                   {titlePrefix ? (
-                    <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
+                    <span aria-hidden="true" className="flex-shrink-0 self-center text-muted-foreground leading-none">
                       {titlePrefix}
                     </span>
                   ) : null}
                   <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">
                     <span className="opacity-50">{effectiveFallbackTitle}</span>
                   </h3>
+                  {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
                 </div>
                 {/* Agents + updated row - exact structural match with same classes */}
                 <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
@@ -650,18 +654,19 @@ export function ConversationSummaryBar({
       className="sticky top-0 z-10 border-b border-border bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
     >
       <div className="px-4 pt-3.5 pb-3">
-        <div className="max-w-4xl">
+        <div className="w-full">
           <div className="flex items-center justify-between gap-4">
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
               {/* Title */}
-              <div className="flex items-center gap-2 min-w-0 w-full">
+              <div className="flex items-baseline gap-2 min-w-0 w-full">
                 {titlePrefix ? (
-                  <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
+                  <span aria-hidden="true" className="flex-shrink-0 self-center text-muted-foreground leading-none">
                     {titlePrefix}
                   </span>
                 ) : null}
                 <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
+                {titleRightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{titleRightSlot}</div> : null}
               </div>
 
               {/* Agents + updated row */}

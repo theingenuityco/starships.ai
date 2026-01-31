@@ -11,13 +11,18 @@ export default function StarshipOverviewPage({ params }: { params: { slug: strin
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starship?.id ?? '', Boolean(starship?.id))
 
-  const defaultChannelConversationId = useMemo(() => {
+  const defaultChannelSlug = useMemo(() => {
     const channels = channelsData?.channels ?? []
-    const lobby = channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === 'lobby')
-    const lobbyConversationId = lobby?.conversationId ? String(lobby.conversationId) : ''
-    if (lobbyConversationId) return lobbyConversationId
+    const lobby = channels.find(
+      (ch: any) =>
+        String(ch?.slug || '')
+          .trim()
+          .toLowerCase() === 'lobby'
+    )
+    const lobbySlug = lobby?.slug ? String(lobby.slug) : ''
+    if (lobbySlug) return lobbySlug
 
-    const first = channels.length > 0 ? String((channels[0] as any)?.conversationId || '') : ''
+    const first = channels.length > 0 ? String((channels[0] as any)?.slug || '') : ''
     return first || null
   }, [channelsData?.channels])
 
@@ -25,12 +30,12 @@ export default function StarshipOverviewPage({ params }: { params: { slug: strin
     if (!slug) return
     if (!starship?.id) return
     if (channelsLoading) return
-    if (!defaultChannelConversationId) {
+    if (!defaultChannelSlug) {
       router.replace('/marketplace')
       return
     }
-    router.replace(`/ship/${slug}/conversations/${defaultChannelConversationId}`)
-  }, [channelsLoading, defaultChannelConversationId, router, slug, starship?.id])
+    router.replace(`/ship/${slug}/channels/${encodeURIComponent(defaultChannelSlug)}`)
+  }, [channelsLoading, defaultChannelSlug, router, slug, starship?.id])
 
   return null
 }

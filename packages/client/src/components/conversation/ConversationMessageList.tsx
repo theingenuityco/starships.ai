@@ -6,7 +6,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -192,6 +192,8 @@ function LinkedConversationCard({
 interface ConversationMessageListProps {
   conversationId: string | null
   starshipId?: string
+  /** Optional channel name when the conversation is a channel (used for empty-state hero). */
+  channelName?: string | null
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
@@ -266,6 +268,7 @@ interface ConversationMessageListProps {
 export function ConversationMessageList({
   conversationId,
   starshipId,
+  channelName,
   bottomPaddingPx,
   className,
   scrollClassName,
@@ -309,6 +312,8 @@ export function ConversationMessageList({
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
+  const { data: conversationDetail } = useConversationDetail(conversationId)
+
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
@@ -346,6 +351,8 @@ export function ConversationMessageList({
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
   const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
+  // Per-conversation “snap-to-bottom once content exists” state (prevents initial top->bottom jump).
+  const bottomSnapStateRef = useRef<{ key: string; didSnapOnceContentExists: boolean } | null>(null)
 
   // In-chat search: local input value (typed); submitted query from parent drives highlight and sidebar
   const [searchInputValue, setSearchInputValue] = useState('')
@@ -853,23 +860,58 @@ export function ConversationMessageList({
     isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
   }, [])
 
+  // Bottom anchoring (layout phase): when messages/gap-loader first appear for a conversation,
+  // snap to the bottom BEFORE paint so there’s no visible scroll “jump”.
+  useLayoutEffect(() => {
+    const container = scrollContainerRef.current
+    if (!container) return
+
+    const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id) : ''
+    const snapKey = `${String(conversationId ?? 'none')}|${pinnedId}`
+
+    if (!bottomSnapStateRef.current || bottomSnapStateRef.current.key !== snapKey) {
+      bottomSnapStateRef.current = { key: snapKey, didSnapOnceContentExists: false }
+      // Treat this as a fresh timeline for scroll-behavior decisions.
+      lastMessageCountRef.current = 0
+    }
+
+    const hasContent = renderMessages.length > 0 || shouldShowGapLoader || Boolean(pinnedFirstMessage)
+    if (!bottomSnapStateRef.current.didSnapOnceContentExists && hasContent) {
+      // IMPORTANT:
+      // Tailwind `scroll-smooth` (scroll-behavior: smooth) can cause even scrollTop assignment to animate.
+      // Temporarily disable smooth behavior so the initial anchor is instantaneous.
+      const prevInlineScrollBehavior = container.style.scrollBehavior
+      container.style.scrollBehavior = 'auto'
+      container.scrollTop = container.scrollHeight
+      // Restore any inline style after we've applied the snap.
+      container.style.scrollBehavior = prevInlineScrollBehavior
+      isNearBottomRef.current = true
+      bottomSnapStateRef.current.didSnapOnceContentExists = true
+    }
+  }, [conversationId, pinnedFirstMessage, renderMessages.length, shouldShowGapLoader, displayMessages.length])
+
   // Optimized auto-scroll with debouncing (now supports streaming progress).
   useEffect(() => {
     if (!scrollContainerRef.current) return
 
     const container = scrollContainerRef.current
     const isActivelyStreaming = isAssistantStreaming || !!activeRenderedStreamingAssistantId || shouldShowGapLoader
+    const shouldStickToBottom = isNearBottomRef.current
 
     // Only scroll if user is near bottom (as last reported by onScroll) or new messages arrived.
     // NOTE: during streaming, content grows without a scroll event; keeping a ref avoids losing the lock.
-    if (isNearBottomRef.current || displayMessages.length > lastMessageCountRef.current || shouldShowGapLoader) {
+    //
+    if (shouldStickToBottom) {
+      const messagesIncreased = displayMessages.length > lastMessageCountRef.current
+      const requestedBehavior: ScrollBehavior = messagesIncreased ? 'auto' : isActivelyStreaming ? 'auto' : 'smooth'
+
       // Use requestAnimationFrame for smooth scrolling
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
         scrollContainerRef.current.scrollTo({
           top: scrollContainerRef.current.scrollHeight,
           // Prefer immediate scroll during streaming to avoid "lagging behind" effect.
-          behavior: displayMessages.length === lastMessageCountRef.current ? (isActivelyStreaming ? 'auto' : 'smooth') : 'auto',
+          behavior: requestedBehavior,
         })
       })
     }
@@ -881,10 +923,11 @@ export function ConversationMessageList({
   // either initially or while waiting after tool results.
   useEffect(() => {
     if (!scrollContainerRef.current) return
-    if (shouldShowGapLoader) {
+    if (shouldShowGapLoader && isNearBottomRef.current) {
       requestAnimationFrame(() => {
         if (!scrollContainerRef.current) return
-        scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'smooth' })
+        // Keep it unanimated to avoid visible “scrolling” on load.
+        scrollContainerRef.current.scrollTo({ top: scrollContainerRef.current.scrollHeight, behavior: 'auto' })
       })
     }
   }, [shouldShowGapLoader])
@@ -991,13 +1034,16 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
+  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage)
+  const shouldBottomAlignChannelHero = Boolean(showChannelHero && renderMessages.length === 0 && !shouldShowGapLoader)
+
   const hasSearchMatches = matchingPositions.length > 0
   // Search input UI intentionally disabled for now.
   const showSearchBar = false
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
 
   return (
-    <div className={cn('h-full flex flex-col', className)}>
+    <div className={cn('h-full min-h-0 flex flex-col', className)}>
       {showSearchBar && !hideSearchInput && (
         <div className="flex-shrink-0 border-b px-4 py-2 flex items-center gap-2 bg-background/95">
           {!hideSearchInput && (
@@ -1077,15 +1123,30 @@ export function ConversationMessageList({
       )}
       <div
         ref={scrollContainerRef}
-        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
-        style={{ paddingBottom: bottomPaddingPx ?? 160 }}
+        className={cn(
+          // Do NOT use `scroll-smooth` here; it causes the initial bottom anchor to animate (looks like top->bottom jump).
+          'flex-1 min-h-0 overflow-y-auto px-4',
+          sizeVariant === 'delegation' ? 'pt-3' : 'pt-6',
+          scrollClassName
+        )}
+        // When the channel is empty, we want the hero to "sit" near the bottom like Slack.
+        // The normal bottom padding is intentionally large (to avoid message overlap with the composer),
+        // but that padding makes an empty-state hero float too high.
+        style={{ paddingBottom: shouldBottomAlignChannelHero ? 32 : (bottomPaddingPx ?? 160) }}
         onScroll={() => {
           const container = scrollContainerRef.current
           if (!container) return
           isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
         }}
       >
-        <div className={cn('w-full bg-transparent', contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none')}>
+        <div
+          className={cn(
+            'w-full bg-transparent',
+            contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none',
+            // Allows the timeline to sit at the bottom when short.
+            'min-h-full flex flex-col'
+          )}
+        >
           {canLoadOlder && (
             <div className="flex justify-center pb-4">
               <button
@@ -1097,156 +1158,167 @@ export function ConversationMessageList({
               </button>
             </div>
           )}
-          {renderMessages.map((message, idx) => {
-            const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
-            const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
-            const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
-            const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
-            const userKey = (m: any): string | null => {
-              if (!m || String(m?.role ?? '') !== 'user') return null
-              const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
-              if (uid) return `id:${uid}`
-              const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
-              if (un) return `name:${un}`
-              const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
-              if (ua) return `avatar:${ua}`
-              // Backward-compat: treat unknown human author as the same person.
-              return 'unknown'
-            }
-            const prevUserKey = prev ? userKey(prev) : null
-            const currUserKey = userKey(message)
-            const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
-            const startsNewGroup = (() => {
-              if (!prev) return false
-              if (message.role === 'assistant') return Boolean(showAssistantAvatar)
-              if (message.role === 'user') return !isConsecutiveUser
-              return prev.role !== message.role
-            })()
-            const isFirstMessage = idx === 0
-            const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
-            const isCurrentMatch = message.id === currentMatchMessageId
 
-            return (
-              <Fragment key={message.id}>
-                <div
-                  ref={el => {
-                    messageRefs.current[message.id] = el
-                  }}
-                  data-message-id={message.id}
-                  className={cn(
-                    messageHasMatch && 'rounded-lg transition-colors',
-                    messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
-                    messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
-                  )}
-                >
-                  <MemoizedMessageBubble
-                    message={message}
-                    agentName={message.agentName || agentName}
-                    agentSlug={agentSlug}
-                    starshipSlug={starshipSlug}
-                    agentAvatarUrl={agentAvatarUrl}
-                    isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                    starshipId={starshipId}
-                    enableChannelMessageThreads={enableChannelMessageThreads}
-                    onThreadAction={handleThreadAction}
-                    showAssistantAvatar={showAssistantAvatar}
-                    isConsecutiveUser={isConsecutiveUser}
-                    startsNewGroup={startsNewGroup}
-                    isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
-                    suppressLinkedConversationCard={suppressLinkedConversationCard}
-                    userNameOverride={userNameOverride}
-                    userEmailOverride={userEmailOverride}
-                    userAvatarUrlOverride={userAvatarUrlOverride}
-                    userAvatarSeedOverride={userAvatarSeedOverride}
-                    userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
-                    isAwaitingToolResults={isAwaitingToolResults}
-                    isLastMessage={idx === renderMessages.length - 1}
-                    sizeVariant={sizeVariant}
-                    highlightTerm={normalizedHighlightTerm}
-                  />
-                  {(() => {
-                    const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
-                    if (widgets.length === 0) return null
-                    return (
-                      <div className="flex justify-start">
-                        <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
-                          {/* Spacer to match avatar width */}
-                          <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
-                          <div className="flex-1 w-full">
-                            <div className="space-y-4 mt-3 w-full max-w-none">
-                              {widgets.map(widget => (
-                                <div key={widget.id} className="w-full max-w-none mb-4">
-                                  {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
-                                  {widget.widgetType !== 'StarshipDetails' && (
-                                    <div className="text-sm w-full mb-4">
-                                      <div className="flex items-baseline gap-1">
-                                        <span className="font-medium">{widget.name}</span>
+          <div className="mt-auto">
+            {showChannelHero ? (
+              <ChannelHero
+                channelName={channelName}
+                conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
+                bottomAlign={shouldBottomAlignChannelHero}
+              />
+            ) : null}
+            {renderMessages.map((message, idx) => {
+              const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
+              const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+              const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
+              const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
+              const userKey = (m: any): string | null => {
+                if (!m || String(m?.role ?? '') !== 'user') return null
+                const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+                if (uid) return `id:${uid}`
+                const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
+                if (un) return `name:${un}`
+                const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
+                if (ua) return `avatar:${ua}`
+                // Backward-compat: treat unknown human author as the same person.
+                return 'unknown'
+              }
+              const prevUserKey = prev ? userKey(prev) : null
+              const currUserKey = userKey(message)
+              const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
+              const startsNewGroup = (() => {
+                if (!prev) return false
+                if (message.role === 'assistant') return Boolean(showAssistantAvatar)
+                if (message.role === 'user') return !isConsecutiveUser
+                return prev.role !== message.role
+              })()
+              const isFirstMessage = idx === 0
+              const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
+              const isCurrentMatch = message.id === currentMatchMessageId
+
+              return (
+                <Fragment key={message.id}>
+                  <div
+                    ref={el => {
+                      messageRefs.current[message.id] = el
+                    }}
+                    data-message-id={message.id}
+                    className={cn(
+                      messageHasMatch && 'rounded-lg transition-colors',
+                      messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
+                      messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
+                    )}
+                  >
+                    <MemoizedMessageBubble
+                      message={message}
+                      agentName={message.agentName || agentName}
+                      agentSlug={agentSlug}
+                      starshipSlug={starshipSlug}
+                      agentAvatarUrl={agentAvatarUrl}
+                      isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                      starshipId={starshipId}
+                      enableChannelMessageThreads={enableChannelMessageThreads}
+                      onThreadAction={handleThreadAction}
+                      showAssistantAvatar={showAssistantAvatar}
+                      isConsecutiveUser={isConsecutiveUser}
+                      startsNewGroup={startsNewGroup}
+                      isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
+                      suppressLinkedConversationCard={suppressLinkedConversationCard}
+                      userNameOverride={userNameOverride}
+                      userEmailOverride={userEmailOverride}
+                      userAvatarUrlOverride={userAvatarUrlOverride}
+                      userAvatarSeedOverride={userAvatarSeedOverride}
+                      userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                      isAwaitingToolResults={isAwaitingToolResults}
+                      isLastMessage={idx === renderMessages.length - 1}
+                      sizeVariant={sizeVariant}
+                      highlightTerm={normalizedHighlightTerm}
+                    />
+                    {(() => {
+                      const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
+                      if (widgets.length === 0) return null
+                      return (
+                        <div className="flex justify-start">
+                          <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
+                            {/* Spacer to match avatar width */}
+                            <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
+                            <div className="flex-1 w-full">
+                              <div className="space-y-4 mt-3 w-full max-w-none">
+                                {widgets.map(widget => (
+                                  <div key={widget.id} className="w-full max-w-none mb-4">
+                                    {/* Conversational widget header - hidden for StarshipDetails (widget has its own "My Starship" title) */}
+                                    {widget.widgetType !== 'StarshipDetails' && (
+                                      <div className="text-sm w-full mb-4">
+                                        <div className="flex items-baseline gap-1">
+                                          <span className="font-medium">{widget.name}</span>
+                                        </div>
+                                        {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
                                       </div>
-                                      {widget.description && <div className="text-muted-foreground text-xs mt-1">{widget.description}</div>}
-                                    </div>
-                                  )}
+                                    )}
 
-                                  {/* Widget visualization - minimal styling, full width */}
-                                  {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
-                                  <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                                    <InlineWidgetRenderer
-                                      widget={{
-                                        widgetType: widget.widgetType,
-                                        props: widget.props,
-                                      }}
-                                      compactMode={true}
-                                      className="w-full"
-                                    />
+                                    {/* Widget visualization - minimal styling, full width */}
+                                    {/* NOTE: overflow-x-auto clips box-shadow; add padding so widget cards can render shadows without being cut off */}
+                                    <div className="relative w-full max-w-none overflow-x-auto p-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                                      <InlineWidgetRenderer
+                                        widget={{
+                                          widgetType: widget.widgetType,
+                                          props: widget.props,
+                                        }}
+                                        compactMode={true}
+                                        className="w-full"
+                                      />
+                                    </div>
                                   </div>
-                                </div>
-                              ))}
+                                ))}
+                              </div>
                             </div>
                           </div>
                         </div>
+                      )
+                    })()}
+                  </div>
+                </Fragment>
+              )
+            })}
+
+            {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
+            {shouldShowGapLoader && (
+              <div className="flex justify-start">
+                {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
+                  <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
+                    <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
+                        <TypingDots />
+                        <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
                       </div>
-                    )
-                  })()}
-                </div>
-              </Fragment>
-            )
-          })}
-          {/* Gap loader: show while awaiting first assistant text OR between tool results and next assistant text */}
-          {shouldShowGapLoader && (
-            <div className="flex justify-start">
-              {sizeVariant === 'hero' || sizeVariant === 'delegation' ? (
-                <div className={cn('flex items-start w-full', sizeVariant === 'delegation' ? 'gap-2' : 'gap-3')}>
-                  <div className={cn('flex-shrink-0 mt-1', sizeVariant === 'hero' ? 'w-10 h-10' : 'w-6 h-6')} aria-hidden="true" />
-                  <div className="min-w-0 flex-1">
-                    <div className={cn('flex items-center gap-2 leading-relaxed text-muted-foreground', sizeVariant === 'hero' ? 'text-base' : 'text-sm')}>
-                      <TypingDots />
-                      <span className={sizeVariant === 'hero' ? 'text-base leading-relaxed' : 'text-sm leading-relaxed'}>Typing...</span>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
-                  <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                    <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
-                  </div>
-                  <div className="min-w-0 flex-1 pt-0.5">
-                    <div className="mb-1 text-sm font-bold text-foreground">
-                      {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
-                        <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
-                          {(agentName || 'Assistant').trim()}
-                        </Link>
-                      ) : (
-                        <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
-                      )}
+                ) : (
+                  <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                    <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
+                      <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
                     </div>
-                    <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
-                      <TypingDots />
-                      <span className="text-sm leading-relaxed">Typing...</span>
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <div className="mb-1 text-sm font-bold text-foreground">
+                        {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
+                          <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
+                            {(agentName || 'Assistant').trim()}
+                          </Link>
+                        ) : (
+                          <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
+                        <TypingDots />
+                        <span className="text-sm leading-relaxed">Typing...</span>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -1885,6 +1957,47 @@ function EmptyState() {
           <p className="text-muted-foreground">Select an agent and start your conversation</p>
         </div>
       </div>
+    </div>
+  )
+}
+
+function ChannelHero({
+  channelName,
+  conversationTitle,
+  bottomAlign,
+}: {
+  channelName?: string | null
+  conversationTitle: string | null
+  bottomAlign: boolean
+}) {
+  const displayName =
+    (typeof channelName === 'string' && channelName.trim().length > 0 ? channelName.trim() : null) ||
+    (typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : null) ||
+    'Channel'
+  const displayHashed = `#${displayName.replace(/^#/, '')}`
+
+  return (
+    <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
+      <div className="max-w-3xl">
+        <div className="flex items-start gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center flex-shrink-0">
+            <Icon name="hash" className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
+            <p className="text-muted-foreground mt-1 leading-relaxed">
+              This is the beginning of {displayHashed}. Send a message to start a conversation.
+            </p>
+          </div>
+        </div>
+      </div>
+      <div
+        role="separator"
+        aria-hidden="true"
+        // Match ConversationSummaryBar's `border-b border-border` (same thickness + color),
+        // but with a left-weighted fade (transparent → solid border → transparent).
+        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
+      />
     </div>
   )
 }

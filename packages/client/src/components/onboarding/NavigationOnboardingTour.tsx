@@ -61,14 +61,13 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
       return '/marketplace'
     }
 
-    // Steps 2-5 need starship slug
+    // Steps 2-4 need starship slug
     if (!starshipSlug) return null
 
     const routeMap: Record<number, string> = {
       2: `/ship/${starshipSlug}/connectors`,
       3: `/ship/${starshipSlug}/agents`,
       4: `/ship/${starshipSlug}/schedules`,
-      5: `/ship/${starshipSlug}/conversations`,
     }
 
     return routeMap[step.step] || null
@@ -105,7 +104,6 @@ export function NavigationOnboardingTour({ starshipSlug, navigationItemRefs }: N
       2: 'Connectors',
       3: 'My Agents',
       4: 'Schedules',
-      5: 'New Chat',
     }
 
     const refKey = refKeyMap[currentStepInfo.step]

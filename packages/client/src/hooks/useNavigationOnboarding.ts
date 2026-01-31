@@ -8,7 +8,7 @@ import { useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 
-const TOTAL_STEPS = 5
+const TOTAL_STEPS = 4
 
 export interface OnboardingStep {
   step: number
@@ -46,13 +46,6 @@ export const ONBOARDING_STEPS: OnboardingStep[] = [
     label: 'Schedules',
     description: 'Automate agents to run tasks at a specific time and date.',
     icon: 'clock',
-  },
-  {
-    step: 5,
-    route: '/conversations', // This will be replaced with actual starship slug
-    label: 'New Chat',
-    description: 'Click here anytime to start a new conversation.',
-    icon: 'plus',
   },
 ]
 

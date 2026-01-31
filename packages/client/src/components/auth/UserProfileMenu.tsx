@@ -99,12 +99,15 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
             aria-label="Open user menu"
             className="h-10 w-full justify-start gap-2 rounded-lg px-2 text-muted-foreground hover:text-foreground hover:bg-muted/60"
           >
-            <UserProfile mode="collapsed" centerInContainer collapsedSize="sm" />
+            <UserProfile mode="collapsed" centerInContainer collapsedSize="md" />
             <span className="min-w-0 flex-1 text-left">
               <span className="block text-[13px] font-medium leading-tight truncate text-foreground">{userName || userEmail || 'Account'}</span>
-              <span className="block text-[11px] leading-tight truncate text-muted-foreground">{activeStarshipName || 'No starship selected'}</span>
+              <span className="flex items-center gap-1 text-[11px] leading-tight text-muted-foreground min-w-0">
+                <StarshipsLogo width={12} height={12} className="flex-shrink-0" idleLoop={false} />
+                <span className="truncate">{activeStarshipName || 'No starship selected'}</span>
+              </span>
             </span>
-            <Icon name="chevron-down" className="h-4 w-4 text-muted-foreground" />
+            <Icon name="chevron-up" className="h-4 w-4 text-muted-foreground" />
           </Button>
         ) : (
           <Button type="button" variant="ghost" size="icon" aria-label="Open user menu" className={`${controlClassName} h-10 w-10`}>
@@ -112,7 +115,7 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
           </Button>
         )}
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-lg bg-card border border-border shadow-sm">
+      <DropdownMenuContent align="end" sideOffset={8} className="w-64 rounded-lg bg-card !border-0 ring-1 ring-border/60 dark:ring-border shadow-md">
         <DropdownMenuLabel className="px-2 py-2 font-normal">
           <div className="flex items-center gap-3">
             <Avatar className="h-12 w-12 rounded-full ring-1 ring-border/40">

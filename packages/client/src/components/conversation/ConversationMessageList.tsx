@@ -162,6 +162,18 @@ export function ConversationMessageList({
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
+    const isHiddenThreadContextSeed = (m: any): boolean => {
+      if (!m) return false
+      // Hide only our special "seed" system messages; keep other system messages visible.
+      const role = String(m?.role ?? '')
+      if (role !== 'system') return false
+      const mt = String(m?.messageType ?? '')
+      const content = String(m?.content ?? '')
+      const meta = m?.metadata
+      const flagged = Boolean(meta && typeof meta === 'object' && (meta as any).thread_context_seed === true)
+      return (mt === 'system_instruction' && flagged) || content.startsWith('[THREAD_CONTEXT_SEED]')
+    }
+
     // Sort ascending by createdAt, with a special rule for the active stream placeholder.
     //
     // Why:
@@ -183,16 +195,18 @@ export function ConversationMessageList({
       if (streaming && id.startsWith('stream-')) return Number.MAX_SAFE_INTEGER
       return base
     }
-    const sortedMessages = [...messages].sort((a, b) => {
-      const ka = sortKey(a as any)
-      const kb = sortKey(b as any)
-      if (ka !== kb) return ka - kb
-      // Tie-breaker: createdAt then id for deterministic order
-      const ta = toTime((a as any)?.createdAt)
-      const tb = toTime((b as any)?.createdAt)
-      if (ta !== tb) return ta - tb
-      return String((a as any)?.id ?? '').localeCompare(String((b as any)?.id ?? ''))
-    })
+    const sortedMessages = [...messages]
+      .filter(m => !isHiddenThreadContextSeed(m as any))
+      .sort((a, b) => {
+        const ka = sortKey(a as any)
+        const kb = sortKey(b as any)
+        if (ka !== kb) return ka - kb
+        // Tie-breaker: createdAt then id for deterministic order
+        const ta = toTime((a as any)?.createdAt)
+        const tb = toTime((b as any)?.createdAt)
+        if (ta !== tb) return ta - tb
+        return String((a as any)?.id ?? '').localeCompare(String((b as any)?.id ?? ''))
+      })
 
     // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
     // IMPORTANT: For assistant messages with tool calls, deduplicate by (id + toolCallIds) to preserve

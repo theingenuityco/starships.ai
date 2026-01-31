@@ -296,6 +296,8 @@ export function useChildConversationsPaged(
   oldestCursor: { updatedAt: string; id: string } | null
   isLoading: boolean
   isFetching: boolean
+  isError: boolean
+  error: unknown
   isFetchingNextPage: boolean
   fetchNextPage: () => Promise<unknown>
   refetch: () => Promise<unknown>
@@ -371,6 +373,8 @@ export function useChildConversationsPaged(
     oldestCursor: (lastPage?.oldestCursor as Cursor | null) ?? null,
     isLoading: q.isLoading,
     isFetching: q.fetchStatus === 'fetching',
+    isError: q.isError,
+    error: q.error,
     isFetchingNextPage: q.isFetchingNextPage,
     fetchNextPage: () => q.fetchNextPage(),
     refetch: () => q.refetch(),

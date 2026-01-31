@@ -23,7 +23,7 @@ export function ForumChannelView(props: {
   const params = useParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
 
-  const { conversations: children, isLoading, hasMoreBefore, isFetchingNextPage, fetchNextPage } = useChildConversationsPaged(props.channelConversationId, {
+  const { conversations: children, isLoading, isError, error, hasMoreBefore, isFetchingNextPage, fetchNextPage, refetch } = useChildConversationsPaged(props.channelConversationId, {
     enabled: true,
     limit: 10,
   })
@@ -113,6 +113,22 @@ export function ForumChannelView(props: {
               {[1, 2, 3, 4].map(i => (
                 <Skeleton key={i} className="h-16 w-full rounded-xl" />
               ))}
+            </div>
+          ) : isError ? (
+            <div className="flex flex-col items-center justify-center py-16 text-center">
+              <div className="w-12 h-12 rounded-full bg-muted/30 flex items-center justify-center mb-3">
+                <Icon name="warning" className="h-6 w-6 text-muted-foreground" />
+              </div>
+              <p className="text-sm text-foreground">Couldn’t load threads</p>
+              <p className="text-xs text-muted-foreground mt-1 max-w-md break-words">
+                {(() => {
+                  const msg = (error as any)?.message ? String((error as any).message) : ''
+                  return msg || 'Please try again.'
+                })()}
+              </p>
+              <Button className="mt-4" type="button" variant="outline" onClick={() => refetch()}>
+                Retry
+              </Button>
             </div>
           ) : sortedChildren.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">

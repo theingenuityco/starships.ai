@@ -2,7 +2,7 @@
 
 import Icon from '@/components/primitives/Icon'
 
-import { useChildConversations, useCreateChannel, useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
+import { useCreateChannel, useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
@@ -60,10 +60,6 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   const [newChannelName, setNewChannelName] = useState('')
   const [newChannelPrivate, setNewChannelPrivate] = useState(false)
   const channels = (channelsData?.channels || []) as ChannelModel[]
-
-  const oldConversationsChannel = useMemo(() => channels.find(c => String(c.slug || '').toLowerCase() === 'old-conversations') || null, [channels])
-  const oldConversationsChannelId = oldConversationsChannel?.conversationId ? String(oldConversationsChannel.conversationId) : null
-  const { data: oldConversationsChildren = [], isLoading: oldChildrenLoading } = useChildConversations(oldConversationsChannelId, Boolean(oldConversationsChannelId))
 
   const directMessages = (dmData?.directMessages || []) as DirectMessageListItem[]
   const filteredDirectMessages = useMemo(() => {
@@ -239,7 +235,6 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               {channels.map(ch => {
                 const isActive = ch.conversationId === currentConversationId
                 const label = ch.slug ? `#${ch.slug}` : ch.name
-                const isOld = String(ch.slug || '').toLowerCase() === 'old-conversations'
                 return (
                   <div key={ch.conversationId}>
                     <div
@@ -256,37 +251,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                       </div>
                     </div>
 
-                    {/* Legacy threads under #old-conversations */}
-                    {isOld && (oldChildrenLoading || oldConversationsChildren.length > 0) && (
-                      <div className="mt-1 space-y-1 pl-6 border-l border-dashed border-border/60">
-                        {oldChildrenLoading ? (
-                          <>
-                            {[1, 2].map(i => (
-                              <Skeleton key={i} className="h-7 w-full rounded-lg" />
-                            ))}
-                          </>
-                        ) : (
-                          (oldConversationsChildren as Array<ConversationModel & { agents: AgentModel[] }>).map(child => {
-                            const childTitle = child.title || `Conversation ${child.id.slice(0, 8)}`
-                            const childActive = child.id === currentConversationId
-                            return (
-                              <div
-                                key={child.id}
-                                className={cn(
-                                  'group flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-all',
-                                  'hover:bg-muted/40',
-                                  childActive && 'bg-muted/70 shadow-sm'
-                                )}
-                                onClick={() => handleConversationClick(child.id)}
-                              >
-                                <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Old</span>
-                                <span className={cn('truncate flex-1', childActive && 'text-primary font-medium')}>{childTitle}</span>
-                              </div>
-                            )
-                          })
-                        )}
-                      </div>
-                    )}
+                    {/* Forum channels render threads in the main panel (no nested sidebar list). */}
                   </div>
                 )
               })}
@@ -358,62 +323,23 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                 {channels.map(ch => {
                   const isActive = ch.conversationId === currentConversationId
                   const label = ch.slug ? `#${ch.slug}` : ch.name
-                  const isOld = String(ch.slug || '').toLowerCase() === 'old-conversations'
                   return (
                     <div key={ch.conversationId}>
                       <div
-                        className={cn(
-                          'group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all',
-                          'hover:bg-muted/50',
-                          isActive && 'bg-muted/70 shadow-sm'
-                        )}
+                        className={cn('group flex items-center gap-2 px-3 py-2 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isActive && 'bg-muted/70 shadow-sm')}
                         onClick={() => handleConversationClick(ch.conversationId)}
                       >
                         <span className={cn('text-xs font-mono', isActive ? 'text-primary' : 'text-muted-foreground')}>#</span>
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center justify-between gap-2">
                             <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
-                            <span className="text-[10px] text-muted-foreground">
-                              {formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}
-                            </span>
+                            <span className="text-[10px] text-muted-foreground">{formatDistanceToNow(new Date(ch.updatedAt || ch.createdAt), { addSuffix: false })}</span>
                           </div>
-                          <div className="flex items-center gap-2 mt-0.5">
-                            {ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}
-                          </div>
+                          <div className="flex items-center gap-2 mt-0.5">{ch.isPrivate && <span className="text-[10px] text-muted-foreground">Private</span>}</div>
                         </div>
                       </div>
 
-                      {/* Legacy threads under #old-conversations */}
-                      {isOld && (oldChildrenLoading || oldConversationsChildren.length > 0) && (
-                        <div className="mt-1 space-y-1 pl-6 border-l border-dashed border-border/60">
-                          {oldChildrenLoading ? (
-                            <>
-                              {[1, 2, 3].map(i => (
-                                <Skeleton key={i} className="h-8 w-full rounded-lg" />
-                              ))}
-                            </>
-                          ) : (
-                            (oldConversationsChildren as Array<ConversationModel & { agents: AgentModel[] }>).map(child => {
-                              const childTitle = child.title || `Conversation ${child.id.slice(0, 8)}`
-                              const childActive = child.id === currentConversationId
-                              return (
-                                <div
-                                  key={child.id}
-                                  className={cn(
-                                    'group flex items-center gap-2 p-2 rounded-lg cursor-pointer text-xs transition-all',
-                                    'hover:bg-muted/40',
-                                    childActive && 'bg-muted/70 shadow-sm'
-                                  )}
-                                  onClick={() => handleConversationClick(child.id)}
-                                >
-                                  <span className="text-[10px] uppercase tracking-wide text-muted-foreground/80">Old</span>
-                                  <span className={cn('truncate flex-1', childActive && 'text-primary font-medium')}>{childTitle}</span>
-                                </div>
-                              )
-                            })
-                          )}
-                        </div>
-                      )}
+                      {/* Forum channels render threads in the main panel (no nested sidebar list). */}
                     </div>
                   )
                 })}

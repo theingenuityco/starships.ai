@@ -4,11 +4,18 @@
  * Channels are conversation-backed rooms (Slack/Discord-like) within a starship.
  */
 
+export type ChannelType = 'chat' | 'forum';
+
 export interface Channel {
   slug: string;
   name: string;
   isPrivate: boolean;
   topic?: string | null;
+  /**
+   * Optional on create; defaults to `chat` server-side.
+   * `forum` channels render as thread/card indexes (Discord-forum style).
+   */
+  channelType?: ChannelType;
 }
 
 /**
@@ -19,7 +26,7 @@ export interface Channel {
 export interface ChannelModel extends Channel {
   conversationId: string;
   starshipId: string;
+  channelType: ChannelType;
   createdAt: string;
   updatedAt: string;
 }
-

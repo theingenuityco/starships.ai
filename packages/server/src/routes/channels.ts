@@ -56,6 +56,7 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
       slug: string;
       name: string;
       is_private: boolean;
+      channel_type?: string | null;
       topic: string | null;
       created_at: string;
       updated_at: string;
@@ -92,6 +93,12 @@ router.get('/starships/:starshipId/channels', jwtAuthMiddleware, async (req: Req
       slug: String(r.slug),
       name: String(r.name),
       isPrivate: Boolean(r.is_private),
+      channelType:
+        String((r as any).channel_type || 'chat')
+          .trim()
+          .toLowerCase() === 'forum'
+          ? 'forum'
+          : 'chat',
       topic: r.topic ?? null,
       createdAt: String(r.created_at),
       updatedAt: String(r.updated_at),

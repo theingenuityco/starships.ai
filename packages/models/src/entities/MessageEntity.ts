@@ -141,6 +141,15 @@ export class MessageEntity implements MessageModel {
   attachmentIds?: string[];
 
   /**
+   * Optional link target conversation (index/preview posts).
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  linkedConversationId?: string;
+
+  /**
    * Simple validation function using class-validator
    * This replaces the manual validation approach with a decorator-based solution
    */

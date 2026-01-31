@@ -81,7 +81,18 @@ export function ThreadPane(props: {
               newConversationParentConversationId={draftParentConversationId ?? null}
               newConversationTitleOverride={draftTitle ?? null}
               linkMessageToNewConversation={
-                pinnedFirstMessage && draftParentConversationId ? { parentConversationId: draftParentConversationId, messageId: String((pinnedFirstMessage as any).id) } : null
+                pinnedFirstMessage && draftParentConversationId
+                  ? {
+                      parentConversationId: draftParentConversationId,
+                      messageId: String((pinnedFirstMessage as any).id),
+                      content: String((pinnedFirstMessage as any)?.content ?? ''),
+                      createdAt: typeof (pinnedFirstMessage as any)?.createdAt === 'string' ? String((pinnedFirstMessage as any).createdAt) : null,
+                      role: typeof (pinnedFirstMessage as any)?.role === 'string' ? String((pinnedFirstMessage as any).role) : null,
+                      userName: typeof (pinnedFirstMessage as any)?.userName === 'string' ? String((pinnedFirstMessage as any).userName) : null,
+                      agentName: typeof (pinnedFirstMessage as any)?.agentName === 'string' ? String((pinnedFirstMessage as any).agentName) : null,
+                      attachmentIds: Array.isArray((pinnedFirstMessage as any)?.attachmentIds) ? ((pinnedFirstMessage as any).attachmentIds as string[]) : null,
+                    }
+                  : null
               }
               disabled={false}
               minimal={true}

@@ -61,7 +61,16 @@ interface ConversationMessageInputProps {
    * Optional: after creating a new conversation, link an existing parent message to it (persisted on server).
    * Used to persist the thread link only when the user sends the first reply in the draft thread.
    */
-  linkMessageToNewConversation?: { parentConversationId: string; messageId: string } | null
+  linkMessageToNewConversation?: {
+    parentConversationId: string
+    messageId: string
+    content: string
+    createdAt?: string | null
+    role?: string | null
+    userName?: string | null
+    agentName?: string | null
+    attachmentIds?: string[] | null
+  } | null
   onMessageSent?: () => void // Simplified callback for UI state updates
   onToggleToolForm?: () => void // Callback to toggle tool form drawer
   isToolFormOpen?: boolean // Current state of tool form drawer
@@ -577,6 +586,54 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
             if (parentId && msgId) {
               await linkMessageToConversation.mutateAsync({ messageId: msgId, linkedConversationId: currentConversationId, conversationId: parentId })
+            }
+          } catch {}
+
+          // Seed hidden thread context into the NEW thread conversation so the agent sees the linked message.
+          // This message is not shown in the UI (ConversationMessageList filters it out).
+          try {
+            const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+            const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+            const sourceContent = typeof linkMessageToNewConversation?.content === 'string' ? linkMessageToNewConversation.content : ''
+            if (parentId && msgId && sourceContent.trim().length > 0) {
+              const createdAt = typeof linkMessageToNewConversation?.createdAt === 'string' ? linkMessageToNewConversation.createdAt : ''
+              const role = typeof linkMessageToNewConversation?.role === 'string' ? linkMessageToNewConversation.role : ''
+              const userName = typeof linkMessageToNewConversation?.userName === 'string' ? linkMessageToNewConversation.userName : ''
+              const agentName = typeof linkMessageToNewConversation?.agentName === 'string' ? linkMessageToNewConversation.agentName : ''
+              const attachmentIds = Array.isArray(linkMessageToNewConversation?.attachmentIds) ? linkMessageToNewConversation.attachmentIds : []
+
+              const seedContent = [
+                '[THREAD_CONTEXT_SEED]',
+                'Thread context seed (system instruction). Use this as upstream context for the thread.',
+                '',
+                `Source conversation id: ${parentId}`,
+                `Source message id: ${msgId}`,
+                role ? `Source role: ${role}` : null,
+                userName ? `Source userName: ${userName}` : null,
+                agentName ? `Source agentName: ${agentName}` : null,
+                createdAt ? `Source createdAt: ${createdAt}` : null,
+                attachmentIds.length > 0 ? `Source attachmentIds: ${attachmentIds.join(', ')}` : null,
+                '',
+                'Source message content:',
+                '"""',
+                sourceContent,
+                '"""',
+              ]
+                .filter(Boolean)
+                .join('\n')
+
+              await api.post('/api/v1/messages', {
+                role: 'system',
+                content: seedContent,
+                starshipId: starshipId,
+                conversationId: currentConversationId,
+                messageType: 'system_instruction',
+                metadata: {
+                  thread_context_seed: true,
+                  sourceConversationId: parentId,
+                  sourceMessageId: msgId,
+                },
+              })
             }
           } catch {}
 

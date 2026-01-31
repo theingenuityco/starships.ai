@@ -1,5 +1,7 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
 import { MessageService } from '@/services/MessageService';
+import { ConversationService } from '@/services/ConversationService';
+import { verifyResourceAccess } from '@/middleware/verify-starship-access';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
@@ -44,6 +46,63 @@ const checkAuth = (req: Request, res: Response): boolean => {
   }
   return true;
 };
+
+/**
+ * POST /messages - Create a message (no agent processing)
+ *
+ * NOTE:
+ * This endpoint ONLY persists a message. It does not trigger ConversationService processing
+ * (unlike POST /conversations/:conversationId/messages).
+ *
+ * Used for inserting hidden system context (e.g. thread context seed) into a conversation history.
+ */
+router.post('/messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!checkAuth(req, res)) return;
+
+    // Validate request body
+    const bodyValidation = validateData(CreateMessageSchema, req.body, res, 'create message');
+    if (!bodyValidation) return;
+
+    const conversationId = typeof bodyValidation.conversationId === 'string' ? bodyValidation.conversationId : '';
+    if (!conversationId) {
+      sendError(res, 'VALIDATION_ERROR', 'conversationId is required', 400, { field: 'conversationId' });
+      return;
+    }
+
+    // Verify conversation exists + access
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { resource: 'conversation', id: conversationId });
+      return;
+    }
+
+    const authUserId = req.user?.id as string;
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+
+    // Safety: ensure starshipId matches the conversation's starship
+    if (String(bodyValidation.starshipId) !== String(conversation.starshipId)) {
+      sendError(res, 'VALIDATION_ERROR', 'starshipId does not match conversation', 400, {
+        starshipId: bodyValidation.starshipId,
+        conversationStarshipId: conversation.starshipId,
+      });
+      return;
+    }
+
+    const messageService = new MessageService();
+    const created = await messageService.createMessage({
+      ...(bodyValidation as any),
+      conversationId,
+      // Attribute to the caller for auditing (even for system messages).
+      userId: authUserId,
+    });
+
+    sendSuccess(res, created, 201);
+  } catch (error) {
+    handleError(error, res, 'creating message');
+  }
+});
 
 /**
  * GET /messages/:messageId - Get message by ID

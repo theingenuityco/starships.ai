@@ -3,8 +3,7 @@
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import type { Agent } from '@/lib/api'
-import type { MessageModel } from '@starships/protocol'
+import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
@@ -14,7 +13,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const router = useRouter()
   const searchParams = useSearchParams()
   const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
-  const [threadAgent, setThreadAgent] = useState<Agent | null>(null)
+  const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
   const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
   const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
@@ -267,8 +266,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
               pinnedFirstMessage={threadPinnedFirstMessage}
               draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
               draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-              selectedAgent={(threadAgent as any) ?? null}
-              onAgentChange={setThreadAgent as any}
+              selectedAgent={threadAgent}
+              onAgentChange={setThreadAgent}
               onThreadCreated={cid => {
                 setThreadConversationIdInUrl(cid)
               }}
@@ -295,8 +294,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
             pinnedFirstMessage={threadPinnedFirstMessage}
             draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
             draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-            selectedAgent={(threadAgent as any) ?? null}
-            onAgentChange={setThreadAgent as any}
+            selectedAgent={threadAgent}
+            onAgentChange={setThreadAgent}
             onThreadCreated={cid => {
               setThreadConversationIdInUrl(cid)
             }}

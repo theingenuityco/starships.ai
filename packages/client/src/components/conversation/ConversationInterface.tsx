@@ -17,7 +17,6 @@ import { useConversationStreamContextOptional } from '@/hooks/ConversationStream
 import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useStarship } from '@/hooks/useStarships'
-import type { Agent } from '@/lib/api'
 import api, { agentAPI, templateAPI, toolAPI } from '@/lib/api'
 import { toast } from 'sonner'
 
@@ -30,13 +29,13 @@ import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
-import type { ConversationStreamUIAction, MessageModel } from '@starships/protocol'
+import type { AgentModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
 
 interface ConversationInterfaceProps {
   starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
-  onOpenThread?: (args: { conversationId: string | null; defaultAgent: Agent | null; linkedMessage?: MessageModel | null; parentConversationId?: string | null }) => void
+  onOpenThread?: (args: { conversationId: string | null; defaultAgent: AgentModel | null; linkedMessage?: MessageModel | null; parentConversationId?: string | null }) => void
   initialAgentId?: string
   starshipSlug?: string
 }
@@ -89,7 +88,7 @@ function getMostRecentAgentIdFromMessages(messages: any[], conversationId?: stri
   return null
 }
 
-function pickDefaultAgent(agents: any[]): any | null {
+function pickDefaultAgent(agents: AgentModel[]): AgentModel | null {
   if (!Array.isArray(agents) || agents.length === 0) return null
   const aria = agents.find(a => typeof a?.slug === 'string' && a.slug.toLowerCase().startsWith('aria'))
   return aria ?? agents[0] ?? null
@@ -116,10 +115,10 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }, [pathname, router, searchParams])
 
   // Agent and UI state
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null)
+  const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
 
   // Wrapper to log all agent changes
-  const setSelectedAgentWithLogging = useCallback((agent: Agent | null) => {
+  const setSelectedAgentWithLogging = useCallback((agent: AgentModel | null) => {
     setSelectedAgent(agent)
   }, [])
 
@@ -415,7 +414,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
 
   // Core agent change handler used by both input and cards
   const handleAgentChange = useCallback(
-    (agent: Agent | null) => {
+    (agent: AgentModel | null) => {
       userSelectedAgentRef.current = true
       setSelectedAgentWithLogging(agent)
       // Mark that user has interacted with agent selection - never show Gaia fallback again
@@ -868,7 +867,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
           onCreateDraftThread={() => {
             // Open a draft thread in the thread pane without persisting a conversation yet.
             // The conversation is created on the first message send from the thread composer.
-            const defaultAgent = (selectedAgent ?? pickDefaultAgent(starshipAgentsData as any)) as any
+                  const defaultAgent = selectedAgent ?? pickDefaultAgent(starshipAgentsData as AgentModel[])
             onOpenThread?.({ conversationId: null, defaultAgent, linkedMessage: null, parentConversationId: currentConversationId })
           }}
         />
@@ -904,7 +903,13 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 bottomPaddingPx={inputHeight + 24}
                 enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
                 onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
-                  onOpenThread?.({ conversationId, defaultAgent: selectedAgent, linkedMessage: linkedMessage ?? null, parentConversationId: parentConversationId ?? null })
+                  // Thread default agent rules:
+                  // - If started from an assistant message: use that agent as the thread default (if resolvable)
+                  // - If started from any other message: no default agent
+                  const lm = linkedMessage ?? null
+                  const lmAgentId = lm?.role === 'assistant' ? lm.agentId ?? null : null
+                  const defaultAgent = lmAgentId ? starshipAgentsData.find(a => a.id === lmAgentId) ?? null : null
+                  onOpenThread?.({ conversationId, defaultAgent, linkedMessage: lm, parentConversationId: parentConversationId ?? null })
                 }}
               />
             </div>

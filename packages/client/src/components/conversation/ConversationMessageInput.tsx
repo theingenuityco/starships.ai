@@ -9,6 +9,7 @@ import {
   useCreateConversation,
   useConversationStop,
   useConversationDetail,
+  useConversationAgents,
   usePendingToolApprovals,
   useStarshipChannels,
   useLinkMessageToConversation,
@@ -233,6 +234,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Conversation state for web browsing toggle
     const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
+    const { data: conversationAgents = [] } = useConversationAgents(conversationId ?? null)
     const updateConversationState = useUpdateConversationState()
 
     // Pending ask-first tool approvals (durable, DB-backed)
@@ -263,6 +265,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Otherwise use pending preference
       return pendingWebBrowsing
     }, [conversation?.state, pendingWebBrowsing])
+
+    // Thread routing rules:
+    // - If the thread pane was opened from a non-assistant message, there may be no default agent selected.
+    // - If a thread has >2 linked agents, it becomes mention-only (no default agent fallback).
+    const isThreadConversation = Boolean(conversation?.parentConversationId)
+    const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0
+    const isMentionOnlyThread = Boolean(isThreadConversation && linkedAgentCount > 2)
+    const isThreadDraft = Boolean(typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0)
+    const isThreadContext = Boolean(isThreadConversation || isThreadDraft)
 
     // Reset pending state when conversation is created
     useEffect(() => {
@@ -508,7 +519,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
       // Resolve agent to send to: prefer explicit leading @handle in content, else selectedAgent.
       // (No enforcement: the editor content is not mutated/prefilled anymore.)
-      let effectiveAgent: AgentModel | null | undefined = selectedAgent ?? null
+      // For mention-only threads, ignore selectedAgent and require a mention every time.
+      let effectiveAgent: AgentModel | null | undefined = isMentionOnlyThread ? null : selectedAgent ?? null
       let contentToSend = messageToSend
       // Also support plain-text leading @handle for safety
       const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
@@ -519,14 +531,17 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (matched) {
           effectiveAgent = matched
           // Do NOT strip the leading mention; keep it in the message content
-          if (onAgentChange) onAgentChange(matched)
+          // Thread behavior: mentioning an agent should NOT re-assign the "default agent".
+          if (!isThreadContext && onAgentChange) onAgentChange(matched)
         }
       }
 
       // Validation for agent and starship
       if (!effectiveAgent && !isChannelConversation) {
         resetFlags()
-        toast.error('Select an agent', { description: 'Please select an agent to chat.' })
+        toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
+          description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
+        })
         return
       }
 
@@ -934,7 +949,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [hasActualContent, setHasActualContent] = useState(false)
 
     // Require balance; server also enforces funds.
-    const hasTargetAgent = isChannelConversation ? true : Boolean(selectedAgent) || message.trim().startsWith('@')
+    const hasTargetAgent = isChannelConversation ? true : isMentionOnlyThread ? message.trim().startsWith('@') : Boolean(selectedAgent) || message.trim().startsWith('@')
     const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units

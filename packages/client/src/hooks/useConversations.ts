@@ -105,6 +105,20 @@ export const DIRECT_MESSAGE_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...DIRECT_MESSAGE_QUERY_KEYS.all, 'starship', starshipId] as const,
 } as const
 
+type ConversationMessagesResponseData = {
+  conversationId: string
+  messages: MessageModel[]
+  total: number
+  hasMoreBefore?: boolean
+  oldestCursor?: { createdAt: string; id: string } | null
+  participants?: string[]
+  startedAt?: string
+  lastActivityAt?: string
+  agents?: AgentModel[]
+  turnActive?: boolean
+  lastCompleteAt?: string | null
+}
+
 // Local DM model until protocol dist typings are available in-editor.
 // (The server contract is stable: dmType + peer fields + timestamps.)
 export type DirectMessageModel = {
@@ -536,11 +550,11 @@ export function useLinkMessageToConversation() {
 export function useConversationAgents(conversationId: string | null) {
   return useQuery({
     queryKey: [...CONVERSATION_QUERY_KEYS.messages(conversationId!), 'agents'],
-    queryFn: async (): Promise<any[]> => {
-      const response: FetchResponse<any> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
+    queryFn: async (): Promise<AgentModel[]> => {
+      const response: FetchResponse<ApiResponse<ConversationMessagesResponseData>> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
         params: { limit: 1, page: 1 }, // We only need agents, not all messages
       })
-      return response.data.data.agents || []
+      return response.data.data?.agents || []
     },
     enabled: !!conversationId,
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod

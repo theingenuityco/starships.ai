@@ -6,7 +6,7 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState, Fragment } from 'react'
+import { useEffect, useMemo, useRef, memo, useState, Fragment, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
 import { useConversationAgents } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -118,6 +119,11 @@ export function ConversationMessageList({
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const lastMessageCountRef = useRef(0)
+  const messageRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  // In-chat search: query and current match index (for Prev/Next)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [currentMatchIndex, setCurrentMatchIndex] = useState(0)
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -539,12 +545,120 @@ export function ConversationMessageList({
     }
   }, [shouldShowGapLoader])
 
+  // In-chat search: one entry per occurrence (so "Avatar" 5 times = 5 positions, not 2 messages). Case-insensitive.
+  const highlightTerm = searchQuery.trim() || undefined
+  const matchingPositions = useMemo(() => {
+    if (!highlightTerm) return []
+    const q = highlightTerm.trim().toLowerCase()
+    if (!q) return []
+    const escaped = q.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+    const positions: { messageId: string }[] = []
+    for (const msg of renderMessages) {
+      const content = typeof (msg as ExtendedMessage).content === 'string' ? (msg as ExtendedMessage).content : ''
+      const reasoning = typeof (msg as ExtendedMessage).reasoning === 'string' ? (msg as ExtendedMessage).reasoning : ''
+      const searchable = `${content} ${reasoning}`.toLowerCase()
+      const matches = searchable.match(new RegExp(escaped, 'g'))
+      const count = matches ? matches.length : 0
+      for (let i = 0; i < count; i++) {
+        positions.push({ messageId: msg.id })
+      }
+    }
+    return positions
+  }, [renderMessages, highlightTerm])
+
+  // Clamp current match index when query or matches change
+  useEffect(() => {
+    if (matchingPositions.length === 0) {
+      setCurrentMatchIndex(0)
+      return
+    }
+    setCurrentMatchIndex(i => Math.min(i, matchingPositions.length - 1))
+  }, [matchingPositions.length, searchQuery])
+
+  // Scroll to current match when user clicks Prev/Next (not on every keystroke)
+  useEffect(() => {
+    if (matchingPositions.length === 0 || currentMatchIndex < 0) return
+    const messageId = matchingPositions[currentMatchIndex]?.messageId
+    if (!messageId) return
+    const el = messageRefs.current[messageId]
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only scroll when user changes match index (Prev/Next)
+  }, [currentMatchIndex])
+
   if (!conversationId && !messagesOverride) {
     return <EmptyState />
   }
 
+  const hasSearchMatches = matchingPositions.length > 0
+  const showSearchBar = sizeVariant === 'default' && renderMessages.length > 0
+  // Message IDs that contain at least one match (so we can highlight the whole message bubble)
+  const messageIdsWithMatch = useMemo(
+    () => new Set(matchingPositions.map(p => p.messageId)),
+    [matchingPositions]
+  )
+  const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
+
   return (
     <div className={cn('h-full flex flex-col', className)}>
+      {showSearchBar && (
+        <div className="flex-shrink-0 border-b px-4 py-2 flex items-center gap-2 bg-background/95">
+          <div className="relative flex-1 min-w-0">
+            <Icon name="magnifying-glass" className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              type="text"
+              placeholder="Search in conversation..."
+              value={searchQuery}
+              onChange={e => {
+                setSearchQuery(e.target.value)
+                setCurrentMatchIndex(0)
+              }}
+              className="pl-8 pr-8 h-8 text-xs"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchQuery('')
+                  setCurrentMatchIndex(0)
+                }}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                aria-label="Clear search"
+              >
+                <Icon name="x" className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+          {highlightTerm && (
+            <>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {hasSearchMatches ? `${currentMatchIndex + 1} of ${matchingPositions.length}` : 'No matches'}
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+                onClick={() => setCurrentMatchIndex(i => (i <= 0 ? matchingPositions.length - 1 : i - 1))}
+                disabled={!hasSearchMatches}
+                aria-label="Previous match"
+              >
+                <Icon name="caret-up" className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 flex-shrink-0"
+                onClick={() => setCurrentMatchIndex(i => (i >= matchingPositions.length - 1 ? 0 : i + 1))}
+                disabled={!hasSearchMatches}
+                aria-label="Next match"
+              >
+                <Icon name="caret-down" className="h-4 w-4" />
+              </Button>
+            </>
+          )}
+        </div>
+      )}
       <div
         ref={scrollContainerRef}
         className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
@@ -560,28 +674,42 @@ export function ConversationMessageList({
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
             const isFirstMessage = idx === 0
+            const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
+            const isCurrentMatch = message.id === currentMatchMessageId
 
             return (
               <Fragment key={message.id}>
-                <MemoizedMessageBubble
-                  message={message}
-                  agentName={message.agentName || agentName}
-                  agentSlug={agentSlug}
-                  starshipSlug={starshipSlug}
-                  agentAvatarUrl={agentAvatarUrl}
-                  isStreamingActive={message.id === activeRenderedStreamingAssistantId}
-                  starshipId={starshipId}
-                  showAssistantAvatar={showAssistantAvatar}
-                  isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
-                  userNameOverride={userNameOverride}
-                  userEmailOverride={userEmailOverride}
-                  userAvatarUrlOverride={userAvatarUrlOverride}
-                  userAvatarSeedOverride={userAvatarSeedOverride}
-                  userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
-                  isAwaitingToolResults={isAwaitingToolResults}
-                  isLastMessage={idx === renderMessages.length - 1}
-                  sizeVariant={sizeVariant}
-                />
+                <div
+                  ref={el => {
+                    messageRefs.current[message.id] = el
+                  }}
+                  data-message-id={message.id}
+                  className={cn(
+                    messageHasMatch && 'rounded-lg transition-colors',
+                    messageHasMatch && !isCurrentMatch && 'border-l-4 border-amber-500/60 bg-amber-500/5 dark:bg-amber-400/5 pl-2 -ml-2',
+                    messageHasMatch && isCurrentMatch && 'border-l-4 border-amber-500 bg-amber-500/10 dark:bg-amber-400/10 pl-2 -ml-2 ring-1 ring-amber-500/40 dark:ring-amber-400/40'
+                  )}
+                >
+                  <MemoizedMessageBubble
+                    message={message}
+                    agentName={message.agentName || agentName}
+                    agentSlug={agentSlug}
+                    starshipSlug={starshipSlug}
+                    agentAvatarUrl={agentAvatarUrl}
+                    isStreamingActive={message.id === activeRenderedStreamingAssistantId}
+                    starshipId={starshipId}
+                    showAssistantAvatar={showAssistantAvatar}
+                    isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
+                    userNameOverride={userNameOverride}
+                    userEmailOverride={userEmailOverride}
+                    userAvatarUrlOverride={userAvatarUrlOverride}
+                    userAvatarSeedOverride={userAvatarSeedOverride}
+                    userAvatarFallbackVariantOverride={userAvatarFallbackVariantOverride}
+                    isAwaitingToolResults={isAwaitingToolResults}
+                    isLastMessage={idx === renderMessages.length - 1}
+                    sizeVariant={sizeVariant}
+                    highlightTerm={highlightTerm}
+                  />
                 {(() => {
                   const widgets =
                     message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
@@ -625,6 +753,7 @@ export function ConversationMessageList({
                     </div>
                   )
                 })()}
+                </div>
               </Fragment>
             )
           })}
@@ -731,6 +860,30 @@ interface ConversationMessageBubbleProps {
   isAwaitingToolResults?: boolean
   isLastMessage?: boolean
   sizeVariant?: 'default' | 'hero' | 'delegation'
+  /** When set, highlight this search term in message content (in-chat search). */
+  highlightTerm?: string
+}
+
+/** Renders plain text with optional search term highlighted (for user bubbles that don't use markdown). Case-insensitive. */
+function renderTextWithHighlight(text: string, term: string | undefined): ReactNode {
+  if (!term || term.trim() === '') return text
+  const t = term.trim()
+  const escaped = t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const parts = text.split(new RegExp(`(${escaped})`, 'gi'))
+  const tLower = t.toLowerCase()
+  return (
+    <>
+      {parts.map((part, i) =>
+        part.toLowerCase() === tLower ? (
+          <mark key={i} className="bg-amber-200/70 dark:bg-amber-400/50 rounded px-0.5 font-medium">
+            {part}
+          </mark>
+        ) : (
+          part
+        )
+      )}
+    </>
+  )
 }
 
 function isImageUrl(value?: string | null): boolean {
@@ -842,6 +995,7 @@ const MemoizedMessageBubble = memo(
     isAwaitingToolResults = false,
     isLastMessage = false,
     sizeVariant = 'default',
+    highlightTerm,
   }: ConversationMessageBubbleProps) {
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
@@ -873,7 +1027,9 @@ const MemoizedMessageBubble = memo(
             <div className={cn('flex w-full sm:w-auto items-end max-w-full sm:max-w-[70%]', userRowClass)}>
               <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
                 <div className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}>
-                  <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{message.content}</div>
+                  <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>
+                  {renderTextWithHighlight(message.content, highlightTerm)}
+                </div>
                   {message.sending && (
                     <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-card border-2 border-background rounded-full flex items-center justify-center">
                       <div className="w-2 h-2 bg-card-foreground rounded-full animate-pulse" />
@@ -975,6 +1131,7 @@ const MemoizedMessageBubble = memo(
                 starshipId={starshipId}
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
+                highlightTerm={highlightTerm}
               />
             </div>
           </div>
@@ -1021,6 +1178,7 @@ const MemoizedMessageBubble = memo(
                   starshipId={starshipId}
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
+                  highlightTerm={highlightTerm}
                 />
               </div>
             </div>
@@ -1076,6 +1234,7 @@ const MemoizedMessageBubble = memo(
                 starshipId={starshipId}
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
+                highlightTerm={highlightTerm}
               />
             </div>
           </div>
@@ -1140,6 +1299,9 @@ const MemoizedMessageBubble = memo(
     const prevUiActions = (prevProps.message as ExtendedMessage).uiActions?.length ?? 0
     const nextUiActions = (nextProps.message as ExtendedMessage).uiActions?.length ?? 0
     if (prevUiActions !== nextUiActions) return false
+
+    // Re-render when in-chat search highlight term changes
+    if ((prevProps.highlightTerm || '') !== (nextProps.highlightTerm || '')) return false
 
     return true
   }

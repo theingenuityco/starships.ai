@@ -259,32 +259,20 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const isThreadPaneOpen = Boolean(threadKey)
 
-  const threadPaneSharedProps = useMemo(
-    () => ({
-      starshipId: starshipData.id,
-      starshipSlug: routeParams.slug,
-      conversationId: threadConversationId,
-      pinnedFirstMessage: threadPinnedFirstMessage,
-      draftParentConversationId: isDraftThreadOpen ? threadDraftParentConversationId : null,
-      draftTitle: isDraftThreadOpen ? threadDraftTitle : null,
-      selectedAgent: threadAgent,
-      onAgentChange: setThreadAgent,
-      onThreadCreated: handleThreadCreated,
-      onClose: handleCloseThread,
-    }),
-    [
-      handleCloseThread,
-      handleThreadCreated,
-      isDraftThreadOpen,
-      routeParams.slug,
-      starshipData.id,
-      threadAgent,
-      threadConversationId,
-      threadDraftParentConversationId,
-      threadDraftTitle,
-      threadPinnedFirstMessage,
-    ]
-  )
+  // IMPORTANT: do not add hooks below conditional early-returns (starshipData loading, onboarding, etc.).
+  // A plain object avoids violating Rules of Hooks when starshipData appears/disappears between renders.
+  const threadPaneSharedProps = {
+    starshipId: starshipData.id,
+    starshipSlug: routeParams.slug,
+    conversationId: threadConversationId,
+    pinnedFirstMessage: threadPinnedFirstMessage,
+    draftParentConversationId: isDraftThreadOpen ? threadDraftParentConversationId : null,
+    draftTitle: isDraftThreadOpen ? threadDraftTitle : null,
+    selectedAgent: threadAgent,
+    onAgentChange: setThreadAgent,
+    onThreadCreated: handleThreadCreated,
+    onClose: handleCloseThread,
+  } as const
 
   return (
     <div className="h-screen w-full flex flex-col md:flex-row min-w-0">

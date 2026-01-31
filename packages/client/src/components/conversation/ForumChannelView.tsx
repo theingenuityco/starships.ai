@@ -4,11 +4,11 @@ import Icon from '@/components/primitives/Icon'
 import { ConversationSummaryBar } from '@/components/conversation/ConversationSummaryBar'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useChildConversations } from '@/hooks/useConversations'
+import { useChildConversationsPaged } from '@/hooks/useConversations'
 import type { AgentModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 import { useParams, useRouter } from 'next/navigation'
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 export function ForumChannelView(props: {
   starshipId: string
@@ -23,7 +23,34 @@ export function ForumChannelView(props: {
   const params = useParams()
   const effectiveStarshipSlug = (props.starshipSlug || (params.slug as string | undefined) || '').trim()
 
-  const { data: children = [], isLoading } = useChildConversations(props.channelConversationId, true)
+  const { conversations: children, isLoading, hasMoreBefore, isFetchingNextPage, fetchNextPage } = useChildConversationsPaged(props.channelConversationId, {
+    enabled: true,
+    limit: 10,
+  })
+
+  // Infinite scrolling: when the sentinel becomes visible, fetch the next page automatically.
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!hasMoreBefore) return
+    if (isFetchingNextPage) return
+    const el = loadMoreRef.current
+    if (!el) return
+
+    const obs = new IntersectionObserver(
+      entries => {
+        const first = entries[0]
+        if (!first?.isIntersecting) return
+        if (!hasMoreBefore) return
+        if (isFetchingNextPage) return
+        void fetchNextPage()
+      },
+      // Trigger a little before bottom so it feels seamless.
+      { root: null, rootMargin: '200px 0px 200px 0px', threshold: 0 }
+    )
+
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [fetchNextPage, hasMoreBefore, isFetchingNextPage])
 
   const sortedChildren = useMemo(() => {
     const list = Array.isArray(children) ? children.slice() : []
@@ -99,33 +126,46 @@ export function ForumChannelView(props: {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {sortedChildren.map(child => {
-              const id = String((child as any)?.id || '')
-              const title = String((child as any)?.title || '').trim() || `Conversation ${id.slice(0, 8)}`
-              const agents = Array.isArray((child as any)?.agents) ? ((child as any).agents as AgentModel[]) : []
-              const updatedAt = String((child as any)?.updatedAt || (child as any)?.createdAt || '')
-              const when = updatedAt ? formatDistanceToNow(new Date(updatedAt), { addSuffix: true }) : ''
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 gap-3">
+              {sortedChildren.map(child => {
+                const id = String((child as any)?.id || '')
+                const title = String((child as any)?.title || '').trim() || `Conversation ${id.slice(0, 8)}`
+                const agents = Array.isArray((child as any)?.agents) ? ((child as any).agents as AgentModel[]) : []
+                const updatedAt = String((child as any)?.updatedAt || (child as any)?.createdAt || '')
+                const when = updatedAt ? formatDistanceToNow(new Date(updatedAt), { addSuffix: true }) : ''
 
-              const agentLabel = agents
-                .map(a => String((a as any)?.name || (a as any)?.slug || '').trim())
-                .filter(Boolean)
-                .slice(0, 3)
-                .join(', ')
+                const agentLabel = agents
+                  .map(a => String((a as any)?.name || (a as any)?.slug || '').trim())
+                  .filter(Boolean)
+                  .slice(0, 3)
+                  .join(', ')
 
-              return (
-                <button key={id} type="button" onClick={() => onOpenChild(id)} className="group text-left rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate group-hover:text-foreground">{title}</p>
-                      <p className="text-xs text-muted-foreground mt-1 truncate">{agentLabel ? `Agents: ${agentLabel}` : 'Agents: —'}</p>
+                return (
+                  <button key={id} type="button" onClick={() => onOpenChild(id)} className="group text-left rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate group-hover:text-foreground">{title}</p>
+                        <p className="text-xs text-muted-foreground mt-1 truncate">{agentLabel ? `Agents: ${agentLabel}` : 'Agents: —'}</p>
+                      </div>
+                      <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                     </div>
-                    <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </div>
-                  {when ? <p className="text-[11px] text-muted-foreground mt-2">{when}</p> : null}
-                </button>
-              )
-            })}
+                    {when ? <p className="text-[11px] text-muted-foreground mt-2">{when}</p> : null}
+                  </button>
+                )
+              })}
+            </div>
+
+            {hasMoreBefore ? (
+              <div className="flex justify-center pt-2">
+                <Button type="button" variant="outline" size="sm" onClick={() => fetchNextPage()} disabled={isFetchingNextPage}>
+                  {isFetchingNextPage ? 'Loading…' : 'Load more threads'}
+                </Button>
+              </div>
+            ) : null}
+
+            {/* Sentinel for infinite scrolling */}
+            <div ref={loadMoreRef} className="h-px w-full" aria-hidden="true" />
           </div>
         )}
       </div>

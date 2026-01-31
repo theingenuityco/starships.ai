@@ -3,7 +3,6 @@
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { useStarshipBySlug } from '@/hooks/useStarships'
-import { useCreateConversation, useLinkMessageToConversation } from '@/hooks/useConversations'
 import type { Agent } from '@/lib/api'
 import type { MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -17,10 +16,9 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
   const [threadAgent, setThreadAgent] = useState<Agent | null>(null)
   const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
+  const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
+  const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
   const lastThreadConversationIdRef = useRef<string | null>(null)
-
-  const createConversation = useCreateConversation()
-  const linkMessageToConversation = useLinkMessageToConversation()
 
   // Desktop thread pane width (draggable resizer)
   const THREAD_PANE_WIDTH_STORAGE_KEY = 'starships.threadPaneWidthPx'
@@ -118,11 +116,18 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
 
-  const threadConversationId = useMemo(() => {
+  const threadKey = useMemo(() => {
     const raw = searchParams.get('thread')
     const v = typeof raw === 'string' ? raw.trim() : ''
     return v.length > 0 ? v : null
   }, [searchParams])
+
+  const isDraftThreadOpen = threadKey === 'draft'
+  const threadConversationId = useMemo(() => {
+    if (!threadKey) return null
+    if (threadKey === 'draft') return null
+    return threadKey
+  }, [threadKey])
 
   const setThreadConversationIdInUrl = useCallback(
     (conversationId: string | null) => {
@@ -142,12 +147,24 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   useEffect(() => {
     // If thread id changes via back/forward / manual URL edits, clear per-thread ephemeral state.
     const prev = lastThreadConversationIdRef.current
-    if (prev !== threadConversationId) {
-      lastThreadConversationIdRef.current = threadConversationId
+    if (prev !== threadKey) {
+      lastThreadConversationIdRef.current = threadKey
       setThreadPinnedFirstMessage(null)
       setThreadAgent(null)
+      setThreadDraftParentConversationId(null)
+      setThreadDraftTitle(null)
     }
-  }, [threadConversationId])
+  }, [threadKey])
+
+  // When opening a draft thread purely via URL (e.g. forum "New thread"), default parent to the current conversation.
+  useEffect(() => {
+    if (!isDraftThreadOpen) return
+    if (threadDraftParentConversationId) return
+    const parent = typeof routeParams.conversationId === 'string' ? routeParams.conversationId.trim() : ''
+    if (!parent) return
+    setThreadDraftParentConversationId(parent)
+    setThreadDraftTitle('New thread')
+  }, [isDraftThreadOpen, routeParams.conversationId, threadDraftParentConversationId])
 
   // Redirect to marketplace immediately if onboarding should start BUT we're not on step 5
   // Step 5 needs to show the conversations page, so we allow it to render
@@ -180,12 +197,14 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return null // Layout handles loading/error states
   }
 
+  const isThreadPaneOpen = Boolean(threadKey)
+
   return (
     <div className="h-screen w-full flex flex-col md:flex-row min-w-0">
       <div
         className="flex-1 min-w-0 h-full"
         style={{
-          ['--conversation-right-gutter' as any]: threadConversationId ? '16px' : '52px',
+          ['--conversation-right-gutter' as any]: isThreadPaneOpen ? '16px' : '52px',
         }}
       >
         <ConversationInterface
@@ -202,42 +221,17 @@ export default function ConversationsLayout({ children }: { children: React.Reac
               return
             }
 
-            // Draft thread opening (no conversationId yet): eagerly create + link, then open via URL param.
-            if (linkedMessage && parentConversationId) {
-              const raw = String((linkedMessage as any)?.content ?? '')
-                .trim()
-                .replace(/\s+/g, ' ')
-              const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
-              const title = snippet ? `Thread: ${snippet}` : 'New thread'
-
-              createConversation.mutate(
-                {
-                  starshipId: starshipData.id,
-                  title,
-                  parentConversationId,
-                  agentId: typeof (defaultAgent as any)?.id === 'string' ? String((defaultAgent as any).id) : undefined,
-                  agentSlug: typeof (defaultAgent as any)?.slug === 'string' ? String((defaultAgent as any).slug) : undefined,
-                },
-                {
-                  onSuccess: conv => {
-                    const newId = String((conv as any)?.id || '').trim()
-                    if (!newId) return
-
-                    // Best-effort: persist the thread link immediately.
-                    const messageId = String((linkedMessage as any)?.id || '').trim()
-                    if (messageId) {
-                      linkMessageToConversation.mutate({
-                        messageId,
-                        linkedConversationId: newId,
-                        conversationId: parentConversationId,
-                      })
-                    }
-
-                    setThreadConversationIdInUrl(newId)
-                  },
-                }
-              )
-            }
+            // Draft thread opening (no conversationId yet): open the pane without persisting anything.
+            // The thread conversation (and link to the parent message) is created on the first reply.
+            const parent = typeof parentConversationId === 'string' ? parentConversationId.trim() : ''
+            setThreadDraftParentConversationId(parent || null)
+            const raw = String((linkedMessage as any)?.content ?? '')
+              .trim()
+              .replace(/\s+/g, ' ')
+            const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
+            const title = snippet ? `Thread: ${snippet}` : 'New thread'
+            setThreadDraftTitle(title)
+            setThreadConversationIdInUrl('draft')
           }}
           initialAgentId={routeParams.agentIdOrSlug}
           starshipSlug={routeParams.slug}
@@ -245,7 +239,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       </div>
 
       {/* Thread split pane (desktop/tablet) */}
-      {threadConversationId ? (
+      {isThreadPaneOpen ? (
         <>
           {/* Draggable resize handle (desktop/tablet) */}
           <div className="hidden md:flex relative h-full w-px flex-shrink-0 bg-border/60">
@@ -271,6 +265,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
               starshipSlug={routeParams.slug}
               conversationId={threadConversationId}
               pinnedFirstMessage={threadPinnedFirstMessage}
+              draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+              draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
               selectedAgent={(threadAgent as any) ?? null}
               onAgentChange={setThreadAgent as any}
               onThreadCreated={cid => {
@@ -279,6 +275,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
               onClose={() => {
                 setThreadPinnedFirstMessage(null)
                 setThreadAgent(null)
+                setThreadDraftParentConversationId(null)
+                setThreadDraftTitle(null)
                 setThreadConversationIdInUrl(null)
               }}
             />
@@ -287,13 +285,15 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       ) : null}
 
       {/* Thread in-flow pane (mobile) */}
-      {threadConversationId ? (
+      {isThreadPaneOpen ? (
         <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border/60 bg-background min-w-0">
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             conversationId={threadConversationId}
             pinnedFirstMessage={threadPinnedFirstMessage}
+            draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
+            draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
             selectedAgent={(threadAgent as any) ?? null}
             onAgentChange={setThreadAgent as any}
             onThreadCreated={cid => {
@@ -302,6 +302,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
             onClose={() => {
               setThreadPinnedFirstMessage(null)
               setThreadAgent(null)
+              setThreadDraftParentConversationId(null)
+              setThreadDraftTitle(null)
               setThreadConversationIdInUrl(null)
             }}
           />

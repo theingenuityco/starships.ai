@@ -113,7 +113,12 @@ export function Navigation(props: NavigationProps) {
     (nextSlug: string): string => {
       const p = typeof pathname === 'string' ? pathname : ''
       if (!p.startsWith('/ship/')) {
-        return `/ship/${nextSlug}/conversations`
+        return `/ship/${nextSlug}`
+      }
+      // If we're in a specific conversation, don't carry the conversationId across starships.
+      // It may not exist / be accessible in the destination starship.
+      if (p.includes('/conversations/')) {
+        return `/ship/${nextSlug}`
       }
       const parts = p.split('/')
       // /ship/<slug>/...
@@ -121,7 +126,7 @@ export function Navigation(props: NavigationProps) {
         parts[2] = nextSlug
         return parts.join('/')
       }
-      return `/ship/${nextSlug}/conversations`
+      return `/ship/${nextSlug}`
     },
     [pathname]
   )

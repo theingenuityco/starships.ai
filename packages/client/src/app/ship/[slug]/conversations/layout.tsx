@@ -2,6 +2,7 @@
 
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { ThreadPane } from '@/components/conversation/ThreadPane'
+import { useStarshipChannels } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -12,7 +13,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const params = useParams()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
+  const { shouldShowOnboarding } = useNavigationOnboardingContext()
   const [threadAgent, setThreadAgent] = useState<AgentModel | null>(null)
   const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
@@ -132,12 +133,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     () => ({
       slug: params.slug as string,
       conversationId: params.conversationId as string | undefined,
-      agentIdOrSlug: searchParams.get('agent') || undefined,
     }),
     [params.slug, params.conversationId, searchParams]
   )
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
+  const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
 
   const threadKey = useMemo(() => {
     const raw = searchParams.get('thread')
@@ -159,7 +160,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       else next.delete('thread')
       const qs = next.toString()
       // Preserve the current route (including /conversations/:conversationId) and other query params.
-      const basePath = routeParams.conversationId ? `/ship/${routeParams.slug}/conversations/${routeParams.conversationId}` : `/ship/${routeParams.slug}/conversations`
+      const basePath = routeParams.conversationId ? `/ship/${routeParams.slug}/conversations/${routeParams.conversationId}` : `/ship/${routeParams.slug}`
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
     [router, routeParams.conversationId, routeParams.slug, searchParams]
@@ -218,13 +219,61 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     setThreadDraftTitle('New thread')
   }, [isDraftThreadOpen, routeParams.conversationId, threadDraftParentConversationId])
 
-  // Redirect to marketplace immediately if onboarding should start BUT we're not on step 5
-  // Step 5 needs to show the conversations page, so we allow it to render
+  // Conversations is not part of the navigation onboarding flow.
   useEffect(() => {
-    if (shouldShowOnboarding && currentStep !== 5) {
+    if (shouldShowOnboarding) {
       router.replace('/marketplace')
     }
-  }, [shouldShowOnboarding, currentStep, router])
+  }, [shouldShowOnboarding, router])
+
+  const isDraftDm = useMemo(() => {
+    const dm = searchParams.get('dm')
+    return dm === 'draft'
+  }, [searchParams])
+
+  const pickAutoConversationId = useMemo(() => {
+    const channels = channelsData?.channels ?? []
+    const lobby = channels.find((ch: any) => String(ch?.slug || '').trim().toLowerCase() === 'lobby')
+    const lobbyConversationId = lobby?.conversationId ? String(lobby.conversationId) : ''
+    if (lobbyConversationId) return lobbyConversationId
+
+    const firstChannelConversationId = channels.length > 0 ? String((channels[0] as any)?.conversationId || '') : ''
+    return firstChannelConversationId || null
+  }, [channelsData?.channels])
+
+  const hasAutoNavigatedRef = useRef(false)
+  useEffect(() => {
+    if (hasAutoNavigatedRef.current) return
+    if (shouldShowOnboarding) return
+    if (!starshipData?.id) return
+    if (routeParams.conversationId) return
+    if (isDraftDm) return
+
+    // Always open the default channel (lobby), falling back to first channel.
+    if (channelsLoading) return
+    if (pickAutoConversationId) {
+      hasAutoNavigatedRef.current = true
+      // Preserve query params (e.g. thread), but drop agent to prevent "starter" behaviors.
+      const sp = new URLSearchParams(searchParams.toString())
+      sp.delete('agent')
+      const qs = sp.toString()
+      router.replace(qs ? `/ship/${routeParams.slug}/conversations/${pickAutoConversationId}?${qs}` : `/ship/${routeParams.slug}/conversations/${pickAutoConversationId}`)
+      return
+    }
+    // Nothing to open (should be rare now that starships have default channels) → send to marketplace.
+    hasAutoNavigatedRef.current = true
+    router.replace('/marketplace')
+  }, [
+    shouldShowOnboarding,
+    starshipData?.id,
+    routeParams.conversationId,
+    routeParams.slug,
+    isDraftDm,
+    router,
+    pickAutoConversationId,
+    channelsLoading,
+    searchParams,
+  ])
 
   // Handle conversation change from ConversationInterface
   // Must be called before any early returns to satisfy React Hooks rules
@@ -242,14 +291,14 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       if (newConversationId) {
         router.push(qs ? `/ship/${routeParams.slug}/conversations/${newConversationId}?${qs}` : `/ship/${routeParams.slug}/conversations/${newConversationId}`)
       } else {
-        router.push(qs ? `/ship/${routeParams.slug}/conversations?${qs}` : `/ship/${routeParams.slug}/conversations`)
+        router.push(qs ? `/ship/${routeParams.slug}?${qs}` : `/ship/${routeParams.slug}`)
       }
     },
     [router, routeParams.slug, searchParams]
   )
 
-  // Don't render conversations interface if we're redirecting to onboarding (but allow step 5)
-  if (shouldShowOnboarding && currentStep !== 5) {
+  // Don't render conversations interface if we're redirecting to onboarding
+  if (shouldShowOnboarding) {
     return null
   }
 
@@ -330,7 +379,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
             }
             setThreadConversationIdInUrl('draft')
           }}
-          initialAgentId={routeParams.agentIdOrSlug}
+          initialAgentId={undefined}
           starshipSlug={routeParams.slug}
         />
       </div>

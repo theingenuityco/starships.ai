@@ -222,7 +222,7 @@ export function useLogin() {
         if (shouldStartOnboarding) {
           router.push('/marketplace')
         } else {
-          router.push(addWelcome(`/ship/${starship.slug}/conversations`))
+          router.push(addWelcome(`/ship/${starship.slug}`))
         }
       } else {
         router.push('/profile')
@@ -291,7 +291,7 @@ export function useRegister() {
       if (redirectTarget) {
         router.push(redirectTarget)
       } else if (starship?.slug) {
-        router.push(`/ship/${starship.slug}/conversations`)
+        router.push(`/ship/${starship.slug}`)
       }
 
       queryClient.invalidateQueries()
@@ -362,7 +362,7 @@ export function useOAuthLogin() {
         if (shouldStartOnboarding) {
           router.push('/marketplace')
         } else {
-          router.push(addWelcome(`/ship/${starship.slug}/conversations`))
+          router.push(addWelcome(`/ship/${starship.slug}`))
         }
       } else {
         router.push('/profile')

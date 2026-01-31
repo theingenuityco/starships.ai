@@ -140,8 +140,11 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
       // Marketplace UX: after deploy, take the user to the correct starship (chat).
       // Guarded so uses of this card outside the marketplace don't unexpectedly navigate.
       if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
-        const q = agentSlug ? `?agent=${encodeURIComponent(agentSlug)}` : ''
-        router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/conversations${q}`)
+        if (agentId) {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+        } else {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
+        }
       }
     } finally {
       setIsDeploying(false)

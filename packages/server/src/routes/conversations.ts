@@ -36,6 +36,7 @@ import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
 import { UIActionService } from '@/services/UIActionService';
 import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
@@ -239,98 +240,6 @@ function extractConnectorActionApiError(error: unknown): { code?: string; messag
 
   if (!code && !message && !details) return null;
   return { code, message, details };
-}
-
-/**
- * Enforce private channel membership (conversation-backed channels).
- *
- * Starship collaborators can see starship resources, but private channels are more restrictive:
- * - owner / instance admin can always access
- * - otherwise require a row in `conversation_members`
- */
-async function enforcePrivateChannelMembership(args: {
-  conversationId: string;
-  userId: string;
-  req: Request;
-  res: Response;
-}): Promise<boolean> {
-  try {
-    const channelRepo = new ChannelRepository();
-    const channel = await channelRepo.findByConversationId(args.conversationId).catch(() => null);
-    if (!channel || !channel.isPrivate) return true;
-
-    // Instance admin bypass
-    const isAdmin = isInstanceAdmin(args.req.user);
-    if (isAdmin) return true;
-
-    // Owner bypass
-    const starshipService = new StarshipService();
-    const starship = await starshipService.getStarship(channel.starshipId).catch(() => null);
-    if (starship && starship.ownerId === args.userId) return true;
-
-    const memberRepo = new ConversationMemberRepository();
-    const ok = await memberRepo.isMember(args.userId, args.conversationId);
-    if (!ok) {
-      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
-        resource: 'channel',
-        conversationId: args.conversationId,
-      });
-      return false;
-    }
-
-    return true;
-  } catch {
-    // Best-effort: if we cannot evaluate channel membership, fail closed for safety.
-    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this channel', 403, {
-      resource: 'channel',
-      conversationId: args.conversationId,
-      reason: 'membership_check_failed',
-    });
-    return false;
-  }
-}
-
-/**
- * Enforce direct message membership (conversation-backed DMs).
- *
- * Starship collaborators can see starship resources, but DMs are always restricted:
- * - instance admin can always access
- * - otherwise require a row in `conversation_members`
- */
-async function enforceDirectMessageMembership(args: {
-  conversationId: string;
-  userId: string;
-  req: Request;
-  res: Response;
-}): Promise<boolean> {
-  try {
-    const dmRepo = new DirectMessageRepository();
-    const dm = await dmRepo.findByConversationId(args.conversationId).catch(() => null);
-    if (!dm) return true;
-
-    // Instance admin bypass
-    const isAdmin = isInstanceAdmin(args.req.user);
-    if (isAdmin) return true;
-
-    const memberRepo = new ConversationMemberRepository();
-    const ok = await memberRepo.isMember(args.userId, args.conversationId);
-    if (!ok) {
-      sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
-        resource: 'direct_message',
-        conversationId: args.conversationId,
-      });
-      return false;
-    }
-    return true;
-  } catch {
-    // Best-effort: if we cannot evaluate DM membership, fail closed for safety.
-    sendError(args.res, 'ACCESS_DENIED', 'Access denied to this direct message', 403, {
-      resource: 'direct_message',
-      conversationId: args.conversationId,
-      reason: 'membership_check_failed',
-    });
-    return false;
-  }
 }
 
 // tool execution uses the same runner config bundle as agent execution
@@ -576,7 +485,15 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (!(await verifyResourceAccess(convAuth.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
-    if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: convAuth.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
       return;
     }
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
@@ -994,7 +911,15 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
     if (!(await verifyResourceAccess(exists.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
-    if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: exists.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
       return;
     }
     if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
@@ -1070,7 +995,15 @@ router.post(
       if (!ok) {
         return;
       }
-      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      ) {
         return;
       }
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
@@ -1399,7 +1332,16 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
-      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvals = new ToolCallApprovalRepository();
@@ -1476,7 +1418,16 @@ router.get(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
-      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
       if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvalsRepo = new ToolCallApprovalRepository();
@@ -1563,7 +1514,16 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
-      if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1669,7 +1629,18 @@ router.post(
         if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
           return;
         }
-        if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+        if (
+          !(await enforcePrivateChannelMembership({
+            conversationId,
+            conversationStarshipId: conversation.starshipId,
+            userId: authUserId,
+            req,
+            res,
+          }))
+        ) {
+          return;
+        }
+        if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
           return;
         }
       }
@@ -1918,7 +1889,18 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
-    if (!(await enforcePrivateChannelMembership({ conversationId, userId: authUserId, req, res }))) {
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
 

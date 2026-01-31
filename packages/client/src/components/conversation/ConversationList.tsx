@@ -27,6 +27,8 @@ import { useAuthContext } from '@/providers/auth-provider'
 
 interface ConversationListProps {
   starshipId: string
+  /** Starship slug to use for navigation when not on a /ship/:slug route (e.g. /marketplace). */
+  starshipSlug?: string
   onConversationDelete?: (conversationId: string) => void
   onConversationSelect?: (conversationId: string) => void
   compact?: boolean
@@ -64,6 +66,7 @@ type DmTarget = { kind: 'agent'; key: string; label: string; agent: AgentModel }
 
 export function ConversationList({
   starshipId,
+  starshipSlug,
   onConversationDelete,
   onConversationSelect,
   compact = false,
@@ -73,7 +76,8 @@ export function ConversationList({
 }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
-  const slug = params.slug as string
+  const slugFromParams = typeof (params as any)?.slug === 'string' ? String((params as any).slug) : ''
+  const slug = (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? starshipSlug.trim() : slugFromParams) || ''
   // Current selection can come from either /conversations/:conversationId (DMs) or /channels/:channelSlug (channels).
   const currentConversationId = params.conversationId as string | undefined
   const currentChannelSlug = params.channelSlug as string | undefined
@@ -171,11 +175,13 @@ export function ConversationList({
   }
 
   const handleConversationClick = (conversationId: string) => {
+    if (!slug) return
     router.push(`/ship/${slug}/conversations/${encodeURIComponent(conversationId)}`)
     onConversationSelect?.(conversationId)
   }
 
   const handleChannelClick = (channelSlug: string) => {
+    if (!slug) return
     router.push(`/ship/${slug}/channels/${encodeURIComponent(channelSlug)}`)
     onConversationSelect?.(channelSlug)
   }
@@ -208,6 +214,7 @@ export function ConversationList({
   }, [directMessagesData?.directMessages])
 
   const openDraftDm = (args: { dmType: 'user_agent' | 'user_user'; agentId?: string; peerUserId?: string; peerLabel?: string; peerAvatar?: string }) => {
+    if (!slug) return
     const sp = new URLSearchParams()
     sp.set('dm', 'draft')
     sp.set('dmType', args.dmType)

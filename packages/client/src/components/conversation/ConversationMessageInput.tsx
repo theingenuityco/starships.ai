@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import {
   CONVERSATION_QUERY_KEYS,
   useCreateConversation,
+  useCreateDirectMessage,
   useConversationStop,
   useConversationDetail,
   useConversationAgents,
@@ -51,6 +52,11 @@ interface ConversationMessageInputProps {
   starshipId: string
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
+  /**
+   * Optional: draft direct message target.
+   * When provided AND `conversationId` is null, the DM is created/resolved on first send.
+   */
+  draftDirectMessageTarget?: { dmType: 'user_agent' | 'user_user'; agentId?: string | null; peerUserId?: string | null; title?: string | null } | null
   /**
    * Optional: when creating a new conversation (conversationId is null), create it as a child of this parent conversation.
    * Used for "draft threads" opened from a channel message.
@@ -102,6 +108,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       conversationId,
       onConversationStart,
+      draftDirectMessageTarget,
       newConversationParentConversationId,
       newConversationTitleOverride,
       linkMessageToNewConversation,
@@ -167,6 +174,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const clearEditorRef = useRef<() => void>(() => {})
 
     const createConversation = useCreateConversation()
+    const createDirectMessage = useCreateDirectMessage()
     const linkMessageToConversation = useLinkMessageToConversation()
     const { data: starshipForPerms } = useStarshipBySlug(starshipSlug || '', Boolean(starshipSlug))
     const canManageBilling = Boolean(isInstanceAdmin || (userId && starshipForPerms?.ownerId === userId))
@@ -517,27 +525,34 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = false
       }
 
+      const isDraftUserUserDm = Boolean(!conversationId && draftDirectMessageTarget?.dmType === 'user_user')
+
       // Resolve agent to send to: prefer explicit leading @handle in content, else selectedAgent.
       // (No enforcement: the editor content is not mutated/prefilled anymore.)
       // For mention-only threads, ignore selectedAgent and require a mention every time.
       let effectiveAgent: AgentModel | null | undefined = isMentionOnlyThread ? null : selectedAgent ?? null
       let contentToSend = messageToSend
-      // Also support plain-text leading @handle for safety
-      const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-      if (mentionMatch && starshipAgents.length > 0) {
-        const handle = mentionMatch[1]
-        const lower = handle.toLowerCase()
-        const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
-        if (matched) {
-          effectiveAgent = matched
-          // Do NOT strip the leading mention; keep it in the message content
-          // Thread behavior: mentioning an agent should NOT re-assign the "default agent".
-          if (!isThreadContext && onAgentChange) onAgentChange(matched)
+      if (!isDraftUserUserDm) {
+        // Also support plain-text leading @handle for safety
+        const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
+        if (mentionMatch && starshipAgents.length > 0) {
+          const handle = mentionMatch[1]
+          const lower = handle.toLowerCase()
+          const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
+          if (matched) {
+            effectiveAgent = matched
+            // Do NOT strip the leading mention; keep it in the message content
+            // Thread behavior: mentioning an agent should NOT re-assign the "default agent".
+            if (!isThreadContext && onAgentChange) onAgentChange(matched)
+          }
         }
+      } else {
+        // user↔user DMs are human-only: never require or auto-pick an agent.
+        effectiveAgent = null
       }
 
       // Validation for agent and starship
-      if (!effectiveAgent && !isChannelConversation) {
+      if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm) {
         resetFlags()
         toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
           description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
@@ -564,6 +579,28 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let currentConversationId = conversationId
         let createdNewConversation = false
         if (!currentConversationId) {
+          // Draft DM flow: create/resolve the DM conversation on first send.
+          if (draftDirectMessageTarget && (draftDirectMessageTarget.dmType === 'user_agent' || draftDirectMessageTarget.dmType === 'user_user')) {
+            const dmTitle =
+              typeof draftDirectMessageTarget.title === 'string' && draftDirectMessageTarget.title.trim().length > 0 ? draftDirectMessageTarget.title.trim() : undefined
+
+            const created = await createDirectMessage.mutateAsync({
+              starshipId,
+              ...(draftDirectMessageTarget.dmType === 'user_agent'
+                ? { agentId: String(draftDirectMessageTarget.agentId || '').trim() }
+                : { peerUserId: String(draftDirectMessageTarget.peerUserId || '').trim() }),
+              ...(dmTitle ? { title: dmTitle } : null),
+            })
+
+            currentConversationId = created?.conversationId ? String(created.conversationId) : null
+            if (!currentConversationId) {
+              resetFlags()
+              toast.error('Failed to start direct message', { description: 'Please try again.' })
+              return
+            }
+            sendConversationId = currentConversationId
+            createdNewConversation = true
+          } else {
           // Starter conversations must be agent-backed (channels are created via the Channels UI).
           if (!effectiveAgent) {
             resetFlags()
@@ -654,6 +691,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
           // Apply pending web browsing preference if enabled
           await applyPendingWebBrowsing(currentConversationId)
+          }
         }
         sendConversationId = currentConversationId!
         // Ensure local ref is updated immediately for stop button usability
@@ -766,6 +804,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = false
       }
     }, [
+      draftDirectMessageTarget,
       message,
       sending,
       disabled,
@@ -775,6 +814,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       userId,
       conversationId,
       createConversation,
+      createDirectMessage,
       linkMessageToConversation,
       linkMessageToNewConversation,
       newConversationParentConversationId,

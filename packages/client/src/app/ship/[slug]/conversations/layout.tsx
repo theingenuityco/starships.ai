@@ -177,7 +177,15 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   // Must be called before any early returns to satisfy React Hooks rules
   const handleConversationChange = useCallback(
     (newConversationId: string | null) => {
-      const qs = searchParams.toString()
+      // If we're transitioning out of a "draft DM" view, drop the draft-only query params.
+      const sp = new URLSearchParams(searchParams.toString())
+      sp.delete('dm')
+      sp.delete('dmType')
+      sp.delete('agentId')
+      sp.delete('peerUserId')
+      sp.delete('peerLabel')
+      sp.delete('peerAvatar')
+      const qs = sp.toString()
       if (newConversationId) {
         router.push(qs ? `/ship/${routeParams.slug}/conversations/${newConversationId}?${qs}` : `/ship/${routeParams.slug}/conversations/${newConversationId}`)
       } else {

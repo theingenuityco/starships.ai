@@ -15,7 +15,7 @@ import type {
   EngineConfig,
 } from '@starships/autopilot';
 import { NotFoundError, ConflictError, ValidationError } from '@starships/errors';
-import { ChannelRepository, ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository } from '@starships/models';
+import { ChannelRepository, ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository, DirectMessageRepository } from '@starships/models';
 import {
   AgentModel,
   ConversationModel,
@@ -1347,6 +1347,9 @@ export class ConversationService {
     const channelRepo = new ChannelRepository();
     const channel = await channelRepo.findByConversationId(data.conversationId).catch(() => null);
     const isChannel = Boolean(channel);
+    const dmRepo = new DirectMessageRepository();
+    const dm = await dmRepo.findByConversationId(data.conversationId).catch(() => null);
+    const isUserUserDm = Boolean(dm && (dm as any).dmType === 'user_user');
 
     const conversation = await this.getConversationById(data.conversationId);
     if (!conversation) {
@@ -1360,38 +1363,48 @@ export class ConversationService {
     const isThread = Boolean(conversation.parentConversationId);
 
     let conversationAgents = await this.getConversationAgents(data.conversationId);
-    if (!isChannel && conversationAgents.length < 1) {
+    if (!isChannel && !isUserUserDm && conversationAgents.length < 1) {
       throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
     }
 
-    // Build initial target agents from @mentions in the incoming message.
-    // - For channels: mention-only; no fallback agent.
-    // - For normal conversations: fallback to the first linked agent.
-    // - For threads with >2 agents: mention-only; no fallback agent.
-    const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
-    // Auto-link mentioned agents not yet linked
-    let linkedAny = false;
-    for (const a of initialTargetsUnlinked) {
-      if (!conversationAgents.find((x) => x.id === a.id)) {
-        await this.conversationRepository.linkToAgent(data.conversationId, a.id);
-        linkedAny = true;
+    let isMentionOnlyThread = Boolean(isThread && !isChannel && conversationAgents.length > 2);
+
+    let agentQueue: AgentModel[] = [];
+    let noAgentToRun = false;
+    if (isUserUserDm) {
+      // user↔user DMs are human-only conversations. Do not link agents or run any agent workflow.
+      // We still persist the message + turn lifecycle for consistent streaming UX.
+      agentQueue = [];
+      noAgentToRun = true;
+    } else {
+      // Build initial target agents from @mentions in the incoming message.
+      // - For channels: mention-only; no fallback agent.
+      // - For normal conversations: fallback to the first linked agent.
+      // - For threads with >2 agents: mention-only; no fallback agent.
+      const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
+      // Auto-link mentioned agents not yet linked
+      let linkedAny = false;
+      for (const a of initialTargetsUnlinked) {
+        if (!conversationAgents.find((x) => x.id === a.id)) {
+          await this.conversationRepository.linkToAgent(data.conversationId, a.id);
+          linkedAny = true;
+        }
       }
-    }
-    // Refresh agents after linking so counts/order are accurate for routing rules.
-    if (linkedAny) {
-      conversationAgents = await this.getConversationAgents(data.conversationId);
-    }
+      // Refresh agents after linking so counts/order are accurate for routing rules.
+      if (linkedAny) {
+        conversationAgents = await this.getConversationAgents(data.conversationId);
+      }
 
-    const isMentionOnlyThread = Boolean(isThread && !isChannel && conversationAgents.length > 2);
-    const initialTargets = isChannel
-      ? initialTargetsUnlinked
-      : initialTargetsUnlinked.length > 0
+      isMentionOnlyThread = Boolean(isThread && !isChannel && conversationAgents.length > 2);
+      const initialTargets = isChannel
         ? initialTargetsUnlinked
-        : this.extractMentionedAgents(data.content, conversationAgents);
+        : initialTargetsUnlinked.length > 0
+          ? initialTargetsUnlinked
+          : this.extractMentionedAgents(data.content, conversationAgents);
 
-    const agentQueue: AgentModel[] =
-      initialTargets.length > 0 ? initialTargets.slice() : isChannel || isMentionOnlyThread ? [] : [conversationAgents[0]];
-    const noAgentToRun = (isChannel || isMentionOnlyThread) && agentQueue.length === 0;
+      agentQueue = initialTargets.length > 0 ? initialTargets.slice() : isChannel || isMentionOnlyThread ? [] : [conversationAgents[0]];
+      noAgentToRun = (isChannel || isMentionOnlyThread) && agentQueue.length === 0;
+    }
     const processedAgents: Set<string> = new Set();
     const maxHops = 5; // prevent infinite handoffs per turn
     let hops = 0;

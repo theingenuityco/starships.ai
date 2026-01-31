@@ -117,6 +117,24 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Agent and UI state
   const [selectedAgent, setSelectedAgent] = useState<AgentModel | null>(null)
 
+  const draftDm = useMemo(() => {
+    const dm = (searchParams.get('dm') || '').trim()
+    if (dm !== 'draft') return null
+    const dmTypeRaw = (searchParams.get('dmType') || '').trim()
+    const dmType = dmTypeRaw === 'user_agent' || dmTypeRaw === 'user_user' ? (dmTypeRaw as 'user_agent' | 'user_user') : null
+    if (!dmType) return null
+
+    const agentId = (searchParams.get('agentId') || '').trim()
+    const peerUserId = (searchParams.get('peerUserId') || '').trim()
+    const peerLabel = (searchParams.get('peerLabel') || '').trim()
+    const peerAvatar = (searchParams.get('peerAvatar') || '').trim()
+
+    if (dmType === 'user_agent') {
+      return { dmType, agentId: agentId || null, peerUserId: null, peerLabel: null, peerAvatar: null } as const
+    }
+    return { dmType, agentId: null, peerUserId: peerUserId || null, peerLabel: peerLabel || null, peerAvatar: peerAvatar || null } as const
+  }, [searchParams])
+
   // Wrapper to log all agent changes
   const setSelectedAgentWithLogging = useCallback((agent: AgentModel | null) => {
     setSelectedAgent(agent)
@@ -186,6 +204,19 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     if (!Array.isArray(chans)) return false
     return chans.some((c: any) => String(c?.conversationId || '') === cid)
   }, [starshipChannelsData, currentConversationId])
+
+  // In draft DM mode, lock the agent selection to the DM target agent (if applicable).
+  useEffect(() => {
+    if (!draftDm) return
+    if (draftDm.dmType !== 'user_agent') return
+    const agentId = String(draftDm.agentId || '').trim()
+    if (!agentId) return
+    const list = Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []
+    const match = list.find(a => String(a?.id || '') === agentId) || null
+    if (!match) return
+    if (selectedAgent?.id === match.id) return
+    setSelectedAgentWithLogging(match)
+  }, [draftDm, selectedAgent?.id, setSelectedAgentWithLogging, starshipAgentsData])
 
   const currentChannel = useMemo(() => {
     const cid = String(currentConversationId || '')
@@ -307,7 +338,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
     }
   }, [shouldShowMessages])
 
-  const showMessagesArea = shouldShowMessages
+  const showMessagesArea = Boolean(shouldShowMessages || draftDm)
 
   // Start docking immediately when messages area appears; allow welcome to fade concurrently
   useEffect(() => {
@@ -887,6 +918,53 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               conversationId={currentConversationId}
               starshipId={starshipId}
               titlePrefix={isChannelConversation ? <Icon name="hash" className="h-5 w-5" /> : null}
+              fallbackTitle={
+                draftDm
+                  ? draftDm.dmType === 'user_agent'
+                    ? (() => {
+                        const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || ''))
+                        return a ? formatAgentDisplayName(a) : 'Direct message'
+                      })()
+                    : draftDm.peerLabel || 'Direct message'
+                  : undefined
+              }
+              fallbackSubtitle={draftDm && !currentConversationId ? 'Draft (not saved)' : undefined}
+              participantsOverride={
+                draftDm && !currentConversationId
+                  ? [
+                      {
+                        kind: 'human',
+                        key: `human:${String(authUser?.id || userId || 'me')}`,
+                        label: String(authUser?.name || authUser?.email || 'You'),
+                        ...(authUser?.avatar ? { avatarUrl: String(authUser.avatar) } : null),
+                      },
+                      ...(draftDm.dmType === 'user_agent'
+                        ? (() => {
+                            const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || ''))
+                            const label = a ? formatAgentDisplayName(a) : 'Agent'
+                            const seed = a ? String(a?.name || a?.slug || a?.id || label) : 'agent'
+                            const avatarAttachmentId = a && typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId) : null
+                            return [
+                              {
+                                kind: 'agent',
+                                key: `agent:${String(draftDm.agentId || label)}`,
+                                label,
+                                seed,
+                                ...(avatarAttachmentId ? { avatarAttachmentId } : null),
+                              } as const,
+                            ]
+                          })()
+                        : [
+                            {
+                              kind: 'human',
+                              key: `human:${String(draftDm.peerUserId || draftDm.peerLabel || 'peer')}`,
+                              label: String(draftDm.peerLabel || 'User'),
+                              ...(draftDm.peerAvatar ? { avatarUrl: String(draftDm.peerAvatar) } : null),
+                            } as const,
+                          ]),
+                    ]
+                  : null
+              }
               modelId={selectedAgent?.model ?? null}
               maxTokens={
                 typeof (selectedAgent as any)?.maxTokens === 'number'
@@ -902,6 +980,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 starshipId={starshipId}
                 bottomPaddingPx={inputHeight + 24}
                 enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
+                messagesOverride={draftDm && !currentConversationId ? [] : undefined}
                 onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
                   // Thread default agent rules:
                   // - If started from an assistant message: use that agent as the thread default (if resolvable)
@@ -958,6 +1037,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                   starshipId={starshipId}
                   conversationId={currentConversationId}
                   onConversationStart={handleConversationStart}
+                  draftDirectMessageTarget={draftDm as any}
                   onToggleToolForm={handleToggleToolBuilder}
                   isToolFormOpen={false}
                   disabled={false}

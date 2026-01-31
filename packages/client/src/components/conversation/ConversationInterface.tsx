@@ -1021,6 +1021,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 <ConversationMessageList
                   conversationId={currentConversationId}
                   starshipId={starshipId}
+                  channelName={isChannelConversation ? (typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null) : null}
                   bottomPaddingPx={inputHeight + 24}
                   enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}

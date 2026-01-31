@@ -119,6 +119,13 @@ export class ToolEntity implements ToolModel {
   @IsISO8601()
   templateSnapshotAt?: string; // When tool last synced with template
 
+  /** Connector providers used by this tool's blueprint (connector_action nodes) */
+  @Expose()
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  requiredConnectorProviders?: string[];
+
   // Publication workflow fields
   @Expose()
   @IsString()

@@ -12,8 +12,9 @@ import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useAuth } from '@/hooks/useAuth'
 import api from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { motion } from 'motion/react'
-import { useMemo, useEffect, useRef, type ReactNode } from 'react'
+import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
@@ -169,6 +170,98 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     if (labels.length <= 3) return labels.join(', ')
     return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
   }, [participantItems])
+
+  const [participantsOpen, setParticipantsOpen] = useState(false)
+  const participantsHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const participantsTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const participantsContentRef = useRef<HTMLDivElement | null>(null)
+
+  const clearParticipantsHoverTimers = useCallback(() => {
+    if (participantsHoverCloseTimerRef.current) {
+      clearTimeout(participantsHoverCloseTimerRef.current)
+      participantsHoverCloseTimerRef.current = null
+    }
+  }, [])
+
+  const openParticipantsPopover = useCallback(() => {
+    clearParticipantsHoverTimers()
+    setParticipantsOpen(prev => (prev ? prev : true))
+  }, [clearParticipantsHoverTimers])
+
+  const closeParticipantsPopover = useCallback(
+    (delayMs = 180) => {
+      if (!participantsOpen) return
+      if (participantsHoverCloseTimerRef.current) return
+      participantsHoverCloseTimerRef.current = setTimeout(() => {
+        participantsHoverCloseTimerRef.current = null
+        setParticipantsOpen(false)
+      }, delayMs)
+    },
+    [participantsOpen]
+  )
+
+  // Avoid redundant open/close triggers:
+  // Only close when pointer truly leaves BOTH trigger and content (use relatedTarget across portal boundary).
+  const handleParticipantsTriggerPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      const next = e.relatedTarget as Node | null
+      const contentEl = participantsContentRef.current
+      if (next && contentEl && contentEl.contains(next)) return
+      closeParticipantsPopover(220)
+    },
+    [closeParticipantsPopover]
+  )
+
+  const handleParticipantsContentPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      const next = e.relatedTarget as Node | null
+      const triggerEl = participantsTriggerRef.current
+      if (next && triggerEl && triggerEl.contains(next)) return
+      closeParticipantsPopover(220)
+    },
+    [closeParticipantsPopover]
+  )
+
+  useEffect(() => {
+    return () => {
+      clearParticipantsHoverTimers()
+    }
+  }, [clearParticipantsHoverTimers])
+
+  const ParticipantsPopup = () => {
+    const labels = participantItems.map(p => p.label).filter(Boolean)
+    if (labels.length === 0) return null
+    return (
+      <div className="w-full">
+        <div className="px-2 py-2 font-normal">
+          <div className="text-sm font-medium leading-tight truncate text-foreground">Participants</div>
+        </div>
+        <div className="-mx-1 my-1 h-px bg-muted" />
+        <div className="max-h-72 overflow-y-auto overflow-x-hidden p-1">
+          {participantItems.map(p => (
+            <div
+              key={p.key}
+              className="group relative rounded-lg flex items-center gap-2 w-full h-8 px-2 text-[13px] font-medium border border-transparent cursor-default text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted"
+            >
+              <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
+                {p.kind === 'agent' ? (
+                  <div className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+                    <AgentAvatar seed={p.seed} imageUrl={p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined} size={20} rounded />
+                  </div>
+                ) : (
+                  <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
+                    <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                  </Avatar>
+                )}
+              </div>
+              <span className="min-w-0 truncate">{p.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   // Token indicator: utilization (server totals) vs max (model context window)
   const usageConversationId = showTokens ? conversationId : null
@@ -354,31 +447,67 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
               <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
                 {participantItems.length > 0 ? (
                   <>
-                    {/* Participants (overlapping avatars) */}
-                    <div className="flex items-center -space-x-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
-                      {participantItems.slice(0, 3).map(p => {
-                        if (p.kind === 'agent') {
-                          const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
-                          return (
-                            <div key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                              <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={24} rounded />
-                            </div>
-                          )
-                        }
-                        return (
-                          <Avatar key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                            {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                            <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                          </Avatar>
-                        )
-                      })}
-                    </div>
-
-                    {participantItems.length > 3 ? <span className="text-muted-foreground/70">and {participantItems.length - 3} more</span> : null}
+                    {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
+                    <Popover
+                      open={participantsOpen}
+                      onOpenChange={next => {
+                        clearParticipantsHoverTimers()
+                        setParticipantsOpen(next)
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          ref={participantsTriggerRef}
+                          className="inline-flex items-center gap-2 rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          aria-label={`Participants: ${participantsLabel}`}
+                          title={participantsLabel}
+                          onPointerEnter={openParticipantsPopover}
+                          onPointerLeave={handleParticipantsTriggerPointerLeave}
+                          onFocus={() => {
+                            clearParticipantsHoverTimers()
+                            setParticipantsOpen(true)
+                          }}
+                        >
+                          <div className="flex items-center -space-x-2">
+                            {participantItems.slice(0, 3).map(p => {
+                              if (p.kind === 'agent') {
+                                const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                                return (
+                                  <div key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                                    <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={24} rounded />
+                                  </div>
+                                )
+                              }
+                              return (
+                                <Avatar key={p.key} className="h-6 w-6 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                                  {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                  <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                </Avatar>
+                              )
+                            })}
+                          </div>
+                          {participantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {participantItems.length - 3} more</span> : null}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        ref={participantsContentRef}
+                        side="bottom"
+                        align="start"
+                        sideOffset={8}
+                        className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
+                        onOpenAutoFocus={e => e.preventDefault()}
+                        onCloseAutoFocus={e => e.preventDefault()}
+                        onPointerEnter={openParticipantsPopover}
+                        onPointerLeave={handleParticipantsContentPointerLeave}
+                      >
+                        <ParticipantsPopup />
+                      </PopoverContent>
+                    </Popover>
 
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                      <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
                     </span>
 
                     {/* Tokens: utilized vs max (always render) */}
@@ -393,7 +522,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                   </>
                 ) : (
                   <>
-                    <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                    <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
                     {showTokens ? (
                       <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">

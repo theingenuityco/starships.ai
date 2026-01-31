@@ -285,6 +285,8 @@ interface MessageContentProps {
   enableLinkPreview?: boolean
   isStreaming?: boolean
   chunks?: StreamChunk[]
+  /** When true, use tighter vertical padding for stacked consecutive messages. */
+  compact?: boolean
   // Optional reasoning content and chunks
   reasoning?: string
   reasoningChunks?: StreamChunk[]
@@ -405,6 +407,7 @@ export function ConversationMessageContent({
   enableLinkPreview = true,
   isStreaming = false,
   chunks = [],
+  compact = false,
   reasoning,
   reasoningChunks = [],
   agentName,
@@ -981,6 +984,7 @@ export function ConversationMessageContent({
 
   const rawDisplayContent = String(displayContent ?? '')
   const hasCopyableContent = rawDisplayContent.trim().length > 0
+  const contentContainerClassName = compact ? 'w-full rounded-lg px-2 py-0.5 -mx-2 transition-colors hover:bg-muted' : 'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
 
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
@@ -1013,7 +1017,7 @@ export function ConversationMessageContent({
               ref={messageContainerRef}
               className={cn(
                 // Keep internal padding; remove outside row-gap in the list instead.
-                'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
+                contentContainerClassName
               )}
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>

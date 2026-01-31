@@ -37,17 +37,33 @@ router.get('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (r
 
     const conversationService = new ConversationService();
     const agentService = new AgentService();
+    const userService = new UserService();
 
     const items: Array<{
       dm: DirectMessageModel;
       conversation: ConversationModel | null;
       agent: AgentModel | null;
+      peerUser?: { id: string; displayName?: string | null; email?: string | null; avatar?: string | null } | null;
     }> = [];
 
     for (const dm of dms) {
       const conversation = await conversationService.getConversationById(dm.conversationId).catch(() => null);
       const agent = dm.dmType === 'user_agent' && dm.agentId ? await agentService.getAgent(String(dm.agentId)).catch(() => null) : null;
-      items.push({ dm, conversation, agent });
+      let peerUser: { id: string; displayName?: string | null; email?: string | null; avatar?: string | null } | null = null;
+      if (dm.dmType === 'user_user') {
+        const a = dm.userAId ? String(dm.userAId) : '';
+        const b = dm.userBId ? String(dm.userBId) : '';
+        const peerId = a && b ? (a === authUserId ? b : a) : a || b;
+        if (peerId && peerId !== authUserId) {
+          const u = await userService.getUserById(peerId).catch(() => null);
+          if (u) {
+            peerUser = { id: u.id, displayName: u.displayName ?? null, email: u.email ?? null, avatar: u.avatar ?? null };
+          } else {
+            peerUser = { id: peerId, displayName: null, email: null, avatar: null };
+          }
+        }
+      }
+      items.push({ dm, conversation, agent, peerUser });
     }
 
     sendSuccess(res, { directMessages: items }, 200);
@@ -130,7 +146,7 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
 
       const conversationService = new ConversationService();
       const conversation = await conversationService.createConversation({
-        title: body.title || `DM • ${agent.name}`,
+        title: body.title || agent.name,
         status: 'active',
         starshipId: params.starshipId,
         agentId: agent.id,
@@ -205,7 +221,7 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
     const conversationService = new ConversationService();
     const peerLabel = peerUser.displayName || peerUser.email || 'User';
     const conversation = await conversationService.createConversation({
-      title: body.title || `DM • ${peerLabel}`,
+      title: body.title || peerLabel,
       status: 'active',
       starshipId: params.starshipId,
     });

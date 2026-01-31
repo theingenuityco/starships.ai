@@ -137,6 +137,7 @@ export type DirectMessageListItem = {
   dm: DirectMessageModel
   conversation: ConversationModel | null
   agent: AgentModel | null
+  peerUser?: { id: string; displayName?: string | null; email?: string | null; avatar?: string | null } | null
 }
 
 export type PendingToolCallApproval = ToolCallApprovalModel & {

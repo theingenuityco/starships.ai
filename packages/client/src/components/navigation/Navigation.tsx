@@ -117,7 +117,7 @@ export function Navigation(props: NavigationProps) {
       }
       // If we're in a specific conversation, don't carry the conversationId across starships.
       // It may not exist / be accessible in the destination starship.
-      if (p.includes('/conversations/')) {
+      if (p.includes('/conversations/') || p.includes('/channels/')) {
         return `/ship/${nextSlug}`
       }
       const parts = p.split('/')

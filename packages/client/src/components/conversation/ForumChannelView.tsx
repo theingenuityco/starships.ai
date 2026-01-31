@@ -54,6 +54,11 @@ export function ForumChannelView(props: {
     }
     // Fallback: if no handler was provided, navigate to the channel route (no create).
     if (!effectiveStarshipSlug) return
+    const channelSlug = String(props.channelSlug || '').trim()
+    if (channelSlug) {
+      router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/channels/${encodeURIComponent(channelSlug)}?thread=draft`)
+      return
+    }
     router.push(`/ship/${encodeURIComponent(effectiveStarshipSlug)}/conversations/${encodeURIComponent(props.channelConversationId)}?thread=draft`)
   }
 

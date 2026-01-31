@@ -744,50 +744,50 @@ export function ConversationMessageContent({
               <CollapsibleContent className="not-prose">
                 <div>
                   <blockquote className={toolQuoteClass}>
-                  {/* Match Thought quote content sizing + color */}
-                  <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
-                    <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
-                      <code>{toolSlug || 'unknown'}</code>
-                    </pre>
+                    {/* Match Thought quote content sizing + color */}
+                    <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
+                      <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
+                        <code>{toolSlug || 'unknown'}</code>
+                      </pre>
 
-                    {hasArgs && (
-                      <>
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
-                        <pre className="mt-1 whitespace-pre-wrap break-words">
-                          <code>{prettyArgs}</code>
-                        </pre>
-                      </>
-                    )}
+                      {hasArgs && (
+                        <>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
+                          <pre className="mt-1 whitespace-pre-wrap break-words">
+                            <code>{prettyArgs}</code>
+                          </pre>
+                        </>
+                      )}
 
-                    {matchingResult && (
-                      <>
-                        <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
-                        <pre className="mt-1 whitespace-pre-wrap break-words">
-                          <code>
-                            {(() => {
-                              const resultContent = (() => {
-                                const raw = matchingResult.content ?? matchingResult.result ?? ''
-                                if (typeof raw === 'string') return raw
+                      {matchingResult && (
+                        <>
+                          <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
+                          <pre className="mt-1 whitespace-pre-wrap break-words">
+                            <code>
+                              {(() => {
+                                const resultContent = (() => {
+                                  const raw = matchingResult.content ?? matchingResult.result ?? ''
+                                  if (typeof raw === 'string') return raw
+                                  try {
+                                    return JSON.stringify(raw, null, 2)
+                                  } catch {
+                                    return String(raw)
+                                  }
+                                })()
                                 try {
-                                  return JSON.stringify(raw, null, 2)
-                                } catch {
-                                  return String(raw)
-                                }
-                              })()
-                              try {
-                                const t = (resultContent || '').trim()
-                                if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                  return JSON.stringify(JSON.parse(t), null, 2)
-                                }
-                              } catch {}
-                              return resultContent
-                            })()}
-                          </code>
-                        </pre>
-                      </>
-                    )}
-                  </div>
+                                  const t = (resultContent || '').trim()
+                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                    return JSON.stringify(JSON.parse(t), null, 2)
+                                  }
+                                } catch {}
+                                return resultContent
+                              })()}
+                            </code>
+                          </pre>
+                        </>
+                      )}
+                    </div>
                   </blockquote>
                 </div>
               </CollapsibleContent>
@@ -1008,11 +1008,7 @@ export function ConversationMessageContent({
                 'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
               )}
             >
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined}
-                components={markdownComponents}
-              >
+              <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>
                 {rawDisplayContent}
               </ReactMarkdown>
             </div>
@@ -1059,11 +1055,7 @@ export function ConversationMessageContent({
                   <div className="pb-2">
                     <blockquote className="border-l-4 border-violet-500/30 dark:border-violet-400/30 px-4 pt-2 pb-3 bg-violet-500/5 dark:bg-violet-400/5 rounded-r-lg my-1">
                       <div className="prose dark:prose-invert max-w-none text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                        <ReactMarkdown
-                          remarkPlugins={[remarkGfm]}
-                          rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined}
-                          components={markdownComponents}
-                        >
+                        <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>
                           {String(displayReasoning ?? '')}
                         </ReactMarkdown>
                       </div>
@@ -1075,7 +1067,7 @@ export function ConversationMessageContent({
           </>
         )}
 
-      {/*
+        {/*
         Attachments created by USER uploads (message attachments) should stay near the top of the message.
         Attachments produced by TOOL RESULTS should render *below* the tool panel (see below), so they feel
         visually associated with the tool call that produced them.

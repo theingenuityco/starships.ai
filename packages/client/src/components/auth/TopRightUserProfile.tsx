@@ -55,12 +55,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
   const activeStarshipSlug = starshipFromList?.slug ?? pathStarshipSlug ?? null
   const activeStarshipName = starshipFromList?.name ?? starshipBySlug?.name ?? null
 
-  const canManageBilling = Boolean(
-    isAuthenticated &&
-      user?.id &&
-      activeStarshipId &&
-      (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id)
-  )
+  const canManageBilling = Boolean(isAuthenticated && user?.id && activeStarshipId && (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id))
 
   const { data: wallet, isLoading: walletLoading } = useWallet(activeStarshipId || '', Boolean(activeStarshipId && canManageBilling))
 
@@ -146,16 +141,7 @@ export function TopRightUserProfile(): React.JSX.Element | null {
           >
             <Icon name="coins" className="w-4 h-4" />
             <span className="min-w-0">
-              <BalanceStatusIndicator
-                valueClassName="text-xs"
-                wallet={wallet}
-                isLoading={walletLoading}
-                variant="minimal"
-                showDot={false}
-                showUnit={false}
-                inheritTextColor
-                className="min-w-0"
-              />
+              <BalanceStatusIndicator valueClassName="text-xs" wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={false} inheritTextColor className="min-w-0" />
             </span>
           </Button>
         ) : null}

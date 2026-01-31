@@ -62,10 +62,7 @@ export function rehypeHighlightText(options: { highlightTerm?: string }) {
   }
 }
 
-function visit(
-  node: HastRoot | HastElement | HastText | null | undefined,
-  fn: (node: HastNode, index: number, parent: { children: HastNode[] }) => void
-): void {
+function visit(node: HastRoot | HastElement | HastText | null | undefined, fn: (node: HastNode, index: number, parent: { children: HastNode[] }) => void): void {
   if (!node || typeof node !== 'object' || !('type' in node)) return
   if (node.type === 'text') return
   const children = (node as HastRoot | HastElement).children

@@ -6,9 +6,9 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState, Fragment, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -16,12 +16,178 @@ import { useAuth } from '@/hooks/useAuth'
 import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { isImageUrl } from '@/lib/isImageUrl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
+import api from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
+
+function LinkedConversationCard({
+  linkedConversationId,
+  linkedConversationHref,
+  enableChannelMessageThreads,
+  onThreadAction,
+  message,
+  starshipId,
+}: {
+  linkedConversationId: string | null
+  linkedConversationHref: string | null
+  enableChannelMessageThreads: boolean
+  onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
+  message: MessageModel
+  starshipId?: string
+}) {
+  const { data: conversation } = useConversationDetail(linkedConversationId)
+  const { data: agents = [] } = useConversationAgents(linkedConversationId)
+  const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
+
+  const rawTitle = String((conversation as any)?.title ?? '').trim()
+  const title = rawTitle || (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
+
+  const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
+
+  const avatarAttachmentIds = useMemo(() => {
+    const ids = agentList.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
+    return Array.from(new Set(ids))
+  }, [agentList])
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const avatarUrlById = useMemo(() => new Map((avatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  // Include human participants by sampling recent message authors.
+  // The conversation detail endpoint does not currently include members/users.
+  const { data: participantsPreview } = useQuery({
+    queryKey: ['conversations', 'participants-preview', linkedConversationId],
+    enabled: Boolean(linkedConversationId),
+    queryFn: async () => {
+      if (!linkedConversationId) return null
+      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 50 } })
+      return (resp as any)?.data?.data ?? null
+    },
+    staleTime: 60_000,
+  })
+
+  type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
+
+  const participantItems = useMemo<ParticipantItem[]>(() => {
+    const items: ParticipantItem[] = []
+    const seen = new Set<string>()
+
+    // Humans: derive from recent messages' user identity fields.
+    const msgs = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
+    for (const m of msgs) {
+      const role = String(m?.role ?? '')
+      if (role !== 'user') continue
+      const userId = typeof m?.userId === 'string' ? String(m.userId).trim() : ''
+      const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
+      const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
+
+      const label = userName || (userId ? `User ${userId.slice(0, 6)}` : 'User')
+      const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      items.push({ kind: 'human', key, label, ...(userAvatar ? { avatarUrl: userAvatar } : null) })
+    }
+
+    // Agents: from the agents list.
+    for (let idx = 0; idx < agentList.length; idx++) {
+      const a = agentList[idx]
+      const id = typeof a?.id === 'string' ? String(a.id).trim() : ''
+      const label = String(a?.name || a?.slug || id || `Agent ${idx + 1}`).trim() || `Agent ${idx + 1}`
+      const key = `agent:${id || label}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const seed = String(a?.name || a?.slug || id || `agent-${idx}`).trim() || `agent-${idx}`
+      const aid = typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : ''
+      items.push({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) })
+    }
+
+    return items
+  }, [agentList, participantsPreview])
+
+  const participantsLabel = useMemo(() => {
+    const labels = participantItems.map(p => p.label).filter(Boolean)
+    if (labels.length === 0) return 'No participants'
+    if (labels.length <= 3) return labels.join(', ')
+    return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
+  }, [participantItems])
+
+  // IMPORTANT: Don't early-return before hooks, or we can change hook ordering
+  // between renders when `linkedConversationId` flips from null -> string.
+  if (!linkedConversationId) return null
+
+  const cardInner = (
+    <div className="w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <Icon name="thread" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <p className="text-sm font-medium text-foreground truncate">{title}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Participants (overlapping avatars) */}
+          {participantItems.length > 0 && (
+            <div className="flex items-center -space-x-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
+              {participantItems.slice(0, 4).map(p => {
+                if (p.kind === 'agent') {
+                  const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                  return (
+                    <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
+                    </div>
+                  )
+                }
+                return (
+                  <Avatar key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                    <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                  </Avatar>
+                )
+              })}
+              {participantItems.length > 4 && (
+                <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted text-xs font-semibold text-muted-foreground flex items-center justify-center">+{participantItems.length - 4}</div>
+              )}
+            </div>
+          )}
+          <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+        </div>
+      </div>
+    </div>
+  )
+
+  // In channel mode, open the thread pane (no navigation).
+  if (enableChannelMessageThreads) {
+    return (
+      <div className="mt-2 mb-2 w-full -mx-2">
+        <button
+          type="button"
+          className="group text-left w-full"
+          onClick={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            onThreadAction?.({ messageId: message.id, linkedConversationId, messageText: message.content, linkedMessage: message })
+          }}
+        >
+          {cardInner}
+        </button>
+      </div>
+    )
+  }
+
+  // Non-channel mode: link to the child conversation route.
+  if (!linkedConversationHref) return null
+  return (
+    <div className="mt-2 mb-2 w-full -mx-2">
+      <Link href={linkedConversationHref} className="block group w-full">
+        {cardInner}
+      </Link>
+    </div>
+  )
+}
 
 interface ConversationMessageListProps {
   conversationId: string | null
@@ -29,6 +195,24 @@ interface ConversationMessageListProps {
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
+  /**
+   * Controls the maximum width of the inner message column.
+   * - 'constrained' (default): center a readable column (max-w-4xl)
+   * - 'full': allow messages to expand to the full available width
+   */
+  contentWidth?: 'constrained' | 'full'
+  /** When true, show a per-message action to start/open a thread (child conversation). */
+  enableChannelMessageThreads?: boolean
+  /**
+   * When provided, thread navigation will open inside the current page (e.g. right-side pane)
+   * instead of changing the route.
+   */
+  onOpenThread?: (args: { conversationId: string | null; linkedMessage?: MessageModel | null; parentConversationId?: string | null }) => void
+  /**
+   * Optional pinned message rendered as the first message in the list (e.g. "linked message" when opening a thread from a channel).
+   * If its id matches an existing message in the list, the existing one is deduped.
+   */
+  pinnedFirstMessage?: MessageModel | null
   /**
    * Optional override for the "user" identity (useful for demo / internal chats on landing).
    * If omitted, the component uses the signed-in user's info via `useAuth()`.
@@ -85,6 +269,10 @@ export function ConversationMessageList({
   bottomPaddingPx,
   className,
   scrollClassName,
+  contentWidth = 'constrained',
+  enableChannelMessageThreads = false,
+  onOpenThread,
+  pinnedFirstMessage,
   userNameOverride,
   userEmailOverride,
   userAvatarUrlOverride,
@@ -118,6 +306,8 @@ export function ConversationMessageList({
   const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
+  const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
+  const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
   // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
@@ -131,6 +321,26 @@ export function ConversationMessageList({
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
   const agentAvatarUrl = agentAvatarUrlOverride ?? agentAvatarAttachments?.[0]?.previewUrl
+
+  const handleThreadAction = useCallback(
+    async (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => {
+      const sid = typeof starshipId === 'string' ? starshipId : ''
+      const parentConversationId = typeof conversationId === 'string' ? conversationId : ''
+      if (!enableChannelMessageThreads) return
+      if (!sid || !parentConversationId) return
+
+      const existing = typeof args.linkedConversationId === 'string' ? args.linkedConversationId.trim() : ''
+      if (existing) {
+        onOpenThread?.({ conversationId: existing, linkedMessage: args.linkedMessage ?? null, parentConversationId })
+        return
+      }
+
+      // Draft thread: open the pane without persisting anything yet.
+      // We only create/link the child conversation when the user sends the first message in the thread.
+      onOpenThread?.({ conversationId: null, linkedMessage: args.linkedMessage ?? null, parentConversationId })
+    },
+    [conversationId, enableChannelMessageThreads, onOpenThread, starshipId]
+  )
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -151,6 +361,18 @@ export function ConversationMessageList({
 
   // Create display messages with optimized rendering and group tool calls with their results
   const displayMessages = useMemo(() => {
+    const isHiddenThreadContextSeed = (m: any): boolean => {
+      if (!m) return false
+      // Hide only our special "seed" system messages; keep other system messages visible.
+      const role = String(m?.role ?? '')
+      if (role !== 'system') return false
+      const mt = String(m?.messageType ?? '')
+      const content = String(m?.content ?? '')
+      const meta = m?.metadata
+      const flagged = Boolean(meta && typeof meta === 'object' && (meta as any).thread_context_seed === true)
+      return (mt === 'system_instruction' && flagged) || content.startsWith('[THREAD_CONTEXT_SEED]')
+    }
+
     // Sort ascending by createdAt, with a special rule for the active stream placeholder.
     //
     // Why:
@@ -172,41 +394,138 @@ export function ConversationMessageList({
       if (streaming && id.startsWith('stream-')) return Number.MAX_SAFE_INTEGER
       return base
     }
-    const sortedMessages = [...messages].sort((a, b) => {
-      const ka = sortKey(a as any)
-      const kb = sortKey(b as any)
-      if (ka !== kb) return ka - kb
-      // Tie-breaker: createdAt then id for deterministic order
-      const ta = toTime((a as any)?.createdAt)
-      const tb = toTime((b as any)?.createdAt)
-      if (ta !== tb) return ta - tb
-      return String((a as any)?.id ?? '').localeCompare(String((b as any)?.id ?? ''))
-    })
+    const sortedMessages = [...messages]
+      .filter(m => !isHiddenThreadContextSeed(m as any))
+      .sort((a, b) => {
+        const ka = sortKey(a as any)
+        const kb = sortKey(b as any)
+        if (ka !== kb) return ka - kb
+        // Tie-breaker: createdAt then id for deterministic order
+        const ta = toTime((a as any)?.createdAt)
+        const tb = toTime((b as any)?.createdAt)
+        if (ta !== tb) return ta - tb
+        return String((a as any)?.id ?? '').localeCompare(String((b as any)?.id ?? ''))
+      })
 
-    // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps
-    // IMPORTANT: For assistant messages with tool calls, deduplicate by (id + toolCallIds) to preserve
-    // multiple assistant messages with the same id but different tool calls
-    const seenIds = new Set<string>()
-    const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
-    for (const m of sortedMessages) {
-      const key = m.id != null ? String(m.id) : null
-      if (key) {
-        // For assistant messages with tool calls, create a composite key to preserve messages with different tool calls
-        if (m.role === 'assistant' && Array.isArray(m.toolCalls) && m.toolCalls.length > 0) {
-          const toolCallIds = m.toolCalls
-            .map((tc: any) => tc.id ?? tc.call_id ?? tc.toolCallId)
-            .filter(Boolean)
-            .join(',')
-          const compositeKey = `${key}:${toolCallIds}`
-          if (seenIds.has(compositeKey)) continue
-          seenIds.add(compositeKey)
-        } else {
-          if (seenIds.has(key)) continue
-          seenIds.add(key)
+    // Deduplicate by message id to avoid duplicates during baseline replays or optimistic/SSE overlaps.
+    //
+    // IMPORTANT:
+    // We intentionally dedupe by message id ONLY (not id+toolCallIds). Treating toolCallIds as part
+    // of the identity can accidentally render multiple copies of the *same* assistant message while
+    // its toolCalls are being incrementally updated (e.g. ids/arguments arriving later), which looks
+    // like a "pending tool call" repeating forever.
+    const mergeToolCalls = (a?: LlmToolCall[], b?: LlmToolCall[]): LlmToolCall[] | undefined => {
+      const aa = Array.isArray(a) ? a : []
+      const bb = Array.isArray(b) ? b : []
+      if (aa.length === 0 && bb.length === 0) return undefined
+      const map = new Map<string, LlmToolCall>()
+      const keyOf = (tc: any, idx: number): string => {
+        const id = tc?.id ?? tc?.call_id ?? tc?.toolCallId
+        if (id != null && String(id).trim().length > 0) return `id:${String(id)}`
+        const name = tc?.function?.name
+        if (typeof name === 'string' && name.trim().length > 0) return `name:${name.trim()}`
+        return `idx:${idx}`
+      }
+      // Prefer the later update (b) when keys overlap.
+      aa.forEach((tc, idx) => map.set(keyOf(tc as any, idx), tc))
+      bb.forEach((tc, idx) => map.set(keyOf(tc as any, idx), tc))
+      return Array.from(map.values())
+    }
+
+    const mergeToolResults = (a?: any[], b?: any[]): any[] | undefined => {
+      const aa = Array.isArray(a) ? a : []
+      const bb = Array.isArray(b) ? b : []
+      if (aa.length === 0 && bb.length === 0) return undefined
+      const map = new Map<string, any>()
+      const keyOf = (tr: any, idx: number): string => {
+        const id = tr?.id ?? tr?.toolCallId ?? tr?.call_id
+        if (id != null && String(id).trim().length > 0) return `id:${String(id)}`
+        return `idx:${idx}`
+      }
+      aa.forEach((tr, idx) => map.set(keyOf(tr, idx), tr))
+      bb.forEach((tr, idx) => map.set(keyOf(tr, idx), tr))
+      return Array.from(map.values())
+    }
+
+    const mergeUiActions = (a?: any[], b?: any[]): any[] | undefined => {
+      const aa = Array.isArray(a) ? a : []
+      const bb = Array.isArray(b) ? b : []
+      if (aa.length === 0 && bb.length === 0) return undefined
+      const map = new Map<string, any>()
+      const keyOf = (ua: any, idx: number): string => {
+        const action = typeof ua?.action === 'string' ? ua.action : ''
+        const widgetId = ua?.payload?.widget?.id ?? ua?.payload?.toolCallId ?? ''
+        if (action && widgetId) return `${action}:${String(widgetId)}`
+        // Fallback: stringify a small stable prefix
+        try {
+          return `${action}:${JSON.stringify(ua).slice(0, 128)}`
+        } catch {
+          return `idx:${idx}`
         }
       }
-      uniqueMessages.push(m)
+      aa.forEach((ua, idx) => map.set(keyOf(ua, idx), ua))
+      bb.forEach((ua, idx) => map.set(keyOf(ua, idx), ua))
+      return Array.from(map.values())
     }
+
+    const mergeMessage = (prev: ExtendedMessage, next: ExtendedMessage): ExtendedMessage => {
+      const mergedToolCalls = mergeToolCalls(prev.toolCalls, next.toolCalls)
+      const mergedToolResults = mergeToolResults((prev as any).toolResults, (next as any).toolResults)
+      const mergedUiActions = mergeUiActions((prev as any).uiActions, (next as any).uiActions)
+
+      const pickLonger = <T,>(pa?: T[], pb?: T[]): T[] | undefined => {
+        const aLen = Array.isArray(pa) ? pa.length : 0
+        const bLen = Array.isArray(pb) ? pb.length : 0
+        if (aLen === 0 && bLen === 0) return undefined
+        return bLen >= aLen ? (pb as T[]) : (pa as T[])
+      }
+
+      const merged: ExtendedMessage = {
+        ...prev,
+        ...next,
+        // Preserve "true" streaming/sending flags if either version had them.
+        streaming: Boolean((prev as any).streaming || (next as any).streaming),
+        sending: Boolean((prev as any).sending || (next as any).sending),
+        toolCalls: mergedToolCalls,
+        ...(mergedToolResults ? { toolResults: mergedToolResults } : null),
+        ...(mergedUiActions ? { uiActions: mergedUiActions } : null),
+        chunks: pickLonger((prev as any).chunks, (next as any).chunks),
+        reasoningChunks: pickLonger((prev as any).reasoningChunks, (next as any).reasoningChunks),
+      }
+
+      // Prefer non-empty content/reasoning if the newer version is empty.
+      try {
+        const prevContent = typeof prev.content === 'string' ? prev.content : ''
+        const nextContent = typeof next.content === 'string' ? next.content : ''
+        if (prevContent.trim().length > 0 && nextContent.trim().length === 0) merged.content = prevContent
+      } catch {}
+      try {
+        const prevReason = typeof (prev as any).reasoning === 'string' ? String((prev as any).reasoning) : ''
+        const nextReason = typeof (next as any).reasoning === 'string' ? String((next as any).reasoning) : ''
+        if (prevReason.trim().length > 0 && nextReason.trim().length === 0) (merged as any).reasoning = prevReason
+      } catch {}
+
+      return merged
+    }
+
+    const uniqueById = new Map<string, ExtendedMessage>()
+    for (const m of sortedMessages) {
+      const id = m?.id != null ? String(m.id) : ''
+      // Messages should always have an id, but be defensive.
+      const key = id && id.trim().length > 0 ? id : `__noid__:${uniqueById.size}`
+      const prev = uniqueById.get(key)
+      const next = m as ExtendedMessage
+      if (!prev) {
+        uniqueById.set(key, next)
+        continue
+      }
+      // Merge and re-insert to ensure we keep the most up-to-date copy.
+      const merged = mergeMessage(prev, next)
+      uniqueById.delete(key)
+      uniqueById.set(key, merged)
+    }
+
+    const uniqueMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = Array.from(uniqueById.values())
 
     // Collapse temp user + assistant shells followed by concrete messages from server (UI-level safety if merging missed)
     const collapsedMessages: Array<MessageModel & { streaming?: boolean; chunks?: StreamChunk[]; sending?: boolean }> = []
@@ -483,8 +802,13 @@ export function ConversationMessageList({
       return hasContent || hasChunks || hasRChunks || hasReasoning || hasToolCalls || hasToolResults || hasAttachments || hasUIActions
     }
     const filtered = displayMessages.filter(canRenderAssistant)
-    return filtered
-  }, [displayMessages])
+    const pinned = pinnedFirstMessage as ExtendedMessage | null | undefined
+    if (!pinned) return filtered
+    const pinnedId = typeof (pinned as any)?.id === 'string' ? String((pinned as any).id).trim() : ''
+    if (!pinnedId) return filtered
+    const withoutPinned = filtered.filter(m => m.id !== pinnedId)
+    return [pinned, ...withoutPinned]
+  }, [displayMessages, pinnedFirstMessage])
 
   // Active streaming ID among rendered messages (avoids selecting a filtered-out shell)
   const activeRenderedStreamingAssistantId = useMemo(() => {
@@ -663,12 +987,13 @@ export function ConversationMessageList({
   // Message IDs that contain at least one match (so we can highlight the whole message bubble)
   const messageIdsWithMatch = useMemo(() => new Set(matchingPositions.map(p => p.messageId)), [matchingPositions])
 
-  if (!conversationId && !messagesOverride) {
+  if (!conversationId && !messagesOverride && !pinnedFirstMessage) {
     return <EmptyState />
   }
 
   const hasSearchMatches = matchingPositions.length > 0
-  const showSearchBar = sizeVariant === 'default' && renderMessages.length > 0
+  // Search input UI intentionally disabled for now.
+  const showSearchBar = false
   const currentMatchMessageId = hasSearchMatches ? matchingPositions[currentMatchIndex]?.messageId : null
 
   return (
@@ -760,10 +1085,43 @@ export function ConversationMessageList({
           isNearBottomRef.current = container.scrollTop + container.clientHeight >= container.scrollHeight - SCROLL_THRESHOLD_PX
         }}
       >
-        <div className="w-full max-w-4xl mx-auto bg-transparent">
+        <div className={cn('w-full bg-transparent', contentWidth === 'constrained' ? 'max-w-4xl mx-auto' : 'max-w-none')}>
+          {canLoadOlder && (
+            <div className="flex justify-center pb-4">
+              <button
+                type="button"
+                className={cn('text-xs px-3 py-1.5 rounded-md border bg-background hover:bg-muted transition-colors', isLoadingOlder ? 'opacity-60 pointer-events-none' : '')}
+                onClick={() => (stream as any)?.loadOlder?.({ limit: 100 })}
+              >
+                {isLoadingOlder ? 'Loading…' : 'Load older messages'}
+              </button>
+            </div>
+          )}
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+            const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
+            const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
+            const userKey = (m: any): string | null => {
+              if (!m || String(m?.role ?? '') !== 'user') return null
+              const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
+              if (uid) return `id:${uid}`
+              const un = typeof m?.userName === 'string' ? m.userName.trim() : ''
+              if (un) return `name:${un}`
+              const ua = typeof m?.userAvatar === 'string' ? m.userAvatar.trim() : ''
+              if (ua) return `avatar:${ua}`
+              // Backward-compat: treat unknown human author as the same person.
+              return 'unknown'
+            }
+            const prevUserKey = prev ? userKey(prev) : null
+            const currUserKey = userKey(message)
+            const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
+            const startsNewGroup = (() => {
+              if (!prev) return false
+              if (message.role === 'assistant') return Boolean(showAssistantAvatar)
+              if (message.role === 'user') return !isConsecutiveUser
+              return prev.role !== message.role
+            })()
             const isFirstMessage = idx === 0
             const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
             const isCurrentMatch = message.id === currentMatchMessageId
@@ -789,8 +1147,13 @@ export function ConversationMessageList({
                     agentAvatarUrl={agentAvatarUrl}
                     isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                     starshipId={starshipId}
+                    enableChannelMessageThreads={enableChannelMessageThreads}
+                    onThreadAction={handleThreadAction}
                     showAssistantAvatar={showAssistantAvatar}
+                    isConsecutiveUser={isConsecutiveUser}
+                    startsNewGroup={startsNewGroup}
                     isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
+                    suppressLinkedConversationCard={suppressLinkedConversationCard}
                     userNameOverride={userNameOverride}
                     userEmailOverride={userEmailOverride}
                     userAvatarUrlOverride={userAvatarUrlOverride}
@@ -806,7 +1169,7 @@ export function ConversationMessageList({
                     if (widgets.length === 0) return null
                     return (
                       <div className="flex justify-start">
-                        <div className="flex items-start gap-3 w-full max-w-full pr-[52px]">
+                        <div className="flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)]">
                           {/* Spacer to match avatar width */}
                           <div className="flex-shrink-0 w-10 h-10" aria-hidden="true" />
                           <div className="flex-1 w-full">
@@ -861,7 +1224,7 @@ export function ConversationMessageList({
                   </div>
                 </div>
               ) : (
-                <div className="group flex items-start gap-3 w-full max-w-full pr-[52px] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
+                <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                   <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
                     <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
                   </div>
@@ -923,12 +1286,20 @@ interface ConversationMessageBubbleProps {
   agentAvatarUrl?: string
   isStreamingActive?: boolean
   starshipId?: string
+  enableChannelMessageThreads?: boolean
+  onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
   showAssistantAvatar?: boolean
+  /** True when the previous rendered message row was also a user message. */
+  isConsecutiveUser?: boolean
+  /** True when this row begins a new visual author/role group (so it should get the standard top gap). */
+  startsNewGroup?: boolean
   /**
    * If true, apply the same top spacing a first user message gets (mt-6)
    * so assistant-first conversations don't look "pinned" to the top.
    */
   isFirstMessage?: boolean
+  /** When true, do not show the linked-thread preview card under this message row. */
+  suppressLinkedConversationCard?: boolean
   userNameOverride?: string
   userEmailOverride?: string
   userAvatarUrlOverride?: string
@@ -963,12 +1334,6 @@ function renderTextWithHighlight(text: string, term: string | undefined): ReactN
       )}
     </>
   )
-}
-
-function isImageUrl(value?: string | null): boolean {
-  if (!value || typeof value !== 'string') return false
-  const trimmed = value.trim()
-  return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
 }
 
 function initialsFromName(name?: string | null): string {
@@ -1063,8 +1428,13 @@ const MemoizedMessageBubble = memo(
     agentAvatarUrl,
     isStreamingActive,
     starshipId,
+    enableChannelMessageThreads = false,
+    onThreadAction,
     showAssistantAvatar = true,
+    isConsecutiveUser = false,
+    startsNewGroup = false,
     isFirstMessage = false,
+    suppressLinkedConversationCard = false,
     userNameOverride,
     userEmailOverride,
     userAvatarUrlOverride,
@@ -1079,15 +1449,58 @@ const MemoizedMessageBubble = memo(
     const isDelegation = sizeVariant === 'delegation'
     const avatarSize = isHero ? 40 : isDelegation ? 24 : 32
     const avatarClass = isHero ? 'w-10 h-10' : isDelegation ? 'w-6 h-6' : 'w-8 h-8'
+    const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
     const isUser = message.role === 'user'
     const { userName, userEmail, userAvatar } = useAuth()
-    const effectiveUserName = userNameOverride ?? userName
+    const messageUserName = typeof (message as any)?.userName === 'string' && String((message as any).userName).trim().length > 0 ? String((message as any).userName).trim() : undefined
+    const messageUserAvatar = typeof (message as any)?.userAvatar === 'string' && String((message as any).userAvatar).trim().length > 0 ? String((message as any).userAvatar).trim() : undefined
+
+    const effectiveUserName = userNameOverride ?? messageUserName ?? userName
     const effectiveUserEmail = userEmailOverride ?? userEmail
-    const effectiveUserAvatar = userAvatarUrlOverride ?? userAvatar
+    const effectiveUserAvatar = userAvatarUrlOverride ?? messageUserAvatar ?? userAvatar
     const fallbackVariant = userAvatarFallbackVariantOverride ?? 'initials'
 
+    // Generic: allow any message to link to another conversation (thread preview/index post)
+    const linkedConversationId = useMemo(() => {
+      const anyMsg = message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const raw = anyMsg?.linkedConversationId ?? anyMsg?.linked_conversation_id
+      return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : null
+    }, [message])
+
+    const linkedConversationHref = useMemo(() => {
+      if (!linkedConversationId) return null
+      if (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0) {
+        return `/ship/${encodeURIComponent(starshipSlug)}/conversations/${encodeURIComponent(linkedConversationId)}`
+      }
+      return null
+    }, [linkedConversationId, starshipSlug])
+
+    const threadActionButton = useMemo(() => {
+      if (!enableChannelMessageThreads) return null
+      // Only show on real messages (skip tool_result rows; they are not rendered here anyway)
+      const label = linkedConversationId ? 'Open thread' : 'Start thread'
+      return (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          onClick={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            onThreadAction?.({ messageId: message.id, linkedConversationId, messageText: message.content, linkedMessage: message })
+          }}
+          aria-label={label}
+          title={label}
+        >
+          <Icon name="thread" className="h-4 w-4" />
+        </Button>
+      )
+    }, [enableChannelMessageThreads, linkedConversationId, message.content, message.id, onThreadAction])
+
     if (isUser) {
+      const isConsecutiveSameUser = Boolean(isConsecutiveUser)
       // When the "user" is being overridden to represent an agent (e.g. Aria in landing demos),
       // prefer an explicitly-provided avatar URL (if any). Otherwise fall back to the seeded agent avatar.
       // Never fall back to the signed-in user's avatar when a seed override is present.
@@ -1097,7 +1510,9 @@ const MemoizedMessageBubble = memo(
 
       if (isHero || isDelegation) {
         // User message: Neutral bubble on the right (landing demos)
-        const userRowClass = isDelegation ? 'mb-4 mt-3 gap-2' : 'mb-4 mt-6 gap-3 mr-6'
+        // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
+        // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
+        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3 mr-6', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
         const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
         return (
@@ -1114,35 +1529,50 @@ const MemoizedMessageBubble = memo(
                     </div>
                   )}
                 </div>
+                {!suppressLinkedConversationCard && (
+                  <LinkedConversationCard
+                    linkedConversationId={linkedConversationId}
+                    linkedConversationHref={linkedConversationHref}
+                    enableChannelMessageThreads={enableChannelMessageThreads}
+                    onThreadAction={onThreadAction}
+                    message={message}
+                    starshipId={starshipId}
+                  />
+                )}
               </div>
-              <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
-                {shouldUseExplicitUserAvatar ? (
-                  <AvatarImage
-                    src={explicitUserAvatarUrl!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : userAvatarSeedOverride ? (
-                  <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
-                ) : shouldUseAuthedUserAvatar ? (
-                  <AvatarImage
-                    src={effectiveUserAvatar!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : null}
-                <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                  {fallbackVariant === 'user-icon' ? (
-                    <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
-                  ) : (
-                    initialsFromName(effectiveUserName || effectiveUserEmail)
-                  )}
-                </AvatarFallback>
-              </Avatar>
+              {isConsecutiveSameUser ? (
+                // Only reserve width, not height (prevents "blank gap" under short consecutive messages)
+                <div className={cn('flex-shrink-0 mt-1', avatarWidthClass)} aria-hidden="true" />
+              ) : (
+                <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
+                  {shouldUseExplicitUserAvatar ? (
+                    <AvatarImage
+                      src={explicitUserAvatarUrl!}
+                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      className="rounded-full object-cover"
+                    />
+                  ) : userAvatarSeedOverride ? (
+                    <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
+                  ) : shouldUseAuthedUserAvatar ? (
+                    <AvatarImage
+                      src={effectiveUserAvatar!}
+                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      className="rounded-full object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {fallbackVariant === 'user-icon' ? (
+                      <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
+                    ) : (
+                      initialsFromName(effectiveUserName || effectiveUserEmail)
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+              )}
             </div>
           </div>
         )
@@ -1154,48 +1584,66 @@ const MemoizedMessageBubble = memo(
 
       return (
         <div className="flex justify-start w-full">
-          <div className="group mb-2 mt-4 flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] py-2 -mx-2">
-            <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
-              {shouldUseExplicitUserAvatar ? (
-                <AvatarImage
-                  src={explicitUserAvatarUrl!}
-                  alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  className="rounded-full object-cover"
-                />
-              ) : userAvatarSeedOverride ? (
-                <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-              ) : shouldUseAuthedUserAvatar ? (
-                <AvatarImage
-                  src={effectiveUserAvatar!}
-                  alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                  referrerPolicy="no-referrer"
-                  crossOrigin="anonymous"
-                  className="rounded-full object-cover"
-                />
-              ) : null}
-              <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                {fallbackVariant === 'user-icon' ? (
-                  <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
-                ) : (
-                  initialsFromName(effectiveUserName || effectiveUserEmail)
-                )}
-              </AvatarFallback>
-            </Avatar>
+          <div
+            className={cn(
+              // Match assistant row layout: no outer vertical padding/margins (ConversationMessageContent controls spacing)
+              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'py-0',
+              // Keep a little top spacing when a user message starts a conversation chunk
+              // (No negative margins; we handle tight stacking by not reserving avatar height below.)
+              isConsecutiveSameUser ? 'mt-0' : 'mt-4'
+            )}
+          >
+            {isConsecutiveSameUser ? (
+              // Only reserve width, not height (prevents "inflated" spacing between short consecutive user messages)
+              <div className="flex-shrink-0 w-10 mt-1" aria-hidden="true" />
+            ) : (
+              <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
+                {shouldUseExplicitUserAvatar ? (
+                  <AvatarImage
+                    src={explicitUserAvatarUrl!}
+                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="rounded-full object-cover"
+                  />
+                ) : userAvatarSeedOverride ? (
+                  <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                ) : shouldUseAuthedUserAvatar ? (
+                  <AvatarImage
+                    src={effectiveUserAvatar!}
+                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                    referrerPolicy="no-referrer"
+                    crossOrigin="anonymous"
+                    className="rounded-full object-cover"
+                  />
+                ) : null}
+                <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                  {fallbackVariant === 'user-icon' ? (
+                    <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
+                  ) : (
+                    initialsFromName(effectiveUserName || effectiveUserEmail)
+                  )}
+                </AvatarFallback>
+              </Avatar>
+            )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
-              <div className="mb-0 text-sm font-bold font-mono text-foreground">
-                <Link href={userProfileHref} className="hover:underline underline-offset-2">
-                  {userDisplayName}
-                </Link>
-              </div>
+              {!isConsecutiveSameUser && (
+                <div className="mb-0 text-sm font-bold font-mono text-foreground">
+                  <Link href={userProfileHref} className="hover:underline underline-offset-2">
+                    {userDisplayName}
+                  </Link>
+                </div>
+              )}
               <ConversationMessageContent
                 content={message.content}
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={true}
+                extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={false}
+                compact={isConsecutiveSameUser}
                 className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -1210,6 +1658,16 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
+              {!suppressLinkedConversationCard && (
+                <LinkedConversationCard
+                  linkedConversationId={linkedConversationId}
+                  linkedConversationHref={linkedConversationHref}
+                  enableChannelMessageThreads={enableChannelMessageThreads}
+                  onThreadAction={onThreadAction}
+                  message={message}
+                  starshipId={starshipId}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1225,7 +1683,7 @@ const MemoizedMessageBubble = memo(
       if (isHero || isDelegation) {
         const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
         return (
-          <div className="flex justify-start">
+          <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
             <div className={cn('flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
                 <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
@@ -1240,6 +1698,7 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isStreamingActive}
+                  extraActions={null}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   className="text-foreground"
@@ -1257,6 +1716,16 @@ const MemoizedMessageBubble = memo(
                   isLastMessage={isLastMessage}
                   highlightTerm={highlightTerm}
                 />
+                {!suppressLinkedConversationCard && (
+                  <LinkedConversationCard
+                    linkedConversationId={linkedConversationId}
+                    linkedConversationHref={linkedConversationHref}
+                    enableChannelMessageThreads={enableChannelMessageThreads}
+                    onThreadAction={onThreadAction}
+                    message={message}
+                    starshipId={starshipId}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -1264,10 +1733,10 @@ const MemoizedMessageBubble = memo(
       }
 
       return (
-        <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : '')}>
+        <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : startsNewGroup ? 'mt-4' : '')}>
           <div
             className={cn(
-              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[52px] -mx-2',
+              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
               // Remove the outside vertical gap between consecutive message rows.
               'py-0',
               !showAssistantAvatar && '-mt-1'
@@ -1297,6 +1766,7 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive}
+                extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 className="text-foreground/80"
@@ -1313,6 +1783,16 @@ const MemoizedMessageBubble = memo(
                 isLastMessage={isLastMessage}
                 highlightTerm={highlightTerm}
               />
+              {!suppressLinkedConversationCard && (
+                <LinkedConversationCard
+                  linkedConversationId={linkedConversationId}
+                  linkedConversationHref={linkedConversationHref}
+                  enableChannelMessageThreads={enableChannelMessageThreads}
+                  onThreadAction={onThreadAction}
+                  message={message}
+                  starshipId={starshipId}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1325,8 +1805,18 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    {
+      const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const nextAny = nextProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
+      const prevLink = prevAny?.linkedConversationId ?? prevAny?.linked_conversation_id
+      const nextLink = nextAny?.linkedConversationId ?? nextAny?.linked_conversation_id
+      if (String(prevLink ?? '') !== String(nextLink ?? '')) return false
+    }
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
+    if (Boolean(prevProps.isConsecutiveUser) !== Boolean(nextProps.isConsecutiveUser)) return false
+    if (Boolean(prevProps.startsNewGroup) !== Boolean(nextProps.startsNewGroup)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
+    if (Boolean(prevProps.suppressLinkedConversationCard) !== Boolean(nextProps.suppressLinkedConversationCard)) return false
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false
@@ -1366,6 +1856,8 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.sizeVariant ?? 'default') !== (nextProps.sizeVariant ?? 'default')) return false
     if ((prevProps.starshipSlug || '') !== (nextProps.starshipSlug || '')) return false
     if ((prevProps.agentSlug || '') !== (nextProps.agentSlug || '')) return false
+    if (Boolean(prevProps.enableChannelMessageThreads) !== Boolean(nextProps.enableChannelMessageThreads)) return false
+    if ((prevProps.onThreadAction ? '1' : '0') !== (nextProps.onThreadAction ? '1' : '0')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0

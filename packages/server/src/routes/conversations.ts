@@ -18,7 +18,11 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
+  ChannelRepository,
+  ConversationMemberRepository,
   ConversationWidgetRepository,
+  DirectMessageRepository,
+  getConnection,
   MessageRepository,
   StarshipMemberRepository,
   ToolCallApprovalRepository,
@@ -32,6 +36,7 @@ import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
 import { UIActionService } from '@/services/UIActionService';
 import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
@@ -181,7 +186,6 @@ async function verifyResourceAccess200(args: {
   } else {
     // owner/admin access allowed
   }
- 
 
   return true;
 }
@@ -269,9 +273,7 @@ type ToolResultAttachmentError = {
   reason: string;
 };
 
-type ParseBase64ImageDataUrlResult =
-  | { ok: true; mimeType: string; buffer: Buffer }
-  | { ok: false; reason: string };
+type ParseBase64ImageDataUrlResult = { ok: true; mimeType: string; buffer: Buffer } | { ok: false; reason: string };
 
 function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number; maxDataUrlChars: number }): ParseBase64ImageDataUrlResult {
   if (typeof dataUrl !== 'string') return { ok: false, reason: 'not_a_string' };
@@ -483,6 +485,20 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (!(await verifyResourceAccess(convAuth.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: convAuth.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
 
     // Check if streaming is requested
     const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
@@ -567,8 +583,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const snapshotCursor: string = lastId || qpCursor || lastEventIdHeader || '0-0';
       let cursor: string = snapshotCursor;
 
-      // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
-      const conversationMessages = await conversationService.getConversationMessages(conversationId);
+      // 1) Always send a baseline snapshot from DB (bounded tail + latest known turn status)
+      const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 100 });
+      const conversationMessages = page.messages;
       const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
       const turn: ConversationStreamSnapshot['turn'] =
         latestTurn && typeof latestTurn.id === 'string'
@@ -586,6 +603,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // This fixes a UX bug where refreshing the page mid-stream would lose previously streamed
       // deltas (not yet persisted to DB), and the UI would only show new deltas after reconnect.
       let snapshotMessages = conversationMessages;
+      const hasMoreBefore = page.hasMoreBefore;
+      const oldestCursor = page.oldestCursor;
       const activeTurnId =
         latestTurn &&
         typeof latestTurn.id === 'string' &&
@@ -713,7 +732,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // best-effort only
       }
 
-      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn })}\n\n`);
+      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor })}\n\n`);
 
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.
@@ -800,7 +819,30 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      const messages = await conversationService.getConversationMessages(conversationId, orderValidation.orderDirection);
+      // Keyset pagination (cursor-based). We currently ignore page/offset for this endpoint.
+      const cursorValidation = validateData(
+        z
+          .object({
+            beforeCreatedAt: z.string().datetime().optional(),
+            beforeId: IdSchema.optional(),
+          })
+          .refine((v) => (v.beforeCreatedAt && !v.beforeId ? false : v.beforeId && !v.beforeCreatedAt ? false : true), {
+            message: 'beforeCreatedAt and beforeId must be provided together',
+          }),
+        req.query,
+        res,
+        'message cursor'
+      );
+      if (!cursorValidation) return;
+
+      const page = await conversationService.getConversationMessagesPage({
+        conversationId,
+        limit: paginationValidation.limit,
+        ...(cursorValidation.beforeCreatedAt && cursorValidation.beforeId
+          ? { beforeCreatedAt: cursorValidation.beforeCreatedAt, beforeId: cursorValidation.beforeId }
+          : {}),
+      });
+      const messages = orderValidation.orderDirection === 'desc' ? page.messages.slice().reverse() : page.messages;
 
       // Verify conversation exists
       const conversation = await conversationService.getConversationById(conversationId);
@@ -822,6 +864,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         conversationId,
         messages,
         total: messages.length,
+        hasMoreBefore: page.hasMoreBefore,
+        oldestCursor: page.oldestCursor,
         participants,
         startedAt: conversation.createdAt,
         lastActivityAt: conversation.updatedAt || conversation.createdAt,
@@ -865,6 +909,20 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
       return;
     }
     if (!(await verifyResourceAccess(exists.starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: exists.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
 
@@ -935,6 +993,20 @@ router.post(
         res,
       });
       if (!ok) {
+        return;
+      }
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      ) {
+        return;
+      }
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
         return;
       }
 
@@ -1260,6 +1332,17 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1335,6 +1418,17 @@ router.get(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvalsRepo = new ToolCallApprovalRepository();
       const approvals = await approvalsRepo.findPendingByConversation(conversationId);
@@ -1420,6 +1514,16 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1525,6 +1629,20 @@ router.post(
         if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
           return;
         }
+        if (
+          !(await enforcePrivateChannelMembership({
+            conversationId,
+            conversationStarshipId: conversation.starshipId,
+            userId: authUserId,
+            req,
+            res,
+          }))
+        ) {
+          return;
+        }
+        if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+          return;
+        }
       }
 
       // Resolve starship and wallet, then enforce non-zero balance
@@ -1581,11 +1699,22 @@ router.post(
       // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.
       // If debit fails, delete the message and return 402 (do not start the turn).
       const messageService = new MessageService();
+      // Multi-human support: persist author identity on the message so shared conversations/channels
+      // can render the correct sender (not always “You”).
+      const authUser = req.user as unknown as { id?: string; displayName?: string; email?: string; avatar?: string } | undefined;
+      const authorUserId = typeof authUser?.id === 'string' ? authUser.id : undefined;
+      const authorNameRaw =
+        typeof authUser?.displayName === 'string' ? authUser.displayName : typeof authUser?.email === 'string' ? authUser.email : '';
+      const authorName = authorNameRaw && authorNameRaw.trim().length > 0 ? authorNameRaw.trim() : undefined;
+      const authorAvatar = typeof authUser?.avatar === 'string' && authUser.avatar.trim().length > 0 ? authUser.avatar.trim() : undefined;
       const userMessage = await messageService.createMessage({
         conversationId,
         role: 'user',
         content,
         messageType: 'user_input',
+        ...(authorUserId && { userId: authorUserId }),
+        ...(authorName && { userName: authorName }),
+        ...(authorAvatar && { userAvatar: authorAvatar }),
         ...(agentId && { agentId }),
         ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
       });
@@ -1658,7 +1787,9 @@ router.post(
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
-          const messages = await conversationService.getConversationMessages(conversationId);
+          // Bound sync payload size; client can page older history via GET /conversations/:id/messages.
+          const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 200 });
+          const messages = page.messages;
           // Include the server-authoritative turn status in the sync response.
           // This is critical for delegated conversations (call-agent) where execution can "complete"
           // early because the run is awaiting out-of-band tool approval (turn.status = waiting_for_tools).
@@ -1681,7 +1812,9 @@ router.post(
               status: turn?.status || 'completed',
               streaming: false,
               conversationId,
-              conversation: conversationWithFinalState ? { ...conversationWithFinalState, messages } : null,
+              conversation: conversationWithFinalState
+                ? { ...conversationWithFinalState, messages, hasMoreBefore: page.hasMoreBefore, oldestCursor: page.oldestCursor }
+                : null,
               turn,
               awaitingToolApproval,
             },
@@ -1754,6 +1887,20 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
       return;
     }
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
 
@@ -1858,6 +2005,7 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
         starshipId: IdSchema,
         agentSlug: z.string().min(1).max(255).optional(),
         agentId: IdSchema.optional(),
+        parentConversationId: IdSchema.optional(),
       }),
       req.body,
       res,
@@ -1909,15 +2057,68 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
       resolvedAgentId = agent.id;
     }
 
-    const conversationService = new ConversationService();
-    // Build payload for conversation creation, normalizing agentId and dropping agentSlug
-    const createPayload = {
-      ...req.body,
-      agentId: resolvedAgentId ?? bodyValidation.agentId,
-    };
-    delete createPayload.agentSlug;
+    // No-stray enforcement:
+    // - Child conversations (parentConversationId set) are allowed as nested threads.
+    // - Top-level conversations must be either a DM (agent provided) or a Channel (via channels API).
+    const parentConversationId = bodyValidation.parentConversationId;
+    const effectiveAgentId = resolvedAgentId ?? bodyValidation.agentId;
+    if (!isInternal && !parentConversationId && !effectiveAgentId) {
+      sendError(res, 'VALIDATION_ERROR', 'Top-level conversations must be created as a channel or a direct message', 400, {
+        hint: 'Use POST /starships/:starshipId/channels or POST /starships/:starshipId/direct-messages',
+      });
+      return;
+    }
 
-    const conversation = await conversationService.createConversation(createPayload);
+    const conversationService = new ConversationService();
+    // For external callers creating top-level agent chats, create/reuse a DM instead of a raw conversation.
+    if (!isInternal && !parentConversationId && effectiveAgentId && authUserId) {
+      const dmRepo = new DirectMessageRepository();
+      const existingDm = await dmRepo.findUserAgentDm(bodyValidation.starshipId, authUserId, effectiveAgentId).catch(() => null);
+      if (existingDm) {
+        const existingConversation = await conversationService.getConversationById(existingDm.conversationId);
+        if (existingConversation) {
+          sendSuccess(res, existingConversation, 200);
+          return;
+        }
+      }
+
+      const conversation = await conversationService.createConversation({
+        title: bodyValidation.title || 'New Conversation',
+        status: 'active',
+        starshipId: bodyValidation.starshipId,
+        agentId: effectiveAgentId,
+        parentConversationId,
+      });
+
+      await dmRepo
+        .create({
+          conversationId: conversation.id,
+          starshipId: bodyValidation.starshipId,
+          dmType: 'user_agent',
+          userId: authUserId,
+          agentId: effectiveAgentId,
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt ?? conversation.createdAt,
+        })
+        .catch(() => null);
+
+      const memberRepo = new ConversationMemberRepository();
+      await memberRepo
+        .createOrIgnoreMember({ conversationId: conversation.id, userId: authUserId, role: 'admin', createdBy: authUserId })
+        .catch(() => null);
+
+      sendSuccess(res, conversation, 201);
+      return;
+    }
+
+    // Otherwise, fall back to raw conversation creation (internal/scheduled or nested).
+    const conversation = await conversationService.createConversation({
+      title: bodyValidation.title || 'New Conversation',
+      status: 'active',
+      starshipId: bodyValidation.starshipId,
+      agentId: effectiveAgentId,
+      parentConversationId,
+    });
 
     sendSuccess(res, conversation, 201);
   } catch (error) {
@@ -2019,6 +2220,28 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
     }
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
+    }
+
+    // Prevent deleting the starship's default channel conversation.
+    // Stored at the starship level to make the invariant explicit.
+    try {
+      const conn = getConnection();
+      const row = await conn.queryOne<{ default_channel_conversation_id: string | null }>(
+        `SELECT default_channel_conversation_id
+           FROM starships
+          WHERE id = $1`,
+        [conversation.starshipId]
+      );
+      const defaultId = row?.default_channel_conversation_id ? String(row.default_channel_conversation_id) : '';
+      if (defaultId && defaultId === conversationId) {
+        sendError(res, 'ACCESS_DENIED', 'Cannot delete the default channel for a starship', 403, {
+          conversationId,
+          starshipId: conversation.starshipId,
+        });
+        return;
+      }
+    } catch {
+      // Pre-migration compatibility: if the column doesn't exist yet, do not block.
     }
 
     const deleted = await conversationService.deleteConversation(conversationId);

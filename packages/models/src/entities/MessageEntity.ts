@@ -114,12 +114,40 @@ export class MessageEntity implements MessageModel {
   @Length(1, 100)
   agentName?: string;
 
+  // Human author identity (user messages only)
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  userId?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  userName?: string;
+
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 500)
+  userAvatar?: string;
+
   // File attachments (array of attachment IDs)
   @Expose()
   @IsOptional()
   @IsArray()
   @IsString({ each: true })
   attachmentIds?: string[];
+
+  /**
+   * Optional link target conversation (index/preview posts).
+   */
+  @Expose()
+  @IsOptional()
+  @IsString()
+  @Length(1, 255)
+  linkedConversationId?: string;
 
   /**
    * Simple validation function using class-validator

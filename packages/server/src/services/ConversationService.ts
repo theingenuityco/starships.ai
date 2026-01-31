@@ -15,7 +15,14 @@ import type {
   EngineConfig,
 } from '@starships/autopilot';
 import { NotFoundError, ConflictError, ValidationError } from '@starships/errors';
-import { ConversationRepository, AgentRepository, TurnRepository, LlmModelRepository } from '@starships/models';
+import {
+  ChannelRepository,
+  ConversationRepository,
+  AgentRepository,
+  TurnRepository,
+  LlmModelRepository,
+  DirectMessageRepository,
+} from '@starships/models';
 import {
   AgentModel,
   ConversationModel,
@@ -647,14 +654,23 @@ export class ConversationService {
     return out;
   }
 
+  private static ensureThreadTitlePrefix(title: string): string {
+    const t = (title || '').trim();
+    if (!t) return 'Thread';
+    if (/^thread\s*:/i.test(t)) return t;
+    return `Thread: ${t}`;
+  }
+
   /**
    * Create a new conversation
    */
   async createConversation(
     data: Omit<ConversationModel, 'id' | 'createdAt' | 'updatedAt'> & { starshipId: string; agentId?: string }
   ): Promise<ConversationModel> {
+    const rawTitle = data.title || 'New Conversation';
+    const title = data.parentConversationId ? ConversationService.ensureThreadTitlePrefix(rawTitle) : rawTitle;
     let conversation = await this.conversationRepository.create({
-      title: data.title || 'New Conversation',
+      title,
       status: data.status || 'active',
       starshipId: data.starshipId,
       agentId: data.agentId,
@@ -794,6 +810,21 @@ export class ConversationService {
     return this.conversationRepository.getConversationMessages(conversationId, orderDirection);
   }
 
+  async getConversationMessagesPage(args: {
+    conversationId: string;
+    limit: number;
+    beforeCreatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null }> {
+    const page = await this.conversationRepository.getConversationMessagesPage(args);
+    const oldest = page.messages.length > 0 ? page.messages[0] : null;
+    return {
+      messages: page.messages,
+      hasMoreBefore: page.hasMoreBefore,
+      oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
+    };
+  }
+
   /**
    * Delete a conversation and cleanup all associated S3 files
    */
@@ -886,6 +917,14 @@ export class ConversationService {
     updates: { title?: string; state?: Partial<ConversationState> | Record<string, unknown> }
   ): Promise<ConversationModel | null> {
     try {
+      // Threads should always persist titles with a "Thread:" prefix.
+      if (updates.title !== undefined) {
+        const existingForTitle = await this.getConversationById(conversationId);
+        if (existingForTitle?.parentConversationId) {
+          updates.title = ConversationService.ensureThreadTitlePrefix(updates.title);
+        }
+      }
+
       // If state is being updated, merge with existing state
       if (updates.state !== undefined) {
         const existing = await this.getConversationById(conversationId);
@@ -1268,18 +1307,28 @@ export class ConversationService {
       const convo = await this.getConversationById(data.conversationId);
       if (convo) {
         const t = (convo.title || '').trim().toLowerCase();
-        const needs = !t || t === 'new conversation' || t.startsWith('chat with ');
+        // Titles that are just placeholders should be replaced by an LLM-generated title
+        // on the first real user message.
+        const needs =
+          !t ||
+          t === 'new conversation' ||
+          t === 'new thread' ||
+          t.startsWith('chat with ') ||
+          t.startsWith('thread:') ||
+          t.startsWith('thread ');
 
         if (needs) {
           const star = await this.getConversationStarship(data.conversationId);
           if (star) {
             const gen = await this.generateConversationTitle(star.id, convo.id, data.content);
             if (gen && gen.trim()) {
-              await this.conversationRepository.update(convo.id, { title: gen.trim(), updatedAt: new Date().toISOString() });
+              const raw = gen.trim();
+              const normalized = convo.parentConversationId ? ConversationService.ensureThreadTitlePrefix(raw) : raw;
+              await this.conversationRepository.update(convo.id, { title: normalized, updatedAt: new Date().toISOString() });
               try {
                 await this.uiActions.publish(convo.id, {
                   action: 'conversation_title_updated',
-                  payload: { conversationId: convo.id, title: gen.trim() },
+                  payload: { conversationId: convo.id, title: normalized },
                 });
               } catch (err) {
                 console.error('[ConversationService] Failed to publish conversation title update', {
@@ -1297,35 +1346,75 @@ export class ConversationService {
       console.warn('[TITLE] Early generation failed:', err);
     }
 
-    const conversationAgents = await this.getConversationAgents(data.conversationId);
-    if (conversationAgents.length < 1) {
-      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
-    }
-    // Build initial target agents from @mentions in the incoming message; fallback to first agent
-    // Resolve against starship agents and auto-link any newly mentioned agents
     const starship = await this.getConversationStarship(data.conversationId);
     if (!starship) {
       throw new NotFoundError('Starship', 'for conversation');
     }
     const allStarshipAgents = await this.agentRepository.findByStarship(starship.id);
-    const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
-    // Auto-link mentioned agents not yet linked
-    for (const a of initialTargetsUnlinked) {
-      if (!conversationAgents.find((x) => x.id === a.id)) {
-        await this.conversationRepository.linkToAgent(data.conversationId, a.id);
-      }
-    }
-    const initialTargets =
-      initialTargetsUnlinked.length > 0 ? initialTargetsUnlinked : this.extractMentionedAgents(data.content, conversationAgents);
-    const agentQueue: AgentModel[] = initialTargets.length > 0 ? initialTargets.slice() : [conversationAgents[0]];
-    const processedAgents: Set<string> = new Set();
-    const maxHops = 5; // prevent infinite handoffs per turn
-    let hops = 0;
+    const channelRepo = new ChannelRepository();
+    const channel = await channelRepo.findByConversationId(data.conversationId).catch(() => null);
+    const isChannel = Boolean(channel);
+    const dmRepo = new DirectMessageRepository();
+    const dm = await dmRepo.findByConversationId(data.conversationId).catch(() => null);
+    const isUserUserDm = Boolean(dm && (dm as any).dmType === 'user_user');
 
     const conversation = await this.getConversationById(data.conversationId);
     if (!conversation) {
       throw new NotFoundError('Conversation', data.conversationId);
     }
+
+    // Mention-only threads:
+    // - Threads are child conversations (parentConversationId set).
+    // - When a thread has >2 linked agents, we stop using a default agent fallback.
+    //   Only explicit @mentions will trigger agent execution for that message.
+    const isThread = Boolean(conversation.parentConversationId);
+
+    let conversationAgents = await this.getConversationAgents(data.conversationId);
+    if (!isChannel && !isUserUserDm && conversationAgents.length < 1) {
+      throw new NotFoundError('Agent', `for Conversation ${data.conversationId}`);
+    }
+
+    let isMentionOnlyThread = Boolean(isThread && !isChannel && conversationAgents.length > 2);
+
+    let agentQueue: AgentModel[] = [];
+    let noAgentToRun = false;
+    if (isUserUserDm) {
+      // user↔user DMs are human-only conversations. Do not link agents or run any agent workflow.
+      // We still persist the message + turn lifecycle for consistent streaming UX.
+      agentQueue = [];
+      noAgentToRun = true;
+    } else {
+      // Build initial target agents from @mentions in the incoming message.
+      // - For channels: mention-only; no fallback agent.
+      // - For normal conversations: fallback to the first linked agent.
+      // - For threads with >2 agents: mention-only; no fallback agent.
+      const initialTargetsUnlinked = this.extractMentionedAgents(data.content, allStarshipAgents);
+      // Auto-link mentioned agents not yet linked
+      let linkedAny = false;
+      for (const a of initialTargetsUnlinked) {
+        if (!conversationAgents.find((x) => x.id === a.id)) {
+          await this.conversationRepository.linkToAgent(data.conversationId, a.id);
+          linkedAny = true;
+        }
+      }
+      // Refresh agents after linking so counts/order are accurate for routing rules.
+      if (linkedAny) {
+        conversationAgents = await this.getConversationAgents(data.conversationId);
+      }
+
+      isMentionOnlyThread = Boolean(isThread && !isChannel && conversationAgents.length > 2);
+      const initialTargets = isChannel
+        ? initialTargetsUnlinked
+        : initialTargetsUnlinked.length > 0
+          ? initialTargetsUnlinked
+          : this.extractMentionedAgents(data.content, conversationAgents);
+
+      agentQueue = initialTargets.length > 0 ? initialTargets.slice() : isChannel || isMentionOnlyThread ? [] : [conversationAgents[0]];
+      noAgentToRun = (isChannel || isMentionOnlyThread) && agentQueue.length === 0;
+    }
+    const processedAgents: Set<string> = new Set();
+    const maxHops = 5; // prevent infinite handoffs per turn
+    let hops = 0;
 
     // (late title generation block removed; handled early)
 
@@ -1337,9 +1426,42 @@ export class ConversationService {
     const conversationState = (latestConversation?.state || {}) as Record<string, unknown>;
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
-    this.suppressCompleteFor.add(data.conversationId);
+    if (!noAgentToRun) {
+      this.suppressCompleteFor.add(data.conversationId);
+    }
 
     try {
+      // Mention-only channels and multi-agent threads: if there are no @mentions, do not run any agent.
+      // Still complete the turn lifecycle cleanly so clients can exit "responding" state.
+      if (noAgentToRun) {
+        const conversationId = data.conversationId;
+        const turnId = this.currentTurnId.get(conversationId) || turn.id;
+        const at = new Date().toISOString();
+
+        try {
+          await this.turnRepository.updateTurn(turnId, { status: 'completed', completedAt: at });
+        } catch {
+          // best-effort
+        }
+        try {
+          await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'completed', at } });
+        } catch {
+          // best-effort
+        }
+        try {
+          const convo = await this.getConversationById(conversationId);
+          const prev = (convo?.state as ConversationState | undefined) || {};
+          await this.conversationRepository.update(conversationId, {
+            state: { ...prev, turnActive: false, lastCompleteAt: at },
+            updatedAt: at,
+          });
+        } catch {
+          // best-effort
+        }
+
+        this.finalizeTurnState(conversationId);
+        return;
+      }
       // starship already resolved above
 
       const env = getEnvConfig();
@@ -1390,8 +1512,7 @@ export class ConversationService {
         // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
         const { plugins: _agentPlugins, ...baseStateWithoutPlugins } = baseState as Record<string, unknown>;
         void _agentPlugins;
-        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } =
-          conversationState as Record<string, unknown>;
+        const { plugins: _conversationPlugins, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
         void _conversationPlugins;
 
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
@@ -1879,6 +2000,49 @@ export class ConversationService {
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
 
+      // If this is a thread, include the pinned/linked message context seed.
+      // The client persists a hidden system_instruction message with:
+      // - content starting with "[THREAD_CONTEXT_SEED]"
+      // - metadata.thread_context_seed === true
+      //
+      // That message is filtered from UI but should influence title generation.
+      const extractThreadSeedSourceContent = (seed: string): string | null => {
+        try {
+          if (typeof seed !== 'string') return null;
+          if (!seed.includes('[THREAD_CONTEXT_SEED]')) return null;
+          const idx = seed.indexOf('Source message content:');
+          const tail = idx >= 0 ? seed.slice(idx) : seed;
+          const firstFence = tail.indexOf('"""');
+          if (firstFence < 0) return null;
+          const afterFirst = tail.slice(firstFence + 3);
+          const secondFence = afterFirst.indexOf('"""');
+          if (secondFence < 0) return null;
+          const inside = afterFirst.slice(0, secondFence).trim();
+          return inside.length > 0 ? inside : null;
+        } catch {
+          return null;
+        }
+      };
+
+      let threadPinnedContent: string | null = null;
+      try {
+        const msgs = await this.getConversationMessages(conversationId, 'asc').catch(() => []);
+        const seedMsg =
+          msgs.find((m) => {
+            if (!m) return false;
+            if (String((m as any).role ?? '') !== 'system') return false;
+            const meta = (m as any).metadata;
+            const flagged = Boolean(meta && typeof meta === 'object' && (meta as any).thread_context_seed === true);
+            const content = typeof (m as any).content === 'string' ? String((m as any).content) : '';
+            return flagged || content.startsWith('[THREAD_CONTEXT_SEED]');
+          }) ?? null;
+        if (seedMsg && typeof seedMsg.content === 'string') {
+          threadPinnedContent = extractThreadSeedSourceContent(seedMsg.content) ?? null;
+        }
+      } catch {
+        // best-effort
+      }
+
       const { OPENROUTER_API_KEY } = getEnvConfig();
       if (!OPENROUTER_API_KEY) {
         console.warn('[TITLE] OPENROUTER_API_KEY not configured; skipping title generation');
@@ -1898,13 +2062,19 @@ export class ConversationService {
         'You generate concise, helpful conversation titles.',
         'Rules:',
         '- 4-8 words, sentence case, no trailing punctuation.',
-        '- Capture the main user intent/topic from the first message.',
+        '- Capture the main user intent/topic from the initial context.',
         '- Avoid quotes, emojis, and personal data. Keep under 60 characters.',
       ].join('\n');
 
-      const prompt = `User message: "${String(userContent || '')
-        .replace(/\n+/g, ' ')
-        .slice(0, 400)}"\n\nReturn only the title text.`;
+      const safe = (s: string, max: number) =>
+        String(s || '')
+          .replace(/\n+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, max);
+
+      const ctxBlock = threadPinnedContent ? `Thread pinned message: "${safe(threadPinnedContent, 500)}"\n` : '';
+      const prompt = `${ctxBlock}User message: "${safe(userContent, 400)}"\n\nReturn only the title text.`;
 
       const completion = await client.chat.completions.create({
         model,

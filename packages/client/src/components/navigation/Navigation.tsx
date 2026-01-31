@@ -6,13 +6,15 @@ import { ConversationList } from '@/components/conversation/ConversationList'
 import { NavigationSection } from '@/components/navigation/NavigationSection'
 import { NavigationItem } from '@/components/navigation/NavigationItem'
 import { StarshipRail } from '@/components/navigation/StarshipRail'
+import { UserProfileMenu } from '@/components/auth/UserProfileMenu'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { NavigationOnboardingTour } from '@/components/onboarding/NavigationOnboardingTour'
-import { useDeleteConversation } from '@/hooks/useConversations'
+import BalanceStatusIndicator from '@/components/billing/BalanceStatusIndicator'
 import { useStarshipBySlug, useSelectedStarship, useUserStarships } from '@/hooks/useStarships'
 import { useAuth } from '@/hooks/useAuth'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import { useWallet } from '@/hooks/useWallet'
 
 import { AnimatePresence, motion } from 'motion/react'
 import { usePathname, useRouter } from 'next/navigation'
@@ -52,8 +54,6 @@ export function Navigation(props: NavigationProps) {
   const [navigationStarshipSlug, setNavigationStarshipSlug] = useState<string | null>(null)
   // Ref for click outside detection
   const sidebarRef = useRef<HTMLDivElement>(null)
-  // Ref for conversation history container
-  const conversationHistoryRef = useRef<HTMLDivElement>(null)
 
   // Ref for collapse timeout to keep logo stable during collapse animation
   const collapseTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -158,36 +158,9 @@ export function Navigation(props: NavigationProps) {
   // Get starship data to access starship ID - only fetch when needed
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
 
-  // Conversation action handlers - memoized to prevent unnecessary re-renders
-  const deleteConversationMutation = useDeleteConversation()
+  const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
 
-  // Extract current conversation ID from pathname
-  const currentConversationId = useMemo(() => {
-    if (pathname.startsWith('/ship/')) {
-      const pathParts = pathname.split('/')
-      // Check if path matches /ship/<slug>/conversations/<conversationId>
-      if (pathParts.length >= 5 && pathParts[3] === 'conversations' && pathParts[4]) {
-        return pathParts[4]
-      }
-    }
-    return null
-  }, [pathname])
-
-  const handleConversationDelete = useCallback(
-    async (conversationId: string) => {
-      try {
-        await deleteConversationMutation.mutateAsync(conversationId)
-
-        // If we're currently viewing the deleted conversation, redirect to conversations page
-        if (currentConversationId === conversationId && starshipSlug) {
-          router.push(`/ship/${starshipSlug}/conversations`)
-        }
-      } catch (error) {
-        // Error handling is done in the mutation hook
-      }
-    },
-    [deleteConversationMutation, currentConversationId, starshipSlug, router]
-  )
+  const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
   // Handle new conversation - memoized
   const handleNewConversation = useCallback(() => {
@@ -195,16 +168,6 @@ export function Navigation(props: NavigationProps) {
     router.push(`/ship/${starshipSlug}/conversations`)
     if (isMobile && onClose) onClose()
   }, [router, starshipSlug, isMobile, onClose])
-
-  // Handle conversation selection - memoized
-  const handleConversationSelect = useCallback(
-    (conversationId: string) => {
-      if (!starshipSlug) return
-      router.push(`/ship/${starshipSlug}/conversations/${conversationId}`)
-      if (isMobile && onClose) onClose()
-    },
-    [router, starshipSlug, isMobile, onClose]
-  )
 
   // Handle logo click - memoized
   const handleLogoClick = useCallback(() => {
@@ -364,7 +327,7 @@ export function Navigation(props: NavigationProps) {
         {isAuthenticated ? <StarshipRail starships={userStarships ?? []} activeSlug={activeStarshipSlug} onSelect={handleStarshipSelect as any} onCreate={() => router.push('/profile')} /> : null}
 
         <div
-          className="flex flex-col pb-2 transition-all duration-300 ease-in-out"
+          className="flex flex-col pb-3 transition-all duration-300 ease-in-out"
           style={{
             width: isExpanded ? '16rem' : '3.5rem',
             height: '100%',
@@ -373,7 +336,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="px-2 pt-7 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="px-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
             <div
               className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
@@ -404,7 +367,7 @@ export function Navigation(props: NavigationProps) {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -10 }}
                   transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }}
-                  className="text-[15px] font-medium tracking-tight leading-none whitespace-nowrap max-w-[11.5rem] truncate"
+                  className="text-[15px] font-medium tracking-tight leading-snug whitespace-nowrap max-w-[11.5rem] truncate"
                   style={{ marginLeft: '0.375rem' }}
                 >
                   {starshipData?.name || 'Starships.ai'}
@@ -465,34 +428,18 @@ export function Navigation(props: NavigationProps) {
             </div>
           </div>
 
-          {/* Conversation History List - Recents - only when expanded and data is available */}
+          {/* Channels + Direct messages */}
           {isExpanded && isAuthenticated && starshipSlug && starshipData?.id && (
-            <div ref={conversationHistoryRef} className="flex-1 min-h-0 flex flex-col px-2">
-              {/* Recents header - styled to match nav items (icon + label spacing) */}
-              <div className="w-full">
-                <div className="w-full rounded-lg flex items-center border border-transparent text-muted-foreground px-2 py-1.5" style={{ justifyContent: 'flex-start' }}>
-                  <div
-                    className="flex-shrink-0"
-                    style={{
-                      width: '1.25rem',
-                      height: '1.25rem',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      margin: 0,
-                      marginRight: '0.375rem',
-                    }}
-                  >
-                    <Icon name="history" className="w-4 h-4" />
-                  </div>
-                  <span className="font-medium" style={{ fontSize: '14px' }}>
-                    Recents
-                  </span>
-                </div>
-              </div>
+            <div className="flex-1 min-h-0 flex flex-col px-2">
               <div className="flex-1 min-h-0 overflow-y-auto">
                 <div className="pb-2 space-y-1">
-                  <ConversationList starshipId={starshipData.id} onConversationDelete={handleConversationDelete} onConversationSelect={handleConversationSelect} compact={true} />
+                  <ConversationList
+                    starshipId={starshipData.id}
+                    compact={true}
+                    onConversationSelect={() => {
+                      if (isMobile && onClose) onClose()
+                    }}
+                  />
                 </div>
               </div>
             </div>
@@ -501,7 +448,72 @@ export function Navigation(props: NavigationProps) {
           {/* Spacer to push content toward bottom when needed */}
           {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
 
-          {/* Profile moved to global top-right header (see `TopRightUserProfile`) */}
+          {/* Bottom controls */}
+          <div className="px-2 pt-2 flex-shrink-0">
+            <div className="flex flex-col gap-1">
+              {isAuthenticated && starshipData?.id ? (
+                isExpanded ? (
+                  <button
+                    type="button"
+                    disabled={!canManageBilling || !activeStarshipSlug}
+                    onClick={() => {
+                      if (!activeStarshipSlug) return
+                      router.push(`/ship/${activeStarshipSlug}/settings/billing`)
+                    }}
+                    className="h-9 w-full flex items-center gap-2 rounded-lg px-2 text-muted-foreground hover:text-foreground hover:bg-muted/60 disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label="View credits and billing"
+                  >
+                    <span className="flex-1 text-left text-[13px] font-medium">Credits</span>
+                    <div className="flex items-center gap-1.5">
+                      <Icon name="coins" className="h-3.5 w-3.5" />
+                      <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
+                    </div>
+                  </button>
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        disabled={!canManageBilling || !activeStarshipSlug}
+                        onClick={() => {
+                          if (!activeStarshipSlug) return
+                          router.push(`/ship/${activeStarshipSlug}/settings/billing`)
+                        }}
+                        className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                        aria-label="View credits and billing"
+                      >
+                        <Icon name="coins" className="h-3.5 w-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">
+                      <div className="flex items-center gap-2">
+                        <span className="font-medium">Credits</span>
+                        <Icon name="coins" className="h-3.5 w-3.5" />
+                        <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
+                      </div>
+                    </TooltipContent>
+                  </Tooltip>
+                )
+              ) : null}
+
+              <div className={isExpanded ? 'w-full' : 'flex justify-center'}>
+                {isExpanded ? (
+                  <UserProfileMenu expanded />
+                ) : (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div>
+                        <UserProfileMenu />
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">Account</TooltipContent>
+                  </Tooltip>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Profile lives in bottom controls */}
         </div>
       </motion.div>
 

@@ -262,6 +262,61 @@ export class ConversationRepository extends BaseRepository {
   }
 
   /**
+   * Keyset-paginated message history for a conversation.
+   *
+   * Returns the newest messages first (bounded by `limit`), but the returned array is
+   * in chronological order (oldest → newest) for easy rendering.
+   */
+  async getConversationMessagesPage(args: {
+    conversationId: string;
+    limit: number;
+    beforeCreatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+        const pageSize = limit + 1;
+
+        const useCursor =
+          typeof args.beforeCreatedAt === 'string' && typeof args.beforeId === 'string' && args.beforeCreatedAt && args.beforeId;
+
+        const rows = await connection.query<Record<string, unknown>>(
+          useCursor
+            ? `
+              SELECT *
+              FROM messages
+              WHERE conversation_id = $1
+                AND (
+                  created_at < $2::timestamptz
+                  OR (created_at = $2::timestamptz AND id < $3::text)
+                )
+              ORDER BY created_at DESC, id DESC
+              LIMIT $4
+            `
+            : `
+              SELECT *
+              FROM messages
+              WHERE conversation_id = $1
+              ORDER BY created_at DESC, id DESC
+              LIMIT $2
+            `,
+          useCursor ? [args.conversationId, args.beforeCreatedAt, args.beforeId, pageSize] : [args.conversationId, pageSize]
+        );
+
+        const hasMoreBefore = rows.length > limit;
+        const trimmed = rows.slice(0, limit);
+        const chronological = trimmed.slice().reverse();
+        return { messages: fromDatabaseArray(MessageEntity, chronological), hasMoreBefore };
+      },
+      'getConversationMessagesPage',
+      'Conversation',
+      args.conversationId
+    );
+  }
+
+  /**
    * Create relationship between conversation and agent using junction table
    */
   async linkToAgent(conversationId: string, agentId: string): Promise<void> {

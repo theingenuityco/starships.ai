@@ -3,7 +3,7 @@
 import * as React from 'react'
 import { cn } from '@/lib/utils'
 
-interface SwitchProps {
+interface SwitchProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'onClick' | 'onChange' | 'type'> {
   checked?: boolean
   onCheckedChange?: (checked: boolean) => void
   disabled?: boolean

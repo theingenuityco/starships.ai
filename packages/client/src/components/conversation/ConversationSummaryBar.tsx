@@ -1,9 +1,8 @@
 'use client'
 
 import AgentAvatar from '@/components/animated/AgentAvatar'
-import Icon from '@/components/primitives/Icon'
-import { Avatar } from '@/components/ui/avatar'
-import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { useConversationAgents, useConversationDetail, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
@@ -11,8 +10,13 @@ import { useModelContextLength } from '@/hooks/useLlmModels'
 import { cn } from '@/lib/utils'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useAuth } from '@/hooks/useAuth'
+import api from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { motion } from 'motion/react'
-import { useMemo, useEffect, useRef } from 'react'
+import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
+
+export type ConversationParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
 interface ConversationSummaryBarProps {
   conversationId: string | null
@@ -21,6 +25,21 @@ interface ConversationSummaryBarProps {
   modelId?: string | null
   /** Optional override for the max token budget (used as denominator). */
   maxTokens?: number | null
+  /** Optional prefix shown before the title (e.g. "#" for channels). */
+  titlePrefix?: ReactNode
+  /** Optional right-side content (e.g. controls). */
+  rightSlot?: ReactNode
+  /** Optional third-line content under the metadata row (e.g. agent selector). */
+  thirdLineSlot?: ReactNode
+  /** Optional title to show when `conversationId` is null (e.g. draft thread). */
+  fallbackTitle?: string
+  /** Optional subtitle to show when `conversationId` is null (e.g. "Draft (not saved)"). */
+  fallbackSubtitle?: string
+  /**
+   * Optional participants override (useful for draft headers before a conversation exists).
+   * When set, these participants will be used for the header avatars/list.
+   */
+  participantsOverride?: ConversationParticipantItem[] | null
 }
 
 interface ConversationAgent {
@@ -32,28 +51,319 @@ interface ConversationAgent {
   avatarAttachmentId?: string
 }
 
-export function ConversationSummaryBar({ conversationId, starshipId, modelId, maxTokens }: ConversationSummaryBarProps) {
+function initialsFromName(name?: string | null): string {
+  if (!name || typeof name !== 'string') return 'U'
+  const parts = name.trim().split(/\s+/).filter(Boolean).slice(0, 2)
+  if (parts.length === 0) return 'U'
+  return (
+    parts
+      .map(p => p[0]?.toUpperCase())
+      .filter(Boolean)
+      .join('') || 'U'
+  )
+}
+
+function normalizeConversationTitle(raw: string): string {
+  const t = String(raw || '').trim()
+  if (!t) return t
+  // Back-compat: older DM conversations were titled like "DM • Alice".
+  const m = t.match(/^DM\s*[•:\-–—]\s*(.+)$/i)
+  if (m?.[1]) {
+    const rest = String(m[1]).trim()
+    return rest || t
+  }
+  return t
+}
+
+export function ConversationSummaryBar({
+  conversationId,
+  starshipId,
+  modelId,
+  maxTokens,
+  titlePrefix,
+  rightSlot,
+  thirdLineSlot,
+  fallbackTitle,
+  fallbackSubtitle,
+  participantsOverride,
+}: ConversationSummaryBarProps) {
   const expertMode = useUserPreferencesStore(s => s.expertMode)
-  const { isInstanceAdmin } = useAuth()
+  const { isInstanceAdmin, userId: authUserId, userName: authUserName, userEmail: authUserEmail, userAvatar: authUserAvatar } = useAuth()
   const showTokens = expertMode
   const showCost = expertMode && isInstanceAdmin
 
   // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
   const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
 
+  // Direct message context (lets us display participants even when there are no messages yet)
+  const { data: dmListData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId))
+  const dmItem = useMemo<DirectMessageListItem | null>(() => {
+    const cid = String(conversationId || '')
+    const list = (dmListData?.directMessages || []) as DirectMessageListItem[]
+    if (!cid || !Array.isArray(list) || list.length === 0) return null
+    return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
+  }, [dmListData?.directMessages, conversationId])
+
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
   const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
-  const maxToShow = 4
-  const visibleAgents = agents.slice(0, maxToShow)
-  const remaining = agents.length - visibleAgents.length
-
+  const overrideAvatarAttachmentIds = useMemo(() => {
+    const list = Array.isArray(participantsOverride) ? participantsOverride : []
+    return list
+      .filter(p => p && p.kind === 'agent')
+      .map(p => (typeof p.avatarAttachmentId === 'string' ? p.avatarAttachmentId.trim() : ''))
+      .filter(Boolean)
+  }, [participantsOverride])
   const avatarAttachmentIds = useMemo(() => {
-    return visibleAgents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
-  }, [visibleAgents])
+    const ids = agents.map(a => (a as any).avatarAttachmentId as string | undefined).filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+    return Array.from(new Set([...ids, ...overrideAvatarAttachmentIds]))
+  }, [agents, overrideAvatarAttachmentIds])
   const hasAvatarIds = avatarAttachmentIds.length > 0
   const { data: avatarAttachments = [], isLoading: isLoadingAvatars } = useMessageAttachments(avatarAttachmentIds, starshipId)
   const avatarUrlById = useMemo(() => new Map(avatarAttachments.map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  // Include human participants by sampling recent message authors (matches thread card behavior).
+  // The conversation detail endpoint does not currently include members/users.
+  const { data: participantsPreview } = useQuery({
+    queryKey: ['conversations', 'participants-preview', conversationId],
+    enabled: Boolean(conversationId),
+    queryFn: async () => {
+      const cid = String(conversationId || '')
+      if (!cid) return null
+      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(cid)}/messages`, { params: { limit: 50 } })
+      return (resp as any)?.data?.data ?? null
+    },
+    staleTime: 60_000,
+  })
+
+  const participantItemsFromConversation = useMemo<ConversationParticipantItem[]>(() => {
+    type ParticipantWithSeen = (ConversationParticipantItem & { lastSeenAt: number }) | null
+    const byKey = new Map<string, ConversationParticipantItem & { lastSeenAt: number }>()
+
+    const upsert = (next: ConversationParticipantItem, lastSeenAt: number) => {
+      const prev = byKey.get(next.key)
+      if (!prev) {
+        byKey.set(next.key, { ...(next as any), lastSeenAt })
+        return
+      }
+      const prevSeen = typeof (prev as any).lastSeenAt === 'number' ? (prev as any).lastSeenAt : 0
+      const mergedSeen = Math.max(prevSeen, lastSeenAt)
+      // Prefer richer metadata (e.g. avatarUrl) as we learn it.
+      byKey.set(next.key, { ...(prev as any), ...(next as any), lastSeenAt: mergedSeen })
+    }
+
+    const parseSeenAt = (m: any): number => {
+      const raw = typeof m?.createdAt === 'string' ? m.createdAt : typeof m?.updatedAt === 'string' ? m.updatedAt : null
+      const t = raw ? Date.parse(raw) : NaN
+      return Number.isFinite(t) ? t : 0
+    }
+
+    // Humans: derive from recent messages' user identity fields.
+    const msgs = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
+    for (const m of msgs) {
+      const role = String(m?.role ?? '')
+      const seenAt = parseSeenAt(m)
+
+      if (role === 'user') {
+        const userId = typeof m?.userId === 'string' ? String(m.userId).trim() : ''
+        const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
+        const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
+
+        const label = userName || (userId ? `User ${userId.slice(0, 6)}` : 'User')
+        const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
+        upsert({ kind: 'human', key, label, ...(userAvatar ? { avatarUrl: userAvatar } : null) }, seenAt)
+      }
+
+      if (role === 'assistant') {
+        const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
+        const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
+        const label = agentName || (agentId ? `Agent ${agentId.slice(0, 6)}` : 'Agent')
+        const key = `agent:${agentId || label}`
+        const seed = agentName || agentId || label
+        const fromList = agentId ? (agents as any[]).find(a => String((a as any)?.id || '') === agentId) : null
+        const avatarAttachmentId = typeof (fromList as any)?.avatarAttachmentId === 'string' ? String((fromList as any).avatarAttachmentId).trim() : ''
+        upsert({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) }, seenAt)
+      }
+    }
+
+    // Agents: from the agents list.
+    for (let idx = 0; idx < agents.length; idx++) {
+      const a = agents[idx]
+      const id = typeof (a as any)?.id === 'string' ? String((a as any).id).trim() : ''
+      const label = String((a as any)?.name || (a as any)?.slug || id || `Agent ${idx + 1}`).trim() || `Agent ${idx + 1}`
+      const key = `agent:${id || label}`
+      const seed = String((a as any)?.name || (a as any)?.slug || id || `agent-${idx}`).trim() || `agent-${idx}`
+      const aid = typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId).trim() : ''
+      // Keep agents that haven't spoken yet; they sort after active participants.
+      upsert({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) }, 0)
+    }
+
+    const sorted = Array.from(byKey.values()).filter(Boolean) as Array<Exclude<ParticipantWithSeen, null>>
+
+    sorted.sort((a, b) => {
+      const da = typeof (a as any).lastSeenAt === 'number' ? (a as any).lastSeenAt : 0
+      const db = typeof (b as any).lastSeenAt === 'number' ? (b as any).lastSeenAt : 0
+      if (db !== da) return db - da
+      return String((a as any).label || '').localeCompare(String((b as any).label || ''))
+    })
+
+    return sorted.map(({ lastSeenAt: _lastSeenAt, ...rest }: any) => rest) as ConversationParticipantItem[]
+  }, [agents, participantsPreview])
+
+  const effectiveParticipantItems = useMemo(() => {
+    // For DMs, always show both participants (even with 0 messages / before either has spoken).
+    if (dmItem?.dm) {
+      const items: ConversationParticipantItem[] = []
+      const seen = new Set<string>()
+
+      const addHuman = (args: { id?: string | null; label?: string | null; avatarUrl?: string | null }) => {
+        const id = typeof args.id === 'string' ? args.id.trim() : ''
+        const labelRaw = typeof args.label === 'string' ? args.label.trim() : ''
+        const avatarUrl = typeof args.avatarUrl === 'string' ? args.avatarUrl.trim() : ''
+        const label = labelRaw || (id ? `User ${id.slice(0, 6)}` : 'User')
+        const key = id ? `human:${id}` : label ? `human:name:${label}` : `human:unknown:${label}`
+        if (seen.has(key)) return
+        seen.add(key)
+        items.push({ kind: 'human', key, label, ...(avatarUrl ? { avatarUrl } : null) })
+      }
+
+      const addAgent = (args: { id?: string | null; label?: string | null; seed?: string | null; avatarAttachmentId?: string | null }) => {
+        const id = typeof args.id === 'string' ? args.id.trim() : ''
+        const labelRaw = typeof args.label === 'string' ? args.label.trim() : ''
+        const avatarAttachmentId = typeof args.avatarAttachmentId === 'string' ? args.avatarAttachmentId.trim() : ''
+        const label = labelRaw || (id ? `Agent ${id.slice(0, 6)}` : 'Agent')
+        const key = `agent:${id || label}`
+        if (seen.has(key)) return
+        seen.add(key)
+        const seed = (typeof args.seed === 'string' ? args.seed.trim() : '') || label || id || 'agent'
+        items.push({ kind: 'agent', key, label, seed, ...(avatarAttachmentId ? { avatarAttachmentId } : null) })
+      }
+
+      // Current user
+      addHuman({ id: authUserId ?? null, label: authUserName ?? authUserEmail ?? null, avatarUrl: authUserAvatar ?? null })
+
+      // Other participant
+      const dm = dmItem.dm as any
+      if (dm?.dmType === 'user_agent') {
+        const a: any = (dmItem as any)?.agent
+        addAgent({
+          id: typeof a?.id === 'string' ? String(a.id) : typeof dm?.agentId === 'string' ? String(dm.agentId) : null,
+          label: a ? formatAgentDisplayName(a) : null,
+          seed: typeof a?.name === 'string' ? String(a.name) : typeof dm?.agentId === 'string' ? String(dm.agentId) : 'agent',
+          avatarAttachmentId: typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId) : null,
+        })
+      } else if (dm?.dmType === 'user_user') {
+        const peer: any = (dmItem as any)?.peerUser
+        const peerId = typeof peer?.id === 'string' ? String(peer.id) : typeof dm?.userAId === 'string' && String(dm.userAId) !== String(authUserId || '') ? String(dm.userAId) : typeof dm?.userBId === 'string' ? String(dm.userBId) : null
+        const peerLabel = (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${String(peerId).slice(0, 6)}` : 'User')
+        const peerAvatar = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
+        addHuman({ id: peerId ?? null, label: peerLabel, avatarUrl: peerAvatar })
+      }
+
+      return items.length > 0 ? items : participantItemsFromConversation
+    }
+    if (Array.isArray(participantsOverride) && participantsOverride.length > 0) return participantsOverride
+    return participantItemsFromConversation
+  }, [authUserAvatar, authUserEmail, authUserId, authUserName, dmItem, participantItemsFromConversation, participantsOverride])
+
+  const participantsLabel = useMemo(() => {
+    const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
+    if (labels.length === 0) return 'No participants'
+    if (labels.length <= 3) return labels.join(', ')
+    return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
+  }, [effectiveParticipantItems])
+
+  const [participantsOpen, setParticipantsOpen] = useState(false)
+  const participantsHoverCloseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const participantsTriggerRef = useRef<HTMLButtonElement | null>(null)
+  const participantsContentRef = useRef<HTMLDivElement | null>(null)
+
+  const clearParticipantsHoverTimers = useCallback(() => {
+    if (participantsHoverCloseTimerRef.current) {
+      clearTimeout(participantsHoverCloseTimerRef.current)
+      participantsHoverCloseTimerRef.current = null
+    }
+  }, [])
+
+  const openParticipantsPopover = useCallback(() => {
+    clearParticipantsHoverTimers()
+    setParticipantsOpen(prev => (prev ? prev : true))
+  }, [clearParticipantsHoverTimers])
+
+  const closeParticipantsPopover = useCallback(
+    (delayMs = 180) => {
+      if (!participantsOpen) return
+      if (participantsHoverCloseTimerRef.current) return
+      participantsHoverCloseTimerRef.current = setTimeout(() => {
+        participantsHoverCloseTimerRef.current = null
+        setParticipantsOpen(false)
+      }, delayMs)
+    },
+    [participantsOpen]
+  )
+
+  // Avoid redundant open/close triggers:
+  // Only close when pointer truly leaves BOTH trigger and content (use relatedTarget across portal boundary).
+  const handleParticipantsTriggerPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      const next = e.relatedTarget as Node | null
+      const contentEl = participantsContentRef.current
+      if (next && contentEl && contentEl.contains(next)) return
+      closeParticipantsPopover(220)
+    },
+    [closeParticipantsPopover]
+  )
+
+  const handleParticipantsContentPointerLeave = useCallback(
+    (e: React.PointerEvent) => {
+      const next = e.relatedTarget as Node | null
+      const triggerEl = participantsTriggerRef.current
+      if (next && triggerEl && triggerEl.contains(next)) return
+      closeParticipantsPopover(220)
+    },
+    [closeParticipantsPopover]
+  )
+
+  useEffect(() => {
+    return () => {
+      clearParticipantsHoverTimers()
+    }
+  }, [clearParticipantsHoverTimers])
+
+  const ParticipantsPopup = () => {
+    const labels = effectiveParticipantItems.map(p => p.label).filter(Boolean)
+    if (labels.length === 0) return null
+    return (
+      <div className="w-full">
+        <div className="px-2 py-2 font-normal">
+          <div className="text-sm font-medium leading-tight truncate text-foreground">Participants</div>
+        </div>
+        <div className="-mx-1 my-1 h-px bg-muted" />
+        <div className="max-h-72 overflow-y-auto overflow-x-hidden p-1">
+          {effectiveParticipantItems.map(p => (
+            <div
+              key={p.key}
+              className="group relative rounded-lg flex items-center gap-2 w-full h-8 px-2 text-[13px] font-medium border border-transparent cursor-default text-muted-foreground hover:text-foreground hover:bg-muted focus:bg-muted"
+            >
+              <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
+                {p.kind === 'agent' ? (
+                  <div className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+                    <AgentAvatar seed={p.seed} imageUrl={p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined} size={20} rounded />
+                  </div>
+                ) : (
+                  <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
+                    <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                  </Avatar>
+                )}
+              </div>
+              <span className="min-w-0 truncate">{p.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
 
   // Token indicator: utilization (server totals) vs max (model context window)
   const usageConversationId = showTokens ? conversationId : null
@@ -84,6 +394,9 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
 
   // Track if this is the initial mount to prevent animation on page reload
   const isInitialMountRef = useRef(true)
+  // If we ever rendered the loading header for this conversationId,
+  // don't animate the "real" header in from the top when data arrives.
+  const renderedPlaceholderForConversationRef = useRef(false)
   useEffect(() => {
     // Mark initial mount as complete after a short delay
     const timer = setTimeout(() => {
@@ -92,9 +405,20 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     return () => clearTimeout(timer)
   }, [])
 
+  // Reset placeholder tracking when switching conversations.
+  useEffect(() => {
+    renderedPlaceholderForConversationRef.current = false
+  }, [conversationId])
+
   // Reserve space even when loading to prevent layout shift
   // Show placeholder if: no conversationId, no currentConversation, or data is still loading
   if (!conversationId || !isDataReady) {
+    renderedPlaceholderForConversationRef.current = true
+    const effectiveFallbackTitle = typeof fallbackTitle === 'string' && fallbackTitle.trim().length > 0 ? fallbackTitle.trim() : !conversationId ? 'Draft' : 'Loading...'
+    const effectiveFallbackSubtitle = typeof fallbackSubtitle === 'string' && fallbackSubtitle.trim().length > 0 ? fallbackSubtitle.trim() : null
+    const isDraftHeader = !conversationId
+    const hasDraftParticipants = isDraftHeader && effectiveParticipantItems.length > 0
+
     return (
       <div className="sticky top-0 z-10 border-b border-border bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
         <div className="px-4 pt-3.5 pb-3">
@@ -103,46 +427,133 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
               {/* Title and metadata (stacked) - exact structural match */}
               <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
                 {/* Title - exact match */}
-                <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight">
-                  <span className="opacity-50">Loading...</span>
-                </h3>
+                <div className="flex items-center gap-2 min-w-0 w-full">
+                  {titlePrefix ? (
+                    <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
+                      {titlePrefix}
+                    </span>
+                  ) : null}
+                  <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">
+                    <span className="opacity-50">{effectiveFallbackTitle}</span>
+                  </h3>
+                </div>
                 {/* Agents + updated row - exact structural match with same classes */}
-                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                  {/* Agent placeholder - matches exact structure */}
-                  <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
-                    <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                      <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
-                    </Avatar>
-                    <span className="truncate font-medium leading-none opacity-50">Loading...</span>
-                  </div>
-                  {/* Separator and updated text - exact match */}
-                  <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                    <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                    <span className="font-medium leading-none opacity-50">Updated just now</span>
-                  </span>
-                  {showTokens ? (
+                <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground min-h-5">
+                  {isDraftHeader ? (
                     <>
-                      {/* Token indicator placeholder (reserved space) */}
+                      {hasDraftParticipants ? (
+                        <Popover
+                          open={participantsOpen}
+                          onOpenChange={next => {
+                            clearParticipantsHoverTimers()
+                            setParticipantsOpen(next)
+                          }}
+                        >
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              ref={participantsTriggerRef}
+                              className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              aria-label={`Participants: ${participantsLabel}`}
+                              title={participantsLabel}
+                              onPointerEnter={openParticipantsPopover}
+                              onPointerLeave={handleParticipantsTriggerPointerLeave}
+                              onFocus={() => {
+                                clearParticipantsHoverTimers()
+                                setParticipantsOpen(true)
+                              }}
+                            >
+                              <div className="flex items-center -space-x-1.5">
+                                {effectiveParticipantItems.slice(0, 3).map(p => {
+                                  if (p.kind === 'agent') {
+                                    const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                                    return (
+                                      <div key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
+                                      </div>
+                                    )
+                                  }
+                                  return (
+                                    <Avatar key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                    </Avatar>
+                                  )
+                                })}
+                              </div>
+                              {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            ref={participantsContentRef}
+                            side="bottom"
+                            align="start"
+                            sideOffset={8}
+                            className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
+                            onOpenAutoFocus={e => e.preventDefault()}
+                            onCloseAutoFocus={e => e.preventDefault()}
+                            onPointerEnter={openParticipantsPopover}
+                            onPointerLeave={handleParticipantsContentPointerLeave}
+                          >
+                            <ParticipantsPopup />
+                          </PopoverContent>
+                        </Popover>
+                      ) : (
+                        <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                          <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                            <Avatar className="h-4 w-4 ring-1 ring-border/40 bg-muted/20 overflow-hidden">
+                              <div className="h-4 w-4 rounded-full bg-muted/30" />
+                            </Avatar>
+                            <span className="truncate font-medium leading-none opacity-70">Draft</span>
+                          </div>
+                        </div>
+                      )}
                       <span className="inline-flex items-center gap-2 whitespace-nowrap">
                         <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
-                          <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
-                          <span className="opacity-50 font-medium tabular-nums">—/—</span>
-                        </span>
+                        <span className="font-medium leading-none opacity-70">{effectiveFallbackSubtitle ?? 'Draft (not saved)'}</span>
                       </span>
-                      {showCost ? (
-                        <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                          <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <span className="inline-flex items-center gap-1.5 rounded-full bg-muted/30 px-2 py-1 border border-border/40">
-                            <div className="h-3 w-3 rounded bg-muted/40 animate-pulse" />
-                            <span className="opacity-50 font-medium tabular-nums">$—</span>
+                      {showTokens ? (
+                        <>
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/20" aria-hidden="true" />
                           </span>
-                        </span>
+                        </>
                       ) : null}
                     </>
-                  ) : null}
+                  ) : (
+                    <>
+                      {/* Agent placeholder - matches exact structure */}
+                      <div className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1">
+                        <div className="inline-flex items-center gap-1.5 max-w-[14rem]">
+                          <Avatar className="h-4 w-4 ring-1 ring-border/40">
+                            <div className="h-4 w-4 rounded-full bg-muted/30 animate-pulse" />
+                          </Avatar>
+                          <span className="truncate font-medium leading-none opacity-50">Loading...</span>
+                        </div>
+                      </div>
+                      {/* Separator and updated text - exact match */}
+                      <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                        <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                        <span className="font-medium leading-none opacity-50">{effectiveFallbackSubtitle ?? 'Updated just now'}</span>
+                      </span>
+                      {showTokens ? (
+                        <>
+                          {/* Token indicator placeholder (reserved space) */}
+                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
+                            <span className="inline-flex h-4 w-4 rounded-full ring-1 ring-border/40 bg-muted/30 animate-pulse" aria-hidden="true" />
+                          </span>
+                        </>
+                      ) : null}
+                    </>
+                  )}
                 </div>
+
+                {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
               </div>
+
+              {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
             </div>
           </div>
         </div>
@@ -150,7 +561,7 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     )
   }
 
-  const title = currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`
+  const title = normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
   const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')
 
   // Format dates
@@ -168,7 +579,6 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  const formatCompactTokens = (n: number) => new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 }).format(n)
   const ctx = typeof maxContextTokens === 'number' && Number.isFinite(maxContextTokens) && maxContextTokens > 0 ? maxContextTokens : null
   const overrideMax = typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : null
   const max = ctx ?? overrideMax ?? fallbackMaxTokens
@@ -180,42 +590,48 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
     return `$${v.toFixed(2)}`
   }
 
-  const CostPill = () => (
-    <span className="inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px] bg-muted/60 border-border/50 text-muted-foreground" title={`${formatUSD2(totalCost)} spent`}>
-      <Icon name="coins" className="h-3 w-3 text-amber-500" />
-      <span className="font-semibold tabular-nums text-foreground">{formatUSD2(totalCost)}</span>
-    </span>
-  )
+  const TokensRadial = () => {
+    if (!max || pct == null) return null
 
-  const TokensPill = () => (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1.5 rounded-full px-2 py-1 border text-[11px]',
-        isOver ? 'bg-destructive/10 border-destructive/30 text-destructive' : 'bg-muted/60 border-border/50 text-muted-foreground'
-      )}
-      title={max ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens` : `${totalTokens.toLocaleString()} tokens`}
-    >
-      <Icon name="sparkles" className={cn('h-3 w-3', isOver ? 'text-destructive' : 'text-primary')} />
-      <span className={cn('font-semibold tabular-nums', isOver ? 'text-destructive' : 'text-foreground')}>
-        {formatCompactTokens(totalTokens)}/{max ? formatCompactTokens(max) : '—'}
+    const size = 16
+    const stroke = 2
+    const r = (size - stroke) / 2
+    const c = 2 * Math.PI * r
+    const clamped = Math.max(0, Math.min(100, pct))
+    const offset = c * (1 - clamped / 100)
+    const center = size / 2
+
+    const title = showCost ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens • ${formatUSD2(totalCost)} spent` : `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens`
+
+    return (
+      <span className="inline-flex items-center" aria-label={title} title={title}>
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-hidden="true" focusable="false">
+          <circle cx={center} cy={center} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted-foreground/25" />
+          <circle
+            cx={center}
+            cy={center}
+            r={r}
+            fill="none"
+            stroke="currentColor"
+            strokeWidth={stroke}
+            strokeDasharray={c}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            transform={`rotate(-90 ${center} ${center})`}
+            className={cn(isOver ? 'text-destructive' : 'text-primary')}
+          />
+        </svg>
       </span>
-      {max ? (
-        <span className="ml-1 inline-flex items-center">
-          <span className="w-14 h-1.5 rounded-full bg-border/50 overflow-hidden">
-            <span className={cn('block h-full', isOver ? 'bg-destructive' : 'bg-primary')} style={{ width: `${pct ?? 0}%` }} />
-          </span>
-        </span>
-      ) : null}
-    </span>
-  )
+    )
+  }
 
   return (
     <motion.div
       key={animationKey}
-      initial={isInitialMountRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
+      initial={isInitialMountRef.current || renderedPlaceholderForConversationRef.current ? { opacity: 1, y: 0 } : { opacity: 0, y: -20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={
-        isInitialMountRef.current
+        isInitialMountRef.current || renderedPlaceholderForConversationRef.current
           ? { duration: 0 }
           : {
               duration: 0.5,
@@ -231,27 +647,80 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
             {/* Title and metadata (stacked) */}
             <div className="flex-1 min-w-0 flex flex-col justify-center gap-1.5">
               {/* Title */}
-              <div className="flex items-center gap-2 min-w-0">
-                <h3 className="text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
+              <div className="flex items-center gap-2 min-w-0 w-full">
+                {titlePrefix ? (
+                  <span aria-hidden="true" className="flex-shrink-0 text-muted-foreground leading-none">
+                    {titlePrefix}
+                  </span>
+                ) : null}
+                <h3 className="flex-1 text-xl font-semibold text-foreground truncate tracking-tight leading-tight min-w-0">{title}</h3>
               </div>
 
               {/* Agents + updated row */}
               <div className="flex flex-wrap items-center gap-2 text-xs leading-none text-muted-foreground">
-                {agents.length > 0 ? (
+                {effectiveParticipantItems.length > 0 ? (
                   <>
-                    {visibleAgents.map(agent => (
-                      <div key={agent.id ?? agent.slug ?? agent.name} className="inline-flex items-center gap-1.5 max-w-[14rem]" title={formatAgentDisplayName(agent)}>
-                        <Avatar className="h-4 w-4 ring-1 ring-border/40">
-                          <AgentAvatar seed={agent.name} imageUrl={avatarUrlById.get((agent as any).avatarAttachmentId)} size={16} />
-                        </Avatar>
-                        <span className="truncate font-medium leading-none">{formatAgentDisplayName(agent)}</span>
-                      </div>
-                    ))}
-                    {remaining > 0 ? <span className="text-muted-foreground/70">+{remaining}</span> : null}
+                    {/* Participants (overlapping avatars) + popup list (match navbar user menu popover style) */}
+                    <Popover
+                      open={participantsOpen}
+                      onOpenChange={next => {
+                        clearParticipantsHoverTimers()
+                        setParticipantsOpen(next)
+                      }}
+                    >
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          ref={participantsTriggerRef}
+                          className="inline-flex items-center gap-2 rounded-lg px-1 py-0.5 -mx-1 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          aria-label={`Participants: ${participantsLabel}`}
+                          title={participantsLabel}
+                          onPointerEnter={openParticipantsPopover}
+                          onPointerLeave={handleParticipantsTriggerPointerLeave}
+                          onFocus={() => {
+                            clearParticipantsHoverTimers()
+                            setParticipantsOpen(true)
+                          }}
+                        >
+                          <div className="flex items-center -space-x-1.5">
+                            {effectiveParticipantItems.slice(0, 3).map(p => {
+                              if (p.kind === 'agent') {
+                                const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                                return (
+                                  <div key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                    <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
+                                  </div>
+                                )
+                              }
+                              return (
+                                <Avatar key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                  {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                  <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                </Avatar>
+                              )
+                            })}
+                          </div>
+                          {effectiveParticipantItems.length > 3 ? <span className="font-medium leading-none text-muted-foreground">and {effectiveParticipantItems.length - 3} more</span> : null}
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        ref={participantsContentRef}
+                        side="bottom"
+                        align="start"
+                        sideOffset={8}
+                        className="w-64 !rounded-lg !p-1 bg-card !border-0 ring-1 ring-border/60 dark:ring-border !shadow-md"
+                        onOpenAutoFocus={e => e.preventDefault()}
+                        onCloseAutoFocus={e => e.preventDefault()}
+                        onPointerEnter={openParticipantsPopover}
+                        onPointerLeave={handleParticipantsContentPointerLeave}
+                      >
+                        <ParticipantsPopup />
+                      </PopoverContent>
+                    </Popover>
 
                     <span className="inline-flex items-center gap-2 whitespace-nowrap">
                       <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                      <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                      <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
                     </span>
 
                     {/* Tokens: utilized vs max (always render) */}
@@ -259,39 +728,30 @@ export function ConversationSummaryBar({ conversationId, starshipId, modelId, ma
                       <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <TokensPill />
+                          <TokensRadial />
                         </span>
-
-                        {showCost ? (
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <CostPill />
-                          </span>
-                        ) : null}
                       </>
                     ) : null}
                   </>
                 ) : (
                   <>
-                    <span className="font-medium leading-none">Updated {formatDate(updatedAt)}</span>
+                    <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
                     {showTokens ? (
                       <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <TokensPill />
+                          <TokensRadial />
                         </span>
-                        {showCost ? (
-                          <span className="inline-flex items-center gap-2 whitespace-nowrap">
-                            <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                            <CostPill />
-                          </span>
-                        ) : null}
                       </>
                     ) : null}
                   </>
                 )}
               </div>
+
+              {thirdLineSlot ? <div className="pt-2">{thirdLineSlot}</div> : null}
             </div>
+
+            {rightSlot ? <div className="flex items-center gap-2 flex-shrink-0">{rightSlot}</div> : null}
           </div>
         </div>
       </div>

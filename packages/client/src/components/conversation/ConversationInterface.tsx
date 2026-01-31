@@ -36,6 +36,7 @@ interface ConversationInterfaceProps {
   starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
+  onOpenThread?: (args: { conversationId: string; defaultAgent: Agent | null }) => void
   initialAgentId?: string
   starshipSlug?: string
 }
@@ -100,7 +101,7 @@ function isUIAction(v: unknown): v is ConversationStreamUIAction {
 
 // onboarding_connectors ui_action removed (connector suggestions are no longer driven by UI actions)
 
-export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
+export function ConversationInterface({ starshipId, conversationId: externalConversationId, onConversationChange, onOpenThread, initialAgentId, starshipSlug }: ConversationInterfaceProps) {
   const { userId, isAuthenticated, isLoading } = useAuth()
   const { data: authUser } = useAuthUser()
   const router = useRouter()
@@ -857,7 +858,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Forum channel view (cards/threads, no chat timeline).
   if (isForumChannel && currentConversationId) {
     return (
-      <div className="relative flex flex-col h-screen">
+      <div className="relative flex flex-col h-full">
         <ForumChannelView
           starshipId={starshipId}
           channelConversationId={currentConversationId}
@@ -870,9 +871,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   }
 
   return (
-    <div className="relative flex flex-col h-screen">
-      {/* Content container */}
-      <div className="relative z-[2] flex flex-col h-full">
+    <div className="relative flex flex-col h-full">
+      {/* Main column (shrinks when thread pane is open) */}
+      <div className="relative z-[2] flex flex-col h-full min-w-0">
         {/* Main Content Area - Conversation only; builders use dedicated routes */}
         {/* Messages Area */}
         {showMessagesArea ? (
@@ -895,6 +896,9 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 starshipId={starshipId}
                 bottomPaddingPx={inputHeight + 24}
                 enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
+                onOpenThread={id => {
+                  onOpenThread?.({ conversationId: id, defaultAgent: selectedAgent })
+                }}
               />
             </div>
             {/* Single place for stream-dependent side-effects */}

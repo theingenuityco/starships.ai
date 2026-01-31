@@ -20,6 +20,7 @@ import { AgentDocumentEditor } from '@/components/agents/AgentBuilder/components
 import type { AgentFormData } from '@/components/agents/AgentBuilder/types'
 import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import { isImageUrl } from '@/lib/isImageUrl'
 import Link from 'next/link'
 import type { AgentModel } from '@starships/protocol'
 import { ErrorBoundary } from '@/components/ui/error-boundary'
@@ -33,12 +34,6 @@ interface RequestedByProfileProps {
 
 function RequestedByProfile({ name, starshipName, starshipSlug, avatar }: RequestedByProfileProps) {
   const displayStarship = starshipName || starshipSlug
-
-  const isImageUrl = (value?: string | null): boolean => {
-    if (!value || typeof value !== 'string') return false
-    const trimmed = value.trim()
-    return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
-  }
 
   return (
     <div className="flex items-center gap-2.5 rounded-md border border-border/70 bg-background/70 px-2.5 py-2">

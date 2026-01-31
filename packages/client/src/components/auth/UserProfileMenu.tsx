@@ -9,6 +9,7 @@ import { StarshipsLogo } from '@/components/ui/starships-logo'
 import { ThemeToggle } from '@/components/theme-toggle'
 import { useAuth } from '@/hooks/useAuth'
 import { useSelectedStarship, useStarshipBySlug, useUserStarships } from '@/hooks/useStarships'
+import { isImageUrl } from '@/lib/isImageUrl'
 import { usePathname, useRouter } from 'next/navigation'
 import { useCallback, useMemo } from 'react'
 
@@ -52,12 +53,6 @@ export function UserProfileMenu({ expanded = false }: UserProfileMenuProps): Rea
   const activeStarshipName = starshipFromList?.name ?? starshipBySlug?.name ?? null
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && activeStarshipId && (user?.isInstanceAdmin === true || (starshipFromList?.ownerId ?? starshipBySlug?.ownerId) === user.id))
-
-  const isImageUrl = useCallback((value?: string | null): boolean => {
-    if (!value || typeof value !== 'string') return false
-    const trimmed = value.trim()
-    return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
-  }, [])
 
   const handleBillingClick = useCallback(() => {
     if (!activeStarshipSlug) return

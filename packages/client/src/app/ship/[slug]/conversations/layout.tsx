@@ -18,11 +18,19 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const [threadDraftParentConversationId, setThreadDraftParentConversationId] = useState<string | null>(null)
   const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
   const lastThreadConversationIdRef = useRef<string | null>(null)
+  const pendingThreadStateRef = useRef<{
+    threadKey: string | null
+    threadAgent: AgentModel | null
+    pinnedFirstMessage: MessageModel | null
+    draftParentConversationId: string | null
+    draftTitle: string | null
+  } | null>(null)
 
   // Desktop thread pane width (draggable resizer)
   const THREAD_PANE_WIDTH_STORAGE_KEY = 'starships.threadPaneWidthPx'
   const [threadPaneWidthPx, setThreadPaneWidthPx] = useState<number>(420)
   const resizeStateRef = useRef<{ startX: number; startWidth: number; prevUserSelect: string } | null>(null)
+  const resizeCleanupRef = useRef<null | (() => void)>(null)
 
   const clampThreadPaneWidthPx = useCallback((w: number) => {
     const min = 320
@@ -64,10 +72,24 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return () => window.removeEventListener('resize', onResize)
   }, [clampThreadPaneWidthPx])
 
+  useEffect(() => {
+    // Safety: if the user navigates away mid-drag, ensure we clean up listeners and restore user-select.
+    return () => {
+      try {
+        resizeCleanupRef.current?.()
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [])
+
   const handleThreadResizePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       if (e.button !== 0) return
       if (typeof window === 'undefined') return
+
+      // If somehow still resizing, cleanup first.
+      resizeCleanupRef.current?.()
 
       const startX = e.clientX
       const startWidth = threadPaneWidthPx
@@ -93,10 +115,12 @@ export default function ConversationsLayout({ children }: { children: React.Reac
           document.body.style.userSelect = state.prevUserSelect
         }
         resizeStateRef.current = null
+        resizeCleanupRef.current = null
       }
 
       const onUp = () => cleanup()
 
+      resizeCleanupRef.current = cleanup
       window.addEventListener('pointermove', onMove)
       window.addEventListener('pointerup', onUp)
     },
@@ -136,8 +160,6 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       const qs = next.toString()
       // Preserve the current route (including /conversations/:conversationId) and other query params.
       const basePath = routeParams.conversationId ? `/ship/${routeParams.slug}/conversations/${routeParams.conversationId}` : `/ship/${routeParams.slug}/conversations`
-      // Avoid clearing pinned message/agent when *we* open/close the thread via URL updates.
-      lastThreadConversationIdRef.current = conversationId
       router.push(qs ? `${basePath}?${qs}` : basePath)
     },
     [router, routeParams.conversationId, routeParams.slug, searchParams]
@@ -148,12 +170,43 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     const prev = lastThreadConversationIdRef.current
     if (prev !== threadKey) {
       lastThreadConversationIdRef.current = threadKey
-      setThreadPinnedFirstMessage(null)
-      setThreadAgent(null)
-      setThreadDraftParentConversationId(null)
-      setThreadDraftTitle(null)
+      const pending = pendingThreadStateRef.current
+      if (pending && pending.threadKey === threadKey) {
+        pendingThreadStateRef.current = null
+        setThreadPinnedFirstMessage(pending.pinnedFirstMessage)
+        setThreadAgent(pending.threadAgent)
+        setThreadDraftParentConversationId(pending.draftParentConversationId)
+        setThreadDraftTitle(pending.draftTitle)
+      } else {
+        setThreadPinnedFirstMessage(null)
+        setThreadAgent(null)
+        setThreadDraftParentConversationId(null)
+        setThreadDraftTitle(null)
+      }
     }
   }, [threadKey])
+
+  const handleThreadCreated = useCallback(
+    (cid: string) => {
+      setThreadConversationIdInUrl(cid)
+    },
+    [setThreadConversationIdInUrl]
+  )
+
+  const handleCloseThread = useCallback(() => {
+    setThreadPinnedFirstMessage(null)
+    setThreadAgent(null)
+    setThreadDraftParentConversationId(null)
+    setThreadDraftTitle(null)
+    pendingThreadStateRef.current = {
+      threadKey: null,
+      threadAgent: null,
+      pinnedFirstMessage: null,
+      draftParentConversationId: null,
+      draftTitle: null,
+    }
+    setThreadConversationIdInUrl(null)
+  }, [setThreadConversationIdInUrl])
 
   // When opening a draft thread purely via URL (e.g. forum "New thread"), default parent to the current conversation.
   useEffect(() => {
@@ -206,6 +259,33 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const isThreadPaneOpen = Boolean(threadKey)
 
+  const threadPaneSharedProps = useMemo(
+    () => ({
+      starshipId: starshipData.id,
+      starshipSlug: routeParams.slug,
+      conversationId: threadConversationId,
+      pinnedFirstMessage: threadPinnedFirstMessage,
+      draftParentConversationId: isDraftThreadOpen ? threadDraftParentConversationId : null,
+      draftTitle: isDraftThreadOpen ? threadDraftTitle : null,
+      selectedAgent: threadAgent,
+      onAgentChange: setThreadAgent,
+      onThreadCreated: handleThreadCreated,
+      onClose: handleCloseThread,
+    }),
+    [
+      handleCloseThread,
+      handleThreadCreated,
+      isDraftThreadOpen,
+      routeParams.slug,
+      starshipData.id,
+      threadAgent,
+      threadConversationId,
+      threadDraftParentConversationId,
+      threadDraftTitle,
+      threadPinnedFirstMessage,
+    ]
+  )
+
   return (
     <div className="h-screen w-full flex flex-col md:flex-row min-w-0">
       <div
@@ -219,8 +299,23 @@ export default function ConversationsLayout({ children }: { children: React.Reac
           conversationId={routeParams.conversationId || null}
           onConversationChange={handleConversationChange}
           onOpenThread={({ conversationId, defaultAgent, linkedMessage, parentConversationId }) => {
-            setThreadAgent(prev => prev ?? defaultAgent)
-            setThreadPinnedFirstMessage(linkedMessage ?? null)
+            const nextThreadKey = conversationId ? String(conversationId) : 'draft'
+            const nextPinned = linkedMessage ?? null
+
+            // Preserve the existing selection ONLY when re-opening the same thread; otherwise reset.
+            const nextAgent =
+              nextThreadKey === threadKey ? (threadAgent ?? defaultAgent ?? null) : (defaultAgent ?? null)
+
+            pendingThreadStateRef.current = {
+              threadKey: nextThreadKey,
+              threadAgent: nextAgent,
+              pinnedFirstMessage: nextPinned,
+              draftParentConversationId: null,
+              draftTitle: null,
+            }
+
+            setThreadAgent(nextAgent)
+            setThreadPinnedFirstMessage(nextPinned)
 
             // If we already have a thread conversation id, open it via URL param.
             if (conversationId) {
@@ -238,6 +333,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
             const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
             const title = snippet ? `Thread: ${snippet}` : 'New thread'
             setThreadDraftTitle(title)
+            pendingThreadStateRef.current = {
+              threadKey: 'draft',
+              threadAgent: nextAgent,
+              pinnedFirstMessage: nextPinned,
+              draftParentConversationId: parent || null,
+              draftTitle: title,
+            }
             setThreadConversationIdInUrl('draft')
           }}
           initialAgentId={routeParams.agentIdOrSlug}
@@ -267,27 +369,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
               width: threadPaneWidthPx,
             }}
           >
-            <ThreadPane
-              starshipId={starshipData.id}
-              starshipSlug={routeParams.slug}
-              conversationId={threadConversationId}
-              pinnedFirstMessage={threadPinnedFirstMessage}
-              draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
-              draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-              selectedAgent={threadAgent}
-              onAgentChange={setThreadAgent}
-              onThreadCreated={cid => {
-                setThreadConversationIdInUrl(cid)
-              }}
-              onClose={() => {
-                setThreadPinnedFirstMessage(null)
-                setThreadAgent(null)
-                setThreadDraftParentConversationId(null)
-                setThreadDraftTitle(null)
-                setThreadConversationIdInUrl(null)
-              }}
-              className="w-full min-w-0"
-            />
+            <ThreadPane {...threadPaneSharedProps} className="w-full min-w-0" />
           </aside>
         </>
       ) : null}
@@ -295,26 +377,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       {/* Thread in-flow pane (mobile) */}
       {isThreadPaneOpen ? (
         <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border bg-background min-w-0">
-          <ThreadPane
-            starshipId={starshipData.id}
-            starshipSlug={routeParams.slug}
-            conversationId={threadConversationId}
-            pinnedFirstMessage={threadPinnedFirstMessage}
-            draftParentConversationId={isDraftThreadOpen ? threadDraftParentConversationId : null}
-            draftTitle={isDraftThreadOpen ? threadDraftTitle : null}
-            selectedAgent={threadAgent}
-            onAgentChange={setThreadAgent}
-            onThreadCreated={cid => {
-              setThreadConversationIdInUrl(cid)
-            }}
-            onClose={() => {
-              setThreadPinnedFirstMessage(null)
-              setThreadAgent(null)
-              setThreadDraftParentConversationId(null)
-              setThreadDraftTitle(null)
-              setThreadConversationIdInUrl(null)
-            }}
-          />
+          <ThreadPane {...threadPaneSharedProps} />
         </aside>
       ) : null}
 

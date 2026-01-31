@@ -16,6 +16,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/conversation/conversationSearch'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
+import { isImageUrl } from '@/lib/isImageUrl'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
@@ -1333,12 +1334,6 @@ function renderTextWithHighlight(text: string, term: string | undefined): ReactN
       )}
     </>
   )
-}
-
-function isImageUrl(value?: string | null): boolean {
-  if (!value || typeof value !== 'string') return false
-  const trimmed = value.trim()
-  return /^(https?:\/\/|data:image\/[a-zA-Z]+;base64,|\/)/.test(trimmed)
 }
 
 function initialsFromName(name?: string | null): string {

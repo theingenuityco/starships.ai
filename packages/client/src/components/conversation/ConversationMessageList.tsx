@@ -17,6 +17,8 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { TypingDots } from '@/components/ui/TypingDots'
+import api from '@/lib/api'
+import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
@@ -27,12 +29,14 @@ function LinkedConversationCard({
   enableChannelMessageThreads,
   onThreadAction,
   message,
+  starshipId,
 }: {
   linkedConversationId: string | null
   linkedConversationHref: string | null
   enableChannelMessageThreads: boolean
   onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
   message: MessageModel
+  starshipId?: string
 }) {
   const { data: conversation } = useConversationDetail(linkedConversationId)
   const { data: agents = [] } = useConversationAgents(linkedConversationId)
@@ -42,18 +46,109 @@ function LinkedConversationCard({
   const rawTitle = String((conversation as any)?.title ?? '').trim()
   const title = rawTitle || `Conversation ${linkedConversationId.slice(0, 8)}`
 
-  const agentNames = (Array.isArray(agents) ? agents : []).map(a => String((a as any)?.name || (a as any)?.slug || '').trim()).filter(Boolean)
+  const agentList = (Array.isArray(agents) ? agents : []) as any[]
+  const agentNames = agentList.map(a => String(a?.name || a?.slug || '').trim()).filter(Boolean)
 
-  const participants = agentNames.length === 0 ? '—' : agentNames.length <= 3 ? agentNames.join(', ') : `${agentNames.slice(0, 3).join(', ')} +${agentNames.length - 3}`
+  const avatarAttachmentIds = useMemo(() => {
+    const ids = agentList.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
+    return Array.from(new Set(ids))
+  }, [agentList])
+  const { data: avatarAttachments = [] } = useMessageAttachments(avatarAttachmentIds, starshipId)
+  const avatarUrlById = useMemo(() => new Map((avatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [avatarAttachments])
+
+  // Include human participants by sampling recent message authors.
+  // The conversation detail endpoint does not currently include members/users.
+  const { data: participantsPreview } = useQuery({
+    queryKey: ['conversations', 'participants-preview', linkedConversationId],
+    enabled: Boolean(linkedConversationId),
+    queryFn: async () => {
+      const resp = await api.get(`/api/v1/conversations/${encodeURIComponent(linkedConversationId)}/messages`, { params: { limit: 50 } })
+      return (resp as any)?.data?.data ?? null
+    },
+    staleTime: 60_000,
+  })
+
+  type ParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
+
+  const participantItems = useMemo<ParticipantItem[]>(() => {
+    const items: ParticipantItem[] = []
+    const seen = new Set<string>()
+
+    // Humans: derive from recent messages' user identity fields.
+    const msgs = Array.isArray((participantsPreview as any)?.messages) ? (((participantsPreview as any).messages as any[]) ?? []) : []
+    for (const m of msgs) {
+      const role = String(m?.role ?? '')
+      if (role !== 'user') continue
+      const userId = typeof m?.userId === 'string' ? String(m.userId).trim() : ''
+      const userName = typeof m?.userName === 'string' ? String(m.userName).trim() : ''
+      const userAvatar = typeof m?.userAvatar === 'string' ? String(m.userAvatar).trim() : ''
+
+      const label = userName || (userId ? `User ${userId.slice(0, 6)}` : 'User')
+      const key = userId ? `human:${userId}` : userName ? `human:name:${userName}` : `human:unknown:${label}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      items.push({ kind: 'human', key, label, ...(userAvatar ? { avatarUrl: userAvatar } : null) })
+    }
+
+    // Agents: from the agents list.
+    for (let idx = 0; idx < agentList.length; idx++) {
+      const a = agentList[idx]
+      const id = typeof a?.id === 'string' ? String(a.id).trim() : ''
+      const label = String(a?.name || a?.slug || id || `Agent ${idx + 1}`).trim() || `Agent ${idx + 1}`
+      const key = `agent:${id || label}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      const seed = String(a?.name || a?.slug || id || `agent-${idx}`).trim() || `agent-${idx}`
+      const aid = typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : ''
+      items.push({ kind: 'agent', key, label, seed, ...(aid ? { avatarAttachmentId: aid } : null) })
+    }
+
+    return items
+  }, [agentList, participantsPreview])
+
+  const participantsLabel = useMemo(() => {
+    const labels = participantItems.map(p => p.label).filter(Boolean)
+    if (labels.length === 0) return 'No participants'
+    if (labels.length <= 3) return labels.join(', ')
+    return `${labels.slice(0, 3).join(', ')} +${labels.length - 3}`
+  }, [participantItems])
 
   const cardInner = (
     <div className="w-full rounded-xl border border-border/60 bg-card/60 hover:bg-card transition-colors px-4 py-3">
-      <div className="flex items-start justify-between gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-foreground truncate">{title}</p>
-          <p className="text-xs text-muted-foreground mt-1 truncate">{`Participants: ${participants}`}</p>
+          <div className="flex items-center gap-2 min-w-0">
+            <Icon name="thread" className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <p className="text-sm font-medium text-foreground truncate">{title}</p>
+          </div>
         </div>
-        <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0 mt-0.5" />
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Participants (overlapping avatars) */}
+          {participantItems.length > 0 && (
+            <div className="flex items-center -space-x-2" title={participantsLabel} aria-label={`Participants: ${participantsLabel}`}>
+              {participantItems.slice(0, 4).map(p => {
+                if (p.kind === 'agent') {
+                  const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
+                  return (
+                    <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
+                    </div>
+                  )
+                }
+                return (
+                  <Avatar key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                    <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                  </Avatar>
+                )
+              })}
+              {participantItems.length > 4 && (
+                <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted text-xs font-semibold text-muted-foreground flex items-center justify-center">+{participantItems.length - 4}</div>
+              )}
+            </div>
+          )}
+          <Icon name="chevron-right" className="h-4 w-4 text-muted-foreground/80 opacity-100 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+        </div>
       </div>
     </div>
   )
@@ -788,6 +883,8 @@ export function ConversationMessageList({
           {renderMessages.map((message, idx) => {
             const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
             const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
+            const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
+            const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
             const userKey = (m: any): string | null => {
               if (!m || String(m?.role ?? '') !== 'user') return null
               const uid = typeof m?.userId === 'string' ? m.userId.trim() : ''
@@ -802,6 +899,12 @@ export function ConversationMessageList({
             const prevUserKey = prev ? userKey(prev) : null
             const currUserKey = userKey(message)
             const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
+            const startsNewGroup = (() => {
+              if (!prev) return false
+              if (message.role === 'assistant') return Boolean(showAssistantAvatar)
+              if (message.role === 'user') return !isConsecutiveUser
+              return prev.role !== message.role
+            })()
             const isFirstMessage = idx === 0
 
             return (
@@ -818,7 +921,9 @@ export function ConversationMessageList({
                   onThreadAction={handleThreadAction}
                   showAssistantAvatar={showAssistantAvatar}
                   isConsecutiveUser={isConsecutiveUser}
+                  startsNewGroup={startsNewGroup}
                   isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
+                  suppressLinkedConversationCard={suppressLinkedConversationCard}
                   userNameOverride={userNameOverride}
                   userEmailOverride={userEmailOverride}
                   userAvatarUrlOverride={userAvatarUrlOverride}
@@ -954,11 +1059,15 @@ interface ConversationMessageBubbleProps {
   showAssistantAvatar?: boolean
   /** True when the previous rendered message row was also a user message. */
   isConsecutiveUser?: boolean
+  /** True when this row begins a new visual author/role group (so it should get the standard top gap). */
+  startsNewGroup?: boolean
   /**
    * If true, apply the same top spacing a first user message gets (mt-6)
    * so assistant-first conversations don't look "pinned" to the top.
    */
   isFirstMessage?: boolean
+  /** When true, do not show the linked-thread preview card under this message row. */
+  suppressLinkedConversationCard?: boolean
   userNameOverride?: string
   userEmailOverride?: string
   userAvatarUrlOverride?: string
@@ -1071,7 +1180,9 @@ const MemoizedMessageBubble = memo(
     onThreadAction,
     showAssistantAvatar = true,
     isConsecutiveUser = false,
+    startsNewGroup = false,
     isFirstMessage = false,
+    suppressLinkedConversationCard = false,
     userNameOverride,
     userEmailOverride,
     userAvatarUrlOverride,
@@ -1164,13 +1275,16 @@ const MemoizedMessageBubble = memo(
                     </div>
                   )}
                 </div>
-                <LinkedConversationCard
-                  linkedConversationId={linkedConversationId}
-                  linkedConversationHref={linkedConversationHref}
-                  enableChannelMessageThreads={enableChannelMessageThreads}
-                  onThreadAction={onThreadAction}
-                  message={message}
-                />
+                {!suppressLinkedConversationCard && (
+                  <LinkedConversationCard
+                    linkedConversationId={linkedConversationId}
+                    linkedConversationHref={linkedConversationHref}
+                    enableChannelMessageThreads={enableChannelMessageThreads}
+                    onThreadAction={onThreadAction}
+                    message={message}
+                    starshipId={starshipId}
+                  />
+                )}
               </div>
               {isConsecutiveSameUser ? (
                 // Only reserve width, not height (prevents "blank gap" under short consecutive messages)
@@ -1288,13 +1402,16 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
-              <LinkedConversationCard
-                linkedConversationId={linkedConversationId}
-                linkedConversationHref={linkedConversationHref}
-                enableChannelMessageThreads={enableChannelMessageThreads}
-                onThreadAction={onThreadAction}
-                message={message}
-              />
+              {!suppressLinkedConversationCard && (
+                <LinkedConversationCard
+                  linkedConversationId={linkedConversationId}
+                  linkedConversationHref={linkedConversationHref}
+                  enableChannelMessageThreads={enableChannelMessageThreads}
+                  onThreadAction={onThreadAction}
+                  message={message}
+                  starshipId={starshipId}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1310,7 +1427,7 @@ const MemoizedMessageBubble = memo(
       if (isHero || isDelegation) {
         const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
         return (
-          <div className="flex justify-start">
+          <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
             <div className={cn('flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
                 <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
@@ -1342,13 +1459,16 @@ const MemoizedMessageBubble = memo(
                   isAwaitingToolResults={isAwaitingToolResults}
                   isLastMessage={isLastMessage}
                 />
-                <LinkedConversationCard
-                  linkedConversationId={linkedConversationId}
-                  linkedConversationHref={linkedConversationHref}
-                  enableChannelMessageThreads={enableChannelMessageThreads}
-                  onThreadAction={onThreadAction}
-                  message={message}
-                />
+                {!suppressLinkedConversationCard && (
+                  <LinkedConversationCard
+                    linkedConversationId={linkedConversationId}
+                    linkedConversationHref={linkedConversationHref}
+                    enableChannelMessageThreads={enableChannelMessageThreads}
+                    onThreadAction={onThreadAction}
+                    message={message}
+                    starshipId={starshipId}
+                  />
+                )}
               </div>
             </div>
           </div>
@@ -1356,7 +1476,7 @@ const MemoizedMessageBubble = memo(
       }
 
       return (
-        <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : '')}>
+        <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : startsNewGroup ? 'mt-4' : '')}>
           <div
             className={cn(
               'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
@@ -1405,13 +1525,16 @@ const MemoizedMessageBubble = memo(
                 isAwaitingToolResults={isAwaitingToolResults}
                 isLastMessage={isLastMessage}
               />
-              <LinkedConversationCard
-                linkedConversationId={linkedConversationId}
-                linkedConversationHref={linkedConversationHref}
-                enableChannelMessageThreads={enableChannelMessageThreads}
-                onThreadAction={onThreadAction}
-                message={message}
-              />
+              {!suppressLinkedConversationCard && (
+                <LinkedConversationCard
+                  linkedConversationId={linkedConversationId}
+                  linkedConversationHref={linkedConversationHref}
+                  enableChannelMessageThreads={enableChannelMessageThreads}
+                  onThreadAction={onThreadAction}
+                  message={message}
+                  starshipId={starshipId}
+                />
+              )}
             </div>
           </div>
         </div>
@@ -1433,7 +1556,9 @@ const MemoizedMessageBubble = memo(
     }
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
     if (Boolean(prevProps.isConsecutiveUser) !== Boolean(nextProps.isConsecutiveUser)) return false
+    if (Boolean(prevProps.startsNewGroup) !== Boolean(nextProps.startsNewGroup)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
+    if (Boolean(prevProps.suppressLinkedConversationCard) !== Boolean(nextProps.suppressLinkedConversationCard)) return false
 
     // Re-render when agent label changes (post-reload agent restoration)
     if ((prevProps.agentName || '') !== (nextProps.agentName || '')) return false

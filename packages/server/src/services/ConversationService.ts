@@ -1945,6 +1945,49 @@ export class ConversationService {
       // Hardcode a known, reliable OpenRouter model for titles
       const model = 'openai/gpt-4o-mini';
 
+      // If this is a thread, include the pinned/linked message context seed.
+      // The client persists a hidden system_instruction message with:
+      // - content starting with "[THREAD_CONTEXT_SEED]"
+      // - metadata.thread_context_seed === true
+      //
+      // That message is filtered from UI but should influence title generation.
+      const extractThreadSeedSourceContent = (seed: string): string | null => {
+        try {
+          if (typeof seed !== 'string') return null;
+          if (!seed.includes('[THREAD_CONTEXT_SEED]')) return null;
+          const idx = seed.indexOf('Source message content:');
+          const tail = idx >= 0 ? seed.slice(idx) : seed;
+          const firstFence = tail.indexOf('"""');
+          if (firstFence < 0) return null;
+          const afterFirst = tail.slice(firstFence + 3);
+          const secondFence = afterFirst.indexOf('"""');
+          if (secondFence < 0) return null;
+          const inside = afterFirst.slice(0, secondFence).trim();
+          return inside.length > 0 ? inside : null;
+        } catch {
+          return null;
+        }
+      };
+
+      let threadPinnedContent: string | null = null;
+      try {
+        const msgs = await this.getConversationMessages(conversationId, 'asc').catch(() => []);
+        const seedMsg =
+          msgs.find((m) => {
+            if (!m) return false;
+            if (String((m as any).role ?? '') !== 'system') return false;
+            const meta = (m as any).metadata;
+            const flagged = Boolean(meta && typeof meta === 'object' && (meta as any).thread_context_seed === true);
+            const content = typeof (m as any).content === 'string' ? String((m as any).content) : '';
+            return flagged || content.startsWith('[THREAD_CONTEXT_SEED]');
+          }) ?? null;
+        if (seedMsg && typeof seedMsg.content === 'string') {
+          threadPinnedContent = extractThreadSeedSourceContent(seedMsg.content) ?? null;
+        }
+      } catch {
+        // best-effort
+      }
+
       const { OPENROUTER_API_KEY } = getEnvConfig();
       if (!OPENROUTER_API_KEY) {
         console.warn('[TITLE] OPENROUTER_API_KEY not configured; skipping title generation');
@@ -1964,13 +2007,19 @@ export class ConversationService {
         'You generate concise, helpful conversation titles.',
         'Rules:',
         '- 4-8 words, sentence case, no trailing punctuation.',
-        '- Capture the main user intent/topic from the first message.',
+        '- Capture the main user intent/topic from the initial context.',
         '- Avoid quotes, emojis, and personal data. Keep under 60 characters.',
       ].join('\n');
 
-      const prompt = `User message: "${String(userContent || '')
-        .replace(/\n+/g, ' ')
-        .slice(0, 400)}"\n\nReturn only the title text.`;
+      const safe = (s: string, max: number) =>
+        String(s || '')
+          .replace(/\n+/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim()
+          .slice(0, max);
+
+      const ctxBlock = threadPinnedContent ? `Thread pinned message: "${safe(threadPinnedContent, 500)}"\n` : '';
+      const prompt = `${ctxBlock}User message: "${safe(userContent, 400)}"\n\nReturn only the title text.`;
 
       const completion = await client.chat.completions.create({
         model,

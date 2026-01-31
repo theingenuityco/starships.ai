@@ -15,4 +15,3 @@ export async function up(client: Client): Promise<void> {
 export async function down(client: Client): Promise<void> {
   await client.query(`DROP INDEX IF EXISTS idx_messages_conversation_created_id;`);
 }
-

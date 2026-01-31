@@ -31,4 +31,3 @@ export async function down(client: Client): Promise<void> {
   `;
   await client.query(sql);
 }
-

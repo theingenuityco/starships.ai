@@ -298,7 +298,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
               ) : channels.length === 0 ? (
                 <div className="px-2 py-3 text-xs text-muted-foreground">No channels yet</div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-1">
                   {channels.map(ch => {
                     const isActive = ch.conversationId === currentConversationId
                     const label = ch.name || ch.slug
@@ -381,7 +381,7 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
                     <p className="text-muted-foreground text-xs text-center">No one to message yet</p>
                   </div>
                 ) : (
-                  <div className="space-y-2">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
+                  <div className="space-y-1">{dmTargets.map(t => renderCompactDmTarget(t))}</div>
                 )}
               </div>
             ) : null}

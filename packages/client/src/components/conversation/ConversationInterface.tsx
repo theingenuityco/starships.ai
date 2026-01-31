@@ -30,13 +30,13 @@ import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
 import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
-import type { ConversationStreamUIAction } from '@starships/protocol'
+import type { ConversationStreamUIAction, MessageModel } from '@starships/protocol'
 
 interface ConversationInterfaceProps {
   starshipId: string
   conversationId?: string | null
   onConversationChange?: (conversationId: string | null) => void
-  onOpenThread?: (args: { conversationId: string; defaultAgent: Agent | null }) => void
+  onOpenThread?: (args: { conversationId: string | null; defaultAgent: Agent | null; linkedMessage?: MessageModel | null; parentConversationId?: string | null }) => void
   initialAgentId?: string
   starshipSlug?: string
 }
@@ -896,8 +896,8 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                 starshipId={starshipId}
                 bottomPaddingPx={inputHeight + 24}
                 enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
-                onOpenThread={id => {
-                  onOpenThread?.({ conversationId: id, defaultAgent: selectedAgent })
+                onOpenThread={({ conversationId, linkedMessage, parentConversationId }) => {
+                  onOpenThread?.({ conversationId, defaultAgent: selectedAgent, linkedMessage: linkedMessage ?? null, parentConversationId: parentConversationId ?? null })
                 }}
               />
             </div>

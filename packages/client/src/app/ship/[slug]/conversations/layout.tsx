@@ -4,6 +4,7 @@ import { ConversationInterface } from '@/components/conversation/ConversationInt
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import type { Agent } from '@/lib/api'
+import type { MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect, useState } from 'react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
@@ -15,6 +16,10 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const { shouldShowOnboarding, currentStep } = useNavigationOnboardingContext()
   const [threadConversationId, setThreadConversationId] = useState<string | null>(null)
   const [threadAgent, setThreadAgent] = useState<Agent | null>(null)
+  const [threadPinnedFirstMessage, setThreadPinnedFirstMessage] = useState<MessageModel | null>(null)
+  const [threadDraft, setThreadDraft] = useState<{ parentConversationId: string; title: string } | null>(null)
+  const [threadParentConversationId, setThreadParentConversationId] = useState<string | null>(null)
+  const [threadDraftTitle, setThreadDraftTitle] = useState<string | null>(null)
 
   // Memoize params to prevent unnecessary rerenders
   const routeParams = useMemo(
@@ -70,9 +75,22 @@ export default function ConversationsLayout({ children }: { children: React.Reac
           starshipId={starshipData.id}
           conversationId={routeParams.conversationId || null}
           onConversationChange={handleConversationChange}
-          onOpenThread={({ conversationId, defaultAgent }) => {
+          onOpenThread={({ conversationId, defaultAgent, linkedMessage, parentConversationId }) => {
             setThreadConversationId(conversationId)
             setThreadAgent(prev => prev ?? defaultAgent)
+            setThreadPinnedFirstMessage(linkedMessage ?? null)
+            setThreadParentConversationId(parentConversationId ?? null)
+            if (!conversationId && linkedMessage && parentConversationId) {
+              const raw = String((linkedMessage as any)?.content ?? '')
+                .trim()
+                .replace(/\s+/g, ' ')
+              const snippet = raw.length > 0 ? raw.slice(0, 64) : ''
+              const title = snippet ? `Thread: ${snippet}` : 'New thread'
+              setThreadDraftTitle(title)
+              setThreadDraft({ parentConversationId, title })
+            } else {
+              setThreadDraft(null)
+            }
           }}
           initialAgentId={routeParams.agentIdOrSlug}
           starshipSlug={routeParams.slug}
@@ -80,29 +98,55 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       </div>
 
       {/* Thread split pane (desktop/tablet) */}
-      {threadConversationId ? (
+      {threadConversationId || threadDraft ? (
         <aside className="hidden md:flex h-full w-[420px] lg:w-[520px] flex-shrink-0 border-l border-border/60 bg-card min-w-0">
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             conversationId={threadConversationId}
+            pinnedFirstMessage={threadPinnedFirstMessage}
             selectedAgent={(threadAgent as any) ?? null}
             onAgentChange={setThreadAgent as any}
-            onClose={() => setThreadConversationId(null)}
+            draftParentConversationId={threadDraft?.parentConversationId ?? threadParentConversationId ?? null}
+            draftTitle={threadDraft?.title ?? threadDraftTitle ?? null}
+            onThreadCreated={cid => {
+              setThreadConversationId(cid)
+              setThreadDraft(null)
+            }}
+            onClose={() => {
+              setThreadConversationId(null)
+              setThreadPinnedFirstMessage(null)
+              setThreadDraft(null)
+              setThreadParentConversationId(null)
+              setThreadDraftTitle(null)
+            }}
           />
         </aside>
       ) : null}
 
       {/* Thread in-flow pane (mobile) */}
-      {threadConversationId ? (
+      {threadConversationId || threadDraft ? (
         <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border/60 bg-card min-w-0">
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}
             conversationId={threadConversationId}
+            pinnedFirstMessage={threadPinnedFirstMessage}
             selectedAgent={(threadAgent as any) ?? null}
             onAgentChange={setThreadAgent as any}
-            onClose={() => setThreadConversationId(null)}
+            draftParentConversationId={threadDraft?.parentConversationId ?? threadParentConversationId ?? null}
+            draftTitle={threadDraft?.title ?? threadDraftTitle ?? null}
+            onThreadCreated={cid => {
+              setThreadConversationId(cid)
+              setThreadDraft(null)
+            }}
+            onClose={() => {
+              setThreadConversationId(null)
+              setThreadPinnedFirstMessage(null)
+              setThreadDraft(null)
+              setThreadParentConversationId(null)
+              setThreadDraftTitle(null)
+            }}
           />
         </aside>
       ) : null}

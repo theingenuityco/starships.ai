@@ -6,9 +6,9 @@ import AgentAvatar from '@/components/animated/AgentAvatar'
 import type { MessageModel } from '@starships/protocol'
 
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
-import { useEffect, useMemo, useRef, memo, useState, Fragment } from 'react'
+import { useEffect, useMemo, useRef, memo, useState, Fragment, useCallback } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents } from '@/hooks/useConversations'
+import { useConversationAgents, useCreateConversation, useLinkMessageToConversation } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -18,7 +18,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { TypingDots } from '@/components/ui/TypingDots'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 
 interface ConversationMessageListProps {
@@ -27,6 +27,8 @@ interface ConversationMessageListProps {
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
+  /** When true, show a per-message action to start/open a thread (child conversation). */
+  enableChannelMessageThreads?: boolean
   /**
    * Optional override for the "user" identity (useful for demo / internal chats on landing).
    * If omitted, the component uses the signed-in user's info via `useAuth()`.
@@ -73,6 +75,7 @@ export function ConversationMessageList({
   bottomPaddingPx,
   className,
   scrollClassName,
+  enableChannelMessageThreads = false,
   userNameOverride,
   userEmailOverride,
   userAvatarUrlOverride,
@@ -87,6 +90,7 @@ export function ConversationMessageList({
   sizeVariant = 'default',
   hideTurnActionButtons = false,
 }: ConversationMessageListProps) {
+  const router = useRouter()
   const params = useParams<{ slug?: string }>()
   const starshipSlug = useMemo(() => {
     const raw = (params as any)?.slug
@@ -116,6 +120,53 @@ export function ConversationMessageList({
   const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
   const agentAvatarUrl = agentAvatarUrlOverride ?? agentAvatarAttachments?.[0]?.previewUrl
+
+  const createConversation = useCreateConversation()
+  const linkMessageToConversation = useLinkMessageToConversation()
+  const [threadBusyMessageId, setThreadBusyMessageId] = useState<string | null>(null)
+
+  const handleThreadAction = useCallback(
+    async (args: { messageId: string; linkedConversationId: string | null; messageText?: string }) => {
+      const sid = typeof starshipId === 'string' ? starshipId : ''
+      const parentConversationId = typeof conversationId === 'string' ? conversationId : ''
+      const shipSlug = typeof starshipSlug === 'string' ? starshipSlug : ''
+      if (!enableChannelMessageThreads) return
+      if (!sid || !parentConversationId || !shipSlug) return
+
+      const existing = typeof args.linkedConversationId === 'string' ? args.linkedConversationId.trim() : ''
+      if (existing) {
+        router.push(`/ship/${encodeURIComponent(shipSlug)}/conversations/${encodeURIComponent(existing)}`)
+        return
+      }
+
+      const messageId = String(args.messageId || '').trim()
+      if (!messageId) return
+
+      try {
+        setThreadBusyMessageId(messageId)
+        const rawText = String(args.messageText || '')
+          .trim()
+          .replace(/\s+/g, ' ')
+        const snippet = rawText.length > 0 ? rawText.slice(0, 64) : ''
+        const title = snippet ? `Thread: ${snippet}` : 'New thread'
+
+        const child = await createConversation.mutateAsync({
+          starshipId: sid,
+          title,
+          parentConversationId,
+        })
+
+        const childId = typeof (child as any)?.id === 'string' ? String((child as any).id) : ''
+        if (!childId) return
+
+        await linkMessageToConversation.mutateAsync({ messageId, linkedConversationId: childId, conversationId: parentConversationId })
+        router.push(`/ship/${encodeURIComponent(shipSlug)}/conversations/${encodeURIComponent(childId)}`)
+      } finally {
+        setThreadBusyMessageId(prev => (prev === messageId ? null : prev))
+      }
+    },
+    [conversationId, createConversation, enableChannelMessageThreads, linkMessageToConversation, router, starshipId, starshipSlug]
+  )
 
   // Scroll container reference
   const scrollContainerRef = useRef<HTMLDivElement>(null)
@@ -584,6 +635,9 @@ export function ConversationMessageList({
                   agentAvatarUrl={agentAvatarUrl}
                   isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                   starshipId={starshipId}
+                  enableChannelMessageThreads={enableChannelMessageThreads}
+                  isThreadBusy={threadBusyMessageId === message.id}
+                  onThreadAction={handleThreadAction}
                   showAssistantAvatar={showAssistantAvatar}
                   isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
                   userNameOverride={userNameOverride}
@@ -716,6 +770,9 @@ interface ConversationMessageBubbleProps {
   agentAvatarUrl?: string
   isStreamingActive?: boolean
   starshipId?: string
+  enableChannelMessageThreads?: boolean
+  isThreadBusy?: boolean
+  onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string }) => void
   showAssistantAvatar?: boolean
   /**
    * If true, apply the same top spacing a first user message gets (mt-6)
@@ -830,6 +887,9 @@ const MemoizedMessageBubble = memo(
     agentAvatarUrl,
     isStreamingActive,
     starshipId,
+    enableChannelMessageThreads = false,
+    isThreadBusy = false,
+    onThreadAction,
     showAssistantAvatar = true,
     isFirstMessage = false,
     userNameOverride,
@@ -870,6 +930,39 @@ const MemoizedMessageBubble = memo(
       }
       return null
     }, [linkedConversationId, starshipSlug])
+
+    const threadActionButton = useMemo(() => {
+      if (!enableChannelMessageThreads) return null
+      // Only show on real messages (skip tool_result rows; they are not rendered here anyway)
+      const label = linkedConversationId ? 'Open thread' : 'Start thread'
+      return (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          className="h-7 w-7"
+          disabled={isThreadBusy}
+          onClick={e => {
+            e.preventDefault()
+            e.stopPropagation()
+            onThreadAction?.({ messageId: message.id, linkedConversationId, messageText: message.content })
+          }}
+          aria-label={label}
+          title={label}
+        >
+          {linkedConversationId ? (
+            <Icon name="thread" className="h-4 w-4" />
+          ) : (
+            <span className="relative inline-flex h-4 w-4 items-center justify-center">
+              <Icon name="message-square" className="h-4 w-4" />
+              <span className="absolute -right-1 -bottom-1 h-3 w-3 rounded-full bg-background/80 backdrop-blur flex items-center justify-center ring-1 ring-border/60">
+                <Icon name="plus" className="h-2.5 w-2.5" />
+              </span>
+            </span>
+          )}
+        </Button>
+      )
+    }, [enableChannelMessageThreads, isThreadBusy, linkedConversationId, message.content, message.id, onThreadAction])
 
     if (isUser) {
       // When the "user" is being overridden to represent an agent (e.g. Aria in landing demos),
@@ -978,6 +1071,7 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={true}
+                extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={false}
                 className="text-foreground/80"
@@ -1032,6 +1126,7 @@ const MemoizedMessageBubble = memo(
                   messageId={message.id}
                   enableMarkdown={true}
                   enableCopy={!isStreamingActive}
+                  extraActions={null}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
                   className="text-foreground"
@@ -1097,6 +1192,7 @@ const MemoizedMessageBubble = memo(
                 messageId={message.id}
                 enableMarkdown={true}
                 enableCopy={!isStreamingActive}
+                extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
                 className="text-foreground/80"
@@ -1181,6 +1277,9 @@ const MemoizedMessageBubble = memo(
     if ((prevProps.sizeVariant ?? 'default') !== (nextProps.sizeVariant ?? 'default')) return false
     if ((prevProps.starshipSlug || '') !== (nextProps.starshipSlug || '')) return false
     if ((prevProps.agentSlug || '') !== (nextProps.agentSlug || '')) return false
+    if (Boolean(prevProps.enableChannelMessageThreads) !== Boolean(nextProps.enableChannelMessageThreads)) return false
+    if (Boolean(prevProps.isThreadBusy) !== Boolean(nextProps.isThreadBusy)) return false
+    if ((prevProps.onThreadAction ? '1' : '0') !== (nextProps.onThreadAction ? '1' : '0')) return false
 
     // CRITICAL: Re-render when grouped toolResults attach later
     const prevToolResults = (prevProps.message as ExtendedMessage).toolResults?.length ?? 0

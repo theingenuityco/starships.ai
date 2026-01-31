@@ -464,6 +464,33 @@ export function useDeleteMessage() {
   })
 }
 
+// Link a message to a child conversation (used for channel "threads")
+export function useLinkMessageToConversation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (args: { messageId: string; linkedConversationId: string; conversationId?: string }) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.put(`/api/v1/messages/${args.messageId}`, {
+        linkedConversationId: args.linkedConversationId,
+      })
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      const conversationId = typeof variables.conversationId === 'string' ? variables.conversationId : ''
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } else {
+        // Fallback: invalidate broadly (MessageModel may not always include conversationId in caches)
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.all })
+      }
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create thread', { description: errorMessage })
+    },
+  })
+}
+
 // Get conversation agents (for agent restoration on refresh)
 export function useConversationAgents(conversationId: string | null) {
   return useQuery({

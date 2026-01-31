@@ -890,7 +890,12 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
               }
             />
             <div className="relative flex-1 min-h-0">
-              <ConversationMessageList conversationId={currentConversationId} starshipId={starshipId} bottomPaddingPx={inputHeight + 24} />
+              <ConversationMessageList
+                conversationId={currentConversationId}
+                starshipId={starshipId}
+                bottomPaddingPx={inputHeight + 24}
+                enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
+              />
             </div>
             {/* Single place for stream-dependent side-effects */}
             <StreamSideEffects />

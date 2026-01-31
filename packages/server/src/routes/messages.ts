@@ -19,6 +19,7 @@ const CreateMessageSchema = z.object({
   memoryId: IdSchema.optional(),
   conversationId: IdSchema.optional(),
   parentMessageId: IdSchema.optional(),
+  linkedConversationId: IdSchema.optional(),
   threadDepth: z.number().min(0).max(100).optional(),
   processingStatus: z.enum(['pending', 'processing', 'completed', 'failed']).optional(),
   messageType: z

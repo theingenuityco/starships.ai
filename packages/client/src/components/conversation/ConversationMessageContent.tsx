@@ -279,6 +279,8 @@ interface MessageContentProps {
   className?: string
   enableMarkdown?: boolean
   enableCopy?: boolean
+  /** Optional extra action buttons rendered next to copy/export (e.g. "Start thread"). */
+  extraActions?: ReactNode
   enableLinkPreview?: boolean
   isStreaming?: boolean
   chunks?: StreamChunk[]
@@ -396,6 +398,7 @@ export function ConversationMessageContent({
   className,
   enableMarkdown = true,
   enableCopy = true,
+  extraActions,
   enableLinkPreview = true,
   isStreaming = false,
   chunks = [],
@@ -740,50 +743,50 @@ export function ConversationMessageContent({
               <CollapsibleContent className="not-prose">
                 <div>
                   <blockquote className={toolQuoteClass}>
-                  {/* Match Thought quote content sizing + color */}
-                  <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
-                    <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
-                    <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
-                      <code>{toolSlug || 'unknown'}</code>
-                    </pre>
+                    {/* Match Thought quote content sizing + color */}
+                    <div className="text-muted-foreground text-xs break-words" style={{ fontSize: '0.75rem', lineHeight: '1.25rem' }}>
+                      <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Name</div>
+                      <pre className="mt-1 mb-2 whitespace-pre-wrap break-words pr-8">
+                        <code>{toolSlug || 'unknown'}</code>
+                      </pre>
 
-                    {hasArgs && (
-                      <>
-                        <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
-                        <pre className="mt-1 whitespace-pre-wrap break-words">
-                          <code>{prettyArgs}</code>
-                        </pre>
-                      </>
-                    )}
+                      {hasArgs && (
+                        <>
+                          <div className="text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Arguments</div>
+                          <pre className="mt-1 whitespace-pre-wrap break-words">
+                            <code>{prettyArgs}</code>
+                          </pre>
+                        </>
+                      )}
 
-                    {matchingResult && (
-                      <>
-                        <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
-                        <pre className="mt-1 whitespace-pre-wrap break-words">
-                          <code>
-                            {(() => {
-                              const resultContent = (() => {
-                                const raw = matchingResult.content ?? matchingResult.result ?? ''
-                                if (typeof raw === 'string') return raw
+                      {matchingResult && (
+                        <>
+                          <div className="mt-2 text-[10px] uppercase tracking-wide text-muted-foreground pr-8">Result</div>
+                          <pre className="mt-1 whitespace-pre-wrap break-words">
+                            <code>
+                              {(() => {
+                                const resultContent = (() => {
+                                  const raw = matchingResult.content ?? matchingResult.result ?? ''
+                                  if (typeof raw === 'string') return raw
+                                  try {
+                                    return JSON.stringify(raw, null, 2)
+                                  } catch {
+                                    return String(raw)
+                                  }
+                                })()
                                 try {
-                                  return JSON.stringify(raw, null, 2)
-                                } catch {
-                                  return String(raw)
-                                }
-                              })()
-                              try {
-                                const t = (resultContent || '').trim()
-                                if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
-                                  return JSON.stringify(JSON.parse(t), null, 2)
-                                }
-                              } catch {}
-                              return resultContent
-                            })()}
-                          </code>
-                        </pre>
-                      </>
-                    )}
-                  </div>
+                                  const t = (resultContent || '').trim()
+                                  if ((t.startsWith('{') && t.endsWith('}')) || (t.startsWith('[') && t.endsWith(']'))) {
+                                    return JSON.stringify(JSON.parse(t), null, 2)
+                                  }
+                                } catch {}
+                                return resultContent
+                              })()}
+                            </code>
+                          </pre>
+                        </>
+                      )}
+                    </div>
                   </blockquote>
                 </div>
               </CollapsibleContent>
@@ -975,15 +978,20 @@ export function ConversationMessageContent({
           <div className="relative w-full group/content-chunk">
             {/* Content chunk actions (copy + download): float at bottom edge.
                Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
-            {enableCopy && (
+            {(enableCopy || extraActions) && (
               <div className="pointer-events-none absolute bottom-0 right-0 translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
-                    <Icon name="copy" className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
-                    <Icon name="download" className="h-4 w-4" />
-                  </Button>
+                  {extraActions}
+                  {enableCopy && (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+                        <Icon name="copy" className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+                        <Icon name="download" className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -1054,7 +1062,7 @@ export function ConversationMessageContent({
           </>
         )}
 
-      {/*
+        {/*
         Attachments created by USER uploads (message attachments) should stay near the top of the message.
         Attachments produced by TOOL RESULTS should render *below* the tool panel (see below), so they feel
         visually associated with the tool call that produced them.

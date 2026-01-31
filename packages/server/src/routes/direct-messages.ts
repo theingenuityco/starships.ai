@@ -3,12 +3,14 @@ import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import { IdSchema } from '@/schemas/common';
 import { AgentService } from '@/services/AgentService';
 import { ConversationService } from '@/services/ConversationService';
+import { StarshipService } from '@/services/StarshipService';
+import { UserService } from '@/services/UserService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import type { Request, Response } from 'express';
 import { Router } from 'express';
 import { z } from 'zod';
-import { ConversationMemberRepository, DirectMessageRepository } from '@starships/models';
+import { ConversationMemberRepository, DirectMessageRepository, StarshipMemberRepository } from '@starships/models';
 import type { DirectMessageModel, AgentModel, ConversationModel } from '@starships/protocol';
 
 const router: Router = Router();
@@ -58,7 +60,9 @@ router.get('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (r
  * POST /starships/:starshipId/direct-messages
  *
  * Create (or return existing) DM.
- * For now: user↔agent only.
+ * Supports:
+ * - user↔agent
+ * - user↔user (peer must be in the starship)
  */
 router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
@@ -66,11 +70,24 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
     if (!params) return;
 
     const body = validateData(
-      z.object({
-        agentSlug: z.string().min(1).max(255).optional(),
-        agentId: IdSchema.optional(),
-        title: z.string().min(1).max(100).optional(),
-      }),
+      z
+        .object({
+          agentSlug: z.string().min(1).max(255).optional(),
+          agentId: IdSchema.optional(),
+          peerUserId: IdSchema.optional(),
+          title: z.string().min(1).max(100).optional(),
+        })
+        .refine(
+          (v) => {
+            const hasAgent = Boolean(v.agentId || v.agentSlug);
+            const hasPeerUser = Boolean(v.peerUserId);
+            // exactly one target
+            return (hasAgent && !hasPeerUser) || (!hasAgent && hasPeerUser);
+          },
+          {
+            message: 'Provide either agentId/agentSlug OR peerUserId',
+          }
+        ),
       req.body,
       res,
       'direct message creation data'
@@ -84,52 +101,136 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
     }
     if (!(await verifyStarshipAccess(params.starshipId, authUserId, res))) return;
 
-    const agentService = new AgentService();
-    const agent = body.agentId
-      ? await agentService.getAgent(body.agentId)
-      : body.agentSlug
-        ? await agentService.getAgentBySlug(body.agentSlug)
-        : null;
-
-    if (!agent) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', starshipId: params.starshipId });
-      return;
-    }
-    if (agent.starshipId !== params.starshipId) {
-      sendError(res, 'ACCESS_DENIED', 'Cannot create DM with an agent from a different starship', 403);
-      return;
-    }
-
     const dmRepo = new DirectMessageRepository();
-    const existing = await dmRepo.findUserAgentDm(params.starshipId, authUserId, agent.id).catch(() => null);
+    const memberRepo = new ConversationMemberRepository();
+
+    // Branch 1: user↔agent DM
+    if (body.agentId || body.agentSlug) {
+      const agentService = new AgentService();
+      const agent = body.agentId
+        ? await agentService.getAgent(body.agentId)
+        : body.agentSlug
+          ? await agentService.getAgentBySlug(body.agentSlug)
+          : null;
+
+      if (!agent) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent not found', 404, { resource: 'agent', starshipId: params.starshipId });
+        return;
+      }
+      if (agent.starshipId !== params.starshipId) {
+        sendError(res, 'ACCESS_DENIED', 'Cannot create DM with an agent from a different starship', 403);
+        return;
+      }
+
+      const existing = await dmRepo.findUserAgentDm(params.starshipId, authUserId, agent.id).catch(() => null);
+      if (existing) {
+        sendSuccess(res, { dm: existing, conversationId: existing.conversationId }, 200);
+        return;
+      }
+
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.createConversation({
+        title: body.title || `DM • ${agent.name}`,
+        status: 'active',
+        starshipId: params.starshipId,
+        agentId: agent.id,
+      });
+
+      const dm = await dmRepo.create({
+        conversationId: conversation.id,
+        starshipId: params.starshipId,
+        dmType: 'user_agent',
+        userId: authUserId,
+        agentId: agent.id,
+        createdAt: conversation.createdAt,
+        updatedAt: conversation.updatedAt ?? conversation.createdAt,
+      });
+
+      await memberRepo.createOrIgnoreMember({
+        conversationId: conversation.id,
+        userId: authUserId,
+        role: 'admin',
+        createdBy: authUserId,
+      });
+
+      sendSuccess(res, { dm, conversationId: conversation.id }, 201);
+      return;
+    }
+
+    // Branch 2: user↔user DM
+    const peerUserId = String(body.peerUserId || '');
+    if (!peerUserId) {
+      sendError(res, 'VALIDATION_ERROR', 'peerUserId is required', 400);
+      return;
+    }
+    if (peerUserId === authUserId) {
+      sendError(res, 'VALIDATION_ERROR', 'Cannot create a direct message with yourself', 400);
+      return;
+    }
+
+    const starshipService = new StarshipService();
+    const starship = await starshipService.getStarship(params.starshipId);
+    if (!starship) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, { resource: 'starship', id: params.starshipId });
+      return;
+    }
+
+    const starshipMemberRepo = new StarshipMemberRepository();
+    const peerIsMember = peerUserId === starship.ownerId || (await starshipMemberRepo.isMember(peerUserId, params.starshipId));
+    if (!peerIsMember) {
+      sendError(res, 'ACCESS_DENIED', 'Cannot create DM with a user who is not a member of this starship', 403, {
+        resource: 'starship_member',
+        starshipId: params.starshipId,
+        peerUserId,
+      });
+      return;
+    }
+
+    const userAId = authUserId.localeCompare(peerUserId) < 0 ? authUserId : peerUserId;
+    const userBId = authUserId.localeCompare(peerUserId) < 0 ? peerUserId : authUserId;
+
+    const existing = await dmRepo.findUserUserDm(params.starshipId, userAId, userBId).catch(() => null);
     if (existing) {
       sendSuccess(res, { dm: existing, conversationId: existing.conversationId }, 200);
       return;
     }
 
+    const userService = new UserService();
+    const peerUser = await userService.getUserById(peerUserId);
+    if (!peerUser) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'User not found', 404, { resource: 'user', id: peerUserId });
+      return;
+    }
+
     const conversationService = new ConversationService();
+    const peerLabel = peerUser.displayName || peerUser.email || 'User';
     const conversation = await conversationService.createConversation({
-      title: body.title || `DM • ${agent.name}`,
+      title: body.title || `DM • ${peerLabel}`,
       status: 'active',
       starshipId: params.starshipId,
-      agentId: agent.id,
     });
 
     const dm = await dmRepo.create({
       conversationId: conversation.id,
       starshipId: params.starshipId,
-      dmType: 'user_agent',
-      userId: authUserId,
-      agentId: agent.id,
+      dmType: 'user_user',
+      userAId,
+      userBId,
       createdAt: conversation.createdAt,
       updatedAt: conversation.updatedAt ?? conversation.createdAt,
     });
 
-    const memberRepo = new ConversationMemberRepository();
+    // Add both users to the backing conversation so listing + access checks work.
     await memberRepo.createOrIgnoreMember({
       conversationId: conversation.id,
       userId: authUserId,
       role: 'admin',
+      createdBy: authUserId,
+    });
+    await memberRepo.createOrIgnoreMember({
+      conversationId: conversation.id,
+      userId: peerUserId,
+      role: 'member',
       createdBy: authUserId,
     });
 

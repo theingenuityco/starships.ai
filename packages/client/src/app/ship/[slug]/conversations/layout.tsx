@@ -241,7 +241,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       {isThreadPaneOpen ? (
         <>
           {/* Draggable resize handle (desktop/tablet) */}
-          <div className="hidden md:flex relative h-full w-px flex-shrink-0 bg-border/60">
+          <div className="hidden md:flex relative h-full w-[2px] flex-shrink-0 bg-border">
             {/* Invisible drag hit-area (keep resizing easy without a thick visual divider) */}
             <div
               className="absolute inset-y-0 -left-3 w-6 cursor-col-resize select-none"
@@ -286,7 +286,7 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
       {/* Thread in-flow pane (mobile) */}
       {isThreadPaneOpen ? (
-        <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border/60 bg-background min-w-0">
+        <aside className="md:hidden h-[45vh] flex-shrink-0 border-t border-border bg-background min-w-0">
           <ThreadPane
             starshipId={starshipData.id}
             starshipSlug={routeParams.slug}

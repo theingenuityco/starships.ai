@@ -164,10 +164,11 @@ export function ConversationList({ starshipId, onConversationDelete, onConversat
   }
 
   const handleDmTargetClick = async (t: DmTarget) => {
+    const title = (t.label || '').trim()
     const created = await createDirectMessage.mutateAsync(
       t.kind === 'agent'
-        ? { starshipId, agentId: t.agent.id, title: `DM • ${formatAgentDisplayName(t.agent)}` }
-        : { starshipId, peerUserId: t.user.userId, title: `DM • ${t.user.displayName || t.user.email || 'User'}` }
+        ? { starshipId, agentId: t.agent.id, title }
+        : { starshipId, peerUserId: t.user.userId, title }
     )
     if (created?.conversationId) {
       handleConversationClick(String(created.conversationId))

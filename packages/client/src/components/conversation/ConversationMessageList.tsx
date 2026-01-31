@@ -949,16 +949,7 @@ const MemoizedMessageBubble = memo(
           aria-label={label}
           title={label}
         >
-          {linkedConversationId ? (
-            <Icon name="thread" className="h-4 w-4" />
-          ) : (
-            <span className="relative inline-flex h-4 w-4 items-center justify-center">
-              <Icon name="message-square" className="h-4 w-4" />
-              <span className="absolute -right-1 -bottom-1 h-3 w-3 rounded-full bg-background/80 backdrop-blur flex items-center justify-center ring-1 ring-border/60">
-                <Icon name="plus" className="h-2.5 w-2.5" />
-              </span>
-            </span>
-          )}
+          <Icon name="thread" className="h-4 w-4" />
         </Button>
       )
     }, [enableChannelMessageThreads, linkedConversationId, message.content, message.id, onThreadAction])

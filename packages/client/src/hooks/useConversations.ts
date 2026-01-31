@@ -477,6 +477,40 @@ export function useLinkMessageToConversation() {
     },
     onSuccess: (_data, variables) => {
       const conversationId = typeof variables.conversationId === 'string' ? variables.conversationId : ''
+      const messageId = String(variables.messageId || '').trim()
+      const linkedConversationId = String(variables.linkedConversationId || '').trim()
+
+      // IMPORTANT:
+      // The channel timeline is primarily updated via SSE append events and does not emit "message updated"
+      // events when we mutate linkedConversationId. So we patch the local stream cache to reflect the
+      // new link immediately, ensuring the UI shows the correct "Open thread" icon for *all* messages.
+      if (conversationId && messageId && linkedConversationId) {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
+          if (!Array.isArray(old)) return old
+          return old.map((chunk: any) => {
+            if (!chunk || typeof chunk !== 'object') return chunk
+
+            // Back-compat local pre-seed event
+            if (chunk.type === 'append' && chunk.message && chunk.message.id === messageId) {
+              return { ...chunk, message: { ...chunk.message, linkedConversationId } }
+            }
+
+            // Snapshot event
+            if (chunk.type === 'snapshot' && chunk.data && Array.isArray(chunk.data.messages)) {
+              const nextMsgs = chunk.data.messages.map((m: any) => (m && m.id === messageId ? { ...m, linkedConversationId } : m))
+              return { ...chunk, data: { ...chunk.data, messages: nextMsgs } }
+            }
+
+            // Standard append event
+            if (chunk.type === 'message.append' && chunk.data && chunk.data.message && chunk.data.message.id === messageId) {
+              return { ...chunk, data: { ...chunk.data, message: { ...chunk.data.message, linkedConversationId } } }
+            }
+
+            return chunk
+          })
+        })
+      }
+
       if (conversationId) {
         queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
       } else {

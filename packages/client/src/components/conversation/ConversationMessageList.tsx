@@ -748,7 +748,7 @@ export function ConversationMessageList({
       )}
       <div
         ref={scrollContainerRef}
-        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-5', scrollClassName)}
+        className={cn('flex-1 overflow-y-auto px-4 scroll-smooth', sizeVariant === 'delegation' ? 'pt-3' : 'pt-6', scrollClassName)}
         style={{ paddingBottom: bottomPaddingPx ?? 160 }}
         onScroll={() => {
           const container = scrollContainerRef.current

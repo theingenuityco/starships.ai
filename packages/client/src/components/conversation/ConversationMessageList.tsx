@@ -17,6 +17,7 @@ import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/co
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { isImageUrl } from '@/lib/isImageUrl'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
@@ -318,6 +319,36 @@ export function ConversationMessageList({
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
   const agentName = agentNameOverride ?? agentObj?.name
+  // #region agent log
+  useEffect(() => {
+    const cid = typeof conversationId === 'string' ? String(conversationId) : ''
+    if (!cid) return
+    const a: any = agentObj as any
+    const display = a ? formatAgentDisplayName(a) : null
+    const role = typeof a?.role === 'string' ? String(a.role) : null
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run2',
+        hypothesisId: 'H8',
+        location: 'packages/client/src/components/conversation/ConversationMessageList.tsx:agentLabel',
+        message: 'ConversationMessageList agent label inputs',
+        data: {
+          conversationId: cid,
+          agentObjId: typeof a?.id === 'string' ? String(a.id) : null,
+          agentObjName: typeof a?.name === 'string' ? String(a.name) : null,
+          agentObjRole: role,
+          agentNameProp: typeof agentName === 'string' ? agentName : agentName == null ? null : String(agentName),
+          formattedFromAgentObj: display,
+          conversationAgentsCount: Array.isArray(conversationAgents) ? conversationAgents.length : null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [conversationId, agentObj, agentName, conversationAgents])
+  // #endregion
   const agentSlug = useMemo(() => {
     const raw = (agentObj as any)?.slug
     return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined

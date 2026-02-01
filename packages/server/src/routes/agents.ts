@@ -224,6 +224,24 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
 
     // Delegate to service layer
     const agentService = new AgentService();
+    // #region agent log
+    void fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'H4',
+        location: 'packages/server/src/routes/agents.ts:GET /starships/:starshipId/agents',
+        message: 'Agents route hit for starship agents',
+        data: {
+          starshipId: paramValidation.starshipId,
+          hasUser: Boolean(req.user?.id),
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
     const result = await agentService.getAgentsByStarshipWithAccess(
       paramValidation.starshipId,
       req.user!.id,
@@ -231,6 +249,25 @@ router.get('/starships/:starshipId/agents', jwtAuthMiddleware, async (req: Reque
       queryValidation.limit,
       queryValidation.order
     );
+    // #region agent log
+    void fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'H4',
+        location: 'packages/server/src/routes/agents.ts:GET /starships/:starshipId/agents',
+        message: 'Agents response built',
+        data: {
+          starshipId: paramValidation.starshipId,
+          count: Array.isArray(result?.agents) ? result.agents.length : null,
+          sampleHasRole: Array.isArray(result?.agents) ? Boolean((result.agents[0] as any)?.role) : null,
+        },
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {});
+    // #endregion
 
     sendSuccess(res, result.agents, 200, { pagination: result.pagination });
   } catch (error) {

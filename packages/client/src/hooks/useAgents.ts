@@ -83,6 +83,26 @@ export function useStarshipAgents(starshipId: string, enabled: boolean = true, o
           ...(order ? { order } : {}),
         },
       })
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H1',
+          location: 'packages/client/src/hooks/useAgents.ts:useStarshipAgents',
+          message: 'Fetched starship agents list',
+          data: {
+            starshipId,
+            order: order ?? null,
+            count: Array.isArray(response.data?.data) ? response.data.data.length : null,
+            sampleHasRole: Array.isArray(response.data?.data) ? Boolean((response.data.data[0] as any)?.role) : null,
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       return response.data.data
     },
     enabled: !!starshipId && enabled,

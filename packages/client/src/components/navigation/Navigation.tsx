@@ -443,11 +443,11 @@ export function Navigation(props: NavigationProps) {
           {/* Bottom controls */}
           <div className="px-2 pt-2 flex-shrink-0">
             <div className="flex flex-col gap-1">
-              {isAuthenticated && starshipData?.id ? (
+              {isAuthenticated && starshipData?.id && canManageBilling ? (
                 isExpanded ? (
                   <button
                     type="button"
-                    disabled={!canManageBilling || !activeStarshipSlug}
+                    disabled={!activeStarshipSlug}
                     onClick={() => {
                       if (!activeStarshipSlug) return
                       router.push(`/ship/${activeStarshipSlug}/settings/billing`)
@@ -466,7 +466,7 @@ export function Navigation(props: NavigationProps) {
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        disabled={!canManageBilling || !activeStarshipSlug}
+                        disabled={!activeStarshipSlug}
                         onClick={() => {
                           if (!activeStarshipSlug) return
                           router.push(`/ship/${activeStarshipSlug}/settings/billing`)

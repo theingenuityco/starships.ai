@@ -107,6 +107,40 @@ export function ConversationSummaryBar({
     return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
   }, [dmListData?.directMessages, conversationId])
 
+  // #region agent log
+  // IMPORTANT: debug hooks must remain above any conditional return paths.
+  const dmDebug = useMemo(() => {
+    const dm: any = dmItem?.dm as any
+    const agent: any = (dmItem as any)?.agent
+    return {
+      conversationId: String(conversationId || ''),
+      dmType: typeof dm?.dmType === 'string' ? String(dm.dmType) : null,
+      dmAgentId: typeof dm?.agentId === 'string' ? String(dm.agentId) : null,
+      hasAgentObj: Boolean(agent),
+      agentId: typeof agent?.id === 'string' ? String(agent.id) : null,
+      agentName: typeof agent?.name === 'string' ? String(agent.name) : null,
+      agentRole: typeof agent?.role === 'string' ? String(agent.role) : null,
+      formatted: agent ? formatAgentDisplayName(agent) : null,
+    }
+  }, [conversationId, dmItem])
+  useEffect(() => {
+    if (!conversationId) return
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'H6',
+        location: 'packages/client/src/components/conversation/ConversationSummaryBar.tsx:dmItem',
+        message: 'DM item context for header',
+        data: dmDebug,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [conversationId, dmDebug])
+  // #endregion
+
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
   const agents = useMemo(() => (Array.isArray(convAgents) ? (convAgents as ConversationAgent[]) : []), [convAgents])
@@ -399,6 +433,45 @@ export function ConversationSummaryBar({
   // If there are no avatars to load, don't wait for avatar loading
   const isDataReady = !isLoadingConversation && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
 
+  // #region agent log
+  // IMPORTANT: keep debug hooks ABOVE conditional returns to preserve hook order.
+  const titleDebug = useMemo(() => {
+    const rawTitle = typeof (currentConversation as any)?.title === 'string' ? String((currentConversation as any).title) : null
+    // We can compute the would-be title even when not ready; it will just use the fallback.
+    const normalizedTitle = normalizeConversationTitle(rawTitle || (conversationId ? `Conversation ${String(conversationId).slice(0, 8)}` : ''))
+    const dm: any = (dmItem as any)?.dm
+    const dmAgent: any = (dmItem as any)?.agent
+    const dmType = typeof dm?.dmType === 'string' ? String(dm.dmType) : null
+    const dmAgentLabel = dmType === 'user_agent' && dmAgent ? formatAgentDisplayName(dmAgent) : null
+    const effectiveTitle = dmAgentLabel || (normalizedTitle || null)
+    return {
+      conversationId: String(conversationId || ''),
+      rawTitle,
+      normalizedTitle: normalizedTitle || null,
+      dmType,
+      dmAgentLabel,
+      effectiveTitle,
+      hasDmItem: Boolean((dmItem as any)?.dm),
+    }
+  }, [conversationId, (currentConversation as any)?.title, Boolean((dmItem as any)?.dm)])
+  useEffect(() => {
+    if (!conversationId) return
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        sessionId: 'debug-session',
+        runId: 'run1',
+        hypothesisId: 'H5',
+        location: 'packages/client/src/components/conversation/ConversationSummaryBar.tsx:title',
+        message: 'Conversation title used for header',
+        data: titleDebug,
+        timestamp: Date.now(),
+      }),
+    }).catch(() => {})
+  }, [conversationId, titleDebug])
+  // #endregion
+
   // Use a key based on conversationId to ensure smooth remount animations
   // This helps coordinate the animation when transitioning from starter page
   const animationKey = useMemo(() => conversationId || 'none', [conversationId])
@@ -573,7 +646,17 @@ export function ConversationSummaryBar({
     )
   }
 
-  const title = normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
+  // Prefer DM agent label for user↔agent DMs so the header always includes role.
+  // Conversation titles are persisted and may be name-only (e.g. "Echo") depending on creation path.
+  const title = (() => {
+    const dm: any = (dmItem as any)?.dm
+    const dmAgent: any = (dmItem as any)?.agent
+    if (dm?.dmType === 'user_agent' && dmAgent) {
+      const label = formatAgentDisplayName(dmAgent)
+      if (label && label.trim().length > 0) return label
+    }
+    return normalizeConversationTitle(currentConversation?.title || `Conversation ${String(conversationId).slice(0, 8)}`)
+  })()
   const updatedAt = new Date(currentConversation?.updatedAt || currentConversation?.createdAt || '')
 
   // Format dates

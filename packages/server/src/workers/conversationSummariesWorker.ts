@@ -105,6 +105,8 @@ async function llmUpdateSummary(args: {
   previousSummary: string;
   newMessages: SummarizerMessage[];
   engineConfig: EngineConfig;
+  conversationId?: string;
+  starshipId?: string;
 }): Promise<string> {
   // Pick a small, fast model identifier; routing is handled by modelRoutes in engineConfig.
   const model = 'openai/gpt-4o-mini';
@@ -138,10 +140,20 @@ async function llmUpdateSummary(args: {
   // Log the exact summarizer prompt (readable, with URL redaction).
   try {
     console.log('[ConversationSummariesWorker] SUMMARY_PROMPT', {
+      conversationId: args.conversationId,
+      starshipId: args.starshipId,
       model,
       messagesCount: messages.length,
+      previousSummaryChars: previous.length,
+      newMessagesCount: args.newMessages.length,
     });
-    console.log(formatSummarizerMessagesForLog(messages));
+    const formatted = formatSummarizerMessagesForLog(messages);
+    const maxLogChars = 120000; // guardrail for log aggregation systems
+    console.log(
+      formatted.length > maxLogChars
+        ? formatted.slice(0, maxLogChars) + '\n\n[...summary prompt log truncated...]'
+        : formatted
+    );
   } catch {
     // best-effort only
   }
@@ -244,53 +256,52 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   // Already summarized up to the current window boundary.
   if (sameCursor(existingCursor, targetBefore)) return;
 
-  // Best-effort incremental strategy:
-  // - If we have an existing cursor, summarize messages from that cursor (inclusive) up to targetBefore (exclusive).
-  // - If not, summarize the messages immediately preceding targetBefore (bounded) and create an initial summary.
-  const maxNewMessages = 250;
-  const collected: MessageModel[] = [];
+  // Incremental strategy with a resume cursor + bounded work per job.
+  //
+  // We model contextSummaryBefore as "the first unsummarized message cursor":
+  // summary covers messages strictly before that cursor.
+  //
+  // Each job advances the cursor forward by at most `chunkSize` messages, never re-reading
+  // from the first message once a cursor exists.
+  const chunkSize = 100;
 
-  // Page backwards from targetBefore until we hit existingCursor (or limit).
-  let cursorBefore: ConversationSummaryCursor = targetBefore;
-  while (collected.length < maxNewMessages) {
-    const page = await repo.getConversationMessagesPage({
+  // If we don't yet have a cursor, initialize it to the oldest message strictly before targetBefore.
+  // That makes the summary start at "covers nothing" and lets us advance from the beginning in chunks.
+  let startCursor: ConversationSummaryCursor | null = existingCursor;
+  if (!startCursor) {
+    const first = await repo.getConversationMessagesRangePage({
       conversationId: data.conversationId,
-      limit: Math.min(200, maxNewMessages - collected.length),
-      beforeCreatedAt: cursorBefore.createdAt,
-      beforeId: cursorBefore.id,
+      limit: 1,
+      beforeCreatedAt: targetBefore.createdAt,
+      beforeId: targetBefore.id,
     });
-
-    if (!page.messages.length) break;
-
-    // page.messages is chronological (oldest → newest)
-    // We want to keep chronological order across pages; since we’re paging backwards,
-    // prepend older pages.
-    collected.unshift(...page.messages);
-
-    const pageOldest = page.messages[0]!;
-    cursorBefore = { createdAt: pageOldest.createdAt, id: pageOldest.id };
-
-    if (existingCursor) {
-      const hit = page.messages.findIndex((m) => m.createdAt === existingCursor.createdAt && m.id === existingCursor.id);
-      if (hit >= 0) {
-        // Drop messages older than the existing cursor; include cursor message itself (inclusive).
-        const keep = page.messages.slice(hit);
-        // Replace the portion we just unshifted for this page with the trimmed portion.
-        // Prefix length equals the full page we just unshifted.
-        collected.splice(0, page.messages.length, ...keep);
-        break;
-      }
-    } else {
-      // No prior cursor: we only take a bounded slice immediately before targetBefore.
-      // The loop + maxNewMessages already bounds this; stop after one (or few) pages.
-      if (!page.hasMoreBefore) break;
-      if (collected.length >= maxNewMessages) break;
-    }
+    const m0 = first.messages[0];
+    if (!m0) return;
+    startCursor = { createdAt: m0.createdAt, id: m0.id };
   }
+
+  // Fetch the next chunk in [startCursor (inclusive), targetBefore (exclusive)).
+  const range = await repo.getConversationMessagesRangePage({
+    conversationId: data.conversationId,
+    limit: chunkSize,
+    afterCreatedAt: startCursor.createdAt,
+    afterId: startCursor.id,
+    afterInclusive: true,
+    beforeCreatedAt: targetBefore.createdAt,
+    beforeId: targetBefore.id,
+  });
+
+  // Nothing new to summarize (cursor already at/after targetBefore).
+  if (!range.messages.length) return;
+
+  // The next cursor boundary is either:
+  // - the first message *after* the chunk (range.nextCursor), or
+  // - the targetBefore window boundary (we caught up to the current window).
+  const nextCursorBoundary: ConversationSummaryCursor = range.nextCursor ? range.nextCursor : targetBefore;
 
   // Build a text-only summarizer input (max compatibility across providers).
   const newMessages: SummarizerMessage[] = [];
-  for (const msg of collected) {
+  for (const msg of range.messages) {
     const role = msg.role;
     if (role !== 'user' && role !== 'assistant' && role !== 'system' && role !== 'tool') continue;
     const baseText = await buildMessageTextWithAttachments({ message: msg, starshipId: data.starshipId });
@@ -330,18 +341,30 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
     modelRoutes,
   } as unknown as EngineConfig;
 
-  const updated = await llmUpdateSummary({ previousSummary: existingSummary, newMessages, engineConfig });
+  const updated = await llmUpdateSummary({
+    previousSummary: existingSummary,
+    newMessages,
+    engineConfig,
+    conversationId: data.conversationId,
+    starshipId: data.starshipId,
+  });
   if (!updated.trim()) return;
 
   const now = new Date().toISOString();
   const nextState = mergeConversationState(state, {
     contextSummary: updated.trim(),
-    contextSummaryBefore: targetBefore,
+    contextSummaryBefore: nextCursorBoundary,
     contextSummaryUpdatedAt: now,
     contextSummaryVersion: (typeof state.contextSummaryVersion === 'number' ? state.contextSummaryVersion : 0) + 1,
   });
 
-  await repo.update(data.conversationId, { state: nextState, updatedAt: now });
+  // IMPORTANT: merge only summary keys to avoid clobbering concurrent state updates from the main server.
+  await repo.mergeState(data.conversationId, {
+    contextSummary: nextState.contextSummary,
+    contextSummaryBefore: nextState.contextSummaryBefore,
+    contextSummaryUpdatedAt: nextState.contextSummaryUpdatedAt,
+    contextSummaryVersion: nextState.contextSummaryVersion,
+  });
   console.log('[ConversationSummariesWorker] Updated summary', {
     conversationId: data.conversationId,
     starshipId: data.starshipId,

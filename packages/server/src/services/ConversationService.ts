@@ -1667,12 +1667,7 @@ export class ConversationService {
           // best-effort
         }
         try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as ConversationState | undefined) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: at },
-            updatedAt: at,
-          });
+          await this.conversationRepository.mergeState(conversationId, { turnActive: false, lastCompleteAt: at });
         } catch {
           // best-effort
         }
@@ -1737,6 +1732,35 @@ export class ConversationService {
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
         const conversationSummaryBlock = this.buildConversationSummarySystemPrompt(conversationState);
+        if (conversationSummaryBlock) {
+          // Debugging aid: log the summary block that will be injected into the LLM system prompt.
+          // Note: This may include user-provided content; keep the preview clipped to avoid overly noisy logs.
+          try {
+            const previewMaxChars = 2000;
+            const preview =
+              conversationSummaryBlock.length > previewMaxChars
+                ? conversationSummaryBlock.slice(0, previewMaxChars) + '\n\n[...conversation summary prompt truncated...]'
+                : conversationSummaryBlock;
+            console.log('[ConversationService] Conversation summary system prompt injected', {
+              conversationId: data.conversationId,
+              starshipId: starship.id,
+              agentId: agentModel.id,
+              summaryChars: conversationSummaryBlock.length,
+              contextSummaryVersion:
+                typeof (conversationState as ConversationState | undefined)?.contextSummaryVersion === 'number'
+                  ? (conversationState as ConversationState).contextSummaryVersion
+                  : undefined,
+              contextSummaryUpdatedAt:
+                typeof (conversationState as ConversationState | undefined)?.contextSummaryUpdatedAt === 'string'
+                  ? (conversationState as ConversationState).contextSummaryUpdatedAt
+                  : undefined,
+              contextSummaryBefore: (conversationState as ConversationState | undefined)?.contextSummaryBefore,
+            });
+            console.log(preview);
+          } catch {
+            // best-effort only
+          }
+        }
         const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, conversationSummaryBlock]
           .filter(Boolean)
           .join('\n\n');
@@ -2049,6 +2073,35 @@ export class ConversationService {
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
       const conversationSummaryBlock = this.buildConversationSummarySystemPrompt(conversationState);
+      if (conversationSummaryBlock) {
+        // Debugging aid: log the summary block that will be injected into the LLM system prompt.
+        // Note: This may include user-provided content; keep the preview clipped to avoid overly noisy logs.
+        try {
+          const previewMaxChars = 2000;
+          const preview =
+            conversationSummaryBlock.length > previewMaxChars
+              ? conversationSummaryBlock.slice(0, previewMaxChars) + '\n\n[...conversation summary prompt truncated...]'
+              : conversationSummaryBlock;
+          console.log('[ConversationService] Conversation summary system prompt injected', {
+            conversationId,
+            starshipId: starship.id,
+            agentId: agentModel.id,
+            summaryChars: conversationSummaryBlock.length,
+            contextSummaryVersion:
+              typeof (conversationState as ConversationState | undefined)?.contextSummaryVersion === 'number'
+                ? (conversationState as ConversationState).contextSummaryVersion
+                : undefined,
+            contextSummaryUpdatedAt:
+              typeof (conversationState as ConversationState | undefined)?.contextSummaryUpdatedAt === 'string'
+                ? (conversationState as ConversationState).contextSummaryUpdatedAt
+                : undefined,
+            contextSummaryBefore: (conversationState as ConversationState | undefined)?.contextSummaryBefore,
+          });
+          console.log(preview);
+        } catch {
+          // best-effort only
+        }
+      }
       const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, conversationSummaryBlock]
         .filter(Boolean)
         .join('\n\n');
@@ -2212,11 +2265,9 @@ export class ConversationService {
 
     // Persist server-authoritative end-of-turn state (best-effort, for administrative visibility)
     try {
-      const convo = await this.getConversationById(conversationId);
-      const prev = (convo?.state as ConversationState | undefined) || {};
-      await this.conversationRepository.update(conversationId, {
-        state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-        updatedAt: new Date().toISOString(),
+      await this.conversationRepository.mergeState(conversationId, {
+        turnActive: false,
+        lastCompleteAt: new Date().toISOString(),
       });
     } catch (err) {
       console.warn('[STOP] Failed to persist turnActive=false on stop', err);
@@ -3432,23 +3483,10 @@ export class ConversationService {
           if (execution?.state) {
             const evolvedState = this.extractPersistableState(execution.state);
             if (evolvedState) {
-              // Get existing conversation state to preserve plugins
-              const existingConversation = await this.getConversationById(conversationId);
-              const existingState = (existingConversation?.state || {}) as ConversationState;
-
-              // Merge: preserve plugins from existing state, update other fields from evolved state
-              // Plugins are conversation-level only (controlled by UI toggle) and should NEVER be overwritten by execution state
-              const mergedState = mergeConversationState(existingState, evolvedState);
-
-              // Explicitly preserve plugins from existing state (plugins are never in evolvedState due to blacklist)
-              if (hasPlugins(existingState)) {
-                mergedState.plugins = existingState.plugins;
-              }
-
-              await this.conversationRepository.update(conversationId, {
-                state: mergedState,
-                updatedAt: new Date().toISOString(),
-              });
+              // Atomically merge state patch in DB to avoid clobbering concurrent writers
+              // (e.g. background conversation summarizer updating contextSummary* fields).
+              // Plugins are never in evolvedState due to blacklist; this preserves conversation-level plugins.
+              await this.conversationRepository.mergeState(conversationId, evolvedState);
             }
           }
         } catch (e) {
@@ -3522,12 +3560,7 @@ export class ConversationService {
             // Mark the turn as NOT actively running while awaiting approval.
             // IMPORTANT: continueAfterToolApproval() must be able to resume from this state.
             try {
-              const convo = await this.getConversationById(conversationId);
-              const prev = (convo?.state as ConversationState | undefined) || {};
-              await this.conversationRepository.update(conversationId, {
-                state: { ...prev, turnActive: false },
-                updatedAt: new Date().toISOString(),
-              });
+              await this.conversationRepository.mergeState(conversationId, { turnActive: false });
             } catch {
               /* ignore */
             }
@@ -3595,11 +3628,9 @@ export class ConversationService {
 
         // Persist turn_completed state and notify clients
         try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as ConversationState | undefined) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-            updatedAt: new Date().toISOString(),
+          await this.conversationRepository.mergeState(conversationId, {
+            turnActive: false,
+            lastCompleteAt: new Date().toISOString(),
           });
         } catch (err) {
           console.warn('[STREAMING] Failed to persist turn_completed state', err);
@@ -3675,11 +3706,9 @@ export class ConversationService {
 
         // Persist server-authoritative end-of-turn state (best-effort)
         try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as ConversationState | undefined) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-            updatedAt: new Date().toISOString(),
+          await this.conversationRepository.mergeState(conversationId, {
+            turnActive: false,
+            lastCompleteAt: new Date().toISOString(),
           });
         } catch {
           /* ignore */

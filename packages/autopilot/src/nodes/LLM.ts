@@ -83,6 +83,145 @@ export class LLM extends BaseNode<LlmParams> {
     super(params, options);
   }
 
+  private redactUrl(url: string): string {
+    try {
+      const u = new URL(url);
+      // Drop querystring (often contains auth tokens) and keep only origin + pathname.
+      return `${u.origin}${u.pathname}`;
+    } catch {
+      // If it isn't a URL, still avoid logging long token-like strings.
+      return url.length > 200 ? url.slice(0, 200) + '…' : url;
+    }
+  }
+
+  private summarizeContentForLog(content: unknown): unknown {
+    if (typeof content === 'string') {
+      return content;
+    }
+    if (!Array.isArray(content)) return content;
+
+    // Multimodal content blocks: redact URL-bearing fields.
+    return content.map((b) => {
+      if (!b || typeof b !== 'object') return b;
+      const rec = b as Record<string, unknown>;
+      const type = typeof rec.type === 'string' ? rec.type : 'unknown';
+
+      if (type === 'image_url') {
+        const iu = rec.image_url && typeof rec.image_url === 'object' ? (rec.image_url as Record<string, unknown>) : null;
+        const rawUrl = iu && typeof iu.url === 'string' ? iu.url : '';
+        return {
+          type: 'image_url',
+          image_url: { ...(iu ? iu : {}), ...(rawUrl ? { url: this.redactUrl(rawUrl) } : {}) },
+        };
+      }
+      if (type === 'file') {
+        const f = rec.file && typeof rec.file === 'object' ? (rec.file as Record<string, unknown>) : null;
+        const raw = f && typeof f.file_data === 'string' ? f.file_data : '';
+        return {
+          type: 'file',
+          file: { ...(f ? f : {}), ...(raw ? { file_data: this.redactUrl(raw) } : {}) },
+        };
+      }
+      if (type === 'text') {
+        const text = typeof rec.text === 'string' ? rec.text : '';
+        return { ...rec, ...(text ? { text } : {}) };
+      }
+      return rec;
+    });
+  }
+
+  /**
+   * Drop tool-result messages that no longer have their corresponding tool-call in context.
+   *
+   * This can happen when the host provides a truncated message window (e.g. last-N),
+   * where an assistant tool_call message is outside the window but its tool result remains inside.
+   * Some providers reject such prompts with 400s.
+   */
+  private dropOrphanToolResults(messages: LlmMessage[]): LlmMessage[] {
+    const toolCallIdsSeen = new Set<string>();
+    const out: LlmMessage[] = [];
+
+    for (const m of Array.isArray(messages) ? messages : []) {
+      if (!m || typeof m !== 'object') continue;
+
+      if (m.role === 'assistant' && Array.isArray((m as unknown as { toolCalls?: unknown[] }).toolCalls)) {
+        const calls = (m as unknown as { toolCalls?: unknown[] }).toolCalls as unknown[];
+        for (const c of calls) {
+          if (!c || typeof c !== 'object') continue;
+          const id = (c as Record<string, unknown>).id;
+          if (typeof id === 'string' && id.trim()) toolCallIdsSeen.add(id.trim());
+        }
+      }
+
+      if (m.role === 'tool') {
+        const toolCallId = (m as unknown as { toolCallId?: unknown }).toolCallId;
+        if (typeof toolCallId === 'string' && toolCallId.trim()) {
+          if (!toolCallIdsSeen.has(toolCallId.trim())) {
+            // Orphan tool result; skip it for provider requests.
+            continue;
+          }
+        } else {
+          // Tool message without a toolCallId is not provider-safe; drop it.
+          continue;
+        }
+      }
+
+      out.push(m);
+    }
+
+    return out;
+  }
+
+  private formatMessagesForLog(args: { messages: unknown[] }): string {
+    const out: string[] = [];
+
+    for (let i = 0; i < args.messages.length; i++) {
+      const m = args.messages[i] as Record<string, unknown>;
+      const role = typeof m?.role === 'string' ? m.role : 'unknown';
+      const name = typeof (m as { name?: unknown })?.name === 'string' ? String((m as any).name) : '';
+      const toolCallId = typeof (m as { tool_call_id?: unknown })?.tool_call_id === 'string' ? String((m as any).tool_call_id) : '';
+      const headerParts = [`#${i + 1}`, role];
+      if (name) headerParts.push(`name=${name}`);
+      if (toolCallId) headerParts.push(`tool_call_id=${toolCallId}`);
+      out.push(headerParts.join(' '));
+
+      const summarized = this.summarizeContentForLog((m as { content?: unknown })?.content);
+      if (typeof summarized === 'string') {
+        out.push(summarized);
+      } else if (Array.isArray(summarized)) {
+        for (const block of summarized) {
+          if (!block || typeof block !== 'object') continue;
+          const rec = block as Record<string, unknown>;
+          const type = typeof rec.type === 'string' ? rec.type : 'unknown';
+          if (type === 'text') {
+            const t = typeof rec.text === 'string' ? rec.text : '';
+            if (t) out.push(`[text] ${t}`);
+          } else if (type === 'image_url') {
+            const iu = rec.image_url && typeof rec.image_url === 'object' ? (rec.image_url as Record<string, unknown>) : null;
+            const url = iu && typeof iu.url === 'string' ? iu.url : '';
+            out.push(url ? `[image_url] ${url}` : '[image_url]');
+          } else if (type === 'file') {
+            const f = rec.file && typeof rec.file === 'object' ? (rec.file as Record<string, unknown>) : null;
+            const filename = f && typeof f.filename === 'string' ? f.filename : '';
+            const fileData = f && typeof f.file_data === 'string' ? f.file_data : '';
+            const parts = ['[file]'];
+            if (filename) parts.push(`filename=${filename}`);
+            if (fileData) parts.push(`file_data=${fileData}`);
+            out.push(parts.join(' '));
+          } else {
+            out.push(`[${type}]`);
+          }
+        }
+      } else if (summarized != null) {
+        out.push(String(summarized));
+      }
+
+      out.push(''); // blank line between messages
+    }
+
+    return out.join('\n').trim();
+  }
+
   private static extractToolAttachmentIds(raw: string): string[] {
     try {
       const parsed = JSON.parse(raw) as unknown;
@@ -262,6 +401,10 @@ export class LLM extends BaseNode<LlmParams> {
           ],
         } as LlmMessage);
       }
+
+      // Ensure provider request is valid even when host truncates history:
+      // remove tool results that no longer have their corresponding tool call in context.
+      const providerMessagesForRequest = this.dropOrphanToolResults(providerMessagesWithResolved);
       // Condensed request log: essential params only, with truncated message previews
       // const truncate = (text: unknown, max = 160): string => {
       //   if (typeof text !== 'string') return typeof text === 'undefined' ? '' : '[non-text content]';
@@ -316,7 +459,44 @@ export class LLM extends BaseNode<LlmParams> {
       const plugins = this.coerceMaybeJson<Array<{ id: string; max_results?: number }>>(params.plugins);
       const streamFlag = this.coerceMaybeJson<boolean>(params.stream);
 
-      const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesWithResolved);
+      const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesForRequest);
+
+      // Always log the prompt we are about to send (safe + bounded).
+      // This logs the provider request (after sanitization), with URL redaction for multimodal blocks.
+      try {
+        const runtime = (opts?.runtimeEnv && typeof opts.runtimeEnv === 'object' ? opts.runtimeEnv : {}) as Record<string, unknown>;
+        const conversationId = typeof runtime.CONVERSATION_ID === 'string' ? runtime.CONVERSATION_ID : undefined;
+        const starshipId = typeof runtime.STARSHIP_ID === 'string' ? runtime.STARSHIP_ID : undefined;
+        const agentId = typeof runtime.AGENT_ID === 'string' ? runtime.AGENT_ID : undefined;
+
+        const tools = Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined;
+        const toolSlugs = Array.isArray(tools)
+          ? tools
+              .map((t) => (t && typeof t === 'object' ? (t as unknown as { slug?: unknown }).slug : undefined))
+              .filter((s): s is string => typeof s === 'string' && s.length > 0)
+          : [];
+
+        const pretty = this.formatMessagesForLog({
+          messages: Array.isArray(openAiMessagesForRequest) ? (openAiMessagesForRequest as unknown[]) : [],
+        });
+
+        const header = [
+          '[LLM_PROMPT]',
+          `model=${String(params.model)}`,
+          conversationId ? `conversationId=${conversationId}` : null,
+          starshipId ? `starshipId=${starshipId}` : null,
+          agentId ? `agentId=${agentId}` : null,
+          typeof params.temperature === 'number' ? `temperature=${params.temperature}` : null,
+          typeof params.maxTokens === 'number' ? `maxTokens=${params.maxTokens}` : null,
+          toolSlugs.length ? `tools=${toolSlugs.join(',')}` : null,
+        ]
+          .filter(Boolean)
+          .join(' ');
+
+        console.info(`${header}\n\n${pretty}\n`);
+      } catch (err) {
+        console.info('[LLM_PROMPT] Failed to log prompt', { error: err instanceof Error ? err.message : String(err) });
+      }
 
       const stream = await hostRuntime.llm({
         model: params.model,

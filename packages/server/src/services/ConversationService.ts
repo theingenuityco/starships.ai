@@ -59,6 +59,7 @@ import {
   hasPlugins,
 } from '@/utils/conversation-state';
 import type { ConversationState, AgentState } from '@starships/protocol';
+import { createHash } from 'crypto';
 
 /**
  * Autopilot child process configuration
@@ -759,7 +760,11 @@ export class ConversationService {
     limit: number;
     beforeUpdatedAt?: string;
     beforeId?: string;
-  }): Promise<{ conversations: Array<ConversationModel & { agents: AgentModel[] }>; hasMoreBefore: boolean; oldestCursor: { updatedAt: string; id: string } | null }> {
+  }): Promise<{
+    conversations: Array<ConversationModel & { agents: AgentModel[] }>;
+    hasMoreBefore: boolean;
+    oldestCursor: { updatedAt: string; id: string } | null;
+  }> {
     // IMPORTANT:
     // Do NOT rely on newly-added methods in @starships/models at runtime here. In dev, the server
     // imports the built `@starships/models` package, and new methods may not exist until rebuilt.
@@ -1237,7 +1242,10 @@ export class ConversationService {
     const before = conversationState?.contextSummaryBefore;
     const createdAt = typeof before?.createdAt === 'string' ? before.createdAt : '';
     const id = typeof before?.id === 'string' ? before.id : '';
-    const cursorLine = createdAt && id ? `Covers messages strictly before cursor: createdAt=${createdAt} id=${id}` : 'Covers older messages (cursor unknown)';
+    const cursorLine =
+      createdAt && id
+        ? `Covers messages strictly before cursor: createdAt=${createdAt} id=${id}`
+        : 'Covers older messages (cursor unknown)';
 
     return ['<conversation_summary>', cursorLine, clipped, '</conversation_summary>'].join('\n');
   }
@@ -1251,6 +1259,10 @@ export class ConversationService {
     try {
       // Queue init will throw if Redis isn't configured; treat as best-effort.
       const queue = getConversationSummariesQueue();
+      // BullMQ jobId cannot contain ':' and should be reasonably short.
+      // Include the cursor boundary by hashing it (stable, colon-free).
+      const cursorHash = createHash('sha1').update(`${args.targetBefore.createdAt}|${args.targetBefore.id}`).digest('hex').slice(0, 16);
+      const jobId = `conversation_${args.conversationId}_${cursorHash}`;
       await queue.add(
         'summarize-conversation',
         {
@@ -1260,13 +1272,30 @@ export class ConversationService {
           llmHistoryLimit: args.llmHistoryLimit,
         },
         {
-          jobId: `conversation:${args.conversationId}`,
+          jobId,
+          // Background summarization is best-effort but should be resilient to transient infra hiccups
+          // (e.g. brief DB/runner restarts). Use small retry with exponential backoff.
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
           removeOnComplete: true,
           removeOnFail: 100,
         }
       );
-    } catch {
-      // best-effort only
+      console.log('[ConversationService] Enqueued conversation summary job', {
+        conversationId: args.conversationId,
+        starshipId: args.starshipId,
+        jobId,
+        targetBefore: args.targetBefore,
+        llmHistoryLimit: args.llmHistoryLimit,
+      });
+    } catch (err) {
+      console.warn('[ConversationService] Failed to enqueue conversation summary job', {
+        conversationId: args.conversationId,
+        starshipId: args.starshipId,
+        targetBefore: args.targetBefore,
+        llmHistoryLimit: args.llmHistoryLimit,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
@@ -1995,7 +2024,9 @@ export class ConversationService {
       };
 
       // Load conversation-level state context (if any)
-      const conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as ConversationState;
+      const conversationState = (
+        conversation.state && typeof conversation.state === 'object' ? conversation.state : {}
+      ) as ConversationState;
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 

@@ -8,6 +8,7 @@ export { ConnectorActionSessionService } from './ConnectorActionSessionService';
 export { ConnectorSecretService } from './ConnectorSecretService';
 export { ConnectorService } from './ConnectorService';
 export { ConversationService } from './ConversationService';
+export { ConversationSummaryService } from './ConversationSummaryService';
 export { EmailService } from './EmailService';
 export { ImportExportService } from './ImportExportService';
 export { MessageService } from './MessageService';

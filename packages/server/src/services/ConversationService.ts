@@ -50,7 +50,7 @@ import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { buildStarshipSystemPromptContext } from '@/utils/starship-system-prompt-context';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
-import { getConversationSummariesQueue } from '@/queues/conversationSummariesQueue';
+import { ConversationSummaryService } from '@/services/ConversationSummaryService';
 import type { ConversationSummaryCursor } from '@starships/protocol';
 import {
   resolvePlugins,
@@ -59,7 +59,6 @@ import {
   hasPlugins,
 } from '@/utils/conversation-state';
 import type { ConversationState, AgentState } from '@starships/protocol';
-import { createHash } from 'crypto';
 
 /**
  * Autopilot child process configuration
@@ -178,6 +177,7 @@ export class ConversationService {
   private currentAgentForConversation: Map<string, { id: string; name: string }> = new Map();
   // LLM model catalog repository (for pricing/context metadata)
   private llmModelRepository!: LlmModelRepository;
+  private conversationSummaryService!: ConversationSummaryService;
   // Best-effort in-memory pricing cache to avoid DB reads on every turn
   private static modelPricingCache: Map<
     string,
@@ -205,6 +205,7 @@ export class ConversationService {
     this.messageService = new MessageService();
     this.turnRepository = new TurnRepository();
     this.llmModelRepository = new LlmModelRepository();
+    this.conversationSummaryService = new ConversationSummaryService();
     this.streamBus = ConversationStreamBus.getInstance();
     this.uiActions = new UIActionService(this.streamBus);
     this.connectorSecretService = new ConnectorSecretService();
@@ -1257,39 +1258,20 @@ export class ConversationService {
     llmHistoryLimit: number;
   }): Promise<void> {
     try {
-      // Queue init will throw if Redis isn't configured; treat as best-effort.
-      const queue = getConversationSummariesQueue();
-      // BullMQ jobId cannot contain ':' and should be reasonably short.
-      // Include the cursor boundary by hashing it (stable, colon-free).
-      const cursorHash = createHash('sha1').update(`${args.targetBefore.createdAt}|${args.targetBefore.id}`).digest('hex').slice(0, 16);
-      const jobId = `conversation_${args.conversationId}_${cursorHash}`;
-      await queue.add(
-        'summarize-conversation',
-        {
-          conversationId: args.conversationId,
-          starshipId: args.starshipId,
-          targetBefore: args.targetBefore,
-          llmHistoryLimit: args.llmHistoryLimit,
-        },
-        {
-          jobId,
-          // Background summarization is best-effort but should be resilient to transient infra hiccups
-          // (e.g. brief DB/runner restarts). Use small retry with exponential backoff.
-          attempts: 3,
-          backoff: { type: 'exponential', delay: 5000 },
-          removeOnComplete: true,
-          removeOnFail: 100,
-        }
-      );
-      console.log('[ConversationService] Enqueued conversation summary job', {
+      this.conversationSummaryService.runAsync({
         conversationId: args.conversationId,
         starshipId: args.starshipId,
-        jobId,
+        targetBefore: args.targetBefore,
+        llmHistoryLimit: args.llmHistoryLimit,
+      });
+      console.log('[ConversationService] Scheduled async conversation summary', {
+        conversationId: args.conversationId,
+        starshipId: args.starshipId,
         targetBefore: args.targetBefore,
         llmHistoryLimit: args.llmHistoryLimit,
       });
     } catch (err) {
-      console.warn('[ConversationService] Failed to enqueue conversation summary job', {
+      console.warn('[ConversationService] Failed to schedule async conversation summary', {
         conversationId: args.conversationId,
         starshipId: args.starshipId,
         targetBefore: args.targetBefore,

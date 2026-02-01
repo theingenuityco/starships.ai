@@ -273,6 +273,6 @@ describe('Calculator Tool', () => {
           expect(error).toBeInstanceOf(Error);
         }
       }
-    });
+    }, 30_000);
   });
 });

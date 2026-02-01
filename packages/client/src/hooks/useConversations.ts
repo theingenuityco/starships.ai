@@ -2,6 +2,7 @@ import api, { getCurrentToken } from '@/lib/api'
 import type {
   ApiResponse,
   AgentModel,
+  ChannelModel,
   ConversationModel,
   ConversationState,
   ConversationStreamEvent,
@@ -10,8 +11,8 @@ import type {
   MessageModel,
   ToolCallApprovalModel,
 } from '@starships/protocol'
-import { experimental_streamedQuery as streamedQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
-import { useCallback, useMemo, useEffect, useRef } from 'react'
+import { experimental_streamedQuery as streamedQuery, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
 import { USAGE_QUERY_KEYS } from '@/hooks/useUsage'
@@ -90,9 +91,56 @@ export const CONVERSATION_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...CONVERSATION_QUERY_KEYS.all, 'starship', starshipId] as const,
   detail: (id: string) => [...CONVERSATION_QUERY_KEYS.all, 'detail', id] as const,
   children: (parentConversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children'] as const,
+  childrenPaged: (parentConversationId: string, limit?: number) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children', 'paged', String(limit ?? '')] as const,
+  childrenPendingApprovals: (parentConversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(parentConversationId), 'children', 'pending-approvals'] as const,
   messages: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'messages'] as const,
   toolApprovalsPending: (conversationId: string) => [...CONVERSATION_QUERY_KEYS.detail(conversationId), 'tool-approvals', 'pending'] as const,
 } as const
+
+export const CHANNEL_QUERY_KEYS = {
+  all: ['channels'] as const,
+  byStarship: (starshipId: string) => [...CHANNEL_QUERY_KEYS.all, 'starship', starshipId] as const,
+} as const
+
+export const DIRECT_MESSAGE_QUERY_KEYS = {
+  all: ['direct-messages'] as const,
+  byStarship: (starshipId: string) => [...DIRECT_MESSAGE_QUERY_KEYS.all, 'starship', starshipId] as const,
+} as const
+
+type ConversationMessagesResponseData = {
+  conversationId: string
+  messages: MessageModel[]
+  total: number
+  hasMoreBefore?: boolean
+  oldestCursor?: { createdAt: string; id: string } | null
+  participants?: string[]
+  startedAt?: string
+  lastActivityAt?: string
+  agents?: AgentModel[]
+  turnActive?: boolean
+  lastCompleteAt?: string | null
+}
+
+// Local DM model until protocol dist typings are available in-editor.
+// (The server contract is stable: dmType + peer fields + timestamps.)
+export type DirectMessageModel = {
+  conversationId: string
+  starshipId: string
+  dmType: 'user_agent' | 'user_user'
+  userId?: string | null
+  agentId?: string | null
+  userAId?: string | null
+  userBId?: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export type DirectMessageListItem = {
+  dm: DirectMessageModel
+  conversation: ConversationModel | null
+  agent: AgentModel | null
+  peerUser?: { id: string; displayName?: string | null; email?: string | null; avatar?: string | null } | null
+}
 
 export type PendingToolCallApproval = ToolCallApprovalModel & {
   toolSlug?: string
@@ -112,7 +160,7 @@ export function useCreateConversation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: { title?: string; starshipId: string; agentSlug?: string }): Promise<ConversationModel> => {
+    mutationFn: async (data: { title?: string; starshipId: string; agentSlug?: string; agentId?: string; parentConversationId?: string }): Promise<ConversationModel> => {
       const response: FetchResponse<ApiResponse<ConversationModel>> = await api.post('/api/v1/conversations', data)
       return response.data.data
     },
@@ -121,6 +169,9 @@ export function useCreateConversation() {
       if (variables.starshipId) {
         queryClient.invalidateQueries({
           queryKey: CONVERSATION_QUERY_KEYS.byStarship(variables.starshipId),
+        })
+        queryClient.invalidateQueries({
+          queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(variables.starshipId),
         })
       }
     },
@@ -146,6 +197,76 @@ export function useStarshipConversations(starshipId: string, enabled: boolean = 
   })
 }
 
+export function useStarshipChannels(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: CHANNEL_QUERY_KEYS.byStarship(starshipId),
+    queryFn: async (): Promise<{ channels: ChannelModel[] }> => {
+      const response: FetchResponse<ApiResponse<{ channels: ChannelModel[] }>> = await api.get(`/api/v1/starships/${starshipId}/channels`)
+      return { channels: response.data.data?.channels || [] }
+    },
+    enabled: !!starshipId && enabled,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000,
+  })
+}
+
+export function useStarshipDirectMessages(starshipId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(starshipId),
+    queryFn: async (): Promise<{ directMessages: DirectMessageListItem[] }> => {
+      const response: FetchResponse<ApiResponse<{ directMessages: DirectMessageListItem[] }>> = await api.get(`/api/v1/starships/${starshipId}/direct-messages`)
+      return { directMessages: response.data.data?.directMessages || [] }
+    },
+    enabled: !!starshipId && enabled,
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 10 * 60 * 1000,
+  })
+}
+
+export function useCreateDirectMessage() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { starshipId: string; agentSlug?: string; agentId?: string; peerUserId?: string; title?: string }) => {
+      const response: FetchResponse<ApiResponse<{ dm: DirectMessageModel; conversationId: string }>> = await api.post(`/api/v1/starships/${args.starshipId}/direct-messages`, {
+        agentSlug: args.agentSlug,
+        agentId: args.agentId,
+        peerUserId: args.peerUserId,
+        title: args.title,
+      })
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: DIRECT_MESSAGE_QUERY_KEYS.byStarship(variables.starshipId) })
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create direct message', { description: errorMessage })
+    },
+  })
+}
+
+export function useCreateChannel() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (args: { starshipId: string; slug: string; name: string; isPrivate?: boolean; topic?: string | null }) => {
+      const response: FetchResponse<ApiResponse<{ channel: ChannelModel; conversationId: string }>> = await api.post(`/api/v1/starships/${args.starshipId}/channels`, {
+        slug: args.slug,
+        name: args.name,
+        isPrivate: args.isPrivate,
+        topic: args.topic ?? null,
+      })
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      queryClient.invalidateQueries({ queryKey: CHANNEL_QUERY_KEYS.byStarship(variables.starshipId) })
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create channel', { description: errorMessage })
+    },
+  })
+}
+
 export function useChildConversations(parentConversationId: string | null, enabled: boolean = true) {
   return useQuery({
     queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.children(parentConversationId) : (['__noop__'] as const),
@@ -153,13 +274,166 @@ export function useChildConversations(parentConversationId: string | null, enabl
     queryFn: async (): Promise<Array<ConversationModel & { agents: AgentModel[] }>> => {
       const id = String(parentConversationId || '')
       if (!id) return []
-      const response: FetchResponse<ApiResponse<Array<ConversationModel & { agents: AgentModel[] }>>> = await api.get(`/api/v1/conversations/${id}/children`)
-      return response.data.data || []
+      // Back-compat: older servers returned a raw array; newer servers return a paginated payload.
+      const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${id}/children`, { params: { limit: 200 } })
+      const data = response.data.data
+      if (Array.isArray(data)) return data || []
+      const list = Array.isArray(data?.conversations) ? (data.conversations as Array<ConversationModel & { agents: AgentModel[] }>) : []
+      return list
     },
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 10_000,
     gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
     refetchOnWindowFocus: true,
   })
+}
+
+export function useChildConversationsPaged(
+  parentConversationId: string | null,
+  args?: { enabled?: boolean; limit?: number }
+): {
+  conversations: Array<ConversationModel & { agents: AgentModel[] }>
+  hasMoreBefore: boolean
+  oldestCursor: { updatedAt: string; id: string } | null
+  isLoading: boolean
+  isFetching: boolean
+  isError: boolean
+  error: unknown
+  isFetchingNextPage: boolean
+  fetchNextPage: () => Promise<unknown>
+  refetch: () => Promise<unknown>
+} {
+  const enabled = Boolean(parentConversationId && (args?.enabled ?? true))
+  const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 50)))
+
+  type Cursor = { updatedAt: string; id: string }
+  const toIso = (v: unknown): string => {
+    if (v == null) return ''
+    if (v instanceof Date) return v.toISOString()
+    if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString()
+    if (typeof v === 'string') {
+      const t = Date.parse(v)
+      return Number.isFinite(t) ? new Date(t).toISOString() : v
+    }
+    try {
+      const s = String(v)
+      const t = Date.parse(s)
+      return Number.isFinite(t) ? new Date(t).toISOString() : s
+    } catch {
+      return ''
+    }
+  }
+  type Page = {
+    parentConversationId: string
+    conversations: Array<ConversationModel & { agents: AgentModel[] }>
+    hasMoreBefore: boolean
+    oldestCursor: Cursor | null
+  }
+
+  const q = useInfiniteQuery<Page>({
+    queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.childrenPaged(parentConversationId, limit) : (['__noop__'] as const),
+    enabled,
+    initialPageParam: null as Cursor | null,
+    queryFn: async ({ pageParam }): Promise<Page> => {
+      const id = String(parentConversationId || '')
+      if (!id) return { parentConversationId: '', conversations: [], hasMoreBefore: false, oldestCursor: null }
+
+      const cursor = pageParam as Cursor | null
+      const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${id}/children`, {
+        params: {
+          limit,
+          ...(cursor ? { beforeUpdatedAt: cursor.updatedAt, beforeId: cursor.id } : null),
+        },
+      })
+      const data = response.data.data
+      const conversations = Array.isArray(data?.conversations) ? (data.conversations as Array<ConversationModel & { agents: AgentModel[] }>) : []
+      const hasMoreBefore = Boolean(data?.hasMoreBefore)
+      const oldestCursorRaw = data?.oldestCursor
+      const oldestCursor =
+        oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.updatedAt === 'string' && typeof oldestCursorRaw.id === 'string'
+          ? ({ updatedAt: toIso(oldestCursorRaw.updatedAt), id: oldestCursorRaw.id } as Cursor)
+          : null
+      return { parentConversationId: id, conversations, hasMoreBefore, oldestCursor }
+    },
+    getNextPageParam: lastPage => {
+      if (!lastPage?.hasMoreBefore) return undefined
+      return lastPage.oldestCursor ?? undefined
+    },
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 10_000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const pages = Array.isArray(q.data?.pages) ? q.data!.pages : []
+  const conversations = pages.flatMap(p => (Array.isArray(p?.conversations) ? p.conversations : []))
+  const lastPage = pages.length > 0 ? pages[pages.length - 1] : null
+
+  return {
+    conversations,
+    hasMoreBefore: Boolean(lastPage?.hasMoreBefore),
+    oldestCursor: (lastPage?.oldestCursor as Cursor | null) ?? null,
+    isLoading: q.isLoading,
+    isFetching: q.fetchStatus === 'fetching',
+    isError: q.isError,
+    error: q.error,
+    isFetchingNextPage: q.isFetchingNextPage,
+    fetchNextPage: () => q.fetchNextPage(),
+    refetch: () => q.refetch(),
+  }
+}
+
+export function useChildConversationsPendingApprovals(
+  parentConversationId: string | null,
+  args?: { enabled?: boolean; limit?: number }
+): {
+  children: Array<{ id: string; updatedAt: string; pendingCount: number; agentName: string }>
+  hasMoreBefore: boolean
+  oldestCursor: { updatedAt: string; id: string } | null
+  isLoading: boolean
+  isFetching: boolean
+  refetch: () => Promise<unknown>
+} {
+  const enabled = Boolean(parentConversationId && (args?.enabled ?? true))
+  const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 10)))
+
+  type Cursor = { updatedAt: string; id: string }
+  type Payload = {
+    parentConversationId: string
+    children: Array<{ id: string; updatedAt: string; pendingCount: number; agentName: string }>
+    hasMoreBefore: boolean
+    oldestCursor: Cursor | null
+  }
+
+  const q = useQuery({
+    queryKey: parentConversationId ? CONVERSATION_QUERY_KEYS.childrenPendingApprovals(parentConversationId) : (['__noop__'] as const),
+    enabled,
+    queryFn: async (): Promise<Payload> => {
+      const id = String(parentConversationId || '')
+      if (!id) return { parentConversationId: '', children: [], hasMoreBefore: false, oldestCursor: null }
+      const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${id}/children/pending-approvals`, { params: { limit } })
+      const data = response.data.data
+      const children = Array.isArray(data?.children) ? (data.children as Payload['children']) : []
+      const hasMoreBefore = Boolean(data?.hasMoreBefore)
+      const oldestCursorRaw = data?.oldestCursor
+      const oldestCursor =
+        oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.updatedAt === 'string' && typeof oldestCursorRaw.id === 'string'
+          ? ({ updatedAt: oldestCursorRaw.updatedAt, id: oldestCursorRaw.id } as Cursor)
+          : null
+      return { parentConversationId: id, children, hasMoreBefore, oldestCursor }
+    },
+    staleTime: process.env.NODE_ENV === 'development' ? 0 : 5_000,
+    gcTime: process.env.NODE_ENV === 'development' ? 0 : 60_000,
+    refetchOnWindowFocus: true,
+  })
+
+  const payload = (q.data as any) as Payload | undefined
+  return {
+    children: Array.isArray(payload?.children) ? payload!.children : [],
+    hasMoreBefore: Boolean(payload?.hasMoreBefore),
+    oldestCursor: (payload?.oldestCursor as any) ?? null,
+    isLoading: q.isLoading,
+    isFetching: q.fetchStatus === 'fetching',
+    refetch: () => q.refetch(),
+  }
 }
 
 /**
@@ -190,7 +464,9 @@ export function usePendingToolApprovals(conversationId: string | null, enabled: 
  */
 export function usePendingToolApprovalsMulti(conversationIds: string[], enabled: boolean = true) {
   const ids = Array.isArray(conversationIds) ? conversationIds.filter(Boolean).map(String) : []
-  const uniqueIds = useMemo(() => Array.from(new Set(ids)), [ids.join('|')])
+  // Normalize + stabilize ids to avoid churn (and extra network calls) if the caller provides
+  // the same set in a different order across renders.
+  const uniqueIds = useMemo(() => Array.from(new Set(ids)).sort(), [ids.join('|')])
 
   const results = useQueries({
     queries: uniqueIds.map(conversationId => ({
@@ -206,8 +482,13 @@ export function usePendingToolApprovalsMulti(conversationIds: string[], enabled:
       // Keep parent UI in sync with child approvals without requiring reload.
       // Child conversations publish tool-approval UI actions on their own stream, not the parent’s.
       // So the parent must poll these lightweight endpoints while it’s open.
-      refetchInterval: enabled ? 2_000 : false,
-      refetchIntervalInBackground: true,
+      //
+      // IMPORTANT:
+      // This endpoint is cheap, but polling per-child-conversation every 2s scales poorly
+      // and looks like a runaway loop in the network panel. Prefer a slower cadence and
+      // never poll in the background.
+      refetchInterval: enabled ? 15_000 : false,
+      refetchIntervalInBackground: false,
     })),
   })
 
@@ -360,15 +641,76 @@ export function useDeleteMessage() {
   })
 }
 
+// Link a message to a child conversation (used for channel "threads")
+export function useLinkMessageToConversation() {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (args: { messageId: string; linkedConversationId: string; conversationId?: string }) => {
+      const response: FetchResponse<ApiResponse<any>> = await api.put(`/api/v1/messages/${args.messageId}`, {
+        linkedConversationId: args.linkedConversationId,
+      })
+      return response.data.data
+    },
+    onSuccess: (_data, variables) => {
+      const conversationId = typeof variables.conversationId === 'string' ? variables.conversationId : ''
+      const messageId = String(variables.messageId || '').trim()
+      const linkedConversationId = String(variables.linkedConversationId || '').trim()
+
+      // IMPORTANT:
+      // The channel timeline is primarily updated via SSE append events and does not emit "message updated"
+      // events when we mutate linkedConversationId. So we patch the local stream cache to reflect the
+      // new link immediately, ensuring the UI shows the correct "Open thread" icon for *all* messages.
+      if (conversationId && messageId && linkedConversationId) {
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(conversationId), (old: any) => {
+          if (!Array.isArray(old)) return old
+          return old.map((chunk: any) => {
+            if (!chunk || typeof chunk !== 'object') return chunk
+
+            // Back-compat local pre-seed event
+            if (chunk.type === 'append' && chunk.message && chunk.message.id === messageId) {
+              return { ...chunk, message: { ...chunk.message, linkedConversationId } }
+            }
+
+            // Snapshot event
+            if (chunk.type === 'snapshot' && chunk.data && Array.isArray(chunk.data.messages)) {
+              const nextMsgs = chunk.data.messages.map((m: any) => (m && m.id === messageId ? { ...m, linkedConversationId } : m))
+              return { ...chunk, data: { ...chunk.data, messages: nextMsgs } }
+            }
+
+            // Standard append event
+            if (chunk.type === 'message.append' && chunk.data && chunk.data.message && chunk.data.message.id === messageId) {
+              return { ...chunk, data: { ...chunk.data, message: { ...chunk.data.message, linkedConversationId } } }
+            }
+
+            return chunk
+          })
+        })
+      }
+
+      if (conversationId) {
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(conversationId) })
+      } else {
+        // Fallback: invalidate broadly (MessageModel may not always include conversationId in caches)
+        queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.all })
+      }
+    },
+    onError: (error: any) => {
+      const errorMessage = getSafeErrorMessage(error)
+      toast.error('Failed to create thread', { description: errorMessage })
+    },
+  })
+}
+
 // Get conversation agents (for agent restoration on refresh)
 export function useConversationAgents(conversationId: string | null) {
   return useQuery({
     queryKey: [...CONVERSATION_QUERY_KEYS.messages(conversationId!), 'agents'],
-    queryFn: async (): Promise<any[]> => {
-      const response: FetchResponse<any> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
+    queryFn: async (): Promise<AgentModel[]> => {
+      const response: FetchResponse<ApiResponse<ConversationMessagesResponseData>> = await api.get(`/api/v1/conversations/${conversationId}/messages`, {
         params: { limit: 1, page: 1 }, // We only need agents, not all messages
       })
-      return response.data.data.agents || []
+      return response.data.data?.agents || []
     },
     enabled: !!conversationId,
     staleTime: process.env.NODE_ENV === 'development' ? 0 : 5 * 60 * 1000, // No cache in dev, 5 minutes in prod
@@ -587,6 +929,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const queryClient = useQueryClient()
   const enabledFlag = options?.enabled !== false
   const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+  const lastSseOpenAtRef = useRef<number | null>(null)
+  const lastSseErrorAtRef = useRef<number | null>(null)
 
   type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
 
@@ -611,6 +955,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
     const combinedSignal = signal ? AbortSignal.any([signal, controller.signal, instanceController.signal]) : AbortSignal.any([controller.signal, instanceController.signal])
+    const isActiveInstance = () => activeSseGuards.get(convId) === instanceController
 
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []
@@ -654,12 +999,19 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       openWhenHidden: true,
       signal: combinedSignal,
       async onopen(response) {
+        if (!isActiveInstance()) {
+          return
+        }
+        lastSseOpenAtRef.current = Date.now()
         if (!response.ok) {
           push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
           cleanup('bad_status')
         }
       },
       onmessage(ev: EventSourceMessage) {
+        if (!isActiveInstance()) {
+          return
+        }
         try {
           if (typeof ev.id === 'string' && ev.id) {
             try {
@@ -705,9 +1057,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
       },
       onclose() {
+        if (!isActiveInstance()) return
         cleanup('onclose')
       },
       onerror(err) {
+        if (!isActiveInstance()) return
+        lastSseErrorAtRef.current = Date.now()
         push({ type: 'error', error: err })
         cleanup('onerror')
       },
@@ -798,10 +1153,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         if (m?.id != null) snapIds.add(String(m.id))
       }
       const merged: ClientMessage[] = [...snap]
+      const turnStatus = turn?.status
+      const turnTerminal = turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
       let keptFromAcc = 0
       for (const m of acc) {
         const id = m?.id != null ? String(m.id) : ''
         if (!id) continue
+        if (turnTerminal && id.startsWith('stream-')) {
+          continue
+        }
         if (!snapIds.has(id)) {
           merged.push(m)
           keptFromAcc++
@@ -910,6 +1270,20 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           // Replace temp message with persisted message
           messages[i] = withStreaming(msg, false)
           return messages
+        }
+      }
+
+      if (msg.role === 'assistant') {
+        const lastAssistant = (() => {
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i]?.role === 'assistant') return messages[i] as ClientMessage
+          }
+          return null
+        })()
+        const lastContent = typeof (lastAssistant as any)?.content === 'string' ? String((lastAssistant as any).content).trim() : ''
+        const nextContent = typeof (msg as any)?.content === 'string' ? String((msg as any).content).trim() : ''
+        if (lastAssistant && lastContent && nextContent && lastContent === nextContent) {
+          /* no-op */
         }
       }
 
@@ -1166,10 +1540,13 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     lastReducedChunkCountRef.current = 0
   }, [conversationId])
 
+  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
+
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {
     const processed: StreamedChunk[] = []
     const queued: StreamedChunk[] = []
+    const shouldGateByAnimation = turnState.status === 'active' || turnState.status === 'waiting_for_tools'
 
     for (const chunk of chunks) {
       if (chunk.type === 'message.append') {
@@ -1194,7 +1571,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             // Check if previous assistant message animation is complete
             // Use LAST computed messages (from previous render) to avoid re-reduction
             const lastAssistantId = getLastAssistantMessageId(lastComputedMessagesRef.current)
-            if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
+            if (lastAssistantId && !isAnimationComplete(lastAssistantId) && shouldGateByAnimation) {
               // Queue this chunk for later processing
               queued.push(chunk)
               continue
@@ -1210,7 +1587,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     processedChunksRef.current = processed
 
     return processed
-  }, [chunksRevisionKey])
+  }, [chunksRevisionKey, turnState.status])
 
   // Process queued chunks when animation completes
   useEffect(() => {
@@ -1219,8 +1596,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const processQueued = () => {
       const currentMessages = processedChunksRef.current.reduce(reduceMessages, emptyMessages)
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
+      const turnStatus = turnState.status
+      const shouldBypassAnimation =
+        turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
 
-      if (!lastAssistantId || isAnimationComplete(lastAssistantId)) {
+      if (!lastAssistantId || isAnimationComplete(lastAssistantId) || shouldBypassAnimation) {
         // Animation complete, add queued chunks to the query data
         const queued = queuedAppendChunksRef.current.splice(0)
         if (queued.length > 0 && conversationId) {
@@ -1255,7 +1635,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         removePendingAppendCallback(callback)
       }
     }
-  }, [filteredChunks, conversationId, queryClient])
+  }, [filteredChunks, conversationId, queryClient, turnState.status])
 
   // CRITICAL FIX: Incremental message reduction - only process NEW filtered chunks
   // IMPORTANT: Deep copy previous messages to prevent mutation
@@ -1295,8 +1675,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return result
   }, [filteredChunks, conversationId])
 
-  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
-
   const isAwaitingToolResults = turnState.status === 'waiting_for_tools'
   const isAssistantStreaming = useMemo(() => computedMessages.some(m => m.streaming === true), [computedMessages])
   const turnActive = turnState.status === 'active' || turnState.status === 'waiting_for_tools'
@@ -1322,6 +1700,126 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return null
   }, [chunksRevisionKey])
 
+  // Consume non-render UI actions that should update query caches.
+  //
+  // Why:
+  // Some UI actions (like `conversation_title_updated`) are emitted on the conversation's SSE stream,
+  // but the UI component showing the title (e.g. a linked thread card elsewhere) relies on cached
+  // `useConversationDetail()` data. Without invalidation, the title can remain stale for up to the
+  // query staleTime.
+  const lastProcessedUIActionKeyRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (!lastUIAction) return
+    try {
+      const key = JSON.stringify(lastUIAction)
+      if (lastProcessedUIActionKeyRef.current === key) return
+      lastProcessedUIActionKeyRef.current = key
+
+      const action = typeof (lastUIAction as any)?.action === 'string' ? String((lastUIAction as any).action) : ''
+      const payload = (lastUIAction as any)?.payload
+
+      switch (action) {
+        case 'tool_approval_required':
+        case 'tool_approval_resolved': {
+          const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
+          if (cid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.toolApprovalsPending(cid) })
+          break
+        }
+        case 'conversation_title_updated': {
+          const cid = typeof payload?.conversationId === 'string' ? String(payload.conversationId) : ''
+          if (cid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.detail(cid) })
+          if (starshipId) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(starshipId) })
+          break
+        }
+        case 'child_conversation_created': {
+          const parentId = typeof payload?.parentConversationId === 'string' ? String(payload.parentConversationId) : ''
+          const sid = typeof payload?.starshipId === 'string' ? String(payload.starshipId) : starshipId || ''
+          if (sid) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.byStarship(sid) })
+          if (parentId) queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.children(parentId) })
+          break
+        }
+        default:
+          break
+      }
+    } catch {
+      // ignore UI action parsing failures
+    }
+  }, [lastUIAction, queryClient, starshipId])
+
+  type HistoryCursor = { createdAt: string; id: string }
+  const latestSnapshot = useMemo(() => {
+    if (!Array.isArray(chunks) || chunks.length === 0) {
+      return { hasMoreBefore: false, oldestCursor: null as HistoryCursor | null, snapshotData: null as ConversationStreamSnapshot | null }
+    }
+    for (let i = chunks.length - 1; i >= 0; i--) {
+      const c: any = chunks[i] as any
+      if (c?.type === 'snapshot' && c?.data && typeof c.data === 'object') {
+        const d = c.data as ConversationStreamSnapshot & { hasMoreBefore?: boolean; oldestCursor?: HistoryCursor | null }
+        const hasMoreBefore = Boolean((d as any).hasMoreBefore)
+        const oldestCursorRaw = (d as any).oldestCursor
+        const oldestCursor =
+          oldestCursorRaw && typeof oldestCursorRaw === 'object' && typeof oldestCursorRaw.createdAt === 'string' && typeof oldestCursorRaw.id === 'string'
+            ? ({ createdAt: oldestCursorRaw.createdAt, id: oldestCursorRaw.id } as HistoryCursor)
+            : null
+        return { hasMoreBefore, oldestCursor, snapshotData: d }
+      }
+    }
+    return { hasMoreBefore: false, oldestCursor: null as HistoryCursor | null, snapshotData: null as ConversationStreamSnapshot | null }
+  }, [chunksRevisionKey])
+
+  const [isLoadingOlder, setIsLoadingOlder] = useState(false)
+  const loadOlder = useCallback(
+    async (args?: { limit?: number }) => {
+      const convId = String(conversationId || '')
+      if (!convId) return
+      const snap = latestSnapshot.snapshotData as any
+      const cursor = latestSnapshot.oldestCursor
+      if (!snap || !cursor) return
+      if (isLoadingOlder) return
+
+      setIsLoadingOlder(true)
+      try {
+        const limit = Math.max(1, Math.min(200, Number(args?.limit ?? 100)))
+        const response: FetchResponse<ApiResponse<any>> = await api.get(`/api/v1/conversations/${convId}/messages`, {
+          params: {
+            limit,
+            beforeCreatedAt: cursor.createdAt,
+            beforeId: cursor.id,
+          },
+        })
+        const payload = response.data.data as any
+        const older = Array.isArray(payload?.messages) ? (payload.messages as ClientMessage[]) : []
+        const hasMoreBefore = Boolean(payload?.hasMoreBefore)
+        const oldestCursor = payload?.oldestCursor ?? null
+
+        const existingIds = new Set<string>()
+        const snapMsgs: any[] = Array.isArray(snap?.messages) ? snap.messages : []
+        snapMsgs.forEach((m: any) => {
+          if (m?.id != null) existingIds.add(String(m.id))
+        })
+        const olderFiltered = older.filter(m => m?.id != null && !existingIds.has(String(m.id)))
+
+        const nextSnapshot = {
+          ...snap,
+          messages: [...olderFiltered, ...snapMsgs],
+          hasMoreBefore,
+          oldestCursor,
+        }
+
+        queryClient.setQueryData(CONVERSATION_QUERY_KEYS.messages(convId), (old: any) => {
+          if (!Array.isArray(old)) return old
+          return [...old, { type: 'snapshot', data: nextSnapshot }]
+        })
+      } catch (error: any) {
+        const msg = getSafeErrorMessage(error)
+        toast.error('Failed to load older messages', { description: msg })
+      } finally {
+        setIsLoadingOlder(false)
+      }
+    },
+    [conversationId, latestSnapshot, isLoadingOlder, queryClient]
+  )
+
   const sendMessageMutation = useMutation({
     mutationFn: async (data: CreateMessageRequest & { conversationId: string }) => {
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/conversations/${data.conversationId}/messages`, {
@@ -1334,6 +1832,17 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return response.data
     },
     onMutate: async variables => {
+      const now = Date.now()
+      const lastErrorAt = lastSseErrorAtRef.current
+      const lastOpenAt = lastSseOpenAtRef.current
+      const errorRecently = typeof lastErrorAt === 'number' ? now - lastErrorAt < 5 * 60 * 1000 : false
+      const openStale = typeof lastOpenAt === 'number' ? now - lastOpenAt > 2 * 60 * 1000 : true
+      if (errorRecently || openStale) {
+        // Restart the stream so the response can render even after idle disconnects.
+        if (variables?.conversationId) {
+          queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(variables.conversationId) })
+        }
+      }
       // No optimistic updates - wait for server to send message.append and turn.started events
       // This avoids duplicate messages and keeps the UI in sync with server state
     },
@@ -1354,6 +1863,10 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isAwaitingToolResults,
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
     lastUIAction,
+    hasMoreBefore: latestSnapshot.hasMoreBefore,
+    oldestCursor: latestSnapshot.oldestCursor,
+    isLoadingOlder,
+    loadOlder,
     isFetching: messagesQuery.fetchStatus === 'fetching',
     sendMessage: (data: CreateMessageRequest & { conversationId: string }) => sendMessageMutation.mutateAsync(data),
     isSending: sendMessageMutation.isPending,

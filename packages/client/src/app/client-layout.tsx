@@ -3,8 +3,6 @@
 import Icon from '@/components/primitives/Icon'
 
 import { JwtAuthGate } from '@/components/auth/JwtAuthGate'
-import { TopRightUserProfile } from '@/components/auth/TopRightUserProfile'
-import { ConversationSearchProvider } from '@/components/conversation/ConversationSearchContext'
 import { Navigation } from '@/components/navigation/Navigation'
 import { useAuth } from '@/hooks/useAuth'
 import { StarTheme } from '@/components/theme-context'
@@ -123,11 +121,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   const [isMobile, setIsMobile] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [logoTrigger, setLogoTrigger] = useState(0)
-  const [hasMounted, setHasMounted] = useState(false)
-  const [isPageReady, setIsPageReady] = useState(false)
-
-  // Only show the top-right profile on fully-loaded ship pages.
-  const showTopRightUserProfile = hasMounted && isPageReady && (isShipPage || (isMarketplace && isAuthenticated))
 
   useEffect(() => {
     const checkMobile = () => {
@@ -140,17 +133,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
   }, [])
 
   useEffect(() => {
-    setHasMounted(true)
-  }, [])
-
-  useEffect(() => {
-    if (!hasMounted) return
-    setIsPageReady(false)
-    const rafId = window.requestAnimationFrame(() => setIsPageReady(true))
-    return () => window.cancelAnimationFrame(rafId)
-  }, [hasMounted, pathname])
-
-  useEffect(() => {
     const t = setTimeout(() => setLogoTrigger(v => v + 1), 900)
     return () => clearTimeout(t)
   }, [])
@@ -160,7 +142,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     return (
       <div className="h-full w-full">
         <EmailChangeToastHandler />
-        {showTopRightUserProfile ? <TopRightUserProfile /> : null}
         {children}
       </div>
     )
@@ -174,7 +155,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
         <StarTheme>
           <EmailChangeToastHandler />
           <div className="relative min-h-[100dvh] bg-background">
-            {showTopRightUserProfile ? <TopRightUserProfile /> : null}
             <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
           </div>
         </StarTheme>
@@ -188,7 +168,6 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       <StarTheme>
         <EmailChangeToastHandler />
         <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-          {showTopRightUserProfile ? <TopRightUserProfile /> : null}
           {/* Sidebar Navigation - conditionally rendered */}
           {!shouldHideNavigation && (
             <>
@@ -236,45 +215,42 @@ export function ClientLayout({ children }: ClientLayoutProps) {
     <JwtAuthGate>
       <StarTheme>
         <EmailChangeToastHandler />
-        <ConversationSearchProvider>
-          <div className="relative h-[100dvh] flex overflow-hidden bg-background">
-            {showTopRightUserProfile ? <TopRightUserProfile /> : null}
-            {/* Sidebar Navigation - conditionally rendered */}
-            {!shouldHideNavigation && (
-              <>
-                {/* Desktop: always visible */}
-                {!isMobile && (
-                  <div className="flex-shrink-0 relative z-50">
-                    <aside className="relative h-full">
-                      <Navigation isMobile={false} isOpen={true} />
-                    </aside>
-                  </div>
-                )}
+        <div className="relative h-[100dvh] flex overflow-hidden bg-background">
+          {/* Sidebar Navigation - conditionally rendered */}
+          {!shouldHideNavigation && (
+            <>
+              {/* Desktop: always visible */}
+              {!isMobile && (
+                <div className="flex-shrink-0 relative z-50">
+                  <aside className="relative h-full">
+                    <Navigation isMobile={false} isOpen={true} />
+                  </aside>
+                </div>
+              )}
 
-                {/* Mobile: overlay navigation */}
-                {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
-              </>
-            )}
+              {/* Mobile: overlay navigation */}
+              {isMobile && <Navigation isMobile={true} isOpen={showMobileMenu} onClose={() => setShowMobileMenu(false)} />}
+            </>
+          )}
 
-            {/* Mobile Toggle Button - only show when menu is closed */}
-            {isMobile && !shouldHideNavigation && !showMobileMenu && (
-              <motion.button
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                onClick={() => setShowMobileMenu(true)}
-                className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
-                aria-label="Open navigation menu"
-                style={{ zIndex: 999 }}
-              >
-                <Icon name="sidebar" className="w-5 h-5" />
-              </motion.button>
-            )}
+          {/* Mobile Toggle Button - only show when menu is closed */}
+          {isMobile && !shouldHideNavigation && !showMobileMenu && (
+            <motion.button
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.8 }}
+              onClick={() => setShowMobileMenu(true)}
+              className="fixed top-[14px] left-4 z-[999] p-2.5 bg-card border border-border rounded-lg shadow-lg hover:bg-accent transition-colors"
+              aria-label="Open navigation menu"
+              style={{ zIndex: 999 }}
+            >
+              <Icon name="sidebar" className="w-5 h-5" />
+            </motion.button>
+          )}
 
-            {/* Main Content Area - takes remaining space */}
-            <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
-          </div>
-        </ConversationSearchProvider>
+          {/* Main Content Area - takes remaining space */}
+          <main className="relative flex-1 min-h-full w-full overflow-auto">{children}</main>
+        </div>
       </StarTheme>
     </JwtAuthGate>
   )

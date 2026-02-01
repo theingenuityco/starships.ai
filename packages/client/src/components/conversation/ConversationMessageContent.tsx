@@ -280,9 +280,13 @@ interface MessageContentProps {
   className?: string
   enableMarkdown?: boolean
   enableCopy?: boolean
+  /** Optional extra action buttons rendered next to copy/export (e.g. "Start thread"). */
+  extraActions?: ReactNode
   enableLinkPreview?: boolean
   isStreaming?: boolean
   chunks?: StreamChunk[]
+  /** When true, use tighter vertical padding for stacked consecutive messages. */
+  compact?: boolean
   // Optional reasoning content and chunks
   reasoning?: string
   reasoningChunks?: StreamChunk[]
@@ -399,9 +403,11 @@ export function ConversationMessageContent({
   className,
   enableMarkdown = true,
   enableCopy = true,
+  extraActions,
   enableLinkPreview = true,
   isStreaming = false,
   chunks = [],
+  compact = false,
   reasoning,
   reasoningChunks = [],
   agentName,
@@ -978,6 +984,7 @@ export function ConversationMessageContent({
 
   const rawDisplayContent = String(displayContent ?? '')
   const hasCopyableContent = rawDisplayContent.trim().length > 0
+  const contentContainerClassName = compact ? 'w-full rounded-lg px-2 py-0.5 -mx-2 transition-colors hover:bg-muted' : 'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
 
   // Render markdown + tool calls in the same flow so spacing matches our custom markdown <p>.
   const markdownWithToolsNode: ReactNode =
@@ -988,15 +995,20 @@ export function ConversationMessageContent({
           <div className="relative w-full group/content-chunk">
             {/* Content chunk actions (copy + download): float at bottom edge.
                Anchor to the full-width wrapper (not the -mx content block) so user/assistant align perfectly. */}
-            {enableCopy && (
+            {(enableCopy || extraActions) && (
               <div className="pointer-events-none absolute bottom-0 right-0 translate-y-1/2 opacity-0 transition-opacity group-hover/content-chunk:opacity-100 group-focus-within/content-chunk:opacity-100">
                 <div className="pointer-events-auto inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 backdrop-blur px-1.5 py-1 shadow-sm">
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
-                    <Icon name="copy" className="h-4 w-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
-                    <Icon name="download" className="h-4 w-4" />
-                  </Button>
+                  {extraActions}
+                  {enableCopy && (
+                    <>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleCopyContent} aria-label="Copy message">
+                        <Icon name="copy" className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={handleExportContent} aria-label="Download message">
+                        <Icon name="download" className="h-4 w-4" />
+                      </Button>
+                    </>
+                  )}
                 </div>
               </div>
             )}
@@ -1005,7 +1017,7 @@ export function ConversationMessageContent({
               ref={messageContainerRef}
               className={cn(
                 // Keep internal padding; remove outside row-gap in the list instead.
-                'w-full rounded-lg px-2 py-1.5 -mx-2 transition-colors hover:bg-muted'
+                contentContainerClassName
               )}
             >
               <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={highlightTerm ? [rehypeHighlightText({ highlightTerm })] : undefined} components={markdownComponents}>

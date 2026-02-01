@@ -17,6 +17,7 @@ const map: Record<string, ResolvedIcon> = {
 
   // Common → Phosphor
   search: { type: 'phosphor', component: 'MagnifyingGlass' },
+  hash: { type: 'phosphor', component: 'Hash' },
   user: { type: 'phosphor', component: 'User' },
   users: { type: 'phosphor', component: 'Users' },
   'user-minus': { type: 'phosphor', component: 'UserMinus' },
@@ -53,6 +54,8 @@ const map: Record<string, ResolvedIcon> = {
   'message-square': { type: 'phosphor', component: 'ChatCircleText' },
   'message-circle-more': { type: 'phosphor', component: 'ChatCircleDots' },
   chat: { type: 'phosphor', component: 'Chat' },
+  // Thread / replies
+  thread: { type: 'phosphor', component: 'Chats' },
   // Send / paper plane
   send: { type: 'phosphor', component: 'PaperPlaneTilt' },
   // Stop (square)

@@ -18,7 +18,11 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
+  ChannelRepository,
+  ConversationMemberRepository,
   ConversationWidgetRepository,
+  DirectMessageRepository,
+  getConnection,
   MessageRepository,
   StarshipMemberRepository,
   ToolCallApprovalRepository,
@@ -32,6 +36,7 @@ import { AppError } from '@starships/errors';
 import { StarshipService } from '@/services/StarshipService';
 import { UserService } from '@/services/UserService';
 import { isInstanceAdmin } from '@/utils/auth-helpers';
+import { enforceDirectMessageMembership, enforcePrivateChannelMembership } from '@/utils/conversation-membership';
 import { UIActionService } from '@/services/UIActionService';
 import { MAX_TOOL_RESULT_BASE64_IMAGE_BYTES, MAX_TOOL_RESULT_DATA_URL_CHARS } from '@starships/protocol';
 import type {
@@ -181,7 +186,6 @@ async function verifyResourceAccess200(args: {
   } else {
     // owner/admin access allowed
   }
- 
 
   return true;
 }
@@ -269,9 +273,7 @@ type ToolResultAttachmentError = {
   reason: string;
 };
 
-type ParseBase64ImageDataUrlResult =
-  | { ok: true; mimeType: string; buffer: Buffer }
-  | { ok: false; reason: string };
+type ParseBase64ImageDataUrlResult = { ok: true; mimeType: string; buffer: Buffer } | { ok: false; reason: string };
 
 function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number; maxDataUrlChars: number }): ParseBase64ImageDataUrlResult {
   if (typeof dataUrl !== 'string') return { ok: false, reason: 'not_a_string' };
@@ -289,6 +291,10 @@ function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number;
   if (mimeTypeRaw.length > 64) return { ok: false, reason: 'mime_too_long' };
   if (!/^[a-z0-9.+-]+\/[a-z0-9.+-]+$/i.test(mimeTypeRaw)) return { ok: false, reason: 'invalid_mime' };
   const mimeType = mimeTypeRaw.toLowerCase();
+  // Avoid accepting "active content" image types (e.g. SVG) and keep the surface area small.
+  // This is used for tool-result attachments, so we only allow common raster formats.
+  const allowedMimeTypes = new Set(['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'image/gif']);
+  if (!allowedMimeTypes.has(mimeType)) return { ok: false, reason: 'unsupported_mime' };
 
   let b64 = dataUrl.slice(markerIdx + base64Marker.length);
   if (!b64) return { ok: false, reason: 'empty_base64' };
@@ -302,6 +308,8 @@ function parseBase64ImageDataUrl(dataUrl: string, opts: { maxImageBytes: number;
       return { ok: false, reason: 'base64_contains_whitespace' };
     }
   }
+
+  if (b64.length % 4 !== 0) return { ok: false, reason: 'invalid_base64_length' };
 
   // Validate base64 characters and padding placement in a single pass (linear time).
   let paddingCount = 0;
@@ -483,6 +491,20 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
     if (!(await verifyResourceAccess(convAuth.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: convAuth.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
 
     // Check if streaming is requested
     const wantsStreaming = req.get('Accept')?.includes('text/event-stream') || req.query.stream === 'true';
@@ -567,8 +589,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       const snapshotCursor: string = lastId || qpCursor || lastEventIdHeader || '0-0';
       let cursor: string = snapshotCursor;
 
-      // 1) Always send a baseline snapshot from DB (messages + latest known turn status)
-      const conversationMessages = await conversationService.getConversationMessages(conversationId);
+      // 1) Always send a baseline snapshot from DB (bounded tail + latest known turn status)
+      const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 100 });
+      const conversationMessages = page.messages;
       const latestTurn = await turnRepo.findLatestByConversationId(conversationId);
       const turn: ConversationStreamSnapshot['turn'] =
         latestTurn && typeof latestTurn.id === 'string'
@@ -586,6 +609,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       // This fixes a UX bug where refreshing the page mid-stream would lose previously streamed
       // deltas (not yet persisted to DB), and the UI would only show new deltas after reconnect.
       let snapshotMessages = conversationMessages;
+      const hasMoreBefore = page.hasMoreBefore;
+      const oldestCursor = page.oldestCursor;
       const activeTurnId =
         latestTurn &&
         typeof latestTurn.id === 'string' &&
@@ -713,7 +738,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // best-effort only
       }
 
-      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn })}\n\n`);
+      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor })}\n\n`);
 
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.
@@ -800,7 +825,30 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      let messages = await conversationService.getConversationMessages(conversationId, orderValidation.orderDirection);
+      // Keyset pagination (cursor-based). We currently ignore page/offset for this endpoint.
+      const cursorValidation = validateData(
+        z
+          .object({
+            beforeCreatedAt: z.string().datetime().optional(),
+            beforeId: IdSchema.optional(),
+          })
+          .refine((v) => (v.beforeCreatedAt && !v.beforeId ? false : v.beforeId && !v.beforeCreatedAt ? false : true), {
+            message: 'beforeCreatedAt and beforeId must be provided together',
+          }),
+        req.query,
+        res,
+        'message cursor'
+      );
+      if (!cursorValidation) return;
+
+      const page = await conversationService.getConversationMessagesPage({
+        conversationId,
+        limit: paginationValidation.limit,
+        ...(cursorValidation.beforeCreatedAt && cursorValidation.beforeId
+          ? { beforeCreatedAt: cursorValidation.beforeCreatedAt, beforeId: cursorValidation.beforeId }
+          : {}),
+      });
+      const messages = orderValidation.orderDirection === 'desc' ? page.messages.slice().reverse() : page.messages;
 
       // Verify conversation exists
       const conversation = await conversationService.getConversationById(conversationId);
@@ -822,6 +870,8 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         conversationId,
         messages,
         total: messages.length,
+        hasMoreBefore: page.hasMoreBefore,
+        oldestCursor: page.oldestCursor,
         participants,
         startedAt: conversation.createdAt,
         lastActivityAt: conversation.updatedAt || conversation.createdAt,
@@ -865,6 +915,20 @@ router.post('/conversations/:conversationId/stop', jwtAuthMiddleware, async (req
       return;
     }
     if (!(await verifyResourceAccess(exists.starshipId, authUserId, 'conversation', conversationId, res))) {
+      return;
+    }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: exists.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
       return;
     }
 
@@ -935,6 +999,20 @@ router.post(
         res,
       });
       if (!ok) {
+        return;
+      }
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      ) {
+        return;
+      }
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
         return;
       }
 
@@ -1260,6 +1338,17 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1335,6 +1424,17 @@ router.get(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) return;
 
       const approvalsRepo = new ToolCallApprovalRepository();
       const approvals = await approvalsRepo.findPendingByConversation(conversationId);
@@ -1420,6 +1520,16 @@ router.post(
         return;
       }
       if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      )
+        return;
 
       const approvals = new ToolCallApprovalRepository();
       const approval = await approvals.findById(approvalId);
@@ -1525,6 +1635,20 @@ router.post(
         if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
           return;
         }
+        if (
+          !(await enforcePrivateChannelMembership({
+            conversationId,
+            conversationStarshipId: conversation.starshipId,
+            userId: authUserId,
+            req,
+            res,
+          }))
+        ) {
+          return;
+        }
+        if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+          return;
+        }
       }
 
       // Resolve starship and wallet, then enforce non-zero balance
@@ -1581,11 +1705,22 @@ router.post(
       // Persist the user message first (we need messageId for idempotent charging), then debit fixed credits.
       // If debit fails, delete the message and return 402 (do not start the turn).
       const messageService = new MessageService();
+      // Multi-human support: persist author identity on the message so shared conversations/channels
+      // can render the correct sender (not always “You”).
+      const authUser = req.user as unknown as { id?: string; displayName?: string; email?: string; avatar?: string } | undefined;
+      const authorUserId = typeof authUser?.id === 'string' ? authUser.id : undefined;
+      const authorNameRaw =
+        typeof authUser?.displayName === 'string' ? authUser.displayName : typeof authUser?.email === 'string' ? authUser.email : '';
+      const authorName = authorNameRaw && authorNameRaw.trim().length > 0 ? authorNameRaw.trim() : undefined;
+      const authorAvatar = typeof authUser?.avatar === 'string' && authUser.avatar.trim().length > 0 ? authUser.avatar.trim() : undefined;
       const userMessage = await messageService.createMessage({
         conversationId,
         role: 'user',
         content,
         messageType: 'user_input',
+        ...(authorUserId && { userId: authorUserId }),
+        ...(authorName && { userName: authorName }),
+        ...(authorAvatar && { userAvatar: authorAvatar }),
         ...(agentId && { agentId }),
         ...(attachmentIds && attachmentIds.length > 0 && { attachmentIds }),
       });
@@ -1658,7 +1793,9 @@ router.post(
           );
 
           const conversationWithFinalState = await conversationService.getConversationById(conversationId);
-          const messages = await conversationService.getConversationMessages(conversationId);
+          // Bound sync payload size; client can page older history via GET /conversations/:id/messages.
+          const page = await conversationService.getConversationMessagesPage({ conversationId, limit: 200 });
+          const messages = page.messages;
           // Include the server-authoritative turn status in the sync response.
           // This is critical for delegated conversations (call-agent) where execution can "complete"
           // early because the run is awaiting out-of-band tool approval (turn.status = waiting_for_tools).
@@ -1681,7 +1818,9 @@ router.post(
               status: turn?.status || 'completed',
               streaming: false,
               conversationId,
-              conversation: conversationWithFinalState ? { ...conversationWithFinalState, messages } : null,
+              conversation: conversationWithFinalState
+                ? { ...conversationWithFinalState, messages, hasMoreBefore: page.hasMoreBefore, oldestCursor: page.oldestCursor }
+                : null,
               turn,
               awaitingToolApproval,
             },
@@ -1756,6 +1895,20 @@ router.get('/conversations/:conversationId', jwtAuthMiddleware, async (req: Requ
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
     }
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
 
     sendSuccess(res, conversation, 200);
   } catch (error) {
@@ -1789,19 +1942,229 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
       return;
     }
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
 
-    // IMPORTANT:
-    // Do NOT rely on paginated starship conversation lists here; this endpoint must work on reload
-    // even when the child conversation is not in the first page.
-    //
-    // Also IMPORTANT:
-    // Keep this implemented purely in the server package so it does not depend on freshly-built
-    // `@starships/models` dist typings.
-    const all = await conversationService.getConversationsByStarshipWithAgents(conversation.starshipId);
-    const children = (all ?? []).filter((c) => c.parentConversationId === conversationId);
-    sendSuccess(res, children, 200);
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
+
+    const cursorValidation = validateData(
+      z
+        .object({
+          beforeUpdatedAt: z.string().datetime().optional(),
+          beforeId: IdSchema.optional(),
+        })
+        .refine((v) => (v.beforeUpdatedAt && !v.beforeId ? false : v.beforeId && !v.beforeUpdatedAt ? false : true), {
+          message: 'beforeUpdatedAt and beforeId must be provided together',
+        }),
+      req.query,
+      res,
+      'children cursor'
+    );
+    if (!cursorValidation) return;
+
+    const page = await conversationService.getChildConversationsPage({
+      parentConversationId: conversationId,
+      limit: paginationValidation.limit,
+      ...(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId
+        ? { beforeUpdatedAt: cursorValidation.beforeUpdatedAt, beforeId: cursorValidation.beforeId }
+        : {}),
+    });
+
+    sendSuccess(
+      res,
+      {
+        parentConversationId: conversationId,
+        conversations: page.conversations,
+        total: page.conversations.length,
+        hasMoreBefore: page.hasMoreBefore,
+        oldestCursor: page.oldestCursor,
+      },
+      200
+    );
   } catch (error) {
     handleError(error, res, 'fetching child conversations');
+  }
+});
+
+/**
+ * GET /conversations/:conversationId/children/pending-approvals
+ *
+ * Returns child conversations (threads) that currently have pending tool-call approvals.
+ * This is used to power the parent composer callout without fetching all children and polling each one.
+ */
+router.get('/conversations/:conversationId/children/pending-approvals', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+    if (!paramValidation) return;
+
+    const { conversationId } = paramValidation;
+
+    const authUserId = req.user?.id as string | undefined;
+    if (!authUserId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+    if (!paginationValidation) return;
+
+    const cursorValidation = validateData(
+      z
+        .object({
+          beforeUpdatedAt: z.string().datetime().optional(),
+          beforeId: IdSchema.optional(),
+        })
+        .refine((v) => (v.beforeUpdatedAt && !v.beforeId ? false : v.beforeId && !v.beforeUpdatedAt ? false : true), {
+          message: 'beforeUpdatedAt and beforeId must be provided together',
+        }),
+      req.query,
+      res,
+      'children pending approvals cursor'
+    );
+    if (!cursorValidation) return;
+
+    const conversationService = new ConversationService();
+    const conversation = await conversationService.getConversationById(conversationId);
+    if (!conversation) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+      return;
+    }
+    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+    if (
+      !(await enforcePrivateChannelMembership({
+        conversationId,
+        conversationStarshipId: conversation.starshipId,
+        userId: authUserId,
+        req,
+        res,
+      }))
+    ) {
+      return;
+    }
+    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+      return;
+    }
+
+    // Efficient DB query: find children with pending approvals, newest first.
+    const conn = getConnection();
+    const limit = Math.max(1, Math.min(200, Number(paginationValidation.limit || 50)));
+    const pageSize = limit + 1;
+
+    const useCursor = Boolean(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId);
+    const rows = await conn.query<{
+      id: string;
+      updated_at: string;
+      created_at: string;
+      pending_count: number;
+      agent_name: string | null;
+    }>(
+      useCursor
+        ? `
+          SELECT
+            c.id,
+            c.updated_at,
+            c.created_at,
+            COUNT(tca.id)::int AS pending_count,
+            (
+              SELECT a.name
+              FROM conversation_agents ca
+              INNER JOIN agents a ON a.id = ca.agent_id
+              WHERE ca.conversation_id = c.id
+              ORDER BY a.name
+              LIMIT 1
+            ) AS agent_name
+          FROM conversations c
+          INNER JOIN tool_call_approvals tca ON tca.conversation_id = c.id
+          WHERE c.parent_conversation_id = $1
+            AND tca.status = 'pending'
+            AND (
+              c.updated_at < $2::timestamptz
+              OR (c.updated_at = $2::timestamptz AND c.id < $3::text)
+            )
+          GROUP BY c.id, c.updated_at, c.created_at
+          ORDER BY c.updated_at DESC, c.id DESC
+          LIMIT $4
+        `
+        : `
+          SELECT
+            c.id,
+            c.updated_at,
+            c.created_at,
+            COUNT(tca.id)::int AS pending_count,
+            (
+              SELECT a.name
+              FROM conversation_agents ca
+              INNER JOIN agents a ON a.id = ca.agent_id
+              WHERE ca.conversation_id = c.id
+              ORDER BY a.name
+              LIMIT 1
+            ) AS agent_name
+          FROM conversations c
+          INNER JOIN tool_call_approvals tca ON tca.conversation_id = c.id
+          WHERE c.parent_conversation_id = $1
+            AND tca.status = 'pending'
+          GROUP BY c.id, c.updated_at, c.created_at
+          ORDER BY c.updated_at DESC, c.id DESC
+          LIMIT $2
+        `,
+      useCursor ? [conversationId, cursorValidation.beforeUpdatedAt, cursorValidation.beforeId, pageSize] : [conversationId, pageSize]
+    );
+
+    const hasMoreBefore = rows.length > limit;
+    const trimmed = rows.slice(0, limit);
+    const oldest = trimmed.length > 0 ? trimmed[trimmed.length - 1] : null;
+    const toIso = (v: unknown): string => {
+      if (v == null) return '';
+      if (v instanceof Date) return v.toISOString();
+      if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+      if (typeof v === 'string') {
+        const t = Date.parse(v);
+        return Number.isFinite(t) ? new Date(t).toISOString() : v;
+      }
+      try {
+        const s = String(v);
+        const t = Date.parse(s);
+        return Number.isFinite(t) ? new Date(t).toISOString() : s;
+      } catch {
+        return '';
+      }
+    };
+
+    const oldestCursor = oldest ? { updatedAt: toIso(oldest.updated_at || oldest.created_at), id: String(oldest.id) } : null;
+
+    const items = trimmed.map((r) => ({
+      id: String(r.id),
+      updatedAt: toIso(r.updated_at || r.created_at),
+      pendingCount: Number(r.pending_count) || 0,
+      agentName: typeof r.agent_name === 'string' ? r.agent_name : '',
+    }));
+
+    sendSuccess(
+      res,
+      {
+        parentConversationId: conversationId,
+        children: items,
+        total: items.length,
+        hasMoreBefore,
+        oldestCursor,
+      },
+      200
+    );
+  } catch (error) {
+    handleError(error, res, 'fetching child pending approvals');
   }
 });
 
@@ -1858,6 +2221,7 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
         starshipId: IdSchema,
         agentSlug: z.string().min(1).max(255).optional(),
         agentId: IdSchema.optional(),
+        parentConversationId: IdSchema.optional(),
       }),
       req.body,
       res,
@@ -1909,15 +2273,68 @@ router.post('/conversations', scheduleOrJwtAuth, async (req: Request, res: Respo
       resolvedAgentId = agent.id;
     }
 
-    const conversationService = new ConversationService();
-    // Build payload for conversation creation, normalizing agentId and dropping agentSlug
-    const createPayload = {
-      ...req.body,
-      agentId: resolvedAgentId ?? bodyValidation.agentId,
-    };
-    delete createPayload.agentSlug;
+    // No-stray enforcement:
+    // - Child conversations (parentConversationId set) are allowed as nested threads.
+    // - Top-level conversations must be either a DM (agent provided) or a Channel (via channels API).
+    const parentConversationId = bodyValidation.parentConversationId;
+    const effectiveAgentId = resolvedAgentId ?? bodyValidation.agentId;
+    if (!isInternal && !parentConversationId && !effectiveAgentId) {
+      sendError(res, 'VALIDATION_ERROR', 'Top-level conversations must be created as a channel or a direct message', 400, {
+        hint: 'Use POST /starships/:starshipId/channels or POST /starships/:starshipId/direct-messages',
+      });
+      return;
+    }
 
-    const conversation = await conversationService.createConversation(createPayload);
+    const conversationService = new ConversationService();
+    // For external callers creating top-level agent chats, create/reuse a DM instead of a raw conversation.
+    if (!isInternal && !parentConversationId && effectiveAgentId && authUserId) {
+      const dmRepo = new DirectMessageRepository();
+      const existingDm = await dmRepo.findUserAgentDm(bodyValidation.starshipId, authUserId, effectiveAgentId).catch(() => null);
+      if (existingDm) {
+        const existingConversation = await conversationService.getConversationById(existingDm.conversationId);
+        if (existingConversation) {
+          sendSuccess(res, existingConversation, 200);
+          return;
+        }
+      }
+
+      const conversation = await conversationService.createConversation({
+        title: bodyValidation.title || 'New Conversation',
+        status: 'active',
+        starshipId: bodyValidation.starshipId,
+        agentId: effectiveAgentId,
+        parentConversationId,
+      });
+
+      await dmRepo
+        .create({
+          conversationId: conversation.id,
+          starshipId: bodyValidation.starshipId,
+          dmType: 'user_agent',
+          userId: authUserId,
+          agentId: effectiveAgentId,
+          createdAt: conversation.createdAt,
+          updatedAt: conversation.updatedAt ?? conversation.createdAt,
+        })
+        .catch(() => null);
+
+      const memberRepo = new ConversationMemberRepository();
+      await memberRepo
+        .createOrIgnoreMember({ conversationId: conversation.id, userId: authUserId, role: 'admin', createdBy: authUserId })
+        .catch(() => null);
+
+      sendSuccess(res, conversation, 201);
+      return;
+    }
+
+    // Otherwise, fall back to raw conversation creation (internal/scheduled or nested).
+    const conversation = await conversationService.createConversation({
+      title: bodyValidation.title || 'New Conversation',
+      status: 'active',
+      starshipId: bodyValidation.starshipId,
+      agentId: effectiveAgentId,
+      parentConversationId,
+    });
 
     sendSuccess(res, conversation, 201);
   } catch (error) {
@@ -2019,6 +2436,28 @@ router.delete('/conversations/:conversationId', jwtAuthMiddleware, async (req: R
     }
     if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) {
       return;
+    }
+
+    // Prevent deleting the starship's default channel conversation.
+    // Stored at the starship level to make the invariant explicit.
+    try {
+      const conn = getConnection();
+      const row = await conn.queryOne<{ default_channel_conversation_id: string | null }>(
+        `SELECT default_channel_conversation_id
+           FROM starships
+          WHERE id = $1`,
+        [conversation.starshipId]
+      );
+      const defaultId = row?.default_channel_conversation_id ? String(row.default_channel_conversation_id) : '';
+      if (defaultId && defaultId === conversationId) {
+        sendError(res, 'ACCESS_DENIED', 'Cannot delete the default channel for a starship', 403, {
+          conversationId,
+          starshipId: conversation.starshipId,
+        });
+        return;
+      }
+    } catch {
+      // Pre-migration compatibility: if the column doesn't exist yet, do not block.
     }
 
     const deleted = await conversationService.deleteConversation(conversationId);

@@ -39,7 +39,11 @@ export class MessageService {
       ...(request.toolCallId && { toolCallId: request.toolCallId }),
       ...(request.agentId && { agentId: request.agentId }),
       ...(request.agentName && { agentName: request.agentName }),
+      ...(request.userId && { userId: request.userId }),
+      ...(request.userName && { userName: request.userName }),
+      ...(request.userAvatar && { userAvatar: request.userAvatar }),
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
+      ...(request.linkedConversationId && { linkedConversationId: request.linkedConversationId }),
     });
 
     // Link attachments to message if provided
@@ -69,7 +73,11 @@ export class MessageService {
       ...(request.toolCallId && { toolCallId: request.toolCallId }),
       ...(request.agentId && { agentId: request.agentId }),
       ...(request.agentName && { agentName: request.agentName }),
+      ...(request.userId && { userId: request.userId }),
+      ...(request.userName && { userName: request.userName }),
+      ...(request.userAvatar && { userAvatar: request.userAvatar }),
       ...(request.attachmentIds && { attachmentIds: request.attachmentIds }),
+      ...(request.linkedConversationId && { linkedConversationId: request.linkedConversationId }),
     });
 
     if (request.attachmentIds && request.attachmentIds.length > 0) {

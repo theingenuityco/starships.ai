@@ -68,13 +68,27 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     if (!primaryStarship) return
     setIsDeploying(true)
     try {
+      const safeStarshipPathSegment = (candidates: Array<unknown>): string | null => {
+        for (const c of candidates) {
+          if (typeof c !== 'string') continue
+          const raw = c.trim()
+          if (!raw) continue
+          const lowered = raw.toLowerCase()
+          if (lowered === 'undefined' || lowered === 'null') continue
+          return raw
+        }
+        return null
+      }
+
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
-        starshipSlug: primaryStarship.slug,
+        starshipSlug: safeStarshipPathSegment([primaryStarship.slug]) ?? undefined,
       })
 
       const agentId = (created as any)?.id as string | undefined
+      const agentSlug = (created as any)?.slug as string | undefined
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, primaryStarship.slug, primaryStarship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -84,6 +98,15 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
           await api.put(`/api/v1/agents/${agentId}/tool-permissions`, body)
         } catch (e: any) {
           toast.error('Permissions not saved', { description: e?.response?.data?.error || e?.message || 'Agent deployed, but tool permissions could not be updated.' })
+        }
+      }
+
+      // Marketplace UX: after deploy, take the user to the correct starship (chat).
+      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+        if (agentId) {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+        } else {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
         }
       }
     } finally {

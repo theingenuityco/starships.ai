@@ -26,6 +26,7 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 
 function LinkedConversationCard({
   linkedConversationId,
@@ -195,6 +196,20 @@ interface ConversationMessageListProps {
   starshipId?: string
   /** Optional channel name when the conversation is a channel (used for empty-state hero). */
   channelName?: string | null
+  /**
+   * Optional override for the conversation title used in the empty-state hero.
+   * Primarily used for draft direct-messages (no persisted conversation yet).
+   */
+  emptyHeroTitleOverride?: string | null
+  /**
+   * Optional participant metadata for the empty-state hero (e.g. draft DM target).
+   * - For agent DMs, pass `{ kind: 'agent', seed, avatarAttachmentId }` to show the agent avatar.
+   * - For user DMs, pass `{ kind: 'human', avatarUrl }` to show the peer avatar.
+   */
+  emptyHeroParticipantOverride?:
+    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
+    | { kind: 'human'; label: string; avatarUrl?: string | null }
+    | null
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
@@ -270,6 +285,8 @@ export function ConversationMessageList({
   conversationId,
   starshipId,
   channelName,
+  emptyHeroTitleOverride,
+  emptyHeroParticipantOverride,
   bottomPaddingPx,
   className,
   scrollClassName,
@@ -314,6 +331,12 @@ export function ConversationMessageList({
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
   const { data: conversationDetail } = useConversationDetail(conversationId)
+  const resolvedEmptyHeroTitle = useMemo(() => {
+    const fromDetail = typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title).trim() : ''
+    if (fromDetail) return fromDetail
+    const fromOverride = typeof emptyHeroTitleOverride === 'string' ? emptyHeroTitleOverride.trim() : ''
+    return fromOverride || null
+  }, [conversationDetail, emptyHeroTitleOverride])
 
   // Conversation agents (can be multiple). We need to resolve agent details per message by `message.agentId`.
   type ConversationAgent = {
@@ -325,6 +348,28 @@ export function ConversationMessageList({
   }
   const { data: conversationAgentsRaw = [] } = useConversationAgents(conversationId)
   const conversationAgents = useMemo(() => (Array.isArray(conversationAgentsRaw) ? (conversationAgentsRaw as ConversationAgent[]) : []), [conversationAgentsRaw])
+
+  const resolvedEmptyHeroParticipant = useMemo(() => {
+    // Prefer explicit override (draft DM target).
+    if (emptyHeroParticipantOverride) return emptyHeroParticipantOverride
+
+    // Otherwise derive from the conversation's first agent (works for empty/brand-new DM conversations too).
+    const a0: any = conversationAgents?.[0]
+    if (!a0) return null
+    const label = formatAgentDisplayName(a0) || 'Agent'
+    const seed = String(a0?.name || a0?.slug || a0?.id || label)
+    const avatarAttachmentId = typeof a0?.avatarAttachmentId === 'string' ? String(a0.avatarAttachmentId) : null
+    return { kind: 'agent' as const, label, seed, avatarAttachmentId }
+  }, [conversationAgents, emptyHeroParticipantOverride])
+
+  const emptyHeroAvatarAttachmentIds = useMemo(() => {
+    const p = resolvedEmptyHeroParticipant
+    if (!p || p.kind !== 'agent') return []
+    const id = typeof p.avatarAttachmentId === 'string' ? p.avatarAttachmentId.trim() : ''
+    return id ? [id] : []
+  }, [resolvedEmptyHeroParticipant])
+  const { data: emptyHeroAvatarAttachments = [] } = useMessageAttachments(emptyHeroAvatarAttachmentIds, starshipId)
+  const emptyHeroAvatarUrlById = useMemo(() => new Map((emptyHeroAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [emptyHeroAvatarAttachments])
 
   const fallbackAgent = conversationAgents[0]
   const fallbackAgentDisplayName = useMemo(() => {
@@ -1117,7 +1162,8 @@ export function ConversationMessageList({
   }
 
   const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage)
-  const shouldBottomAlignChannelHero = Boolean(showChannelHero && renderMessages.length === 0 && !shouldShowGapLoader)
+  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && renderMessages.length === 0 && !shouldShowGapLoader)
+  const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0
   // Search input UI intentionally disabled for now.
@@ -1214,7 +1260,7 @@ export function ConversationMessageList({
         // When the channel is empty, we want the hero to "sit" near the bottom like Slack.
         // The normal bottom padding is intentionally large (to avoid message overlap with the composer),
         // but that padding makes an empty-state hero float too high.
-        style={{ paddingBottom: shouldBottomAlignChannelHero ? 32 : (bottomPaddingPx ?? 160) }}
+        style={{ paddingBottom: shouldBottomAlignHero ? 32 : (bottomPaddingPx ?? 160) }}
         onScroll={() => {
           const container = scrollContainerRef.current
           if (!container) return
@@ -1246,7 +1292,15 @@ export function ConversationMessageList({
               <ChannelHero
                 channelName={channelName}
                 conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
-                bottomAlign={shouldBottomAlignChannelHero}
+                bottomAlign={shouldBottomAlignHero}
+              />
+            ) : null}
+            {showDirectMessageHero ? (
+              <DirectMessageHero
+                title={resolvedEmptyHeroTitle}
+                participant={resolvedEmptyHeroParticipant ?? null}
+                avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
+                bottomAlign={shouldBottomAlignHero}
               />
             ) : null}
             {renderMessages.map((message, idx) => {
@@ -2093,4 +2147,72 @@ function ChannelHero({
       />
     </div>
   )
+}
+
+function DirectMessageHero({
+  title,
+  participant,
+  avatarUrlByAttachmentId,
+  bottomAlign,
+}: {
+  title: string | null
+  participant:
+    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
+    | { kind: 'human'; label: string; avatarUrl?: string | null }
+    | null
+  avatarUrlByAttachmentId: Map<string, string | null | undefined>
+  bottomAlign: boolean
+}) {
+  const displayName = (title ?? '').trim() || 'Direct message'
+  return (
+    <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
+      <div className="max-w-3xl">
+        <div className="flex items-start gap-4">
+          <DirectMessageHeroAvatar participant={participant} avatarUrlByAttachmentId={avatarUrlByAttachmentId} />
+          <div className="min-w-0">
+            <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
+            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of your conversation. Send a message to start.</p>
+          </div>
+        </div>
+      </div>
+      <div
+        role="separator"
+        aria-hidden="true"
+        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
+      />
+    </div>
+  )
+}
+
+function DirectMessageHeroAvatar({
+  participant,
+  avatarUrlByAttachmentId,
+}: {
+  participant:
+    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
+    | { kind: 'human'; label: string; avatarUrl?: string | null }
+    | null
+  avatarUrlByAttachmentId: Map<string, string | null | undefined>
+}) {
+  const p = participant
+  // Shared marketplace-style avatar component so DM + marketplace stay in sync.
+  const sizeClassName = 'h-20 w-20 sm:h-24 sm:w-24'
+
+  if (!p) {
+    return (
+      <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
+        <Icon name="message-square" className="h-7 w-7 text-muted-foreground" />
+        <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
+      </div>
+    )
+  }
+
+  if (p.kind === 'agent') {
+    const aid = typeof p.avatarAttachmentId === 'string' ? p.avatarAttachmentId.trim() : ''
+    const imageUrl = aid ? avatarUrlByAttachmentId.get(aid) : undefined
+    return <MarketplaceAvatar imageUrl={typeof imageUrl === 'string' ? imageUrl : null} label={p.label} seed={p.seed} sizeClassName={sizeClassName} />
+  }
+
+  const avatarUrl = typeof p.avatarUrl === 'string' ? p.avatarUrl.trim() : ''
+  return <MarketplaceAvatar imageUrl={avatarUrl || null} label={p.label} seed={p.label} sizeClassName={sizeClassName} tintClassName="bg-[radial-gradient(circle_at_30%_30%,rgba(124,58,237,0.18),transparent_60%)]" />
 }

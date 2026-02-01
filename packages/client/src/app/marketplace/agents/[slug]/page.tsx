@@ -6,6 +6,7 @@ import type { AgentTemplateModel, ToolTemplateModel } from '@starships/protocol'
 import { fetchPublicAgentTemplates, fetchPublicToolTemplates } from '@/lib/server/public-templates'
 import PublicHeader from '@/components/navigation/PublicHeader'
 import Icon from '@/components/primitives/Icon'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
@@ -191,17 +192,13 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             <section className="mt-4 sm:mt-6 mb-10 sm:mb-12">
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-6">
                 <div className="flex items-start gap-4 min-w-0 flex-1">
-                  <div className="relative h-24 w-24 sm:h-28 sm:w-28 rounded-2xl ring-1 ring-border/50 bg-muted/40 overflow-hidden shadow-lg flex-shrink-0">
-                    {template.avatarUrl ? (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img src={template.avatarUrl} alt={`${template.name || 'Agent'} avatar`} width={112} height={112} className="h-full w-full object-cover" />
-                    ) : (
-                      <div className="h-full w-full flex items-center justify-center">
-                        <span className="text-lg sm:text-xl font-semibold text-muted-foreground">{initials || 'AI'}</span>
-                      </div>
-                    )}
-                    <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
-                  </div>
+                  <MarketplaceAvatar
+                    imageUrl={template.avatarUrl || null}
+                    label={`${template.name || 'Agent'} avatar`}
+                    seed={template.name || template.slug || 'AI'}
+                    sizeClassName="h-24 w-24 sm:h-28 sm:w-28"
+                    fallbackTextClassName="text-lg sm:text-xl font-semibold text-muted-foreground"
+                  />
 
                   <div className="min-w-0 flex-1">
                     <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight leading-tight truncate max-w-[38ch]">{template.name}</h1>

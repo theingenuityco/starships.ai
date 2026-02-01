@@ -95,9 +95,7 @@ export function mergeConversationState(
  * @param executionState - Execution state from autopilot
  * @returns Persistable state fields, or null if nothing to persist
  */
-export function extractPersistableState(
-  executionState: Record<string, unknown> | undefined
-): Record<string, unknown> | null {
+export function extractPersistableState(executionState: Record<string, unknown> | undefined): Record<string, unknown> | null {
   if (!executionState || typeof executionState !== 'object') {
     return null;
   }
@@ -154,9 +152,7 @@ export function hasPlugins(state: ConversationState | Record<string, unknown> | 
  * @param state - State to normalize
  * @returns Normalized state
  */
-export function normalizeStateForComparison(
-  state: ConversationState | Record<string, unknown> | undefined
-): Record<string, unknown> {
+export function normalizeStateForComparison(state: ConversationState | Record<string, unknown> | undefined): Record<string, unknown> {
   if (!state || typeof state !== 'object') {
     return {};
   }
@@ -178,4 +174,3 @@ export function normalizeStateForComparison(
 
   return normalized;
 }
-

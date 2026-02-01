@@ -41,7 +41,7 @@ export default function Hero(props: { initialAgentTemplates?: AgentTemplateModel
 
   const navigatePrimary = useCallback(() => {
     if (isAuthenticated && primaryStarship?.slug) {
-      router.push(`/ship/${primaryStarship.slug}/conversations`)
+      router.push(`/ship/${primaryStarship.slug}`)
       return
     }
     router.push('/login')

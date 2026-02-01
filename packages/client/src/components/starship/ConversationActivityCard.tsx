@@ -70,7 +70,7 @@ export function ConversationActivityCard({ starshipSlug, recentConversation, con
               <div className="text-xs text-muted-foreground mb-4">Start a conversation with your agents to see recent activity</div>
             </div>
             <Button asChild size="sm" variant="outline" className="w-full border-primary text-primary hover:bg-primary/5">
-              <Link href={`/ship/${starshipSlug}/conversations`}>
+              <Link href={`/ship/${starshipSlug}`}>
                 <Icon name="message-square" className="h-3.5 w-3.5 mr-1.5" />
                 Start a Conversation
               </Link>

@@ -17,6 +17,7 @@ import { track } from '@/lib/analytics'
 import api from '@/lib/api'
 import type { AgentToolPermission, UpdateAgentToolPermissionsRequest } from '@starships/protocol'
 import { toast } from 'sonner'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 
 interface AgentTemplateCardProps {
   template: AgentTemplateModel
@@ -115,12 +116,26 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
 
     setIsDeploying(true)
     try {
+      const safeStarshipPathSegment = (candidates: Array<unknown>): string | null => {
+        for (const c of candidates) {
+          if (typeof c !== 'string') continue
+          const raw = c.trim()
+          if (!raw) continue
+          const lowered = raw.toLowerCase()
+          if (lowered === 'undefined' || lowered === 'null') continue
+          return raw
+        }
+        return null
+      }
+
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: starship.id,
-        starshipSlug: (starship as any)?.slug || undefined,
+        starshipSlug: safeStarshipPathSegment([(starship as any)?.slug]) ?? undefined,
       })
       const agentId = (created as any)?.id as string | undefined
+      const agentSlug = (created as any)?.slug as string | undefined
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, (starship as any)?.slug, starship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -133,6 +148,16 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         }
       }
       onDeploy?.(template)
+
+      // Marketplace UX: after deploy, take the user to the correct starship (chat).
+      // Guarded so uses of this card outside the marketplace don't unexpectedly navigate.
+      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+        if (agentId) {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+        } else {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
+        }
+      }
     } finally {
       setIsDeploying(false)
     }
@@ -159,10 +184,15 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
             <img src={avatarUrl} alt={`${displayName || 'Agent'} avatar`} className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-[1.03]" />
           ) : (
             <div className="h-full w-full flex items-center justify-center bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]">
-              <div className="relative h-14 w-14 rounded-2xl bg-background/40 border border-border/60 backdrop-blur-sm flex items-center justify-center overflow-hidden">
-                <span className="text-lg font-semibold text-muted-foreground">{initials || 'AI'}</span>
-                <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-violet-500/20 shadow-[inset_0_1px_0_rgba(124,58,237,0.18),inset_0_0_18px_rgba(124,58,237,0.18)] dark:ring-violet-400/20 dark:shadow-[inset_0_1px_0_rgba(167,139,250,0.14),inset_0_0_18px_rgba(167,139,250,0.14)]" />
-              </div>
+              <MarketplaceAvatar
+                imageUrl={null}
+                label={displayName || 'Agent'}
+                seed={displayName || 'AI'}
+                sizeClassName="h-14 w-14"
+                shadowClassName="shadow-sm"
+                fallbackTextClassName="text-lg font-semibold text-muted-foreground"
+                tintClassName="bg-[radial-gradient(circle_at_center,rgba(124,58,237,0.14),transparent_55%)]"
+              />
             </div>
           )}
           {/* Soft overlay for readability */}

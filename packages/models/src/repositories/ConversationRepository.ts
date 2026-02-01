@@ -191,6 +191,95 @@ export class ConversationRepository extends BaseRepository {
   }
 
   /**
+   * Keyset-paginated child conversations for a parent conversation, including linked agents.
+   *
+   * Returns newest children first (by updated_at DESC, id DESC).
+   * Cursor is (beforeUpdatedAt, beforeId), both required together when provided.
+   */
+  async findChildrenWithAgentsPage(args: {
+    parentConversationId: string;
+    limit: number;
+    beforeUpdatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ conversations: Array<ConversationModel & { agents: AgentModel[] }>; hasMoreBefore: boolean }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+        const pageSize = limit + 1;
+
+        const useCursor =
+          typeof args.beforeUpdatedAt === 'string' &&
+          typeof args.beforeId === 'string' &&
+          args.beforeUpdatedAt.trim().length > 0 &&
+          args.beforeId.trim().length > 0;
+
+        const convRows = await connection.query<Record<string, unknown>>(
+          useCursor
+            ? `
+              SELECT *
+              FROM conversations
+              WHERE parent_conversation_id = $1
+                AND (
+                  updated_at < $2::timestamptz
+                  OR (updated_at = $2::timestamptz AND id < $3::text)
+                )
+              ORDER BY updated_at DESC, id DESC
+              LIMIT $4
+            `
+            : `
+              SELECT *
+              FROM conversations
+              WHERE parent_conversation_id = $1
+              ORDER BY updated_at DESC, id DESC
+              LIMIT $2
+            `,
+          useCursor ? [args.parentConversationId, args.beforeUpdatedAt, args.beforeId, pageSize] : [args.parentConversationId, pageSize]
+        );
+
+        const hasMoreBefore = convRows.length > limit;
+        const trimmed = convRows.slice(0, limit);
+        const conversations = fromDatabaseArray(ConversationEntity, trimmed);
+        const conversationIds = conversations.map((c) => c.id).filter((id) => typeof id === 'string' && id.trim().length > 0);
+
+        if (conversationIds.length === 0) {
+          return { conversations: conversations.map((c) => ({ ...c, agents: [] })), hasMoreBefore };
+        }
+
+        const agentRows = await connection.query<Record<string, unknown>>(
+          `SELECT ca.conversation_id, a.*
+           FROM conversation_agents ca
+           INNER JOIN agents a ON a.id = ca.agent_id
+           WHERE ca.conversation_id = ANY($1::text[])
+           ORDER BY a.name`,
+          [conversationIds]
+        );
+
+        const agentsByConversationId = new Map<string, AgentModel[]>();
+        for (const row of agentRows) {
+          const rawConversationId = (row as Record<string, unknown>)['conversation_id'];
+          const conversationId = typeof rawConversationId === 'string' ? rawConversationId : '';
+          if (!conversationId) continue;
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          const { conversation_id: _conversationId, ...agentRow } = row as Record<string, unknown> & { conversation_id?: unknown };
+          const agent = fromDatabase(AgentEntity, agentRow);
+          const list = agentsByConversationId.get(conversationId) || [];
+          list.push(agent);
+          agentsByConversationId.set(conversationId, list);
+        }
+
+        return {
+          conversations: conversations.map((c) => ({ ...c, agents: agentsByConversationId.get(c.id) || [] })),
+          hasMoreBefore,
+        };
+      },
+      'findChildrenWithAgentsPage',
+      'Conversation',
+      args.parentConversationId
+    );
+  }
+
+  /**
    * Get the starship associated with a conversation using JOIN
    */
   async getConversationStarship(conversationId: string): Promise<StarshipModel | null> {
@@ -258,6 +347,61 @@ export class ConversationRepository extends BaseRepository {
       },
       'getConversationMessages',
       'Conversation'
+    );
+  }
+
+  /**
+   * Keyset-paginated message history for a conversation.
+   *
+   * Returns the newest messages first (bounded by `limit`), but the returned array is
+   * in chronological order (oldest → newest) for easy rendering.
+   */
+  async getConversationMessagesPage(args: {
+    conversationId: string;
+    limit: number;
+    beforeCreatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+        const pageSize = limit + 1;
+
+        const useCursor =
+          typeof args.beforeCreatedAt === 'string' && typeof args.beforeId === 'string' && args.beforeCreatedAt && args.beforeId;
+
+        const rows = await connection.query<Record<string, unknown>>(
+          useCursor
+            ? `
+              SELECT *
+              FROM messages
+              WHERE conversation_id = $1
+                AND (
+                  created_at < $2::timestamptz
+                  OR (created_at = $2::timestamptz AND id < $3::text)
+                )
+              ORDER BY created_at DESC, id DESC
+              LIMIT $4
+            `
+            : `
+              SELECT *
+              FROM messages
+              WHERE conversation_id = $1
+              ORDER BY created_at DESC, id DESC
+              LIMIT $2
+            `,
+          useCursor ? [args.conversationId, args.beforeCreatedAt, args.beforeId, pageSize] : [args.conversationId, pageSize]
+        );
+
+        const hasMoreBefore = rows.length > limit;
+        const trimmed = rows.slice(0, limit);
+        const chronological = trimmed.slice().reverse();
+        return { messages: fromDatabaseArray(MessageEntity, chronological), hasMoreBefore };
+      },
+      'getConversationMessagesPage',
+      'Conversation',
+      args.conversationId
     );
   }
 

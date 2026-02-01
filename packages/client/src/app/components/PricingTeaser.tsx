@@ -13,7 +13,7 @@ export default function PricingTeaser() {
 
   const handleClick = () => {
     if (isAuthenticated && primaryStarship?.slug) {
-      router.push(`/ship/${primaryStarship.slug}/conversations`)
+      router.push(`/ship/${primaryStarship.slug}`)
       return
     }
     router.push('/login')

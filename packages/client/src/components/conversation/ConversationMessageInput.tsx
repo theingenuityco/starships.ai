@@ -4,7 +4,18 @@ import Icon from '@/components/primitives/Icon'
 
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
-import { CONVERSATION_QUERY_KEYS, useCreateConversation, useConversationStop, useConversationDetail, usePendingToolApprovals, useUpdateConversationState } from '@/hooks/useConversations'
+import {
+  CONVERSATION_QUERY_KEYS,
+  useCreateConversation,
+  useCreateDirectMessage,
+  useConversationStop,
+  useConversationDetail,
+  useConversationAgents,
+  usePendingToolApprovals,
+  useStarshipChannels,
+  useLinkMessageToConversation,
+  useUpdateConversationState,
+} from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { useModelContextLength } from '@/hooks/useLlmModels'
@@ -41,6 +52,32 @@ interface ConversationMessageInputProps {
   starshipId: string
   conversationId?: string | null
   onConversationStart?: (conversationId: string) => void
+  /**
+   * Optional: draft direct message target.
+   * When provided AND `conversationId` is null, the DM is created/resolved on first send.
+   */
+  draftDirectMessageTarget?: { dmType: 'user_agent' | 'user_user'; agentId?: string | null; peerUserId?: string | null; title?: string | null } | null
+  /**
+   * Optional: when creating a new conversation (conversationId is null), create it as a child of this parent conversation.
+   * Used for "draft threads" opened from a channel message.
+   */
+  newConversationParentConversationId?: string | null
+  /** Optional: override the title used when creating a new conversation. */
+  newConversationTitleOverride?: string | null
+  /**
+   * Optional: after creating a new conversation, link an existing parent message to it (persisted on server).
+   * Used to persist the thread link only when the user sends the first reply in the draft thread.
+   */
+  linkMessageToNewConversation?: {
+    parentConversationId: string
+    messageId: string
+    content: string
+    createdAt?: string | null
+    role?: string | null
+    userName?: string | null
+    agentName?: string | null
+    attachmentIds?: string[] | null
+  } | null
   onMessageSent?: () => void // Simplified callback for UI state updates
   onToggleToolForm?: () => void // Callback to toggle tool form drawer
   isToolFormOpen?: boolean // Current state of tool form drawer
@@ -71,6 +108,10 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       starshipId,
       conversationId,
       onConversationStart,
+      draftDirectMessageTarget,
+      newConversationParentConversationId,
+      newConversationTitleOverride,
+      linkMessageToNewConversation,
       onMessageSent,
       // onToggleToolForm,
       // isToolFormOpen = false,
@@ -93,6 +134,14 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [message, setMessage] = useState('')
     const [sending, setSending] = useState(false)
     const isStarter = !conversationId
+    const { data: channelsData } = useStarshipChannels(starshipId, Boolean(starshipId && conversationId))
+    const isChannelConversation = useMemo(() => {
+      const cid = typeof conversationId === 'string' ? conversationId : ''
+      if (!cid) return false
+      const channels = (channelsData as any)?.channels
+      if (!Array.isArray(channels)) return false
+      return channels.some((c: any) => String(c?.conversationId || '') === cid)
+    }, [channelsData, conversationId])
 
     // File upload state
     const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
@@ -125,6 +174,8 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const clearEditorRef = useRef<() => void>(() => {})
 
     const createConversation = useCreateConversation()
+    const createDirectMessage = useCreateDirectMessage()
+    const linkMessageToConversation = useLinkMessageToConversation()
     const { data: starshipForPerms } = useStarshipBySlug(starshipSlug || '', Boolean(starshipSlug))
     const canManageBilling = Boolean(isInstanceAdmin || (userId && starshipForPerms?.ownerId === userId))
     const { data: wallet, isLoading } = useWallet(starshipId, Boolean(starshipId && canManageBilling))
@@ -191,6 +242,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Conversation state for web browsing toggle
     const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
+    const { data: conversationAgents = [] } = useConversationAgents(conversationId ?? null)
     const updateConversationState = useUpdateConversationState()
 
     // Pending ask-first tool approvals (durable, DB-backed)
@@ -221,6 +273,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       // Otherwise use pending preference
       return pendingWebBrowsing
     }, [conversation?.state, pendingWebBrowsing])
+
+    // Thread routing rules:
+    // - If the thread pane was opened from a non-assistant message, there may be no default agent selected.
+    // - If a thread has >2 linked agents, it becomes mention-only (no default agent fallback).
+    const isThreadConversation = Boolean(conversation?.parentConversationId)
+    const linkedAgentCount = Array.isArray(conversationAgents) ? conversationAgents.length : 0
+    const isMentionOnlyThread = Boolean(isThreadConversation && linkedAgentCount > 2)
+    const isThreadDraft = Boolean(typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0)
+    const isThreadContext = Boolean(isThreadConversation || isThreadDraft)
 
     // Reset pending state when conversation is created
     useEffect(() => {
@@ -262,27 +323,27 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       async (approval: any) => {
         const approvalId = String(approval?.id ?? '')
         if (!conversationId || !approvalId || submittingToolApprovalId === approvalId) return
-      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+        // Optimistically hide immediately for snappy UX; refetch will reconcile.
         setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(approvalId))
         setSubmittingToolApprovalId(approvalId)
-      // Immediate UX feedback (do not wait for server-side tool execution).
-      toast.success('Tool approved')
-      try {
+        // Immediate UX feedback (do not wait for server-side tool execution).
+        toast.success('Tool approved')
+        try {
           await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approvalId}/approve`)
-        // IMPORTANT: do NOT await message invalidation here. The messages query is SSE-backed and may never "settle",
-        // which would delay UX feedback like toasts until navigation/unmount.
-        void refreshPendingToolApprovals(conversationId)
-      } catch (e: any) {
-        setOptimisticallyHiddenApprovalIds(prev => {
-          const next = new Set(prev)
+          // IMPORTANT: do NOT await message invalidation here. The messages query is SSE-backed and may never "settle",
+          // which would delay UX feedback like toasts until navigation/unmount.
+          void refreshPendingToolApprovals(conversationId)
+        } catch (e: any) {
+          setOptimisticallyHiddenApprovalIds(prev => {
+            const next = new Set(prev)
             next.delete(approvalId)
-          return next
-        })
-        const msg = e?.message ? String(e.message) : 'Failed to approve tool'
-        toast.error('Failed to approve tool', { description: msg })
-      } finally {
+            return next
+          })
+          const msg = e?.message ? String(e.message) : 'Failed to approve tool'
+          toast.error('Failed to approve tool', { description: msg })
+        } finally {
           setSubmittingToolApprovalId(cur => (cur === approvalId ? null : cur))
-      }
+        }
       },
       [conversationId, submittingToolApprovalId, queryClient, refreshPendingToolApprovals]
     )
@@ -293,33 +354,33 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         if (!conversationId || !approvalId || submittingToolApprovalId === approvalId) return
         const agentId = String(approval?.agentId || '')
         const toolSlug = String(approval?.toolSlug || (approval as any)?.toolSlug || '')
-      if (!agentId || !toolSlug) {
-        toast.error('Cannot always-allow', { description: 'Missing agentId or tool slug.' })
-        return
-      }
+        if (!agentId || !toolSlug) {
+          toast.error('Cannot always-allow', { description: 'Missing agentId or tool slug.' })
+          return
+        }
 
-      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+        // Optimistically hide immediately for snappy UX; refetch will reconcile.
         setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(approvalId))
         setSubmittingToolApprovalId(approvalId)
-      // Immediate UX feedback (permission + execution may still fail; we handle errors separately).
-      toast.success('Always allow enabled')
-      try {
-        // 1) Flip permission to allow so future calls don't require approval
-        await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
-        // 2) Approve this pending tool call
+        // Immediate UX feedback (permission + execution may still fail; we handle errors separately).
+        toast.success('Always allow enabled')
+        try {
+          // 1) Flip permission to allow so future calls don't require approval
+          await api.put(`/api/v1/agents/${agentId}/tool-permissions`, { permissions: [{ toolSlug, permission: 'allow' }] })
+          // 2) Approve this pending tool call
           await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approvalId}/approve`)
-        void refreshPendingToolApprovals(conversationId)
-      } catch (e: any) {
-        setOptimisticallyHiddenApprovalIds(prev => {
-          const next = new Set(prev)
+          void refreshPendingToolApprovals(conversationId)
+        } catch (e: any) {
+          setOptimisticallyHiddenApprovalIds(prev => {
+            const next = new Set(prev)
             next.delete(approvalId)
-          return next
-        })
-        const msg = e?.message ? String(e.message) : 'Failed to set always-allow'
-        toast.error('Failed to set always-allow', { description: msg })
-      } finally {
+            return next
+          })
+          const msg = e?.message ? String(e.message) : 'Failed to set always-allow'
+          toast.error('Failed to set always-allow', { description: msg })
+        } finally {
           setSubmittingToolApprovalId(cur => (cur === approvalId ? null : cur))
-      }
+        }
       },
       [conversationId, submittingToolApprovalId, queryClient, refreshPendingToolApprovals]
     )
@@ -328,24 +389,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       async (approval: any) => {
         const approvalId = String(approval?.id ?? '')
         if (!conversationId || !approvalId || submittingToolApprovalId === approvalId) return
-      // Optimistically hide immediately for snappy UX; refetch will reconcile.
+        // Optimistically hide immediately for snappy UX; refetch will reconcile.
         setOptimisticallyHiddenApprovalIds(prev => new Set(prev).add(approvalId))
         setSubmittingToolApprovalId(approvalId)
-      toast.message('Tool denied')
-      try {
+        toast.message('Tool denied')
+        try {
           await api.post(`/api/v1/conversations/${conversationId}/tool-approvals/${approvalId}/deny`)
-        void refreshPendingToolApprovals(conversationId)
-      } catch (e: any) {
-        setOptimisticallyHiddenApprovalIds(prev => {
-          const next = new Set(prev)
+          void refreshPendingToolApprovals(conversationId)
+        } catch (e: any) {
+          setOptimisticallyHiddenApprovalIds(prev => {
+            const next = new Set(prev)
             next.delete(approvalId)
-          return next
-        })
-        const msg = e?.message ? String(e.message) : 'Failed to deny tool'
-        toast.error('Failed to deny tool', { description: msg })
-      } finally {
+            return next
+          })
+          const msg = e?.message ? String(e.message) : 'Failed to deny tool'
+          toast.error('Failed to deny tool', { description: msg })
+        } finally {
           setSubmittingToolApprovalId(cur => (cur === approvalId ? null : cur))
-      }
+        }
       },
       [conversationId, submittingToolApprovalId, queryClient, refreshPendingToolApprovals]
     )
@@ -464,27 +525,38 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = false
       }
 
+      const isDraftUserUserDm = Boolean(!conversationId && draftDirectMessageTarget?.dmType === 'user_user')
+
       // Resolve agent to send to: prefer explicit leading @handle in content, else selectedAgent.
       // (No enforcement: the editor content is not mutated/prefilled anymore.)
-      let effectiveAgent: AgentModel | null | undefined = selectedAgent ?? null
+      // For mention-only threads, ignore selectedAgent and require a mention every time.
+      let effectiveAgent: AgentModel | null | undefined = isMentionOnlyThread ? null : (selectedAgent ?? null)
       let contentToSend = messageToSend
-      // Also support plain-text leading @handle for safety
-      const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
-      if (mentionMatch && starshipAgents.length > 0) {
-        const handle = mentionMatch[1]
-        const lower = handle.toLowerCase()
-        const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
-        if (matched) {
-          effectiveAgent = matched
-          // Do NOT strip the leading mention; keep it in the message content
-          if (onAgentChange) onAgentChange(matched)
+      if (!isDraftUserUserDm) {
+        // Also support plain-text leading @handle for safety
+        const mentionMatch = messageToSend.match(/^\s*@([A-Za-z0-9_-]+)/)
+        if (mentionMatch && starshipAgents.length > 0) {
+          const handle = mentionMatch[1]
+          const lower = handle.toLowerCase()
+          const matched = starshipAgents.find(a => a.slug.toLowerCase() === lower || a.name.toLowerCase() === lower)
+          if (matched) {
+            effectiveAgent = matched
+            // Do NOT strip the leading mention; keep it in the message content
+            // Thread behavior: mentioning an agent should NOT re-assign the "default agent".
+            if (!isThreadContext && onAgentChange) onAgentChange(matched)
+          }
         }
+      } else {
+        // user↔user DMs are human-only: never require or auto-pick an agent.
+        effectiveAgent = null
       }
 
       // Validation for agent and starship
-      if (!effectiveAgent) {
+      if (!effectiveAgent && !isChannelConversation && !isDraftUserUserDm) {
         resetFlags()
-        toast.error('Select an agent', { description: 'Please select an agent to chat.' })
+        toast.error(isMentionOnlyThread ? 'Mention an agent' : 'Select an agent', {
+          description: isMentionOnlyThread ? 'This thread has multiple agents. Start your message with @agent to choose who replies.' : 'Please select an agent to chat.',
+        })
         return
       }
 
@@ -507,17 +579,118 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         let currentConversationId = conversationId
         let createdNewConversation = false
         if (!currentConversationId) {
-          const newConversation = await createConversation.mutateAsync({
-            title: `Chat with ${formatAgentDisplayName(effectiveAgent)}`,
-            starshipId: starshipId,
-            agentSlug: effectiveAgent.slug,
-          })
-          currentConversationId = newConversation.id
-          sendConversationId = currentConversationId
-          createdNewConversation = true
+          // Draft DM flow: create/resolve the DM conversation on first send.
+          if (draftDirectMessageTarget && (draftDirectMessageTarget.dmType === 'user_agent' || draftDirectMessageTarget.dmType === 'user_user')) {
+            const dmTitle = typeof draftDirectMessageTarget.title === 'string' && draftDirectMessageTarget.title.trim().length > 0 ? draftDirectMessageTarget.title.trim() : undefined
 
-          // Apply pending web browsing preference if enabled
-          await applyPendingWebBrowsing(currentConversationId)
+            const created = await createDirectMessage.mutateAsync({
+              starshipId,
+              ...(draftDirectMessageTarget.dmType === 'user_agent'
+                ? { agentId: String(draftDirectMessageTarget.agentId || '').trim() }
+                : { peerUserId: String(draftDirectMessageTarget.peerUserId || '').trim() }),
+              ...(dmTitle ? { title: dmTitle } : null),
+            })
+
+            currentConversationId = created?.conversationId ? String(created.conversationId) : null
+            if (!currentConversationId) {
+              resetFlags()
+              toast.error('Failed to start direct message', { description: 'Please try again.' })
+              return
+            }
+            sendConversationId = currentConversationId
+            createdNewConversation = true
+          } else {
+            // Starter conversations must be agent-backed (channels are created via the Channels UI).
+            if (!effectiveAgent) {
+              resetFlags()
+              toast.error('Select an agent', { description: 'Please select an agent to chat.' })
+              return
+            }
+            const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
+            const title = (() => {
+              const override = typeof newConversationTitleOverride === 'string' ? newConversationTitleOverride.trim() : ''
+              if (override) return override
+              return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(effectiveAgent)}`
+            })()
+            const newConversation = await createConversation.mutateAsync(
+              isThreadCreate
+                ? {
+                    title,
+                    starshipId: starshipId,
+                    parentConversationId: newConversationParentConversationId!.trim(),
+                    // IMPORTANT: threads are not channels; server requires at least one linked agent.
+                    agentSlug: effectiveAgent.slug,
+                  }
+                : {
+                    title,
+                    starshipId: starshipId,
+                    agentSlug: effectiveAgent.slug,
+                  }
+            )
+            currentConversationId = newConversation.id
+            sendConversationId = currentConversationId
+            createdNewConversation = true
+
+            // If this was a draft-thread create, persist the "linked message" now (only on first reply).
+            try {
+              const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+              const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+              if (parentId && msgId) {
+                await linkMessageToConversation.mutateAsync({ messageId: msgId, linkedConversationId: currentConversationId, conversationId: parentId })
+              }
+            } catch {}
+
+            // Seed hidden thread context into the NEW thread conversation so the agent sees the linked message.
+            // This message is not shown in the UI (ConversationMessageList filters it out).
+            try {
+              const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+              const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+              const sourceContent = typeof linkMessageToNewConversation?.content === 'string' ? linkMessageToNewConversation.content : ''
+              if (parentId && msgId && sourceContent.trim().length > 0) {
+                const createdAt = typeof linkMessageToNewConversation?.createdAt === 'string' ? linkMessageToNewConversation.createdAt : ''
+                const role = typeof linkMessageToNewConversation?.role === 'string' ? linkMessageToNewConversation.role : ''
+                const userName = typeof linkMessageToNewConversation?.userName === 'string' ? linkMessageToNewConversation.userName : ''
+                const agentName = typeof linkMessageToNewConversation?.agentName === 'string' ? linkMessageToNewConversation.agentName : ''
+                const attachmentIds = Array.isArray(linkMessageToNewConversation?.attachmentIds) ? linkMessageToNewConversation.attachmentIds : []
+
+                const seedContent = [
+                  '[THREAD_CONTEXT_SEED]',
+                  'Thread context seed (system instruction). Use this as upstream context for the thread.',
+                  '',
+                  `Source conversation id: ${parentId}`,
+                  `Source message id: ${msgId}`,
+                  role ? `Source role: ${role}` : null,
+                  userName ? `Source userName: ${userName}` : null,
+                  agentName ? `Source agentName: ${agentName}` : null,
+                  createdAt ? `Source createdAt: ${createdAt}` : null,
+                  attachmentIds.length > 0 ? `Source attachmentIds: ${attachmentIds.join(', ')}` : null,
+                  '',
+                  'Source message content:',
+                  '"""',
+                  sourceContent,
+                  '"""',
+                ]
+                  .filter(Boolean)
+                  .join('\n')
+
+                await api.post('/api/v1/messages', {
+                  role: 'system',
+                  content: seedContent,
+                  starshipId: starshipId,
+                  conversationId: currentConversationId,
+                  messageType: 'system_instruction',
+                  metadata: {
+                    thread_context_seed: true,
+                    sourceConversationId: parentId,
+                    sourceMessageId: msgId,
+                  },
+                })
+              }
+            } catch {}
+
+            // Apply pending web browsing preference if enabled
+            await applyPendingWebBrowsing(currentConversationId)
+          }
         }
         sendConversationId = currentConversationId!
         // Ensure local ref is updated immediately for stop button usability
@@ -535,7 +708,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             createdAt: now,
             updatedAt: now,
             messageType: 'user_input',
-            agentId: effectiveAgent!.id,
+            ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),
           }
           // Seed streamedQuery chunks; sendMessageMutation.onMutate will detect and avoid duplicating this.
           queryClient.setQueryData(['conversations', 'detail', currentConversationId!, 'messages'], (old: any[] | undefined) => {
@@ -601,7 +774,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         // Fire-and-forget streaming; streaming lifecycle manages completion/cleanup
         void sendMessageFn({
           conversationId: currentConversationId!,
-          agentId: effectiveAgent!.id,
+          ...(effectiveAgent?.id ? { agentId: effectiveAgent.id } : null),
           content: contentToSend,
           role: 'user',
           starshipId: starshipId!,
@@ -630,14 +803,25 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
         streamingRef.current = false
       }
     }, [
+      draftDirectMessageTarget,
       message,
       sending,
       disabled,
       isStreamingEffective,
+      conversation,
+      conversationAgents,
+      isThreadContext,
+      isMentionOnlyThread,
       selectedAgent,
+      isChannelConversation,
       userId,
       conversationId,
       createConversation,
+      createDirectMessage,
+      linkMessageToConversation,
+      linkMessageToNewConversation,
+      newConversationParentConversationId,
+      newConversationTitleOverride,
       onConversationStart,
       onMessageSent,
       sendMessageFn,
@@ -691,14 +875,39 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           // Create conversation if one doesn't exist
           let currentConversationId = conversationId
           if (!currentConversationId) {
-            const newConversation = await createConversation.mutateAsync({
-              title: `Chat with ${formatAgentDisplayName(selectedAgent)}`,
-              starshipId: starshipId,
-              agentSlug: selectedAgent.slug,
-            })
+            const isThreadCreate = typeof newConversationParentConversationId === 'string' && newConversationParentConversationId.trim().length > 0
+            const title = (() => {
+              const override = typeof newConversationTitleOverride === 'string' ? newConversationTitleOverride.trim() : ''
+              if (override) return override
+              return isThreadCreate ? 'New thread' : `Chat with ${formatAgentDisplayName(selectedAgent)}`
+            })()
+            const newConversation = await createConversation.mutateAsync(
+              isThreadCreate
+                ? {
+                    title,
+                    starshipId: starshipId,
+                    parentConversationId: newConversationParentConversationId!.trim(),
+                    // IMPORTANT: threads are not channels; server requires at least one linked agent.
+                    agentSlug: selectedAgent.slug,
+                  }
+                : {
+                    title,
+                    starshipId: starshipId,
+                    agentSlug: selectedAgent.slug,
+                  }
+            )
             currentConversationId = newConversation.id
             sendConversationId = currentConversationId
             createdNewConversation = true
+
+            // If this was a draft-thread create, persist the "linked message" now (only on first reply).
+            try {
+              const parentId = typeof linkMessageToNewConversation?.parentConversationId === 'string' ? linkMessageToNewConversation.parentConversationId.trim() : ''
+              const msgId = typeof linkMessageToNewConversation?.messageId === 'string' ? linkMessageToNewConversation.messageId.trim() : ''
+              if (parentId && msgId) {
+                await linkMessageToConversation.mutateAsync({ messageId: msgId, linkedConversationId: currentConversationId, conversationId: parentId })
+              }
+            } catch {}
 
             // Apply pending web browsing preference if enabled
             await applyPendingWebBrowsing(currentConversationId)
@@ -745,7 +954,24 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
           streamingRef.current = false
         }
       },
-      [sending, disabled, isStreamingEffective, selectedAgent, userId, conversationId, createConversation, onConversationStart, onMessageSent, sendMessageFn, starshipId, applyPendingWebBrowsing]
+      [
+        sending,
+        disabled,
+        isStreamingEffective,
+        selectedAgent,
+        userId,
+        conversationId,
+        createConversation,
+        linkMessageToConversation,
+        linkMessageToNewConversation,
+        newConversationParentConversationId,
+        newConversationTitleOverride,
+        onConversationStart,
+        onMessageSent,
+        sendMessageFn,
+        starshipId,
+        applyPendingWebBrowsing,
+      ]
     )
 
     // Resolve the agent we should use for UI hints/prompts: prefer the leading @mention if present
@@ -757,7 +983,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
       if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
-      if (!promptAgent) return 'Select an agent to assign a task'
+      if (!promptAgent) return isChannelConversation ? 'Message this channel (mention agents with @)' : 'Select an agent to assign a task'
       // Show placeholder even after the conversation has started.
       return `Assign a task to ${promptAgent.name}`
     }
@@ -766,7 +992,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const [hasActualContent, setHasActualContent] = useState(false)
 
     // Require balance; server also enforces funds.
-    const hasTargetAgent = Boolean(selectedAgent) || message.trim().startsWith('@')
+    const hasTargetAgent = isChannelConversation ? true : isMentionOnlyThread ? message.trim().startsWith('@') : Boolean(selectedAgent) || message.trim().startsWith('@')
     const canSend = hasActualContent && hasTargetAgent && !disabled && !sending && !isStreamingEffective && hasFunds
 
     // TipTap editor with Mention extension to treat mentions as atomic units

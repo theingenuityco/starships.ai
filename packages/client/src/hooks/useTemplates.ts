@@ -130,7 +130,14 @@ export function useCreateAgentFromTemplate() {
       const response: FetchResponse<ApiResponse<any>> = await api.post(`/api/v1/agent-templates/${templateId}/agents`, {
         starshipId,
       })
-      return { ...response.data.data, _starshipSlug: starshipSlug }
+      const cleanStarshipSlug = (() => {
+        const raw = typeof starshipSlug === 'string' ? starshipSlug.trim() : ''
+        if (!raw) return undefined
+        const lowered = raw.toLowerCase()
+        if (lowered === 'undefined' || lowered === 'null') return undefined
+        return raw
+      })()
+      return { ...response.data.data, _starshipSlug: cleanStarshipSlug }
     },
     onSuccess: (agent, variables) => {
       // Invalidate agent queries to refresh lists
@@ -157,7 +164,7 @@ export function useCreateAgentFromTemplate() {
       // Extract error message with better handling for ValidationError
       let errorMessage = 'Failed to deploy agent'
       let isValidationError = false
-      
+
       if (error?.response?.data?.error) {
         // Handle structured error response from server
         const serverError = error.response.data.error
@@ -170,12 +177,12 @@ export function useCreateAgentFromTemplate() {
       } else if (error?.message) {
         errorMessage = error.message
       }
-      
+
       // Only log unexpected errors to console to avoid noise
       if (!isValidationError || error?.response?.status !== 400) {
         console.error('Agent deployment error:', error)
       }
-      
+
       toast.error('Failed to deploy agent', {
         description: errorMessage,
       })

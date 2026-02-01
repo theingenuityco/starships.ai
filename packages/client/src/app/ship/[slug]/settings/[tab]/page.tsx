@@ -21,10 +21,18 @@ type TabValue = (typeof ALL_TABS)[number]
 export default function ShipSettingsTabPage(): React.JSX.Element {
   const router = useRouter()
   const { slug, tab } = useParams<{ slug: string; tab: string }>()
-  const { isInstanceAdmin, isLoading: authLoading } = useAuth()
+  const { isInstanceAdmin, user, isLoading: authLoading } = useAuth()
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const showAnalytics = isInstanceAdmin && expertMode
-  const visibleTabs: readonly TabValue[] = showAnalytics ? ALL_TABS : (['my-profile', 'my-starship', 'billing'] as const)
+  const { data: starshipData, isLoading: starshipLoading } = useStarshipBySlug(slug, true)
+
+  const canManageBilling = Boolean(isInstanceAdmin === true || (user?.id && starshipData?.ownerId && String(starshipData.ownerId) === String(user.id)))
+
+  const baseTabs = (['my-profile', 'my-starship'] as const) satisfies readonly TabValue[]
+  const withBilling = (canManageBilling ? (['billing'] as const) : ([] as const)) satisfies readonly TabValue[]
+  const withAnalytics = (showAnalytics ? (['usage'] as const) : ([] as const)) satisfies readonly TabValue[]
+  const visibleTabs: readonly TabValue[] = [...baseTabs, ...withBilling, ...withAnalytics]
+
   const isValidTab = visibleTabs.includes(tab as TabValue)
   const currentTab: TabValue = isValidTab ? (tab as TabValue) : 'my-profile'
 
@@ -33,7 +41,15 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
     if (!isValidTab) router.replace(`/ship/${slug}/settings/${currentTab}`)
   }, [router, slug, currentTab, isValidTab, authLoading])
 
-  const { data: starshipData, isLoading: starshipLoading } = useStarshipBySlug(slug, true)
+  // Members should never land on billing; redirect if they try to deep-link.
+  useEffect(() => {
+    if (authLoading) return
+    if (starshipLoading) return
+    if (!tab) return
+    if (tab !== 'billing') return
+    if (canManageBilling) return
+    router.replace(`/ship/${slug}/settings/my-profile`)
+  }, [authLoading, canManageBilling, router, slug, starshipLoading, tab])
 
   return (
     <PageLayout>
@@ -59,10 +75,12 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                     <Icon name="rocket" className="h-4 w-4" />
                     <span>My Starship</span>
                   </TabsTrigger>
-                  <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
-                    <Icon name="credit-card" className="h-4 w-4" />
-                    <span>Billing</span>
-                  </TabsTrigger>
+                  {canManageBilling ? (
+                    <TabsTrigger value="billing" className="gap-2 rounded-xl px-3 py-1">
+                      <Icon name="credit-card" className="h-4 w-4" />
+                      <span>Billing</span>
+                    </TabsTrigger>
+                  ) : null}
                   {showAnalytics ? (
                     <TabsTrigger value="usage" className="gap-2 rounded-xl px-3 py-1 border border-border/50 hover:border-border/80">
                       <Icon name="sparkles" className="h-4 w-4 text-fuchsia-600 dark:text-fuchsia-400" />
@@ -92,11 +110,13 @@ export default function ShipSettingsTabPage(): React.JSX.Element {
                 </TabsContent>
               )}
 
-              <TabsContent value="billing">
-                <section aria-labelledby="billing-section" className="bg-background">
-                  <StarshipBillingSection starshipId={starshipData?.id} />
-                </section>
-              </TabsContent>
+              {canManageBilling ? (
+                <TabsContent value="billing">
+                  <section aria-labelledby="billing-section" className="bg-background">
+                    <StarshipBillingSection starshipId={starshipData?.id} />
+                  </section>
+                </TabsContent>
+              ) : null}
             </Tabs>
           </div>
         </div>

@@ -82,7 +82,7 @@ function LoginContent() {
       if (returnUrl && isValidRedirectUrl(returnUrl)) {
         router.push(returnUrl)
       } else if (starships && starships.length > 0) {
-        router.push(`/ship/${starships[0].slug}/conversations`)
+        router.push(`/ship/${starships[0].slug}`)
       } else {
         router.push('/profile')
       }

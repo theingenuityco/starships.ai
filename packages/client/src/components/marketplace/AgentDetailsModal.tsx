@@ -6,8 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AgentTemplateDetailsModalContent } from '@/components/marketplace/AgentTemplateDetailsModalContent'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { Avatar } from '@/components/ui/avatar'
-import AgentAvatar from '@/components/animated/AgentAvatar'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
@@ -74,12 +73,26 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
     if (!primaryStarship) return
     setIsDeploying(true)
     try {
+      const safeStarshipPathSegment = (candidates: Array<unknown>): string | null => {
+        for (const c of candidates) {
+          if (typeof c !== 'string') continue
+          const raw = c.trim()
+          if (!raw) continue
+          const lowered = raw.toLowerCase()
+          if (lowered === 'undefined' || lowered === 'null') continue
+          return raw
+        }
+        return null
+      }
+
       const created = await createAgentMutation.mutateAsync({
         templateId: template.id,
         starshipId: primaryStarship.id,
-        starshipSlug: primaryStarship.slug,
+        starshipSlug: safeStarshipPathSegment([primaryStarship.slug]) ?? undefined,
       })
       const agentId = (created as any)?.id as string | undefined
+      const agentSlug = (created as any)?.slug as string | undefined
+      const starshipSlugOrId = safeStarshipPathSegment([(created as any)?._starshipSlug, primaryStarship.slug, primaryStarship.id])
       const toolPermissions = input?.toolPermissions
       if (agentId && toolPermissions && Object.keys(toolPermissions).length > 0) {
         const body: UpdateAgentToolPermissionsRequest = {
@@ -93,6 +106,15 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
       }
       onDeploy?.(template)
       onOpenChange(false)
+
+      // Marketplace UX: after deploy, take the user to the correct starship (chat).
+      if (pathname?.startsWith('/marketplace') && starshipSlugOrId) {
+        if (agentId) {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(agentId)}`)
+        } else {
+          router.push(`/ship/${encodeURIComponent(starshipSlugOrId)}`)
+        }
+      }
     } catch {
       // handled by hook
     } finally {
@@ -112,9 +134,18 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden flex flex-col">
         <div className="px-6 pt-4 pb-0 pr-14 flex items-center gap-4">
-          <Avatar className="h-14 w-14 rounded-full ring-1 ring-border/40 shadow-lg">
-            <AgentAvatar seed={template.name} imageUrl={avatarUrl} size={56} rounded />
-          </Avatar>
+          <MarketplaceAvatar
+            imageUrl={avatarUrl || null}
+            label={template.name}
+            seed={template.name || template.slug || 'AI'}
+            sizeClassName="h-14 w-14"
+            shapeClassName="rounded-full"
+            ringClassName="ring-1 ring-border/40"
+            shadowClassName="shadow-lg"
+            showTintWhenMissing={false}
+            showInsetRing={false}
+            fallbackTextClassName="text-base font-semibold text-muted-foreground"
+          />
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-xl font-bold leading-tight truncate">{template.name}</DialogTitle>
             {template.role ? <div className="mt-0.5 text-sm text-muted-foreground truncate">{template.role}</div> : null}

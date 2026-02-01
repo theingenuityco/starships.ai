@@ -20,6 +20,8 @@ jobs:
     env:
       # Core Configuration
       NODE_ENV: ${{ vars.NODE_ENV }}
+      # Next.js builds can exceed Node's default ~2GB heap in CI.
+      NODE_OPTIONS: --max-old-space-size=6144
       SERVER_PORT: ${{ vars.SERVER_PORT }}
       CLIENT_PORT: ${{ vars.CLIENT_PORT }}
 

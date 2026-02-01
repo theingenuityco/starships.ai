@@ -78,6 +78,7 @@ export function ClientLayout({ children }: ClientLayoutProps) {
       // Admin
       if (path === '/admin/connector-templates') return 'Admin: Connector Templates | Starships.ai'
       if (path.startsWith('/admin/connector-templates/')) return 'Admin: Connector Template | Starships.ai'
+      if (path === '/admin/tools') return 'Admin: Tools | Starships.ai'
       if (path === '/admin/agents/pending') return 'Admin: Agent Approvals | Starships.ai'
       if (path === '/admin/platform-secrets') return 'Admin: Platform Secrets | Starships.ai'
 

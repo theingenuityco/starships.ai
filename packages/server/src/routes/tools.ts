@@ -636,6 +636,48 @@ router.post('/tools/:id/publish-request', jwtAuthMiddleware, async (req: Request
   }
 });
 
+// ============================================================================
+// ADMIN TOOLS LIST (INSTANCE ADMIN ONLY)
+
+/**
+ * GET /admin/tools - List all tool instances with starship info (instance admin only).
+ */
+router.get('/admin/tools', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    if (!isInstanceAdmin(req.user as AuthUser | null | undefined)) {
+      sendError(res, 'FORBIDDEN', 'Only instance admins can list all tools', 403);
+      return;
+    }
+
+    const toolRepository = new ToolRepository();
+    const starshipRepository = new StarshipRepository();
+    const tools = await toolRepository.findAll();
+
+    const starshipIds = [...new Set(tools.map((t) => t.starshipId))];
+    const starshipMap = new Map<string, { id: string; name?: string; slug?: string }>();
+    for (const sid of starshipIds) {
+      const ship = await starshipRepository.findById(sid);
+      if (ship) {
+        starshipMap.set(sid, { id: ship.id, name: ship.name || ship.slug, slug: ship.slug });
+      }
+    }
+
+    const enriched = tools.map((tool) => {
+      const starship = starshipMap.get(tool.starshipId);
+      return {
+        ...tool,
+        starship: starship ?? undefined,
+      };
+    });
+
+    sendSuccess(res, { tools: enriched });
+  } catch (error) {
+    console.error('[TOOLS] Error listing admin tools:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to list tools');
+  }
+});
+
+// ============================================================================
 // ADMIN PUBLICATION APPROVAL ROUTES (INSTANCE ADMIN ONLY)
 
 // GET /admin/tools/pending - List tools pending approval

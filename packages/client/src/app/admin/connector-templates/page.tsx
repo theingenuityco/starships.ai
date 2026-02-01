@@ -166,6 +166,10 @@ export default function AdminConnectorTemplatesPage(): React.JSX.Element {
                   Connector templates
                 </Link>
                 <span className="text-muted-foreground">·</span>
+                <Link href="/admin/tools" className="text-sm font-medium underline underline-offset-4">
+                  Tools
+                </Link>
+                <span className="text-muted-foreground">·</span>
                 <Link href="/admin/agents/pending" className="text-sm font-medium underline underline-offset-4">
                   Agent approvals
                 </Link>

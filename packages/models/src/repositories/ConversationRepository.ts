@@ -103,6 +103,49 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Atomically merge a partial state patch into conversation.state (JSONB) in the database.
+   *
+   * This avoids race conditions where multiple processes read-modify-write `state` concurrently
+   * (e.g. background summarizer updating `contextSummary*` while the main server persists other
+   * execution state keys).
+   *
+   * Note: This performs a shallow JSONB merge at the top level: `state = state || patch`.
+   */
+  async mergeState(conversationId: string, patch: Record<string, unknown>): Promise<ConversationModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+          throw new Error('State patch must be an object');
+        }
+
+        const connection = this.getConnection();
+        // Pass JSON as text and cast to jsonb for deterministic typing.
+        const patchJson = JSON.stringify(patch);
+
+        const result = await connection.queryOne<Record<string, unknown>>(
+          `
+            UPDATE conversations
+            SET state = COALESCE(state, '{}'::jsonb) || $2::jsonb,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+          `,
+          [conversationId, patchJson]
+        );
+
+        if (!result) {
+          this.handleNotFound('Conversation', conversationId);
+        }
+
+        return result ? fromDatabase(ConversationEntity, result) : null;
+      },
+      'mergeState',
+      'Conversation',
+      conversationId
+    );
+  }
+
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
@@ -400,6 +443,98 @@ export class ConversationRepository extends BaseRepository {
         return { messages: fromDatabaseArray(MessageEntity, chronological), hasMoreBefore };
       },
       'getConversationMessagesPage',
+      'Conversation',
+      args.conversationId
+    );
+  }
+
+  /**
+   * Keyset-paginated message history within an optional cursor range.
+   *
+   * Returns the oldest messages first (created_at ASC, id ASC).
+   *
+   * - `after*` sets a lower bound (exclusive by default, or inclusive when `afterInclusive` is true)
+   * - `before*` sets an upper bound (always exclusive)
+   *
+   * This is useful for incremental processing jobs (e.g. background summarization) that need to
+   * resume from a cursor and process the next N messages without scanning the entire history.
+   */
+  async getConversationMessagesRangePage(args: {
+    conversationId: string;
+    limit: number;
+    afterCreatedAt?: string;
+    afterId?: string;
+    afterInclusive?: boolean;
+    beforeCreatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ messages: MessageModel[]; hasMoreAfter: boolean; nextCursor: { createdAt: string; id: string } | null }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+        const pageSize = limit + 1;
+
+        const afterCursorValid =
+          typeof args.afterCreatedAt === 'string' &&
+          typeof args.afterId === 'string' &&
+          args.afterCreatedAt.trim().length > 0 &&
+          args.afterId.trim().length > 0;
+
+        const beforeCursorValid =
+          typeof args.beforeCreatedAt === 'string' &&
+          typeof args.beforeId === 'string' &&
+          args.beforeCreatedAt.trim().length > 0 &&
+          args.beforeId.trim().length > 0;
+
+        const params: unknown[] = [args.conversationId];
+        const where: string[] = ['conversation_id = $1'];
+        const afterInclusive = args.afterInclusive === true;
+
+        if (afterCursorValid) {
+          params.push(args.afterCreatedAt, args.afterId);
+          // IMPORTANT: SQL placeholders are 1-based, but params array is 0-based.
+          // afterCreatedAt is the second-to-last param, afterId is the last param.
+          const createdIdx = params.length - 1; // placeholder index for afterCreatedAt
+          const atIdx = params.length; // placeholder index for afterId
+          where.push(
+            afterInclusive
+              ? `(created_at > $${createdIdx}::timestamptz OR (created_at = $${createdIdx}::timestamptz AND id >= $${atIdx}::text))`
+              : `(created_at > $${createdIdx}::timestamptz OR (created_at = $${createdIdx}::timestamptz AND id > $${atIdx}::text))`
+          );
+        }
+
+        if (beforeCursorValid) {
+          params.push(args.beforeCreatedAt, args.beforeId);
+          const createdIdx = params.length - 1; // placeholder index for beforeCreatedAt
+          const idIdx = params.length; // placeholder index for beforeId
+          where.push(`(created_at < $${createdIdx}::timestamptz OR (created_at = $${createdIdx}::timestamptz AND id < $${idIdx}::text))`);
+        }
+
+        params.push(pageSize);
+        const limitIdx = params.length;
+
+        const rows = await connection.query<Record<string, unknown>>(
+          `
+            SELECT *
+            FROM messages
+            WHERE ${where.join(' AND ')}
+            ORDER BY created_at ASC, id ASC
+            LIMIT $${limitIdx}
+          `,
+          params
+        );
+
+        const hasMoreAfter = rows.length > limit;
+        const trimmed = rows.slice(0, limit);
+        const messages = fromDatabaseArray(MessageEntity, trimmed);
+
+        const next = hasMoreAfter ? fromDatabase(MessageEntity, rows[limit] as Record<string, unknown>) : null;
+        const nextCursor =
+          next && typeof next.createdAt === 'string' && typeof next.id === 'string' ? { createdAt: next.createdAt, id: next.id } : null;
+
+        return { messages, hasMoreAfter, nextCursor };
+      },
+      'getConversationMessagesRangePage',
       'Conversation',
       args.conversationId
     );

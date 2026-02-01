@@ -929,6 +929,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const queryClient = useQueryClient()
   const enabledFlag = options?.enabled !== false
   const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null
+  const lastSseOpenAtRef = useRef<number | null>(null)
+  const lastSseErrorAtRef = useRef<number | null>(null)
 
   type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
 
@@ -953,6 +955,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     activeSseGuards.set(convId, instanceController)
     const timeoutId = setTimeout(() => controller.abort(), 5 * 60 * 1000)
     const combinedSignal = signal ? AbortSignal.any([signal, controller.signal, instanceController.signal]) : AbortSignal.any([controller.signal, instanceController.signal])
+    const isActiveInstance = () => activeSseGuards.get(convId) === instanceController
 
     type Resolver = (value: IteratorResult<StreamedChunk>) => void
     const queue: StreamedChunk[] = []
@@ -996,12 +999,19 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       openWhenHidden: true,
       signal: combinedSignal,
       async onopen(response) {
+        if (!isActiveInstance()) {
+          return
+        }
+        lastSseOpenAtRef.current = Date.now()
         if (!response.ok) {
           push({ type: 'error', error: { status: response.status, statusText: response.statusText } })
           cleanup('bad_status')
         }
       },
       onmessage(ev: EventSourceMessage) {
+        if (!isActiveInstance()) {
+          return
+        }
         try {
           if (typeof ev.id === 'string' && ev.id) {
             try {
@@ -1047,9 +1057,12 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         }
       },
       onclose() {
+        if (!isActiveInstance()) return
         cleanup('onclose')
       },
       onerror(err) {
+        if (!isActiveInstance()) return
+        lastSseErrorAtRef.current = Date.now()
         push({ type: 'error', error: err })
         cleanup('onerror')
       },
@@ -1140,10 +1153,15 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         if (m?.id != null) snapIds.add(String(m.id))
       }
       const merged: ClientMessage[] = [...snap]
+      const turnStatus = turn?.status
+      const turnTerminal = turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
       let keptFromAcc = 0
       for (const m of acc) {
         const id = m?.id != null ? String(m.id) : ''
         if (!id) continue
+        if (turnTerminal && id.startsWith('stream-')) {
+          continue
+        }
         if (!snapIds.has(id)) {
           merged.push(m)
           keptFromAcc++
@@ -1252,6 +1270,20 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           // Replace temp message with persisted message
           messages[i] = withStreaming(msg, false)
           return messages
+        }
+      }
+
+      if (msg.role === 'assistant') {
+        const lastAssistant = (() => {
+          for (let i = messages.length - 1; i >= 0; i--) {
+            if (messages[i]?.role === 'assistant') return messages[i] as ClientMessage
+          }
+          return null
+        })()
+        const lastContent = typeof (lastAssistant as any)?.content === 'string' ? String((lastAssistant as any).content).trim() : ''
+        const nextContent = typeof (msg as any)?.content === 'string' ? String((msg as any).content).trim() : ''
+        if (lastAssistant && lastContent && nextContent && lastContent === nextContent) {
+          /* no-op */
         }
       }
 
@@ -1508,10 +1540,13 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     lastReducedChunkCountRef.current = 0
   }, [conversationId])
 
+  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
+
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {
     const processed: StreamedChunk[] = []
     const queued: StreamedChunk[] = []
+    const shouldGateByAnimation = turnState.status === 'active' || turnState.status === 'waiting_for_tools'
 
     for (const chunk of chunks) {
       if (chunk.type === 'message.append') {
@@ -1536,7 +1571,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
             // Check if previous assistant message animation is complete
             // Use LAST computed messages (from previous render) to avoid re-reduction
             const lastAssistantId = getLastAssistantMessageId(lastComputedMessagesRef.current)
-            if (lastAssistantId && !isAnimationComplete(lastAssistantId)) {
+            if (lastAssistantId && !isAnimationComplete(lastAssistantId) && shouldGateByAnimation) {
               // Queue this chunk for later processing
               queued.push(chunk)
               continue
@@ -1552,7 +1587,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     processedChunksRef.current = processed
 
     return processed
-  }, [chunksRevisionKey])
+  }, [chunksRevisionKey, turnState.status])
 
   // Process queued chunks when animation completes
   useEffect(() => {
@@ -1561,8 +1596,11 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const processQueued = () => {
       const currentMessages = processedChunksRef.current.reduce(reduceMessages, emptyMessages)
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
+      const turnStatus = turnState.status
+      const shouldBypassAnimation =
+        turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
 
-      if (!lastAssistantId || isAnimationComplete(lastAssistantId)) {
+      if (!lastAssistantId || isAnimationComplete(lastAssistantId) || shouldBypassAnimation) {
         // Animation complete, add queued chunks to the query data
         const queued = queuedAppendChunksRef.current.splice(0)
         if (queued.length > 0 && conversationId) {
@@ -1597,7 +1635,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
         removePendingAppendCallback(callback)
       }
     }
-  }, [filteredChunks, conversationId, queryClient])
+  }, [filteredChunks, conversationId, queryClient, turnState.status])
 
   // CRITICAL FIX: Incremental message reduction - only process NEW filtered chunks
   // IMPORTANT: Deep copy previous messages to prevent mutation
@@ -1636,8 +1674,6 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     return result
   }, [filteredChunks, conversationId])
-
-  const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
   const isAwaitingToolResults = turnState.status === 'waiting_for_tools'
   const isAssistantStreaming = useMemo(() => computedMessages.some(m => m.streaming === true), [computedMessages])
@@ -1796,6 +1832,17 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       return response.data
     },
     onMutate: async variables => {
+      const now = Date.now()
+      const lastErrorAt = lastSseErrorAtRef.current
+      const lastOpenAt = lastSseOpenAtRef.current
+      const errorRecently = typeof lastErrorAt === 'number' ? now - lastErrorAt < 5 * 60 * 1000 : false
+      const openStale = typeof lastOpenAt === 'number' ? now - lastOpenAt > 2 * 60 * 1000 : true
+      if (errorRecently || openStale) {
+        // Restart the stream so the response can render even after idle disconnects.
+        if (variables?.conversationId) {
+          queryClient.invalidateQueries({ queryKey: CONVERSATION_QUERY_KEYS.messages(variables.conversationId) })
+        }
+      }
       // No optimistic updates - wait for server to send message.append and turn.started events
       // This avoids duplicate messages and keeps the UI in sync with server state
     },

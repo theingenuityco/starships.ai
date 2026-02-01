@@ -17,6 +17,7 @@ import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/co
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { isImageUrl } from '@/lib/isImageUrl'
+import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
@@ -314,18 +315,78 @@ export function ConversationMessageList({
 
   const { data: conversationDetail } = useConversationDetail(conversationId)
 
-  // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
-  const { data: conversationAgents = [] } = useConversationAgents(conversationId)
-  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
-  const agentName = agentNameOverride ?? agentObj?.name
-  const agentSlug = useMemo(() => {
-    const raw = (agentObj as any)?.slug
-    return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined
-  }, [agentObj])
-  const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
-  const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
-  const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
-  const agentAvatarUrl = agentAvatarUrlOverride ?? agentAvatarAttachments?.[0]?.previewUrl
+  // Conversation agents (can be multiple). We need to resolve agent details per message by `message.agentId`.
+  type ConversationAgent = {
+    id?: string
+    name?: string
+    role?: string
+    slug?: string
+    avatarAttachmentId?: string
+  }
+  const { data: conversationAgentsRaw = [] } = useConversationAgents(conversationId)
+  const conversationAgents = useMemo(() => (Array.isArray(conversationAgentsRaw) ? (conversationAgentsRaw as ConversationAgent[]) : []), [conversationAgentsRaw])
+
+  const fallbackAgent = conversationAgents[0]
+  const fallbackAgentDisplayName = useMemo(() => {
+    if (typeof agentNameOverride === 'string' && agentNameOverride.trim().length > 0) return agentNameOverride.trim()
+    if (fallbackAgent) return formatAgentDisplayName(fallbackAgent)
+    return undefined
+  }, [agentNameOverride, fallbackAgent])
+
+  const agentById = useMemo(() => {
+    const m = new Map<string, ConversationAgent>()
+    for (const a of conversationAgents) {
+      const id = typeof a?.id === 'string' ? a.id.trim() : ''
+      if (!id) continue
+      m.set(id, a)
+    }
+    return m
+  }, [conversationAgents])
+
+  const agentDisplayNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const a of conversationAgents) {
+      const id = typeof a?.id === 'string' ? a.id.trim() : ''
+      if (!id) continue
+      const label = formatAgentDisplayName(a).trim()
+      if (!label) continue
+      m.set(id, label)
+    }
+    return m
+  }, [conversationAgents])
+
+  const agentAvatarAttachmentIds = useMemo(() => {
+    const ids = conversationAgents
+      .map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : ''))
+      .filter(Boolean)
+    return Array.from(new Set(ids))
+  }, [conversationAgents])
+  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
+  const agentAvatarUrlByAttachmentId = useMemo(() => new Map((agentAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
+
+  const resolveAssistantPresentation = useCallback(
+    (msg: ExtendedMessage | null | undefined) => {
+      if (!msg || msg.role !== 'assistant') return null
+      const agentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : ''
+      const fromList = agentId ? agentById.get(agentId) : undefined
+      const agent = fromList ?? fallbackAgent
+
+      const displayName =
+        (typeof (msg as any)?.agentName === 'string' && String((msg as any).agentName).trim()) ||
+        (agentId && agentDisplayNameById.get(agentId)) ||
+        (agent ? formatAgentDisplayName(agent) : '') ||
+        (fallbackAgentDisplayName || 'Assistant')
+
+      const slugRaw = typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : ''
+      const slug = slugRaw || undefined
+
+      const avatarAttachmentId = typeof (agent as any)?.avatarAttachmentId === 'string' ? String((agent as any).avatarAttachmentId).trim() : ''
+      const avatarUrl = agentAvatarUrlOverride ?? (avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) : undefined)
+
+      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl }
+    },
+    [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
+  )
 
   const handleThreadAction = useCallback(
     async (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => {
@@ -1014,12 +1075,19 @@ export function ConversationMessageList({
         timestamp: (msg as ExtendedMessage).createdAt,
         occurrenceCount: count,
         firstMatchIndexInPositions: firstIndexInPositions,
-        agentName: msg.role === 'assistant' ? ((msg as ExtendedMessage).agentName ?? agentName) : undefined,
+        agentName:
+          msg.role === 'assistant'
+            ? (() => {
+                const mid = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : ''
+                const fromList = mid ? agentDisplayNameById.get(mid) : undefined
+                return ((msg as ExtendedMessage).agentName ?? fromList ?? fallbackAgentDisplayName ?? 'Assistant').trim()
+              })()
+            : undefined,
       })
       firstIndexInPositions += count
     }
     return results
-  }, [normalizedHighlightTerm, renderMessages, agentName])
+  }, [agentDisplayNameById, fallbackAgentDisplayName, normalizedHighlightTerm, renderMessages])
 
   useEffect(() => {
     if (searchResultsForSidebar != null && onSearchResults) {
@@ -1195,7 +1263,7 @@ export function ConversationMessageList({
               const isFirstMessage = idx === 0
               const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
               const isCurrentMatch = message.id === currentMatchMessageId
-              const bubbleAgentName = message.role === 'assistant' ? (message.agentName || agentName) : undefined
+              const assistant = resolveAssistantPresentation(message)
 
               return (
                 <Fragment key={message.id}>
@@ -1212,10 +1280,10 @@ export function ConversationMessageList({
                   >
                     <MemoizedMessageBubble
                       message={message}
-                      agentName={bubbleAgentName}
-                      agentSlug={agentSlug}
+                      agentName={assistant?.displayName}
+                      agentSlug={assistant?.slug}
                       starshipSlug={starshipSlug}
-                      agentAvatarUrl={agentAvatarUrl}
+                      agentAvatarUrl={assistant?.avatarUrl}
                       isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                       starshipId={starshipId}
                       enableChannelMessageThreads={enableChannelMessageThreads}
@@ -1298,17 +1366,27 @@ export function ConversationMessageList({
                 ) : (
                   <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                      <AgentAvatar seed={(agentObj as any)?.name || agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
+                      {(() => {
+                        const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
+                        const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+                        return <AgentAvatar seed={p.displayName || 'AI'} imageUrl={p.avatarUrl} size={40} rounded />
+                      })()}
                     </div>
                     <div className="min-w-0 flex-1 pt-0.5">
                       <div className="mb-1 text-sm font-bold text-foreground">
-                        {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
-                          <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
-                            {(agentName || 'Assistant').trim()}
-                          </Link>
-                        ) : (
-                          <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
-                        )}
+                        {(() => {
+                          const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
+                          const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+                          const label = (p.displayName || fallbackAgentDisplayName || 'Assistant').trim()
+                          const slug = p.slug
+                          return typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof slug === 'string' && slug.trim().length > 0 ? (
+                            <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(slug)}`} className="font-mono hover:underline underline-offset-2">
+                              {label}
+                            </Link>
+                          ) : (
+                            <span className="font-mono">{label}</span>
+                          )
+                        })()}
                       </div>
                       <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
                         <TypingDots />

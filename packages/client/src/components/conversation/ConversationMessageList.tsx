@@ -17,7 +17,6 @@ import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/co
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { isImageUrl } from '@/lib/isImageUrl'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
@@ -319,68 +318,6 @@ export function ConversationMessageList({
   const { data: conversationAgents = [] } = useConversationAgents(conversationId)
   const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
   const agentName = agentNameOverride ?? agentObj?.name
-  const agentDisplayName = useMemo(() => {
-    const a: any = agentObj as any
-    if (a) {
-      const formatted = formatAgentDisplayName(a)
-      if (formatted && String(formatted).trim().length > 0) return String(formatted).trim()
-    }
-    const fallback = typeof agentName === 'string' ? agentName : agentName == null ? '' : String(agentName)
-    return fallback.trim()
-  }, [agentObj, agentName])
-  // #region agent log
-  useEffect(() => {
-    const cid = typeof conversationId === 'string' ? String(conversationId) : ''
-    if (!cid) return
-    const a: any = agentObj as any
-    const display = a ? formatAgentDisplayName(a) : null
-    const role = typeof a?.role === 'string' ? String(a.role) : null
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run2',
-        hypothesisId: 'H8',
-        location: 'packages/client/src/components/conversation/ConversationMessageList.tsx:agentLabel',
-        message: 'ConversationMessageList agent label inputs',
-        data: {
-          conversationId: cid,
-          agentObjId: typeof a?.id === 'string' ? String(a.id) : null,
-          agentObjName: typeof a?.name === 'string' ? String(a.name) : null,
-          agentObjRole: role,
-          agentNameProp: typeof agentName === 'string' ? agentName : agentName == null ? null : String(agentName),
-          formattedFromAgentObj: display,
-          conversationAgentsCount: Array.isArray(conversationAgents) ? conversationAgents.length : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [conversationId, agentObj, agentName, conversationAgents])
-  // #endregion
-
-  // #region agent log
-  useEffect(() => {
-    const cid = typeof conversationId === 'string' ? String(conversationId) : ''
-    if (!cid) return
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run3',
-        hypothesisId: 'H11',
-        location: 'packages/client/src/components/conversation/ConversationMessageList.tsx:assistantDisplayName',
-        message: 'Computed agent display name for chat UI',
-        data: {
-          conversationId: cid,
-          agentDisplayName: agentDisplayName || null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [conversationId, agentDisplayName])
-  // #endregion
   const agentSlug = useMemo(() => {
     const raw = (agentObj as any)?.slug
     return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined
@@ -1077,12 +1014,12 @@ export function ConversationMessageList({
         timestamp: (msg as ExtendedMessage).createdAt,
         occurrenceCount: count,
         firstMatchIndexInPositions: firstIndexInPositions,
-        agentName: msg.role === 'assistant' ? ((msg as ExtendedMessage).agentName ?? agentDisplayName ?? agentName) : undefined,
+        agentName: msg.role === 'assistant' ? ((msg as ExtendedMessage).agentName ?? agentName) : undefined,
       })
       firstIndexInPositions += count
     }
     return results
-  }, [normalizedHighlightTerm, renderMessages, agentDisplayName, agentName])
+  }, [normalizedHighlightTerm, renderMessages, agentName])
 
   useEffect(() => {
     if (searchResultsForSidebar != null && onSearchResults) {
@@ -1258,49 +1195,7 @@ export function ConversationMessageList({
               const isFirstMessage = idx === 0
               const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
               const isCurrentMatch = message.id === currentMatchMessageId
-              // Prefer the authoritative conversation agent label (name + role) when we can safely attribute
-              // this assistant message to that agent. This avoids showing name-only `message.agentName` for DMs.
-              // IMPORTANT: Do NOT override per-message agent labels for channels (messages may come from many agents).
-              const msgAgentId = typeof (message as any)?.agentId === 'string' ? String((message as any).agentId) : ''
-              const msgAgentName = typeof (message as any)?.agentName === 'string' ? String((message as any).agentName) : ''
-              const convAgentId = typeof (agentObj as any)?.id === 'string' ? String((agentObj as any).id) : ''
-              const canUseConversationAgentLabel = Boolean(agentDisplayName && convAgentId && msgAgentId && msgAgentId === convAgentId)
-              const bubbleAgentName =
-                message.role === 'assistant'
-                  ? canUseConversationAgentLabel
-                    ? agentDisplayName
-                    : msgAgentName || agentDisplayName || (typeof agentName === 'string' ? agentName : agentName == null ? '' : String(agentName))
-                  : undefined
-
-              // #region agent log
-              // Log the EXACT agent label fed into the bubble (last assistant row only).
-              if (message.role === 'assistant' && idx === renderMessages.length - 1) {
-                fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({
-                    sessionId: 'debug-session',
-                    runId: 'run4',
-                    hypothesisId: 'H12',
-                    location: 'packages/client/src/components/conversation/ConversationMessageList.tsx:bubbleAgentName',
-                    message: 'Chosen agent label passed to message bubble',
-                    data: {
-                      conversationId: String(conversationId || ''),
-                      messageId: String((message as any)?.id || ''),
-                      messageAgentId: typeof (message as any)?.agentId === 'string' ? String((message as any).agentId) : null,
-                      messageAgentName: typeof (message as any)?.agentName === 'string' ? String((message as any).agentName) : null,
-                      agentObjId: typeof (agentObj as any)?.id === 'string' ? String((agentObj as any).id) : null,
-                      agentObjName: typeof (agentObj as any)?.name === 'string' ? String((agentObj as any).name) : null,
-                      agentObjRole: typeof (agentObj as any)?.role === 'string' ? String((agentObj as any).role) : null,
-                      agentDisplayName: agentDisplayName || null,
-                      canUseConversationAgentLabel,
-                      bubbleAgentName: typeof bubbleAgentName === 'string' ? String(bubbleAgentName) : bubbleAgentName == null ? null : String(bubbleAgentName),
-                    },
-                    timestamp: Date.now(),
-                  }),
-                }).catch(() => {})
-              }
-              // #endregion
+              const bubbleAgentName = message.role === 'assistant' ? (message.agentName || agentName) : undefined
 
               return (
                 <Fragment key={message.id}>
@@ -1409,10 +1304,10 @@ export function ConversationMessageList({
                       <div className="mb-1 text-sm font-bold text-foreground">
                         {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
                           <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
-                            {(agentDisplayName || agentName || 'Assistant').trim()}
+                            {(agentName || 'Assistant').trim()}
                           </Link>
                         ) : (
-                          <span className="font-mono">{(agentDisplayName || agentName || 'Assistant').trim()}</span>
+                          <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
                         )}
                       </div>
                       <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">

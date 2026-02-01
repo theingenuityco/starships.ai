@@ -8,7 +8,7 @@ import type { MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -349,9 +349,31 @@ export function ConversationMessageList({
   const { data: conversationAgentsRaw = [] } = useConversationAgents(conversationId)
   const conversationAgents = useMemo(() => (Array.isArray(conversationAgentsRaw) ? (conversationAgentsRaw as ConversationAgent[]) : []), [conversationAgentsRaw])
 
+  // For user↔user DMs, derive the peer user from the DM list (same source as ConversationSummaryBar).
+  const { data: dmListData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId && conversationId))
+  const dmItem = useMemo<DirectMessageListItem | null>(() => {
+    const cid = String(conversationId || '')
+    const list = (dmListData?.directMessages || []) as DirectMessageListItem[]
+    if (!cid || !Array.isArray(list) || list.length === 0) return null
+    return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
+  }, [dmListData?.directMessages, conversationId])
+
   const resolvedEmptyHeroParticipant = useMemo(() => {
     // Prefer explicit override (draft DM target).
     if (emptyHeroParticipantOverride) return emptyHeroParticipantOverride
+
+    // user↔user DM: show peer avatar instead of chat icon.
+    const dm: any = (dmItem as any)?.dm
+    if (dm?.dmType === 'user_user') {
+      const peer: any = (dmItem as any)?.peerUser
+      const peerId = typeof peer?.id === 'string' ? String(peer.id).trim() : ''
+      const label =
+        (typeof peer?.displayName === 'string' && peer.displayName.trim()) ||
+        (typeof peer?.email === 'string' && peer.email.trim()) ||
+        (peerId ? `User ${peerId.slice(0, 6)}` : 'User')
+      const avatarUrl = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
+      return { kind: 'human' as const, label, avatarUrl }
+    }
 
     // Otherwise derive from the conversation's first agent (works for empty/brand-new DM conversations too).
     const a0: any = conversationAgents?.[0]
@@ -360,7 +382,7 @@ export function ConversationMessageList({
     const seed = String(a0?.name || a0?.slug || a0?.id || label)
     const avatarAttachmentId = typeof a0?.avatarAttachmentId === 'string' ? String(a0.avatarAttachmentId) : null
     return { kind: 'agent' as const, label, seed, avatarAttachmentId }
-  }, [conversationAgents, emptyHeroParticipantOverride])
+  }, [conversationAgents, dmItem, emptyHeroParticipantOverride])
 
   const emptyHeroAvatarAttachmentIds = useMemo(() => {
     const p = resolvedEmptyHeroParticipant
@@ -1162,7 +1184,9 @@ export function ConversationMessageList({
   }
 
   const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage)
-  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && renderMessages.length === 0 && !shouldShowGapLoader)
+  // Direct messages: keep the "beginning of conversation" hero visible even after messages exist,
+  // similar to Slack's "beginning of conversation" marker.
+  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage)
   const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0
@@ -2163,7 +2187,19 @@ function DirectMessageHero({
   avatarUrlByAttachmentId: Map<string, string | null | undefined>
   bottomAlign: boolean
 }) {
-  const displayName = (title ?? '').trim() || 'Direct message'
+  const normalizeDmTitle = (raw: string): string => {
+    const t = String(raw || '').trim()
+    if (!t) return t
+    // Back-compat: older DM conversations were titled like "DM • Alice" (or "DM · Alice").
+    const m = t.match(/^DM\s*[•·:\-–—]\s*(.+)$/i)
+    if (m?.[1]) return String(m[1]).trim() || t
+    return t
+  }
+  const displayName =
+    // Prefer agent label (includes role) when available.
+    participant?.kind === 'agent' && participant.label.trim().length > 0
+      ? normalizeDmTitle(participant.label)
+      : normalizeDmTitle(title ?? '') || 'Direct message'
   return (
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
@@ -2171,7 +2207,7 @@ function DirectMessageHero({
           <DirectMessageHeroAvatar participant={participant} avatarUrlByAttachmentId={avatarUrlByAttachmentId} />
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
-            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of your conversation. Send a message to start.</p>
+            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of your conversation. Start with a quick hello.</p>
           </div>
         </div>
       </div>

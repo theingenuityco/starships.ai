@@ -1,19 +1,49 @@
-import { Worker } from 'bullmq';
-import { getEnvConfig } from '@starships/env';
-import { ConversationRepository, LlmModelRepository, createConnection } from '@starships/models';
-import { autopilot, ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
+import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
+import { getEnvConfig } from '@starships/env';
+import { ConversationRepository, LlmModelRepository } from '@starships/models';
 import type { ConversationState, ConversationSummaryCursor, MessageModel } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
-import {
-  closeConversationSummariesQueue,
-  CONVERSATION_SUMMARIES_QUEUE_NAME,
-  type ConversationSummaryJobData,
-} from '@/queues/conversationSummariesQueue';
-import { getRedisConnection } from '@/queues/scheduledRunsQueue';
-import { mergeConversationState } from '@/utils/conversation-state';
 import { AttachmentService } from '@/services/AttachmentService';
+import { mergeConversationState } from '@/utils/conversation-state';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
+
+export interface ConversationSummaryJobData {
+  conversationId: string;
+  starshipId: string;
+  /**
+   * Summarize all messages strictly before this cursor (typically the oldest
+   * message in the last-N window used for LLM execution).
+   *
+   * Note: we treat this as a hint only; the job recomputes its own boundary.
+   */
+  targetBefore: ConversationSummaryCursor;
+  /**
+   * The last-N window size used by the host when deciding the target cursor.
+   * (Used only for logging/debugging; job recomputes its own view.)
+   */
+  llmHistoryLimit?: number;
+}
+
+/**
+ * Best-effort, fire-and-forget conversation summarization.
+ *
+ * This intentionally runs in-process (no queue/worker). It should never block request handling.
+ */
+export class ConversationSummaryService {
+  runAsync(data: ConversationSummaryJobData): void {
+    setImmediate(() => {
+      void summarizeConversationJob(data).catch((err) => {
+        console.warn('[ConversationSummaries] Async summarization failed', {
+          conversationId: data.conversationId,
+          starshipId: data.starshipId,
+          error: err instanceof Error ? err.message : String(err),
+          stack: err instanceof Error ? err.stack : undefined,
+        });
+      });
+    });
+  }
+}
 
 /**
  * Provider-agnostic summarizer message. Keep it strictly text to maximize compatibility
@@ -32,20 +62,19 @@ function redactUrl(url: string): string {
 
 function formatSummarizerMessagesForLog(messages: SummarizerMessage[]): string {
   const out: string[] = [];
-
   for (let i = 0; i < messages.length; i++) {
     const m = messages[i]!;
     out.push(`#${i + 1} ${m.role}`);
     out.push(m.content);
     out.push('');
   }
-
   return out.join('\n').trimEnd();
 }
 
 function normalizeCursor(c: unknown): ConversationSummaryCursor | null {
   if (!c || typeof c !== 'object') return null;
-  const createdAt = typeof (c as Record<string, unknown>).createdAt === 'string' ? String((c as Record<string, unknown>).createdAt) : '';
+  const createdAt =
+    typeof (c as Record<string, unknown>).createdAt === 'string' ? String((c as Record<string, unknown>).createdAt) : '';
   const id = typeof (c as Record<string, unknown>).id === 'string' ? String((c as Record<string, unknown>).id) : '';
   return createdAt && id ? { createdAt, id } : null;
 }
@@ -78,18 +107,19 @@ async function buildMessageTextWithAttachments(args: { message: MessageModel; st
         if (attachment.sizeBytes > MAX_TEXT_FILE_SIZE) {
           // Best-effort: still try to fetch, but we'll truncate aggressively below.
           console.warn(
-            `[ConversationSummariesWorker] Text attachment ${attachment.filename} exceeds MAX_TEXT_FILE_SIZE; will truncate heavily`
+            `[ConversationSummaries] Text attachment ${attachment.filename} exceeds MAX_TEXT_FILE_SIZE; will truncate heavily`
           );
         }
 
         const textContent = await fetchTextFromS3(attachment.s3Key);
         const maxChars = 20000; // keep summarizer prompt bounded
-        const truncated = textContent.length > maxChars ? textContent.slice(0, maxChars) + '\n\n[... content truncated ...]' : textContent;
+        const truncated =
+          textContent.length > maxChars ? textContent.slice(0, maxChars) + '\n\n[... content truncated ...]' : textContent;
 
         text += `\n\n--- Content of ${attachment.filename} (attachmentId: ${attachment.id}) ---\n${truncated}\n--- End of ${attachment.filename} ---`;
       } catch (err) {
         text += `\n\n[Note: Could not load content of ${attachment.filename} (attachmentId: ${attachment.id})]`;
-        console.warn('[ConversationSummariesWorker] Failed to load text attachment content', {
+        console.warn('[ConversationSummaries] Failed to load text attachment content', {
           attachmentId: attachment.id,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -139,7 +169,7 @@ async function llmUpdateSummary(args: {
 
   // Log the exact summarizer prompt (readable, with URL redaction).
   try {
-    console.log('[ConversationSummariesWorker] SUMMARY_PROMPT', {
+    console.log('[ConversationSummaries] SUMMARY_PROMPT', {
       conversationId: args.conversationId,
       starshipId: args.starshipId,
       model,
@@ -149,11 +179,7 @@ async function llmUpdateSummary(args: {
     });
     const formatted = formatSummarizerMessagesForLog(messages);
     const maxLogChars = 120000; // guardrail for log aggregation systems
-    console.log(
-      formatted.length > maxLogChars
-        ? formatted.slice(0, maxLogChars) + '\n\n[...summary prompt log truncated...]'
-        : formatted
-    );
+    console.log(formatted.length > maxLogChars ? formatted.slice(0, maxLogChars) + '\n\n[...truncated...]' : formatted);
   } catch {
     // best-effort only
   }
@@ -234,13 +260,13 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   const repo = new ConversationRepository();
   const conversation = await repo.findById(data.conversationId);
   if (!conversation) return;
-  console.log('[ConversationSummariesWorker] Start', {
+  console.log('[ConversationSummaries] Start', {
     conversationId: data.conversationId,
     starshipId: data.starshipId,
     llmHistoryLimit: data.llmHistoryLimit,
   });
 
-  // Worker recomputes the “oldest in last-N” cursor to avoid trusting stale job payloads.
+  // Recompute the “oldest in last-N” cursor to avoid trusting stale payloads.
   const llmHistoryLimit = Math.max(1, Math.min(200, Number(data.llmHistoryLimit || 30)));
   const latestPage = await repo.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
   const oldestInWindow = latestPage.messages.length > 0 ? latestPage.messages[0] : null;
@@ -256,17 +282,10 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   // Already summarized up to the current window boundary.
   if (sameCursor(existingCursor, targetBefore)) return;
 
-  // Incremental strategy with a resume cursor + bounded work per job.
-  //
-  // We model contextSummaryBefore as "the first unsummarized message cursor":
-  // summary covers messages strictly before that cursor.
-  //
-  // Each job advances the cursor forward by at most `chunkSize` messages, never re-reading
-  // from the first message once a cursor exists.
+  // Incremental strategy with a resume cursor + bounded work per run.
   const chunkSize = 100;
 
   // If we don't yet have a cursor, initialize it to the oldest message strictly before targetBefore.
-  // That makes the summary start at "covers nothing" and lets us advance from the beginning in chunks.
   let startCursor: ConversationSummaryCursor | null = existingCursor;
   if (!startCursor) {
     const first = await repo.getConversationMessagesRangePage({
@@ -365,7 +384,7 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
     contextSummaryUpdatedAt: nextState.contextSummaryUpdatedAt,
     contextSummaryVersion: nextState.contextSummaryVersion,
   });
-  console.log('[ConversationSummariesWorker] Updated summary', {
+  console.log('[ConversationSummaries] Updated summary', {
     conversationId: data.conversationId,
     starshipId: data.starshipId,
     contextSummaryVersion: nextState.contextSummaryVersion,
@@ -374,88 +393,3 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   });
 }
 
-async function main(): Promise<void> {
-  const env = getEnvConfig();
-
-  // Ensure Redis config is present early (throws if missing).
-  getRedisConnection();
-
-  // Configure remote runner (URL and optional token) the same way the main server does.
-  // This is REQUIRED when process.env.RUNNER_URL is set; otherwise RunnerFactory selects RemoteRunner
-  // and it will throw if autopilot.setRunnerConfig() was never called in this process.
-  autopilot.setRunnerConfig({
-    url: env.RUNNER_URL,
-    token: env.RUNNER_AUTH_TOKEN,
-  });
-
-  // IMPORTANT: repositories use the shared models connection singleton.
-  // Workers must initialize it explicitly (unlike the main server process).
-  const db = createConnection({
-    host: env.POSTGRES_HOST,
-    port: env.POSTGRES_PORT,
-    user: env.POSTGRES_USER,
-    password: env.POSTGRES_PASSWORD,
-    database: env.POSTGRES_DATABASE,
-    ssl: env.POSTGRES_SSL,
-  });
-  await db.connect();
-  console.log('[ConversationSummariesWorker] Connected to PostgreSQL');
-
-  console.log('[ConversationSummariesWorker] Started', {
-    queue: CONVERSATION_SUMMARIES_QUEUE_NAME,
-    prefix: 'starships',
-  });
-
-  const worker = new Worker<ConversationSummaryJobData>(
-    CONVERSATION_SUMMARIES_QUEUE_NAME,
-    async (job) => {
-      await summarizeConversationJob(job.data);
-    },
-    { connection: getRedisConnection(), prefix: 'starships' }
-  );
-
-  worker.on('ready', () => {
-    console.log('[ConversationSummariesWorker] Ready');
-  });
-
-  worker.on('failed', (job, err) => {
-    console.error('[ConversationSummariesWorker] Job failed', {
-      jobId: job?.id,
-      name: job?.name,
-      conversationId: job?.data?.conversationId,
-      error: err instanceof Error ? err.message : String(err),
-      stack: err instanceof Error ? err.stack : undefined,
-    });
-  });
-
-  worker.on('error', (err) => {
-    console.error('[ConversationSummariesWorker] Worker error', {
-      error: err instanceof Error ? err.message : String(err),
-    });
-  });
-
-  process.on('SIGINT', async () => {
-    console.log('[ConversationSummariesWorker] Shutting down...');
-    try {
-      await worker.close();
-    } catch (err) {
-      console.error('[ConversationSummariesWorker] Failed to close worker', err);
-    }
-    try {
-      await db.disconnect();
-    } catch (err) {
-      console.error('[ConversationSummariesWorker] Failed to disconnect database', err);
-    }
-    try {
-      await closeConversationSummariesQueue();
-    } catch (err) {
-      console.error('[ConversationSummariesWorker] Failed to close queue', err);
-    }
-    process.exit(0);
-  });
-}
-
-main().catch((err) => {
-  console.error('[ConversationSummariesWorker] Fatal error during startup', err);
-  process.exit(1);
-});

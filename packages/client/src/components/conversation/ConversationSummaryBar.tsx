@@ -107,8 +107,6 @@ export function ConversationSummaryBar({
     return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
   }, [dmListData?.directMessages, conversationId])
 
-  // #region agent log
-  // IMPORTANT: debug hooks must remain above any conditional return paths.
   const dmDebug = useMemo(() => {
     const dm: any = dmItem?.dm as any
     const agent: any = (dmItem as any)?.agent
@@ -123,23 +121,6 @@ export function ConversationSummaryBar({
       formatted: agent ? formatAgentDisplayName(agent) : null,
     }
   }, [conversationId, dmItem])
-  useEffect(() => {
-    if (!conversationId) return
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H6',
-        location: 'packages/client/src/components/conversation/ConversationSummaryBar.tsx:dmItem',
-        message: 'DM item context for header',
-        data: dmDebug,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [conversationId, dmDebug])
-  // #endregion
 
   // Derive agents for this conversation (same source as the left navigation list)
   const { data: convAgents = [], isLoading: isLoadingAgents } = useConversationAgents(conversationId)
@@ -433,8 +414,6 @@ export function ConversationSummaryBar({
   // If there are no avatars to load, don't wait for avatar loading
   const isDataReady = !isLoadingConversation && !isLoadingAgents && (hasAvatarIds ? !isLoadingAvatars : true) && !!currentConversation
 
-  // #region agent log
-  // IMPORTANT: keep debug hooks ABOVE conditional returns to preserve hook order.
   const titleDebug = useMemo(() => {
     const rawTitle = typeof (currentConversation as any)?.title === 'string' ? String((currentConversation as any).title) : null
     // We can compute the would-be title even when not ready; it will just use the fallback.
@@ -454,23 +433,6 @@ export function ConversationSummaryBar({
       hasDmItem: Boolean((dmItem as any)?.dm),
     }
   }, [conversationId, (currentConversation as any)?.title, Boolean((dmItem as any)?.dm)])
-  useEffect(() => {
-    if (!conversationId) return
-    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H5',
-        location: 'packages/client/src/components/conversation/ConversationSummaryBar.tsx:title',
-        message: 'Conversation title used for header',
-        data: titleDebug,
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {})
-  }, [conversationId, titleDebug])
-  // #endregion
 
   // Use a key based on conversationId to ensure smooth remount animations
   // This helps coordinate the animation when transitioning from starter page

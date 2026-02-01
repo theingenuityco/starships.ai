@@ -892,49 +892,12 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
 
     // Authorization: collaborators can view deployed agents (needed for DM + conversation UI).
     const accessOk = await verifyStarshipAccess(starshipId, userId, res);
-    // #region agent log
-    void fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H3',
-        location: 'packages/server/src/routes/starships.ts:GET /starships/:id/agents',
-        message: 'Starships route hit for deployed agents',
-        data: {
-          starshipId,
-          accessOk,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
     if (!accessOk) return;
 
     const starshipService = new StarshipService();
 
     // Get deployed agents
     const deployedAgents = await starshipService.getDeployedAgents(starshipId);
-    // #region agent log
-    void fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        sessionId: 'debug-session',
-        runId: 'run1',
-        hypothesisId: 'H3',
-        location: 'packages/server/src/routes/starships.ts:GET /starships/:id/agents',
-        message: 'Deployed agents response built',
-        data: {
-          starshipId,
-          count: Array.isArray(deployedAgents) ? deployedAgents.length : null,
-          sampleHasRole: Array.isArray(deployedAgents) ? Boolean((deployedAgents[0] as any)?.role) : null,
-        },
-        timestamp: Date.now(),
-      }),
-    }).catch(() => {});
-    // #endregion
 
     // NOTE: This endpoint returns an AgentModel[] directly (wrapped in ApiResponse),
     // because the client expects a list in many places.

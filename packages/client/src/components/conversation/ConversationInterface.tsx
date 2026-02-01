@@ -851,26 +851,6 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
             hasEverSetAnyAgentRef.current = true
             // Update the store so it's remembered for this conversation
             setConversationAgentStore(currentConversationId, messageAgent.id, formatAgentDisplayName(messageAgent))
-            // #region agent log
-            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                sessionId: 'debug-session',
-                runId: 'run1',
-                hypothesisId: 'H2',
-                location: 'packages/client/src/components/conversation/ConversationInterface.tsx:StreamSideEffects.restoreAgent',
-                message: 'Restored agent from messages',
-                data: {
-                  conversationId: String(currentConversationId),
-                  agentId: String(messageAgent.id),
-                  hasRole: Boolean((messageAgent as any)?.role),
-                  formatted: formatAgentDisplayName(messageAgent),
-                },
-                timestamp: Date.now(),
-              }),
-            }).catch(() => {});
-            // #endregion
           }
         }
       }

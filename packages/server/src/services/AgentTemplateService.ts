@@ -1,5 +1,12 @@
 import { NotFoundError, ValidationError } from '@starships/errors';
-import { AgentRepository, AgentTemplateRepository, ToolRepository, ToolTemplateRepository, StarshipRepository } from '@starships/models';
+import {
+  AgentRepository,
+  AgentTemplateRepository,
+  ConnectorTemplateRepository,
+  ToolRepository,
+  ToolTemplateRepository,
+  StarshipRepository,
+} from '@starships/models';
 import type {
   AgentModel,
   AgentTemplateModel,
@@ -7,6 +14,15 @@ import type {
   CreateAgentTemplateRequest,
   UpdateAgentTemplateRequest,
 } from '@starships/protocol';
+import { getRequiredConnectorProviderIdsForTemplate } from '@/utils/required-connectors';
+
+/** Required connector info for deploy modal */
+export interface RequiredConnectorItem {
+  provider: string;
+  name: string;
+  description?: string;
+  auth: { type: string };
+}
 
 export class AgentTemplateService {
   private templateRepository: AgentTemplateRepository;
@@ -14,6 +30,7 @@ export class AgentTemplateService {
   private agentRepository: AgentRepository;
   private toolRepository: ToolRepository;
   private toolTemplateRepository: ToolTemplateRepository;
+  private connectorTemplateRepository: ConnectorTemplateRepository;
 
   constructor() {
     this.templateRepository = new AgentTemplateRepository();
@@ -21,6 +38,7 @@ export class AgentTemplateService {
     this.agentRepository = new AgentRepository();
     this.toolRepository = new ToolRepository();
     this.toolTemplateRepository = new ToolTemplateRepository();
+    this.connectorTemplateRepository = new ConnectorTemplateRepository();
   }
 
   /**
@@ -59,6 +77,41 @@ export class AgentTemplateService {
 
   async searchTemplates(query: string): Promise<AgentTemplateModel[]> {
     return this.templateRepository.searchTemplates(query);
+  }
+
+  /**
+   * Get required connectors for an agent template (from its tool templates' blueprints).
+   * Used by deploy modal to show "Connect these connectors".
+   */
+  async getRequiredConnectorsForTemplate(templateId: string): Promise<RequiredConnectorItem[]> {
+    const template = await this.templateRepository.findById(templateId);
+    if (!template) {
+      throw new NotFoundError('Agent template', templateId);
+    }
+
+    const providerIds = await getRequiredConnectorProviderIdsForTemplate(templateId);
+    const result: RequiredConnectorItem[] = [];
+
+    for (const provider of providerIds) {
+      const connectorTemplate = await this.connectorTemplateRepository.findByProvider(provider);
+      if (connectorTemplate) {
+        const authType = (connectorTemplate.authJson as { type?: string })?.type ?? 'none';
+        result.push({
+          provider,
+          name: connectorTemplate.name ?? provider,
+          description: connectorTemplate.description,
+          auth: { type: authType },
+        });
+      } else {
+        result.push({
+          provider,
+          name: provider,
+          auth: { type: 'unknown' },
+        });
+      }
+    }
+
+    return result;
   }
 
   async createTemplate(

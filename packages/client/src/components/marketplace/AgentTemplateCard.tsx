@@ -258,6 +258,8 @@ export function AgentTemplateCard({ template, onDeploy, onClick, showDeployCta =
         type="agent"
         template={template}
         starshipName={(starship as any)?.name || 'Unknown Starship'}
+        starshipId={starship?.id}
+        starshipSlug={(starship as any)?.slug}
       />
     </>
   )

@@ -21,6 +21,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useStarship } from '@/hooks/useStarships'
 import api, { agentAPI, templateAPI, toolAPI } from '@/lib/api'
+import type { Agent } from '@/lib/api'
 import { toast } from 'sonner'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -31,7 +32,6 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
-import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import type { AgentModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
 
 interface ConversationInterfaceProps {
@@ -616,17 +616,14 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
   // Handle initial agent selection from URL parameter (supports both ID and slug)
   useEffect(() => {
     if (initialAgentId && starshipAgentsData.length > 0 && !selectedAgent) {
-      // Try to find by slug first (preferred), then fall back to ID for backward compatibility
-      const agent = starshipAgentsData.find(a => a.slug === initialAgentId) || starshipAgentsData.find(a => a.id === initialAgentId)
+      const agent = starshipAgentsData.find((a: { slug?: string; id?: string }) => a.slug === initialAgentId) || starshipAgentsData.find((a: { slug?: string; id?: string }) => a.id === initialAgentId)
       if (agent) {
-        // Mark default as set so fallback effect does not override URL-selected agent
         hasSetInitialDefaultAgentRef.current = true
-        setSelectedAgentWithLogging(agent)
+        setSelectedAgentWithLogging(agent as Agent)
         hasEverSetAnyAgentRef.current = true
-        lastAutoSelectedAgentIdRef.current = agent.id
-        // Also update the UI store so that this agent is remembered for this conversation
+        lastAutoSelectedAgentIdRef.current = (agent as { id?: string }).id ?? null
         if (currentConversationId) {
-          setConversationAgentStore(currentConversationId, agent.id, formatAgentDisplayName(agent))
+          setConversationAgentStore(currentConversationId, (agent as { id: string }).id, formatAgentDisplayName(agent as Agent))
         }
       }
     }

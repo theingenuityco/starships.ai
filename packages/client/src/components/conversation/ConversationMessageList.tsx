@@ -17,7 +17,7 @@ import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/co
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { isImageUrl } from '@/lib/isImageUrl'
-import { formatAgentDisplayName } from '@/lib/agentDisplay'
+import { formatAgentDisplayName, formatAgentNameWithRole } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
@@ -371,11 +371,17 @@ export function ConversationMessageList({
       const fromList = agentId ? agentById.get(agentId) : undefined
       const agent = fromList ?? fallbackAgent
 
-      const displayName =
-        (typeof (msg as any)?.agentName === 'string' && String((msg as any).agentName).trim()) ||
-        (agentId && agentDisplayNameById.get(agentId)) ||
-        (agent ? formatAgentDisplayName(agent) : '') ||
-        (fallbackAgentDisplayName || 'Assistant')
+      // `message.agentName` often comes from the backend as *name-only* (no role).
+      // Always append role when we can resolve it from the agent list.
+      const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
+      const roleFromAgent = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : ''
+      const nameFallback =
+        nameFromMsg ||
+        (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') ||
+        (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') ||
+        (agentId ? `Agent ${agentId.slice(0, 6)}` : '')
+
+      const displayName = (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
 
       const slugRaw = typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : ''
       const slug = slugRaw || undefined
@@ -1079,15 +1085,23 @@ export function ConversationMessageList({
           msg.role === 'assistant'
             ? (() => {
                 const mid = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : ''
-                const fromList = mid ? agentDisplayNameById.get(mid) : undefined
-                return ((msg as ExtendedMessage).agentName ?? fromList ?? fallbackAgentDisplayName ?? 'Assistant').trim()
+                const agent = mid ? agentById.get(mid) : undefined
+                const roleFromAgent = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : ''
+                const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
+                const nameFallback =
+                  nameFromMsg ||
+                  (agent ? (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') : '') ||
+                  (agent ? (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') : '') ||
+                  (mid ? `Agent ${mid.slice(0, 6)}` : '') ||
+                  (fallbackAgentDisplayName || 'Assistant')
+                return (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
               })()
             : undefined,
       })
       firstIndexInPositions += count
     }
     return results
-  }, [agentDisplayNameById, fallbackAgentDisplayName, normalizedHighlightTerm, renderMessages])
+  }, [agentById, fallbackAgentDisplayName, normalizedHighlightTerm, renderMessages])
 
   useEffect(() => {
     if (searchResultsForSidebar != null && onSearchResults) {

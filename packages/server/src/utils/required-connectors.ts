@@ -16,9 +16,7 @@ export async function getRequiredConnectorProviderIdsForTemplate(templateId: str
     let list = (tt as { requiredConnectorProviders?: string[] }).requiredConnectorProviders;
     if (!Array.isArray(list) || list.length === 0) {
       const blueprint = (tt as { blueprint?: unknown }).blueprint;
-      list = extractRequiredConnectorProviders(
-        blueprint as Parameters<typeof extractRequiredConnectorProviders>[0]
-      );
+      list = extractRequiredConnectorProviders(blueprint as Parameters<typeof extractRequiredConnectorProviders>[0]);
     }
     if (Array.isArray(list)) {
       for (const p of list) {

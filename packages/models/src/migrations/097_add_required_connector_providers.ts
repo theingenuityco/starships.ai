@@ -3,7 +3,7 @@ import type { PostgresConnection } from '@/helpers/database';
 import { extractRequiredConnectorProviders } from '@/utils/extractRequiredConnectorProviders';
 
 /**
- * Migration 092: Add required_connector_providers to tool_templates and tools.
+ * Migration 097: Add required_connector_providers to tool_templates and tools.
  *
  * Extracts connector provider identifiers from connector_action nodes in blueprints.
  * Enables "Connect these connectors" UX when deploying agents.
@@ -11,7 +11,7 @@ import { extractRequiredConnectorProviders } from '@/utils/extractRequiredConnec
 export async function up(connection?: PostgresConnection): Promise<void> {
   const conn = connection ?? getConnection();
   await conn.transaction(async (client) => {
-    console.log('[092] Adding required_connector_providers columns...');
+    console.log('[097] Adding required_connector_providers columns...');
 
     await client.query(`
       ALTER TABLE tool_templates
@@ -23,7 +23,7 @@ export async function up(connection?: PostgresConnection): Promise<void> {
       ADD COLUMN IF NOT EXISTS required_connector_providers TEXT[] DEFAULT '{}'
     `);
 
-    console.log('[092] Backfilling tool_templates...');
+    console.log('[097] Backfilling tool_templates...');
     const templateResult = await client.query('SELECT id, blueprint FROM tool_templates');
     const templates = (templateResult.rows || []) as Array<{
       id: string;
@@ -42,9 +42,9 @@ export async function up(connection?: PostgresConnection): Promise<void> {
       templatesUpdated++;
     }
 
-    console.log(`[092] Backfilled ${templatesUpdated} tool_templates`);
+    console.log(`[097] Backfilled ${templatesUpdated} tool_templates`);
 
-    console.log('[092] Backfilling tools from templates...');
+    console.log('[097] Backfilling tools from templates...');
     await client.query(`
       UPDATE tools t
       SET required_connector_providers = tt.required_connector_providers
@@ -52,7 +52,7 @@ export async function up(connection?: PostgresConnection): Promise<void> {
       WHERE t.source_template_id = tt.id
     `);
 
-    console.log('[092] Backfilling tools without source_template_id...');
+    console.log('[097] Backfilling tools without source_template_id...');
     const toolResult = await client.query(
       'SELECT id, blueprint FROM tools WHERE source_template_id IS NULL'
     );
@@ -70,8 +70,8 @@ export async function up(connection?: PostgresConnection): Promise<void> {
       toolsParsed++;
     }
 
-    console.log(`[092] Parsed blueprint for ${toolsParsed} template-less tools`);
-    console.log('[092] Migration completed successfully');
+    console.log(`[097] Parsed blueprint for ${toolsParsed} template-less tools`);
+    console.log('[097] Migration completed successfully');
   });
 }
 
@@ -80,6 +80,6 @@ export async function down(conn?: PostgresConnection): Promise<void> {
   await connection.transaction(async (client) => {
     await client.query('ALTER TABLE tools DROP COLUMN IF EXISTS required_connector_providers');
     await client.query('ALTER TABLE tool_templates DROP COLUMN IF EXISTS required_connector_providers');
-    console.log('[092] Rollback completed');
+    console.log('[097] Rollback completed');
   });
 }

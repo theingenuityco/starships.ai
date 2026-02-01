@@ -70,8 +70,10 @@ export class ConnectorService {
   /**
    * Extract simple {{var}} placeholders from a URL template string.
    * Intentionally does NOT support arbitrary expressions.
+   * Returns [] if url is not a string (e.g. missing on connector template).
    */
-  private extractUrlTemplateVars(url: string): string[] {
+  private extractUrlTemplateVars(url: string | undefined | null): string[] {
+    if (url == null || typeof url !== 'string') return [];
     const vars = new Set<string>();
     const re = /\{\{\s*([a-zA-Z0-9_]+)\s*\}\}/g;
     for (const match of url.matchAll(re)) {
@@ -226,15 +228,20 @@ export class ConnectorService {
           description: tpl.description,
           auth: { type: authType },
           ...(authType === 'oauth2' && (tpl.authJson as unknown as ConnectorAuthOAuth2V2)?.type === 'oauth2'
-            ? {
-                oauthRequiredMetadataKeys: Array.from(
-                  new Set([
-                    ...this.extractUrlTemplateVars((tpl.authJson as unknown as ConnectorAuthOAuth2V2).authorizationUrl),
-                    ...this.extractUrlTemplateVars((tpl.authJson as unknown as ConnectorAuthOAuth2V2).tokenUrl),
-                  ])
-                ),
-                metadataSchema: tpl.metadataSchemaJson ?? undefined,
-              }
+            ? (() => {
+                const auth = tpl.authJson as unknown as ConnectorAuthOAuth2V2 & { authorizeUrl?: string };
+                const authUrl = auth?.authorizationUrl ?? auth?.authorizeUrl;
+                const tokenUrl = auth?.tokenUrl;
+                return {
+                  oauthRequiredMetadataKeys: Array.from(
+                    new Set([
+                      ...this.extractUrlTemplateVars(authUrl),
+                      ...this.extractUrlTemplateVars(tokenUrl),
+                    ])
+                  ),
+                  metadataSchema: tpl.metadataSchemaJson ?? undefined,
+                };
+              })()
             : {}),
         };
       });

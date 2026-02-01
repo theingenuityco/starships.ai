@@ -21,8 +21,9 @@ RUN corepack enable && corepack prepare pnpm@10.12.4 --activate
 # Set DOCKER_BUILD=true to skip Docker checks in postinstall
 ENV DOCKER_BUILD=true
 
-# Node runtime flags (kept minimal; heap sizing is configured externally if needed)
-ENV NODE_OPTIONS="--no-node-snapshot"
+# Node heap size for build (Next.js/webpack can exceed default ~2GB). CI passes 6144.
+ARG NODE_MAX_OLD_SPACE_SIZE=4096
+ENV NODE_OPTIONS="--no-node-snapshot --max-old-space-size=${NODE_MAX_OLD_SPACE_SIZE}"
 
 # Prime pnpm store from lockfile (cacheable) then do an offline install after full source copy.
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./

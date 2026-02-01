@@ -1,5 +1,5 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { verifyStarshipAccess } from '@/middleware/verify-starship-access';
+import { verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
 import { ConnectorService } from '@/services/ConnectorService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
@@ -192,7 +192,7 @@ router.get('/starships/:id/connectors', jwtAuthMiddleware, async (req: Request, 
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
 
     const connectorService = new ConnectorService();
     const connectors = await connectorService.listStarshipConnectors(starshipId);
@@ -226,7 +226,7 @@ router.post('/starships/:id/connectors/:provider/refresh', jwtAuthMiddleware, as
 
     const { id: starshipId, provider } = paramsValidation;
 
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
 
     const connectorService = new ConnectorService();
     const connector = await connectorService.refreshConnector(starshipId, provider);
@@ -264,7 +264,7 @@ router.post('/starships/:id/connectors/:provider/test', jwtAuthMiddleware, async
 
     const { id: starshipId, provider } = paramsValidation;
 
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
 
     const connectorService = new ConnectorService();
     const result = await connectorService.testConnector(starshipId, provider as ConnectorProvider);
@@ -302,7 +302,7 @@ router.post('/starships/:id/connectors/:provider/api-key', jwtAuthMiddleware, as
 
     const { id: starshipId, provider } = paramsValidation;
 
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
 
     const bodyValidation = validateData(ApiKeyConnectSchema, req.body as ConnectWithApiKeyRequest, res, 'API key connector payload');
     if (!bodyValidation) return;
@@ -335,7 +335,7 @@ router.post('/starships/:id/connectors/:provider/basic', jwtAuthMiddleware, asyn
 
     const { id: starshipId, provider } = paramsValidation;
 
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
 
     const bodyValidation = validateData(BasicConnectSchema, req.body as ConnectWithBasicAuthRequest, res, 'basic auth connector payload');
     if (!bodyValidation) return;
@@ -373,7 +373,7 @@ router.post('/starships/:id/connectors/:provider/disconnect', jwtAuthMiddleware,
 
     const { id: starshipId, provider } = paramsValidation;
 
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
 
     const connectorService = new ConnectorService();
     const disconnected = await connectorService.disconnect(starshipId, provider);
@@ -411,7 +411,7 @@ async function startConnectorHandler(req: Request, res: Response): Promise<void>
 
     const { id: starshipId, provider } = paramsValidation;
 
-    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
 
     const bodyValidation = validateData(StartOAuthBodySchema, (req.body ?? {}) as StartOAuthRequest, res, 'start connector payload');
     if (!bodyValidation) return;

@@ -164,6 +164,7 @@ export function Navigation(props: NavigationProps) {
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
+  const canManageConnectors = Boolean(isAuthenticated && user?.id && starshipSlug && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
 
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
@@ -238,7 +239,7 @@ export function Navigation(props: NavigationProps) {
             },
           ]
         : []),
-      ...(isAuthenticated && starshipSlug
+      ...(canManageConnectors && starshipSlug
         ? [
             {
               href: `/ship/${starshipSlug}/connectors`,

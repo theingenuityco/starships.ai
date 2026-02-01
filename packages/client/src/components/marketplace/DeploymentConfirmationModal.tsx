@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
 import Icon from '@/components/primitives/Icon'
-import AgentAvatar from '@/components/animated/AgentAvatar'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { Avatar } from '@/components/ui/avatar'
 
 import { Button } from '@/components/ui/button'
@@ -126,9 +126,18 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             <div className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm">
               <div className="flex items-start gap-3 min-w-0">
                 {isAgent ? (
-                  <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shadow-sm">
-                    <AgentAvatar seed={template.name} imageUrl={avatarUrl} size={40} rounded />
-                  </Avatar>
+                  <MarketplaceAvatar
+                    imageUrl={avatarUrl || null}
+                    label={template.name}
+                    seed={template.name || 'AI'}
+                    sizeClassName="h-10 w-10"
+                    shapeClassName="rounded-full"
+                    ringClassName="ring-1 ring-border/40"
+                    shadowClassName="shadow-sm"
+                    showTintWhenMissing={false}
+                    showInsetRing={false}
+                    fallbackTextClassName="text-xs font-semibold text-muted-foreground"
+                  />
                 ) : (
                   <div className="flex-shrink-0 p-2 rounded-lg bg-primary/20">
                     <div className="text-lg">🔧</div>

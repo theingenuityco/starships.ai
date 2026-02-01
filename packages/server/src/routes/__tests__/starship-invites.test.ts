@@ -7,6 +7,7 @@ jest.mock('@starships/env', () => ({
 }));
 
 jest.mock('@/middleware/verify-starship-access', () => ({
+  verifyStarshipAccess: jest.fn(),
   verifyStarshipOwnerAccess: jest.fn(),
 }));
 
@@ -30,7 +31,7 @@ jest.mock('@starships/models', () => ({
 }));
 
 import starshipInvitesRouter from '@/routes/starship-invites';
-import { verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
+import { verifyStarshipAccess, verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
 import { EmailService } from '@/services/EmailService';
 import { StarshipService } from '@/services/StarshipService';
 import { StarshipInviteTokenRepository, StarshipMemberRepository, UserRepository, getConnection } from '@starships/models';
@@ -196,7 +197,7 @@ describe('starship invite routes', () => {
   });
 
   it('GET /starships/:id/members returns active members and pending invites', async () => {
-    jest.mocked(verifyStarshipOwnerAccess).mockResolvedValue(true);
+    jest.mocked(verifyStarshipAccess).mockResolvedValue(true);
 
     // Route uses raw SQL via getConnection().query(...)
     const query = jest
@@ -237,7 +238,7 @@ describe('starship invite routes', () => {
     const handler = getHandler('/starships/:id/members', 'get');
     await handler(req, res as unknown as Response);
 
-    expect(verifyStarshipOwnerAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());
+    expect(verifyStarshipAccess).toHaveBeenCalledWith('starship_1234', 'user_owner', expect.anything());
     expect(query).toHaveBeenCalledTimes(2);
     expect(queryOne).toHaveBeenCalledTimes(1);
 

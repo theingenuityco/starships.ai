@@ -13,10 +13,9 @@ export async function getRequiredConnectorProviderIdsForTemplate(templateId: str
   const toolTemplates = await agentTemplateRepo.getToolTemplates(templateId);
   const providers = new Set<string>();
   for (const tt of toolTemplates) {
-    let list = (tt as { requiredConnectorProviders?: string[] }).requiredConnectorProviders;
+    let list = tt.requiredConnectorProviders;
     if (!Array.isArray(list) || list.length === 0) {
-      const blueprint = (tt as { blueprint?: unknown }).blueprint;
-      list = extractRequiredConnectorProviders(blueprint as Parameters<typeof extractRequiredConnectorProviders>[0]);
+      list = extractRequiredConnectorProviders(tt.blueprint ?? undefined);
     }
     if (Array.isArray(list)) {
       for (const p of list) {

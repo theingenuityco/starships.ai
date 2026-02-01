@@ -5,9 +5,8 @@ import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, PaginationSchema, SlugSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
-import { AgentTemplateRepository, ConnectorTemplateRepository } from '@starships/models';
+import { AgentTemplateRepository } from '@starships/models';
 import { generatePresignedUrlInline } from '@/utils/s3-helper';
-import { getRequiredConnectorProviderIdsForTemplate } from '@/utils/required-connectors';
 
 const router: Router = Router();
 
@@ -144,45 +143,13 @@ router.get('/agent-templates/:id/required-connectors', optionalJwtAuth, async (r
     if (!paramValidation) return;
     const { id } = paramValidation;
 
-    const agentTemplateRepo = new AgentTemplateRepository();
-    const agentTemplate = await agentTemplateRepo.findById(id);
-    if (!agentTemplate) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent template not found', 404, {
-        resource: 'agent-template',
-        id,
-      });
+    const templateService = getAgentTemplateService();
+    if (!templateService) {
+      sendError(res, 'SERVICE_UNAVAILABLE', 'Template service not available', 503);
       return;
     }
 
-    const providerIds = await getRequiredConnectorProviderIdsForTemplate(id);
-    const connectorTemplateRepo = new ConnectorTemplateRepository();
-
-    const requiredConnectors: Array<{
-      provider: string;
-      name: string;
-      description?: string;
-      auth: { type: string };
-    }> = [];
-
-    for (const provider of providerIds) {
-      const connectorTemplate = await connectorTemplateRepo.findByProvider(provider);
-      if (connectorTemplate) {
-        const authType = (connectorTemplate.authJson as { type?: string })?.type ?? 'none';
-        requiredConnectors.push({
-          provider,
-          name: connectorTemplate.name ?? provider,
-          description: connectorTemplate.description,
-          auth: { type: authType },
-        });
-      } else {
-        requiredConnectors.push({
-          provider,
-          name: provider,
-          auth: { type: 'unknown' },
-        });
-      }
-    }
-
+    const requiredConnectors = await templateService.getRequiredConnectorsForTemplate(id);
     sendSuccess(res, { requiredConnectors }, 200);
   } catch (error) {
     handleError(error, res, 'loading required connectors');

@@ -32,7 +32,6 @@ import { cn } from '@/lib/utils'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { WelcomeSignupCard } from '@/components/conversation/WelcomeSignupCard'
 import { ChildConversationApprovalCallout } from '@/components/conversation/ChildConversationApprovalCallout'
-import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnectorsPanel'
 import type { AgentModel, ConversationStreamUIAction, MessageModel } from '@starships/protocol'
 
 interface ConversationInterfaceProps {

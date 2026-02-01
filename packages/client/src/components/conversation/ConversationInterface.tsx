@@ -21,6 +21,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useStarshipUIStore } from '@/store/starship-ui-store'
 import { useStarship } from '@/hooks/useStarships'
 import api, { agentAPI, templateAPI, toolAPI } from '@/lib/api'
+import type { Agent } from '@/lib/api'
 import { toast } from 'sonner'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'

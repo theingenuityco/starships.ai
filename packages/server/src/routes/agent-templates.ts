@@ -7,6 +7,7 @@ import { IdSchema, PaginationSchema, SlugSchema } from '@/schemas/common';
 import { createPaginationMeta, handleError, sendError, sendSuccess } from '../utils/responseHelpers';
 import { AgentTemplateRepository, ConnectorTemplateRepository } from '@starships/models';
 import { generatePresignedUrlInline } from '@/utils/s3-helper';
+import { getRequiredConnectorProviderIdsForTemplate } from '@/utils/required-connectors';
 
 const router: Router = Router();
 
@@ -147,8 +148,6 @@ router.get(
       const { id } = paramValidation;
 
       const agentTemplateRepo = new AgentTemplateRepository();
-      const connectorTemplateRepo = new ConnectorTemplateRepository();
-
       const agentTemplate = await agentTemplateRepo.findById(id);
       if (!agentTemplate) {
         sendError(res, 'RESOURCE_NOT_FOUND', 'Agent template not found', 404, {
@@ -158,15 +157,8 @@ router.get(
         return;
       }
 
-      const toolTemplates = await agentTemplateRepo.getToolTemplates(id);
-      const allProviders = new Set<string>();
-      for (const toolTemplate of toolTemplates) {
-        if (toolTemplate.requiredConnectorProviders) {
-          for (const p of toolTemplate.requiredConnectorProviders) {
-            if (p && p !== 'starships') allProviders.add(p);
-          }
-        }
-      }
+      const providerIds = await getRequiredConnectorProviderIdsForTemplate(id);
+      const connectorTemplateRepo = new ConnectorTemplateRepository();
 
       const requiredConnectors: Array<{
         provider: string;
@@ -175,7 +167,7 @@ router.get(
         auth: { type: string };
       }> = [];
 
-      for (const provider of allProviders) {
+      for (const provider of providerIds) {
         const connectorTemplate = await connectorTemplateRepo.findByProvider(provider);
         if (connectorTemplate) {
           const authType =

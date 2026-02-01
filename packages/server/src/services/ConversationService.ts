@@ -50,6 +50,8 @@ import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { buildStarshipSystemPromptContext } from '@/utils/starship-system-prompt-context';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
+import { getConversationSummariesQueue } from '@/queues/conversationSummariesQueue';
+import type { ConversationSummaryCursor } from '@starships/protocol';
 import {
   resolvePlugins,
   mergeConversationState,
@@ -1220,6 +1222,55 @@ export class ConversationService {
   }
 
   /**
+   * Build a compact system-prompt block representing the summarized portion of the conversation.
+   *
+   * This is designed to keep LLM input bounded: we send last-N raw messages plus this summary
+   * for all older history (maintained asynchronously by a background worker).
+   */
+  private buildConversationSummarySystemPrompt(conversationState: ConversationState | undefined): string {
+    const summary = typeof conversationState?.contextSummary === 'string' ? conversationState.contextSummary.trim() : '';
+    if (!summary) return '';
+
+    const maxChars = 5000;
+    const clipped = summary.length > maxChars ? summary.slice(0, maxChars) + '\n\n[...summary truncated...]' : summary;
+
+    const before = conversationState?.contextSummaryBefore;
+    const createdAt = typeof before?.createdAt === 'string' ? before.createdAt : '';
+    const id = typeof before?.id === 'string' ? before.id : '';
+    const cursorLine = createdAt && id ? `Covers messages strictly before cursor: createdAt=${createdAt} id=${id}` : 'Covers older messages (cursor unknown)';
+
+    return ['<conversation_summary>', cursorLine, clipped, '</conversation_summary>'].join('\n');
+  }
+
+  private async enqueueConversationSummaryJob(args: {
+    conversationId: string;
+    starshipId: string;
+    targetBefore: ConversationSummaryCursor;
+    llmHistoryLimit: number;
+  }): Promise<void> {
+    try {
+      // Queue init will throw if Redis isn't configured; treat as best-effort.
+      const queue = getConversationSummariesQueue();
+      await queue.add(
+        'summarize-conversation',
+        {
+          conversationId: args.conversationId,
+          starshipId: args.starshipId,
+          targetBefore: args.targetBefore,
+          llmHistoryLimit: args.llmHistoryLimit,
+        },
+        {
+          jobId: `conversation:${args.conversationId}`,
+          removeOnComplete: true,
+          removeOnFail: 100,
+        }
+      );
+    } catch {
+      // best-effort only
+    }
+  }
+
+  /**
    * Build multimodal content blocks from message with attachments
    *
    * Converts messages with attachments into ContentBlock[] format for LLMs.
@@ -1543,12 +1594,25 @@ export class ConversationService {
 
     // (late title generation block removed; handled early)
 
-    // Get conversation messages from database
-    let messages = await this.getConversationMessages(data.conversationId);
+    // IMPORTANT:
+    // Do NOT load the full message history for agent execution. This can grow without bound and
+    // overflow model context windows. Always cap the LLM input to the most recent N messages.
+    const llmHistoryLimit = 30;
+    const initialPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
+    let messages = initialPage.messages;
+    if (initialPage.hasMoreBefore && initialPage.oldestCursor) {
+      // Background job to keep a rolling summary of the older history.
+      void this.enqueueConversationSummaryJob({
+        conversationId: data.conversationId,
+        starshipId: starship.id,
+        targetBefore: initialPage.oldestCursor,
+        llmHistoryLimit,
+      });
+    }
 
     // Load conversation state for context - reload conversation to get latest state
     const latestConversation = await this.getConversationById(data.conversationId);
-    const conversationState = (latestConversation?.state || {}) as Record<string, unknown>;
+    const conversationState = (latestConversation?.state || {}) as ConversationState;
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
     if (!noAgentToRun) {
@@ -1643,7 +1707,10 @@ export class ConversationService {
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
+        const conversationSummaryBlock = this.buildConversationSummarySystemPrompt(conversationState);
+        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, conversationSummaryBlock]
+          .filter(Boolean)
+          .join('\n\n');
 
         const agentWithTools: AgentParams = {
           ...agentModel,
@@ -1720,7 +1787,8 @@ export class ConversationService {
 
         // Refresh messages after this agent's turn so subsequent agents (if any)
         // see the updated conversation state, but do not perform mention-based handoffs
-        messages = await this.getConversationMessages(data.conversationId);
+        const refreshedPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
+        messages = refreshedPage.messages;
       }
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
@@ -1885,7 +1953,18 @@ export class ConversationService {
       }
 
       // Load latest persisted conversation messages and convert to LlmMessage array
-      const messages = await this.getConversationMessages(conversationId);
+      // Keep resumed turns bounded too; do not load full history into the LLM context.
+      const llmHistoryLimit = 30;
+      const page = await this.getConversationMessagesPage({ conversationId, limit: llmHistoryLimit });
+      const messages = page.messages;
+      if (page.hasMoreBefore && page.oldestCursor) {
+        void this.enqueueConversationSummaryJob({
+          conversationId,
+          starshipId: starship.id,
+          targetBefore: page.oldestCursor,
+          llmHistoryLimit,
+        });
+      }
       const llmMessages: LlmMessage[] = await Promise.all(
         messages.map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
@@ -1916,10 +1995,7 @@ export class ConversationService {
       };
 
       // Load conversation-level state context (if any)
-      const conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as Record<
-        string,
-        unknown
-      >;
+      const conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as ConversationState;
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
@@ -1941,7 +2017,10 @@ export class ConversationService {
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
+      const conversationSummaryBlock = this.buildConversationSummarySystemPrompt(conversationState);
+      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, conversationSummaryBlock]
+        .filter(Boolean)
+        .join('\n\n');
 
       const agentWithTools: AgentParams = {
         ...agentModel,

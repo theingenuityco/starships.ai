@@ -319,8 +319,8 @@ export function StarshipConnectorsPanel({ starshipId, onlyProviders, hideSearch 
     const showLogo = !!provider && !hiddenLogos[provider]
 
     return (
-      <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} whileHover={{ y: -4 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
-        <Card className="group relative overflow-hidden h-full flex flex-col rounded-lg bg-card border border-border/40 shadow-sm transition-colors duration-200 hover:bg-muted/30 hover:border-muted hover:shadow-md">
+      <motion.div key={provider} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.2, ease: [0.4, 0, 0.2, 1] }} className="h-full">
+        <Card className="group relative overflow-hidden h-full flex flex-col rounded-xl bg-slate-100/50 dark:bg-zinc-800/35 border border-slate-200/50 dark:border-zinc-600/30 shadow-sm dark:shadow-black/5 transition-colors duration-200 hover:bg-slate-100/70 dark:hover:bg-zinc-800/50 hover:border-slate-200/70 dark:hover:border-zinc-600/45">
           <CardHeader className="pb-3 relative z-10 pt-5 space-y-3">
             <div className="flex items-center justify-between">
               <CardTitle className="flex items-center gap-3">

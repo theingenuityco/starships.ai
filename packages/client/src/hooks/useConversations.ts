@@ -487,7 +487,7 @@ export function usePendingToolApprovalsMulti(conversationIds: string[], enabled:
       // This endpoint is cheap, but polling per-child-conversation every 2s scales poorly
       // and looks like a runaway loop in the network panel. Prefer a slower cadence and
       // never poll in the background.
-      refetchInterval: enabled ? 15_000 : false,
+      refetchInterval: enabled ? 15_000 : (false as const),
       refetchIntervalInBackground: false,
     })),
   })

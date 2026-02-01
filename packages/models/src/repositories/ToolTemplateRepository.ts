@@ -2,6 +2,7 @@ import { ToolTemplateEntity } from '@/entities/ToolTemplateEntity';
 import { AgentTemplateEntity } from '@/entities/AgentTemplateEntity';
 import { fromDatabase, fromDatabaseArray, toDatabase, toEntityInstance } from '@/helpers/serialization-helper';
 import { generateSlug } from '@/helpers/slugUtils';
+import { extractRequiredConnectorProviders } from '@/utils/extractRequiredConnectorProviders';
 import { BaseRepository } from '@/repositories/BaseRepository';
 import { generateUniqueSlugRandomSuffix } from '@/utils/slugGenerator';
 import type {
@@ -195,6 +196,7 @@ export class ToolTemplateRepository extends BaseRepository {
           // Template-specific fields
           category: data.category,
           usageCount: 0,
+          requiredConnectorProviders: extractRequiredConnectorProviders(data.blueprint),
           exampleUsage: data.exampleUsage,
           requiresApiKey: data.requiresApiKey,
           configurationFields: data.configurationFields,
@@ -248,6 +250,12 @@ export class ToolTemplateRepository extends BaseRepository {
             const baseSlug = generateSlug(nextName) || 'tool-template';
             internalUpdates.slug = await this.generateUniqueTemplateSlug(baseSlug);
           }
+        }
+
+        if (cleanedUpdates.blueprint !== undefined && cleanedUpdates.blueprint !== null) {
+          internalUpdates.requiredConnectorProviders = extractRequiredConnectorProviders(
+            cleanedUpdates.blueprint
+          );
         }
 
         await ToolTemplateEntity.validate(internalUpdates, 'update');

@@ -118,9 +118,10 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden">
+      <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden p-6">
         <TooltipProvider>
-          <DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
               Confirm {isAgent ? 'Deployment' : 'Installation'}
@@ -319,7 +320,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             ) : null}
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t border-border/50 mt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
               Cancel
             </Button>
@@ -336,7 +337,8 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                 </>
               )}
             </Button>
-          </DialogFooter>
+            </DialogFooter>
+          </div>
         </TooltipProvider>
       </DialogContent>
     </Dialog>

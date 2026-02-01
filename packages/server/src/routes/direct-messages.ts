@@ -145,6 +145,29 @@ router.post('/starships/:starshipId/direct-messages', jwtAuthMiddleware, async (
       }
 
       const conversationService = new ConversationService();
+      // #region agent log
+      void fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sessionId: 'debug-session',
+          runId: 'run1',
+          hypothesisId: 'H7',
+          location: 'packages/server/src/routes/direct-messages.ts:POST /starships/:starshipId/direct-messages user_agent',
+          message: 'Creating user↔agent DM conversation',
+          data: {
+            starshipId: params.starshipId,
+            authUserId,
+            agentId: agent?.id ?? null,
+            agentName: agent?.name ?? null,
+            agentRole: (agent as any)?.role ?? null,
+            providedTitle: body.title ?? null,
+            computedTitle: body.title || (agent ? agent.name : null),
+          },
+          timestamp: Date.now(),
+        }),
+      }).catch(() => {});
+      // #endregion
       const conversation = await conversationService.createConversation({
         title: body.title || agent.name,
         status: 'active',

@@ -138,61 +138,56 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
 });
 
 // GET /agent-templates/:id/required-connectors - Get required connectors for an agent template (public)
-router.get(
-  '/agent-templates/:id/required-connectors',
-  optionalJwtAuth,
-  async (req: Request, res: Response): Promise<void> => {
-    try {
-      const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
-      if (!paramValidation) return;
-      const { id } = paramValidation;
+router.get('/agent-templates/:id/required-connectors', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+    const { id } = paramValidation;
 
-      const agentTemplateRepo = new AgentTemplateRepository();
-      const agentTemplate = await agentTemplateRepo.findById(id);
-      if (!agentTemplate) {
-        sendError(res, 'RESOURCE_NOT_FOUND', 'Agent template not found', 404, {
-          resource: 'agent-template',
-          id,
-        });
-        return;
-      }
-
-      const providerIds = await getRequiredConnectorProviderIdsForTemplate(id);
-      const connectorTemplateRepo = new ConnectorTemplateRepository();
-
-      const requiredConnectors: Array<{
-        provider: string;
-        name: string;
-        description?: string;
-        auth: { type: string };
-      }> = [];
-
-      for (const provider of providerIds) {
-        const connectorTemplate = await connectorTemplateRepo.findByProvider(provider);
-        if (connectorTemplate) {
-          const authType =
-            (connectorTemplate.authJson as { type?: string })?.type ?? 'none';
-          requiredConnectors.push({
-            provider,
-            name: connectorTemplate.name ?? provider,
-            description: connectorTemplate.description,
-            auth: { type: authType },
-          });
-        } else {
-          requiredConnectors.push({
-            provider,
-            name: provider,
-            auth: { type: 'unknown' },
-          });
-        }
-      }
-
-      sendSuccess(res, { requiredConnectors }, 200);
-    } catch (error) {
-      handleError(error, res, 'loading required connectors');
+    const agentTemplateRepo = new AgentTemplateRepository();
+    const agentTemplate = await agentTemplateRepo.findById(id);
+    if (!agentTemplate) {
+      sendError(res, 'RESOURCE_NOT_FOUND', 'Agent template not found', 404, {
+        resource: 'agent-template',
+        id,
+      });
+      return;
     }
+
+    const providerIds = await getRequiredConnectorProviderIdsForTemplate(id);
+    const connectorTemplateRepo = new ConnectorTemplateRepository();
+
+    const requiredConnectors: Array<{
+      provider: string;
+      name: string;
+      description?: string;
+      auth: { type: string };
+    }> = [];
+
+    for (const provider of providerIds) {
+      const connectorTemplate = await connectorTemplateRepo.findByProvider(provider);
+      if (connectorTemplate) {
+        const authType = (connectorTemplate.authJson as { type?: string })?.type ?? 'none';
+        requiredConnectors.push({
+          provider,
+          name: connectorTemplate.name ?? provider,
+          description: connectorTemplate.description,
+          auth: { type: authType },
+        });
+      } else {
+        requiredConnectors.push({
+          provider,
+          name: provider,
+          auth: { type: 'unknown' },
+        });
+      }
+    }
+
+    sendSuccess(res, { requiredConnectors }, 200);
+  } catch (error) {
+    handleError(error, res, 'loading required connectors');
   }
-);
+});
 
 // GET /agent-templates/:id - Get template by ID (public)
 router.get('/agent-templates/:id', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {

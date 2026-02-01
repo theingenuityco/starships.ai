@@ -4,9 +4,7 @@ import type { Blueprint } from '@starships/autopilot';
  * Extract unique connector provider identifiers from a blueprint.
  * Only captures static string values from connector_action nodes.
  */
-export function extractRequiredConnectorProviders(
-  blueprint: Blueprint | null | undefined
-): string[] {
+export function extractRequiredConnectorProviders(blueprint: Blueprint | null | undefined): string[] {
   if (!blueprint?.nodes || !Array.isArray(blueprint.nodes)) {
     return [];
   }

@@ -744,7 +744,10 @@ router.post('/agents/:id/profile-images/generate', jwtAuthMiddleware, async (req
     });
 
     // Map type to field name
-    const fieldMap: Record<string, keyof Pick<AgentModel, 'problemStatementsAttachmentId' | 'capabilitiesAttachmentId' | 'tryThesePromptsAttachmentId'>> = {
+    const fieldMap: Record<
+      string,
+      keyof Pick<AgentModel, 'problemStatementsAttachmentId' | 'capabilitiesAttachmentId' | 'tryThesePromptsAttachmentId'>
+    > = {
       problem_statements: 'problemStatementsAttachmentId',
       capabilities: 'capabilitiesAttachmentId',
       try_these_prompts: 'tryThesePromptsAttachmentId',
@@ -797,7 +800,10 @@ router.delete('/agents/:id/profile-images/:type', jwtAuthMiddleware, async (req:
     if (!hasAccess) return;
 
     // Map type to field name
-    const fieldMap: Record<string, keyof Pick<AgentModel, 'problemStatementsAttachmentId' | 'capabilitiesAttachmentId' | 'tryThesePromptsAttachmentId'>> = {
+    const fieldMap: Record<
+      string,
+      keyof Pick<AgentModel, 'problemStatementsAttachmentId' | 'capabilitiesAttachmentId' | 'tryThesePromptsAttachmentId'>
+    > = {
       problem_statements: 'problemStatementsAttachmentId',
       capabilities: 'capabilitiesAttachmentId',
       try_these_prompts: 'tryThesePromptsAttachmentId',

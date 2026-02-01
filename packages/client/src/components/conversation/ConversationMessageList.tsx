@@ -2146,13 +2146,22 @@ function ChannelHero({
     (typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : null) ||
     'Channel'
   const displayHashed = `#${displayName.replace(/^#/, '')}`
+  // Match DirectMessageHero avatar sizing.
+  const sizeClassName = 'h-20 w-20 sm:h-24 sm:w-24'
 
   return (
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
         <div className="flex items-start gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center flex-shrink-0">
-            <Icon name="hash" className="h-7 w-7 text-muted-foreground" />
+          <div
+            className={cn(
+              'relative overflow-hidden flex-shrink-0',
+              sizeClassName,
+              'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center'
+            )}
+          >
+            <Icon name="hash" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
+            <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
           </div>
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>

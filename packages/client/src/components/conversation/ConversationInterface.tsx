@@ -1017,6 +1017,33 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                   conversationId={currentConversationId}
                   starshipId={starshipId}
                   channelName={isChannelConversation ? (typeof (currentChannel as any)?.name === 'string' ? String((currentChannel as any).name) : null) : null}
+                  emptyHeroTitleOverride={
+                    draftDm && !currentConversationId
+                      ? draftDm.dmType === 'user_agent'
+                        ? (() => {
+                            const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || ''))
+                            return a ? formatAgentDisplayName(a) : 'Direct message'
+                          })()
+                        : draftDm.peerLabel || 'Direct message'
+                      : null
+                  }
+                  emptyHeroParticipantOverride={
+                    draftDm && !currentConversationId
+                      ? draftDm.dmType === 'user_agent'
+                        ? (() => {
+                            const a = (Array.isArray(starshipAgentsData) ? (starshipAgentsData as AgentModel[]) : []).find(x => String(x?.id || '') === String(draftDm.agentId || '')) || null
+                            const label = a ? formatAgentDisplayName(a) : 'Agent'
+                            const seed = a ? String((a as any)?.name || (a as any)?.slug || (a as any)?.id || label) : 'agent'
+                            const avatarAttachmentId = a && typeof (a as any)?.avatarAttachmentId === 'string' ? String((a as any).avatarAttachmentId) : null
+                            return { kind: 'agent' as const, label, seed, avatarAttachmentId }
+                          })()
+                        : {
+                            kind: 'human' as const,
+                            label: String(draftDm.peerLabel || 'User'),
+                            avatarUrl: draftDm.peerAvatar || null,
+                          }
+                      : null
+                  }
                   bottomPaddingPx={inputHeight + 24}
                   enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}

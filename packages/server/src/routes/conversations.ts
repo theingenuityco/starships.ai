@@ -26,6 +26,8 @@ import {
   TurnRepository,
   WidgetRepository,
 } from '@starships/models';
+import { getRequiredConnectorProviderIdsForAgent } from '@/utils/required-connectors';
+import { ConnectorService } from '@/services/ConnectorService';
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { AppError } from '@starships/errors';
@@ -674,6 +676,51 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         }
       }
 
+      // Optional: inject connector suggestion when conversation is empty and agent has required unconnected connectors
+      if (Array.isArray(snapshotMessages) && snapshotMessages.length === 0) {
+        try {
+          const conversation = await conversationService.getConversationById(conversationId);
+          if (conversation?.starshipId) {
+            const streamAgents = await conversationService.getConversationAgents(conversationId);
+            const primaryAgentId = streamAgents.length > 0 ? streamAgents[0]?.id : null;
+            if (primaryAgentId) {
+              const required = await getRequiredConnectorProviderIdsForAgent(primaryAgentId);
+              if (required.length > 0) {
+                const connectorService = new ConnectorService();
+                const connectors = await connectorService.listStarshipConnectors(conversation.starshipId);
+                const connectedSet = new Set(connectors.map((c) => String(c.provider ?? '').toLowerCase()));
+                const requiredNotConnected = required.filter((p) => !connectedSet.has(p.toLowerCase()));
+                if (requiredNotConnected.length > 0) {
+                  const now = new Date().toISOString();
+                  const synthetic: MessageModel & { uiActions?: unknown[] } = {
+                    id: 'welcome:connector-suggestion',
+                    role: 'assistant',
+                    content: 'Connect these connectors to use this agent.',
+                    messageType: 'agent_response',
+                    createdAt: now,
+                    updatedAt: now,
+                    uiActions: [
+                      {
+                        action: 'render_widget',
+                        payload: {
+                          widget: {
+                            widgetType: 'ConnectorSuggestionCard',
+                            props: { starshipId: conversation.starshipId, providers: requiredNotConnected },
+                          },
+                        },
+                      },
+                    ],
+                  } as MessageModel & { uiActions: unknown[] };
+                  snapshotMessages = [synthetic, ...snapshotMessages];
+                }
+              }
+            }
+          }
+        } catch {
+          /* best-effort */
+        }
+      }
+
       // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
       res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
@@ -800,7 +847,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
 
       // Delegate to service layer
       const conversationService = new ConversationService();
-      const messages = await conversationService.getConversationMessages(conversationId, orderValidation.orderDirection);
+      let messages = await conversationService.getConversationMessages(conversationId, orderValidation.orderDirection);
 
       // Verify conversation exists
       const conversation = await conversationService.getConversationById(conversationId);
@@ -812,8 +859,48 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         return;
       }
 
-      // Get conversation agents to determine participants
+      // Get conversation agents to determine participants (needed for injection check and response)
       const agents = await conversationService.getConversationAgents(conversationId);
+      const primaryAgentId = agents.length > 0 ? agents[0]?.id : null;
+
+      // Optional: inject connector suggestion when conversation is empty and agent has required unconnected connectors
+      if (Array.isArray(messages) && messages.length === 0 && primaryAgentId && conversation.starshipId) {
+        try {
+          const required = await getRequiredConnectorProviderIdsForAgent(primaryAgentId);
+          if (required.length > 0) {
+            const connectorService = new ConnectorService();
+            const connectors = await connectorService.listStarshipConnectors(conversation.starshipId);
+            const connectedSet = new Set(connectors.map((c) => String(c.provider ?? '').toLowerCase()));
+            const requiredNotConnected = required.filter((p) => !connectedSet.has(p.toLowerCase()));
+            if (requiredNotConnected.length > 0) {
+              const now = new Date().toISOString();
+              const synthetic: MessageModel & { uiActions?: unknown[] } = {
+                id: 'welcome:connector-suggestion',
+                role: 'assistant',
+                content: 'Connect these connectors to use this agent.',
+                messageType: 'agent_response',
+                createdAt: now,
+                updatedAt: now,
+                uiActions: [
+                  {
+                    action: 'render_widget',
+                    payload: {
+                      widget: {
+                        widgetType: 'ConnectorSuggestionCard',
+                        props: { starshipId: conversation.starshipId, providers: requiredNotConnected },
+                      },
+                    },
+                  },
+                ],
+              } as MessageModel & { uiActions: unknown[] };
+              messages = [synthetic, ...messages];
+            }
+          }
+        } catch {
+          /* best-effort: do not fail the request */
+        }
+      }
+
       const participants = agents.map((agent) => agent.id);
 
       // Structure response to match client expectations

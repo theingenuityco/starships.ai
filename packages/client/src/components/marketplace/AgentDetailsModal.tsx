@@ -149,6 +149,8 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         type="agent"
         template={template}
         starshipName={primaryStarship?.name || 'Unknown Starship'}
+        starshipId={primaryStarship?.id}
+        starshipSlug={primaryStarship?.slug}
       />
     </Dialog>
   )

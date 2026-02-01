@@ -121,6 +121,8 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
         type="agent"
         template={template}
         starshipName={primaryStarship?.name || 'Unknown Starship'}
+        starshipId={primaryStarship?.id}
+        starshipSlug={primaryStarship?.slug}
       />
     </>
   )

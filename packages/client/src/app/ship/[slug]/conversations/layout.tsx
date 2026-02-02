@@ -2,13 +2,14 @@
 
 import { ConversationInterface } from '@/components/conversation/ConversationInterface'
 import { ThreadPane } from '@/components/conversation/ThreadPane'
-import { useStarshipChannels } from '@/hooks/useConversations'
+import { useStarshipChannels, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useMarkConversationRead } from '@/hooks/useNotifications'
 import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
 import { useNavigationOnboardingContext } from '@/contexts/NavigationOnboardingContext'
+import { useStarshipAgents } from '@/hooks/useAgents'
 
 export default function ConversationsLayout({ children }: { children: React.ReactNode }) {
   const params = useParams()
@@ -149,6 +150,8 @@ export default function ConversationsLayout({ children }: { children: React.Reac
 
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipData?.id ?? '', Boolean(starshipData?.id))
+  const { data: agentsData, isLoading: agentsLoading } = useStarshipAgents(starshipData?.id ?? '', Boolean(starshipData?.id))
 
   const markRead = useMarkConversationRead()
   useEffect(() => {
@@ -256,6 +259,43 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     return dm === 'draft'
   }, [searchParams])
 
+  const agentFromUrl = useMemo(() => {
+    const raw = searchParams.get('agent')
+    const v = typeof raw === 'string' ? raw.trim() : ''
+    return v.length > 0 ? v : null
+  }, [searchParams])
+
+  // DM landing: `?agent=<slug|id>` should open a DM with that agent (existing if present, otherwise draft).
+  useEffect(() => {
+    if (!starshipData?.id) return
+    if (shouldShowOnboarding) return
+    if (routeParams.conversationId) return
+    if (!agentFromUrl) return
+    if (agentsLoading || directMessagesLoading) return
+
+    const agents = Array.isArray(agentsData) ? (agentsData as any[]) : []
+    const agent =
+      agents.find(a => String((a as any)?.slug || '').trim().toLowerCase() === agentFromUrl.toLowerCase()) ??
+      agents.find(a => String((a as any)?.id || '').trim() === agentFromUrl) ??
+      null
+    if (!agent?.id) return
+
+    const list = ((directMessagesData as any)?.directMessages || []) as DirectMessageListItem[]
+    const existingCid =
+      list
+        .map((item: any) => (item as any)?.dm)
+        .filter((dm: any) => dm && dm.dmType === 'user_agent')
+        .find((dm: any) => String(dm.agentId || '') === String(agent.id))?.conversationId ?? null
+
+    if (existingCid) {
+      router.replace(`/ship/${routeParams.slug}/conversations/${encodeURIComponent(String(existingCid))}`)
+      return
+    }
+
+    // Open draft DM view targeted at this agent.
+    router.replace(`/ship/${routeParams.slug}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(String(agent.id))}`)
+  }, [agentFromUrl, agentsData, agentsLoading, directMessagesData, directMessagesLoading, routeParams.conversationId, routeParams.slug, router, shouldShowOnboarding, starshipData?.id])
+
   const pickAutoChannelSlug = useMemo(() => {
     const channels = channelsData?.channels ?? []
     const lobby = channels.find(
@@ -287,22 +327,25 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     if (!starshipData?.id) return
     if (routeParams.conversationId) return
     if (isDraftDm) return
+    // If `agent` is present, DM landing logic will handle navigation.
+    if (agentFromUrl) return
 
     // Always open the default channel (lobby), falling back to first channel.
     if (channelsLoading) return
     if (pickAutoChannelSlug) {
       hasAutoNavigatedRef.current = true
-      // Preserve query params (e.g. thread), but drop agent to prevent "starter" behaviors.
-      const sp = new URLSearchParams(searchParams.toString())
-      sp.delete('agent')
-      const qs = sp.toString()
+      // When redirecting to a channel, only carry channel-relevant query params.
+      const next = new URLSearchParams()
+      const thread = (searchParams.get('thread') || '').trim()
+      if (thread) next.set('thread', thread)
+      const qs = next.toString()
       router.replace(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`)
       return
     }
     // Nothing to open (should be rare now that starships have default channels) → send to marketplace.
     hasAutoNavigatedRef.current = true
     router.replace('/marketplace')
-  }, [shouldShowOnboarding, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
+  }, [agentFromUrl, shouldShowOnboarding, starshipData?.id, routeParams.conversationId, routeParams.slug, isDraftDm, router, pickAutoChannelSlug, channelsLoading, searchParams])
 
   // If the user is on /conversations/:id but that id is a channel-backed conversation, redirect to /channels/:channelSlug.
   useEffect(() => {
@@ -310,7 +353,11 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     if (channelsLoading) return
     if (!routeParams.conversationId) return
     if (!channelSlugForCurrentConversationId) return
-    const qs = searchParams.toString()
+    // When redirecting to a channel, only carry channel-relevant query params.
+    const next = new URLSearchParams()
+    const thread = (searchParams.get('thread') || '').trim()
+    if (thread) next.set('thread', thread)
+    const qs = next.toString()
     router.replace(
       qs
         ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlugForCurrentConversationId)}?${qs}`
@@ -330,18 +377,24 @@ export default function ConversationsLayout({ children }: { children: React.Reac
       sp.delete('peerUserId')
       sp.delete('peerLabel')
       sp.delete('peerAvatar')
-      const qs = sp.toString()
       if (newConversationId) {
         const cid = String(newConversationId)
         const channels = channelsData?.channels ?? []
         const match = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
         const channelSlug = match?.slug ? String(match.slug) : ''
         if (channelSlug) {
+          // When routing into channels, only carry channel-relevant query params.
+          const next = new URLSearchParams()
+          const thread = (sp.get('thread') || '').trim()
+          if (thread) next.set('thread', thread)
+          const qs = next.toString()
           router.push(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}`)
           return
         }
+        const qs = sp.toString()
         router.push(qs ? `/ship/${routeParams.slug}/conversations/${cid}?${qs}` : `/ship/${routeParams.slug}/conversations/${cid}`)
       } else {
+        const qs = sp.toString()
         router.push(qs ? `/ship/${routeParams.slug}?${qs}` : `/ship/${routeParams.slug}`)
       }
     },

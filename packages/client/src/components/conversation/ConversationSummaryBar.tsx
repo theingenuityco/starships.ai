@@ -468,7 +468,7 @@ export function ConversationSummaryBar({
                 {/* Title - exact match */}
                 <div className="flex items-baseline gap-2 min-w-0 w-full">
                   {titlePrefix ? (
-                    <span aria-hidden="true" className="flex-shrink-0 self-center text-muted-foreground leading-none">
+                    <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                       {titlePrefix}
                     </span>
                   ) : null}
@@ -662,7 +662,7 @@ export function ConversationSummaryBar({
               {/* Title */}
               <div className="flex items-baseline gap-2 min-w-0 w-full">
                 {titlePrefix ? (
-                  <span aria-hidden="true" className="flex-shrink-0 self-center text-muted-foreground leading-none">
+                  <span aria-hidden="true" className="flex-shrink-0 self-center text-foreground leading-none">
                     {titlePrefix}
                   </span>
                 ) : null}

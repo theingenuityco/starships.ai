@@ -14,6 +14,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 
 export type ConversationParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
 
@@ -94,9 +95,11 @@ export function ConversationSummaryBar({
   const { isInstanceAdmin, userId: authUserId, userName: authUserName, userEmail: authUserEmail, userAvatar: authUserAvatar } = useAuth()
   const showTokens = expertMode
   const showCost = expertMode && isInstanceAdmin
+  const { isUserOnline } = useStarshipPresence(starshipId, Boolean(starshipId))
 
   // Fetch conversation detail directly (avoids pagination gaps in starship conversation lists)
   const { data: currentConversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId)
+  const isConversationBusy = !!((currentConversation as any)?.state && typeof (currentConversation as any)?.state === 'object' && ((currentConversation as any).state as any).turnActive === true)
 
   // Direct message context (lets us display participants even when there are no messages yet)
   const { data: dmListData } = useStarshipDirectMessages(starshipId, Boolean(starshipId && conversationId))
@@ -373,14 +376,18 @@ export function ConversationSummaryBar({
             >
               <div className="flex-shrink-0" style={{ width: '1.25rem', height: '1.25rem', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: 0, pointerEvents: 'none' }}>
                 {p.kind === 'agent' ? (
-                  <div className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
-                    <AgentAvatar seed={p.seed} imageUrl={p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined} size={20} rounded />
+                  <div className="relative">
+                    <div className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+                      <AgentAvatar seed={p.seed} imageUrl={p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined} size={20} rounded />
+                    </div>
                   </div>
                 ) : (
-                  <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
-                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
-                    <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                  </Avatar>
+                  <div className="relative">
+                    <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
+                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
+                      <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                    </Avatar>
+                  </div>
                 )}
               </div>
               <span className="min-w-0 truncate">{p.label}</span>
@@ -501,16 +508,20 @@ export function ConversationSummaryBar({
                                   if (p.kind === 'agent') {
                                     const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                                     return (
-                                      <div key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
+                                      <div key={p.key} className="relative h-5 w-5">
+                                        <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                          <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
+                                        </div>
                                       </div>
                                     )
                                   }
                                   return (
-                                    <Avatar key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                    </Avatar>
+                                    <div key={p.key} className="relative h-5 w-5">
+                                      <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                        {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                      </Avatar>
+                                    </div>
                                   )
                                 })}
                               </div>
@@ -690,16 +701,20 @@ export function ConversationSummaryBar({
                               if (p.kind === 'agent') {
                                 const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                                 return (
-                                  <div key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                    <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
-                                  </div>
+                                    <div key={p.key} className="relative h-5 w-5">
+                                      <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
+                                      </div>
+                                    </div>
                                 )
                               }
                               return (
-                                <Avatar key={p.key} className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                  {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                                  <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                                </Avatar>
+                                  <div key={p.key} className="relative h-5 w-5">
+                                    <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                    </Avatar>
+                                  </div>
                               )
                             })}
                           </div>

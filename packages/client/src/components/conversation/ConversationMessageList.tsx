@@ -29,6 +29,8 @@ import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useModelContextLength } from '@/hooks/useLlmModels'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 
 type TurnUsageForRing = {
   turnId: string
@@ -48,6 +50,7 @@ function AgentAvatarWithTurnUsageRing({
   rounded,
   usage,
   enabled,
+  busy,
   className,
 }: {
   seed: string
@@ -58,6 +61,7 @@ function AgentAvatarWithTurnUsageRing({
   rounded?: boolean
   usage?: TurnUsageForRing | null
   enabled: boolean
+  busy?: boolean
   className?: string
 }) {
   const modelId =
@@ -86,8 +90,7 @@ function AgentAvatarWithTurnUsageRing({
   const pct = pctTurnVsCtx ?? pctTurnVsMax
   const offset = pct == null ? c : c * (1 - pct / 100)
 
-  const ringClass =
-    pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 50 ? 'text-orange-500' : 'text-yellow-500'
+  const ringClass = pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 50 ? 'text-orange-500' : 'text-yellow-500'
   const title = (() => {
     if (!enabled || pct == null) return undefined
     if (pctTurnVsCtx != null && ctx) {
@@ -105,8 +108,14 @@ function AgentAvatarWithTurnUsageRing({
 
   if (!enabled || !usage || pct == null) {
     return (
-      <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden', className)} style={{ width: size, height: size }}>
-        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      <div className={cn('relative flex-shrink-0', className)} style={{ width: size, height: size }}>
+        <div className="relative w-full h-full">
+          <div className="w-full h-full rounded-full bg-muted flex items-center justify-center overflow-hidden">
+            <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+          </div>
+          {/* Align to the avatar box (not an outer wrapper) */}
+          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} />
+        </div>
       </div>
     )
   }
@@ -130,8 +139,14 @@ function AgentAvatarWithTurnUsageRing({
           className={ringClass}
         />
       </svg>
-      <div className="absolute inset-[3px] rounded-full bg-muted flex items-center justify-center overflow-hidden">
-        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      {/* Anchor the indicator to the inner avatar box (inset), not the outer ring box */}
+      <div className="absolute inset-[3px]">
+        <div className="relative w-full h-full">
+          <div className="w-full h-full rounded-full bg-muted flex items-center justify-center overflow-hidden">
+            <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+          </div>
+          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} />
+        </div>
       </div>
     </div>
   )
@@ -144,6 +159,7 @@ function LinkedConversationCard({
   onThreadAction,
   message,
   starshipId,
+  isUserOnline,
 }: {
   linkedConversationId: string | null
   linkedConversationHref: string | null
@@ -151,10 +167,12 @@ function LinkedConversationCard({
   onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
   message: MessageModel
   starshipId?: string
+  isUserOnline?: (userId: string) => boolean
 }) {
   const { data: conversation } = useConversationDetail(linkedConversationId)
   const { data: agents = [] } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
+  const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
   const title = rawTitle || (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
@@ -253,10 +271,12 @@ function LinkedConversationCard({
                   )
                 }
                 return (
-                  <Avatar key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                    <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                  </Avatar>
+                  <div key={p.key} className="h-7 w-7">
+                    <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                    </Avatar>
+                  </div>
                 )
               })}
               {participantItems.length > 4 && (
@@ -315,10 +335,7 @@ interface ConversationMessageListProps {
    * - For agent DMs, pass `{ kind: 'agent', seed, avatarAttachmentId }` to show the agent avatar.
    * - For user DMs, pass `{ kind: 'human', avatarUrl }` to show the peer avatar.
    */
-  emptyHeroParticipantOverride?:
-    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
-    | { kind: 'human'; label: string; avatarUrl?: string | null }
-    | null
+  emptyHeroParticipantOverride?: { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null } | { kind: 'human'; label: string; avatarUrl?: string | null } | null
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
@@ -440,6 +457,8 @@ export function ConversationMessageList({
   const activeTurnId = typeof (stream as any)?.turnId === 'string' ? String((stream as any).turnId) : null
   const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null
   const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
+  const presence = useStarshipPresence(String(starshipId || ''), Boolean(starshipId))
+  const isConversationBusy = !isTerminalTurnStatus && (activeTurnStatus === 'active' || activeTurnStatus === 'waiting_for_tools') && (isResponding || isAssistantStreaming || isAwaitingToolResults)
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
@@ -482,10 +501,7 @@ export function ConversationMessageList({
     if (dm?.dmType === 'user_user') {
       const peer: any = (dmItem as any)?.peerUser
       const peerId = typeof peer?.id === 'string' ? String(peer.id).trim() : ''
-      const label =
-        (typeof peer?.displayName === 'string' && peer.displayName.trim()) ||
-        (typeof peer?.email === 'string' && peer.email.trim()) ||
-        (peerId ? `User ${peerId.slice(0, 6)}` : 'User')
+      const label = (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${peerId.slice(0, 6)}` : 'User')
       const avatarUrl = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
       return { kind: 'human' as const, label, avatarUrl }
     }
@@ -538,9 +554,7 @@ export function ConversationMessageList({
   }, [conversationAgents])
 
   const agentAvatarAttachmentIds = useMemo(() => {
-    const ids = conversationAgents
-      .map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : ''))
-      .filter(Boolean)
+    const ids = conversationAgents.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
     return Array.from(new Set(ids))
   }, [conversationAgents])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
@@ -614,7 +628,7 @@ export function ConversationMessageList({
   const submittedQuery = submittedQueryProp ?? ''
   const highlightTerm = submittedQuery.trim() || undefined
   // Normalize query by stripping markdown so "The last **Avatar** movie" matches content "The last Avatar movie".
-  const normalizedHighlightTerm = highlightTerm ? (stripMarkdownToPlainText(highlightTerm).trim() || undefined) : undefined
+  const normalizedHighlightTerm = highlightTerm ? stripMarkdownToPlainText(highlightTerm).trim() || undefined : undefined
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -1280,7 +1294,8 @@ export function ConversationMessageList({
                   (agent ? (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') : '') ||
                   (agent ? (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') : '') ||
                   (mid ? `Agent ${mid.slice(0, 6)}` : '') ||
-                  (fallbackAgentDisplayName || 'Assistant')
+                  fallbackAgentDisplayName ||
+                  'Assistant'
                 return (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
               })()
             : undefined,
@@ -1458,6 +1473,7 @@ export function ConversationMessageList({
             ) : null}
             {renderMessages.map((message, idx) => {
               const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
+              const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
               const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
               const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
               const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
@@ -1472,9 +1488,32 @@ export function ConversationMessageList({
                 // Backward-compat: treat unknown human author as the same person.
                 return 'unknown'
               }
+              const assistantKey = (m: any): string | null => {
+                if (!m || String(m?.role ?? '') !== 'assistant') return null
+                // Don't treat tool_result rows as part of an assistant "turn" for spacing.
+                if (String(m?.messageType ?? '') === 'tool_result') return null
+                const turnId = typeof m?.turnId === 'string' ? String(m.turnId).trim() : ''
+                if (turnId) return `turn:${turnId}`
+                const agentId = typeof m?.agentId === 'string' ? String(m.agentId).trim() : ''
+                if (agentId) return `agent:${agentId}`
+                const agentName = typeof m?.agentName === 'string' ? String(m.agentName).trim() : ''
+                if (agentName) return `name:${agentName}`
+                return 'unknown'
+              }
               const prevUserKey = prev ? userKey(prev) : null
               const currUserKey = userKey(message)
+              const nextUserKey = next ? userKey(next) : null
               const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
+              const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey)
+              // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
+              // message chrome so the spacing/padding is consistent (including the first message in the run).
+              const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
+              const prevAssistantKey = prev ? assistantKey(prev) : null
+              const currAssistantKey = assistantKey(message)
+              const nextAssistantKey = next ? assistantKey(next) : null
+              const isConsecutiveAssistant = Boolean(currAssistantKey && prevAssistantKey && currAssistantKey === prevAssistantKey)
+              const isNextConsecutiveAssistant = Boolean(currAssistantKey && nextAssistantKey && currAssistantKey === nextAssistantKey)
+              const compactAssistantGroup = Boolean(currAssistantKey && (isConsecutiveAssistant || isNextConsecutiveAssistant))
               const startsNewGroup = (() => {
                 if (!prev) return false
                 if (message.role === 'assistant') return Boolean(showAssistantAvatar)
@@ -1513,6 +1552,8 @@ export function ConversationMessageList({
                       onThreadAction={handleThreadAction}
                       showAssistantAvatar={showAssistantAvatar}
                       isConsecutiveUser={isConsecutiveUser}
+                      compactUserGroup={compactUserGroup}
+                      compactAssistantGroup={compactAssistantGroup}
                       startsNewGroup={startsNewGroup}
                       isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
                       suppressLinkedConversationCard={suppressLinkedConversationCard}
@@ -1526,26 +1567,27 @@ export function ConversationMessageList({
                       sizeVariant={sizeVariant}
                       highlightTerm={normalizedHighlightTerm}
                       expertMode={expertMode}
-                      turnUsage={
-                        (() => {
-                          if (!expertMode) return null
-                          if (message.role !== 'assistant') return null
-                          const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
-                          if (!tid) return null
-                          const raw = (turnUsageByTurnId?.[tid] ?? null) as any
-                          if (!raw) return null
-                          // Avoid showing partial/in-progress usage for the currently active turn.
-                          // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
-                          // Robust gating:
-                          // - Prefer terminal turn status when we have it.
-                          // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
-                          //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
-                          //   In that case, allow the ring to render once `isResponding` is false.
-                          const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
-                          if (shouldHide) return null
-                          return raw
-                        })()
-                      }
+                      turnUsage={(() => {
+                        if (!expertMode) return null
+                        if (message.role !== 'assistant') return null
+                        const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
+                        if (!tid) return null
+                        const raw = (turnUsageByTurnId?.[tid] ?? null) as any
+                        if (!raw) return null
+                        // Avoid showing partial/in-progress usage for the currently active turn.
+                        // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
+                        // Robust gating:
+                        // - Prefer terminal turn status when we have it.
+                        // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
+                        //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
+                        //   In that case, allow the ring to render once `isResponding` is false.
+                        const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
+                        if (shouldHide) return null
+                        return raw
+                      })()}
+                      isUserOnline={presence.isUserOnline}
+                      isConversationBusy={isConversationBusy}
+                      presenceRevision={presence.dataUpdatedAt}
                     />
                     {(() => {
                       const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
@@ -1690,6 +1732,16 @@ interface ConversationMessageBubbleProps {
   showAssistantAvatar?: boolean
   /** True when the previous rendered message row was also a user message. */
   isConsecutiveUser?: boolean
+  /**
+   * When true, render user-message chrome in compact mode even if it's the first message
+   * in a multi-message user run (so the entire run stacks tightly).
+   */
+  compactUserGroup?: boolean
+  /**
+   * When true, render assistant-message chrome in compact mode even if it's the first message
+   * in a multi-message assistant run (so the entire run stacks tightly).
+   */
+  compactAssistantGroup?: boolean
   /** True when this row begins a new visual author/role group (so it should get the standard top gap). */
   startsNewGroup?: boolean
   /**
@@ -1713,6 +1765,15 @@ interface ConversationMessageBubbleProps {
   expertMode?: boolean
   /** UX-only usage for this message's turn (if available). */
   turnUsage?: TurnUsageForRing | null
+  /** Presence lookup (starship-scoped). */
+  isUserOnline?: (userId: string) => boolean
+  /** Conversation-scoped "busy" indicator (active or waiting_for_tools). */
+  isConversationBusy?: boolean
+  /**
+   * Monotonic revision to force memoized bubbles to re-render when presence changes.
+   * (e.g. TanStack Query `dataUpdatedAt` from `useStarshipPresence`).
+   */
+  presenceRevision?: number
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -1837,6 +1898,8 @@ const MemoizedMessageBubble = memo(
     onThreadAction,
     showAssistantAvatar = true,
     isConsecutiveUser = false,
+    compactUserGroup = false,
+    compactAssistantGroup = false,
     startsNewGroup = false,
     isFirstMessage = false,
     suppressLinkedConversationCard = false,
@@ -1851,10 +1914,17 @@ const MemoizedMessageBubble = memo(
     highlightTerm,
     expertMode = false,
     turnUsage,
+    isUserOnline,
+    isConversationBusy = false,
+    presenceRevision,
   }: ConversationMessageBubbleProps) {
+    void presenceRevision
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
     const avatarSize = isHero ? 40 : isDelegation ? 24 : 32
+    // Must match `AgentAvatarWithTurnUsageRing`'s `pad`.
+    // We reserve this width in expert mode so user/assistant rows share the same "avatar slot" width.
+    const usageRingPadPx = 3
     const avatarClass = isHero ? 'w-10 h-10' : isDelegation ? 'w-6 h-6' : 'w-8 h-8'
     const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
@@ -1882,6 +1952,12 @@ const MemoizedMessageBubble = memo(
       }
       return null
     }, [linkedConversationId, starshipSlug])
+
+    const avatarSlotPadPx = Boolean(expertMode) ? usageRingPadPx * 2 : 0
+    const heroAvatarSlotPx = avatarSize + avatarSlotPadPx
+    // In the normal app layout (non-hero), user avatars are rendered at 40px (w-10 h-10).
+    // Reserve the same expert-mode padding so user/assistant rows have consistent content widths.
+    const appAvatarSlotPx = 40 + avatarSlotPadPx
 
     const threadActionButton = useMemo(() => {
       if (!enableChannelMessageThreads) return null
@@ -1914,20 +1990,27 @@ const MemoizedMessageBubble = memo(
       const explicitUserAvatarUrl = userAvatarUrlOverride
       const shouldUseExplicitUserAvatar = isImageUrl(explicitUserAvatarUrl)
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
+      const messageUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : ''
+      const showUserOnline = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline?.(messageUserId))
 
       if (isHero || isDelegation) {
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
-        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3 mr-6', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
-        const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
+        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
+        // Always use the compact bubble padding (no "normal" padding mode).
+        const userBubbleClass = 'px-3 py-2'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
         return (
           <div className="flex justify-end">
-            <div className={cn('flex w-full sm:w-auto items-end max-w-full sm:max-w-[70%]', userRowClass)}>
+            <div className={cn('flex items-end w-full max-w-full', userRowClass)}>
               <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
                 <div
-                  className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}
+                  className={cn(
+                    'w-full max-w-full sm:max-w-[70%] bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative',
+                    userBubbleClass,
+                    message.sending && 'opacity-70'
+                  )}
                 >
                   <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{renderTextWithHighlight(message.content, highlightTerm)}</div>
                   {message.sending && (
@@ -1944,41 +2027,48 @@ const MemoizedMessageBubble = memo(
                     onThreadAction={onThreadAction}
                     message={message}
                     starshipId={starshipId}
+                    isUserOnline={isUserOnline}
                   />
                 )}
               </div>
               {isConsecutiveSameUser ? (
                 // Only reserve width, not height (prevents "blank gap" under short consecutive messages)
-                <div className={cn('flex-shrink-0 mt-1', avatarWidthClass)} aria-hidden="true" />
+                <div className="flex-shrink-0 mt-1" style={{ width: heroAvatarSlotPx }} aria-hidden="true" />
               ) : (
-                <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
-                  {shouldUseExplicitUserAvatar ? (
-                    <AvatarImage
-                      src={explicitUserAvatarUrl!}
-                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
-                      className="rounded-full object-cover"
-                    />
-                  ) : userAvatarSeedOverride ? (
-                    <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
-                  ) : shouldUseAuthedUserAvatar ? (
-                    <AvatarImage
-                      src={effectiveUserAvatar!}
-                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
-                      className="rounded-full object-cover"
-                    />
-                  ) : null}
-                  <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {fallbackVariant === 'user-icon' ? (
-                      <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
-                    ) : (
-                      initialsFromName(effectiveUserName || effectiveUserEmail)
-                    )}
-                  </AvatarFallback>
-                </Avatar>
+                <div className="relative flex-shrink-0 mb-1 flex items-center justify-center" style={{ width: heroAvatarSlotPx, height: heroAvatarSlotPx }}>
+                  {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
+                  <div className="relative" style={{ width: avatarSize, height: avatarSize }}>
+                    <Avatar className={cn('rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden', avatarClass)}>
+                      {shouldUseExplicitUserAvatar ? (
+                        <AvatarImage
+                          src={explicitUserAvatarUrl!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : userAvatarSeedOverride ? (
+                        <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
+                      ) : shouldUseAuthedUserAvatar ? (
+                        <AvatarImage
+                          src={effectiveUserAvatar!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : null}
+                      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                        {fallbackVariant === 'user-icon' ? (
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
+                        ) : (
+                          initialsFromName(effectiveUserName || effectiveUserEmail)
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                    <PresenceIndicator kind="online" active={showUserOnline} />
+                  </div>
+                </div>
               )}
             </div>
           </div>
@@ -1988,13 +2078,16 @@ const MemoizedMessageBubble = memo(
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
       const userProfileHref = typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
+      // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
+      // We keep the avatar visible, but overlay it so the row height is driven only by content.
+      const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
 
       return (
         <div className="flex justify-start w-full">
           <div
             className={cn(
               // Match assistant row layout: no outer vertical padding/margins (ConversationMessageContent controls spacing)
-              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
@@ -2003,36 +2096,88 @@ const MemoizedMessageBubble = memo(
           >
             {isConsecutiveSameUser ? (
               // Only reserve width, not height (prevents "inflated" spacing between short consecutive user messages)
-              <div className="flex-shrink-0 w-10 mt-1" aria-hidden="true" />
+              <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
+            ) : overlayUserAvatar ? (
+              // For compact user runs: reserve width only and overlay the avatar so it doesn't inflate row height.
+              <>
+                <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
+                <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
+                  {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
+                  <div className="relative w-10 h-10">
+                    <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
+                      {shouldUseExplicitUserAvatar ? (
+                        <AvatarImage
+                          src={explicitUserAvatarUrl!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : userAvatarSeedOverride ? (
+                        <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                      ) : shouldUseAuthedUserAvatar ? (
+                        <AvatarImage
+                          src={effectiveUserAvatar!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : null}
+                      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                        {fallbackVariant === 'user-icon' ? (
+                          <Icon
+                            name="user"
+                            iconOverride={{ type: 'phosphor', component: 'User' }}
+                            weight="bold"
+                            size={isHero ? 20 : isDelegation ? 14 : 16}
+                            className="text-primary"
+                          />
+                        ) : (
+                          initialsFromName(effectiveUserName || effectiveUserEmail)
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                    <PresenceIndicator kind="online" active={showUserOnline} />
+                  </div>
+                </div>
+              </>
             ) : (
-              <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
-                {shouldUseExplicitUserAvatar ? (
-                  <AvatarImage
-                    src={explicitUserAvatarUrl!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : userAvatarSeedOverride ? (
-                  <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-                ) : shouldUseAuthedUserAvatar ? (
-                  <AvatarImage
-                    src={effectiveUserAvatar!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : null}
-                <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                  {fallbackVariant === 'user-icon' ? (
-                    <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
-                  ) : (
-                    initialsFromName(effectiveUserName || effectiveUserEmail)
-                  )}
-                </AvatarFallback>
-              </Avatar>
+              // Normal (non-compact) rows: render avatar in-flow so it reserves height (prevents overlap with next speaker).
+              <div className="relative flex-shrink-0 mt-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
+                {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
+                <div className="relative w-10 h-10">
+                  <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
+                    {shouldUseExplicitUserAvatar ? (
+                      <AvatarImage
+                        src={explicitUserAvatarUrl!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : userAvatarSeedOverride ? (
+                      <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                    ) : shouldUseAuthedUserAvatar ? (
+                      <AvatarImage
+                        src={effectiveUserAvatar!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      {fallbackVariant === 'user-icon' ? (
+                        <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
+                      ) : (
+                        initialsFromName(effectiveUserName || effectiveUserEmail)
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <PresenceIndicator kind="online" active={showUserOnline} />
+                </div>
+              </div>
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
@@ -2050,7 +2195,8 @@ const MemoizedMessageBubble = memo(
                 extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={false}
-                compact={isConsecutiveSameUser}
+                // Always compact (no "normal" padding mode).
+                compact={true}
                 className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -2073,6 +2219,7 @@ const MemoizedMessageBubble = memo(
                   onThreadAction={onThreadAction}
                   message={message}
                   starshipId={starshipId}
+                  isUserOnline={isUserOnline}
                 />
               )}
             </div>
@@ -2090,8 +2237,7 @@ const MemoizedMessageBubble = memo(
       // When expert mode is on and we have turn usage, `AgentAvatarWithTurnUsageRing` renders an outer ring that adds padding.
       // If we don't reserve the extra width on *subsequent* messages (where the avatar is hidden), the first message in a turn
       // ends up slightly narrower.
-      const usageRingPadPx = 3 // must match `AgentAvatarWithTurnUsageRing`'s `pad`
-      const shouldReserveUsageRing = Boolean(expertMode) && Boolean(turnUsage)
+      const shouldReserveUsageRing = Boolean(expertMode)
       const assistantAvatarBasePx = isHero || isDelegation ? avatarSize : 40
       const assistantAvatarSlotPx = assistantAvatarBasePx + (shouldReserveUsageRing ? usageRingPadPx * 2 : 0)
 
@@ -2099,23 +2245,45 @@ const MemoizedMessageBubble = memo(
         const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
         return (
           <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
-            <div className={cn('flex items-start w-full', assistantGap)}>
+            <div className={cn('relative flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
-                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
-                  <AgentAvatarWithTurnUsageRing
-                    seed={agentName || 'AI'}
-                    imageUrl={agentAvatarUrl}
-                    modelIdOverride={agentModelId ?? null}
-                    tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
-                    size={avatarSize}
-                    rounded
-                    enabled={Boolean(expertMode)}
-                    usage={turnUsage}
-                    className={cn('mx-auto', avatarClass)}
-                  />
-                </div>
+                compactAssistantGroup ? (
+                  <>
+                    <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
+                    <div className="absolute left-0 top-1 flex items-center justify-center" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                      <AgentAvatarWithTurnUsageRing
+                        seed={agentName || 'AI'}
+                        imageUrl={agentAvatarUrl}
+                        modelIdOverride={agentModelId ?? null}
+                        tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                        size={avatarSize}
+                        rounded
+                        enabled={Boolean(expertMode)}
+                        usage={turnUsage}
+                        busy={Boolean(isConversationBusy)}
+                        className={cn('mx-auto', avatarClass)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                    <AgentAvatarWithTurnUsageRing
+                      seed={agentName || 'AI'}
+                      imageUrl={agentAvatarUrl}
+                      modelIdOverride={agentModelId ?? null}
+                      tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                      size={avatarSize}
+                      rounded
+                      enabled={Boolean(expertMode)}
+                      usage={turnUsage}
+                      busy={Boolean(isConversationBusy)}
+                      className={cn('mx-auto', avatarClass)}
+                    />
+                  </div>
+                )
               ) : (
-                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
+                // Only reserve width, not height, so short consecutive assistant messages stack tightly.
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
               )}
               <div className="flex-1 w-full pt-0.5">
                 <ConversationMessageContent
@@ -2126,6 +2294,8 @@ const MemoizedMessageBubble = memo(
                   extraActions={null}
                   enableLinkPreview={true}
                   isStreaming={!!isStreamingActive}
+                  // Always compact (no "normal" padding mode).
+                  compact={true}
                   className="text-foreground"
                   contentTextClass={contentTextClass}
                   chunks={message.chunks}
@@ -2149,6 +2319,7 @@ const MemoizedMessageBubble = memo(
                     onThreadAction={onThreadAction}
                     message={message}
                     starshipId={starshipId}
+                    isUserOnline={isUserOnline}
                   />
                 )}
               </div>
@@ -2161,28 +2332,50 @@ const MemoizedMessageBubble = memo(
         <div className={cn('flex justify-start w-full', isFirstMessage ? 'mt-6' : startsNewGroup ? 'mt-4' : '')}>
           <div
             className={cn(
-              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
               // Remove the outside vertical gap between consecutive message rows.
               'py-0',
               !showAssistantAvatar && '-mt-1'
             )}
           >
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
-                <AgentAvatarWithTurnUsageRing
-                  seed={agentName || 'AI'}
-                  imageUrl={agentAvatarUrl}
-                  modelIdOverride={agentModelId ?? null}
-                  tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
-                  size={40}
-                  rounded
-                  enabled={Boolean(expertMode)}
-                  usage={turnUsage}
-                  className="mx-auto"
-                />
-              </div>
+              compactAssistantGroup ? (
+                <>
+                  <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
+                  <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                    <AgentAvatarWithTurnUsageRing
+                      seed={agentName || 'AI'}
+                      imageUrl={agentAvatarUrl}
+                      modelIdOverride={agentModelId ?? null}
+                      tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                      size={40}
+                      rounded
+                      enabled={Boolean(expertMode)}
+                      usage={turnUsage}
+                      busy={Boolean(isConversationBusy)}
+                      className="mx-auto"
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                  <AgentAvatarWithTurnUsageRing
+                    seed={agentName || 'AI'}
+                    imageUrl={agentAvatarUrl}
+                    modelIdOverride={agentModelId ?? null}
+                    tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                    size={40}
+                    rounded
+                    enabled={Boolean(expertMode)}
+                    usage={turnUsage}
+                    busy={Boolean(isConversationBusy)}
+                    className="mx-auto"
+                  />
+                </div>
+              )
             ) : (
-              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
+              // Only reserve width, not height, so short consecutive assistant messages stack tightly.
+              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx }} aria-hidden="true" />
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
@@ -2204,6 +2397,8 @@ const MemoizedMessageBubble = memo(
                 extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={!!isStreamingActive}
+                // Always compact (no "normal" padding mode).
+                compact={true}
                 className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -2226,6 +2421,7 @@ const MemoizedMessageBubble = memo(
                   onThreadAction={onThreadAction}
                   message={message}
                   starshipId={starshipId}
+                  isUserOnline={isUserOnline}
                 />
               )}
             </div>
@@ -2242,6 +2438,9 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
     // Re-render when expert mode toggles, since it affects avatar ring visibility.
     if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
+    // Presence and busy indicators are independent of message content.
+    if (Boolean(prevProps.isConversationBusy) !== Boolean(nextProps.isConversationBusy)) return false
+    if (Number(prevProps.presenceRevision ?? 0) !== Number(nextProps.presenceRevision ?? 0)) return false
     {
       const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
       const nextAny = nextProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
@@ -2251,6 +2450,8 @@ const MemoizedMessageBubble = memo(
     }
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
     if (Boolean(prevProps.isConsecutiveUser) !== Boolean(nextProps.isConsecutiveUser)) return false
+    if (Boolean(prevProps.compactUserGroup) !== Boolean(nextProps.compactUserGroup)) return false
+    if (Boolean(prevProps.compactAssistantGroup) !== Boolean(nextProps.compactAssistantGroup)) return false
     if (Boolean(prevProps.startsNewGroup) !== Boolean(nextProps.startsNewGroup)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
     if (Boolean(prevProps.suppressLinkedConversationCard) !== Boolean(nextProps.suppressLinkedConversationCard)) return false
@@ -2347,15 +2548,7 @@ function EmptyState() {
   )
 }
 
-function ChannelHero({
-  channelName,
-  conversationTitle,
-  bottomAlign,
-}: {
-  channelName?: string | null
-  conversationTitle: string | null
-  bottomAlign: boolean
-}) {
+function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelName?: string | null; conversationTitle: string | null; bottomAlign: boolean }) {
   const displayName =
     (typeof channelName === 'string' && channelName.trim().length > 0 ? channelName.trim() : null) ||
     (typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : null) ||
@@ -2368,21 +2561,13 @@ function ChannelHero({
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
         <div className="flex items-start gap-4">
-          <div
-            className={cn(
-              'relative overflow-hidden flex-shrink-0',
-              sizeClassName,
-              'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center'
-            )}
-          >
+          <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
             <Icon name="hash" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
           </div>
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
-            <p className="text-muted-foreground mt-1 leading-relaxed">
-              This is the beginning of {displayHashed}. Send a message to start a conversation.
-            </p>
+            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of {displayHashed}. Send a message to start a conversation.</p>
           </div>
         </div>
       </div>
@@ -2404,10 +2589,7 @@ function DirectMessageHero({
   bottomAlign,
 }: {
   title: string | null
-  participant:
-    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
-    | { kind: 'human'; label: string; avatarUrl?: string | null }
-    | null
+  participant: { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null } | { kind: 'human'; label: string; avatarUrl?: string | null } | null
   avatarUrlByAttachmentId: Map<string, string | null | undefined>
   bottomAlign: boolean
 }) {
@@ -2421,9 +2603,7 @@ function DirectMessageHero({
   }
   const displayName =
     // Prefer agent label (includes role) when available.
-    participant?.kind === 'agent' && participant.label.trim().length > 0
-      ? normalizeDmTitle(participant.label)
-      : normalizeDmTitle(title ?? '') || 'Direct message'
+    participant?.kind === 'agent' && participant.label.trim().length > 0 ? normalizeDmTitle(participant.label) : normalizeDmTitle(title ?? '') || 'Direct message'
   return (
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
@@ -2448,10 +2628,7 @@ function DirectMessageHeroAvatar({
   participant,
   avatarUrlByAttachmentId,
 }: {
-  participant:
-    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
-    | { kind: 'human'; label: string; avatarUrl?: string | null }
-    | null
+  participant: { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null } | { kind: 'human'; label: string; avatarUrl?: string | null } | null
   avatarUrlByAttachmentId: Map<string, string | null | undefined>
 }) {
   const p = participant
@@ -2474,5 +2651,13 @@ function DirectMessageHeroAvatar({
   }
 
   const avatarUrl = typeof p.avatarUrl === 'string' ? p.avatarUrl.trim() : ''
-  return <MarketplaceAvatar imageUrl={avatarUrl || null} label={p.label} seed={p.label} sizeClassName={sizeClassName} tintClassName="bg-[radial-gradient(circle_at_30%_30%,rgba(124,58,237,0.18),transparent_60%)]" />
+  return (
+    <MarketplaceAvatar
+      imageUrl={avatarUrl || null}
+      label={p.label}
+      seed={p.label}
+      sizeClassName={sizeClassName}
+      tintClassName="bg-[radial-gradient(circle_at_30%_30%,rgba(124,58,237,0.18),transparent_60%)]"
+    />
+  )
 }

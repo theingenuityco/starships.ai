@@ -29,7 +29,6 @@ import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useModelContextLength } from '@/hooks/useLlmModels'
-import { useConversationContextUsage } from '@/hooks/useConversationContextUsage'
 
 type TurnUsageForRing = {
   turnId: string
@@ -44,20 +43,20 @@ function AgentAvatarWithTurnUsageRing({
   seed,
   imageUrl,
   modelIdOverride,
+  tokenLimitOverride,
   size,
   rounded,
   usage,
-  contextWindow,
   enabled,
   className,
 }: {
   seed: string
   imageUrl?: string
   modelIdOverride?: string | null
+  tokenLimitOverride?: number | null
   size: number
   rounded?: boolean
   usage?: TurnUsageForRing | null
-  contextWindow?: { used: number; limit: number; folded: boolean } | null
   enabled: boolean
   className?: string
 }) {
@@ -67,6 +66,9 @@ function AgentAvatarWithTurnUsageRing({
   const { contextLength } = useModelContextLength(modelId)
 
   const promptTokens = Number(usage?.usage?.promptTokens ?? 0)
+  const completionTokens = Number(usage?.usage?.completionTokens ?? 0)
+  const totalTokens = Number(usage?.usage?.totalTokens ?? 0) || Number(promptTokens) + Number(completionTokens)
+  const agentTokenLimit = typeof tokenLimitOverride === 'number' && Number.isFinite(tokenLimitOverride) && tokenLimitOverride > 0 ? tokenLimitOverride : null
   const ctx = typeof contextLength === 'number' && Number.isFinite(contextLength) && contextLength > 0 ? contextLength : null
 
   // Outer ring padding (px) around the avatar
@@ -75,98 +77,33 @@ function AgentAvatarWithTurnUsageRing({
   const stroke = 2
   const r = outer / 2 - stroke / 2
   const c = 2 * Math.PI * r
-  const windowLimitRaw = Number(contextWindow?.limit ?? 0)
-  const windowUsedRaw = Number(contextWindow?.used ?? 0)
-  const windowLimit = Number.isFinite(windowLimitRaw) && windowLimitRaw > 0 ? windowLimitRaw : 0
-  const windowUsed = Number.isFinite(windowUsedRaw) ? Math.max(0, Math.min(windowLimit || 0, windowUsedRaw)) : 0
 
-  const pctTokens = ctx && promptTokens > 0 ? Math.max(0, Math.min(100, (promptTokens / ctx) * 100)) : null
-  const pctWindow = windowLimit > 0 ? Math.max(0, Math.min(100, (windowUsed / windowLimit) * 100)) : null
-  const pct = pctTokens ?? pctWindow
+  // Preferred ring meaning:
+  // 1) Turn "tokens burned" vs agent token limit (maxTokens) when available
+  // 2) Prompt tokens vs model context length (if the model catalog provides it)
+  const pctTurn = agentTokenLimit && totalTokens > 0 ? Math.max(0, Math.min(100, (totalTokens / agentTokenLimit) * 100)) : null
+  const pctPromptVsCtx = ctx && promptTokens > 0 ? Math.max(0, Math.min(100, (promptTokens / ctx) * 100)) : null
+  const pct = pctTurn ?? pctPromptVsCtx
   const offset = pct == null ? c : c * (1 - pct / 100)
 
   const ringClass =
     pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 75 ? 'text-orange-500' : 'text-primary'
   const title = (() => {
     if (!enabled || pct == null) return undefined
-    if (pctTokens != null && ctx) {
-      return `${promptTokens.toLocaleString()}/${ctx.toLocaleString()} prompt tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
-        typeof usage?.usage?.totalTokens === 'number' ? ` • ${Number(usage.usage.totalTokens).toLocaleString()} total` : ''
-      }${typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''}`
+    if (pctTurn != null && agentTokenLimit) {
+      return `${totalTokens.toLocaleString()}/${agentTokenLimit.toLocaleString()} turn tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
+        typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''
+      }`
     }
-    if (pctWindow != null) {
-      const folded = Boolean(contextWindow?.folded)
-      return `${windowUsed.toLocaleString()}/${windowLimit.toLocaleString()} context messages (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${folded ? ' • history summarized' : ''}`
+    if (pctPromptVsCtx != null && ctx) {
+      return `${promptTokens.toLocaleString()}/${ctx.toLocaleString()} prompt tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
+        typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''
+      }`
     }
     return undefined
   })()
 
-  // #region agent log (hypothesis D/E)
-  useEffect(() => {
-    try {
-      if (!enabled) return
-      if (typeof window === 'undefined') return
-      const w = window as any
-      w.__dbg_turnRing_effect_seen ??= {}
-      const key = `${usage?.turnId || 'no-turn'}:${String(modelId || 'no-model')}:${String(ctx || 'no-ctx')}:${String(promptTokens || 0)}`
-      if (w.__dbg_turnRing_effect_seen[key]) return
-      w.__dbg_turnRing_effect_seen[key] = 1
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'ring-pre',
-          hypothesisId: 'D/E',
-          location: 'ConversationMessageList.tsx:AgentAvatarWithTurnUsageRing(useEffect)',
-          message: 'ring_state_change',
-          data: { enabled, hasUsage: Boolean(usage), turnId: usage?.turnId ?? null, modelId, ctx, promptTokens, pct },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-    } catch {}
-  }, [enabled, usage?.turnId, modelId, ctx, promptTokens, pct])
-  // #endregion
-
-  // #region agent log (hypothesis A/B/D/E)
-  try {
-    if (enabled && typeof window !== 'undefined') {
-      const w = window as any
-      w.__dbg_turnRing_seen ??= {}
-      const key = `${usage?.turnId || 'no-turn'}:${String(modelId || 'no-model')}:${String(seed || 'no-seed')}`
-      if (!w.__dbg_turnRing_seen[key]) {
-        w.__dbg_turnRing_seen[key] = 1
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'ring-pre',
-            hypothesisId: 'A/B/D/E',
-            location: 'ConversationMessageList.tsx:AgentAvatarWithTurnUsageRing',
-            message: 'ring_compute',
-            data: {
-              enabled,
-              hasUsage: Boolean(usage),
-              turnId: usage?.turnId || null,
-              modelFromUsage: typeof usage?.model === 'string' ? usage.model : null,
-              modelIdOverride: typeof modelIdOverride === 'string' ? modelIdOverride : modelIdOverride ?? null,
-              modelId,
-              contextLength: ctx,
-              promptTokens,
-              pct,
-              contextWindow: contextWindow ? { used: windowUsed, limit: windowLimit, folded: Boolean(contextWindow.folded) } : null,
-              wouldRenderRing: Boolean(enabled && pct != null && (Boolean(ctx && pctTokens != null) || Boolean(windowLimit > 0 && pctWindow != null))),
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-      }
-    }
-  } catch {}
-  // #endregion
-
-  if (!enabled || pct == null) {
+  if (!enabled || !usage || pct == null) {
     return (
       <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden', className)} style={{ width: size, height: size }}>
         <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
@@ -500,76 +437,6 @@ export function ConversationMessageList({
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
   const turnUsageByTurnId = (stream as any)?.turnUsageByTurnId as Record<string, any> | undefined
   const expertMode = useUserPreferencesStore(s => s.expertMode)
-  const { data: ctxUsage } = useConversationContextUsage(expertMode ? (conversationId ?? null) : null, { limit: 30, enabled: Boolean(expertMode && conversationId) })
-  const ctxWindowForRing = useMemo(() => {
-    const limit = typeof (ctxUsage as any)?.limit === 'number' ? Number((ctxUsage as any).limit) : 0
-    const used = typeof (ctxUsage as any)?.messageCount === 'number' ? Number((ctxUsage as any).messageCount) : 0
-    const folded = Boolean((ctxUsage as any)?.hasMoreBefore)
-    if (!Number.isFinite(limit) || limit <= 0) return null
-    return { used: Math.max(0, Math.min(limit, Number.isFinite(used) ? used : 0)), limit, folded }
-  }, [ctxUsage])
-  // #region agent log (hypothesis B/C)
-  useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return
-      const w = window as any
-      w.__dbg_convList_effect_seen ??= {}
-      const msgCount = Array.isArray(messages) ? messages.length : 0
-      if (msgCount <= 0) return
-      const anyAssistant = Array.isArray(messages) ? (messages as any[]).find(m => m?.role === 'assistant') : null
-      const anyTurnId = typeof anyAssistant?.turnId === 'string' ? String(anyAssistant.turnId) : null
-      const key = `${msgCount}:${String(anyTurnId || 'no-turn')}:${turnUsageByTurnId ? Object.keys(turnUsageByTurnId).length : 0}:${String(expertMode)}`
-      if (w.__dbg_convList_effect_seen[key]) return
-      w.__dbg_convList_effect_seen[key] = 1
-      fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          sessionId: 'debug-session',
-          runId: 'ring-pre',
-          hypothesisId: 'B/C',
-          location: 'ConversationMessageList.tsx:ConversationMessageList(useEffect)',
-          message: 'messages_present',
-          data: {
-            expertMode,
-            messageCount: msgCount,
-            sampleAssistantTurnId: anyTurnId,
-            turnUsageKeyCount: turnUsageByTurnId ? Object.keys(turnUsageByTurnId).length : 0,
-          },
-          timestamp: Date.now(),
-        }),
-      }).catch(() => {})
-    } catch {}
-  }, [expertMode, messages, turnUsageByTurnId])
-  // #endregion
-  // #region agent log (hypothesis A/B)
-  try {
-    if (typeof window !== 'undefined') {
-      const w = window as any
-      if (!w.__dbg_convList_once) {
-        w.__dbg_convList_once = 1
-        fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            sessionId: 'debug-session',
-            runId: 'ring-pre',
-            hypothesisId: 'A/B',
-            location: 'ConversationMessageList.tsx:ConversationMessageList',
-            message: 'stream_state',
-            data: {
-              expertMode,
-              hasStream: Boolean(stream),
-              messageCount: Array.isArray(messages) ? messages.length : null,
-              turnUsageKeys: turnUsageByTurnId ? Object.keys(turnUsageByTurnId).slice(0, 10) : [],
-            },
-            timestamp: Date.now(),
-          }),
-        }).catch(() => {})
-      }
-    }
-  } catch {}
-  // #endregion
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
@@ -701,7 +568,11 @@ export function ConversationMessageList({
       const avatarUrl = agentAvatarUrlOverride ?? (avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) : undefined)
 
       const model = typeof (agent as any)?.model === 'string' ? String((agent as any).model).trim() : ''
-      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl, modelId: model || undefined }
+      const maxTokensRaw = (agent as any)?.maxTokens ?? (agent as any)?.state?.maxTokens
+      const maxTokensNum = typeof maxTokensRaw === 'number' ? maxTokensRaw : typeof maxTokensRaw === 'string' ? Number(maxTokensRaw) : NaN
+      const maxTokens = Number.isFinite(maxTokensNum) && maxTokensNum > 0 ? maxTokensNum : undefined
+
+      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl, modelId: model || undefined, maxTokens }
     },
     [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
   )
@@ -1631,6 +1502,7 @@ export function ConversationMessageList({
                       starshipSlug={starshipSlug}
                       agentAvatarUrl={assistant?.avatarUrl}
                       agentModelId={assistant?.modelId}
+                      agentMaxTokens={assistant?.maxTokens}
                       isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                       starshipId={starshipId}
                       enableChannelMessageThreads={enableChannelMessageThreads}
@@ -1655,7 +1527,6 @@ export function ConversationMessageList({
                           ? ((turnUsageByTurnId?.[String((message as any).turnId)] ?? null) as any)
                           : null
                       }
-                      contextWindow={expertMode ? ctxWindowForRing : null}
                     />
                     {(() => {
                       const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
@@ -1791,6 +1662,8 @@ interface ConversationMessageBubbleProps {
   agentAvatarUrl?: string
   /** Agent configured model id (fallback when provider usage omits model). */
   agentModelId?: string
+  /** Agent maxTokens (internal per-turn budget / cap). */
+  agentMaxTokens?: number
   isStreamingActive?: boolean
   starshipId?: string
   enableChannelMessageThreads?: boolean
@@ -1821,8 +1694,6 @@ interface ConversationMessageBubbleProps {
   expertMode?: boolean
   /** UX-only usage for this message's turn (if available). */
   turnUsage?: TurnUsageForRing | null
-  /** Context-window usage (matches server context policy). */
-  contextWindow?: { used: number; limit: number; folded: boolean } | null
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -1940,6 +1811,7 @@ const MemoizedMessageBubble = memo(
     starshipSlug,
     agentAvatarUrl,
     agentModelId,
+    agentMaxTokens,
     isStreamingActive,
     starshipId,
     enableChannelMessageThreads = false,
@@ -1960,7 +1832,6 @@ const MemoizedMessageBubble = memo(
     highlightTerm,
     expertMode = false,
     turnUsage,
-    contextWindow,
   }: ConversationMessageBubbleProps) {
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
@@ -2208,11 +2079,11 @@ const MemoizedMessageBubble = memo(
                     seed={agentName || 'AI'}
                     imageUrl={agentAvatarUrl}
                     modelIdOverride={agentModelId ?? null}
+                    tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
                     size={avatarSize}
                     rounded
                     enabled={Boolean(expertMode)}
                     usage={turnUsage}
-                    contextWindow={contextWindow}
                     className={cn('mx-auto', avatarClass)}
                   />
                 </div>
@@ -2275,11 +2146,11 @@ const MemoizedMessageBubble = memo(
                   seed={agentName || 'AI'}
                   imageUrl={agentAvatarUrl}
                   modelIdOverride={agentModelId ?? null}
+                  tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
                   size={40}
                   rounded
                   enabled={Boolean(expertMode)}
                   usage={turnUsage}
-                  contextWindow={contextWindow}
                   className="w-10 h-10"
                 />
               </div>

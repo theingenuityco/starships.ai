@@ -183,8 +183,8 @@ export class LLM extends BaseNode<LlmParams> {
     for (let i = 0; i < args.messages.length; i++) {
       const m = args.messages[i] as Record<string, unknown>;
       const role = typeof m?.role === 'string' ? m.role : 'unknown';
-      const name = typeof (m as { name?: unknown })?.name === 'string' ? String((m as any).name) : '';
-      const toolCallId = typeof (m as { tool_call_id?: unknown })?.tool_call_id === 'string' ? String((m as any).tool_call_id) : '';
+      const name = typeof m['name'] === 'string' ? String(m['name']) : '';
+      const toolCallId = typeof m['tool_call_id'] === 'string' ? String(m['tool_call_id']) : '';
       const headerParts = [`#${i + 1}`, role];
       if (name) headerParts.push(`name=${name}`);
       if (toolCallId) headerParts.push(`tool_call_id=${toolCallId}`);

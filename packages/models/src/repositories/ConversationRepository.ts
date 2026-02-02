@@ -107,7 +107,7 @@ export class ConversationRepository extends BaseRepository {
    * Atomically merge a partial state patch into conversation.state (JSONB) in the database.
    *
    * This avoids race conditions where multiple processes read-modify-write `state` concurrently
-   * (e.g. background summarizer updating `contextSummary*` while the main server persists other
+   * (e.g. background summarizer updating summary fields while the main server persists other
    * execution state keys).
    *
    * Note: This performs a shallow JSONB merge at the top level: `state = state || patch`.

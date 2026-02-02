@@ -111,12 +111,6 @@ export function extractPersistableState(executionState: Record<string, unknown> 
     'modalities',
     'imageConfig',
     'plugins',
-    // Conversation summarization/memory is managed by the server (and/or background workers),
-    // not by arbitrary agent executions. Keep these keys ephemeral to prevent accidental drift.
-    'contextSummary',
-    'contextSummaryBefore',
-    'contextSummaryUpdatedAt',
-    'contextSummaryVersion',
   ]);
 
   // Blacklist: Store everything except messages, tools, and plugins

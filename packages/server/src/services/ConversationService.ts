@@ -1233,16 +1233,81 @@ export class ConversationService {
    * This is designed to keep LLM input bounded: we send last-N raw messages plus this summary
    * for all older history (maintained asynchronously by a background worker).
    */
-  private buildConversationSummarySystemPrompt(conversationState: ConversationState | undefined): string {
-    const summary = typeof conversationState?.contextSummary === 'string' ? conversationState.contextSummary.trim() : '';
-    if (!summary) return '';
+  private toIso(v: unknown): string {
+    if (v == null) return '';
+    if (v instanceof Date) return v.toISOString();
+    if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+    if (typeof v === 'string') {
+      const t = Date.parse(v);
+      return Number.isFinite(t) ? new Date(t).toISOString() : v;
+    }
+    try {
+      const s = String(v);
+      const t = Date.parse(s);
+      return Number.isFinite(t) ? new Date(t).toISOString() : s;
+    } catch {
+      return '';
+    }
+  }
+
+  private async getConversationSummaryRecord(conversationId: string): Promise<{
+    summary: string;
+    summaryBeforeCreatedAt: string | null;
+    summaryBeforeMessageId: string | null;
+    updatedAt: string | null;
+    version: number;
+  } | null> {
+    try {
+      const conn = getConnection();
+      const row = await conn.queryOne<{
+        summary: string;
+        summary_before_created_at: unknown | null;
+        summary_before_message_id: string | null;
+        updated_at: unknown;
+        version: number;
+      }>(
+        `
+          SELECT
+            summary,
+            summary_before_created_at,
+            summary_before_message_id,
+            updated_at,
+            version
+          FROM conversation_summaries
+          WHERE conversation_id = $1
+          LIMIT 1
+        `,
+        [conversationId]
+      );
+      if (!row) return null;
+      return {
+        summary: typeof row.summary === 'string' ? row.summary : '',
+        summaryBeforeCreatedAt: row.summary_before_created_at ? this.toIso(row.summary_before_created_at) : null,
+        summaryBeforeMessageId: typeof row.summary_before_message_id === 'string' && row.summary_before_message_id ? row.summary_before_message_id : null,
+        updatedAt: row.updated_at ? this.toIso(row.updated_at) : null,
+        version: typeof row.version === 'number' ? row.version : 0,
+      };
+    } catch {
+      return null;
+    }
+  }
+
+  private buildConversationSummarySystemPrompt(args: {
+    summaryRecord: {
+      summary: string;
+      summaryBeforeCreatedAt: string | null;
+      summaryBeforeMessageId: string | null;
+    } | null;
+  }): string {
+    const raw = args.summaryRecord && typeof args.summaryRecord.summary === 'string' ? args.summaryRecord.summary.trim() : '';
+    if (!raw) return '';
 
     const maxChars = 5000;
-    const clipped = summary.length > maxChars ? summary.slice(0, maxChars) + '\n\n[...summary truncated...]' : summary;
+    const clipped = raw.length > maxChars ? raw.slice(0, maxChars) + '\n\n[...summary truncated...]' : raw;
 
-    const before = conversationState?.contextSummaryBefore;
-    const createdAt = typeof before?.createdAt === 'string' ? before.createdAt : '';
-    const id = typeof before?.id === 'string' ? before.id : '';
+    const createdAt = args.summaryRecord?.summaryBeforeCreatedAt || '';
+    const id = args.summaryRecord?.summaryBeforeMessageId || '';
+
     const cursorLine =
       createdAt && id
         ? `Covers messages strictly before cursor: createdAt=${createdAt} id=${id}`
@@ -1624,6 +1689,7 @@ export class ConversationService {
     // Load conversation state for context - reload conversation to get latest state
     const latestConversation = await this.getConversationById(data.conversationId);
     const conversationState = (latestConversation?.state || {}) as ConversationState;
+    const conversationSummaryRecord = await this.getConversationSummaryRecord(data.conversationId);
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
     if (!noAgentToRun) {
@@ -1713,7 +1779,9 @@ export class ConversationService {
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-        const conversationSummaryBlock = this.buildConversationSummarySystemPrompt(conversationState);
+        const conversationSummaryBlock = this.buildConversationSummarySystemPrompt({
+          summaryRecord: conversationSummaryRecord,
+        });
         if (conversationSummaryBlock) {
           // Debugging aid: log the summary block that will be injected into the LLM system prompt.
           // Note: This may include user-provided content; keep the preview clipped to avoid overly noisy logs.
@@ -1728,15 +1796,12 @@ export class ConversationService {
               starshipId: starship.id,
               agentId: agentModel.id,
               summaryChars: conversationSummaryBlock.length,
-              contextSummaryVersion:
-                typeof (conversationState as ConversationState | undefined)?.contextSummaryVersion === 'number'
-                  ? (conversationState as ConversationState).contextSummaryVersion
+              summaryVersion: conversationSummaryRecord?.version,
+              summaryUpdatedAt: conversationSummaryRecord?.updatedAt,
+              summaryBefore:
+                conversationSummaryRecord?.summaryBeforeCreatedAt && conversationSummaryRecord?.summaryBeforeMessageId
+                  ? { createdAt: conversationSummaryRecord.summaryBeforeCreatedAt, id: conversationSummaryRecord.summaryBeforeMessageId }
                   : undefined,
-              contextSummaryUpdatedAt:
-                typeof (conversationState as ConversationState | undefined)?.contextSummaryUpdatedAt === 'string'
-                  ? (conversationState as ConversationState).contextSummaryUpdatedAt
-                  : undefined,
-              contextSummaryBefore: (conversationState as ConversationState | undefined)?.contextSummaryBefore,
             });
             console.log(preview);
           } catch {
@@ -2033,6 +2098,7 @@ export class ConversationService {
       const conversationState = (
         conversation.state && typeof conversation.state === 'object' ? conversation.state : {}
       ) as ConversationState;
+      const conversationSummaryRecord = await this.getConversationSummaryRecord(conversationId);
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
@@ -2048,13 +2114,15 @@ export class ConversationService {
       // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
       const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
       void _agentPluginsContinue;
-      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState;
+      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
       void _conversationPluginsContinue;
 
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-      const conversationSummaryBlock = this.buildConversationSummarySystemPrompt(conversationState);
+      const conversationSummaryBlock = this.buildConversationSummarySystemPrompt({
+        summaryRecord: conversationSummaryRecord,
+      });
       if (conversationSummaryBlock) {
         // Debugging aid: log the summary block that will be injected into the LLM system prompt.
         // Note: This may include user-provided content; keep the preview clipped to avoid overly noisy logs.
@@ -2069,15 +2137,12 @@ export class ConversationService {
             starshipId: starship.id,
             agentId: agentModel.id,
             summaryChars: conversationSummaryBlock.length,
-            contextSummaryVersion:
-              typeof (conversationState as ConversationState | undefined)?.contextSummaryVersion === 'number'
-                ? (conversationState as ConversationState).contextSummaryVersion
+            summaryVersion: conversationSummaryRecord?.version,
+            summaryUpdatedAt: conversationSummaryRecord?.updatedAt,
+            summaryBefore:
+              conversationSummaryRecord?.summaryBeforeCreatedAt && conversationSummaryRecord?.summaryBeforeMessageId
+                ? { createdAt: conversationSummaryRecord.summaryBeforeCreatedAt, id: conversationSummaryRecord.summaryBeforeMessageId }
                 : undefined,
-            contextSummaryUpdatedAt:
-              typeof (conversationState as ConversationState | undefined)?.contextSummaryUpdatedAt === 'string'
-                ? (conversationState as ConversationState).contextSummaryUpdatedAt
-                : undefined,
-            contextSummaryBefore: (conversationState as ConversationState | undefined)?.contextSummaryBefore,
           });
           console.log(preview);
         } catch {
@@ -3466,7 +3531,7 @@ export class ConversationService {
             const evolvedState = this.extractPersistableState(execution.state);
             if (evolvedState) {
               // Atomically merge state patch in DB to avoid clobbering concurrent writers
-              // (e.g. background conversation summarizer updating contextSummary* fields).
+              // (e.g. background conversation summarizer updating summary fields).
               // Plugins are never in evolvedState due to blacklist; this preserves conversation-level plugins.
               await this.conversationRepository.mergeState(conversationId, evolvedState);
             }

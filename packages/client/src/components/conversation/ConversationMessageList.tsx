@@ -1473,6 +1473,7 @@ export function ConversationMessageList({
             ) : null}
             {renderMessages.map((message, idx) => {
               const prev = idx > 0 ? (renderMessages[idx - 1] as ExtendedMessage) : null
+              const next = idx < renderMessages.length - 1 ? (renderMessages[idx + 1] as ExtendedMessage) : null
               const showAssistantAvatar = message.role !== 'assistant' ? true : !(prev && prev.role === 'assistant')
               const pinnedId = typeof (pinnedFirstMessage as any)?.id === 'string' ? String((pinnedFirstMessage as any).id).trim() : ''
               const suppressLinkedConversationCard = Boolean(pinnedId && String(message.id) === pinnedId)
@@ -1489,7 +1490,12 @@ export function ConversationMessageList({
               }
               const prevUserKey = prev ? userKey(prev) : null
               const currUserKey = userKey(message)
+              const nextUserKey = next ? userKey(next) : null
               const isConsecutiveUser = Boolean(currUserKey && prevUserKey && currUserKey === prevUserKey)
+              const isNextConsecutiveUser = Boolean(currUserKey && nextUserKey && currUserKey === nextUserKey)
+              // When a user "turn" spans multiple messages, render *all* messages in that run using the compact
+              // message chrome so the spacing/padding is consistent (including the first message in the run).
+              const compactUserGroup = Boolean(currUserKey && (isConsecutiveUser || isNextConsecutiveUser))
               const startsNewGroup = (() => {
                 if (!prev) return false
                 if (message.role === 'assistant') return Boolean(showAssistantAvatar)
@@ -1528,6 +1534,7 @@ export function ConversationMessageList({
                       onThreadAction={handleThreadAction}
                       showAssistantAvatar={showAssistantAvatar}
                       isConsecutiveUser={isConsecutiveUser}
+                      compactUserGroup={compactUserGroup}
                       startsNewGroup={startsNewGroup}
                       isFirstMessage={isFirstMessage && message.role === 'assistant' && message.messageType !== 'tool_result'}
                       suppressLinkedConversationCard={suppressLinkedConversationCard}
@@ -1706,6 +1713,11 @@ interface ConversationMessageBubbleProps {
   showAssistantAvatar?: boolean
   /** True when the previous rendered message row was also a user message. */
   isConsecutiveUser?: boolean
+  /**
+   * When true, render user-message chrome in compact mode even if it's the first message
+   * in a multi-message user run (so the entire run stacks tightly).
+   */
+  compactUserGroup?: boolean
   /** True when this row begins a new visual author/role group (so it should get the standard top gap). */
   startsNewGroup?: boolean
   /**
@@ -1862,6 +1874,7 @@ const MemoizedMessageBubble = memo(
     onThreadAction,
     showAssistantAvatar = true,
     isConsecutiveUser = false,
+    compactUserGroup = false,
     startsNewGroup = false,
     isFirstMessage = false,
     suppressLinkedConversationCard = false,
@@ -2039,24 +2052,28 @@ const MemoizedMessageBubble = memo(
       // User message: Render using the same engine as assistant messages (no bubble) - app layout
       const userDisplayName = (effectiveUserName || effectiveUserEmail || 'You').trim()
       const userProfileHref = typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? `/ship/${encodeURIComponent(starshipSlug)}/settings/my-profile` : '/profile'
+      // When a user run is "compact" (multi-message turn), don't let the avatar height inflate the first row.
+      // We keep the avatar visible, but overlay it so the row height is driven only by content.
+      const overlayUserAvatar = Boolean(compactUserGroup && !isConsecutiveSameUser)
 
       return (
         <div className="flex justify-start w-full">
           <div
             className={cn(
               // Match assistant row layout: no outer vertical padding/margins (ConversationMessageContent controls spacing)
-              'group flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
+              'group relative flex flex-1 min-w-0 items-start gap-3 w-full max-w-full rounded-lg pl-2 pr-[var(--conversation-right-gutter)] -mx-2',
               'py-0',
               // Keep a little top spacing when a user message starts a conversation chunk
               // (No negative margins; we handle tight stacking by not reserving avatar height below.)
               isConsecutiveSameUser ? 'mt-0' : 'mt-4'
             )}
           >
-            {isConsecutiveSameUser ? (
-              // Only reserve width, not height (prevents "inflated" spacing between short consecutive user messages)
-              <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
-            ) : (
-              <div className="relative flex-shrink-0 mt-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
+            {/* Avatar slot: reserve width only (never height) so short messages stack tightly. */}
+            <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
+
+            {/* Actual avatar: render in-flow for normal rows, overlay for compact user runs (first message only). */}
+            {!isConsecutiveSameUser && !overlayUserAvatar ? (
+              <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
                 {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
                 <div className="relative w-10 h-10">
                   <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
@@ -2090,7 +2107,44 @@ const MemoizedMessageBubble = memo(
                   <PresenceIndicator kind="online" active={showUserOnline} />
                 </div>
               </div>
-            )}
+            ) : null}
+
+            {!isConsecutiveSameUser && overlayUserAvatar ? (
+              <div className="absolute left-2 top-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
+                {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
+                <div className="relative w-10 h-10">
+                  <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
+                    {shouldUseExplicitUserAvatar ? (
+                      <AvatarImage
+                        src={explicitUserAvatarUrl!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : userAvatarSeedOverride ? (
+                      <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                    ) : shouldUseAuthedUserAvatar ? (
+                      <AvatarImage
+                        src={effectiveUserAvatar!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      {fallbackVariant === 'user-icon' ? (
+                        <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
+                      ) : (
+                        initialsFromName(effectiveUserName || effectiveUserEmail)
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <PresenceIndicator kind="online" active={showUserOnline} />
+                </div>
+              </div>
+            ) : null}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
                 <div className="mb-0 text-sm font-bold font-mono text-foreground">
@@ -2107,7 +2161,7 @@ const MemoizedMessageBubble = memo(
                 extraActions={threadActionButton}
                 enableLinkPreview={true}
                 isStreaming={false}
-                compact={isConsecutiveSameUser}
+                compact={Boolean(compactUserGroup)}
                 className="text-foreground/80"
                 chunks={message.chunks}
                 reasoning={message.reasoning}
@@ -2315,6 +2369,7 @@ const MemoizedMessageBubble = memo(
     }
     if ((prevProps.showAssistantAvatar ?? true) !== (nextProps.showAssistantAvatar ?? true)) return false
     if (Boolean(prevProps.isConsecutiveUser) !== Boolean(nextProps.isConsecutiveUser)) return false
+    if (Boolean(prevProps.compactUserGroup) !== Boolean(nextProps.compactUserGroup)) return false
     if (Boolean(prevProps.startsNewGroup) !== Boolean(nextProps.startsNewGroup)) return false
     if ((prevProps.isFirstMessage ?? false) !== (nextProps.isFirstMessage ?? false)) return false
     if (Boolean(prevProps.suppressLinkedConversationCard) !== Boolean(nextProps.suppressLinkedConversationCard)) return false

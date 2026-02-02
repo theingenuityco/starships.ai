@@ -237,14 +237,8 @@ export function useGenerateProfileImage() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (input: { 
-      agentId: string; 
-      type: 'problem_statements' | 'capabilities' | 'try_these_prompts' 
-    }): Promise<AgentModel> => {
-      const response: FetchResponse<ApiResponse<{ agent: AgentModel }>> = await api.post(
-        `/api/v1/agents/${input.agentId}/profile-images/generate`,
-        { type: input.type }
-      )
+    mutationFn: async (input: { agentId: string; type: 'problem_statements' | 'capabilities' | 'try_these_prompts' }): Promise<AgentModel> => {
+      const response: FetchResponse<ApiResponse<{ agent: AgentModel }>> = await api.post(`/api/v1/agents/${input.agentId}/profile-images/generate`, { type: input.type })
       return response.data.data.agent
     },
     onSuccess: (agent, variables) => {

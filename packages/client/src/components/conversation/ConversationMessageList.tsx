@@ -8,7 +8,7 @@ import type { MessageModel } from '@starships/protocol'
 import LoadingSpinner from '@/components/primitives/LoadingSpinner'
 import { useEffect, useLayoutEffect, useMemo, useRef, memo, useState, Fragment, useCallback, type ReactNode } from 'react'
 import { ConversationMessageContent } from './ConversationMessageContent'
-import { useConversationAgents, useConversationDetail } from '@/hooks/useConversations'
+import { useConversationAgents, useConversationDetail, useStarshipDirectMessages, type DirectMessageListItem } from '@/hooks/useConversations'
 import { useConversationStreamContextOptional } from '@/hooks/ConversationStreamContext'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
@@ -17,6 +17,7 @@ import { buildPlainTextSnippet, stripMarkdownToPlainText } from '@/components/co
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { cn } from '@/lib/utils'
 import { isImageUrl } from '@/lib/isImageUrl'
+import { formatAgentDisplayName, formatAgentNameWithRole } from '@/lib/agentDisplay'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { TypingDots } from '@/components/ui/TypingDots'
@@ -25,6 +26,7 @@ import { useQuery } from '@tanstack/react-query'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 
 function LinkedConversationCard({
   linkedConversationId,
@@ -194,6 +196,20 @@ interface ConversationMessageListProps {
   starshipId?: string
   /** Optional channel name when the conversation is a channel (used for empty-state hero). */
   channelName?: string | null
+  /**
+   * Optional override for the conversation title used in the empty-state hero.
+   * Primarily used for draft direct-messages (no persisted conversation yet).
+   */
+  emptyHeroTitleOverride?: string | null
+  /**
+   * Optional participant metadata for the empty-state hero (e.g. draft DM target).
+   * - For agent DMs, pass `{ kind: 'agent', seed, avatarAttachmentId }` to show the agent avatar.
+   * - For user DMs, pass `{ kind: 'human', avatarUrl }` to show the peer avatar.
+   */
+  emptyHeroParticipantOverride?:
+    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
+    | { kind: 'human'; label: string; avatarUrl?: string | null }
+    | null
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
@@ -269,6 +285,8 @@ export function ConversationMessageList({
   conversationId,
   starshipId,
   channelName,
+  emptyHeroTitleOverride,
+  emptyHeroParticipantOverride,
   bottomPaddingPx,
   className,
   scrollClassName,
@@ -313,19 +331,135 @@ export function ConversationMessageList({
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
   const { data: conversationDetail } = useConversationDetail(conversationId)
+  const resolvedEmptyHeroTitle = useMemo(() => {
+    const fromDetail = typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title).trim() : ''
+    if (fromDetail) return fromDetail
+    const fromOverride = typeof emptyHeroTitleOverride === 'string' ? emptyHeroTitleOverride.trim() : ''
+    return fromOverride || null
+  }, [conversationDetail, emptyHeroTitleOverride])
 
-  // Fallback to server-sourced conversation agents for reloads where the UI store lacks agentName
-  const { data: conversationAgents = [] } = useConversationAgents(conversationId)
-  const agentObj = Array.isArray(conversationAgents) && conversationAgents.length > 0 ? conversationAgents[0] : undefined
-  const agentName = agentNameOverride ?? agentObj?.name
-  const agentSlug = useMemo(() => {
-    const raw = (agentObj as any)?.slug
-    return typeof raw === 'string' && raw.trim().length > 0 ? raw.trim() : undefined
-  }, [agentObj])
-  const agentAvatarAttachmentId = agentObj?.avatarAttachmentId as string | undefined
-  const avatarIds = useMemo(() => (agentAvatarAttachmentId ? [agentAvatarAttachmentId] : []), [agentAvatarAttachmentId])
-  const { data: agentAvatarAttachments = [] } = useMessageAttachments(avatarIds, starshipId)
-  const agentAvatarUrl = agentAvatarUrlOverride ?? agentAvatarAttachments?.[0]?.previewUrl
+  // Conversation agents (can be multiple). We need to resolve agent details per message by `message.agentId`.
+  type ConversationAgent = {
+    id?: string
+    name?: string
+    role?: string
+    slug?: string
+    avatarAttachmentId?: string
+  }
+  const { data: conversationAgentsRaw = [] } = useConversationAgents(conversationId)
+  const conversationAgents = useMemo(() => (Array.isArray(conversationAgentsRaw) ? (conversationAgentsRaw as ConversationAgent[]) : []), [conversationAgentsRaw])
+
+  // For user↔user DMs, derive the peer user from the DM list (same source as ConversationSummaryBar).
+  const { data: dmListData } = useStarshipDirectMessages(String(starshipId || ''), Boolean(starshipId && conversationId))
+  const dmItem = useMemo<DirectMessageListItem | null>(() => {
+    const cid = String(conversationId || '')
+    const list = (dmListData?.directMessages || []) as DirectMessageListItem[]
+    if (!cid || !Array.isArray(list) || list.length === 0) return null
+    return list.find(x => String((x as any)?.dm?.conversationId || '') === cid) || null
+  }, [dmListData?.directMessages, conversationId])
+
+  const resolvedEmptyHeroParticipant = useMemo(() => {
+    // Prefer explicit override (draft DM target).
+    if (emptyHeroParticipantOverride) return emptyHeroParticipantOverride
+
+    // user↔user DM: show peer avatar instead of chat icon.
+    const dm: any = (dmItem as any)?.dm
+    if (dm?.dmType === 'user_user') {
+      const peer: any = (dmItem as any)?.peerUser
+      const peerId = typeof peer?.id === 'string' ? String(peer.id).trim() : ''
+      const label =
+        (typeof peer?.displayName === 'string' && peer.displayName.trim()) ||
+        (typeof peer?.email === 'string' && peer.email.trim()) ||
+        (peerId ? `User ${peerId.slice(0, 6)}` : 'User')
+      const avatarUrl = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
+      return { kind: 'human' as const, label, avatarUrl }
+    }
+
+    // Otherwise derive from the conversation's first agent (works for empty/brand-new DM conversations too).
+    const a0: any = conversationAgents?.[0]
+    if (!a0) return null
+    const label = formatAgentDisplayName(a0) || 'Agent'
+    const seed = String(a0?.name || a0?.slug || a0?.id || label)
+    const avatarAttachmentId = typeof a0?.avatarAttachmentId === 'string' ? String(a0.avatarAttachmentId) : null
+    return { kind: 'agent' as const, label, seed, avatarAttachmentId }
+  }, [conversationAgents, dmItem, emptyHeroParticipantOverride])
+
+  const emptyHeroAvatarAttachmentIds = useMemo(() => {
+    const p = resolvedEmptyHeroParticipant
+    if (!p || p.kind !== 'agent') return []
+    const id = typeof p.avatarAttachmentId === 'string' ? p.avatarAttachmentId.trim() : ''
+    return id ? [id] : []
+  }, [resolvedEmptyHeroParticipant])
+  const { data: emptyHeroAvatarAttachments = [] } = useMessageAttachments(emptyHeroAvatarAttachmentIds, starshipId)
+  const emptyHeroAvatarUrlById = useMemo(() => new Map((emptyHeroAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [emptyHeroAvatarAttachments])
+
+  const fallbackAgent = conversationAgents[0]
+  const fallbackAgentDisplayName = useMemo(() => {
+    if (typeof agentNameOverride === 'string' && agentNameOverride.trim().length > 0) return agentNameOverride.trim()
+    if (fallbackAgent) return formatAgentDisplayName(fallbackAgent)
+    return undefined
+  }, [agentNameOverride, fallbackAgent])
+
+  const agentById = useMemo(() => {
+    const m = new Map<string, ConversationAgent>()
+    for (const a of conversationAgents) {
+      const id = typeof a?.id === 'string' ? a.id.trim() : ''
+      if (!id) continue
+      m.set(id, a)
+    }
+    return m
+  }, [conversationAgents])
+
+  const agentDisplayNameById = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const a of conversationAgents) {
+      const id = typeof a?.id === 'string' ? a.id.trim() : ''
+      if (!id) continue
+      const label = formatAgentDisplayName(a).trim()
+      if (!label) continue
+      m.set(id, label)
+    }
+    return m
+  }, [conversationAgents])
+
+  const agentAvatarAttachmentIds = useMemo(() => {
+    const ids = conversationAgents
+      .map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : ''))
+      .filter(Boolean)
+    return Array.from(new Set(ids))
+  }, [conversationAgents])
+  const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
+  const agentAvatarUrlByAttachmentId = useMemo(() => new Map((agentAvatarAttachments || []).map(a => [a.id, a.previewUrl] as const)), [agentAvatarAttachments])
+
+  const resolveAssistantPresentation = useCallback(
+    (msg: ExtendedMessage | null | undefined) => {
+      if (!msg || msg.role !== 'assistant') return null
+      const agentId = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : ''
+      const fromList = agentId ? agentById.get(agentId) : undefined
+      const agent = fromList ?? fallbackAgent
+
+      // `message.agentName` often comes from the backend as *name-only* (no role).
+      // Always append role when we can resolve it from the agent list.
+      const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
+      const roleFromAgent = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : ''
+      const nameFallback =
+        nameFromMsg ||
+        (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') ||
+        (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') ||
+        (agentId ? `Agent ${agentId.slice(0, 6)}` : '')
+
+      const displayName = (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
+
+      const slugRaw = typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : ''
+      const slug = slugRaw || undefined
+
+      const avatarAttachmentId = typeof (agent as any)?.avatarAttachmentId === 'string' ? String((agent as any).avatarAttachmentId).trim() : ''
+      const avatarUrl = agentAvatarUrlOverride ?? (avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) : undefined)
+
+      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl }
+    },
+    [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
+  )
 
   const handleThreadAction = useCallback(
     async (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => {
@@ -1014,12 +1148,27 @@ export function ConversationMessageList({
         timestamp: (msg as ExtendedMessage).createdAt,
         occurrenceCount: count,
         firstMatchIndexInPositions: firstIndexInPositions,
-        agentName: msg.role === 'assistant' ? ((msg as ExtendedMessage).agentName ?? agentName) : undefined,
+        agentName:
+          msg.role === 'assistant'
+            ? (() => {
+                const mid = typeof (msg as any)?.agentId === 'string' ? String((msg as any).agentId).trim() : ''
+                const agent = mid ? agentById.get(mid) : undefined
+                const roleFromAgent = typeof (agent as any)?.role === 'string' ? String((agent as any).role).trim() : ''
+                const nameFromMsg = typeof (msg as any)?.agentName === 'string' ? String((msg as any).agentName).trim() : ''
+                const nameFallback =
+                  nameFromMsg ||
+                  (agent ? (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') : '') ||
+                  (agent ? (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') : '') ||
+                  (mid ? `Agent ${mid.slice(0, 6)}` : '') ||
+                  (fallbackAgentDisplayName || 'Assistant')
+                return (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
+              })()
+            : undefined,
       })
       firstIndexInPositions += count
     }
     return results
-  }, [normalizedHighlightTerm, renderMessages, agentName])
+  }, [agentById, fallbackAgentDisplayName, normalizedHighlightTerm, renderMessages])
 
   useEffect(() => {
     if (searchResultsForSidebar != null && onSearchResults) {
@@ -1034,7 +1183,7 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
-  // Only show the "beginning of channel" hero when we are actually at the beginning of the timeline.
+  // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
   // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
   const isAtConversationStart = (() => {
     // Static/demo rendering: treat "start" as empty list only.
@@ -1045,10 +1194,9 @@ export function ConversationMessageList({
   })()
   const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
   const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart)
-  const shouldBottomAlignChannelHero = Boolean(showChannelHero && renderMessages.length === 0 && !shouldShowGapLoader)
-  const showDmHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart)
-  const shouldBottomAlignDmHero = Boolean(showDmHero && renderMessages.length === 0 && !shouldShowGapLoader)
-  const shouldBottomAlignAnyHero = Boolean(shouldBottomAlignChannelHero || shouldBottomAlignDmHero)
+  // Direct messages: keep the hero visible even after messages exist, but only once we've reached the beginning (Slack-like).
+  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart)
+  const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0
   // Search input UI intentionally disabled for now.
@@ -1145,7 +1293,7 @@ export function ConversationMessageList({
         // When the channel is empty, we want the hero to "sit" near the bottom like Slack.
         // The normal bottom padding is intentionally large (to avoid message overlap with the composer),
         // but that padding makes an empty-state hero float too high.
-        style={{ paddingBottom: shouldBottomAlignAnyHero ? 32 : (bottomPaddingPx ?? 160) }}
+        style={{ paddingBottom: shouldBottomAlignHero ? 32 : (bottomPaddingPx ?? 160) }}
         onScroll={() => {
           const container = scrollContainerRef.current
           if (!container) return
@@ -1173,17 +1321,19 @@ export function ConversationMessageList({
           )}
 
           <div className="mt-auto">
-            {showDmHero ? (
-              <DmHero
-                conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
-                bottomAlign={shouldBottomAlignDmHero}
-              />
-            ) : null}
             {showChannelHero ? (
               <ChannelHero
                 channelName={channelName}
                 conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
-                bottomAlign={shouldBottomAlignChannelHero}
+                bottomAlign={shouldBottomAlignHero}
+              />
+            ) : null}
+            {showDirectMessageHero ? (
+              <DirectMessageHero
+                title={resolvedEmptyHeroTitle}
+                participant={resolvedEmptyHeroParticipant ?? null}
+                avatarUrlByAttachmentId={emptyHeroAvatarUrlById}
+                bottomAlign={shouldBottomAlignHero}
               />
             ) : null}
             {renderMessages.map((message, idx) => {
@@ -1214,6 +1364,7 @@ export function ConversationMessageList({
               const isFirstMessage = idx === 0
               const messageHasMatch = Boolean(highlightTerm && messageIdsWithMatch.has(message.id))
               const isCurrentMatch = message.id === currentMatchMessageId
+              const assistant = resolveAssistantPresentation(message)
 
               return (
                 <Fragment key={message.id}>
@@ -1230,10 +1381,10 @@ export function ConversationMessageList({
                   >
                     <MemoizedMessageBubble
                       message={message}
-                      agentName={message.agentName || agentName}
-                      agentSlug={agentSlug}
+                      agentName={assistant?.displayName}
+                      agentSlug={assistant?.slug}
                       starshipSlug={starshipSlug}
-                      agentAvatarUrl={agentAvatarUrl}
+                      agentAvatarUrl={assistant?.avatarUrl}
                       isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                       starshipId={starshipId}
                       enableChannelMessageThreads={enableChannelMessageThreads}
@@ -1316,17 +1467,27 @@ export function ConversationMessageList({
                 ) : (
                   <div className="group flex items-start gap-3 w-full max-w-full pr-[var(--conversation-right-gutter)] rounded-lg px-2 py-2 -mx-2 hover:bg-black/5 dark:hover:bg-white/10 transition-colors">
                     <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                      <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
+                      {(() => {
+                        const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
+                        const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+                        return <AgentAvatar seed={p.displayName || 'AI'} imageUrl={p.avatarUrl} size={40} rounded />
+                      })()}
                     </div>
                     <div className="min-w-0 flex-1 pt-0.5">
                       <div className="mb-1 text-sm font-bold text-foreground">
-                        {typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0 ? (
-                          <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`} className="font-mono hover:underline underline-offset-2">
-                            {(agentName || 'Assistant').trim()}
-                          </Link>
-                        ) : (
-                          <span className="font-mono">{(agentName || 'Assistant').trim()}</span>
-                        )}
+                        {(() => {
+                          const lastAssistant = [...renderMessages].reverse().find(m => (m as any)?.role === 'assistant') as ExtendedMessage | undefined
+                          const p = resolveAssistantPresentation(lastAssistant) || { displayName: fallbackAgentDisplayName || 'Assistant', slug: undefined, avatarUrl: undefined }
+                          const label = (p.displayName || fallbackAgentDisplayName || 'Assistant').trim()
+                          const slug = p.slug
+                          return typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof slug === 'string' && slug.trim().length > 0 ? (
+                            <Link href={`/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(slug)}`} className="font-mono hover:underline underline-offset-2">
+                              {label}
+                            </Link>
+                          ) : (
+                            <span className="font-mono">{label}</span>
+                          )
+                        })()}
                       </div>
                       <div className="flex items-center gap-2 text-sm leading-relaxed text-muted-foreground">
                         <TypingDots />
@@ -1778,7 +1939,7 @@ const MemoizedMessageBubble = memo(
             <div className={cn('flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
                 <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
-                  <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={avatarSize} />
+                  <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={avatarSize} />
                 </div>
               ) : (
                 <div className={cn('flex-shrink-0 mt-1', avatarClass)} aria-hidden="true" />
@@ -1835,7 +1996,7 @@ const MemoizedMessageBubble = memo(
           >
             {showAssistantAvatar ? (
               <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                <AgentAvatar seed={agentName} imageUrl={agentAvatarUrl} size={40} rounded />
+                <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
               </div>
             ) : (
               <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
@@ -1994,13 +2155,22 @@ function ChannelHero({
     (typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : null) ||
     'Channel'
   const displayHashed = `#${displayName.replace(/^#/, '')}`
+  // Match DirectMessageHero avatar sizing.
+  const sizeClassName = 'h-20 w-20 sm:h-24 sm:w-24'
 
   return (
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
         <div className="flex items-start gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center flex-shrink-0">
-            <Icon name="hash" className="h-7 w-7 text-muted-foreground" />
+          <div
+            className={cn(
+              'relative overflow-hidden flex-shrink-0',
+              sizeClassName,
+              'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center'
+            )}
+          >
+            <Icon name="hash" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
+            <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
           </div>
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
@@ -2021,25 +2191,41 @@ function ChannelHero({
   )
 }
 
-function DmHero({
-  conversationTitle,
+function DirectMessageHero({
+  title,
+  participant,
+  avatarUrlByAttachmentId,
   bottomAlign,
 }: {
-  conversationTitle: string | null
+  title: string | null
+  participant:
+    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
+    | { kind: 'human'; label: string; avatarUrl?: string | null }
+    | null
+  avatarUrlByAttachmentId: Map<string, string | null | undefined>
   bottomAlign: boolean
 }) {
-  const displayName = typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : 'Direct message'
-
+  const normalizeDmTitle = (raw: string): string => {
+    const t = String(raw || '').trim()
+    if (!t) return t
+    // Back-compat: older DM conversations were titled like "DM • Alice" (or "DM · Alice").
+    const m = t.match(/^DM\s*[•·:\-–—]\s*(.+)$/i)
+    if (m?.[1]) return String(m[1]).trim() || t
+    return t
+  }
+  const displayName =
+    // Prefer agent label (includes role) when available.
+    participant?.kind === 'agent' && participant.label.trim().length > 0
+      ? normalizeDmTitle(participant.label)
+      : normalizeDmTitle(title ?? '') || 'Direct message'
   return (
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
         <div className="flex items-start gap-4">
-          <div className="h-14 w-14 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center flex-shrink-0">
-            <Icon name="message-square" className="h-7 w-7 text-muted-foreground" />
-          </div>
+          <DirectMessageHeroAvatar participant={participant} avatarUrlByAttachmentId={avatarUrlByAttachmentId} />
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
-            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of this conversation. Send a message to start.</p>
+            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of your conversation. Start with a quick hello.</p>
           </div>
         </div>
       </div>
@@ -2050,4 +2236,37 @@ function DmHero({
       />
     </div>
   )
+}
+
+function DirectMessageHeroAvatar({
+  participant,
+  avatarUrlByAttachmentId,
+}: {
+  participant:
+    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
+    | { kind: 'human'; label: string; avatarUrl?: string | null }
+    | null
+  avatarUrlByAttachmentId: Map<string, string | null | undefined>
+}) {
+  const p = participant
+  // Shared marketplace-style avatar component so DM + marketplace stay in sync.
+  const sizeClassName = 'h-20 w-20 sm:h-24 sm:w-24'
+
+  if (!p) {
+    return (
+      <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
+        <Icon name="message-square" className="h-7 w-7 text-muted-foreground" />
+        <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
+      </div>
+    )
+  }
+
+  if (p.kind === 'agent') {
+    const aid = typeof p.avatarAttachmentId === 'string' ? p.avatarAttachmentId.trim() : ''
+    const imageUrl = aid ? avatarUrlByAttachmentId.get(aid) : undefined
+    return <MarketplaceAvatar imageUrl={typeof imageUrl === 'string' ? imageUrl : null} label={p.label} seed={p.seed} sizeClassName={sizeClassName} />
+  }
+
+  const avatarUrl = typeof p.avatarUrl === 'string' ? p.avatarUrl.trim() : ''
+  return <MarketplaceAvatar imageUrl={avatarUrl || null} label={p.label} seed={p.label} sizeClassName={sizeClassName} tintClassName="bg-[radial-gradient(circle_at_30%_30%,rgba(124,58,237,0.18),transparent_60%)]" />
 }

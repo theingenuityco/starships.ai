@@ -9,7 +9,7 @@ import { AgentService } from '@/services/AgentService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
 import { IdSchema } from '@/schemas/common';
-import { verifyResourceAccess } from '@/middleware/verify-starship-access';
+import { verifyResourceAccess, verifyStarshipAccess } from '@/middleware/verify-starship-access';
 import type { StarshipModel } from '@starships/protocol';
 import type { AuthUser, ImportExportContainerV1 } from '@starships/protocol';
 import type { NextFunction, Request, Response } from 'express';
@@ -878,7 +878,7 @@ router.delete('/starships/:id', jwtAuthMiddleware, async (req: Request, res: Res
   }
 });
 
-// GET /starships/:id/agents - Get deployed agents for starship (OpenAPI pattern)
+// GET /starships/:id/agents - Get deployed agents for starship (collaborator access)
 router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const starshipId = req.params.id;
@@ -890,22 +890,11 @@ router.get('/starships/:id/agents', jwtAuthMiddleware, async (req: Request, res:
     const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'starship parameter');
     if (!paramValidation) return;
 
+    // Authorization: collaborators can view deployed agents (needed for DM + conversation UI).
+    const accessOk = await verifyStarshipAccess(starshipId, userId, res);
+    if (!accessOk) return;
+
     const starshipService = new StarshipService();
-
-    // Verify starship exists and ownership
-    const starship = await starshipService.getStarship(starshipId);
-    if (!starship) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, {
-        resource: 'starship',
-        id: starshipId,
-      });
-      return;
-    }
-
-    if (starship.ownerId !== userId) {
-      sendError(res, 'ACCESS_DENIED', 'Access denied to this starship', 403);
-      return;
-    }
 
     // Get deployed agents
     const deployedAgents = await starshipService.getDeployedAgents(starshipId);

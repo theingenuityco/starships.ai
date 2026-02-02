@@ -3,16 +3,17 @@
 import React, { useEffect, useMemo, useState } from 'react'
 
 import Icon from '@/components/primitives/Icon'
-import AgentAvatar from '@/components/animated/AgentAvatar'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { Avatar } from '@/components/ui/avatar'
 
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Badge } from '@/components/ui/badge'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { cn } from '@/lib/utils'
-import { useToolTemplates } from '@/hooks/useTemplates'
+import { useToolTemplates, useRequiredConnectors } from '@/hooks/useTemplates'
+import { ConnectorSuggestionCard } from '@/components/widgets/ConnectorSuggestionCard'
 
 import type { AgentTemplateModel, AgentToolPermission, ToolTemplateModel } from '@starships/protocol'
 
@@ -24,17 +25,22 @@ interface DeploymentConfirmationModalProps {
   type: 'agent' | 'tool'
   template: AgentTemplateModel | ToolTemplateModel
   starshipName: string
+  /** Required for "Connect" action on required connectors. If omitted, only a message is shown. */
+  starshipId?: string
+  starshipSlug?: string
 }
 
-export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, isProcessing, type, template, starshipName }: DeploymentConfirmationModalProps) {
+export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, isProcessing, type, template, starshipName, starshipId, starshipSlug }: DeploymentConfirmationModalProps) {
   const isAgent = type === 'agent'
-  const actionText = isAgent ? 'deploy' : 'install'
   const ActionIconName = isAgent ? 'bot' : 'wrench'
   const avatarUrl = isAgent ? (template as AgentTemplateModel).avatarUrl : undefined
   const agentTemplate = (isAgent ? (template as AgentTemplateModel) : null) as AgentTemplateModel | null
   const assignedToolSlugs = (agentTemplate?.assignedToolSlugs || []).filter(Boolean)
+  const templateId = template?.id ?? ''
 
   const { data: allToolTemplates = [] } = useToolTemplates(undefined, isOpen && isAgent && assignedToolSlugs.length > 0)
+  const { data: requiredConnectors = [] } = useRequiredConnectors(templateId, isOpen && isAgent && !!templateId)
+
   const toolTemplateBySlug = useMemo(() => {
     const map = new Map<string, ToolTemplateModel>()
     for (const t of allToolTemplates) {
@@ -112,9 +118,10 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden">
+      <DialogContent className="flex flex-col w-[calc(100vw-2rem)] max-w-3xl max-h-[85vh] overflow-hidden p-6">
         <TooltipProvider>
-          <DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
+            <DialogHeader className="flex-shrink-0">
             <DialogTitle className="flex items-center gap-2">
               <Icon name={ActionIconName} className="w-5 h-5 text-primary" />
               Confirm {isAgent ? 'Deployment' : 'Installation'}
@@ -126,9 +133,18 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             <div className="rounded-xl border border-border/60 bg-card/50 p-4 shadow-sm">
               <div className="flex items-start gap-3 min-w-0">
                 {isAgent ? (
-                  <Avatar className="h-10 w-10 rounded-full ring-1 ring-border/40 shadow-sm">
-                    <AgentAvatar seed={template.name} imageUrl={avatarUrl} size={40} rounded />
-                  </Avatar>
+                  <MarketplaceAvatar
+                    imageUrl={avatarUrl || null}
+                    label={template.name}
+                    seed={template.name || 'AI'}
+                    sizeClassName="h-10 w-10"
+                    shapeClassName="rounded-full"
+                    ringClassName="ring-1 ring-border/40"
+                    shadowClassName="shadow-sm"
+                    showTintWhenMissing={false}
+                    showInsetRing={false}
+                    fallbackTextClassName="text-xs font-semibold text-muted-foreground"
+                  />
                 ) : (
                   <div className="flex-shrink-0 p-2 rounded-lg bg-primary/20">
                     <div className="text-lg">🔧</div>
@@ -159,6 +175,46 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
               </div>
               {template.description ? <p className="mt-3 text-sm text-muted-foreground leading-relaxed line-clamp-3">{template.description}</p> : null}
             </div>
+
+            {/* Required connectors (agent templates) – same UI as suggest-connectors tool */}
+            {isAgent && requiredConnectors.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Icon name="plug" className="h-4 w-4 text-primary" />
+                  <div className="text-sm font-semibold">Required connectors</div>
+                </div>
+                {starshipId ? (
+                  <ConnectorSuggestionCard
+                    starshipId={starshipId}
+                    providers={requiredConnectors.map(c => c.provider)}
+                    hideSearch={true}
+                    hideDisconnect={false}
+                  />
+                ) : (
+                  <div className="rounded-xl border border-border/60 bg-card/50 p-3">
+                    <p className="text-sm text-muted-foreground">
+                      Connect these in Settings → Connectors
+                      {starshipSlug ? (
+                        <>
+                          {' '}
+                          <a
+                            href={`/ship/${starshipSlug}/connectors`}
+                            className="font-medium text-primary hover:underline"
+                            onClick={e => {
+                              e.preventDefault()
+                              onOpenChange(false)
+                              window.location.href = `/ship/${starshipSlug}/connectors`
+                            }}
+                          >
+                            Open Connectors
+                          </a>
+                        </>
+                      ) : null}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Additional Info */}
             {!isAgent && (template as ToolTemplateModel).requiresApiKey && (
@@ -264,7 +320,7 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
             ) : null}
           </div>
 
-          <DialogFooter className="gap-2">
+          <DialogFooter className="flex-shrink-0 gap-2 pt-4 border-t border-border/50 mt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} disabled={isProcessing}>
               Cancel
             </Button>
@@ -281,7 +337,8 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
                 </>
               )}
             </Button>
-          </DialogFooter>
+            </DialogFooter>
+          </div>
         </TooltipProvider>
       </DialogContent>
     </Dialog>

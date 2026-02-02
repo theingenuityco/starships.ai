@@ -164,6 +164,7 @@ export function Navigation(props: NavigationProps) {
   const { data: starshipData } = useStarshipBySlug(starshipSlug || '', !!starshipSlug && isAuthenticated)
 
   const canManageBilling = Boolean(isAuthenticated && user?.id && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
+  const canManageConnectors = Boolean(isAuthenticated && user?.id && starshipSlug && starshipData?.id && (isInstanceAdmin === true || starshipData.ownerId === user.id))
 
   const { data: wallet, isLoading: walletLoading } = useWallet(starshipData?.id ?? '', Boolean(canManageBilling && starshipData?.id))
 
@@ -238,7 +239,7 @@ export function Navigation(props: NavigationProps) {
             },
           ]
         : []),
-      ...(isAuthenticated && starshipSlug
+      ...(canManageConnectors && starshipSlug
         ? [
             {
               href: `/ship/${starshipSlug}/connectors`,
@@ -442,11 +443,11 @@ export function Navigation(props: NavigationProps) {
           {/* Bottom controls */}
           <div className="px-2 pt-2 flex-shrink-0">
             <div className="flex flex-col gap-1">
-              {isAuthenticated && starshipData?.id ? (
+              {isAuthenticated && starshipData?.id && canManageBilling ? (
                 isExpanded ? (
                   <button
                     type="button"
-                    disabled={!canManageBilling || !activeStarshipSlug}
+                    disabled={!activeStarshipSlug}
                     onClick={() => {
                       if (!activeStarshipSlug) return
                       router.push(`/ship/${activeStarshipSlug}/settings/billing`)
@@ -465,7 +466,7 @@ export function Navigation(props: NavigationProps) {
                     <TooltipTrigger asChild>
                       <button
                         type="button"
-                        disabled={!canManageBilling || !activeStarshipSlug}
+                        disabled={!activeStarshipSlug}
                         onClick={() => {
                           if (!activeStarshipSlug) return
                           router.push(`/ship/${activeStarshipSlug}/settings/billing`)

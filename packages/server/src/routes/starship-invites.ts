@@ -1,9 +1,10 @@
 import { jwtAuthMiddleware } from '@/middleware/jwt-auth';
-import { verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
+import { verifyStarshipAccess, verifyStarshipOwnerAccess } from '@/middleware/verify-starship-access';
 import { EmailService } from '@/services/EmailService';
 import { StarshipService } from '@/services/StarshipService';
 import { handleError, sendError, sendSuccess } from '@/utils/responseHelpers';
 import { validateData } from '@/utils/validation';
+import { isInstanceAdmin } from '@/utils/auth-helpers';
 import { getEnvConfig } from '@starships/env';
 import { StarshipInviteTokenRepository, StarshipMemberRepository, getConnection } from '@starships/models';
 import type { CreateStarshipInviteRequest } from '@starships/protocol';
@@ -42,7 +43,7 @@ function buildClientInviteUrl(token: string): string {
   }
 }
 
-// GET /starships/:id/members - list active members + pending invites (owner-only)
+// GET /starships/:id/members - list active members (+ pending invites for owner/admin)
 router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = requireUserId(req, res);
@@ -52,15 +53,19 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
     if (!params) return;
     const starshipId = params.id;
 
-    // Authorization: owner-only (members cannot view invite list)
-    if (!(await verifyStarshipOwnerAccess(starshipId, userId, res))) return;
-
     const starshipService = new StarshipService();
     const starship = await starshipService.getStarship(starshipId);
     if (!starship) {
       sendError(res, 'RESOURCE_NOT_FOUND', 'Starship not found', 404, { starshipId });
       return;
     }
+
+    // Authorization:
+    // - All collaborators (owner/admin/member) may list members (needed for DM UX).
+    // - Only owner/instance-admin may view pending invites.
+    if (!(await verifyStarshipAccess(starshipId, userId, res))) return;
+    const canViewInvites = String(starship.ownerId) === String(userId) || isInstanceAdmin(req.user);
+    const canViewEmails = canViewInvites;
 
     const connection = getConnection();
     const [memberRows, inviteRows, ownerRow] = await Promise.all([
@@ -91,21 +96,23 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
           ORDER BY m.created_at ASC`,
         [starshipId]
       ),
-      connection.query<{
-        invited_email: string;
-        invited_by_user_id: string | null;
-        role: 'admin' | 'collaborator';
-        created_at: string;
-        expires_at: string;
-      }>(
-        `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
-           FROM starship_invite_tokens
-          WHERE starship_id = $1
-            AND NOT consumed
-            AND expires_at > NOW()
-          ORDER BY created_at DESC`,
-        [starshipId]
-      ),
+      canViewInvites
+        ? connection.query<{
+            invited_email: string;
+            invited_by_user_id: string | null;
+            role: 'admin' | 'collaborator';
+            created_at: string;
+            expires_at: string;
+          }>(
+            `SELECT invited_email, invited_by_user_id, role, created_at, expires_at
+               FROM starship_invite_tokens
+              WHERE starship_id = $1
+                AND NOT consumed
+                AND expires_at > NOW()
+              ORDER BY created_at DESC`,
+            [starshipId]
+          )
+        : Promise.resolve([] as Array<{ invited_email: string; invited_by_user_id: string | null; role: 'admin' | 'collaborator'; created_at: string; expires_at: string }>),
       connection.queryOne<{
         email: string | null;
         display_name: string | null;
@@ -131,7 +138,7 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
       userId: starship.ownerId,
       role: 'owner' as const,
       createdAt: starship.createdAt,
-      email: ownerRow?.email ?? null,
+      email: canViewEmails ? (ownerRow?.email ?? null) : null,
       displayName: ownerRow?.display_name ?? null,
       avatar: ownerRow?.avatar ?? null,
     };
@@ -142,19 +149,21 @@ router.get('/starships/:id/members', jwtAuthMiddleware, async (req: Request, res
         userId: String(m.user_id),
         role: m.role,
         createdAt: String(m.created_at),
-        email: m.email ?? null,
+        email: canViewEmails ? (m.email ?? null) : null,
         displayName: m.display_name ?? null,
         avatar: m.avatar ?? null,
       })),
     ];
 
-    const invites = inviteRows.map((r) => ({
-      invitedEmail: String(r.invited_email),
-      invitedByUserId: r.invited_by_user_id ?? null,
-      role: r.role,
-      createdAt: String(r.created_at),
-      expiresAt: String(r.expires_at),
-    }));
+    const invites = canViewInvites
+      ? inviteRows.map((r) => ({
+          invitedEmail: String(r.invited_email),
+          invitedByUserId: r.invited_by_user_id ?? null,
+          role: r.role,
+          createdAt: String(r.created_at),
+          expiresAt: String(r.expires_at),
+        }))
+      : [];
 
     sendSuccess(res, { members, invites }, 200);
   } catch (error) {

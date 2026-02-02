@@ -118,6 +118,48 @@ export class AgentTemplateRepository extends BaseRepository {
   }
 
   /**
+   * Build assignedToolDefaultPermissions map from junction query rows (single template).
+   * Returns only valid allow/ask/deny entries; callers use undefined when empty.
+   */
+  private buildDefaultPermissionsFromToolRows(
+    rows: Array<{ slug: string; default_permission: string | null }>
+  ): Record<string, 'allow' | 'ask' | 'deny'> {
+    const out: Record<string, 'allow' | 'ask' | 'deny'> = {};
+    for (const row of rows || []) {
+      if (row?.slug && row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
+        out[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
+      }
+    }
+    return out;
+  }
+
+  /**
+   * Build assignedToolSlugs and assignedToolDefaultPermissions by template id from batch junction rows.
+   */
+  private buildToolAssignmentMapsFromBatchRows(
+    rows: Array<{ agent_template_id: string; slug: string; default_permission: string | null }>
+  ): {
+    assignedToolSlugsByTemplateId: Map<string, string[]>;
+    assignedToolDefaultPermissionsByTemplateId: Map<string, Record<string, 'allow' | 'ask' | 'deny'>>;
+  } {
+    const assignedToolSlugsByTemplateId = new Map<string, string[]>();
+    const assignedToolDefaultPermissionsByTemplateId = new Map<string, Record<string, 'allow' | 'ask' | 'deny'>>();
+    for (const row of rows || []) {
+      if (!row?.agent_template_id || !row?.slug) continue;
+      const key = String(row.agent_template_id);
+      const list = assignedToolSlugsByTemplateId.get(key) ?? [];
+      list.push(row.slug);
+      assignedToolSlugsByTemplateId.set(key, list);
+      if (row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
+        const perms = assignedToolDefaultPermissionsByTemplateId.get(key) ?? {};
+        perms[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
+        assignedToolDefaultPermissionsByTemplateId.set(key, perms);
+      }
+    }
+    return { assignedToolSlugsByTemplateId, assignedToolDefaultPermissionsByTemplateId };
+  }
+
+  /**
    * Resolve the "creator" (user id) for one or more templates.
    *
    * We define creator as:
@@ -210,12 +252,7 @@ export class AgentTemplateRepository extends BaseRepository {
         );
 
         const assignedToolSlugs = toolResults.map((row) => row.slug).filter(Boolean);
-        const assignedToolDefaultPermissions: Record<string, 'allow' | 'ask' | 'deny'> = {};
-        for (const row of toolResults) {
-          if (row?.slug && row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
-            assignedToolDefaultPermissions[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
-          }
-        }
+        const assignedToolDefaultPermissions = this.buildDefaultPermissionsFromToolRows(toolResults);
 
         return {
           ...(baseTemplate as AgentTemplateModel),
@@ -264,20 +301,8 @@ export class AgentTemplateRepository extends BaseRepository {
           [uniqueIds]
         );
 
-        const assignedToolSlugsByTemplateId = new Map<string, string[]>();
-        const assignedToolDefaultPermissionsByTemplateId = new Map<string, Record<string, 'allow' | 'ask' | 'deny'>>();
-        for (const row of toolRows || []) {
-          if (!row?.agent_template_id || !row?.slug) continue;
-          const key = String(row.agent_template_id);
-          const list = assignedToolSlugsByTemplateId.get(key) ?? [];
-          list.push(row.slug);
-          assignedToolSlugsByTemplateId.set(key, list);
-          if (row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
-            const perms = assignedToolDefaultPermissionsByTemplateId.get(key) ?? {};
-            perms[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
-            assignedToolDefaultPermissionsByTemplateId.set(key, perms);
-          }
-        }
+        const { assignedToolSlugsByTemplateId, assignedToolDefaultPermissionsByTemplateId } =
+          this.buildToolAssignmentMapsFromBatchRows(toolRows || []);
 
         const out = new Map<string, AgentTemplateModel>();
         for (const t of templates) {
@@ -566,8 +591,8 @@ export class AgentTemplateRepository extends BaseRepository {
         // Populate assignedToolSlugs for list views (Marketplace cards need this)
         const templateIds = templates.map((t) => t.id).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
-        const assignedToolSlugsByTemplateId = new Map<string, string[]>();
-        const assignedToolDefaultPermissionsByTemplateId = new Map<string, Record<string, 'allow' | 'ask' | 'deny'>>();
+        let assignedToolSlugsByTemplateId = new Map<string, string[]>();
+        let assignedToolDefaultPermissionsByTemplateId = new Map<string, Record<string, 'allow' | 'ask' | 'deny'>>();
         if (templateIds.length > 0) {
           const connection = this.getConnection();
           const toolResults = await connection.query<{ agent_template_id: string; slug: string; default_permission: string | null }>(
@@ -578,19 +603,9 @@ export class AgentTemplateRepository extends BaseRepository {
              ORDER BY attt.agent_template_id, tt.name`,
             [templateIds]
           );
-
-          for (const row of toolResults) {
-            if (!row?.agent_template_id || !row?.slug) continue;
-            const key = row.agent_template_id;
-            const list = assignedToolSlugsByTemplateId.get(key) ?? [];
-            list.push(row.slug);
-            assignedToolSlugsByTemplateId.set(key, list);
-            if (row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
-              const perms = assignedToolDefaultPermissionsByTemplateId.get(key) ?? {};
-              perms[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
-              assignedToolDefaultPermissionsByTemplateId.set(key, perms);
-            }
-          }
+          const maps = this.buildToolAssignmentMapsFromBatchRows(toolResults || []);
+          assignedToolSlugsByTemplateId = maps.assignedToolSlugsByTemplateId;
+          assignedToolDefaultPermissionsByTemplateId = maps.assignedToolDefaultPermissionsByTemplateId;
         }
 
         return Promise.all(
@@ -636,12 +651,7 @@ export class AgentTemplateRepository extends BaseRepository {
         );
 
         const assignedToolSlugs = toolResults.map((result) => result.slug);
-        const assignedToolDefaultPermissions: Record<string, 'allow' | 'ask' | 'deny'> = {};
-        for (const row of toolResults) {
-          if (row?.slug && row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
-            assignedToolDefaultPermissions[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
-          }
-        }
+        const assignedToolDefaultPermissions = this.buildDefaultPermissionsFromToolRows(toolResults);
 
         return await this.toPublicModel({
           ...baseTemplate,
@@ -680,12 +690,7 @@ export class AgentTemplateRepository extends BaseRepository {
           [templateId]
         );
         const assignedToolSlugs = toolResults.map((r) => r.slug).filter(Boolean);
-        const assignedToolDefaultPermissions: Record<string, 'allow' | 'ask' | 'deny'> = {};
-        for (const row of toolResults) {
-          if (row?.slug && row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
-            assignedToolDefaultPermissions[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
-          }
-        }
+        const assignedToolDefaultPermissions = this.buildDefaultPermissionsFromToolRows(toolResults);
 
         return await this.toPublicModel({
           ...template,

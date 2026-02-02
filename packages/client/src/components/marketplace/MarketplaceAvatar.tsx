@@ -72,7 +72,14 @@ export function MarketplaceAvatar({
       {!hasImage && showTintWhenMissing ? <div className={cn('absolute inset-0', tintClassName)} /> : null}
       {hasImage ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={img} alt={rawLabel || 'Avatar'} className="relative z-10 h-full w-full object-cover" />
+        <img
+          src={img}
+          alt={rawLabel || 'Avatar'}
+          referrerPolicy="no-referrer"
+          crossOrigin="anonymous"
+          decoding="async"
+          className="relative z-10 h-full w-full object-cover"
+        />
       ) : (
         <div className="relative z-10 h-full w-full flex items-center justify-center">
           <span className={fallbackTextClassName}>{initials || 'AI'}</span>

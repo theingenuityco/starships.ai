@@ -143,7 +143,7 @@ export function ConversationList({
       t.kind === 'agent'
         ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
           (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
-        : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.id) === currentConversationId
+        : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
 
     return (
       <div
@@ -604,7 +604,7 @@ export function ConversationList({
                     t.kind === 'agent'
                       ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
                         (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
-                      : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.id) === currentConversationId
+                      : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
                   return (
                     <div
                       key={t.key}

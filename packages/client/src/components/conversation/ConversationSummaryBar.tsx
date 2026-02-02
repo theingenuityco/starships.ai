@@ -6,7 +6,6 @@ import { useConversationAgents, useConversationDetail, useStarshipDirectMessages
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { useConversationUsageTotals } from '@/hooks/useUsage'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
-import { useModelContextLength } from '@/hooks/useLlmModels'
 import { cn } from '@/lib/utils'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useAuth } from '@/hooks/useAuth'
@@ -81,8 +80,8 @@ function normalizeConversationTitle(raw: string): string {
 export function ConversationSummaryBar({
   conversationId,
   starshipId,
-  modelId,
-  maxTokens,
+  modelId: _modelId,
+  maxTokens: _maxTokens,
   titlePrefix,
   titleRightSlot,
   rightSlot,
@@ -395,21 +394,7 @@ export function ConversationSummaryBar({
   // Token indicator: utilization (server totals) vs max (model context window)
   const usageConversationId = showTokens ? conversationId : null
   const { data: totalsData } = useConversationUsageTotals(usageConversationId)
-  const totalTokens = Number(totalsData?.totalTokens ?? 0)
   const totalCost = Number(totalsData?.cost ?? 0)
-  const primaryModelId = useMemo(() => {
-    const override = typeof modelId === 'string' && modelId.trim().length > 0 ? modelId.trim() : null
-    if (override) return override
-    const m = agents?.[0]?.model
-    return typeof m === 'string' && m.trim().length > 0 ? m.trim() : null
-  }, [agents, modelId])
-  const { contextLength: maxContextTokens } = useModelContextLength(primaryModelId)
-  const fallbackMaxTokens = useMemo(() => {
-    const a0: any = agents?.[0]
-    const raw = a0?.maxTokens ?? a0?.state?.maxTokens
-    const n = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : NaN
-    return Number.isFinite(n) && n > 0 ? n : null
-  }, [agents])
 
   // Only render actual header when all data is ready to prevent layout shifts
   // If there are no avatars to load, don't wait for avatar loading
@@ -637,50 +622,9 @@ export function ConversationSummaryBar({
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
   }
 
-  const ctx = typeof maxContextTokens === 'number' && Number.isFinite(maxContextTokens) && maxContextTokens > 0 ? maxContextTokens : null
-  const overrideMax = typeof maxTokens === 'number' && Number.isFinite(maxTokens) && maxTokens > 0 ? maxTokens : null
-  const max = ctx ?? overrideMax ?? fallbackMaxTokens
-  const pct = max ? Math.max(0, Math.min(100, (totalTokens / max) * 100)) : null
-  const isOver = Boolean(max && totalTokens > max)
-
   const formatUSD2 = (v: number) => {
     if (!(typeof v === 'number') || !Number.isFinite(v)) return '$0.00'
     return `$${v.toFixed(2)}`
-  }
-
-  const TokensRadial = () => {
-    if (!max || pct == null) return null
-
-    const size = 16
-    const stroke = 2
-    const r = (size - stroke) / 2
-    const c = 2 * Math.PI * r
-    const clamped = Math.max(0, Math.min(100, pct))
-    const offset = c * (1 - clamped / 100)
-    const center = size / 2
-
-    const title = showCost ? `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens • ${formatUSD2(totalCost)} spent` : `${totalTokens.toLocaleString()}/${max.toLocaleString()} tokens`
-
-    return (
-      <span className="inline-flex items-center" aria-label={title} title={title}>
-        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0" aria-hidden="true" focusable="false">
-          <circle cx={center} cy={center} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted-foreground/25" />
-          <circle
-            cx={center}
-            cy={center}
-            r={r}
-            fill="none"
-            stroke="currentColor"
-            strokeWidth={stroke}
-            strokeDasharray={c}
-            strokeDashoffset={offset}
-            strokeLinecap="round"
-            transform={`rotate(-90 ${center} ${center})`}
-            className={cn(isOver ? 'text-destructive' : 'text-primary')}
-          />
-        </svg>
-      </span>
-    )
   }
 
   return (
@@ -782,12 +726,18 @@ export function ConversationSummaryBar({
                       <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
                     </span>
 
-                    {/* Tokens: utilized vs max (always render) */}
-                    {showTokens ? (
+                    {/* Usage: keep cost-only in expert mode; context is shown on agent avatar per-turn */}
+                    {showTokens && showCost ? (
                       <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <TokensRadial />
+                          <span
+                            className="inline-flex items-center text-[11px] text-muted-foreground"
+                            title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                            aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                          >
+                            {showCost ? formatUSD2(totalCost) : null}
+                          </span>
                         </span>
                       </>
                     ) : null}
@@ -795,11 +745,17 @@ export function ConversationSummaryBar({
                 ) : (
                   <>
                     <span className="font-medium leading-none text-muted-foreground">Updated {formatDate(updatedAt)}</span>
-                    {showTokens ? (
+                    {showTokens && showCost ? (
                       <>
                         <span className="inline-flex items-center gap-2 whitespace-nowrap">
                           <span aria-hidden="true" className="h-3 w-px bg-border/60" />
-                          <TokensRadial />
+                          <span
+                            className="inline-flex items-center text-[11px] text-muted-foreground"
+                            title={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                            aria-label={showCost ? `${formatUSD2(totalCost)} spent` : undefined}
+                          >
+                            {showCost ? formatUSD2(totalCost) : null}
+                          </span>
                         </span>
                       </>
                     ) : null}

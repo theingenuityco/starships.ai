@@ -66,6 +66,27 @@ export type ConversationStreamMessageAppend = {
   message: MessageModel;
 };
 
+/**
+ * Provider/model usage for a specific LLM call inside a turn.
+ *
+ * This is emitted as soon as the provider reports usage (typically on content_complete).
+ * It is intended for **UX/debug** only (e.g. showing a context utilization ring on the agent avatar).
+ */
+export type ConversationStreamTurnUsage = {
+  conversationId: string;
+  turnId: string;
+  at: string;
+  agentId?: string;
+  agentName?: string;
+  model?: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    cost?: number;
+  };
+};
+
 // ----------------------------------------------------------------------------
 // UI Actions (server → client hints over SSE)
 // ----------------------------------------------------------------------------
@@ -136,6 +157,7 @@ export type ConversationStreamEvent =
   | { type: 'snapshot'; data: ConversationStreamSnapshot }
   | { type: 'turn.started'; data: ConversationStreamTurnStarted }
   | { type: 'turn.status'; data: ConversationStreamTurnStatus }
+  | { type: 'turn.usage'; data: ConversationStreamTurnUsage }
   | { type: 'assistant.delta'; data: ConversationStreamAssistantDelta }
   | { type: 'assistant.reasoning_delta'; data: ConversationStreamAssistantReasoningDelta }
   | { type: 'message.append'; data: ConversationStreamMessageAppend }

@@ -20,6 +20,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState } from 'react'
 import { StarshipUpgradeSection } from '@/components/settings/StarshipUpgradeSection'
+import { StarshipToolsDefaultsSection } from '@/components/settings/StarshipToolsDefaultsSection'
 
 interface MyStarshipSettingsSectionProps {
   starship?: StarshipModel
@@ -302,6 +303,8 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
               <AlertDescription>You don’t have permission to edit this starship.</AlertDescription>
             </Alert>
           )}
+
+          {starship.id ? <StarshipToolsDefaultsSection starshipId={starship.id} canEdit={canEdit} /> : null}
 
           <Card className={PROFILE_SECTION_CARD_CLASS}>
             <CardHeader className="pb-4">

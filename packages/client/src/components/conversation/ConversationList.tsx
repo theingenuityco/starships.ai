@@ -19,10 +19,12 @@ import { ScrollArea } from '../ui/scroll-area'
 import { Skeleton } from '../ui/skeleton'
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
 import { formatAgentDisplayName } from '@/lib/agentDisplay'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { useAuthContext } from '@/providers/auth-provider'
 
 interface ConversationListProps {
@@ -37,7 +39,7 @@ interface ConversationListProps {
   onboardingHighlight?: 'channels' | 'directMessages' | null
 }
 
-function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent: AgentModel | null }) {
+function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; agent: AgentModel | null; busy?: boolean }) {
   const avatarAttachmentIds = useMemo(() => {
     const id = agent?.avatarAttachmentId
     return typeof id === 'string' && id.trim().length > 0 ? [id] : []
@@ -46,19 +48,25 @@ function DirectMessageAvatar({ starshipId, agent }: { starshipId: string; agent:
   const previewUrl = avatarAttachments?.[0]?.previewUrl
 
   return (
-    <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
-      <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
-    </Avatar>
+    <div className="relative">
+      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
+        <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
+      </Avatar>
+      <PresenceIndicator kind="busy" active={Boolean(busy)} />
+    </div>
   )
 }
 
-function HumanAvatar({ user }: { user: StarshipMemberListItem }) {
+function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: boolean }) {
   const fallback = (user.displayName || user.email || '?').trim().slice(0, 1).toUpperCase()
   return (
-    <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
-      {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
-    </Avatar>
+    <div className="relative">
+      <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
+        {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+        <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
+      </Avatar>
+      <PresenceIndicator kind="online" active={Boolean(online)} />
+    </div>
   )
 }
 
@@ -86,6 +94,7 @@ export function ConversationList({
   const { data: directMessagesData, isLoading: directMessagesLoading } = useStarshipDirectMessages(starshipId, true)
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
+  const { isUserOnline } = useStarshipPresence(starshipId, true)
   const createChannel = useCreateChannel()
   const { userId: authUserId } = useAuthContext()
   const [searchQuery, setSearchQuery] = useState('')
@@ -197,6 +206,21 @@ export function ConversationList({
       if (agentId && cid) map.set(agentId, cid)
     }
     return map
+  }, [directMessagesData?.directMessages])
+
+  const busyAgentIds = useMemo(() => {
+    const set = new Set<string>()
+    const list = (directMessagesData?.directMessages || []) as DirectMessageListItem[]
+    for (const item of list) {
+      const dm: any = (item as any)?.dm
+      if (!dm || dm.dmType !== 'user_agent') continue
+      const agentId = typeof dm.agentId === 'string' ? String(dm.agentId) : ''
+      if (!agentId) continue
+      const conv: any = (item as any)?.conversation
+      const busy = !!(conv?.state && typeof conv.state === 'object' && (conv.state as any).turnActive === true)
+      if (busy) set.add(agentId)
+    }
+    return set
   }, [directMessagesData?.directMessages])
 
   const existingDmConversationIdByPeerUserId = useMemo(() => {
@@ -598,7 +622,11 @@ export function ConversationList({
                       className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isBusy && 'opacity-70 pointer-events-none')}
                       onClick={() => handleDmTargetClick(t)}
                     >
-                      {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
+                      {t.kind === 'agent' ? (
+                        <DirectMessageAvatar starshipId={starshipId} agent={t.agent} busy={busyAgentIds.has(String(t.agent.id))} />
+                      ) : (
+                        <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1 gap-2">
                           <p className={cn('text-sm font-medium truncate')}>{label}</p>

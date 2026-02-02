@@ -29,6 +29,8 @@ import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { useUserPreferencesStore } from '@/store/user-preferences-store'
 import { useModelContextLength } from '@/hooks/useLlmModels'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 
 type TurnUsageForRing = {
   turnId: string
@@ -48,6 +50,7 @@ function AgentAvatarWithTurnUsageRing({
   rounded,
   usage,
   enabled,
+  busy,
   className,
 }: {
   seed: string
@@ -58,6 +61,7 @@ function AgentAvatarWithTurnUsageRing({
   rounded?: boolean
   usage?: TurnUsageForRing | null
   enabled: boolean
+  busy?: boolean
   className?: string
 }) {
   const modelId =
@@ -105,8 +109,11 @@ function AgentAvatarWithTurnUsageRing({
 
   if (!enabled || !usage || pct == null) {
     return (
-      <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden', className)} style={{ width: size, height: size }}>
-        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      <div className={cn('relative flex-shrink-0', className)} style={{ width: size, height: size }}>
+        <div className="w-full h-full rounded-full bg-muted flex items-center justify-center overflow-hidden">
+          <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+        </div>
+        <PresenceIndicator kind="busy" active={Boolean(busy)} />
       </div>
     )
   }
@@ -133,6 +140,7 @@ function AgentAvatarWithTurnUsageRing({
       <div className="absolute inset-[3px] rounded-full bg-muted flex items-center justify-center overflow-hidden">
         <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
       </div>
+      <PresenceIndicator kind="busy" active={Boolean(busy)} />
     </div>
   )
 }
@@ -144,6 +152,7 @@ function LinkedConversationCard({
   onThreadAction,
   message,
   starshipId,
+  isUserOnline,
 }: {
   linkedConversationId: string | null
   linkedConversationHref: string | null
@@ -151,10 +160,12 @@ function LinkedConversationCard({
   onThreadAction?: (args: { messageId: string; linkedConversationId: string | null; messageText?: string; linkedMessage?: MessageModel | null }) => void
   message: MessageModel
   starshipId?: string
+  isUserOnline?: (userId: string) => boolean
 }) {
   const { data: conversation } = useConversationDetail(linkedConversationId)
   const { data: agents = [] } = useConversationAgents(linkedConversationId)
   const agentList = useMemo(() => (Array.isArray(agents) ? agents : []) as any[], [agents])
+  const isLinkedConversationBusy = !!((conversation as any)?.state && typeof (conversation as any)?.state === 'object' && ((conversation as any).state as any).turnActive === true)
 
   const rawTitle = String((conversation as any)?.title ?? '').trim()
   const title = rawTitle || (linkedConversationId ? `Conversation ${linkedConversationId.slice(0, 8)}` : 'Conversation')
@@ -247,16 +258,25 @@ function LinkedConversationCard({
                 if (p.kind === 'agent') {
                   const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                   return (
-                    <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
+                    <div key={p.key} className="relative h-7 w-7">
+                      <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
+                      </div>
+                      <PresenceIndicator kind="busy" active={isLinkedConversationBusy} />
                     </div>
                   )
                 }
+                const key = String(p.key || '')
+                const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
+                const userId = m?.[1]
                 return (
-                  <Avatar key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                    {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                    <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
-                  </Avatar>
+                  <div key={p.key} className="relative h-7 w-7">
+                    <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                      {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
+                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                    </Avatar>
+                    <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline?.(userId))} />
+                  </div>
                 )
               })}
               {participantItems.length > 4 && (
@@ -440,6 +460,11 @@ export function ConversationMessageList({
   const activeTurnId = typeof (stream as any)?.turnId === 'string' ? String((stream as any).turnId) : null
   const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null
   const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
+  const presence = useStarshipPresence(String(starshipId || ''), Boolean(starshipId))
+  const isConversationBusy =
+    !isTerminalTurnStatus &&
+    (activeTurnStatus === 'active' || activeTurnStatus === 'waiting_for_tools') &&
+    (isResponding || isAssistantStreaming || isAwaitingToolResults)
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
@@ -1546,6 +1571,9 @@ export function ConversationMessageList({
                           return raw
                         })()
                       }
+                      isUserOnline={presence.isUserOnline}
+                      isConversationBusy={isConversationBusy}
+                      presenceRevision={presence.dataUpdatedAt}
                     />
                     {(() => {
                       const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
@@ -1713,6 +1741,15 @@ interface ConversationMessageBubbleProps {
   expertMode?: boolean
   /** UX-only usage for this message's turn (if available). */
   turnUsage?: TurnUsageForRing | null
+  /** Presence lookup (starship-scoped). */
+  isUserOnline?: (userId: string) => boolean
+  /** Conversation-scoped "busy" indicator (active or waiting_for_tools). */
+  isConversationBusy?: boolean
+  /**
+   * Monotonic revision to force memoized bubbles to re-render when presence changes.
+   * (e.g. TanStack Query `dataUpdatedAt` from `useStarshipPresence`).
+   */
+  presenceRevision?: number
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -1851,7 +1888,11 @@ const MemoizedMessageBubble = memo(
     highlightTerm,
     expertMode = false,
     turnUsage,
+    isUserOnline,
+    isConversationBusy = false,
+    presenceRevision,
   }: ConversationMessageBubbleProps) {
+    void presenceRevision
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
     const avatarSize = isHero ? 40 : isDelegation ? 24 : 32
@@ -1914,6 +1955,8 @@ const MemoizedMessageBubble = memo(
       const explicitUserAvatarUrl = userAvatarUrlOverride
       const shouldUseExplicitUserAvatar = isImageUrl(explicitUserAvatarUrl)
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
+      const messageUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : ''
+      const showUserOnline = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline?.(messageUserId))
 
       if (isHero || isDelegation) {
         // User message: Neutral bubble on the right (landing demos)
@@ -1944,6 +1987,7 @@ const MemoizedMessageBubble = memo(
                     onThreadAction={onThreadAction}
                     message={message}
                     starshipId={starshipId}
+                    isUserOnline={isUserOnline}
                   />
                 )}
               </div>
@@ -1951,34 +1995,37 @@ const MemoizedMessageBubble = memo(
                 // Only reserve width, not height (prevents "blank gap" under short consecutive messages)
                 <div className={cn('flex-shrink-0 mt-1', avatarWidthClass)} aria-hidden="true" />
               ) : (
-                <Avatar className={cn('flex-shrink-0 rounded-full ring-1 ring-border/40 bg-primary/10 mb-1 overflow-hidden', avatarClass)}>
-                  {shouldUseExplicitUserAvatar ? (
-                    <AvatarImage
-                      src={explicitUserAvatarUrl!}
-                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
-                      className="rounded-full object-cover"
-                    />
-                  ) : userAvatarSeedOverride ? (
-                    <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
-                  ) : shouldUseAuthedUserAvatar ? (
-                    <AvatarImage
-                      src={effectiveUserAvatar!}
-                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
-                      className="rounded-full object-cover"
-                    />
-                  ) : null}
-                  <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {fallbackVariant === 'user-icon' ? (
-                      <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
-                    ) : (
-                      initialsFromName(effectiveUserName || effectiveUserEmail)
-                    )}
-                  </AvatarFallback>
-                </Avatar>
+                <div className={cn('relative flex-shrink-0 mb-1', avatarClass)}>
+                  <Avatar className={cn('rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden', avatarClass)}>
+                    {shouldUseExplicitUserAvatar ? (
+                      <AvatarImage
+                        src={explicitUserAvatarUrl!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : userAvatarSeedOverride ? (
+                      <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
+                    ) : shouldUseAuthedUserAvatar ? (
+                      <AvatarImage
+                        src={effectiveUserAvatar!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      {fallbackVariant === 'user-icon' ? (
+                        <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
+                      ) : (
+                        initialsFromName(effectiveUserName || effectiveUserEmail)
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <PresenceIndicator kind="online" active={showUserOnline} />
+                </div>
               )}
             </div>
           </div>
@@ -2005,34 +2052,37 @@ const MemoizedMessageBubble = memo(
               // Only reserve width, not height (prevents "inflated" spacing between short consecutive user messages)
               <div className="flex-shrink-0 w-10 mt-1" aria-hidden="true" />
             ) : (
-              <Avatar className="flex-shrink-0 w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 mt-1 overflow-hidden">
-                {shouldUseExplicitUserAvatar ? (
-                  <AvatarImage
-                    src={explicitUserAvatarUrl!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : userAvatarSeedOverride ? (
-                  <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-                ) : shouldUseAuthedUserAvatar ? (
-                  <AvatarImage
-                    src={effectiveUserAvatar!}
-                    alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                    referrerPolicy="no-referrer"
-                    crossOrigin="anonymous"
-                    className="rounded-full object-cover"
-                  />
-                ) : null}
-                <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                  {fallbackVariant === 'user-icon' ? (
-                    <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
-                  ) : (
-                    initialsFromName(effectiveUserName || effectiveUserEmail)
-                  )}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative flex-shrink-0 w-10 h-10 mt-1">
+                <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
+                  {shouldUseExplicitUserAvatar ? (
+                    <AvatarImage
+                      src={explicitUserAvatarUrl!}
+                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      className="rounded-full object-cover"
+                    />
+                  ) : userAvatarSeedOverride ? (
+                    <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                  ) : shouldUseAuthedUserAvatar ? (
+                    <AvatarImage
+                      src={effectiveUserAvatar!}
+                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                      referrerPolicy="no-referrer"
+                      crossOrigin="anonymous"
+                      className="rounded-full object-cover"
+                    />
+                  ) : null}
+                  <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                    {fallbackVariant === 'user-icon' ? (
+                      <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
+                    ) : (
+                      initialsFromName(effectiveUserName || effectiveUserEmail)
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+                <PresenceIndicator kind="online" active={showUserOnline} />
+              </div>
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {!isConsecutiveSameUser && (
@@ -2073,6 +2123,7 @@ const MemoizedMessageBubble = memo(
                   onThreadAction={onThreadAction}
                   message={message}
                   starshipId={starshipId}
+                  isUserOnline={isUserOnline}
                 />
               )}
             </div>
@@ -2111,6 +2162,7 @@ const MemoizedMessageBubble = memo(
                     rounded
                     enabled={Boolean(expertMode)}
                     usage={turnUsage}
+                    busy={Boolean(isConversationBusy)}
                     className={cn('mx-auto', avatarClass)}
                   />
                 </div>
@@ -2149,6 +2201,7 @@ const MemoizedMessageBubble = memo(
                     onThreadAction={onThreadAction}
                     message={message}
                     starshipId={starshipId}
+                    isUserOnline={isUserOnline}
                   />
                 )}
               </div>
@@ -2178,6 +2231,7 @@ const MemoizedMessageBubble = memo(
                   rounded
                   enabled={Boolean(expertMode)}
                   usage={turnUsage}
+                  busy={Boolean(isConversationBusy)}
                   className="mx-auto"
                 />
               </div>
@@ -2226,6 +2280,7 @@ const MemoizedMessageBubble = memo(
                   onThreadAction={onThreadAction}
                   message={message}
                   starshipId={starshipId}
+                  isUserOnline={isUserOnline}
                 />
               )}
             </div>
@@ -2242,6 +2297,9 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
     // Re-render when expert mode toggles, since it affects avatar ring visibility.
     if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
+    // Presence and busy indicators are independent of message content.
+    if (Boolean(prevProps.isConversationBusy) !== Boolean(nextProps.isConversationBusy)) return false
+    if (Number(prevProps.presenceRevision ?? 0) !== Number(nextProps.presenceRevision ?? 0)) return false
     {
       const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
       const nextAny = nextProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }

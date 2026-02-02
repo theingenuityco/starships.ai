@@ -9,11 +9,13 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useAuth } from '@/hooks/useAuth'
 import { STARSHIP_QUERY_KEYS, useUpdateStarship } from '@/hooks/useStarships'
 import { useStarshipAgents } from '@/hooks/useAgents'
 import { useCreateStarshipInvite } from '@/hooks/useStarshipInvites'
 import { STARSHIP_MEMBERS_QUERY_KEYS, useRemoveStarshipMember, useRevokeStarshipInvite, useStarshipMembersAndInvites } from '@/hooks/useStarshipMembers'
+import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import type { ShipClass, StarshipModel, StarshipStatus, UpdateStarshipRequest } from '@starships/protocol'
 import { useQueryClient } from '@tanstack/react-query'
@@ -78,6 +80,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
 
   const canManageMembers = canManageBilling
   const { data: membersAndInvites, isLoading: isMembersLoading } = useStarshipMembersAndInvites(starship?.id ?? '', Boolean(starship?.id && canManageMembers))
+  const presence = useStarshipPresence(starship?.id ?? '', Boolean(starship?.id))
   const removeMember = useRemoveStarshipMember(starship?.id ?? '')
   const revokeInvite = useRevokeStarshipInvite(starship?.id ?? '')
 
@@ -265,10 +268,13 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     <span className="text-xs text-muted-foreground">Owner</span>
                     {starship.ownerId === userId ? (
                       <div className="flex h-6 items-center gap-2">
-                        <Avatar className="h-5 w-5 rounded-full">
-                          {typeof userAvatar === 'string' && userAvatar.trim() ? <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} referrerPolicy="no-referrer" /> : null}
-                          <AvatarFallback className="rounded-full text-[9px] leading-none">{(userName || 'You').slice(0, 1).toUpperCase()}</AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar className="h-5 w-5 rounded-full">
+                            {typeof userAvatar === 'string' && userAvatar.trim() ? <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} referrerPolicy="no-referrer" /> : null}
+                            <AvatarFallback className="rounded-full text-[9px] leading-none">{(userName || 'You').slice(0, 1).toUpperCase()}</AvatarFallback>
+                          </Avatar>
+                          <PresenceIndicator kind="online" active={Boolean(userId && presence.isUserOnline(userId))} />
+                        </div>
                         <span className="text-xs font-medium">{userName || 'You'}</span>
                       </div>
                     ) : (
@@ -415,10 +421,13 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                           return (
                             <div key={`member-${m.userId}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3">
                               <div className="flex min-w-0 items-center gap-3">
-                                <Avatar className="h-7 w-7 rounded-full">
-                                  {typeof m.avatar === 'string' && m.avatar.trim() ? <AvatarImage src={m.avatar.trim()} alt={label} referrerPolicy="no-referrer" /> : null}
-                                  <AvatarFallback className="rounded-full text-[10px] leading-none">{initials}</AvatarFallback>
-                                </Avatar>
+                                <div className="relative">
+                                  <Avatar className="h-7 w-7 rounded-full">
+                                    {typeof m.avatar === 'string' && m.avatar.trim() ? <AvatarImage src={m.avatar.trim()} alt={label} referrerPolicy="no-referrer" /> : null}
+                                    <AvatarFallback className="rounded-full text-[10px] leading-none">{initials}</AvatarFallback>
+                                  </Avatar>
+                                  <PresenceIndicator kind="online" active={Boolean(m.userId && presence.isUserOnline(m.userId))} />
+                                </div>
                                 <div className="min-w-0">
                                   <div className="text-sm font-medium truncate">{label}</div>
                                   {m.email && m.displayName ? <div className="text-xs text-muted-foreground truncate">{m.email}</div> : null}

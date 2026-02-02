@@ -90,8 +90,7 @@ function AgentAvatarWithTurnUsageRing({
   const pct = pctTurnVsCtx ?? pctTurnVsMax
   const offset = pct == null ? c : c * (1 - pct / 100)
 
-  const ringClass =
-    pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 50 ? 'text-orange-500' : 'text-yellow-500'
+  const ringClass = pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 50 ? 'text-orange-500' : 'text-yellow-500'
   const title = (() => {
     if (!enabled || pct == null) return undefined
     if (pctTurnVsCtx != null && ctx) {
@@ -266,24 +265,17 @@ function LinkedConversationCard({
                 if (p.kind === 'agent') {
                   const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                   return (
-                    <div key={p.key} className="relative h-7 w-7">
-                      <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
-                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
-                      </div>
-                      <PresenceIndicator kind={isLinkedConversationBusy ? 'busy' : 'online'} active={true} size="sm" />
+                    <div key={p.key} className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
+                      <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
                     </div>
                   )
                 }
-                const key = String(p.key || '')
-                const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
-                const userId = m?.[1]
                 return (
-                  <div key={p.key} className="relative h-7 w-7">
+                  <div key={p.key} className="h-7 w-7">
                     <Avatar className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
                       {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
                       <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                     </Avatar>
-                    <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline?.(userId))} size="sm" />
                   </div>
                 )
               })}
@@ -343,10 +335,7 @@ interface ConversationMessageListProps {
    * - For agent DMs, pass `{ kind: 'agent', seed, avatarAttachmentId }` to show the agent avatar.
    * - For user DMs, pass `{ kind: 'human', avatarUrl }` to show the peer avatar.
    */
-  emptyHeroParticipantOverride?:
-    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
-    | { kind: 'human'; label: string; avatarUrl?: string | null }
-    | null
+  emptyHeroParticipantOverride?: { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null } | { kind: 'human'; label: string; avatarUrl?: string | null } | null
   bottomPaddingPx?: number
   className?: string
   scrollClassName?: string
@@ -469,10 +458,7 @@ export function ConversationMessageList({
   const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null
   const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
   const presence = useStarshipPresence(String(starshipId || ''), Boolean(starshipId))
-  const isConversationBusy =
-    !isTerminalTurnStatus &&
-    (activeTurnStatus === 'active' || activeTurnStatus === 'waiting_for_tools') &&
-    (isResponding || isAssistantStreaming || isAwaitingToolResults)
+  const isConversationBusy = !isTerminalTurnStatus && (activeTurnStatus === 'active' || activeTurnStatus === 'waiting_for_tools') && (isResponding || isAssistantStreaming || isAwaitingToolResults)
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
@@ -515,10 +501,7 @@ export function ConversationMessageList({
     if (dm?.dmType === 'user_user') {
       const peer: any = (dmItem as any)?.peerUser
       const peerId = typeof peer?.id === 'string' ? String(peer.id).trim() : ''
-      const label =
-        (typeof peer?.displayName === 'string' && peer.displayName.trim()) ||
-        (typeof peer?.email === 'string' && peer.email.trim()) ||
-        (peerId ? `User ${peerId.slice(0, 6)}` : 'User')
+      const label = (typeof peer?.displayName === 'string' && peer.displayName.trim()) || (typeof peer?.email === 'string' && peer.email.trim()) || (peerId ? `User ${peerId.slice(0, 6)}` : 'User')
       const avatarUrl = typeof peer?.avatar === 'string' ? String(peer.avatar) : null
       return { kind: 'human' as const, label, avatarUrl }
     }
@@ -571,9 +554,7 @@ export function ConversationMessageList({
   }, [conversationAgents])
 
   const agentAvatarAttachmentIds = useMemo(() => {
-    const ids = conversationAgents
-      .map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : ''))
-      .filter(Boolean)
+    const ids = conversationAgents.map(a => (typeof a?.avatarAttachmentId === 'string' ? String(a.avatarAttachmentId).trim() : '')).filter(Boolean)
     return Array.from(new Set(ids))
   }, [conversationAgents])
   const { data: agentAvatarAttachments = [] } = useMessageAttachments(agentAvatarAttachmentIds, starshipId)
@@ -647,7 +628,7 @@ export function ConversationMessageList({
   const submittedQuery = submittedQueryProp ?? ''
   const highlightTerm = submittedQuery.trim() || undefined
   // Normalize query by stripping markdown so "The last **Avatar** movie" matches content "The last Avatar movie".
-  const normalizedHighlightTerm = highlightTerm ? (stripMarkdownToPlainText(highlightTerm).trim() || undefined) : undefined
+  const normalizedHighlightTerm = highlightTerm ? stripMarkdownToPlainText(highlightTerm).trim() || undefined : undefined
   // Track whether the user is currently near the bottom. This avoids the "scroll a tiny amount then stop"
   // issue during streaming where message length stays constant but chunks keep appending.
   const isNearBottomRef = useRef(true)
@@ -1313,7 +1294,8 @@ export function ConversationMessageList({
                   (agent ? (typeof (agent as any)?.name === 'string' ? String((agent as any).name).trim() : '') : '') ||
                   (agent ? (typeof (agent as any)?.slug === 'string' ? String((agent as any).slug).trim() : '') : '') ||
                   (mid ? `Agent ${mid.slice(0, 6)}` : '') ||
-                  (fallbackAgentDisplayName || 'Assistant')
+                  fallbackAgentDisplayName ||
+                  'Assistant'
                 return (formatAgentNameWithRole(nameFallback, roleFromAgent) || nameFallback || fallbackAgentDisplayName || 'Assistant').trim()
               })()
             : undefined,
@@ -1559,26 +1541,24 @@ export function ConversationMessageList({
                       sizeVariant={sizeVariant}
                       highlightTerm={normalizedHighlightTerm}
                       expertMode={expertMode}
-                      turnUsage={
-                        (() => {
-                          if (!expertMode) return null
-                          if (message.role !== 'assistant') return null
-                          const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
-                          if (!tid) return null
-                          const raw = (turnUsageByTurnId?.[tid] ?? null) as any
-                          if (!raw) return null
-                          // Avoid showing partial/in-progress usage for the currently active turn.
-                          // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
-                          // Robust gating:
-                          // - Prefer terminal turn status when we have it.
-                          // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
-                          //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
-                          //   In that case, allow the ring to render once `isResponding` is false.
-                          const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
-                          if (shouldHide) return null
-                          return raw
-                        })()
-                      }
+                      turnUsage={(() => {
+                        if (!expertMode) return null
+                        if (message.role !== 'assistant') return null
+                        const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
+                        if (!tid) return null
+                        const raw = (turnUsageByTurnId?.[tid] ?? null) as any
+                        if (!raw) return null
+                        // Avoid showing partial/in-progress usage for the currently active turn.
+                        // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
+                        // Robust gating:
+                        // - Prefer terminal turn status when we have it.
+                        // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
+                        //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
+                        //   In that case, allow the ring to render once `isResponding` is false.
+                        const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
+                        if (shouldHide) return null
+                        return raw
+                      })()}
                       isUserOnline={presence.isUserOnline}
                       isConversationBusy={isConversationBusy}
                       presenceRevision={presence.dataUpdatedAt}
@@ -1904,6 +1884,9 @@ const MemoizedMessageBubble = memo(
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
     const avatarSize = isHero ? 40 : isDelegation ? 24 : 32
+    // Must match `AgentAvatarWithTurnUsageRing`'s `pad`.
+    // We reserve this width in expert mode so user/assistant rows share the same "avatar slot" width.
+    const usageRingPadPx = 3
     const avatarClass = isHero ? 'w-10 h-10' : isDelegation ? 'w-6 h-6' : 'w-8 h-8'
     const avatarWidthClass = isHero ? 'w-10' : isDelegation ? 'w-6' : 'w-8'
     const contentTextClass = isHero ? 'text-base leading-relaxed prose' : undefined
@@ -1931,6 +1914,12 @@ const MemoizedMessageBubble = memo(
       }
       return null
     }, [linkedConversationId, starshipSlug])
+
+    const avatarSlotPadPx = Boolean(expertMode) ? usageRingPadPx * 2 : 0
+    const heroAvatarSlotPx = avatarSize + avatarSlotPadPx
+    // In the normal app layout (non-hero), user avatars are rendered at 40px (w-10 h-10).
+    // Reserve the same expert-mode padding so user/assistant rows have consistent content widths.
+    const appAvatarSlotPx = 40 + avatarSlotPadPx
 
     const threadActionButton = useMemo(() => {
       if (!enableChannelMessageThreads) return null
@@ -1970,15 +1959,19 @@ const MemoizedMessageBubble = memo(
         // User message: Neutral bubble on the right (landing demos)
         // Keep spacing similar to assistant hero/delegation rows (avoid large inter-message gaps)
         // IMPORTANT: Avoid `mb-*` here; it creates unwanted gaps even when the next message is consecutive.
-        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3 mr-6', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
+        const userRowClass = isDelegation ? cn('gap-2', isConsecutiveSameUser ? 'mt-0' : 'mt-3') : cn('gap-3', isConsecutiveSameUser ? 'mt-0' : 'mt-6')
         const userBubbleClass = isDelegation ? 'px-3 py-2' : 'px-4 py-3'
         const userTextClass = isHero ? 'text-base' : 'text-sm'
         return (
           <div className="flex justify-end">
-            <div className={cn('flex w-full sm:w-auto items-end max-w-full sm:max-w-[70%]', userRowClass)}>
+            <div className={cn('flex items-end w-full max-w-full', userRowClass)}>
               <div className="flex flex-1 flex-col gap-2 items-end ph-mask-chat-message">
                 <div
-                  className={cn('w-full sm:w-auto bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative', userBubbleClass, message.sending && 'opacity-70')}
+                  className={cn(
+                    'w-full max-w-full sm:max-w-[70%] bg-card text-card-foreground border border-border/60 shadow-sm rounded-2xl rounded-br-md relative',
+                    userBubbleClass,
+                    message.sending && 'opacity-70'
+                  )}
                 >
                   <div className={cn('leading-relaxed whitespace-pre-wrap', userTextClass)}>{renderTextWithHighlight(message.content, highlightTerm)}</div>
                   {message.sending && (
@@ -2001,38 +1994,41 @@ const MemoizedMessageBubble = memo(
               </div>
               {isConsecutiveSameUser ? (
                 // Only reserve width, not height (prevents "blank gap" under short consecutive messages)
-                <div className={cn('flex-shrink-0 mt-1', avatarWidthClass)} aria-hidden="true" />
+                <div className="flex-shrink-0 mt-1" style={{ width: heroAvatarSlotPx }} aria-hidden="true" />
               ) : (
-                <div className={cn('relative flex-shrink-0 mb-1', avatarClass)}>
-                  <Avatar className={cn('rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden', avatarClass)}>
-                    {shouldUseExplicitUserAvatar ? (
-                      <AvatarImage
-                        src={explicitUserAvatarUrl!}
-                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                        referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
-                        className="rounded-full object-cover"
-                      />
-                    ) : userAvatarSeedOverride ? (
-                      <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
-                    ) : shouldUseAuthedUserAvatar ? (
-                      <AvatarImage
-                        src={effectiveUserAvatar!}
-                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                        referrerPolicy="no-referrer"
-                        crossOrigin="anonymous"
-                        className="rounded-full object-cover"
-                      />
-                    ) : null}
-                    <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                      {fallbackVariant === 'user-icon' ? (
-                        <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
-                      ) : (
-                        initialsFromName(effectiveUserName || effectiveUserEmail)
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                  <PresenceIndicator kind="online" active={showUserOnline} />
+                <div className="relative flex-shrink-0 mb-1 flex items-center justify-center" style={{ width: heroAvatarSlotPx, height: heroAvatarSlotPx }}>
+                  {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
+                  <div className="relative" style={{ width: avatarSize, height: avatarSize }}>
+                    <Avatar className={cn('rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden', avatarClass)}>
+                      {shouldUseExplicitUserAvatar ? (
+                        <AvatarImage
+                          src={explicitUserAvatarUrl!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : userAvatarSeedOverride ? (
+                        <AgentAvatar seed={userAvatarSeedOverride} size={avatarSize} />
+                      ) : shouldUseAuthedUserAvatar ? (
+                        <AvatarImage
+                          src={effectiveUserAvatar!}
+                          alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                          referrerPolicy="no-referrer"
+                          crossOrigin="anonymous"
+                          className="rounded-full object-cover"
+                        />
+                      ) : null}
+                      <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                        {fallbackVariant === 'user-icon' ? (
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : 14} className="text-primary" />
+                        ) : (
+                          initialsFromName(effectiveUserName || effectiveUserEmail)
+                        )}
+                      </AvatarFallback>
+                    </Avatar>
+                    <PresenceIndicator kind="online" active={showUserOnline} />
+                  </div>
                 </div>
               )}
             </div>
@@ -2058,38 +2054,41 @@ const MemoizedMessageBubble = memo(
           >
             {isConsecutiveSameUser ? (
               // Only reserve width, not height (prevents "inflated" spacing between short consecutive user messages)
-              <div className="flex-shrink-0 w-10 mt-1" aria-hidden="true" />
+              <div className="flex-shrink-0 mt-1" style={{ width: appAvatarSlotPx }} aria-hidden="true" />
             ) : (
-              <div className="relative flex-shrink-0 w-10 h-10 mt-1">
-                <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
-                  {shouldUseExplicitUserAvatar ? (
-                    <AvatarImage
-                      src={explicitUserAvatarUrl!}
-                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
-                      className="rounded-full object-cover"
-                    />
-                  ) : userAvatarSeedOverride ? (
-                    <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
-                  ) : shouldUseAuthedUserAvatar ? (
-                    <AvatarImage
-                      src={effectiveUserAvatar!}
-                      alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
-                      referrerPolicy="no-referrer"
-                      crossOrigin="anonymous"
-                      className="rounded-full object-cover"
-                    />
-                  ) : null}
-                  <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
-                    {fallbackVariant === 'user-icon' ? (
-                      <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
-                    ) : (
-                      initialsFromName(effectiveUserName || effectiveUserEmail)
-                    )}
-                  </AvatarFallback>
-                </Avatar>
-                <PresenceIndicator kind="online" active={showUserOnline} />
+              <div className="relative flex-shrink-0 mt-1 flex items-center justify-center" style={{ width: appAvatarSlotPx, height: appAvatarSlotPx }}>
+                {/* Anchor presence to the actual avatar box, not the padded slot wrapper */}
+                <div className="relative w-10 h-10">
+                  <Avatar className="w-10 h-10 rounded-full ring-1 ring-border/40 bg-primary/10 overflow-hidden">
+                    {shouldUseExplicitUserAvatar ? (
+                      <AvatarImage
+                        src={explicitUserAvatarUrl!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : userAvatarSeedOverride ? (
+                      <AgentAvatar seed={userAvatarSeedOverride} size={40} rounded />
+                    ) : shouldUseAuthedUserAvatar ? (
+                      <AvatarImage
+                        src={effectiveUserAvatar!}
+                        alt={effectiveUserName || effectiveUserEmail || 'User avatar'}
+                        referrerPolicy="no-referrer"
+                        crossOrigin="anonymous"
+                        className="rounded-full object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      {fallbackVariant === 'user-icon' ? (
+                        <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
+                      ) : (
+                        initialsFromName(effectiveUserName || effectiveUserEmail)
+                      )}
+                    </AvatarFallback>
+                  </Avatar>
+                  <PresenceIndicator kind="online" active={showUserOnline} />
+                </div>
               </div>
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
@@ -2149,8 +2148,7 @@ const MemoizedMessageBubble = memo(
       // When expert mode is on and we have turn usage, `AgentAvatarWithTurnUsageRing` renders an outer ring that adds padding.
       // If we don't reserve the extra width on *subsequent* messages (where the avatar is hidden), the first message in a turn
       // ends up slightly narrower.
-      const usageRingPadPx = 3 // must match `AgentAvatarWithTurnUsageRing`'s `pad`
-      const shouldReserveUsageRing = Boolean(expertMode) && Boolean(turnUsage)
+      const shouldReserveUsageRing = Boolean(expertMode)
       const assistantAvatarBasePx = isHero || isDelegation ? avatarSize : 40
       const assistantAvatarSlotPx = assistantAvatarBasePx + (shouldReserveUsageRing ? usageRingPadPx * 2 : 0)
 
@@ -2413,15 +2411,7 @@ function EmptyState() {
   )
 }
 
-function ChannelHero({
-  channelName,
-  conversationTitle,
-  bottomAlign,
-}: {
-  channelName?: string | null
-  conversationTitle: string | null
-  bottomAlign: boolean
-}) {
+function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelName?: string | null; conversationTitle: string | null; bottomAlign: boolean }) {
   const displayName =
     (typeof channelName === 'string' && channelName.trim().length > 0 ? channelName.trim() : null) ||
     (typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : null) ||
@@ -2434,21 +2424,13 @@ function ChannelHero({
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
         <div className="flex items-start gap-4">
-          <div
-            className={cn(
-              'relative overflow-hidden flex-shrink-0',
-              sizeClassName,
-              'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center'
-            )}
-          >
+          <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
             <Icon name="hash" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
           </div>
           <div className="min-w-0">
             <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
-            <p className="text-muted-foreground mt-1 leading-relaxed">
-              This is the beginning of {displayHashed}. Send a message to start a conversation.
-            </p>
+            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of {displayHashed}. Send a message to start a conversation.</p>
           </div>
         </div>
       </div>
@@ -2470,10 +2452,7 @@ function DirectMessageHero({
   bottomAlign,
 }: {
   title: string | null
-  participant:
-    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
-    | { kind: 'human'; label: string; avatarUrl?: string | null }
-    | null
+  participant: { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null } | { kind: 'human'; label: string; avatarUrl?: string | null } | null
   avatarUrlByAttachmentId: Map<string, string | null | undefined>
   bottomAlign: boolean
 }) {
@@ -2487,9 +2466,7 @@ function DirectMessageHero({
   }
   const displayName =
     // Prefer agent label (includes role) when available.
-    participant?.kind === 'agent' && participant.label.trim().length > 0
-      ? normalizeDmTitle(participant.label)
-      : normalizeDmTitle(title ?? '') || 'Direct message'
+    participant?.kind === 'agent' && participant.label.trim().length > 0 ? normalizeDmTitle(participant.label) : normalizeDmTitle(title ?? '') || 'Direct message'
   return (
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
@@ -2514,10 +2491,7 @@ function DirectMessageHeroAvatar({
   participant,
   avatarUrlByAttachmentId,
 }: {
-  participant:
-    | { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null }
-    | { kind: 'human'; label: string; avatarUrl?: string | null }
-    | null
+  participant: { kind: 'agent'; label: string; seed: string; avatarAttachmentId?: string | null } | { kind: 'human'; label: string; avatarUrl?: string | null } | null
   avatarUrlByAttachmentId: Map<string, string | null | undefined>
 }) {
   const p = participant
@@ -2540,5 +2514,13 @@ function DirectMessageHeroAvatar({
   }
 
   const avatarUrl = typeof p.avatarUrl === 'string' ? p.avatarUrl.trim() : ''
-  return <MarketplaceAvatar imageUrl={avatarUrl || null} label={p.label} seed={p.label} sizeClassName={sizeClassName} tintClassName="bg-[radial-gradient(circle_at_30%_30%,rgba(124,58,237,0.18),transparent_60%)]" />
+  return (
+    <MarketplaceAvatar
+      imageUrl={avatarUrl || null}
+      label={p.label}
+      seed={p.label}
+      sizeClassName={sizeClassName}
+      tintClassName="bg-[radial-gradient(circle_at_30%_30%,rgba(124,58,237,0.18),transparent_60%)]"
+    />
+  )
 }

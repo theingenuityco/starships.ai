@@ -50,8 +50,6 @@ import { fetchTextFromS3 } from '@/utils/s3-helper';
 import { buildStarshipSystemPromptContext } from '@/utils/starship-system-prompt-context';
 // Connector runtime (http_request.connector) removed in v2; connector_action uses template+session bundles.
 import { AgentService } from '@/services/AgentService';
-import { ConversationSummaryService } from '@/services/ConversationSummaryService';
-import type { ConversationSummaryCursor } from '@starships/protocol';
 import {
   resolvePlugins,
   mergeConversationState,
@@ -177,7 +175,6 @@ export class ConversationService {
   private currentAgentForConversation: Map<string, { id: string; name: string }> = new Map();
   // LLM model catalog repository (for pricing/context metadata)
   private llmModelRepository!: LlmModelRepository;
-  private conversationSummaryService!: ConversationSummaryService;
   // Best-effort in-memory pricing cache to avoid DB reads on every turn
   private static modelPricingCache: Map<
     string,
@@ -205,7 +202,6 @@ export class ConversationService {
     this.messageService = new MessageService();
     this.turnRepository = new TurnRepository();
     this.llmModelRepository = new LlmModelRepository();
-    this.conversationSummaryService = new ConversationSummaryService();
     this.streamBus = ConversationStreamBus.getInstance();
     this.uiActions = new UIActionService(this.streamBus);
     this.connectorSecretService = new ConnectorSecretService();
@@ -1229,126 +1225,6 @@ export class ConversationService {
   }
 
   /**
-   * Build a compact system-prompt block representing the summarized portion of the conversation.
-   *
-   * This is designed to keep LLM input bounded: we send last-N raw messages plus this summary
-   * for all older history (maintained asynchronously by a background worker).
-   */
-  private toIso(v: unknown): string {
-    if (v == null) return '';
-    if (v instanceof Date) return v.toISOString();
-    if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
-    if (typeof v === 'string') {
-      const t = Date.parse(v);
-      return Number.isFinite(t) ? new Date(t).toISOString() : v;
-    }
-    try {
-      const s = String(v);
-      const t = Date.parse(s);
-      return Number.isFinite(t) ? new Date(t).toISOString() : s;
-    } catch {
-      return '';
-    }
-  }
-
-  private async getConversationSummaryRecord(conversationId: string): Promise<{
-    summary: string;
-    summaryBeforeCreatedAt: string | null;
-    summaryBeforeMessageId: string | null;
-    updatedAt: string | null;
-    version: number;
-  } | null> {
-    try {
-      const conn = getConnection();
-      const row = await conn.queryOne<{
-        summary: string;
-        summary_before_created_at: unknown | null;
-        summary_before_message_id: string | null;
-        updated_at: unknown;
-        version: number;
-      }>(
-        `
-          SELECT
-            summary,
-            summary_before_created_at,
-            summary_before_message_id,
-            updated_at,
-            version
-          FROM conversation_summaries
-          WHERE conversation_id = $1
-          LIMIT 1
-        `,
-        [conversationId]
-      );
-      if (!row) return null;
-      return {
-        summary: typeof row.summary === 'string' ? row.summary : '',
-        summaryBeforeCreatedAt: row.summary_before_created_at ? this.toIso(row.summary_before_created_at) : null,
-        summaryBeforeMessageId:
-          typeof row.summary_before_message_id === 'string' && row.summary_before_message_id ? row.summary_before_message_id : null,
-        updatedAt: row.updated_at ? this.toIso(row.updated_at) : null,
-        version: typeof row.version === 'number' ? row.version : 0,
-      };
-    } catch {
-      return null;
-    }
-  }
-
-  private buildConversationSummarySystemPrompt(args: {
-    summaryRecord: {
-      summary: string;
-      summaryBeforeCreatedAt: string | null;
-      summaryBeforeMessageId: string | null;
-    } | null;
-  }): string {
-    const raw = args.summaryRecord && typeof args.summaryRecord.summary === 'string' ? args.summaryRecord.summary.trim() : '';
-    if (!raw) return '';
-
-    const maxChars = 5000;
-    const clipped = raw.length > maxChars ? raw.slice(0, maxChars) + '\n\n[...summary truncated...]' : raw;
-
-    const createdAt = args.summaryRecord?.summaryBeforeCreatedAt || '';
-    const id = args.summaryRecord?.summaryBeforeMessageId || '';
-
-    const cursorLine =
-      createdAt && id
-        ? `Covers messages strictly before cursor: createdAt=${createdAt} id=${id}`
-        : 'Covers older messages (cursor unknown)';
-
-    return ['<conversation_summary>', cursorLine, clipped, '</conversation_summary>'].join('\n');
-  }
-
-  private async enqueueConversationSummaryJob(args: {
-    conversationId: string;
-    starshipId: string;
-    targetBefore: ConversationSummaryCursor;
-    llmHistoryLimit: number;
-  }): Promise<void> {
-    try {
-      this.conversationSummaryService.runAsync({
-        conversationId: args.conversationId,
-        starshipId: args.starshipId,
-        targetBefore: args.targetBefore,
-        llmHistoryLimit: args.llmHistoryLimit,
-      });
-      console.log('[ConversationService] Scheduled async conversation summary', {
-        conversationId: args.conversationId,
-        starshipId: args.starshipId,
-        targetBefore: args.targetBefore,
-        llmHistoryLimit: args.llmHistoryLimit,
-      });
-    } catch (err) {
-      console.warn('[ConversationService] Failed to schedule async conversation summary', {
-        conversationId: args.conversationId,
-        starshipId: args.starshipId,
-        targetBefore: args.targetBefore,
-        llmHistoryLimit: args.llmHistoryLimit,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    }
-  }
-
-  /**
    * Build multimodal content blocks from message with attachments
    *
    * Converts messages with attachments into ContentBlock[] format for LLMs.
@@ -1678,20 +1554,10 @@ export class ConversationService {
     const llmHistoryLimit = 30;
     const initialPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
     let messages = initialPage.messages;
-    if (initialPage.hasMoreBefore && initialPage.oldestCursor) {
-      // Background job to keep a rolling summary of the older history.
-      void this.enqueueConversationSummaryJob({
-        conversationId: data.conversationId,
-        starshipId: starship.id,
-        targetBefore: initialPage.oldestCursor,
-        llmHistoryLimit,
-      });
-    }
 
     // Load conversation state for context - reload conversation to get latest state
     const latestConversation = await this.getConversationById(data.conversationId);
     const conversationState = (latestConversation?.state || {}) as ConversationState;
-    const conversationSummaryRecord = await this.getConversationSummaryRecord(data.conversationId);
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
     if (!noAgentToRun) {
@@ -1781,38 +1647,7 @@ export class ConversationService {
         // Fetch fresh starship details for each agent execution so prompt context reflects the latest updates.
         const freshStarship = (await this.getConversationStarship(data.conversationId).catch(() => null)) || starship;
         const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-        const conversationSummaryBlock = this.buildConversationSummarySystemPrompt({
-          summaryRecord: conversationSummaryRecord,
-        });
-        if (conversationSummaryBlock) {
-          // Debugging aid: log the summary block that will be injected into the LLM system prompt.
-          // Note: This may include user-provided content; keep the preview clipped to avoid overly noisy logs.
-          try {
-            const previewMaxChars = 2000;
-            const preview =
-              conversationSummaryBlock.length > previewMaxChars
-                ? conversationSummaryBlock.slice(0, previewMaxChars) + '\n\n[...conversation summary prompt truncated...]'
-                : conversationSummaryBlock;
-            console.log('[ConversationService] Conversation summary system prompt injected', {
-              conversationId: data.conversationId,
-              starshipId: starship.id,
-              agentId: agentModel.id,
-              summaryChars: conversationSummaryBlock.length,
-              summaryVersion: conversationSummaryRecord?.version,
-              summaryUpdatedAt: conversationSummaryRecord?.updatedAt,
-              summaryBefore:
-                conversationSummaryRecord?.summaryBeforeCreatedAt && conversationSummaryRecord?.summaryBeforeMessageId
-                  ? { createdAt: conversationSummaryRecord.summaryBeforeCreatedAt, id: conversationSummaryRecord.summaryBeforeMessageId }
-                  : undefined,
-            });
-            console.log(preview);
-          } catch {
-            // best-effort only
-          }
-        }
-        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, conversationSummaryBlock]
-          .filter(Boolean)
-          .join('\n\n');
+        const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
 
         const agentWithTools: AgentParams = {
           ...agentModel,
@@ -2059,14 +1894,6 @@ export class ConversationService {
       const llmHistoryLimit = 30;
       const page = await this.getConversationMessagesPage({ conversationId, limit: llmHistoryLimit });
       const messages = page.messages;
-      if (page.hasMoreBefore && page.oldestCursor) {
-        void this.enqueueConversationSummaryJob({
-          conversationId,
-          starshipId: starship.id,
-          targetBefore: page.oldestCursor,
-          llmHistoryLimit,
-        });
-      }
       const llmMessages: LlmMessage[] = await Promise.all(
         messages.map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
@@ -2100,7 +1927,6 @@ export class ConversationService {
       const conversationState = (
         conversation.state && typeof conversation.state === 'object' ? conversation.state : {}
       ) as ConversationState;
-      const conversationSummaryRecord = await this.getConversationSummaryRecord(conversationId);
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
@@ -2122,38 +1948,7 @@ export class ConversationService {
       // Fetch fresh starship details so prompt context reflects the latest updates.
       const freshStarship = (await this.getConversationStarship(conversationId).catch(() => null)) || starship;
       const injectedStarshipContext = buildStarshipSystemPromptContext(freshStarship);
-      const conversationSummaryBlock = this.buildConversationSummarySystemPrompt({
-        summaryRecord: conversationSummaryRecord,
-      });
-      if (conversationSummaryBlock) {
-        // Debugging aid: log the summary block that will be injected into the LLM system prompt.
-        // Note: This may include user-provided content; keep the preview clipped to avoid overly noisy logs.
-        try {
-          const previewMaxChars = 2000;
-          const preview =
-            conversationSummaryBlock.length > previewMaxChars
-              ? conversationSummaryBlock.slice(0, previewMaxChars) + '\n\n[...conversation summary prompt truncated...]'
-              : conversationSummaryBlock;
-          console.log('[ConversationService] Conversation summary system prompt injected', {
-            conversationId,
-            starshipId: starship.id,
-            agentId: agentModel.id,
-            summaryChars: conversationSummaryBlock.length,
-            summaryVersion: conversationSummaryRecord?.version,
-            summaryUpdatedAt: conversationSummaryRecord?.updatedAt,
-            summaryBefore:
-              conversationSummaryRecord?.summaryBeforeCreatedAt && conversationSummaryRecord?.summaryBeforeMessageId
-                ? { createdAt: conversationSummaryRecord.summaryBeforeCreatedAt, id: conversationSummaryRecord.summaryBeforeMessageId }
-                : undefined,
-          });
-          console.log(preview);
-        } catch {
-          // best-effort only
-        }
-      }
-      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext, conversationSummaryBlock]
-        .filter(Boolean)
-        .join('\n\n');
+      const combinedSystemPrompt = [String(agentModel.systemPrompt ?? ''), injectedStarshipContext].filter(Boolean).join('\n\n');
 
       const agentWithTools: AgentParams = {
         ...agentModel,

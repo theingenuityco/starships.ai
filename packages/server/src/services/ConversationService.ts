@@ -44,6 +44,7 @@ import { StarshipTurnLeaseService } from '@/services/StarshipTurnLeaseService';
 import { WalletService } from '@/services/WalletService';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { UIActionService } from '@/services/UIActionService';
+import { NotificationService } from '@/services/NotificationService';
 import { parse, Allow } from 'partial-json-parser';
 import { parsePartialJSONObject } from '../utils/PartialJson';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
@@ -105,6 +106,7 @@ export class ConversationService {
   private usageService!: UsageService;
   private billingService!: BillingService;
   private walletService!: WalletService;
+  private notifications!: NotificationService;
   // Auto-stop guards for low balance
   private lowBalanceStopTriggered: Set<string> = new Set();
   private lastLowBalanceCheckAt: Map<string, number> = new Map();
@@ -208,6 +210,7 @@ export class ConversationService {
     this.usageService = new UsageService();
     this.billingService = new BillingService();
     this.walletService = new WalletService();
+    this.notifications = new NotificationService();
 
     // Choose default runner based on whether a remote runner is configured.
     // When RUNNER_URL is set, server startup configures autopilot.setRunnerConfig({ url, token })
@@ -1455,6 +1458,12 @@ export class ConversationService {
         type: 'message.append',
         data: { conversationId: data.conversationId, message: userMessage },
       });
+      // Best-effort: produce notifications for channels/DMs.
+      try {
+        void this.notifications.handleMessageAppend({ conversationId: data.conversationId, message: userMessage });
+      } catch {
+        /* best-effort */
+      }
     } catch (e) {
       console.warn('[STREAM] Failed to publish initial turn/message events', e);
     }
@@ -2248,6 +2257,11 @@ export class ConversationService {
       const at = new Date().toISOString();
       if (persistedMsg) {
         await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
+        try {
+          void this.notifications.handleMessageAppend({ conversationId, message: persistedMsg });
+        } catch {
+          /* best-effort */
+        }
       }
       await this.streamBus.publish(conversationId, { type: 'turn.status', data: { conversationId, turnId, status: 'cancelled', at } });
     } catch (err) {
@@ -2650,6 +2664,11 @@ export class ConversationService {
           });
           if (persisted) {
             await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persisted } });
+            try {
+              void this.notifications.handleMessageAppend({ conversationId, message: persisted });
+            } catch {
+              /* best-effort */
+            }
           }
         } catch (e) {
           console.warn('[STREAMING] Failed to persist partial on workflow_paused:', e);
@@ -3483,6 +3502,11 @@ export class ConversationService {
                 // Publish persisted messages to the shared stream.
                 try {
                   await this.streamBus.publish(conversationId, { type: 'message.append', data: { conversationId, message: persistedMsg } });
+                  try {
+                    void this.notifications.handleMessageAppend({ conversationId, message: persistedMsg });
+                  } catch {
+                    /* best-effort */
+                  }
                 } catch (e) {
                   console.warn('[STREAM] Failed to publish message.append', e);
                 }

@@ -4,6 +4,7 @@ import { ConversationInterface } from '@/components/conversation/ConversationInt
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { useStarshipChannels } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useMarkConversationRead } from '@/hooks/useNotifications'
 import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo, useEffect, useRef, useState } from 'react'
@@ -140,6 +141,14 @@ export default function ConversationsLayout({ children }: { children: React.Reac
   const { data: starshipData } = useStarshipBySlug(routeParams.slug)
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starshipData?.id ?? '', Boolean(starshipData?.id))
 
+  const markRead = useMarkConversationRead()
+  useEffect(() => {
+    const cid = typeof routeParams.conversationId === 'string' ? routeParams.conversationId : ''
+    if (!cid) return
+    void markRead.mutateAsync(cid).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [routeParams.conversationId])
+
   const threadKey = useMemo(() => {
     const raw = searchParams.get('thread')
     const v = typeof raw === 'string' ? raw.trim() : ''
@@ -152,6 +161,13 @@ export default function ConversationsLayout({ children }: { children: React.Reac
     if (threadKey === 'draft') return null
     return threadKey
   }, [threadKey])
+
+  useEffect(() => {
+    const cid = typeof threadConversationId === 'string' ? threadConversationId : ''
+    if (!cid) return
+    void markRead.mutateAsync(cid).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadConversationId])
 
   const setThreadConversationIdInUrl = useCallback(
     (conversationId: string | null) => {

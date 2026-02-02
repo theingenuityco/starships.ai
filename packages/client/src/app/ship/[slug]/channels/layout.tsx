@@ -4,6 +4,7 @@ import { ConversationInterface } from '@/components/conversation/ConversationInt
 import { ThreadPane } from '@/components/conversation/ThreadPane'
 import { useStarshipChannels } from '@/hooks/useConversations'
 import { useStarshipBySlug } from '@/hooks/useStarships'
+import { useMarkConversationRead } from '@/hooks/useNotifications'
 import type { AgentModel, MessageModel } from '@starships/protocol'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -170,6 +171,16 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     return cid ? String(cid) : null
   }, [activeChannel?.conversationId])
 
+  const markRead = useMarkConversationRead()
+  useEffect(() => {
+    const cid = typeof activeConversationId === 'string' ? activeConversationId : ''
+    if (!cid) return
+    // Best-effort: mark the open channel as read to clear unread styling/badges.
+    // (Server is authoritative and will resolve latest message.)
+    void markRead.mutateAsync(cid).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConversationId])
+
   const threadKey = useMemo(() => {
     const raw = searchParams.get('thread')
     const v = typeof raw === 'string' ? raw.trim() : ''
@@ -182,6 +193,13 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     if (threadKey === 'draft') return null
     return threadKey
   }, [threadKey])
+
+  useEffect(() => {
+    const cid = typeof threadConversationId === 'string' ? threadConversationId : ''
+    if (!cid) return
+    void markRead.mutateAsync(cid).catch(() => undefined)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threadConversationId])
 
   const setThreadConversationIdInUrl = useCallback(
     (conversationId: string | null) => {

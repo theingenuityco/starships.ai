@@ -842,11 +842,11 @@ export class ConversationService {
         ...c,
         // Ensure cursor fields are always valid ISO datetime strings
         createdAt: toIso(c.createdAt),
-        updatedAt: toIso((c as any).updatedAt ?? (c as any).createdAt),
+        updatedAt: toIso(c.updatedAt ?? c.createdAt),
       })) as unknown as ConversationModel[];
     const conversationIds = conversations
-      .map((c: any) => (typeof c?.id === 'string' ? String(c.id) : ''))
-      .filter((id) => id && id.trim().length > 0);
+      .map((c) => (typeof c.id === 'string' ? c.id : ''))
+      .filter((id) => id.trim().length > 0);
 
     const agentsByConversationId = new Map<string, AgentModel[]>();
     if (conversationIds.length > 0) {
@@ -1609,7 +1609,7 @@ export class ConversationService {
     const isChannel = Boolean(channel);
     const dmRepo = new DirectMessageRepository();
     const dm = await dmRepo.findByConversationId(data.conversationId).catch(() => null);
-    const isUserUserDm = Boolean(dm && (dm as any).dmType === 'user_user');
+    const isUserUserDm = dm?.dmType === 'user_user';
 
     const conversation = await this.getConversationById(data.conversationId);
     if (!conversation) {

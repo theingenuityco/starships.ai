@@ -91,25 +91,23 @@ router.get('/connectors/catalog', async (req: Request, res: Response): Promise<v
 
     const connectorService = new ConnectorService();
     const catalog = await connectorService.getConnectorCatalog();
-    const limit = queryData.limit ?? 20;
     const query = (queryData.q ?? '').trim().toLowerCase();
 
     let results: ConnectorCatalogItem[];
 
     if (!query) {
-      // No query: return a lightweight listing
-      results = catalog.slice(0, limit);
+      // No query: return all enabled connectors
+      results = queryData.limit ? catalog.slice(0, queryData.limit) : catalog;
     } else {
       // Search: filter by provider name, description, and category
-      results = catalog
-        .filter((connector) => {
-          const providerMatch = connector.provider.toLowerCase().includes(query);
-          const nameMatch = connector.name.toLowerCase().includes(query);
-          const descMatch = connector.description?.toLowerCase().includes(query) ?? false;
-          const categoryMatch = (connector as { category?: string }).category?.toLowerCase().includes(query) ?? false;
-          return providerMatch || nameMatch || descMatch || categoryMatch;
-        })
-        .slice(0, limit);
+      const filtered = catalog.filter((connector) => {
+        const providerMatch = connector.provider.toLowerCase().includes(query);
+        const nameMatch = connector.name.toLowerCase().includes(query);
+        const descMatch = connector.description?.toLowerCase().includes(query) ?? false;
+        const categoryMatch = (connector as { category?: string }).category?.toLowerCase().includes(query) ?? false;
+        return providerMatch || nameMatch || descMatch || categoryMatch;
+      });
+      results = queryData.limit ? filtered.slice(0, queryData.limit) : filtered;
     }
 
     const response: ConnectorCatalogResponse = {

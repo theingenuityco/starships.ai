@@ -24,13 +24,10 @@ export function useStarshipToolPermissions(starshipId: string, enabled: boolean 
     queryKey: STARSHIP_TOOL_PERMISSION_QUERY_KEYS.byStarship(starshipId),
     queryFn: async (): Promise<StarshipToolPermissionRow[]> => {
       if (!starshipId) return []
-      const res: FetchResponse<ApiResponse<StarshipToolPermissionRow[]>> = await api.get(
-        `/api/v1/starships/${starshipId}/starship-tool-permissions`
-      )
+      const res: FetchResponse<ApiResponse<StarshipToolPermissionRow[]>> = await api.get(`/api/v1/starships/${starshipId}/starship-tool-permissions`)
       return res.data.data || []
     },
     enabled: Boolean(starshipId) && enabled,
     staleTime: 30 * 1000,
   })
 }
-

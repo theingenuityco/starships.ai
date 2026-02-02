@@ -13,12 +13,7 @@ import type { ApiResponse, ToolModel } from '@starships/protocol'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import React, { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import {
-  STARSHIP_TOOL_PERMISSION_QUERY_KEYS,
-  type StarshipToolPermissionRow,
-  type ToolPermission,
-  useStarshipToolPermissions,
-} from '@/hooks/useStarshipToolPermissions'
+import { STARSHIP_TOOL_PERMISSION_QUERY_KEYS, type StarshipToolPermissionRow, type ToolPermission, useStarshipToolPermissions } from '@/hooks/useStarshipToolPermissions'
 import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 import { cn } from '@/lib/utils'
 
@@ -114,13 +109,7 @@ const permissionDotClassName = (p: PermissionUIValue): string => {
   return 'bg-muted-foreground/60'
 }
 
-function ToolDropdown(args: {
-  value: string
-  onValueChange: (next: string) => void
-  tools: ToolModel[]
-  disabled?: boolean
-  placeholder?: string
-}) {
+function ToolDropdown(args: { value: string; onValueChange: (next: string) => void; tools: ToolModel[]; disabled?: boolean; placeholder?: string }) {
   const { value, onValueChange, tools, disabled = false, placeholder = 'Select…' } = args
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
@@ -163,23 +152,11 @@ function ToolDropdown(args: {
         </Button>
       </PopoverTrigger>
 
-      <PopoverContent
-        align="start"
-        side="bottom"
-        sideOffset={8}
-        aria-label="Tool options"
-        className={cn('p-0 rounded-lg shadow-frosted-lg text-sm leading-6 w-[min(520px,calc(100vw-40px))]')}
-      >
+      <PopoverContent align="start" side="bottom" sideOffset={8} aria-label="Tool options" className={cn('p-0 rounded-lg shadow-frosted-lg text-sm leading-6 w-[min(520px,calc(100vw-40px))]')}>
         <div className="border-b border-border/40 p-2">
           <div className="relative">
             <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
-            <Input
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              placeholder="Search tools…"
-              className="h-9 pl-10"
-              autoFocus
-            />
+            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tools…" className="h-9 pl-10" autoFocus />
           </div>
         </div>
 
@@ -201,9 +178,7 @@ function ToolDropdown(args: {
                   className={cn(
                     // Match conversation AgentSelector item styling
                     'w-full text-left px-3 py-2 rounded-lg transition-colors focus-visible-ring',
-                    value === tool.slug
-                      ? 'text-primary bg-primary/10 border-transparent'
-                      : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/5 hover:shadow-sm'
+                    value === tool.slug ? 'text-primary bg-primary/10 border-transparent' : 'text-muted-foreground border-transparent hover:text-foreground hover:bg-primary/5 hover:shadow-sm'
                   )}
                 >
                   <div className="flex items-center gap-3 min-w-0">
@@ -274,9 +249,7 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
 
   const addableTools = useMemo(() => {
     const already = new Set(permissionRows.map(r => r.toolSlug).filter(Boolean))
-    return starshipTools
-      .filter(t => t?.slug && !already.has(t.slug))
-      .sort((a, b) => (a.name || a.slug || '').localeCompare(b.name || b.slug || ''))
+    return starshipTools.filter(t => t?.slug && !already.has(t.slug)).sort((a, b) => (a.name || a.slug || '').localeCompare(b.name || b.slug || ''))
   }, [permissionRows, starshipTools])
 
   const upsertPermission = useMutation({
@@ -318,17 +291,13 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
 
   const removePermission = useMutation({
     mutationFn: async (toolSlug: string) => {
-      const res: FetchResponse<ApiResponse<{ ok: true }>> = await api.delete(
-        `/api/v1/starships/${starshipId}/starship-tool-permissions/${encodeURIComponent(toolSlug)}`
-      )
+      const res: FetchResponse<ApiResponse<{ ok: true }>> = await api.delete(`/api/v1/starships/${starshipId}/starship-tool-permissions/${encodeURIComponent(toolSlug)}`)
       return res.data.data
     },
     onMutate: async toolSlug => {
       await queryClient.cancelQueries({ queryKey: STARSHIP_TOOL_PERMISSION_QUERY_KEYS.byStarship(starshipId) })
       const prev = queryClient.getQueryData<StarshipToolPermissionRow[]>(STARSHIP_TOOL_PERMISSION_QUERY_KEYS.byStarship(starshipId))
-      queryClient.setQueryData<StarshipToolPermissionRow[]>(STARSHIP_TOOL_PERMISSION_QUERY_KEYS.byStarship(starshipId), old =>
-        (Array.isArray(old) ? old : []).filter(r => r.toolSlug !== toolSlug)
-      )
+      queryClient.setQueryData<StarshipToolPermissionRow[]>(STARSHIP_TOOL_PERMISSION_QUERY_KEYS.byStarship(starshipId), old => (Array.isArray(old) ? old : []).filter(r => r.toolSlug !== toolSlug))
       return { prev }
     },
     onError: (err: any, _vars, ctx) => {
@@ -355,8 +324,7 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
           Starship-level tools
         </CardTitle>
         <CardDescription className="text-sm">
-          Set default tool permissions that apply to <span className="font-medium">all agents</span> in this starship. Agent-specific permissions can still override these
-          defaults.
+          Set default tool permissions that apply to <span className="font-medium">all agents</span> in this starship. Agent-specific permissions can still override these defaults.
         </CardDescription>
       </CardHeader>
 
@@ -402,9 +370,7 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading tools…</p>
         ) : permissionRows.length === 0 ? (
-          <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 text-sm text-muted-foreground">
-            No starship-level tools assigned yet.
-          </div>
+          <div className="rounded-lg border border-dashed border-border/60 bg-muted/10 p-4 text-sm text-muted-foreground">No starship-level tools assigned yet.</div>
         ) : (
           <div className="grid grid-cols-1 gap-4">
             {assignedRows.map(row => {
@@ -423,10 +389,7 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
               ]
 
               return (
-                <div
-                  key={row.toolId || row.toolSlug}
-                  className="group relative rounded-xl border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
-                >
+                <div key={row.toolId || row.toolSlug} className="group relative rounded-xl border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
                       <div className="mt-1.5 flex-shrink-0">
@@ -434,9 +397,7 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
                       </div>
                       <div className="min-w-0">
                         <div className="text-sm font-semibold leading-5 text-foreground truncate">{tool?.name || toolSlug || 'Unknown tool'}</div>
-                        <div className={cn('mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2', !tool?.description ? 'font-mono' : undefined)}>
-                          {toolSecondary}
-                        </div>
+                        <div className={cn('mt-1.5 text-xs leading-relaxed text-muted-foreground line-clamp-2', !tool?.description ? 'font-mono' : undefined)}>{toolSecondary}</div>
                       </div>
                     </div>
 
@@ -487,13 +448,8 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
           </div>
         )}
 
-        {!canEdit ? (
-          <div className="rounded-lg border border-border/60 bg-muted/10 p-3 text-xs text-muted-foreground">
-            You don’t have permission to change starship-level tool defaults.
-          </div>
-        ) : null}
+        {!canEdit ? <div className="rounded-lg border border-border/60 bg-muted/10 p-3 text-xs text-muted-foreground">You don’t have permission to change starship-level tool defaults.</div> : null}
       </CardContent>
     </Card>
   )
 }
-

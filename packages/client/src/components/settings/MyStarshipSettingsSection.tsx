@@ -81,11 +81,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
   const removeMember = useRemoveStarshipMember(starship?.id ?? '')
   const revokeInvite = useRevokeStarshipInvite(starship?.id ?? '')
 
-  const [confirmAction, setConfirmAction] = useState<
-    | { kind: 'removeMember'; memberUserId: string; label: string }
-    | { kind: 'revokeInvite'; email: string }
-    | null
-  >(null)
+  const [confirmAction, setConfirmAction] = useState<{ kind: 'removeMember'; memberUserId: string; label: string } | { kind: 'revokeInvite'; email: string } | null>(null)
 
   const [inviteEmail, setInviteEmail] = useState('')
   const [lastInviteUrl, setLastInviteUrl] = useState<string | null>(null)
@@ -270,9 +266,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                     {starship.ownerId === userId ? (
                       <div className="flex h-6 items-center gap-2">
                         <Avatar className="h-5 w-5 rounded-full">
-                          {typeof userAvatar === 'string' && userAvatar.trim() ? (
-                            <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} referrerPolicy="no-referrer" />
-                          ) : null}
+                          {typeof userAvatar === 'string' && userAvatar.trim() ? <AvatarImage src={userAvatar.trim()} alt={userName || 'Owner'} referrerPolicy="no-referrer" /> : null}
                           <AvatarFallback className="rounded-full text-[9px] leading-none">{(userName || 'You').slice(0, 1).toUpperCase()}</AvatarFallback>
                         </Avatar>
                         <span className="text-xs font-medium">{userName || 'You'}</span>
@@ -353,13 +347,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
               <CardContent className="flex flex-1 flex-col gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="invite-email">Email</Label>
-                  <Input
-                    id="invite-email"
-                    value={inviteEmail}
-                    onChange={e => setInviteEmail(e.target.value)}
-                    placeholder="teammate@example.com"
-                    disabled={createInvite.isPending}
-                  />
+                  <Input id="invite-email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} placeholder="teammate@example.com" disabled={createInvite.isPending} />
                 </div>
                 <div className="flex items-center gap-2">
                   <Button
@@ -437,9 +425,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                                 </div>
                               </div>
                               <div className="flex items-center gap-2">
-                                <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">
-                                  {m.role}
-                                </span>
+                                <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">{m.role}</span>
                                 <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-400">
                                   <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                                   Active
@@ -476,10 +462,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                       </div>
                       <div className="space-y-2">
                         {(membersAndInvites?.invites ?? []).map(invite => (
-                          <div
-                            key={`invite-${invite.invitedEmail}-${invite.createdAt}`}
-                            className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3"
-                          >
+                          <div key={`invite-${invite.invitedEmail}-${invite.createdAt}`} className="flex items-center justify-between gap-3 rounded-lg border border-border/60 bg-muted/10 p-3">
                             <div className="flex min-w-0 items-center gap-3">
                               <div className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 ring-1 ring-primary/30">
                                 <Icon name="mail" className="h-4 w-4 text-primary" />
@@ -490,9 +473,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
                               </div>
                             </div>
                             <div className="flex items-center gap-2">
-                              <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">
-                                {invite.role}
-                              </span>
+                              <span className="inline-flex items-center rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[11px] font-medium capitalize">{invite.role}</span>
                               <span className="inline-flex items-center gap-1 rounded-full border border-amber-500/30 bg-amber-500/10 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-400">
                                 <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                                 Invited
@@ -532,13 +513,9 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
       >
         <DialogContent className="sm:max-w-[520px]">
           <DialogHeader>
-            <DialogTitle className={confirmAction?.kind === 'removeMember' ? 'text-destructive' : undefined}>
-              {confirmAction?.kind === 'removeMember' ? 'Remove member' : 'Revoke invite'}
-            </DialogTitle>
+            <DialogTitle className={confirmAction?.kind === 'removeMember' ? 'text-destructive' : undefined}>{confirmAction?.kind === 'removeMember' ? 'Remove member' : 'Revoke invite'}</DialogTitle>
             <DialogDescription>
-              {confirmAction?.kind === 'removeMember'
-                ? 'This will remove the member’s access to this starship immediately.'
-                : 'This will invalidate the invite link so it can no longer be used.'}
+              {confirmAction?.kind === 'removeMember' ? 'This will remove the member’s access to this starship immediately.' : 'This will invalidate the invite link so it can no longer be used.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -569,12 +546,7 @@ export function MyStarshipSettingsSection({ starship, starshipSlug, isLoading = 
           ) : null}
 
           <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="ghost"
-              onClick={() => setConfirmAction(null)}
-              disabled={removeMember.isPending || revokeInvite.isPending}
-            >
+            <Button type="button" variant="ghost" onClick={() => setConfirmAction(null)} disabled={removeMember.isPending || revokeInvite.isPending}>
               Cancel
             </Button>
             <Button

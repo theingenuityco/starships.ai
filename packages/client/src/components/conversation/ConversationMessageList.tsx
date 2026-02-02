@@ -2127,13 +2127,7 @@ const MemoizedMessageBubble = memo(
                       ) : null}
                       <AvatarFallback className="rounded-full bg-primary/10 text-primary text-xs font-semibold">
                         {fallbackVariant === 'user-icon' ? (
-                          <Icon
-                            name="user"
-                            iconOverride={{ type: 'phosphor', component: 'User' }}
-                            weight="bold"
-                            size={isHero ? 20 : isDelegation ? 14 : 16}
-                            className="text-primary"
-                          />
+                          <Icon name="user" iconOverride={{ type: 'phosphor', component: 'User' }} weight="bold" size={isHero ? 20 : isDelegation ? 14 : 16} className="text-primary" />
                         ) : (
                           initialsFromName(effectiveUserName || effectiveUserEmail)
                         )}

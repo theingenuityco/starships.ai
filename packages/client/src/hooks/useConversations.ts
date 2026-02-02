@@ -425,7 +425,7 @@ export function useChildConversationsPendingApprovals(
     refetchOnWindowFocus: true,
   })
 
-  const payload = (q.data as any) as Payload | undefined
+  const payload = q.data as any as Payload | undefined
   return {
     children: Array.isArray(payload?.children) ? payload!.children : [],
     hasMoreBefore: Boolean(payload?.hasMoreBefore),
@@ -933,6 +933,14 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastSseErrorAtRef = useRef<number | null>(null)
 
   type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
+  type TurnUsage = {
+    turnId: string
+    at: string
+    agentId?: string
+    agentName?: string
+    model?: string
+    usage: { promptTokens: number; completionTokens: number; totalTokens: number; cost?: number }
+  }
 
   type LegacyChunk = { type: 'append'; message: ClientMessage } | { type: 'turn_started'; payload?: { local?: boolean } }
   type StreamErrorChunk = { type: 'error'; error: unknown }
@@ -1036,6 +1044,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
               return
             case 'turn.status':
               push({ type: 'turn.status', data })
+              return
+            case 'turn.usage':
+              push({ type: 'turn.usage', data })
               return
             case 'assistant.delta':
               push({ type: 'assistant.delta', data })
@@ -1307,6 +1318,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
       const at = (chunk as any)?.data?.at
       const now = typeof at === 'string' && at.trim().length > 0 ? at : new Date().toISOString()
+      const evtTurnId = typeof (chunk as any)?.data?.turnId === 'string' ? String((chunk as any).data.turnId) : null
       if (idx === -1) {
         const shell: ClientMessage = {
           id: messageId,
@@ -1542,6 +1554,84 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
+  function reduceTurnUsage(acc: Record<string, TurnUsage>, chunk: StreamedChunk): Record<string, TurnUsage> {
+    if (chunk.type === 'snapshot') {
+      const d: any = (chunk as any)?.data
+      const snapMap = d?.turnUsageByTurnId
+      if (!snapMap || typeof snapMap !== 'object') return acc
+      const nextAcc: Record<string, TurnUsage> = { ...acc }
+      for (const [k, v] of Object.entries(snapMap as Record<string, any>)) {
+        const tid = typeof (v as any)?.turnId === 'string' ? String((v as any).turnId) : typeof k === 'string' ? String(k) : ''
+        if (!tid) continue
+        const at = typeof (v as any)?.at === 'string' ? String((v as any).at) : new Date().toISOString()
+        const u = (v as any)?.usage
+        if (!u || typeof u !== 'object') continue
+        const promptTokens = typeof u.promptTokens === 'number' ? u.promptTokens : 0
+        const completionTokens = typeof u.completionTokens === 'number' ? u.completionTokens : 0
+        const totalTokens = typeof u.totalTokens === 'number' ? u.totalTokens : Number(promptTokens) + Number(completionTokens)
+        const cost = typeof u.cost === 'number' && Number.isFinite(u.cost) ? u.cost : undefined
+        nextAcc[tid] = {
+          turnId: tid,
+          at,
+          ...(typeof (v as any)?.agentId === 'string' ? { agentId: String((v as any).agentId) } : null),
+          ...(typeof (v as any)?.agentName === 'string' ? { agentName: String((v as any).agentName) } : null),
+          ...(typeof (v as any)?.model === 'string' ? { model: String((v as any).model) } : null),
+          usage: { promptTokens, completionTokens, totalTokens, ...(typeof cost === 'number' ? { cost } : null) },
+        }
+      }
+      return nextAcc
+    }
+    if (chunk.type !== 'turn.usage') return acc
+    const d: any = (chunk as any)?.data
+    const turnId = typeof d?.turnId === 'string' ? String(d.turnId) : ''
+    if (!turnId) return acc
+    const at = typeof d?.at === 'string' ? String(d.at) : new Date().toISOString()
+    const usageNode = d?.usage && typeof d.usage === 'object' ? d.usage : null
+    if (!usageNode) return acc
+    const promptTokens = typeof usageNode.promptTokens === 'number' ? usageNode.promptTokens : 0
+    const completionTokens = typeof usageNode.completionTokens === 'number' ? usageNode.completionTokens : 0
+    const totalTokens = typeof usageNode.totalTokens === 'number' ? usageNode.totalTokens : Number(promptTokens) + Number(completionTokens)
+    const cost = typeof usageNode.cost === 'number' && Number.isFinite(usageNode.cost) ? usageNode.cost : undefined
+
+    // A single assistant "turn" can include multiple LLM calls (tool flows, retries, etc).
+    // For UX, we want the *total tokens/cost burned in the turn*, so we aggregate by turnId.
+    const prev = acc[turnId]
+    if (!prev) {
+      const next: TurnUsage = {
+        turnId,
+        at,
+        ...(typeof d?.agentId === 'string' ? { agentId: String(d.agentId) } : null),
+        ...(typeof d?.agentName === 'string' ? { agentName: String(d.agentName) } : null),
+        ...(typeof d?.model === 'string' ? { model: String(d.model) } : null),
+        usage: { promptTokens, completionTokens, totalTokens, ...(typeof cost === 'number' ? { cost } : null) },
+      }
+      return { ...acc, [turnId]: next }
+    }
+
+    const prevPrompt = Number(prev?.usage?.promptTokens ?? 0)
+    const prevCompletion = Number(prev?.usage?.completionTokens ?? 0)
+    const prevTotal = Number(prev?.usage?.totalTokens ?? (prevPrompt + prevCompletion))
+    const prevCost = typeof prev?.usage?.cost === 'number' && Number.isFinite(prev.usage.cost) ? Number(prev.usage.cost) : 0
+    const nextCost = typeof cost === 'number' && Number.isFinite(cost) ? cost : 0
+
+    const next: TurnUsage = {
+      ...prev,
+      // Keep latest timestamp for display/debug.
+      at,
+      // Preserve prior metadata if present; otherwise fill from incoming.
+      ...(typeof prev?.agentId === 'string' ? { agentId: prev.agentId } : typeof d?.agentId === 'string' ? { agentId: String(d.agentId) } : null),
+      ...(typeof prev?.agentName === 'string' ? { agentName: prev.agentName } : typeof d?.agentName === 'string' ? { agentName: String(d.agentName) } : null),
+      ...(typeof prev?.model === 'string' ? { model: prev.model } : typeof d?.model === 'string' ? { model: String(d.model) } : null),
+      usage: {
+        promptTokens: prevPrompt + Number(promptTokens),
+        completionTokens: prevCompletion + Number(completionTokens),
+        totalTokens: prevTotal + Number(totalTokens),
+        ...(prevCost + nextCost > 0 ? { cost: prevCost + nextCost } : null),
+      },
+    }
+    return { ...acc, [turnId]: next }
+  }
+
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {
     const processed: StreamedChunk[] = []
@@ -1589,6 +1679,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     return processed
   }, [chunksRevisionKey, turnState.status])
 
+  const turnUsageByTurnId = useMemo<Record<string, TurnUsage>>(() => filteredChunks.reduce(reduceTurnUsage, {}), [chunksRevisionKey])
+
   // Process queued chunks when animation completes
   useEffect(() => {
     if (queuedAppendChunksRef.current.length === 0) return
@@ -1597,8 +1689,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const currentMessages = processedChunksRef.current.reduce(reduceMessages, emptyMessages)
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
       const turnStatus = turnState.status
-      const shouldBypassAnimation =
-        turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
+      const shouldBypassAnimation = turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
 
       if (!lastAssistantId || isAnimationComplete(lastAssistantId) || shouldBypassAnimation) {
         // Animation complete, add queued chunks to the query data
@@ -1862,6 +1953,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isAwaitingAssistant,
     isAwaitingToolResults,
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
+    turnId: turnState.turnId,
+    turnStatus: turnState.status,
+    turnUsageByTurnId,
     lastUIAction,
     hasMoreBefore: latestSnapshot.hasMoreBefore,
     oldestCursor: latestSnapshot.oldestCursor,

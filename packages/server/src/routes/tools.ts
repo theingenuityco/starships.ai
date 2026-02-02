@@ -4,7 +4,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { validateData } from '@/utils/validation';
 import { IdSchema, SlugSchema, PaginationSchema, noXSS, XSS_ERROR_MESSAGE } from '@/schemas/common';
-import { ToolRepository, ToolTemplateRepository, StarshipRepository, UserRepository } from '@starships/models';
+import { AgentRepository, ToolRepository, ToolTemplateRepository, StarshipRepository, UserRepository } from '@starships/models';
 import { BalanceValidationService } from '@/services/BalanceValidationService';
 import { WalletService } from '@/services/WalletService';
 import { handleError, sendError, sendSuccess } from '../utils/responseHelpers';
@@ -310,6 +310,113 @@ router.get('/starships/:starshipId/tools', jwtAuthMiddleware, async (req: Reques
     sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship tools');
   }
 });
+
+// GET /starships/:starshipId/starship-tool-permissions - Get starship-level tool permission rows
+router.get('/starships/:starshipId/starship-tool-permissions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const hasAccess = await verifyStarshipAccess(paramValidation.starshipId, userId, res);
+    if (!hasAccess) return;
+
+    const repo = new AgentRepository();
+    const rows = await repo.getStarshipToolPermissions(paramValidation.starshipId);
+    sendSuccess(res, rows);
+  } catch (error) {
+    console.error('[TOOLS] Error fetching starship tool permissions:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to fetch starship tool permissions');
+  }
+});
+
+// PUT /starships/:starshipId/starship-tool-permissions - Upsert starship-level tool permissions by slug
+router.put('/starships/:starshipId/starship-tool-permissions', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ starshipId: IdSchema }), req.params, res, 'starship parameter');
+    if (!paramValidation) return;
+
+    const userId = req.user?.id as string | undefined;
+    if (!userId) {
+      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+      return;
+    }
+
+    const hasAccess = await verifyStarshipAccess(paramValidation.starshipId, userId, res);
+    if (!hasAccess) return;
+
+    const bodyValidation = validateData(
+      z.object({
+        permissions: z.array(
+          z.object({
+            toolSlug: z.string().min(1),
+            permission: z.enum(['allow', 'ask', 'deny']),
+          })
+        ),
+      }),
+      req.body,
+      res,
+      'starship tool permissions payload'
+    );
+    if (!bodyValidation) return;
+
+    const repo = new AgentRepository();
+    for (const p of bodyValidation.permissions) {
+      if (!p?.toolSlug) continue;
+      await repo.setStarshipToolPermissionBySlug({
+        starshipId: paramValidation.starshipId,
+        toolSlug: p.toolSlug,
+        permission: p.permission,
+      });
+    }
+
+    sendSuccess(res, { ok: true });
+  } catch (error) {
+    console.error('[TOOLS] Error updating starship tool permissions:', error);
+    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update starship tool permissions');
+  }
+});
+
+// DELETE /starships/:starshipId/starship-tool-permissions/:toolSlug - Remove a starship-level tool permission mapping
+router.delete(
+  '/starships/:starshipId/starship-tool-permissions/:toolSlug',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(
+        z.object({
+          starshipId: IdSchema,
+          toolSlug: SlugSchema,
+        }),
+        req.params,
+        res,
+        'starship tool permission parameters'
+      );
+      if (!paramValidation) return;
+
+      const userId = req.user?.id as string | undefined;
+      if (!userId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
+
+      const hasAccess = await verifyStarshipAccess(paramValidation.starshipId, userId, res);
+      if (!hasAccess) return;
+
+      const repo = new AgentRepository();
+      await repo.removeStarshipToolPermissionBySlug({ starshipId: paramValidation.starshipId, toolSlug: paramValidation.toolSlug });
+      sendSuccess(res, { ok: true });
+    } catch (error) {
+      console.error('[TOOLS] Error removing starship tool permission mapping:', error);
+      sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to remove starship tool permission mapping');
+    }
+  }
+);
 
 // GET /starships/:starshipId/tools/:slug - Get specific tool for a starship (OpenAPI pattern)
 router.get('/starships/:starshipId/tools/:slug', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {

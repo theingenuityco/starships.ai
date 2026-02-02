@@ -840,9 +840,7 @@ export class ConversationService {
         createdAt: toIso(c.createdAt),
         updatedAt: toIso(c.updatedAt ?? c.createdAt),
       })) as unknown as ConversationModel[];
-    const conversationIds = conversations
-      .map((c) => (typeof c.id === 'string' ? c.id : ''))
-      .filter((id) => id.trim().length > 0);
+    const conversationIds = conversations.map((c) => (typeof c.id === 'string' ? c.id : '')).filter((id) => id.trim().length > 0);
 
     const agentsByConversationId = new Map<string, AgentModel[]>();
     if (conversationIds.length > 0) {
@@ -1209,8 +1207,11 @@ export class ConversationService {
         metadata: { generatedBy: 'Tool.blueprintRedacted' },
       };
 
-      // Use relationship-based approach: Agent-[:USES_TOOL]->Tool-[:DEPLOYED_ON]->Starship
-      const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
+      // Effective tools at runtime:
+      // - agent-assigned tools (agent_tools) OR starship-level tools (starship_tools)
+      // - with effective permission != 'deny'
+      // - precedence: agent_tools.permission overrides starship_tools.permission
+      const deployedTools = await this.agentRepository.getEffectiveAgentTools(agentId, starshipId);
 
       if (deployedTools.length === 0) {
         return [];
@@ -2046,6 +2047,18 @@ export class ConversationService {
   }
 
   /**
+   * Best-effort token estimate for stop/cancel flows where providers do not return usage.
+   *
+   * NOTE: This is intentionally a heuristic. It improves UX/analytics consistency when a turn is interrupted
+   * before the provider reports usage (common in streaming cancels).
+   */
+  private static estimateTokensFromText(text: string): number {
+    if (typeof text !== 'string' || text.length === 0) return 0;
+    // Rough heuristic: ~4 chars/token for English-like text.
+    return Math.max(1, Math.ceil(text.length / 4));
+  }
+
+  /**
    * Stop current turn: cancel runner, persist partial content/reasoning (omit tool_calls), finalize SSE.
    */
   async stopConversation(conversationId: string): Promise<void> {
@@ -2093,30 +2106,133 @@ export class ConversationService {
     // If we have cached usage from streaming but no content_complete occurred, persist usage now
     try {
       const latest = this.latestStreamingUsage.get(conversationId);
-      if (latest) {
-        const starship = await this.getConversationStarship(conversationId);
-        if (starship) {
-          const promptTokens = Number(latest.promptTokens || 0);
-          const completionTokens = Number(latest.completionTokens || 0);
-          const rawCost = typeof latest.cost === 'number' && Number.isFinite(latest.cost) ? latest.cost : undefined;
-          const computedCost =
-            rawCost !== undefined
-              ? rawCost
-              : await this.computeCostFromCatalog({
-                  model: typeof latest.model === 'string' ? latest.model : undefined,
-                  promptTokens,
-                  completionTokens,
-                });
-          await this.usageService.createUsageForTurn({
-            starshipId: starship.id,
-            conversationId,
-            promptTokens,
-            completionTokens,
-            totalTokens: Number(latest.totalTokens || 0),
-            cost: Number(computedCost ?? 0),
-            ...(latest.model ? { model: latest.model } : {}),
+      const starship = await this.getConversationStarship(conversationId);
+      if (!starship) {
+        // No access to starship context → skip usage persistence (best-effort).
+      } else if (latest) {
+        // Provider-supplied usage (preferred).
+        const promptTokens = Number(latest.promptTokens || 0);
+        const completionTokens = Number(latest.completionTokens || 0);
+        const totalTokens = Number(latest.totalTokens || 0) || promptTokens + completionTokens;
+        const rawCost = typeof latest.cost === 'number' && Number.isFinite(latest.cost) ? latest.cost : undefined;
+        const computedCost =
+          rawCost !== undefined
+            ? rawCost
+            : await this.computeCostFromCatalog({
+                model: typeof latest.model === 'string' ? latest.model : undefined,
+                promptTokens,
+                completionTokens,
+              });
+        await this.usageService.createUsageForTurn({
+          starshipId: starship.id,
+          conversationId,
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          cost: Number(computedCost ?? 0),
+          ...(latest.model ? { model: latest.model } : {}),
+        });
+
+        // Also publish a turn.usage so the client can update UI immediately (best-effort).
+        try {
+          const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+          const agent = this.currentAgentForConversation.get(conversationId);
+          await this.streamBus.publish(conversationId, {
+            type: 'turn.usage',
+            data: {
+              conversationId,
+              turnId,
+              at: new Date().toISOString(),
+              ...(agent?.id ? { agentId: agent.id } : {}),
+              ...(agent?.name ? { agentName: agent.name } : {}),
+              ...(typeof latest.model === 'string' ? { model: latest.model } : {}),
+              usage: {
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                ...(typeof computedCost === 'number' && Number.isFinite(computedCost) ? { cost: Number(computedCost) } : {}),
+              },
+            },
           });
-          // Credits system: usage rows are analytics only; do not debit wallet based on token usage.
+        } catch {
+          // best-effort only
+        }
+      } else {
+        // Heuristic estimate: provider did not report usage before stop.
+        // We estimate completion tokens from streamed content and prompt tokens from recent persisted messages.
+        const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+        const agent = this.currentAgentForConversation.get(conversationId);
+
+        // Resolve model from active agent (best-effort) for cost estimation.
+        let model: string | undefined;
+        try {
+          if (agent?.id) {
+            const agentService = new AgentService();
+            const agentModel = await agentService.getAgent(agent.id).catch(() => null);
+            if (agentModel && typeof (agentModel as any)?.model === 'string') {
+              const m = String((agentModel as any).model).trim();
+              if (m) model = m;
+            }
+          }
+        } catch {
+          /* best-effort */
+        }
+
+        // Completion estimate from current streamed assistant content/reasoning.
+        const streamedContent = this.streamingContent.get(conversationId) || '';
+        const streamedReasoning = this.streamingReasoning.get(conversationId) || '';
+        const completionTokens = ConversationService.estimateTokensFromText(streamedContent + streamedReasoning);
+
+        // Prompt estimate from last N persisted messages (text only).
+        let promptTokens = 0;
+        try {
+          const page = await this.getConversationMessagesPage({ conversationId, limit: 30 });
+          const msgs = Array.isArray(page?.messages) ? page.messages : [];
+          const joined = msgs.map((m) => String((m as any)?.content ?? '')).join('\n');
+          promptTokens = ConversationService.estimateTokensFromText(joined);
+        } catch {
+          promptTokens = 0;
+        }
+
+        const totalTokens = promptTokens + completionTokens;
+        const computedCost = await this.computeCostFromCatalog({
+          model,
+          promptTokens,
+          completionTokens,
+        });
+
+        // Persist usage (even if estimated) so totals update after stop.
+        await this.usageService.createUsageForTurn({
+          starshipId: starship.id,
+          conversationId,
+          promptTokens,
+          completionTokens,
+          totalTokens,
+          cost: Number(computedCost ?? 0),
+          ...(model ? { model } : {}),
+        });
+
+        // Publish turn.usage for UI (best-effort).
+        try {
+          await this.streamBus.publish(conversationId, {
+            type: 'turn.usage',
+            data: {
+              conversationId,
+              turnId,
+              at: new Date().toISOString(),
+              ...(agent?.id ? { agentId: agent.id } : {}),
+              ...(agent?.name ? { agentName: agent.name } : {}),
+              ...(model ? { model } : {}),
+              usage: {
+                promptTokens,
+                completionTokens,
+                totalTokens,
+                ...(typeof computedCost === 'number' && Number.isFinite(computedCost) ? { cost: Number(computedCost) } : {}),
+              },
+            },
+          });
+        } catch {
+          // best-effort only
         }
       }
     } catch (e) {
@@ -2198,11 +2314,7 @@ export class ConversationService {
             const msg = m as unknown as MessageLike;
             if (typeof msg.role !== 'string' || msg.role !== 'system') return false;
             const meta = msg.metadata;
-            const flagged = Boolean(
-              meta &&
-                typeof meta === 'object' &&
-                (meta as Record<string, unknown>)['thread_context_seed'] === true
-            );
+            const flagged = Boolean(meta && typeof meta === 'object' && (meta as Record<string, unknown>)['thread_context_seed'] === true);
             const content = typeof msg.content === 'string' ? String(msg.content) : '';
             return flagged || content.startsWith('[THREAD_CONTEXT_SEED]');
           }) ?? null;
@@ -3021,6 +3133,33 @@ export class ConversationService {
                       promptTokens: usagePayload.promptTokens,
                       completionTokens: usagePayload.completionTokens,
                     });
+
+              // Emit a UX-only per-turn usage event so clients can show context utilization
+              // around the agent avatar for this turn.
+              try {
+                const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+                const agent = this.currentAgentForConversation.get(conversationId);
+                await this.streamBus.publish(conversationId, {
+                  type: 'turn.usage',
+                  data: {
+                    conversationId,
+                    turnId,
+                    at: new Date().toISOString(),
+                    ...(agent?.id ? { agentId: agent.id } : {}),
+                    ...(agent?.name ? { agentName: agent.name } : {}),
+                    ...(typeof usagePayload.model === 'string' ? { model: usagePayload.model } : {}),
+                    usage: {
+                      promptTokens: usagePayload.promptTokens,
+                      completionTokens: usagePayload.completionTokens,
+                      totalTokens: usagePayload.totalTokens,
+                      ...(typeof computedCost === 'number' && Number.isFinite(computedCost) ? { cost: Number(computedCost) } : {}),
+                    },
+                  },
+                });
+              } catch {
+                // best-effort only; UX hint
+              }
+
               await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,

@@ -471,6 +471,210 @@ export class AgentRepository extends BaseRepository {
   }
 
   /**
+   * Resolve the effective permission for an agent/tool slug within a starship.
+   *
+   * Precedence:
+   * - agent_tools.permission (agent override) if an agent_tools row exists
+   * - else starship_tools.permission (starship default) if a starship_tools row exists
+   * - else null (no access)
+   */
+  async getEffectiveToolPermissionBySlug(
+    agentId: string,
+    starshipId: string,
+    toolSlug: string
+  ): Promise<'allow' | 'ask' | 'deny' | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const row = await connection.queryOne<{ permission: 'allow' | 'ask' | 'deny' | null }>(
+          `
+          SELECT COALESCE(at.permission, st.permission) as permission
+          FROM tools t
+          LEFT JOIN agent_tools at
+            ON at.tool_id = t.id AND at.agent_id = $1
+          LEFT JOIN starship_tools st
+            ON st.tool_id = t.id AND st.starship_id = $2
+          WHERE t.starship_id = $2 AND t.slug = $3
+          LIMIT 1
+          `,
+          [agentId, starshipId, toolSlug]
+        );
+        const p = row?.permission ?? null;
+        return p === 'allow' || p === 'ask' || p === 'deny' ? p : null;
+      },
+      'getEffectiveToolPermissionBySlug',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Get the effective tool set for an agent at runtime.
+   *
+   * A tool is included if:
+   * - it is explicitly assigned to the agent (agent_tools row exists), OR
+   * - it is enabled at the starship level (starship_tools row exists),
+   * AND the effective permission is not 'deny'.
+   *
+   * Precedence: agent_tools.permission overrides starship_tools.permission.
+   */
+  async getEffectiveAgentTools(agentId: string, starshipId: string): Promise<ToolModel[]> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const rows = await connection.query<Record<string, unknown>>(
+          `
+          SELECT t.*
+          FROM tools t
+          LEFT JOIN agent_tools at
+            ON at.tool_id = t.id AND at.agent_id = $1
+          LEFT JOIN starship_tools st
+            ON st.tool_id = t.id AND st.starship_id = $2
+          WHERE t.starship_id = $2
+            AND COALESCE(at.permission, st.permission) IS NOT NULL
+            AND COALESCE(at.permission, st.permission) <> 'deny'
+          ORDER BY t.created_at DESC
+          `,
+          [agentId, starshipId]
+        );
+        return fromDatabaseArray(ToolEntity, rows);
+      },
+      'getEffectiveAgentTools',
+      'Agent',
+      agentId
+    );
+  }
+
+  /**
+   * Get starship-level tool permission rows for a starship.
+   * Returns only rows present in starship_tools.
+   */
+  async getStarshipToolPermissions(
+    starshipId: string
+  ): Promise<Array<{ starshipId: string; toolId: string; toolSlug: string; permission: 'allow' | 'ask' | 'deny' }>> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const rows = await connection.query<{ tool_id: string; tool_slug: string; permission: 'allow' | 'ask' | 'deny' }>(
+          `
+          SELECT
+            st.tool_id as tool_id,
+            t.slug as tool_slug,
+            st.permission as permission
+          FROM starship_tools st
+          INNER JOIN tools t ON t.id = st.tool_id
+          WHERE st.starship_id = $1 AND t.starship_id = $1
+          ORDER BY t.created_at DESC
+          `,
+          [starshipId]
+        );
+        return (rows || []).map((r) => ({
+          starshipId,
+          toolId: r.tool_id,
+          toolSlug: r.tool_slug,
+          permission: r.permission,
+        }));
+      },
+      'getStarshipToolPermissions',
+      'Agent'
+    );
+  }
+
+  /**
+   * Upsert a starship-level tool permission by slug.
+   *
+   * Accepts either:
+   * - tool instance slug (tools.slug), OR
+   * - tool template slug (tool_templates.slug) (will resolve the deployed tool on this starship)
+   */
+  async setStarshipToolPermissionBySlug(args: {
+    starshipId: string;
+    toolSlug: string;
+    permission: 'allow' | 'ask' | 'deny';
+  }): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { starshipId, toolSlug, permission } = args;
+        if (!starshipId?.trim() || !toolSlug?.trim()) {
+          throw new Error('starshipId and toolSlug are required');
+        }
+
+        const connection = this.getConnection();
+        // 1) Tool instance slug on starship (tools.slug)
+        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+          toolSlug,
+          starshipId,
+        ]);
+        // 2) Fallback: tool template slug → resolve deployed tool for this starship
+        if (!toolResult?.id) {
+          toolResult = await connection.queryOne<{ id: string }>(
+            `SELECT t.id FROM tools t
+             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
+             WHERE tt.slug = $1 AND t.starship_id = $2
+             LIMIT 1`,
+            [toolSlug, starshipId]
+          );
+        }
+        if (!toolResult?.id) {
+          throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
+        }
+
+        await connection.query(
+          `
+          INSERT INTO starship_tools (starship_id, tool_id, permission, created_at, updated_at)
+          VALUES ($1, $2, $3, NOW(), NOW())
+          ON CONFLICT (starship_id, tool_id)
+          DO UPDATE SET permission = EXCLUDED.permission, updated_at = NOW()
+          `,
+          [starshipId, toolResult.id, permission]
+        );
+      },
+      'setStarshipToolPermissionBySlug',
+      'Agent'
+    );
+  }
+
+  /**
+   * Remove a starship-level tool permission mapping by tool slug.
+   * Accepts tool instance slug or template slug (same resolution as setStarshipToolPermissionBySlug).
+   */
+  async removeStarshipToolPermissionBySlug(args: { starshipId: string; toolSlug: string }): Promise<void> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { starshipId, toolSlug } = args;
+        if (!starshipId?.trim() || !toolSlug?.trim()) {
+          throw new Error('starshipId and toolSlug are required');
+        }
+
+        const connection = this.getConnection();
+        // Resolve tool ID by instance slug
+        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+          toolSlug,
+          starshipId,
+        ]);
+        // Fallback: resolve by template slug
+        if (!toolResult?.id) {
+          toolResult = await connection.queryOne<{ id: string }>(
+            `SELECT t.id FROM tools t
+             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
+             WHERE tt.slug = $1 AND t.starship_id = $2
+             LIMIT 1`,
+            [toolSlug, starshipId]
+          );
+        }
+        if (!toolResult?.id) {
+          // Idempotent: nothing to delete
+          return;
+        }
+
+        await connection.query('DELETE FROM starship_tools WHERE starship_id = $1 AND tool_id = $2', [starshipId, toolResult.id]);
+      },
+      'removeStarshipToolPermissionBySlug',
+      'Agent'
+    );
+  }
+
+  /**
    * Get agent→tool permissions (join metadata) for a specific starship.
    * Returns only rows present in agent_tools; callers can treat missing pairs as 'deny'.
    */
@@ -562,6 +766,80 @@ export class AgentRepository extends BaseRepository {
         }
       },
       'setAgentToolPermissionBySlug',
+      'Agent',
+      args.agentId
+    );
+  }
+
+  /**
+   * Update the effective permission for an agent/tool slug within a starship WITHOUT creating assignment rows.
+   *
+   * Precedence:
+   * - If an agent_tools row exists → update agent_tools.permission (agent override)
+   * - Else if a starship_tools row exists → update starship_tools.permission (starship default)
+   * - Else throw (tool not available in this scope)
+   */
+  async setEffectiveToolPermissionBySlug(args: {
+    agentId: string;
+    starshipId: string;
+    toolSlug: string;
+    permission: 'allow' | 'ask' | 'deny';
+  }): Promise<{ scope: 'agent' | 'starship' }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { agentId, starshipId, toolSlug, permission } = args;
+        if (!agentId?.trim() || !starshipId?.trim() || !toolSlug?.trim()) {
+          throw new Error('agentId, starshipId, and toolSlug are required');
+        }
+
+        const connection = this.getConnection();
+        // Resolve tool id (instance slug first, then template slug)
+        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+          toolSlug,
+          starshipId,
+        ]);
+        if (!toolResult?.id) {
+          toolResult = await connection.queryOne<{ id: string }>(
+            `SELECT t.id FROM tools t
+             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
+             WHERE tt.slug = $1 AND t.starship_id = $2
+             LIMIT 1`,
+            [toolSlug, starshipId]
+          );
+        }
+        if (!toolResult?.id) {
+          throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
+        }
+
+        // 1) Agent override (update-only)
+        const agentRes = await connection.queryWithResult(
+          `
+          UPDATE agent_tools
+          SET permission = $3
+          WHERE agent_id = $1 AND tool_id = $2
+          `,
+          [agentId, toolResult.id, permission]
+        );
+        if (agentRes.rowCount && agentRes.rowCount > 0) {
+          return { scope: 'agent' as const };
+        }
+
+        // 2) Starship default (update-only; do NOT create starship_tools rows here)
+        const shipRes = await connection.queryWithResult(
+          `
+          UPDATE starship_tools
+          SET permission = $3, updated_at = NOW()
+          WHERE starship_id = $1 AND tool_id = $2
+          `,
+          [starshipId, toolResult.id, permission]
+        );
+        if (shipRes.rowCount && shipRes.rowCount > 0) {
+          return { scope: 'starship' as const };
+        }
+
+        throw new ValidationError('Tool is not available to agent', 'toolSlug', { agentId, toolSlug });
+      },
+      'setEffectiveToolPermissionBySlug',
       'Agent',
       args.agentId
     );

@@ -479,29 +479,31 @@ export function Navigation(props: NavigationProps) {
                     </div>
                   </button>
                 ) : (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <button
-                        type="button"
-                        disabled={!activeStarshipSlug}
-                        onClick={() => {
-                          if (!activeStarshipSlug) return
-                          router.push(`/ship/${activeStarshipSlug}/settings/billing`)
-                        }}
-                        className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
-                        aria-label="View credits and billing"
-                      >
-                        <Icon name="coins" className="h-3.5 w-3.5" />
-                      </button>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">Credits</span>
-                        <Icon name="coins" className="h-3.5 w-3.5" />
-                        <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
+                  <div className="flex justify-center">
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={!activeStarshipSlug}
+                          onClick={() => {
+                            if (!activeStarshipSlug) return
+                            router.push(`/ship/${activeStarshipSlug}/settings/billing`)
+                          }}
+                          className="h-9 w-9 inline-flex items-center justify-center rounded-full bg-background/70 shadow-sm ring-1 ring-border/50 text-muted-foreground transition-all hover:bg-muted hover:text-foreground hover:shadow-md disabled:opacity-60 disabled:cursor-not-allowed"
+                          aria-label="View credits and billing"
+                        >
+                          <Icon name="coins" className="h-3.5 w-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="right">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">Credits</span>
+                          <Icon name="coins" className="h-3.5 w-3.5" />
+                          <BalanceStatusIndicator wallet={wallet} isLoading={walletLoading} variant="minimal" showDot={false} showUnit={true} inheritTextColor valueClassName="text-[12px]" />
+                        </div>
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 )
               ) : null}
 

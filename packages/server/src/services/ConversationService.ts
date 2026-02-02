@@ -840,9 +840,7 @@ export class ConversationService {
         createdAt: toIso(c.createdAt),
         updatedAt: toIso(c.updatedAt ?? c.createdAt),
       })) as unknown as ConversationModel[];
-    const conversationIds = conversations
-      .map((c) => (typeof c.id === 'string' ? c.id : ''))
-      .filter((id) => id.trim().length > 0);
+    const conversationIds = conversations.map((c) => (typeof c.id === 'string' ? c.id : '')).filter((id) => id.trim().length > 0);
 
     const agentsByConversationId = new Map<string, AgentModel[]>();
     if (conversationIds.length > 0) {
@@ -2201,11 +2199,7 @@ export class ConversationService {
             const msg = m as unknown as MessageLike;
             if (typeof msg.role !== 'string' || msg.role !== 'system') return false;
             const meta = msg.metadata;
-            const flagged = Boolean(
-              meta &&
-                typeof meta === 'object' &&
-                (meta as Record<string, unknown>)['thread_context_seed'] === true
-            );
+            const flagged = Boolean(meta && typeof meta === 'object' && (meta as Record<string, unknown>)['thread_context_seed'] === true);
             const content = typeof msg.content === 'string' ? String(msg.content) : '';
             return flagged || content.startsWith('[THREAD_CONTEXT_SEED]');
           }) ?? null;

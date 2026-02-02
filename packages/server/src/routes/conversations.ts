@@ -2025,74 +2025,77 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
  * Returns child conversations (threads) that currently have pending tool-call approvals.
  * This is used to power the parent composer callout without fetching all children and polling each one.
  */
-router.get('/conversations/:conversationId/children/pending-approvals', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
-    if (!paramValidation) return;
+router.get(
+  '/conversations/:conversationId/children/pending-approvals',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!paramValidation) return;
 
-    const { conversationId } = paramValidation;
+      const { conversationId } = paramValidation;
 
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
 
-    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
-    if (!paginationValidation) return;
+      const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+      if (!paginationValidation) return;
 
-    const cursorValidation = validateData(
-      z
-        .object({
-          beforeUpdatedAt: z.string().datetime().optional(),
-          beforeId: IdSchema.optional(),
-        })
-        .refine((v) => (v.beforeUpdatedAt && !v.beforeId ? false : v.beforeId && !v.beforeUpdatedAt ? false : true), {
-          message: 'beforeUpdatedAt and beforeId must be provided together',
-        }),
-      req.query,
-      res,
-      'children pending approvals cursor'
-    );
-    if (!cursorValidation) return;
-
-    const conversationService = new ConversationService();
-    const conversation = await conversationService.getConversationById(conversationId);
-    if (!conversation) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
-      return;
-    }
-    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
-    if (
-      !(await enforcePrivateChannelMembership({
-        conversationId,
-        conversationStarshipId: conversation.starshipId,
-        userId: authUserId,
-        req,
+      const cursorValidation = validateData(
+        z
+          .object({
+            beforeUpdatedAt: z.string().datetime().optional(),
+            beforeId: IdSchema.optional(),
+          })
+          .refine((v) => (v.beforeUpdatedAt && !v.beforeId ? false : v.beforeId && !v.beforeUpdatedAt ? false : true), {
+            message: 'beforeUpdatedAt and beforeId must be provided together',
+          }),
+        req.query,
         res,
-      }))
-    ) {
-      return;
-    }
-    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
-      return;
-    }
+        'children pending approvals cursor'
+      );
+      if (!cursorValidation) return;
 
-    // Efficient DB query: find children with pending approvals, newest first.
-    const conn = getConnection();
-    const limit = Math.max(1, Math.min(200, Number(paginationValidation.limit || 50)));
-    const pageSize = limit + 1;
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+        return;
+      }
+      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      ) {
+        return;
+      }
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+        return;
+      }
 
-    const useCursor = Boolean(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId);
-    const rows = await conn.query<{
-      id: string;
-      updated_at: string;
-      created_at: string;
-      pending_count: number;
-      agent_name: string | null;
-    }>(
-      useCursor
-        ? `
+      // Efficient DB query: find children with pending approvals, newest first.
+      const conn = getConnection();
+      const limit = Math.max(1, Math.min(200, Number(paginationValidation.limit || 50)));
+      const pageSize = limit + 1;
+
+      const useCursor = Boolean(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId);
+      const rows = await conn.query<{
+        id: string;
+        updated_at: string;
+        created_at: string;
+        pending_count: number;
+        agent_name: string | null;
+      }>(
+        useCursor
+          ? `
           SELECT
             c.id,
             c.updated_at,
@@ -2118,7 +2121,7 @@ router.get('/conversations/:conversationId/children/pending-approvals', jwtAuthM
           ORDER BY c.updated_at DESC, c.id DESC
           LIMIT $4
         `
-        : `
+          : `
           SELECT
             c.id,
             c.updated_at,
@@ -2140,53 +2143,54 @@ router.get('/conversations/:conversationId/children/pending-approvals', jwtAuthM
           ORDER BY c.updated_at DESC, c.id DESC
           LIMIT $2
         `,
-      useCursor ? [conversationId, cursorValidation.beforeUpdatedAt, cursorValidation.beforeId, pageSize] : [conversationId, pageSize]
-    );
+        useCursor ? [conversationId, cursorValidation.beforeUpdatedAt, cursorValidation.beforeId, pageSize] : [conversationId, pageSize]
+      );
 
-    const hasMoreBefore = rows.length > limit;
-    const trimmed = rows.slice(0, limit);
-    const oldest = trimmed.length > 0 ? trimmed[trimmed.length - 1] : null;
-    const toIso = (v: unknown): string => {
-      if (v == null) return '';
-      if (v instanceof Date) return v.toISOString();
-      if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
-      if (typeof v === 'string') {
-        const t = Date.parse(v);
-        return Number.isFinite(t) ? new Date(t).toISOString() : v;
-      }
-      try {
-        const s = String(v);
-        const t = Date.parse(s);
-        return Number.isFinite(t) ? new Date(t).toISOString() : s;
-      } catch {
-        return '';
-      }
-    };
+      const hasMoreBefore = rows.length > limit;
+      const trimmed = rows.slice(0, limit);
+      const oldest = trimmed.length > 0 ? trimmed[trimmed.length - 1] : null;
+      const toIso = (v: unknown): string => {
+        if (v == null) return '';
+        if (v instanceof Date) return v.toISOString();
+        if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+        if (typeof v === 'string') {
+          const t = Date.parse(v);
+          return Number.isFinite(t) ? new Date(t).toISOString() : v;
+        }
+        try {
+          const s = String(v);
+          const t = Date.parse(s);
+          return Number.isFinite(t) ? new Date(t).toISOString() : s;
+        } catch {
+          return '';
+        }
+      };
 
-    const oldestCursor = oldest ? { updatedAt: toIso(oldest.updated_at || oldest.created_at), id: String(oldest.id) } : null;
+      const oldestCursor = oldest ? { updatedAt: toIso(oldest.updated_at || oldest.created_at), id: String(oldest.id) } : null;
 
-    const items = trimmed.map((r) => ({
-      id: String(r.id),
-      updatedAt: toIso(r.updated_at || r.created_at),
-      pendingCount: Number(r.pending_count) || 0,
-      agentName: typeof r.agent_name === 'string' ? r.agent_name : '',
-    }));
+      const items = trimmed.map((r) => ({
+        id: String(r.id),
+        updatedAt: toIso(r.updated_at || r.created_at),
+        pendingCount: Number(r.pending_count) || 0,
+        agentName: typeof r.agent_name === 'string' ? r.agent_name : '',
+      }));
 
-    sendSuccess(
-      res,
-      {
-        parentConversationId: conversationId,
-        children: items,
-        total: items.length,
-        hasMoreBefore,
-        oldestCursor,
-      },
-      200
-    );
-  } catch (error) {
-    handleError(error, res, 'fetching child pending approvals');
+      sendSuccess(
+        res,
+        {
+          parentConversationId: conversationId,
+          children: items,
+          total: items.length,
+          hasMoreBefore,
+          oldestCursor,
+        },
+        200
+      );
+    } catch (error) {
+      handleError(error, res, 'fetching child pending approvals');
+    }
   }
-});
+);
 
 /**
  * GET /starships/:starshipId/conversations - Get conversations by starship

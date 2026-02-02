@@ -1992,6 +1992,7 @@ const MemoizedMessageBubble = memo(
       const shouldUseAuthedUserAvatar = !userAvatarSeedOverride && isImageUrl(effectiveUserAvatar)
       const messageUserId = typeof (message as any)?.userId === 'string' ? String((message as any).userId).trim() : ''
       const showUserOnline = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline?.(messageUserId))
+      const showUserPresenceDot = Boolean(!userAvatarSeedOverride && messageUserId && isUserOnline)
 
       if (isHero || isDelegation) {
         // User message: Neutral bubble on the right (landing demos)
@@ -2066,7 +2067,7 @@ const MemoizedMessageBubble = memo(
                         )}
                       </AvatarFallback>
                     </Avatar>
-                    <PresenceIndicator kind="online" active={showUserOnline} />
+                    <PresenceIndicator kind={showUserOnline ? 'online' : 'offline'} active={showUserPresenceDot} />
                   </div>
                 </div>
               )}
@@ -2138,7 +2139,7 @@ const MemoizedMessageBubble = memo(
                         )}
                       </AvatarFallback>
                     </Avatar>
-                    <PresenceIndicator kind="online" active={showUserOnline} />
+                    <PresenceIndicator kind={showUserOnline ? 'online' : 'offline'} active={showUserPresenceDot} />
                   </div>
                 </div>
               </>
@@ -2175,7 +2176,7 @@ const MemoizedMessageBubble = memo(
                       )}
                     </AvatarFallback>
                   </Avatar>
-                  <PresenceIndicator kind="online" active={showUserOnline} />
+                  <PresenceIndicator kind={showUserOnline ? 'online' : 'offline'} active={showUserPresenceDot} />
                 </div>
               </div>
             )}

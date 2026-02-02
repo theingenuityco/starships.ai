@@ -60,13 +60,14 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
 
 function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: boolean }) {
   const fallback = (user.displayName || user.email || '?').trim().slice(0, 1).toUpperCase()
+  const hasPresence = typeof online === 'boolean'
   return (
     <div className="relative">
       <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
-      <PresenceIndicator kind="online" active={Boolean(online)} size="xs" />
+      {hasPresence ? <PresenceIndicator kind={online ? 'online' : 'offline'} active={true} size="xs" /> : null}
     </div>
   )
 }
@@ -231,7 +232,11 @@ export function ConversationList({
             pointerEvents: 'none',
           }}
         >
-          {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
+          {t.kind === 'agent' ? (
+            <DirectMessageAvatar starshipId={starshipId} agent={t.agent} />
+          ) : (
+            <HumanAvatar user={t.user} online={isUserOnline(String(t.user.userId))} />
+          )}
         </div>
         <span
           className={cn(

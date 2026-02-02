@@ -34,10 +34,7 @@ export function PresenceIndicator({
     placement === 'inset'
       ? 'absolute bottom-0 right-0 -translate-x-0.5 -translate-y-0.5 z-50 pointer-events-none'
       : 'absolute bottom-0 right-0 translate-x-[16%] translate-y-[16%] z-50 pointer-events-none'
-  const color =
-    kind === 'busy'
-      ? 'bg-amber-500 dark:bg-amber-400'
-      : 'bg-emerald-500 dark:bg-emerald-400'
+  const color = kind === 'busy' ? 'bg-amber-500 dark:bg-amber-400' : 'bg-emerald-500 dark:bg-emerald-400'
 
   return (
     <span className={cn(pos, className)} aria-label={kind} title={kind}>
@@ -54,4 +51,3 @@ export function PresenceIndicator({
     </span>
   )
 }
-

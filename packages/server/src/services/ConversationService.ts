@@ -2451,6 +2451,36 @@ export class ConversationService {
   private extractMentionedAgents(text: string, availableAgents: AgentModel[]): AgentModel[] {
     try {
       if (typeof text !== 'string' || text.length === 0) return [];
+      // Preferred: structured agent mentions emitted by the client composer.
+      // Format: <@a:AGENT_ID>
+      //
+      // IMPORTANT:
+      // - User mentions are emitted as <@u:USER_ID> and must NEVER trigger agent execution.
+      // - If we detect structured tokens, we prioritize them and ignore legacy @slug parsing to avoid collisions.
+      const tokenRe = /<@a:([^>\s]+)>/gi;
+      const tokenMatches = Array.from(text.matchAll(tokenRe));
+      if (tokenMatches.length > 0) {
+        const byId = new Map<string, AgentModel>();
+        for (const a of availableAgents) {
+          if (a?.id) byId.set(String(a.id), a);
+        }
+        const seen: Set<string> = new Set();
+        const out: AgentModel[] = [];
+        for (const m of tokenMatches) {
+          const id = String(m[1] || '').trim();
+          if (!id) continue;
+          const agent = byId.get(id);
+          if (!agent) continue;
+          if (seen.has(id)) continue;
+          seen.add(id);
+          out.push(agent);
+        }
+        return out;
+      }
+
+      // Strip any structured mention tokens (<@u:...>, <@a:...>) before legacy parsing so we don't accidentally
+      // treat "@u" or "@a" inside those tokens as an agent mention.
+      const legacyText = text.replace(/<@[^>\n]+>/g, ' ');
       // Mentions:
       // - Plain: @slug_or_name (no spaces)
       // - Quoted: @"Display Name With Spaces"
@@ -2471,7 +2501,7 @@ export class ConversationService {
 
       let m: RegExpExecArray | null;
       const resolvedLog: Array<{ raw: string; matchedId?: string; strategy?: string }> = [];
-      while ((m = mentionRe.exec(text)) !== null) {
+      while ((m = mentionRe.exec(legacyText)) !== null) {
         const token = (m[1] || m[2] || m[3] || m[4] || '').toLowerCase();
         const raw = token;
         if (!raw) continue;

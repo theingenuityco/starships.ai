@@ -757,7 +757,11 @@ export class ConversationService {
     limit: number;
     beforeUpdatedAt?: string;
     beforeId?: string;
-  }): Promise<{ conversations: Array<ConversationModel & { agents: AgentModel[] }>; hasMoreBefore: boolean; oldestCursor: { updatedAt: string; id: string } | null }> {
+  }): Promise<{
+    conversations: Array<ConversationModel & { agents: AgentModel[] }>;
+    hasMoreBefore: boolean;
+    oldestCursor: { updatedAt: string; id: string } | null;
+  }> {
     // IMPORTANT:
     // Do NOT rely on newly-added methods in @starships/models at runtime here. In dev, the server
     // imports the built `@starships/models` package, and new methods may not exist until rebuilt.
@@ -834,11 +838,11 @@ export class ConversationService {
         ...c,
         // Ensure cursor fields are always valid ISO datetime strings
         createdAt: toIso(c.createdAt),
-        updatedAt: toIso((c as any).updatedAt ?? (c as any).createdAt),
+        updatedAt: toIso(c.updatedAt ?? c.createdAt),
       })) as unknown as ConversationModel[];
     const conversationIds = conversations
-      .map((c: any) => (typeof c?.id === 'string' ? String(c.id) : ''))
-      .filter((id) => id && id.trim().length > 0);
+      .map((c) => (typeof c.id === 'string' ? c.id : ''))
+      .filter((id) => id.trim().length > 0);
 
     const agentsByConversationId = new Map<string, AgentModel[]>();
     if (conversationIds.length > 0) {
@@ -852,12 +856,13 @@ export class ConversationService {
       );
 
       for (const row of agentRows) {
-        const rawConversationId = (row as any).conversation_id;
+        const rawConversationId = (row as Record<string, unknown>)['conversation_id'];
         const conversationId = typeof rawConversationId === 'string' ? rawConversationId : '';
         if (!conversationId) continue;
 
         // Drop the join column, then camel-case the remaining agent columns.
-        const { conversation_id: _conversationId, ...agentRow } = row as Record<string, unknown> & { conversation_id?: unknown };
+        const agentRow: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+        delete agentRow['conversation_id'];
         const agent = toCamelObject(agentRow) as unknown as AgentModel;
         const list = agentsByConversationId.get(conversationId) || [];
         list.push(agent);
@@ -865,13 +870,13 @@ export class ConversationService {
       }
     }
 
-    const withAgents = conversations.map((c: any) => ({
-      ...(c as ConversationModel),
+    const withAgents = conversations.map((c) => ({
+      ...c,
       agents: agentsByConversationId.get(String(c.id)) || [],
     })) as Array<ConversationModel & { agents: AgentModel[] }>;
 
     const oldest = withAgents.length > 0 ? withAgents[withAgents.length - 1] : null;
-    const updatedAt = oldest ? toIso((oldest as any)?.updatedAt || (oldest as any)?.createdAt || '') : '';
+    const updatedAt = oldest ? toIso(oldest.updatedAt ?? oldest.createdAt ?? '') : '';
 
     return { conversations: withAgents, hasMoreBefore, oldestCursor: oldest && updatedAt ? { updatedAt, id: String(oldest.id) } : null };
   }
@@ -948,6 +953,32 @@ export class ConversationService {
       hasMoreBefore: page.hasMoreBefore,
       oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
     };
+  }
+
+  async getConversationMessagesTailOffsetPage(args: {
+    conversationId: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null }> {
+    const page = await this.conversationRepository.getConversationMessagesTailOffsetPage(args);
+    const oldest = page.messages.length > 0 ? page.messages[0] : null;
+    return {
+      messages: page.messages,
+      hasMoreBefore: page.hasMoreBefore,
+      oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
+    };
+  }
+
+  private buildHistoryFoldMessage(args: { historyLimit: number }): LlmMessage {
+    const { historyLimit } = args;
+    const content =
+      `Note: conversation history is truncated in this prompt.\n` +
+      `- Only the most recent ${historyLimit} messages are included to avoid overflowing the model context.\n` +
+      `- Earlier messages exist but are folded.\n` +
+      `To read older messages, use an available history-reading tool (discoverable via your tool list) that accepts an \`offset\` (skip N newest messages) and \`limit\`.\n` +
+      `Example: { "offset": ${historyLimit}, "limit": 20 }`;
+
+    return { role: 'system', content };
   }
 
   /**
@@ -1481,7 +1512,7 @@ export class ConversationService {
     const isChannel = Boolean(channel);
     const dmRepo = new DirectMessageRepository();
     const dm = await dmRepo.findByConversationId(data.conversationId).catch(() => null);
-    const isUserUserDm = Boolean(dm && (dm as any).dmType === 'user_user');
+    const isUserUserDm = dm?.dmType === 'user_user';
 
     const conversation = await this.getConversationById(data.conversationId);
     if (!conversation) {
@@ -1543,12 +1574,17 @@ export class ConversationService {
 
     // (late title generation block removed; handled early)
 
-    // Get conversation messages from database
-    let messages = await this.getConversationMessages(data.conversationId);
+    // IMPORTANT:
+    // Do NOT load the full message history for agent execution. This can grow without bound and
+    // overflow model context windows. Always cap the LLM input to the most recent N messages.
+    const llmHistoryLimit = 30;
+    const initialPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
+    let messages = initialPage.messages;
+    let hasMoreBefore = initialPage.hasMoreBefore;
 
     // Load conversation state for context - reload conversation to get latest state
     const latestConversation = await this.getConversationById(data.conversationId);
-    const conversationState = (latestConversation?.state || {}) as Record<string, unknown>;
+    const conversationState = (latestConversation?.state || {}) as ConversationState;
 
     // Enable complete suppression during orchestration; we will emit a single 'complete' at the end
     if (!noAgentToRun) {
@@ -1574,12 +1610,7 @@ export class ConversationService {
           // best-effort
         }
         try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as ConversationState | undefined) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: at },
-            updatedAt: at,
-          });
+          await this.conversationRepository.mergeState(conversationId, { turnActive: false, lastCompleteAt: at });
         } catch {
           // best-effort
         }
@@ -1662,7 +1693,7 @@ export class ConversationService {
         };
 
         // Prepare input messages snapshot for this agent (with multimodal content support)
-        const llmMessages: LlmMessage[] = await Promise.all(
+        const llmMessagesCore: LlmMessage[] = await Promise.all(
           messages.map(async (msg): Promise<LlmMessage> => {
             // Build multimodal content if message has attachments
             const content = await this.buildMessageContent(msg, starship.id);
@@ -1681,6 +1712,9 @@ export class ConversationService {
             return baseMessage;
           })
         );
+        const llmMessages: LlmMessage[] = hasMoreBefore
+          ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCore]
+          : llmMessagesCore;
         // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent
@@ -1720,7 +1754,9 @@ export class ConversationService {
 
         // Refresh messages after this agent's turn so subsequent agents (if any)
         // see the updated conversation state, but do not perform mention-based handoffs
-        messages = await this.getConversationMessages(data.conversationId);
+        const refreshedPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
+        messages = refreshedPage.messages;
+        hasMoreBefore = refreshedPage.hasMoreBefore;
       }
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
@@ -1885,8 +1921,11 @@ export class ConversationService {
       }
 
       // Load latest persisted conversation messages and convert to LlmMessage array
-      const messages = await this.getConversationMessages(conversationId);
-      const llmMessages: LlmMessage[] = await Promise.all(
+      // Keep resumed turns bounded too; do not load full history into the LLM context.
+      const llmHistoryLimit = 30;
+      const page = await this.getConversationMessagesPage({ conversationId, limit: llmHistoryLimit });
+      const messages = page.messages;
+      const llmMessagesCore: LlmMessage[] = await Promise.all(
         messages.map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
           const baseMessage: LlmMessage = {
@@ -1903,6 +1942,9 @@ export class ConversationService {
           return baseMessage;
         })
       );
+      const llmMessages: LlmMessage[] = page.hasMoreBefore
+        ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCore]
+        : llmMessagesCore;
 
       const env = getEnvConfig();
 
@@ -1916,10 +1958,9 @@ export class ConversationService {
       };
 
       // Load conversation-level state context (if any)
-      const conversationState = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as Record<
-        string,
-        unknown
-      >;
+      const conversationState = (
+        conversation.state && typeof conversation.state === 'object' ? conversation.state : {}
+      ) as ConversationState;
       // Resolve tools for this agent (always redacted; server executes tools)
       const resolvedTools = await this.getAgentTools(agentModel.id, starship.id);
 
@@ -1935,7 +1976,7 @@ export class ConversationService {
       // Exclude plugins from baseState and conversationState; plugins are set explicitly from resolvePlugins
       const { plugins: _agentPluginsContinue, ...baseStateWithoutPlugins } = baseState;
       void _agentPluginsContinue;
-      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState;
+      const { plugins: _conversationPluginsContinue, ...conversationStateWithoutPlugins } = conversationState as Record<string, unknown>;
       void _conversationPluginsContinue;
 
       // Fetch fresh starship details so prompt context reflects the latest updates.
@@ -2102,11 +2143,9 @@ export class ConversationService {
 
     // Persist server-authoritative end-of-turn state (best-effort, for administrative visibility)
     try {
-      const convo = await this.getConversationById(conversationId);
-      const prev = (convo?.state as ConversationState | undefined) || {};
-      await this.conversationRepository.update(conversationId, {
-        state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-        updatedAt: new Date().toISOString(),
+      await this.conversationRepository.mergeState(conversationId, {
+        turnActive: false,
+        lastCompleteAt: new Date().toISOString(),
       });
     } catch (err) {
       console.warn('[STOP] Failed to persist turnActive=false on stop', err);
@@ -2155,10 +2194,16 @@ export class ConversationService {
         const seedMsg =
           msgs.find((m) => {
             if (!m) return false;
-            if (String((m as any).role ?? '') !== 'system') return false;
-            const meta = (m as any).metadata;
-            const flagged = Boolean(meta && typeof meta === 'object' && (meta as any).thread_context_seed === true);
-            const content = typeof (m as any).content === 'string' ? String((m as any).content) : '';
+            type MessageLike = { role?: unknown; metadata?: unknown; content?: unknown };
+            const msg = m as unknown as MessageLike;
+            if (typeof msg.role !== 'string' || msg.role !== 'system') return false;
+            const meta = msg.metadata;
+            const flagged = Boolean(
+              meta &&
+                typeof meta === 'object' &&
+                (meta as Record<string, unknown>)['thread_context_seed'] === true
+            );
+            const content = typeof msg.content === 'string' ? String(msg.content) : '';
             return flagged || content.startsWith('[THREAD_CONTEXT_SEED]');
           }) ?? null;
         if (seedMsg && typeof seedMsg.content === 'string') {
@@ -3322,23 +3367,10 @@ export class ConversationService {
           if (execution?.state) {
             const evolvedState = this.extractPersistableState(execution.state);
             if (evolvedState) {
-              // Get existing conversation state to preserve plugins
-              const existingConversation = await this.getConversationById(conversationId);
-              const existingState = (existingConversation?.state || {}) as ConversationState;
-
-              // Merge: preserve plugins from existing state, update other fields from evolved state
-              // Plugins are conversation-level only (controlled by UI toggle) and should NEVER be overwritten by execution state
-              const mergedState = mergeConversationState(existingState, evolvedState);
-
-              // Explicitly preserve plugins from existing state (plugins are never in evolvedState due to blacklist)
-              if (hasPlugins(existingState)) {
-                mergedState.plugins = existingState.plugins;
-              }
-
-              await this.conversationRepository.update(conversationId, {
-                state: mergedState,
-                updatedAt: new Date().toISOString(),
-              });
+              // Atomically merge state patch in DB to avoid clobbering concurrent writers
+              // (e.g. multiple processes persisting state concurrently).
+              // Plugins are never in evolvedState due to blacklist; this preserves conversation-level plugins.
+              await this.conversationRepository.mergeState(conversationId, evolvedState);
             }
           }
         } catch (e) {
@@ -3412,12 +3444,7 @@ export class ConversationService {
             // Mark the turn as NOT actively running while awaiting approval.
             // IMPORTANT: continueAfterToolApproval() must be able to resume from this state.
             try {
-              const convo = await this.getConversationById(conversationId);
-              const prev = (convo?.state as ConversationState | undefined) || {};
-              await this.conversationRepository.update(conversationId, {
-                state: { ...prev, turnActive: false },
-                updatedAt: new Date().toISOString(),
-              });
+              await this.conversationRepository.mergeState(conversationId, { turnActive: false });
             } catch {
               /* ignore */
             }
@@ -3485,11 +3512,9 @@ export class ConversationService {
 
         // Persist turn_completed state and notify clients
         try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as ConversationState | undefined) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-            updatedAt: new Date().toISOString(),
+          await this.conversationRepository.mergeState(conversationId, {
+            turnActive: false,
+            lastCompleteAt: new Date().toISOString(),
           });
         } catch (err) {
           console.warn('[STREAMING] Failed to persist turn_completed state', err);
@@ -3565,11 +3590,9 @@ export class ConversationService {
 
         // Persist server-authoritative end-of-turn state (best-effort)
         try {
-          const convo = await this.getConversationById(conversationId);
-          const prev = (convo?.state as ConversationState | undefined) || {};
-          await this.conversationRepository.update(conversationId, {
-            state: { ...prev, turnActive: false, lastCompleteAt: new Date().toISOString() },
-            updatedAt: new Date().toISOString(),
+          await this.conversationRepository.mergeState(conversationId, {
+            turnActive: false,
+            lastCompleteAt: new Date().toISOString(),
           });
         } catch {
           /* ignore */

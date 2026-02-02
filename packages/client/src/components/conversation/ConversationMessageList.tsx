@@ -1183,10 +1183,19 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
-  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage)
-  // Direct messages: keep the "beginning of conversation" hero visible even after messages exist,
-  // similar to Slack's "beginning of conversation" marker.
-  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage)
+  // Only show the "beginning of channel / conversation" hero when we are actually at the beginning of the timeline.
+  // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
+  const isAtConversationStart = (() => {
+    // Static/demo rendering: treat "start" as empty list only.
+    if (messagesOverride) return renderMessages.length === 0
+    // Streamed conversations: start == no more older pages.
+    if (stream) return !Boolean((stream as any)?.hasMoreBefore)
+    return renderMessages.length === 0
+  })()
+  const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
+  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart)
+  // Direct messages: keep the hero visible even after messages exist, but only once we've reached the beginning (Slack-like).
+  const showDirectMessageHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart)
   const shouldBottomAlignHero = Boolean((showChannelHero || showDirectMessageHero) && renderMessages.length === 0 && !shouldShowGapLoader)
 
   const hasSearchMatches = matchingPositions.length > 0

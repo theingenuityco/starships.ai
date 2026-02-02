@@ -2068,6 +2068,14 @@ const MemoizedMessageBubble = memo(
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
           : null
+      // Keep the avatar "slot" width stable across consecutive assistant messages.
+      // When expert mode is on and we have turn usage, `AgentAvatarWithTurnUsageRing` renders an outer ring that adds padding.
+      // If we don't reserve the extra width on *subsequent* messages (where the avatar is hidden), the first message in a turn
+      // ends up slightly narrower.
+      const usageRingPadPx = 3 // must match `AgentAvatarWithTurnUsageRing`'s `pad`
+      const shouldReserveUsageRing = Boolean(expertMode) && Boolean(turnUsage)
+      const assistantAvatarBasePx = isHero || isDelegation ? avatarSize : 40
+      const assistantAvatarSlotPx = assistantAvatarBasePx + (shouldReserveUsageRing ? usageRingPadPx * 2 : 0)
 
       if (isHero || isDelegation) {
         const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
@@ -2075,7 +2083,7 @@ const MemoizedMessageBubble = memo(
           <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
             <div className={cn('flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
-                <div className={cn('mt-1', avatarWidthClass)}>
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
                   <AgentAvatarWithTurnUsageRing
                     seed={agentName || 'AI'}
                     imageUrl={agentAvatarUrl}
@@ -2089,7 +2097,7 @@ const MemoizedMessageBubble = memo(
                   />
                 </div>
               ) : (
-                <div className={cn('flex-shrink-0 mt-1', avatarClass)} aria-hidden="true" />
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
               )}
               <div className="flex-1 w-full pt-0.5">
                 <ConversationMessageContent
@@ -2142,7 +2150,7 @@ const MemoizedMessageBubble = memo(
             )}
           >
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 mt-1">
+              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
                 <AgentAvatarWithTurnUsageRing
                   seed={agentName || 'AI'}
                   imageUrl={agentAvatarUrl}
@@ -2152,11 +2160,11 @@ const MemoizedMessageBubble = memo(
                   rounded
                   enabled={Boolean(expertMode)}
                   usage={turnUsage}
-                  className="w-10 h-10"
+                  className="mx-auto"
                 />
               </div>
             ) : (
-              <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
+              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (

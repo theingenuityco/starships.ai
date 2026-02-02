@@ -73,9 +73,9 @@ export async function up(client: Client): Promise<void> {
     await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_starship_user ON notifications(starship_id, user_id, created_at DESC);`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_conversation ON notifications(conversation_id, created_at DESC);`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;`);
-    await client.query(
-      `CREATE UNIQUE INDEX IF NOT EXISTS uq_notifications_user_type_message ON notifications(user_id, type, message_id) WHERE message_id IS NOT NULL;`
-    );
+    // De-dupe per user per message per type (DM vs mention).
+    // Note: Postgres UNIQUE allows multiple NULLs; that's fine because our pipeline only de-dupes rows with message_id set.
+    await client.query(`CREATE UNIQUE INDEX IF NOT EXISTS uq_notifications_user_type_message ON notifications(user_id, type, message_id);`);
   } catch (e) {
     await client.query('ROLLBACK');
     throw e;

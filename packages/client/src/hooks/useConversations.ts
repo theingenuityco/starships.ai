@@ -1031,6 +1031,31 @@ export function useConversationStreamed(conversationId: string | null, starshipI
           const data = ev.data ? JSON.parse(ev.data) : null
           if (!eventType || data == null) return
 
+          // #region agent log (hypothesis C)
+          try {
+            if (typeof window !== 'undefined') {
+              const w = window as any
+              w.__dbg_sse_events ??= {}
+              if (eventType.includes('usage') && !w.__dbg_sse_events[eventType]) {
+                w.__dbg_sse_events[eventType] = 1
+                fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({
+                    sessionId: 'debug-session',
+                    runId: 'ring-pre',
+                    hypothesisId: 'C',
+                    location: 'useConversations.ts:makeSSEAsyncIterable(onmessage)',
+                    message: 'sse_event_received',
+                    data: { eventType, hasId: Boolean(ev.id), id: typeof ev.id === 'string' ? ev.id : null },
+                    timestamp: Date.now(),
+                  }),
+                }).catch(() => {})
+              }
+            }
+          } catch {}
+          // #endregion
+
           if (eventType === 'snapshot') {
             push({ type: 'snapshot', data })
             return
@@ -1194,6 +1219,32 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const msg = chunk.data?.message
       const messages = clone(acc)
       if (!msg || !msg.id) return messages
+      // #region agent log (hypothesis B/C)
+      try {
+        if (typeof window !== 'undefined' && msg?.role === 'assistant') {
+          const w = window as any
+          w.__dbg_append_seen ??= {}
+          const tid = typeof (msg as any)?.turnId === 'string' ? String((msg as any).turnId) : ''
+          const key = `${String(msg.id)}:${tid || 'no-turn'}`
+          if (!w.__dbg_append_seen[key]) {
+            w.__dbg_append_seen[key] = 1
+            fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                sessionId: 'debug-session',
+                runId: 'ring-pre',
+                hypothesisId: 'B/C',
+                location: 'useConversations.ts:reduceMessages(message.append)',
+                message: 'assistant_message_append',
+                data: { messageId: String(msg.id), turnId: tid || null, agentId: (msg as any)?.agentId ?? null },
+                timestamp: Date.now(),
+              }),
+            }).catch(() => {})
+          }
+        }
+      } catch {}
+      // #endregion
       // If a message with the same id already exists, treat this as an update rather than a new message.
       // This avoids duplicate ids, which can cause streaming deltas to "attach" to an older copy.
       const existingIdxById = messages.findIndex(m => m.id === msg.id)
@@ -1574,6 +1625,30 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       ...(typeof d?.model === 'string' ? { model: String(d.model) } : null),
       usage: { promptTokens, completionTokens, totalTokens, ...(typeof cost === 'number' ? { cost } : null) },
     }
+    // #region agent log (hypothesis C)
+    try {
+      if (typeof window !== 'undefined') {
+        const w = window as any
+        w.__dbg_turnUsage_seen ??= {}
+        if (!w.__dbg_turnUsage_seen[turnId]) {
+          w.__dbg_turnUsage_seen[turnId] = 1
+          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              sessionId: 'debug-session',
+              runId: 'ring-pre',
+              hypothesisId: 'C',
+              location: 'useConversations.ts:reduceTurnUsage',
+              message: 'turn_usage_received',
+              data: { turnId, at, agentId: next.agentId ?? null, model: next.model ?? null, promptTokens, completionTokens, totalTokens, cost: cost ?? null },
+              timestamp: Date.now(),
+            }),
+          }).catch(() => {})
+        }
+      }
+    } catch {}
+    // #endregion
     return { ...acc, [turnId]: next }
   }
 

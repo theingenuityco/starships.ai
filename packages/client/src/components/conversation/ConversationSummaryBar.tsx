@@ -14,7 +14,6 @@ import { useQuery } from '@tanstack/react-query'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { motion } from 'motion/react'
 import { useMemo, useEffect, useRef, useState, useCallback, type ReactNode } from 'react'
-import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { useStarshipPresence } from '@/hooks/useStarshipPresence'
 
 export type ConversationParticipantItem = { kind: 'human'; key: string; label: string; avatarUrl?: string } | { kind: 'agent'; key: string; label: string; seed: string; avatarAttachmentId?: string }
@@ -381,7 +380,6 @@ export function ConversationSummaryBar({
                     <div className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
                       <AgentAvatar seed={p.seed} imageUrl={p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined} size={20} rounded />
                     </div>
-                    <PresenceIndicator kind={isConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
                   </div>
                 ) : (
                   <div className="relative">
@@ -389,12 +387,6 @@ export function ConversationSummaryBar({
                       {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="rounded-full object-cover" /> : null}
                       <AvatarFallback className="rounded-full bg-muted/40 text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                     </Avatar>
-                    {(() => {
-                      const key = String(p.key || '')
-                      const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
-                      const userId = m?.[1]
-                      return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} size="xs" />
-                    })()}
                   </div>
                 )}
               </div>
@@ -516,26 +508,19 @@ export function ConversationSummaryBar({
                                   if (p.kind === 'agent') {
                                     const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                                     return (
-                                      <div key={p.key} className="relative h-4 w-4">
-                                        <div className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                          <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
+                                      <div key={p.key} className="relative h-5 w-5">
+                                        <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                          <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
                                         </div>
-                                        <PresenceIndicator kind={isConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
                                       </div>
                                     )
                                   }
                                   return (
-                                    <div key={p.key} className="relative h-4 w-4">
-                                      <Avatar className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                    <div key={p.key} className="relative h-5 w-5">
+                                      <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
                                         {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                        <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                                       </Avatar>
-                                      {(() => {
-                                        const key = String(p.key || '')
-                                        const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
-                                        const userId = m?.[1]
-                                        return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} size="xs" />
-                                      })()}
                                     </div>
                                   )
                                 })}
@@ -716,26 +701,19 @@ export function ConversationSummaryBar({
                               if (p.kind === 'agent') {
                                 const imageUrl = p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined
                                 return (
-                                    <div key={p.key} className="relative h-4 w-4">
-                                      <div className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
-                                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
+                                    <div key={p.key} className="relative h-5 w-5">
+                                      <div className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                        <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={20} rounded />
                                       </div>
-                                      <PresenceIndicator kind={isConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
                                     </div>
                                 )
                               }
                               return (
-                                  <div key={p.key} className="relative h-4 w-4">
-                                    <Avatar className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
+                                  <div key={p.key} className="relative h-5 w-5">
+                                    <Avatar className="h-5 w-5 rounded-full ring-1 ring-background bg-muted overflow-hidden">
                                       {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
-                                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[8px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
+                                      <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[9px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                                     </Avatar>
-                                    {(() => {
-                                      const key = String(p.key || '')
-                                      const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
-                                      const userId = m?.[1]
-                                      return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} size="xs" />
-                                    })()}
                                   </div>
                               )
                             })}

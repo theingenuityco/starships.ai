@@ -115,7 +115,7 @@ function AgentAvatarWithTurnUsageRing({
             <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
           </div>
           {/* Align to the avatar box (not an outer wrapper) */}
-          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
+          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} />
         </div>
       </div>
     )
@@ -146,7 +146,7 @@ function AgentAvatarWithTurnUsageRing({
           <div className="w-full h-full rounded-full bg-muted flex items-center justify-center overflow-hidden">
             <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
           </div>
-          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
+          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} />
         </div>
       </div>
     </div>
@@ -270,7 +270,7 @@ function LinkedConversationCard({
                       <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
                         <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
                       </div>
-                      <PresenceIndicator kind={isLinkedConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
+                      <PresenceIndicator kind={isLinkedConversationBusy ? 'busy' : 'online'} active={true} size="sm" />
                     </div>
                   )
                 }
@@ -283,7 +283,7 @@ function LinkedConversationCard({
                       {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
                       <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                     </Avatar>
-                    <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline?.(userId))} size="xs" />
+                    <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline?.(userId))} size="sm" />
                   </div>
                 )
               })}
@@ -2032,7 +2032,7 @@ const MemoizedMessageBubble = memo(
                       )}
                     </AvatarFallback>
                   </Avatar>
-                  <PresenceIndicator kind="online" active={showUserOnline} size="xs" />
+                  <PresenceIndicator kind="online" active={showUserOnline} />
                 </div>
               )}
             </div>
@@ -2089,7 +2089,7 @@ const MemoizedMessageBubble = memo(
                     )}
                   </AvatarFallback>
                 </Avatar>
-                <PresenceIndicator kind="online" active={showUserOnline} size="xs" />
+                <PresenceIndicator kind="online" active={showUserOnline} />
               </div>
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">

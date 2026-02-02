@@ -955,6 +955,20 @@ export class ConversationService {
     };
   }
 
+  async getConversationMessagesTailOffsetPage(args: {
+    conversationId: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean; oldestCursor: { createdAt: string; id: string } | null }> {
+    const page = await this.conversationRepository.getConversationMessagesTailOffsetPage(args);
+    const oldest = page.messages.length > 0 ? page.messages[0] : null;
+    return {
+      messages: page.messages,
+      hasMoreBefore: page.hasMoreBefore,
+      oldestCursor: oldest ? { createdAt: oldest.createdAt, id: oldest.id } : null,
+    };
+  }
+
   /**
    * Delete a conversation and cleanup all associated S3 files
    */

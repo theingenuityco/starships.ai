@@ -232,8 +232,7 @@ export class PublicationService {
         });
 
         if (toolTemplateId && !relationshipItems.some((item) => item.toolTemplateId === toolTemplateId)) {
-          const permission =
-            (await this.agentRepository.getAgentToolPermissionBySlug(agent.id, agent.starshipId, tool.slug)) ?? 'ask';
+          const permission = (await this.agentRepository.getAgentToolPermissionBySlug(agent.id, agent.starshipId, tool.slug)) ?? 'ask';
           relationshipItems.push({ toolTemplateId, defaultPermission: permission });
         }
       }

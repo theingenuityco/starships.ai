@@ -15,11 +15,7 @@ export function CapabilitiesLegendTooltip() {
           <Icon name="info" className="h-4 w-4" />
         </button>
       </TooltipTrigger>
-      <TooltipContent
-        side="bottom"
-        align="start"
-        className="max-w-xs p-3 space-y-2 text-left bg-popover border border-border text-popover-foreground shadow-md"
-      >
+      <TooltipContent side="bottom" align="start" className="max-w-xs p-3 space-y-2 text-left bg-popover border border-border text-popover-foreground shadow-md">
         <p className="text-xs font-medium">Permission defaults—editable after you deploy.</p>
         <div className="space-y-1.5 text-xs">
           <div className="flex items-center gap-2">

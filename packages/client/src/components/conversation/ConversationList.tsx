@@ -341,8 +341,7 @@ export function ConversationList({
           <div
             className={cn(
               'flex flex-col flex-none min-h-0 rounded-lg',
-              onboardingHighlight === 'channels' &&
-                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+              onboardingHighlight === 'channels' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
             <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8">
@@ -395,7 +394,12 @@ export function ConversationList({
                   <div className="space-y-1">
                     {channels.map(ch => {
                       const isActive = currentChannelSlug
-                        ? String(ch.slug || '').trim().toLowerCase() === String(currentChannelSlug || '').trim().toLowerCase()
+                        ? String(ch.slug || '')
+                            .trim()
+                            .toLowerCase() ===
+                          String(currentChannelSlug || '')
+                            .trim()
+                            .toLowerCase()
                         : ch.conversationId === currentConversationId
                       const label = ch.name || ch.slug
                       return (
@@ -446,15 +450,10 @@ export function ConversationList({
           <div
             className={cn(
               'flex flex-col min-h-0 rounded-lg flex-1',
-              onboardingHighlight === 'directMessages' &&
-                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+              onboardingHighlight === 'directMessages' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
-            <div
-              ref={onboardingDirectMessagesAnchorRef}
-              data-onboarding-anchor="direct-messages"
-              className="w-full flex items-center justify-between h-8"
-            >
+            <div ref={onboardingDirectMessagesAnchorRef} data-onboarding-anchor="direct-messages" className="w-full flex items-center justify-between h-8">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -550,7 +549,12 @@ export function ConversationList({
               <div className="space-y-1">
                 {channels.map(ch => {
                   const isActive = currentChannelSlug
-                    ? String(ch.slug || '').trim().toLowerCase() === String(currentChannelSlug || '').trim().toLowerCase()
+                    ? String(ch.slug || '')
+                        .trim()
+                        .toLowerCase() ===
+                      String(currentChannelSlug || '')
+                        .trim()
+                        .toLowerCase()
                     : ch.conversationId === currentConversationId
                   const label = ch.name || ch.slug
                   return (

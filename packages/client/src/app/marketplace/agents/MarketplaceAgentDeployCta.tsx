@@ -114,10 +114,7 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     }
   }
 
-  const deployedAgent = useMemo(
-    () => (deployedAgents || []).find(agent => agent.sourceTemplateId === templateId),
-    [deployedAgents, templateId]
-  )
+  const deployedAgent = useMemo(() => (deployedAgents || []).find(agent => agent.sourceTemplateId === templateId), [deployedAgents, templateId])
 
   return (
     <>

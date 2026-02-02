@@ -220,7 +220,8 @@ export class AgentTemplateRepository extends BaseRepository {
         return {
           ...(baseTemplate as AgentTemplateModel),
           assignedToolSlugs,
-          assignedToolDefaultPermissions: Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
+          assignedToolDefaultPermissions:
+            Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
         };
       },
       'findInternalById',
@@ -445,10 +446,10 @@ export class AgentTemplateRepository extends BaseRepository {
 
   private async toPublicModel(model: AgentTemplateModel & Record<string, unknown>): Promise<AgentTemplateModel> {
     const templateId = String(model.id);
-    
+
     // Fetch all marketing content for this template
     const allContent = await this.marketingContentRepo.findByEntity('agent_template', templateId);
-    const contentMap = new Map(allContent.map(c => [c.contentType, c]));
+    const contentMap = new Map(allContent.map((c) => [c.contentType, c]));
 
     // Avatar
     const avatarContent = contentMap.get('avatar');
@@ -645,7 +646,8 @@ export class AgentTemplateRepository extends BaseRepository {
         return await this.toPublicModel({
           ...baseTemplate,
           assignedToolSlugs,
-          assignedToolDefaultPermissions: Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
+          assignedToolDefaultPermissions:
+            Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
         } as AgentTemplateModel & Record<string, unknown>);
       },
       'findById',
@@ -688,7 +690,8 @@ export class AgentTemplateRepository extends BaseRepository {
         return await this.toPublicModel({
           ...template,
           assignedToolSlugs,
-          assignedToolDefaultPermissions: Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
+          assignedToolDefaultPermissions:
+            Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
         } as AgentTemplateModel & Record<string, unknown>);
       },
       'findBySlug',
@@ -1104,7 +1107,8 @@ export class AgentTemplateRepository extends BaseRepository {
         for (const item of items || []) {
           const toolTemplateId = String(item?.toolTemplateId || '').trim();
           if (!toolTemplateId) continue;
-          const permission = item.defaultPermission && ['allow', 'ask', 'deny'].includes(item.defaultPermission) ? item.defaultPermission : 'ask';
+          const permission =
+            item.defaultPermission && ['allow', 'ask', 'deny'].includes(item.defaultPermission) ? item.defaultPermission : 'ask';
           await connection.query(
             `INSERT INTO agent_template_tool_templates (agent_template_id, tool_template_id, default_permission, created_at)
              VALUES ($1, $2, $3, $4)

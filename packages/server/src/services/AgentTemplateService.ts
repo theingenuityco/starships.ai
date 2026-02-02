@@ -114,9 +114,7 @@ export class AgentTemplateService {
     return result;
   }
 
-  async createTemplate(
-    templateData: CreateAgentTemplateRequest
-  ): Promise<AgentTemplateModel> {
+  async createTemplate(templateData: CreateAgentTemplateRequest): Promise<AgentTemplateModel> {
     // Validate required fields
     if (!templateData.name || !templateData.model) {
       throw new ValidationError('Template name and model are required');

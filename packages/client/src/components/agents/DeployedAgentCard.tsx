@@ -9,6 +9,7 @@ import { motion } from 'motion/react'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Avatar } from '@/components/ui/avatar'
 import AgentAvatar from '@/components/animated/AgentAvatar'
+import { PresenceIndicator } from '@/components/ui/PresenceIndicator'
 import { Badge } from '@/components/ui/badge'
 import { Button, type ButtonProps } from '@/components/ui/button'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
@@ -280,13 +281,11 @@ export function DeployedAgentCard({
               ) : null}
               {/* Online/Active indicator */}
               {showStatusIndicator ? (
-                <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-green-500 rounded-full border-2 border-card shadow-md z-20">
-                  <motion.div className="absolute inset-0 bg-green-400 rounded-full" animate={{ scale: [1, 1.3, 1], opacity: [0.5, 0, 0.5] }} transition={{ duration: 2, repeat: Infinity }} />
-                </div>
+                <PresenceIndicator kind="online" active={true} size="md" />
               ) : null}
               {/* Deployed indicator - green dot */}
               {isAlreadyDeployed && !showStatusIndicator ? (
-                <div className="absolute bottom-0 right-0 -translate-x-1/4 -translate-y-1/4 w-3.5 h-3.5 bg-emerald-500 rounded-full border-2 border-card shadow-md z-20" />
+                <PresenceIndicator kind="online" active={true} size="md" />
               ) : null}
             </div>
 

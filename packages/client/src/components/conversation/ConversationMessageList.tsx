@@ -110,10 +110,13 @@ function AgentAvatarWithTurnUsageRing({
   if (!enabled || !usage || pct == null) {
     return (
       <div className={cn('relative flex-shrink-0', className)} style={{ width: size, height: size }}>
-        <div className="w-full h-full rounded-full bg-muted flex items-center justify-center overflow-hidden">
-          <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+        <div className="relative w-full h-full">
+          <div className="w-full h-full rounded-full bg-muted flex items-center justify-center overflow-hidden">
+            <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+          </div>
+          {/* Align to the avatar box (not an outer wrapper) */}
+          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
         </div>
-        <PresenceIndicator kind="busy" active={Boolean(busy)} />
       </div>
     )
   }
@@ -137,10 +140,15 @@ function AgentAvatarWithTurnUsageRing({
           className={ringClass}
         />
       </svg>
-      <div className="absolute inset-[3px] rounded-full bg-muted flex items-center justify-center overflow-hidden">
-        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      {/* Anchor the indicator to the inner avatar box (inset), not the outer ring box */}
+      <div className="absolute inset-[3px]">
+        <div className="relative w-full h-full">
+          <div className="w-full h-full rounded-full bg-muted flex items-center justify-center overflow-hidden">
+            <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+          </div>
+          <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
+        </div>
       </div>
-      <PresenceIndicator kind="busy" active={Boolean(busy)} />
     </div>
   )
 }
@@ -262,7 +270,7 @@ function LinkedConversationCard({
                       <div className="h-7 w-7 rounded-full ring-2 ring-background bg-muted overflow-hidden">
                         <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={28} rounded />
                       </div>
-                      <PresenceIndicator kind="busy" active={isLinkedConversationBusy} />
+                      <PresenceIndicator kind={isLinkedConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
                     </div>
                   )
                 }
@@ -275,7 +283,7 @@ function LinkedConversationCard({
                       {p.avatarUrl ? <AvatarImage src={p.avatarUrl} alt={p.label} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
                       <AvatarFallback className="rounded-full bg-muted text-muted-foreground text-[10px] font-semibold">{initialsFromName(p.label)}</AvatarFallback>
                     </Avatar>
-                    <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline?.(userId))} />
+                    <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline?.(userId))} size="xs" />
                   </div>
                 )
               })}
@@ -2024,7 +2032,7 @@ const MemoizedMessageBubble = memo(
                       )}
                     </AvatarFallback>
                   </Avatar>
-                  <PresenceIndicator kind="online" active={showUserOnline} />
+                  <PresenceIndicator kind="online" active={showUserOnline} size="xs" />
                 </div>
               )}
             </div>
@@ -2081,7 +2089,7 @@ const MemoizedMessageBubble = memo(
                     )}
                   </AvatarFallback>
                 </Avatar>
-                <PresenceIndicator kind="online" active={showUserOnline} />
+                <PresenceIndicator kind="online" active={showUserOnline} size="xs" />
               </div>
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">

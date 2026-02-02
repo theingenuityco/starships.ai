@@ -329,7 +329,7 @@ export function Navigation(props: NavigationProps) {
           }}
         >
           {/* Header – logo, brand, and collapse toggle */}
-          <div className="px-2 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
+          <div className="pl-2 pr-3 pt-3 pb-2 flex-shrink-0 flex items-center justify-between gap-2">
             <div
               className="text-muted-foreground hover:text-foreground flex items-center justify-start gap-0 rounded-lg px-2 py-1 hover:bg-muted/40 transition-colors"
               onClick={isMobile ? undefined : handleHeaderClick}
@@ -400,7 +400,7 @@ export function Navigation(props: NavigationProps) {
                   aria-label="Collapse sidebar"
                   style={{ cursor: 'w-resize' }}
                 >
-                  <Icon name="sidebar" className="w-5 h-5" />
+                  <Icon name="chevron-left" className="w-4 h-4" />
                 </button>
               )
             )}

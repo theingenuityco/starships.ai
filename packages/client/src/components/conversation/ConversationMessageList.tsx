@@ -114,7 +114,6 @@ function AgentAvatarWithTurnUsageRing({
   return (
     <div className={cn('relative flex-shrink-0', className)} style={{ width: outer, height: outer }} aria-label={title} title={title}>
       <svg width={outer} height={outer} viewBox={`0 0 ${outer} ${outer}`} className="absolute inset-0" aria-hidden="true" focusable="false">
-        <circle cx={outer / 2} cy={outer / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted-foreground/25" />
         <circle
           cx={outer / 2}
           cy={outer / 2}
@@ -123,9 +122,11 @@ function AgentAvatarWithTurnUsageRing({
           stroke="currentColor"
           strokeWidth={stroke}
           strokeDasharray={c}
-          strokeDashoffset={offset}
+          // Negative offset reverses direction (anti-clockwise).
+          strokeDashoffset={-offset}
           strokeLinecap="round"
-          transform={`rotate(-90 ${outer / 2} ${outer / 2})`}
+          // Start 45° anticlockwise from bottom (~5 o'clock).
+          transform={`rotate(45 ${outer / 2} ${outer / 2})`}
           className={ringClass}
         />
       </svg>

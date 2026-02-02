@@ -6,6 +6,21 @@ export type ConversationStreamSnapshot = {
   conversationId: string;
   messages: MessageModel[];
   /**
+   * Optional: best-effort per-turn usage map (keyed by turnId) for recent turns.
+   * Used to restore token usage UI (e.g. avatar rings) after refresh/reconnect.
+   */
+  turnUsageByTurnId?: Record<
+    string,
+    {
+      turnId: string;
+      at: string;
+      agentId?: string;
+      agentName?: string;
+      model?: string;
+      usage: { promptTokens: number; completionTokens: number; totalTokens: number; cost?: number };
+    }
+  >;
+  /**
    * If true, there are older persisted messages before `oldestCursor`.
    */
   hasMoreBefore?: boolean;

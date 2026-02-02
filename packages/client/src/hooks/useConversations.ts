@@ -1554,6 +1554,32 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
   function reduceTurnUsage(acc: Record<string, TurnUsage>, chunk: StreamedChunk): Record<string, TurnUsage> {
+    if (chunk.type === 'snapshot') {
+      const d: any = (chunk as any)?.data
+      const snapMap = d?.turnUsageByTurnId
+      if (!snapMap || typeof snapMap !== 'object') return acc
+      const nextAcc: Record<string, TurnUsage> = { ...acc }
+      for (const [k, v] of Object.entries(snapMap as Record<string, any>)) {
+        const tid = typeof (v as any)?.turnId === 'string' ? String((v as any).turnId) : typeof k === 'string' ? String(k) : ''
+        if (!tid) continue
+        const at = typeof (v as any)?.at === 'string' ? String((v as any).at) : new Date().toISOString()
+        const u = (v as any)?.usage
+        if (!u || typeof u !== 'object') continue
+        const promptTokens = typeof u.promptTokens === 'number' ? u.promptTokens : 0
+        const completionTokens = typeof u.completionTokens === 'number' ? u.completionTokens : 0
+        const totalTokens = typeof u.totalTokens === 'number' ? u.totalTokens : Number(promptTokens) + Number(completionTokens)
+        const cost = typeof u.cost === 'number' && Number.isFinite(u.cost) ? u.cost : undefined
+        nextAcc[tid] = {
+          turnId: tid,
+          at,
+          ...(typeof (v as any)?.agentId === 'string' ? { agentId: String((v as any).agentId) } : null),
+          ...(typeof (v as any)?.agentName === 'string' ? { agentName: String((v as any).agentName) } : null),
+          ...(typeof (v as any)?.model === 'string' ? { model: String((v as any).model) } : null),
+          usage: { promptTokens, completionTokens, totalTokens, ...(typeof cost === 'number' ? { cost } : null) },
+        }
+      }
+      return nextAcc
+    }
     if (chunk.type !== 'turn.usage') return acc
     const d: any = (chunk as any)?.data
     const turnId = typeof d?.turnId === 'string' ? String(d.turnId) : ''

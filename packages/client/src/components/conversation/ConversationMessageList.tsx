@@ -87,7 +87,7 @@ function AgentAvatarWithTurnUsageRing({
   const offset = pct == null ? c : c * (1 - pct / 100)
 
   const ringClass =
-    pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 75 ? 'text-orange-500' : 'text-primary'
+    pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 50 ? 'text-orange-500' : 'text-yellow-500'
   const title = (() => {
     if (!enabled || pct == null) return undefined
     if (pctTurnVsCtx != null && ctx) {

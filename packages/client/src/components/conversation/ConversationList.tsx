@@ -440,7 +440,7 @@ export function ConversationList({
             ) : null}
           </div>
 
-          <div className="h-2" />
+          <div className="h-4" />
 
           {/* Direct messages - takes remaining space below Channels */}
           <div

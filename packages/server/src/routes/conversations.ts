@@ -1066,16 +1066,18 @@ router.post(
       // - Cache hits for 'allow' → trust (fast path).
       // - Cache hits for 'ask'/'deny' → re-check DB to pick up recent changes, then update cache.
       let permission =
-        cachedPerm !== undefined ? cachedPerm : await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+        cachedPerm !== undefined
+          ? cachedPerm
+          : await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
       if (cachedPerm === undefined) {
         setCachedPermission(permCacheKey, permission);
       } else if (cachedPerm === 'ask' || cachedPerm === 'deny') {
-        const fresh = await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+        const fresh = await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
         permission = fresh;
         setCachedPermission(permCacheKey, fresh);
       }
       if (!permission) {
-        sendError(res, 'FORBIDDEN', 'Tool is not assigned to agent', 200, { agentId, toolSlug, toolCallId });
+        sendError(res, 'FORBIDDEN', 'Tool is not available to agent', 200, { agentId, toolSlug, toolCallId });
         return;
       }
       if (permission === 'deny') {

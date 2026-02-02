@@ -1209,8 +1209,11 @@ export class ConversationService {
         metadata: { generatedBy: 'Tool.blueprintRedacted' },
       };
 
-      // Use relationship-based approach: Agent-[:USES_TOOL]->Tool-[:DEPLOYED_ON]->Starship
-      const deployedTools = await this.agentRepository.getAgentTools(agentId, starshipId);
+      // Effective tools at runtime:
+      // - agent-assigned tools (agent_tools) OR starship-level tools (starship_tools)
+      // - with effective permission != 'deny'
+      // - precedence: agent_tools.permission overrides starship_tools.permission
+      const deployedTools = await this.agentRepository.getEffectiveAgentTools(agentId, starshipId);
 
       if (deployedTools.length === 0) {
         return [];

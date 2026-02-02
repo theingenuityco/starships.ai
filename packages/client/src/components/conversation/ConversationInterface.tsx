@@ -1043,7 +1043,7 @@ export function ConversationInterface({ starshipId, conversationId: externalConv
                           }
                       : null
                   }
-                  bottomPaddingPx={inputHeight + 24}
+                  bottomPaddingPx={inputHeight + 12}
                   enableChannelMessageThreads={Boolean(isChannelConversation && !isForumChannel)}
                   messagesOverride={draftDm && !currentConversationId ? [] : undefined}
                   submittedQuery={submittedQuery.trim() || undefined}

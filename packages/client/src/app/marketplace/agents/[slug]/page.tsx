@@ -10,6 +10,7 @@ import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
+import { CapabilitiesLegendTooltip } from './CapabilitiesLegendTooltip'
 import { AgentProfileImage } from '@/components/marketplace/AgentProfileImage'
 import { PublicFooter } from '@/app/components/PublicFooter'
 
@@ -292,6 +293,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         <div className="flex items-center gap-2">
                           <Icon name="wrench" className="h-5 w-5 text-primary" />
                           <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+                          <CapabilitiesLegendTooltip />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {toolSlugs.map(slug => {
@@ -346,6 +348,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       <div className="flex items-center gap-2">
                         <Icon name="wrench" className="h-5 w-5 text-primary" />
                         <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+                        <CapabilitiesLegendTooltip />
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {toolSlugs.map(slug => {

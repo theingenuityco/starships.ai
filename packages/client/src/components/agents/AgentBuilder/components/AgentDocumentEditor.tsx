@@ -1441,23 +1441,10 @@ export function AgentDocumentEditor({
       {/* Core configuration */}
       <Card className="rounded-2xl border-border/50 shadow-sm">
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Icon name="settings" className="h-4 w-4 text-primary" />
-                Agent configuration
-              </CardTitle>
-            </div>
-            {isTemplateAgent ? (
-              <Badge variant="outline" className="border-border/60 bg-muted/30 text-foreground">
-                Marketplace
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-border/60 bg-muted/20 text-muted-foreground">
-                Custom
-              </Badge>
-            )}
-          </div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Icon name="settings" className="h-4 w-4 text-primary" />
+            Agent profile
+          </CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-3">

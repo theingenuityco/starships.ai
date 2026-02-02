@@ -222,7 +222,13 @@ export interface ToolParams extends BaseParams {
  */
 export interface LlmParams extends BaseParams {
   model: string;
-  messages: { role: string; content: string }[] | string;
+  /**
+   * Messages to send to the model.
+   *
+   * Supports the full `LlmMessage` shape (toolCalls/toolCallId, multimodal content blocks, etc),
+   * or a template expression string (e.g. '{{ state.messages }}').
+   */
+  messages: LlmMessage[] | string;
   /**
    * Optional streaming control.
    *

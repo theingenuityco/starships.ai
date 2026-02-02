@@ -253,8 +253,15 @@ describe('LLM Node Handler', () => {
         modalities: ['image', 'text'],
         messages: [
           { role: 'user', content: 'Look at the tool output image.' },
+          // Provider-safe tool results must reference a prior assistant toolCall via toolCallId.
+          {
+            role: 'assistant',
+            content: '',
+            toolCalls: [{ id: 'tc_1', type: 'function', function: { name: 'example_tool', arguments: {} } }],
+          },
           {
             role: 'tool',
+            toolCallId: 'tc_1',
             content: JSON.stringify({
               success: true,
               data: { ok: true },

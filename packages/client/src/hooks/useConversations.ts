@@ -1318,6 +1318,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       }
       const at = (chunk as any)?.data?.at
       const now = typeof at === 'string' && at.trim().length > 0 ? at : new Date().toISOString()
+      const evtTurnId = typeof (chunk as any)?.data?.turnId === 'string' ? String((chunk as any).data.turnId) : null
       if (idx === -1) {
         const shell: ClientMessage = {
           id: messageId,
@@ -1592,13 +1593,41 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     const totalTokens = typeof usageNode.totalTokens === 'number' ? usageNode.totalTokens : Number(promptTokens) + Number(completionTokens)
     const cost = typeof usageNode.cost === 'number' && Number.isFinite(usageNode.cost) ? usageNode.cost : undefined
 
+    // A single assistant "turn" can include multiple LLM calls (tool flows, retries, etc).
+    // For UX, we want the *total tokens/cost burned in the turn*, so we aggregate by turnId.
+    const prev = acc[turnId]
+    if (!prev) {
+      const next: TurnUsage = {
+        turnId,
+        at,
+        ...(typeof d?.agentId === 'string' ? { agentId: String(d.agentId) } : null),
+        ...(typeof d?.agentName === 'string' ? { agentName: String(d.agentName) } : null),
+        ...(typeof d?.model === 'string' ? { model: String(d.model) } : null),
+        usage: { promptTokens, completionTokens, totalTokens, ...(typeof cost === 'number' ? { cost } : null) },
+      }
+      return { ...acc, [turnId]: next }
+    }
+
+    const prevPrompt = Number(prev?.usage?.promptTokens ?? 0)
+    const prevCompletion = Number(prev?.usage?.completionTokens ?? 0)
+    const prevTotal = Number(prev?.usage?.totalTokens ?? (prevPrompt + prevCompletion))
+    const prevCost = typeof prev?.usage?.cost === 'number' && Number.isFinite(prev.usage.cost) ? Number(prev.usage.cost) : 0
+    const nextCost = typeof cost === 'number' && Number.isFinite(cost) ? cost : 0
+
     const next: TurnUsage = {
-      turnId,
+      ...prev,
+      // Keep latest timestamp for display/debug.
       at,
-      ...(typeof d?.agentId === 'string' ? { agentId: String(d.agentId) } : null),
-      ...(typeof d?.agentName === 'string' ? { agentName: String(d.agentName) } : null),
-      ...(typeof d?.model === 'string' ? { model: String(d.model) } : null),
-      usage: { promptTokens, completionTokens, totalTokens, ...(typeof cost === 'number' ? { cost } : null) },
+      // Preserve prior metadata if present; otherwise fill from incoming.
+      ...(typeof prev?.agentId === 'string' ? { agentId: prev.agentId } : typeof d?.agentId === 'string' ? { agentId: String(d.agentId) } : null),
+      ...(typeof prev?.agentName === 'string' ? { agentName: prev.agentName } : typeof d?.agentName === 'string' ? { agentName: String(d.agentName) } : null),
+      ...(typeof prev?.model === 'string' ? { model: prev.model } : typeof d?.model === 'string' ? { model: String(d.model) } : null),
+      usage: {
+        promptTokens: prevPrompt + Number(promptTokens),
+        completionTokens: prevCompletion + Number(completionTokens),
+        totalTokens: prevTotal + Number(totalTokens),
+        ...(prevCost + nextCost > 0 ? { cost: prevCost + nextCost } : null),
+      },
     }
     return { ...acc, [turnId]: next }
   }

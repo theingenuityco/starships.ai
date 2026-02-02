@@ -705,6 +705,10 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         const recentDesc = await bus.readReverse(conversationId, snapshotCursor, { count: 2_000 }, redisReader);
         if (Array.isArray(recentDesc) && recentDesc.length > 0) {
           const recent = recentDesc.slice().reverse(); // chronological
+          // IMPORTANT:
+          // A single "assistant turn" can trigger multiple LLM calls (planning/tool flows, retries, etc).
+          // We want per-turn totals for UX, so we AGGREGATE all `turn.usage` events per turnId here
+          // (rather than only keeping the last event).
           const map = new Map<string, any>();
           for (const item of recent) {
             const evt = item.evt as any;
@@ -712,7 +716,50 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
             const d = evt.data as any;
             const tid = typeof d?.turnId === 'string' ? String(d.turnId) : '';
             if (!tid) continue;
-            map.set(tid, d);
+            const u = d?.usage && typeof d.usage === 'object' ? d.usage : null;
+            if (!u) continue;
+            const promptTokens = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
+            const completionTokens = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
+            const totalTokens = typeof u.totalTokens === 'number' ? u.totalTokens : Number(promptTokens) + Number(completionTokens);
+            const cost = typeof u.cost === 'number' && Number.isFinite(u.cost) ? u.cost : 0;
+
+            const prev = map.get(tid);
+            if (!prev) {
+              map.set(tid, {
+                ...d,
+                turnId: tid,
+                usage: {
+                  promptTokens,
+                  completionTokens,
+                  totalTokens,
+                  ...(typeof u.cost === 'number' && Number.isFinite(u.cost) ? { cost: Number(u.cost) } : null),
+                },
+              });
+              continue;
+            }
+
+            const pu = prev?.usage && typeof prev.usage === 'object' ? prev.usage : {};
+            const prevPrompt = typeof pu.promptTokens === 'number' ? pu.promptTokens : 0;
+            const prevCompletion = typeof pu.completionTokens === 'number' ? pu.completionTokens : 0;
+            const prevTotal = typeof pu.totalTokens === 'number' ? pu.totalTokens : Number(prevPrompt) + Number(prevCompletion);
+            const prevCost = typeof pu.cost === 'number' && Number.isFinite(pu.cost) ? pu.cost : 0;
+            const nextAt = typeof d?.at === 'string' ? String(d.at) : typeof prev?.at === 'string' ? String(prev.at) : new Date().toISOString();
+
+            map.set(tid, {
+              ...prev,
+              // Prefer latest timestamp for display/debug.
+              at: nextAt,
+              // Prefer richer metadata as we observe it.
+              ...(typeof prev?.agentId === 'string' ? { agentId: prev.agentId } : typeof d?.agentId === 'string' ? { agentId: d.agentId } : null),
+              ...(typeof prev?.agentName === 'string' ? { agentName: prev.agentName } : typeof d?.agentName === 'string' ? { agentName: d.agentName } : null),
+              ...(typeof prev?.model === 'string' ? { model: prev.model } : typeof d?.model === 'string' ? { model: d.model } : null),
+              usage: {
+                promptTokens: Number(prevPrompt) + Number(promptTokens),
+                completionTokens: Number(prevCompletion) + Number(completionTokens),
+                totalTokens: Number(prevTotal) + Number(totalTokens),
+                ...(Number(prevCost) + Number(cost) > 0 ? { cost: Number(prevCost) + Number(cost) } : null),
+              },
+            });
           }
           if (map.size > 0) {
             turnUsageByTurnId = Object.fromEntries(map.entries());

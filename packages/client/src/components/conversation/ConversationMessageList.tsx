@@ -437,6 +437,9 @@ export function ConversationMessageList({
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
   const turnUsageByTurnId = (stream as any)?.turnUsageByTurnId as Record<string, any> | undefined
+  const activeTurnId = typeof (stream as any)?.turnId === 'string' ? String((stream as any).turnId) : null
+  const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null
+  const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
   const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
@@ -1524,9 +1527,24 @@ export function ConversationMessageList({
                       highlightTerm={normalizedHighlightTerm}
                       expertMode={expertMode}
                       turnUsage={
-                        expertMode && message.role === 'assistant' && typeof (message as any)?.turnId === 'string'
-                          ? ((turnUsageByTurnId?.[String((message as any).turnId)] ?? null) as any)
-                          : null
+                        (() => {
+                          if (!expertMode) return null
+                          if (message.role !== 'assistant') return null
+                          const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
+                          if (!tid) return null
+                          const raw = (turnUsageByTurnId?.[tid] ?? null) as any
+                          if (!raw) return null
+                          // Avoid showing partial/in-progress usage for the currently active turn.
+                          // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
+                          // Robust gating:
+                          // - Prefer terminal turn status when we have it.
+                          // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
+                          //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
+                          //   In that case, allow the ring to render once `isResponding` is false.
+                          const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
+                          if (shouldHide) return null
+                          return raw
+                        })()
                       }
                     />
                     {(() => {
@@ -2222,6 +2240,8 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    // Re-render when expert mode toggles, since it affects avatar ring visibility.
+    if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
     {
       const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
       const nextAny = nextProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
@@ -2240,6 +2260,27 @@ const MemoizedMessageBubble = memo(
 
     // Re-render if the agent avatar URL changes (e.g. after attachments load)
     if ((prevProps.agentAvatarUrl || '') !== (nextProps.agentAvatarUrl || '')) return false
+
+    // Re-render when agent model/maxTokens metadata loads (affects turn-usage ring computation).
+    if ((prevProps.agentModelId || '') !== (nextProps.agentModelId || '')) return false
+    if (Number(prevProps.agentMaxTokens ?? 0) !== Number(nextProps.agentMaxTokens ?? 0)) return false
+
+    // Re-render when turn usage arrives/updates; otherwise the ring can stay missing until refresh.
+    {
+      const prevTU = prevProps.turnUsage as any
+      const nextTU = nextProps.turnUsage as any
+      const prevTurnId = typeof prevTU?.turnId === 'string' ? String(prevTU.turnId) : ''
+      const nextTurnId = typeof nextTU?.turnId === 'string' ? String(nextTU.turnId) : ''
+      if (prevTurnId !== nextTurnId) return false
+
+      const prevTotal = Number(prevTU?.usage?.totalTokens ?? 0)
+      const nextTotal = Number(nextTU?.usage?.totalTokens ?? 0)
+      if (prevTotal !== nextTotal) return false
+
+      const prevCost = typeof prevTU?.usage?.cost === 'number' && Number.isFinite(prevTU.usage.cost) ? Number(prevTU.usage.cost) : 0
+      const nextCost = typeof nextTU?.usage?.cost === 'number' && Number.isFinite(nextTU.usage.cost) ? Number(nextTU.usage.cost) : 0
+      if (prevCost !== nextCost) return false
+    }
 
     // Re-render when text (assistant content) changes
     if (prevProps.message.content !== nextProps.message.content) return false

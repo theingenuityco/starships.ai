@@ -79,24 +79,24 @@ function AgentAvatarWithTurnUsageRing({
   const c = 2 * Math.PI * r
 
   // Preferred ring meaning:
-  // 1) Turn "tokens burned" vs agent token limit (maxTokens) when available
-  // 2) Prompt tokens vs model context length (if the model catalog provides it)
-  const pctTurn = agentTokenLimit && totalTokens > 0 ? Math.max(0, Math.min(100, (totalTokens / agentTokenLimit) * 100)) : null
-  const pctPromptVsCtx = ctx && promptTokens > 0 ? Math.max(0, Math.min(100, (promptTokens / ctx) * 100)) : null
-  const pct = pctTurn ?? pctPromptVsCtx
+  // 1) Turn "tokens burned" vs model context window (preferred when available)
+  // 2) Fallback: turn "tokens burned" vs agent token limit (maxTokens)
+  const pctTurnVsCtx = ctx && totalTokens > 0 ? Math.max(0, Math.min(100, (totalTokens / ctx) * 100)) : null
+  const pctTurnVsMax = agentTokenLimit && totalTokens > 0 ? Math.max(0, Math.min(100, (totalTokens / agentTokenLimit) * 100)) : null
+  const pct = pctTurnVsCtx ?? pctTurnVsMax
   const offset = pct == null ? c : c * (1 - pct / 100)
 
   const ringClass =
     pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 75 ? 'text-orange-500' : 'text-primary'
   const title = (() => {
     if (!enabled || pct == null) return undefined
-    if (pctTurn != null && agentTokenLimit) {
-      return `${totalTokens.toLocaleString()}/${agentTokenLimit.toLocaleString()} turn tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
+    if (pctTurnVsCtx != null && ctx) {
+      return `${totalTokens.toLocaleString()}/${ctx.toLocaleString()} turn tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
         typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''
       }`
     }
-    if (pctPromptVsCtx != null && ctx) {
-      return `${promptTokens.toLocaleString()}/${ctx.toLocaleString()} prompt tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
+    if (pctTurnVsMax != null && agentTokenLimit) {
+      return `${totalTokens.toLocaleString()}/${agentTokenLimit.toLocaleString()} turn tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
         typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''
       }`
     }

@@ -459,7 +459,7 @@ export function ConversationSummaryBar({
     const hasDraftParticipants = isDraftHeader && effectiveParticipantItems.length > 0
 
     return (
-      <div className="sticky top-0 z-10 border-b border-border bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md">
+      <div className="sticky top-0 z-10 border-b border-border/60 bg-card">
         <div className="px-4 pt-3.5 pb-3">
           <div className="w-full">
             <div className="flex items-center justify-between gap-4">
@@ -652,7 +652,7 @@ export function ConversationSummaryBar({
               ease: [0.25, 0.46, 0.45, 0.94],
             }
       }
-      className="sticky top-0 z-10 border-b border-border bg-gradient-to-b from-background via-background to-background/95 backdrop-blur-md"
+      className="sticky top-0 z-10 border-b border-border/60 bg-card"
     >
       <div className="px-4 pt-3.5 pb-3">
         <div className="w-full">

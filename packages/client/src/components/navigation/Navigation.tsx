@@ -351,7 +351,7 @@ export function Navigation(props: NavigationProps) {
                     playOnMountOnce={false}
                   />
                 ) : (
-                  <Icon name="sidebar" className="w-5 h-5" />
+                  <Icon name="chevron-right" className="w-4 h-4" />
                 )}
               </div>
               {isExpanded && (
@@ -453,6 +453,9 @@ export function Navigation(props: NavigationProps) {
 
           {/* Spacer to push content toward bottom when needed */}
           {(!isExpanded || !starshipData?.id) && <div className="flex-1 min-h-0"></div>}
+
+          {/* Divider before footer controls (match menu/channels divider) */}
+          <div className="mx-2 my-0 border-t border-border/60" />
 
           {/* Bottom controls */}
           <div className="px-2 pt-2 flex-shrink-0">

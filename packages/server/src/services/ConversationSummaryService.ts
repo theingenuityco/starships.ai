@@ -31,6 +31,9 @@ export interface ConversationSummaryJobData {
  */
 export class ConversationSummaryService {
   runAsync(data: ConversationSummaryJobData): void {
+    // #region agent log H4 schedule-job
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H4',location:'ConversationSummaryService.ts:36',message:'Schedule summarization job',data:{conversationId:data.conversationId,starshipId:data.starshipId,llmHistoryLimit:data.llmHistoryLimit,targetBeforeCreatedAt:data.targetBefore?.createdAt,targetBeforeId:data.targetBefore?.id},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     setImmediate(() => {
       void summarizeConversationJob(data).catch((err) => {
         console.warn('[ConversationSummaries] Async summarization failed', {
@@ -322,6 +325,9 @@ async function llmUpdateSummary(args: {
 }
 
 async function summarizeConversationJob(data: ConversationSummaryJobData): Promise<void> {
+  // #region agent log H1 job-start
+  fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'ConversationSummaryService.ts:327',message:'Summarization job start',data:{conversationId:data.conversationId,starshipId:data.starshipId,llmHistoryLimit:data.llmHistoryLimit,providedTargetBeforeCreatedAt:data.targetBefore?.createdAt,providedTargetBeforeId:data.targetBefore?.id},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
   const repo = new ConversationRepository();
   const conversation = await repo.findById(data.conversationId);
   if (!conversation) return;
@@ -335,7 +341,8 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   const llmHistoryLimit = Math.max(1, Math.min(200, Number(data.llmHistoryLimit || 30)));
   const latestPage = await repo.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
   const oldestInWindow = latestPage.messages.length > 0 ? latestPage.messages[0] : null;
-  const targetBefore = oldestInWindow ? { createdAt: oldestInWindow.createdAt, id: oldestInWindow.id } : null;
+  // Normalize cursor fields because MessageModel.createdAt may be a Date in some code paths.
+  const targetBefore = oldestInWindow ? { createdAt: toIso(oldestInWindow.createdAt), id: String(oldestInWindow.id) } : null;
 
   // If the conversation fits in the window, nothing to summarize.
   if (!latestPage.hasMoreBefore || !targetBefore) return;
@@ -352,6 +359,10 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
             : null;
         })()
       : null;
+
+  // #region agent log H1/H2 window-and-existing-cursor
+  fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'ConversationSummaryService.ts:374',message:'Computed targetBefore + existingCursor',data:{conversationId:data.conversationId,llmHistoryLimit,latestPageCount:latestPage.messages.length,latestPageHasMoreBefore:latestPage.hasMoreBefore,latestOldestCreatedAt:oldestInWindow?.createdAt,latestOldestId:oldestInWindow?.id,latestNewestCreatedAt:latestPage.messages.length?latestPage.messages[latestPage.messages.length-1]?.createdAt:undefined,latestNewestId:latestPage.messages.length?latestPage.messages[latestPage.messages.length-1]?.id:undefined,computedTargetBeforeCreatedAt:targetBefore?.createdAt,computedTargetBeforeId:targetBefore?.id,existingCursorCreatedAt:existingCursor?.createdAt,existingCursorId:existingCursor?.id,existingVersion:existingRow?.version},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   // Already summarized up to the current window boundary.
   if (sameCursor(existingCursor, targetBefore)) return;
@@ -370,8 +381,12 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
     });
     const m0 = first.messages[0];
     if (!m0) return;
-    startCursor = { createdAt: m0.createdAt, id: m0.id };
+    startCursor = { createdAt: toIso(m0.createdAt), id: String(m0.id) };
   }
+
+  // #region agent log H2/H4 start-cursor-selected
+  fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'ConversationSummaryService.ts:415',message:'Selected startCursor for range summarization',data:{conversationId:data.conversationId,existingCursorCreatedAt:existingCursor?.createdAt,existingCursorId:existingCursor?.id,startCursorCreatedAt:startCursor?.createdAt,startCursorId:startCursor?.id,targetBeforeCreatedAt:targetBefore?.createdAt,targetBeforeId:targetBefore?.id},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   // Fetch the next chunk in [startCursor (inclusive), targetBefore (exclusive)).
   const range = await repo.getConversationMessagesRangePage({
@@ -391,6 +406,10 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   // - the first message *after* the chunk (range.nextCursor), or
   // - the targetBefore window boundary (we caught up to the current window).
   const nextCursorBoundary: ConversationSummaryCursor = range.nextCursor ? range.nextCursor : targetBefore;
+
+  // #region agent log H3 range-result
+  fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H3',location:'ConversationSummaryService.ts:437',message:'Fetched range chunk + nextCursorBoundary',data:{conversationId:data.conversationId,rangeCount:range.messages.length,rangeHasMoreAfter:range.hasMoreAfter,rangeFirstCreatedAt:range.messages[0]?.createdAt,rangeFirstId:range.messages[0]?.id,rangeLastCreatedAt:range.messages.length?range.messages[range.messages.length-1]?.createdAt:undefined,rangeLastId:range.messages.length?range.messages[range.messages.length-1]?.id:undefined,rangeNextCursorCreatedAt:range.nextCursor?.createdAt,rangeNextCursorId:range.nextCursor?.id,nextCursorBoundaryCreatedAt:nextCursorBoundary?.createdAt,nextCursorBoundaryId:nextCursorBoundary?.id},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
 
   // Build a text-only summarizer input (max compatibility across providers).
   const newMessages: SummarizerMessage[] = [];
@@ -445,15 +464,20 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
 
   const now = new Date().toISOString();
   const nextSummary = updated.trim();
-  const nextCursorCreatedAt = typeof nextCursorBoundary?.createdAt === 'string' ? nextCursorBoundary.createdAt : '';
-  const nextCursorId = typeof nextCursorBoundary?.id === 'string' ? nextCursorBoundary.id : '';
+  const nextCursorCreatedAt = toIso(nextCursorBoundary?.createdAt);
+  const nextCursorId = nextCursorBoundary?.id != null ? String(nextCursorBoundary.id) : '';
   const cursorValid = Boolean(nextCursorCreatedAt && nextCursorId);
-  await upsertConversationSummary({
+  const upserted = await upsertConversationSummary({
     conversationId: data.conversationId,
     summary: nextSummary,
     summaryBeforeCreatedAt: cursorValid ? nextCursorCreatedAt : null,
     summaryBeforeMessageId: cursorValid ? nextCursorId : null,
   });
+
+  // #region agent log H2/H4 upsert-complete
+  fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'ConversationSummaryService.ts:469',message:'Upserted conversation summary',data:{conversationId:data.conversationId,summaryChars:nextSummary.length,cursorValid,summaryBeforeCreatedAt:cursorValid?nextCursorCreatedAt:null,summaryBeforeId:cursorValid?nextCursorId:null,version:upserted?.version},timestamp:Date.now()})}).catch(()=>{});
+  // #endregion
+
   console.log('[ConversationSummaries] Updated summary', {
     conversationId: data.conversationId,
     starshipId: data.starshipId,

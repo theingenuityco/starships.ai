@@ -1677,6 +1677,9 @@ export class ConversationService {
     const llmHistoryLimit = 30;
     const initialPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
     let messages = initialPage.messages;
+    // #region agent log H1/H3 llm-window-selected
+    fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H1',location:'ConversationService.ts:1682',message:'Selected last-N window for LLM + possible summary boundary',data:{conversationId:data.conversationId,starshipId:starship.id,llmHistoryLimit,windowCount:messages.length,hasMoreBefore:initialPage.hasMoreBefore,oldestCursorCreatedAt:initialPage.oldestCursor?.createdAt,oldestCursorId:initialPage.oldestCursor?.id,windowFirstCreatedAt:messages[0]?.createdAt,windowFirstId:messages[0]?.id,windowLastCreatedAt:messages.length?messages[messages.length-1]?.createdAt:undefined,windowLastId:messages.length?messages[messages.length-1]?.id:undefined},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
     if (initialPage.hasMoreBefore && initialPage.oldestCursor) {
       // Background job to keep a rolling summary of the older history.
       void this.enqueueConversationSummaryJob({
@@ -1784,6 +1787,9 @@ export class ConversationService {
           summaryRecord: conversationSummaryRecord,
         });
         if (conversationSummaryBlock) {
+          // #region agent log H1/H2 summary-injected
+          fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'debug-session',runId:'run1',hypothesisId:'H2',location:'ConversationService.ts:1791',message:'Injecting conversation summary block into system prompt',data:{conversationId:data.conversationId,starshipId:starship.id,agentId:agentModel.id,summaryVersion:conversationSummaryRecord?.version,summaryUpdatedAt:conversationSummaryRecord?.updatedAt,summaryBeforeCreatedAt:conversationSummaryRecord?.summaryBeforeCreatedAt,summaryBeforeId:conversationSummaryRecord?.summaryBeforeMessageId,llmWindowOldestCreatedAt:initialPage.oldestCursor?.createdAt,llmWindowOldestId:initialPage.oldestCursor?.id,llmWindowCount:messages.length},timestamp:Date.now()})}).catch(()=>{});
+          // #endregion
           // Debugging aid: log the summary block that will be injected into the LLM system prompt.
           // Note: This may include user-provided content; keep the preview clipped to avoid overly noisy logs.
           try {

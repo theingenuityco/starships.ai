@@ -284,11 +284,15 @@ export function AgentDocumentEditor({
         const idx = next.findIndex(r => r.agentId === agentIdForPermissions && r.toolSlug === input.toolSlug)
         if (idx >= 0) {
           next[idx] = { ...next[idx], permission: input.permission }
-        } else {
-          // toolId isn't required for this UI; keep it empty for optimistic row
-          next.push({ agentId: agentIdForPermissions, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
+          return next
         }
-        return next
+        // Only add a new row when we already have data; otherwise cache was empty and
+        // we'd end up with one row, making all other tools show the fallback ('allow').
+        if (next.length > 0) {
+          next.push({ agentId: agentIdForPermissions, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
+          return next
+        }
+        return old
       })
       return { prev }
     },
@@ -1649,7 +1653,7 @@ export function AgentDocumentEditor({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {assignedToolModels.map(tool => {
-                const current = permissionByToolSlug.get(tool.slug) ?? ('allow' as StarshipAgentToolPermissionModel['permission'])
+                const current = permissionByToolSlug.get(tool.slug) ?? ('ask' as StarshipAgentToolPermissionModel['permission'])
                 const disabled = readOnly || setPermissionMutation.isPending
                 const toolSecondary = (tool.description || '').trim() || tool.slug
                 return (

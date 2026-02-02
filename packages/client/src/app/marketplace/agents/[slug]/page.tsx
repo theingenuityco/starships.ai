@@ -298,7 +298,9 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                             const info = toolInfoBySlug.get(slug)
                             const title = info?.name?.trim() || slug
                             const desc = info?.description?.trim() || ''
-                            const permission = inferCapabilityPermission(info)
+                            const templateDefault = (template.assignedToolDefaultPermissions?.[slug] ??
+                              undefined) as CapabilityPermission | undefined
+                            const permission = templateDefault ?? inferCapabilityPermission(info)
                             return (
                               <div
                                 key={slug}
@@ -350,7 +352,9 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                           const info = toolInfoBySlug.get(slug)
                           const title = info?.name?.trim() || slug
                           const desc = info?.description?.trim() || ''
-                          const permission = inferCapabilityPermission(info)
+                          const templateDefault = (template.assignedToolDefaultPermissions?.[slug] ??
+                            undefined) as CapabilityPermission | undefined
+                          const permission = templateDefault ?? inferCapabilityPermission(info)
                           return (
                             <div
                               key={slug}
@@ -447,8 +451,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             {/* Bottom Deploy Section */}
             <section className="mt-6 sm:mt-8 pb-10 sm:pb-16 pt-2">
               <div className="max-w-2xl mx-auto text-center">
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Ready to get started?</h2>
-                <p className="text-sm text-muted-foreground mb-6">Add this agent to your starship and start using it right away.</p>
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-6">Ready to get started?</h2>
                 <div className="flex justify-center">
                   <MarketplaceAgentDeployCta template={template} />
                 </div>

@@ -8,8 +8,8 @@ import type { ExecutionItem, HostRuntime, NodeHandlerOptions } from '@starships/
 
 describe('Read Conversation Messages', () => {
   it('has a valid tool + template definition', () => {
-    expect(readConversationMessagesTool.slug).toBe('read-conversation-messages');
-    expect(readConversationMessagesToolTemplate.slug).toBe('read-conversation-messages');
+    expect(readConversationMessagesTool.slug).toBe('read-older-messages');
+    expect(readConversationMessagesToolTemplate.slug).toBe('read-older-messages');
     expect(readConversationMessagesToolTemplate.name).toBe(readConversationMessagesTool.name);
     expect(readConversationMessagesToolTemplate.description).toBe(readConversationMessagesTool.description);
   });
@@ -29,6 +29,15 @@ describe('Read Conversation Messages', () => {
   });
 
   it('executes and returns a slim message payload', async () => {
+    const nestedPayload = JSON.stringify({
+      conversationId: 'conv_older',
+      limit: 2,
+      offset: 30,
+      hasMoreBefore: false,
+      oldestCursor: null,
+      messages: [{ id: 'x', role: 'user', content: 'nested' }],
+    });
+
     const mockApiBody = {
       success: true,
       data: {
@@ -37,7 +46,8 @@ describe('Read Conversation Messages', () => {
         oldestCursor: { createdAt: new Date('2026-01-01T00:00:00.000Z').toISOString(), id: 'msg_old' },
         messages: [
           { id: 'm1', role: 'user', content: 'hello', createdAt: new Date('2026-01-01T00:00:01.000Z').toISOString() },
-          { id: 'm2', role: 'assistant', content: 'hi', createdAt: new Date('2026-01-01T00:00:02.000Z').toISOString() },
+          // Nested tool output should be redacted by the tool.
+          { id: 'm2', role: 'assistant', content: nestedPayload, createdAt: new Date('2026-01-01T00:00:02.000Z').toISOString() },
         ],
       },
     };
@@ -71,7 +81,7 @@ describe('Read Conversation Messages', () => {
       hasMoreBefore: true,
       messages: [
         { id: 'm1', role: 'user', content: 'hello' },
-        { id: 'm2', role: 'assistant', content: 'hi' },
+        { id: 'm2', role: 'assistant', content: '', redacted: true, redactionReason: 'nested_read_conversation_messages' },
       ],
     });
   });

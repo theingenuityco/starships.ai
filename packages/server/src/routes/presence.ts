@@ -38,12 +38,6 @@ router.post('/starships/:starshipId/presence/heartbeat', jwtAuthMiddleware, asyn
     const svc = PresenceService.getInstance();
     const serverTimeMs = Date.now();
     await svc.touch(starshipId, userId, serverTimeMs);
-    // Best-effort pruning to keep the ZSET bounded.
-    try {
-      await svc.pruneOld(starshipId, serverTimeMs);
-    } catch {
-      /* best-effort only */
-    }
 
     sendSuccess(res, { ok: true, serverTimeMs }, 200);
   } catch (error) {

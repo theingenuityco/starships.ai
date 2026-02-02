@@ -16,8 +16,9 @@ export const STARSHIP_PRESENCE_QUERY_KEYS = {
   byStarship: (starshipId: string) => [...STARSHIP_PRESENCE_QUERY_KEYS.all, starshipId] as const,
 } as const
 
-const HEARTBEAT_INTERVAL_MS = 20_000
-const PRESENCE_REFETCH_INTERVAL_MS = 10_000
+// Keep these aligned so we're not refetching faster than we're updating activity.
+const HEARTBEAT_INTERVAL_MS = 15_000
+const PRESENCE_REFETCH_INTERVAL_MS = HEARTBEAT_INTERVAL_MS
 
 async function postHeartbeat(starshipId: string): Promise<void> {
   if (!starshipId) return
@@ -31,14 +32,23 @@ async function postHeartbeat(starshipId: string): Promise<void> {
 
 export function useStarshipPresence(starshipId: string, enabled: boolean = true) {
   const enabledSafe = Boolean(enabled && starshipId)
-  const heartbeatTimerRef = useRef<number | null>(null)
+  const heartbeatTimerRef = useRef<ReturnType<typeof window.setInterval> | null>(null)
 
   const query = useQuery({
     queryKey: STARSHIP_PRESENCE_QUERY_KEYS.byStarship(starshipId),
     enabled: enabledSafe,
     queryFn: async (): Promise<StarshipPresenceResponse> => {
       const res = await api.get<ApiResponse<StarshipPresenceResponse>>(`/api/v1/starships/${encodeURIComponent(starshipId)}/presence`)
-      return (res as any).data?.data as StarshipPresenceResponse
+      const payload = res.data?.data
+
+      if (!payload || typeof payload.serverTimeMs !== 'number' || !Array.isArray(payload.onlineUserIds)) {
+        throw new Error('Invalid presence response payload')
+      }
+
+      return {
+        ...payload,
+        onlineUserIds: payload.onlineUserIds.filter((x): x is string => typeof x === 'string' && x.length > 0),
+      }
     },
     refetchInterval: enabledSafe ? PRESENCE_REFETCH_INTERVAL_MS : false,
     retry: false,

@@ -11,11 +11,20 @@ export interface TemplateFilters {
   search?: string
 }
 
+// Required connectors for an agent template (from tool blueprints)
+export interface RequiredConnectorItem {
+  provider: string
+  name: string
+  description?: string
+  auth: { type: string }
+}
+
 // Centralized query keys following TanStack Query best practices
 export const TEMPLATE_QUERY_KEYS = {
   agentTemplates: ['agent-templates'] as const,
   agentTemplatesList: (filters?: TemplateFilters) => [...TEMPLATE_QUERY_KEYS.agentTemplates, 'list', { filters }] as const,
   agentTemplate: (id: string) => [...TEMPLATE_QUERY_KEYS.agentTemplates, 'detail', id] as const,
+  agentTemplateRequiredConnectors: (id: string) => [...TEMPLATE_QUERY_KEYS.agentTemplates, 'required-connectors', id] as const,
 
   toolTemplates: ['tool-templates'] as const,
   toolTemplatesList: (filters?: TemplateFilters) => [...TEMPLATE_QUERY_KEYS.toolTemplates, 'list', { filters }] as const,
@@ -88,6 +97,25 @@ export function useToolTemplate(id: string, enabled: boolean = true) {
     enabled: !!id && enabled,
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
+  })
+}
+
+/**
+ * Get required connectors for an agent template (from its tools' blueprints).
+ * Used to show "Connect these connectors" when deploying.
+ */
+export function useRequiredConnectors(templateId: string, enabled: boolean = true) {
+  return useQuery({
+    queryKey: TEMPLATE_QUERY_KEYS.agentTemplateRequiredConnectors(templateId),
+    queryFn: async (): Promise<RequiredConnectorItem[]> => {
+      const response: FetchResponse<ApiResponse<{ requiredConnectors: RequiredConnectorItem[] }>> = await api.get(
+        `/api/v1/agent-templates/${templateId}/required-connectors`
+      )
+      return response.data.data?.requiredConnectors ?? []
+    },
+    enabled: !!templateId && enabled,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   })
 }
 

@@ -1,6 +1,5 @@
 'use client'
 
-import Icon from '@/components/primitives/Icon'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { StarshipsLogo } from '@/components/ui/starships-logo'
 import type { StarshipModel } from '@starships/protocol'
@@ -19,7 +18,6 @@ export function StarshipRail({
   starships,
   activeSlug,
   onSelect,
-  onCreate,
 }: {
   starships: StarshipModel[]
   activeSlug: string | null
@@ -84,34 +82,6 @@ export function StarshipRail({
           )
         })}
       </div>
-
-      {onCreate ? (
-        <Tooltip delayDuration={250}>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={onCreate}
-              className="flex h-10 w-10 items-center justify-center rounded-2xl border border-border/60 bg-muted/10 text-muted-foreground hover:bg-muted hover:text-foreground transition-all"
-              aria-label="Create a new starship"
-            >
-              <Icon name="plus" className="h-4 w-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="right" sideOffset={10} className="z-[1001] rounded-lg bg-popover shadow-lg">
-            <div className="flex items-center gap-2">
-              <StarshipsLogo
-                width={22}
-                height={22}
-                className="text-muted-foreground"
-                gradientId="rail-tooltip-gradient-create"
-                idleLoop={false}
-                playOnMountOnce={false}
-              />
-              <span className="text-[15px] font-medium tracking-tight leading-none text-muted-foreground">Create starship</span>
-            </div>
-          </TooltipContent>
-        </Tooltip>
-      ) : null}
     </div>
   )
 }

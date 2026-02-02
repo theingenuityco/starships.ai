@@ -6,8 +6,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { AgentTemplateDetailsModalContent } from '@/components/marketplace/AgentTemplateDetailsModalContent'
 import { Button } from '@/components/ui/button'
 import Icon from '@/components/primitives/Icon'
-import { Avatar } from '@/components/ui/avatar'
-import AgentAvatar from '@/components/animated/AgentAvatar'
+import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 import { DeploymentConfirmationModal } from '@/components/marketplace/DeploymentConfirmationModal'
 import { useAuth } from '@/hooks/useAuth'
 import { useUserStarships } from '@/hooks/useStarships'
@@ -135,9 +134,18 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl h-[85vh] p-0 overflow-hidden flex flex-col">
         <div className="px-6 pt-4 pb-0 pr-14 flex items-center gap-4">
-          <Avatar className="h-14 w-14 rounded-full ring-1 ring-border/40 shadow-lg">
-            <AgentAvatar seed={template.name} imageUrl={avatarUrl} size={56} rounded />
-          </Avatar>
+          <MarketplaceAvatar
+            imageUrl={avatarUrl || null}
+            label={template.name}
+            seed={template.name || template.slug || 'AI'}
+            sizeClassName="h-14 w-14"
+            shapeClassName="rounded-full"
+            ringClassName="ring-1 ring-border/40"
+            shadowClassName="shadow-lg"
+            showTintWhenMissing={false}
+            showInsetRing={false}
+            fallbackTextClassName="text-base font-semibold text-muted-foreground"
+          />
           <div className="min-w-0 flex-1">
             <DialogTitle className="text-xl font-bold leading-tight truncate">{template.name}</DialogTitle>
             {template.role ? <div className="mt-0.5 text-sm text-muted-foreground truncate">{template.role}</div> : null}
@@ -172,6 +180,8 @@ export function AgentDetailsModal({ template, open, onOpenChange, onDeploy }: Ag
         type="agent"
         template={template}
         starshipName={primaryStarship?.name || 'Unknown Starship'}
+        starshipId={primaryStarship?.id}
+        starshipSlug={primaryStarship?.slug}
       />
     </Dialog>
   )

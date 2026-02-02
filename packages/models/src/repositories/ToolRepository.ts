@@ -12,6 +12,7 @@ import type {
 } from '@starships/protocol';
 import { generateUniqueSlugIncremental } from '@/utils/slugGenerator';
 import { compareVersions, isValidVersion } from '@/utils/version';
+import { extractRequiredConnectorProviders } from '@/utils/extractRequiredConnectorProviders';
 import { ToolTemplateRepository } from './ToolTemplateRepository';
 import { generateSlug } from '@/helpers/slugUtils';
 
@@ -439,6 +440,9 @@ export class ToolRepository extends BaseRepository {
           // Versioning fields
           version: data.version || '1.0.0',
           ...(data.templateSnapshotAt ? { templateSnapshotAt: data.templateSnapshotAt } : {}),
+          ...(data.requiredConnectorProviders
+            ? { requiredConnectorProviders: data.requiredConnectorProviders }
+            : {}),
 
           // Database-specific fields
           createdAt: now,
@@ -565,6 +569,9 @@ export class ToolRepository extends BaseRepository {
           isEnabled: true,
           version: template.version, // Copy template version
           templateSnapshotAt: now, // Capture snapshot time
+          requiredConnectorProviders:
+            template.requiredConnectorProviders ??
+            extractRequiredConnectorProviders(template.blueprint),
         };
 
         // Ensure starship-scoped uniqueness via create and return tool
@@ -761,6 +768,9 @@ export class ToolRepository extends BaseRepository {
         if (template.condition !== null && template.condition !== undefined) {
           updates.condition = template.condition;
         }
+        updates.requiredConnectorProviders =
+          template.requiredConnectorProviders ??
+          extractRequiredConnectorProviders(template.blueprint);
 
         const updated = await this.update(toolId, updates);
         if (!updated) {

@@ -136,6 +136,26 @@ router.get('/agent-templates', optionalJwtAuth, async (req: Request, res: Respon
   }
 });
 
+// GET /agent-templates/:id/required-connectors - Get required connectors for an agent template (public)
+router.get('/agent-templates/:id/required-connectors', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {
+  try {
+    const paramValidation = validateData(z.object({ id: IdSchema }), req.params, res, 'template parameter');
+    if (!paramValidation) return;
+    const { id } = paramValidation;
+
+    const templateService = getAgentTemplateService();
+    if (!templateService) {
+      sendError(res, 'SERVICE_UNAVAILABLE', 'Template service not available', 503);
+      return;
+    }
+
+    const requiredConnectors = await templateService.getRequiredConnectorsForTemplate(id);
+    sendSuccess(res, { requiredConnectors }, 200);
+  } catch (error) {
+    handleError(error, res, 'loading required connectors');
+  }
+});
+
 // GET /agent-templates/:id - Get template by ID (public)
 router.get('/agent-templates/:id', optionalJwtAuth, async (req: Request, res: Response): Promise<void> => {
   try {

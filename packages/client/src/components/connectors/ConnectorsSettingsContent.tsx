@@ -7,6 +7,7 @@ import { StarshipConnectorsPanel } from '@/components/connectors/StarshipConnect
 import { AgentDeploymentModal } from '@/components/connectors/AgentDeploymentModal'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useAgent } from '@/hooks/useAgents'
+import { useAuth } from '@/hooks/useAuth'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 
@@ -15,6 +16,7 @@ interface ConnectorsSettingsContentProps {
 }
 
 export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentProps) {
+  const { user, isInstanceAdmin, isLoading: authLoading } = useAuth()
   const { data: starship, isLoading: starshipLoading } = useStarshipBySlug(slug)
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -35,6 +37,19 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
       setShowDeploymentModal(true)
     }
   }, [agentId, agentSlug, agentName, agentRole])
+
+  // Members should not see connectors. Redirect non-owners away from this page.
+  useEffect(() => {
+    if (authLoading) return
+    if (starshipLoading) return
+    if (!user?.id) return
+    if (!starship?.id) return
+
+    const canManage = Boolean(isInstanceAdmin === true || String(starship.ownerId) === String(user.id))
+    if (!canManage) {
+      router.replace(`/ship/${slug}`)
+    }
+  }, [authLoading, isInstanceAdmin, router, slug, starship?.id, starship?.ownerId, starshipLoading, user?.id])
   
   // Clean up URL params when modal closes
   const handleModalClose = (open: boolean) => {
@@ -64,6 +79,12 @@ export function ConnectorsSettingsContent({ slug }: ConnectorsSettingsContentPro
         </div>
       </PageLayout>
     )
+  }
+
+  // If we already know this user can't manage connectors, don't render the page (avoid UI flash).
+  if (!authLoading && !starshipLoading && user?.id && starship?.id) {
+    const canManage = Boolean(isInstanceAdmin === true || String(starship.ownerId) === String(user.id))
+    if (!canManage) return null
   }
 
   if (!starship) {

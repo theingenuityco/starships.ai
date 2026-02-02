@@ -1,13 +1,13 @@
 'use client'
 
-import { useEffect, useMemo } from 'react'
+import { use, useEffect, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { useStarshipChannels } from '@/hooks/useConversations'
 
-export default function StarshipOverviewPage({ params }: { params: { slug: string } }) {
+export default function StarshipOverviewPage({ params }: { params: Promise<{ slug: string }> }) {
   const router = useRouter()
-  const slug = params.slug
+  const { slug } = use(params)
   const { data: starship } = useStarshipBySlug(slug, Boolean(slug))
   const { data: channelsData, isLoading: channelsLoading } = useStarshipChannels(starship?.id ?? '', Boolean(starship?.id))
 

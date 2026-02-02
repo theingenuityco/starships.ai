@@ -23,7 +23,7 @@ export interface ConversationSummaryCursor {
 
 /**
  * Conversation state structure
- * 
+ *
  * State is stored as JSONB in the database and can contain various fields.
  * This interface defines the known structure for plugins and other state fields.
  */
@@ -35,28 +35,6 @@ export interface ConversationState {
    * - [{ id: 'web', max_results: 3 }]: plugins enabled
    */
   plugins?: ConversationPlugin[] | null;
-
-  /**
-   * Rolling summary of older messages in this conversation.
-   * Maintained by the server/background workers to keep LLM input bounded.
-   */
-  contextSummary?: string;
-
-  /**
-   * Coverage cursor for `contextSummary`.
-   * Interpreted as: summary covers all messages strictly before this cursor.
-   */
-  contextSummaryBefore?: ConversationSummaryCursor;
-
-  /**
-   * ISO timestamp for when the summary was last updated.
-   */
-  contextSummaryUpdatedAt?: string;
-
-  /**
-   * Monotonic version counter (best-effort) for debugging/observability.
-   */
-  contextSummaryVersion?: number;
   
   /**
    * Allow other state fields for extensibility

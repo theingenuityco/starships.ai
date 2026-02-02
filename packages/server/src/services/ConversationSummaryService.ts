@@ -1,11 +1,10 @@
 import { ExecutionItemUtils, RunnerFactory } from '@starships/autopilot';
 import type { Blueprint, EngineConfig } from '@starships/autopilot';
 import { getEnvConfig } from '@starships/env';
-import { ConversationRepository, LlmModelRepository } from '@starships/models';
-import type { ConversationState, ConversationSummaryCursor, MessageModel } from '@starships/protocol';
+import { ConversationRepository, LlmModelRepository, getConnection } from '@starships/models';
+import type { ConversationSummaryCursor, MessageModel } from '@starships/protocol';
 import { isTextFile, MAX_TEXT_FILE_SIZE } from '@starships/protocol';
 import { AttachmentService } from '@/services/AttachmentService';
-import { mergeConversationState } from '@/utils/conversation-state';
 import { fetchTextFromS3 } from '@/utils/s3-helper';
 
 export interface ConversationSummaryJobData {
@@ -71,16 +70,85 @@ function formatSummarizerMessagesForLog(messages: SummarizerMessage[]): string {
   return out.join('\n').trimEnd();
 }
 
-function normalizeCursor(c: unknown): ConversationSummaryCursor | null {
-  if (!c || typeof c !== 'object') return null;
-  const createdAt =
-    typeof (c as Record<string, unknown>).createdAt === 'string' ? String((c as Record<string, unknown>).createdAt) : '';
-  const id = typeof (c as Record<string, unknown>).id === 'string' ? String((c as Record<string, unknown>).id) : '';
-  return createdAt && id ? { createdAt, id } : null;
-}
-
 function sameCursor(a: ConversationSummaryCursor | null, b: ConversationSummaryCursor | null): boolean {
   return Boolean(a && b && a.createdAt === b.createdAt && a.id === b.id);
+}
+
+type ConversationSummaryRow = {
+  conversation_id: string;
+  summary: string;
+  summary_before_created_at: unknown | null;
+  summary_before_message_id: string | null;
+  updated_at: unknown;
+  version: number;
+};
+
+const toIso = (v: unknown): string => {
+  if (v == null) return '';
+  if (v instanceof Date) return v.toISOString();
+  if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+  if (typeof v === 'string') {
+    const t = Date.parse(v);
+    return Number.isFinite(t) ? new Date(t).toISOString() : v;
+  }
+  try {
+    const s = String(v);
+    const t = Date.parse(s);
+    return Number.isFinite(t) ? new Date(t).toISOString() : s;
+  } catch {
+    return '';
+  }
+};
+
+async function getConversationSummaryRow(conversationId: string): Promise<ConversationSummaryRow | null> {
+  const conn = getConnection();
+  const row = await conn.queryOne<ConversationSummaryRow>(
+    `
+      SELECT
+        conversation_id,
+        summary,
+        summary_before_created_at,
+        summary_before_message_id,
+        updated_at,
+        version
+      FROM conversation_summaries
+      WHERE conversation_id = $1
+      LIMIT 1
+    `,
+    [conversationId]
+  );
+  return row || null;
+}
+
+async function upsertConversationSummary(args: {
+  conversationId: string;
+  summary: string;
+  summaryBeforeCreatedAt: string | null;
+  summaryBeforeMessageId: string | null;
+}): Promise<{ version: number }> {
+  const conn = getConnection();
+  const result = await conn.queryOne<{ version: number }>(
+    `
+      INSERT INTO conversation_summaries (
+        conversation_id,
+        summary,
+        summary_before_created_at,
+        summary_before_message_id,
+        updated_at,
+        version
+      )
+      VALUES ($1, $2, $3::timestamptz, $4::varchar(255), NOW(), 1)
+      ON CONFLICT (conversation_id) DO UPDATE
+        SET summary = EXCLUDED.summary,
+            summary_before_created_at = EXCLUDED.summary_before_created_at,
+            summary_before_message_id = EXCLUDED.summary_before_message_id,
+            updated_at = NOW(),
+            version = conversation_summaries.version + 1
+      RETURNING version
+    `,
+    [args.conversationId, args.summary, args.summaryBeforeCreatedAt, args.summaryBeforeMessageId]
+  );
+  return { version: typeof result?.version === 'number' ? result.version : 0 };
 }
 
 async function buildMessageTextWithAttachments(args: { message: MessageModel; starshipId: string }): Promise<string> {
@@ -275,9 +343,16 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   // If the conversation fits in the window, nothing to summarize.
   if (!latestPage.hasMoreBefore || !targetBefore) return;
 
-  const state = (conversation.state && typeof conversation.state === 'object' ? conversation.state : {}) as ConversationState;
-  const existingSummary = typeof state.contextSummary === 'string' ? state.contextSummary : '';
-  const existingCursor = normalizeCursor(state.contextSummaryBefore);
+  // Summary state is stored in conversation_summaries only.
+  const existingRow = await getConversationSummaryRow(data.conversationId).catch(() => null);
+  const existingSummary = existingRow && typeof existingRow.summary === 'string' ? existingRow.summary : '';
+  const existingCursor =
+    existingRow && typeof existingRow.summary_before_message_id === 'string' && existingRow.summary_before_message_id
+      ? (() => {
+          const createdAtIso = toIso(existingRow.summary_before_created_at);
+          return createdAtIso ? ({ createdAt: createdAtIso, id: existingRow.summary_before_message_id } as ConversationSummaryCursor) : null;
+        })()
+      : null;
 
   // Already summarized up to the current window boundary.
   if (sameCursor(existingCursor, targetBefore)) return;
@@ -370,26 +445,21 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
   if (!updated.trim()) return;
 
   const now = new Date().toISOString();
-  const nextState = mergeConversationState(state, {
-    contextSummary: updated.trim(),
-    contextSummaryBefore: nextCursorBoundary,
-    contextSummaryUpdatedAt: now,
-    contextSummaryVersion: (typeof state.contextSummaryVersion === 'number' ? state.contextSummaryVersion : 0) + 1,
-  });
-
-  // IMPORTANT: merge only summary keys to avoid clobbering concurrent state updates from the main server.
-  await repo.mergeState(data.conversationId, {
-    contextSummary: nextState.contextSummary,
-    contextSummaryBefore: nextState.contextSummaryBefore,
-    contextSummaryUpdatedAt: nextState.contextSummaryUpdatedAt,
-    contextSummaryVersion: nextState.contextSummaryVersion,
+  const nextSummary = updated.trim();
+  const nextCursorCreatedAt = typeof nextCursorBoundary?.createdAt === 'string' ? nextCursorBoundary.createdAt : '';
+  const nextCursorId = typeof nextCursorBoundary?.id === 'string' ? nextCursorBoundary.id : '';
+  const cursorValid = Boolean(nextCursorCreatedAt && nextCursorId);
+  await upsertConversationSummary({
+    conversationId: data.conversationId,
+    summary: nextSummary,
+    summaryBeforeCreatedAt: cursorValid ? nextCursorCreatedAt : null,
+    summaryBeforeMessageId: cursorValid ? nextCursorId : null,
   });
   console.log('[ConversationSummaries] Updated summary', {
     conversationId: data.conversationId,
     starshipId: data.starshipId,
-    contextSummaryVersion: nextState.contextSummaryVersion,
-    contextSummaryUpdatedAt: nextState.contextSummaryUpdatedAt,
-    contextSummaryBefore: nextState.contextSummaryBefore,
+    updatedAt: now,
+    summaryBefore: nextCursorBoundary,
   });
 }
 

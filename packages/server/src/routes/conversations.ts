@@ -761,7 +761,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // best-effort only
       }
 
-      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor, ...(turnUsageByTurnId ? { turnUsageByTurnId } : null) })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor, ...(turnUsageByTurnId ? { turnUsageByTurnId } : null) })}\n\n`
+      );
 
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.

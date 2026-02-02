@@ -860,12 +860,13 @@ export class ConversationService {
       );
 
       for (const row of agentRows) {
-        const rawConversationId = (row as any).conversation_id;
+        const rawConversationId = (row as Record<string, unknown>)['conversation_id'];
         const conversationId = typeof rawConversationId === 'string' ? rawConversationId : '';
         if (!conversationId) continue;
 
         // Drop the join column, then camel-case the remaining agent columns.
-        const { conversation_id: _conversationId, ...agentRow } = row as Record<string, unknown> & { conversation_id?: unknown };
+        const agentRow: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+        delete agentRow['conversation_id'];
         const agent = toCamelObject(agentRow) as unknown as AgentModel;
         const list = agentsByConversationId.get(conversationId) || [];
         list.push(agent);
@@ -873,13 +874,13 @@ export class ConversationService {
       }
     }
 
-    const withAgents = conversations.map((c: any) => ({
-      ...(c as ConversationModel),
+    const withAgents = conversations.map((c) => ({
+      ...c,
       agents: agentsByConversationId.get(String(c.id)) || [],
     })) as Array<ConversationModel & { agents: AgentModel[] }>;
 
     const oldest = withAgents.length > 0 ? withAgents[withAgents.length - 1] : null;
-    const updatedAt = oldest ? toIso((oldest as any)?.updatedAt || (oldest as any)?.createdAt || '') : '';
+    const updatedAt = oldest ? toIso(oldest.updatedAt ?? oldest.createdAt ?? '') : '';
 
     return { conversations: withAgents, hasMoreBefore, oldestCursor: oldest && updatedAt ? { updatedAt, id: String(oldest.id) } : null };
   }
@@ -2364,10 +2365,16 @@ export class ConversationService {
         const seedMsg =
           msgs.find((m) => {
             if (!m) return false;
-            if (String((m as any).role ?? '') !== 'system') return false;
-            const meta = (m as any).metadata;
-            const flagged = Boolean(meta && typeof meta === 'object' && (meta as any).thread_context_seed === true);
-            const content = typeof (m as any).content === 'string' ? String((m as any).content) : '';
+            type MessageLike = { role?: unknown; metadata?: unknown; content?: unknown };
+            const msg = m as unknown as MessageLike;
+            if (typeof msg.role !== 'string' || msg.role !== 'system') return false;
+            const meta = msg.metadata;
+            const flagged = Boolean(
+              meta &&
+                typeof meta === 'object' &&
+                (meta as Record<string, unknown>)['thread_context_seed'] === true
+            );
+            const content = typeof msg.content === 'string' ? String(msg.content) : '';
             return flagged || content.startsWith('[THREAD_CONTEXT_SEED]');
           }) ?? null;
         if (seedMsg && typeof seedMsg.content === 'string') {

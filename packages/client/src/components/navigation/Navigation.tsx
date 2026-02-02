@@ -411,7 +411,15 @@ export function Navigation(props: NavigationProps) {
             }}
           >
             <div className="flex flex-col space-y-0 w-full px-2">
-              <NavigationSection title="Navigation" items={mainNavigationItems} pathname={pathname} expanded={isExpanded} onItemClick={isMobile && onClose ? onClose : undefined} />
+              <NavigationSection
+                title="Navigation"
+                items={mainNavigationItems}
+                pathname={pathname}
+                expanded={isExpanded}
+                onItemClick={isMobile && onClose ? onClose : undefined}
+              />
+              {/* Divider to clearly separate primary navigation from channels/DMs */}
+              <div className="mt-5 mb-2 border-t border-border/60" />
             </div>
           </div>
 

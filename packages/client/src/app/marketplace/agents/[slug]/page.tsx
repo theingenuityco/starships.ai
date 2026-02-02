@@ -10,6 +10,7 @@ import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
 
 import { MarketplaceAgentDeployCta } from '../MarketplaceAgentDeployCta'
 import { MarketplaceShareLinkCard } from '../MarketplaceShareLinkCard'
+import { CapabilitiesLegendTooltip } from './CapabilitiesLegendTooltip'
 import { AgentProfileImage } from '@/components/marketplace/AgentProfileImage'
 import { PublicFooter } from '@/app/components/PublicFooter'
 
@@ -292,18 +293,17 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         <div className="flex items-center gap-2">
                           <Icon name="wrench" className="h-5 w-5 text-primary" />
                           <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+                          <CapabilitiesLegendTooltip />
                         </div>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                           {toolSlugs.map(slug => {
                             const info = toolInfoBySlug.get(slug)
                             const title = info?.name?.trim() || slug
                             const desc = info?.description?.trim() || ''
-                            const permission = inferCapabilityPermission(info)
+                            const templateDefault = (template.assignedToolDefaultPermissions?.[slug] ?? undefined) as CapabilityPermission | undefined
+                            const permission = templateDefault ?? inferCapabilityPermission(info)
                             return (
-                              <div
-                                key={slug}
-                                className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
-                              >
+                              <div key={slug} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4">
                                 <div className="flex items-start gap-3">
                                   <div className="mt-0.5 flex-shrink-0">
                                     <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
@@ -344,18 +344,17 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       <div className="flex items-center gap-2">
                         <Icon name="wrench" className="h-5 w-5 text-primary" />
                         <h2 className="text-base font-semibold tracking-tight text-foreground">Capabilities</h2>
+                        <CapabilitiesLegendTooltip />
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         {toolSlugs.map(slug => {
                           const info = toolInfoBySlug.get(slug)
                           const title = info?.name?.trim() || slug
                           const desc = info?.description?.trim() || ''
-                          const permission = inferCapabilityPermission(info)
+                          const templateDefault = (template.assignedToolDefaultPermissions?.[slug] ?? undefined) as CapabilityPermission | undefined
+                          const permission = templateDefault ?? inferCapabilityPermission(info)
                           return (
-                            <div
-                              key={slug}
-                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
-                            >
+                            <div key={slug} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4">
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
                                   <div className={`h-2 w-2 rounded-full ${permissionDotClassName(permission)}`} />
@@ -402,10 +401,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                         </div>
                         <div className="grid grid-cols-1 gap-3">
                           {previewPrompts.map((p, idx) => (
-                            <div
-                              key={idx}
-                              className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
-                            >
+                            <div key={idx} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer">
                               <div className="flex items-start gap-3">
                                 <div className="mt-0.5 flex-shrink-0">
                                   <Icon name="sparkles" className="h-4 w-4 text-primary" />
@@ -425,10 +421,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
                       </div>
                       <div className="grid grid-cols-1 gap-3">
                         {previewPrompts.map((p, idx) => (
-                          <div
-                            key={idx}
-                            className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer"
-                          >
+                          <div key={idx} className="group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4 cursor-pointer">
                             <div className="flex items-start gap-3">
                               <div className="mt-0.5 flex-shrink-0">
                                 <Icon name="sparkles" className="h-4 w-4 text-primary" />
@@ -447,8 +440,7 @@ export default async function MarketplaceAgentDetailsPage(props: PageProps) {
             {/* Bottom Deploy Section */}
             <section className="mt-6 sm:mt-8 pb-10 sm:pb-16 pt-2">
               <div className="max-w-2xl mx-auto text-center">
-                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-2">Ready to get started?</h2>
-                <p className="text-sm text-muted-foreground mb-6">Add this agent to your starship and start using it right away.</p>
+                <h2 className="text-lg sm:text-xl font-semibold text-foreground mb-6">Ready to get started?</h2>
                 <div className="flex justify-center">
                   <MarketplaceAgentDeployCta template={template} />
                 </div>

@@ -370,13 +370,20 @@ export function DeployedAgentCard({
               <span aria-hidden />
             )}
 
-            {/* Primary action (optional override) */}
+            {/* Primary action (optional override). When already deployed and label is "Deployed", show "Start chat" instead of a static badge. */}
             {primaryAction ? (
               isAlreadyDeployed && primaryAction.label === 'Deployed' ? (
-                <div className="relative flex items-center justify-center gap-1.5 h-8 px-3 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
-                  <Icon name="check-circle" className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
-                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
-                </div>
+                <Button
+                  size="sm"
+                  className="h-8 gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90"
+                  onClick={e => {
+                    e.stopPropagation()
+                    primaryAction.onAction(agent)
+                  }}
+                >
+                  <Icon name="message-square" className="h-3.5 w-3.5" />
+                  Start chat
+                </Button>
               ) : (
                 <Button
                   size="sm"

@@ -114,21 +114,25 @@ export function MarketplaceAgentDeployCta({ template }: { template: AgentTemplat
     }
   }
 
+  const deployedAgent = useMemo(() => (deployedAgents || []).find(agent => agent.sourceTemplateId === templateId), [deployedAgents, templateId])
+
   return (
     <>
-      {isAlreadyDeployed ? (
-        <div className="flex items-center gap-3">
-          <div className="relative inline-flex items-center gap-1.5 h-10 px-4 rounded-md bg-emerald-500/15 dark:bg-emerald-500/15 backdrop-blur-md border border-emerald-500/30 dark:border-emerald-500/30 shadow-lg">
-            <Icon name="check-circle" className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">Deployed</span>
-          </div>
-          {primaryStarship?.slug ? (
-            <Button variant="primaryOutline" size="sm" className="h-10 gap-2" onClick={() => router.push(`/ship/${primaryStarship.slug}`)}>
-              <Icon name="message-square" className="h-4 w-4" />
-              Start chat
-            </Button>
-          ) : null}
-        </div>
+      {isAlreadyDeployed && primaryStarship?.slug ? (
+        <Button
+          size="sm"
+          className="h-10 gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+          onClick={() =>
+            router.push(
+              deployedAgent?.id
+                ? `/ship/${encodeURIComponent(primaryStarship.slug)}/dm?dm=draft&dmType=user_agent&agentId=${encodeURIComponent(deployedAgent.id)}`
+                : `/ship/${encodeURIComponent(primaryStarship.slug)}`
+            )
+          }
+        >
+          <Icon name="message-square" className="h-4 w-4" />
+          Start chat
+        </Button>
       ) : (
         <Button onClick={handleDeployClick} disabled={deployDisabled} className="h-10">
           <Icon name={deployIconName} className="w-4 h-4 mr-2" />

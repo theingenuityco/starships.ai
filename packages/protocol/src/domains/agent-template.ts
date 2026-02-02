@@ -4,7 +4,7 @@
  * Clean agent template type definitions for model types.
  */
 
-import { AgentParamsWithoutMetadata } from './agent';
+import { AgentParamsWithoutMetadata, type AgentToolPermission } from './agent';
 
 // ============================================================================
 // AGENT TEMPLATE TYPES
@@ -34,6 +34,12 @@ export interface AgentTemplateModel extends AgentParamsWithoutMetadata {
 
   // Tool assignment - reference by slugs instead of embedding
   assignedToolSlugs?: string[];
+
+  /**
+   * Default tool permissions when deploying from marketplace (keyed by tool template slug).
+   * Publisher's choices at publish time; deployers can still change in the modal.
+   */
+  assignedToolDefaultPermissions?: Record<string, AgentToolPermission>;
 
   // Template metadata
   category: AgentTemplateCategory;

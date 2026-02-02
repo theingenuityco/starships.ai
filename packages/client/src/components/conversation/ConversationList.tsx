@@ -7,7 +7,7 @@ import { cn } from '@/lib/utils'
 import type { AgentModel, ChannelModel, ConversationModel } from '@starships/protocol'
 import { formatDistanceToNow } from 'date-fns'
 
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useMemo, useState, type RefObject } from 'react'
 import { Button } from '../ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -76,6 +76,8 @@ export function ConversationList({
 }: ConversationListProps) {
   const router = useRouter()
   const params = useParams()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
   const slugFromParams = typeof (params as any)?.slug === 'string' ? String((params as any).slug) : ''
   const slug = (typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 ? starshipSlug.trim() : slugFromParams) || ''
   // Current selection can come from either /conversations/:conversationId (DMs) or /channels/:channelSlug (channels).
@@ -137,7 +139,11 @@ export function ConversationList({
   const renderCompactDmTarget = (t: DmTarget) => {
     const label = t.label
     const isBusy = directMessagesLoading
-    const isActive = false
+    const isActive =
+      t.kind === 'agent'
+        ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
+          (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
+        : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
 
     return (
       <div
@@ -331,13 +337,11 @@ export function ConversationList({
     return (
       <>
         <div className="flex flex-col h-full min-h-0">
-          {/* Channels */}
+          {/* Channels - content-sized so Direct messages starts right below */}
           <div
             className={cn(
-              'flex flex-col min-h-0 rounded-lg',
-              isChannelsExpanded ? 'flex-1' : 'flex-none',
-              onboardingHighlight === 'channels' &&
-                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+              'flex flex-col flex-none min-h-0 rounded-lg',
+              onboardingHighlight === 'channels' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
             <div ref={onboardingChannelsAnchorRef} data-onboarding-anchor="channels" className="w-full flex items-center justify-between h-8">
@@ -377,7 +381,7 @@ export function ConversationList({
             </div>
 
             {isChannelsExpanded ? (
-              <div id="sidebar-channels-list" className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div id="sidebar-channels-list" className="flex-none overflow-y-auto pr-1 max-h-[40vh]">
                 {channelsLoading ? (
                   <div className="space-y-1">
                     {[1, 2].map(i => (
@@ -390,7 +394,12 @@ export function ConversationList({
                   <div className="space-y-1">
                     {channels.map(ch => {
                       const isActive = currentChannelSlug
-                        ? String(ch.slug || '').trim().toLowerCase() === String(currentChannelSlug || '').trim().toLowerCase()
+                        ? String(ch.slug || '')
+                            .trim()
+                            .toLowerCase() ===
+                          String(currentChannelSlug || '')
+                            .trim()
+                            .toLowerCase()
                         : ch.conversationId === currentConversationId
                       const label = ch.name || ch.slug
                       return (
@@ -435,22 +444,16 @@ export function ConversationList({
             ) : null}
           </div>
 
-          <div className="h-2" />
+          <div className="h-4" />
 
-          {/* Direct messages */}
+          {/* Direct messages - takes remaining space below Channels */}
           <div
             className={cn(
-              'flex flex-col min-h-0 rounded-lg',
-              isDirectMessagesExpanded ? 'flex-1' : 'flex-none',
-              onboardingHighlight === 'directMessages' &&
-                'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
+              'flex flex-col min-h-0 rounded-lg flex-1',
+              onboardingHighlight === 'directMessages' && 'bg-primary/10 ring-2 ring-primary shadow-[0_0_0_2px_hsl(var(--primary)/0.2),0_6px_18px_hsl(var(--primary)/0.25)]'
             )}
           >
-            <div
-              ref={onboardingDirectMessagesAnchorRef}
-              data-onboarding-anchor="direct-messages"
-              className="w-full flex items-center justify-between h-8"
-            >
+            <div ref={onboardingDirectMessagesAnchorRef} data-onboarding-anchor="direct-messages" className="w-full flex items-center justify-between h-8">
               <button
                 type="button"
                 className={cn('flex-1 min-w-0 h-8 flex items-center rounded-lg border border-transparent text-muted-foreground px-2', 'hover:text-foreground hover:bg-muted/40 transition-colors')}
@@ -480,7 +483,7 @@ export function ConversationList({
             </div>
 
             {isDirectMessagesExpanded ? (
-              <div id="sidebar-direct-messages-list" className="min-h-0 flex-1 overflow-y-auto pr-1">
+              <div id="sidebar-direct-messages-list" className="min-h-0 flex-1 overflow-y-auto pr-1 flex flex-col">
                 {dmTargets.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-6 px-2">
                     <Icon name="message-square" className="w-8 h-8 text-muted-foreground/30 mb-2" />
@@ -546,7 +549,12 @@ export function ConversationList({
               <div className="space-y-1">
                 {channels.map(ch => {
                   const isActive = currentChannelSlug
-                    ? String(ch.slug || '').trim().toLowerCase() === String(currentChannelSlug || '').trim().toLowerCase()
+                    ? String(ch.slug || '')
+                        .trim()
+                        .toLowerCase() ===
+                      String(currentChannelSlug || '')
+                        .trim()
+                        .toLowerCase()
                     : ch.conversationId === currentConversationId
                   const label = ch.name || ch.slug
                   return (
@@ -592,16 +600,26 @@ export function ConversationList({
                 {dmTargets.map(t => {
                   const isBusy = directMessagesLoading
                   const label = t.label
+                  const isActive =
+                    t.kind === 'agent'
+                      ? (!!currentConversationId && existingDmConversationIdByAgentId.get(t.agent.id) === currentConversationId) ||
+                        (typeof pathname === 'string' && pathname.includes('/dm') && searchParams.get('agentId') === t.agent.id)
+                      : !!currentConversationId && existingDmConversationIdByPeerUserId.get(t.user.userId) === currentConversationId
                   return (
                     <div
                       key={t.key}
-                      className={cn('group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all', 'hover:bg-muted/50', isBusy && 'opacity-70 pointer-events-none')}
+                      className={cn(
+                        'group flex items-center gap-3 p-3 rounded-lg cursor-pointer transition-all',
+                        'hover:bg-muted/50',
+                        isActive && 'bg-primary/10 text-primary',
+                        isBusy && 'opacity-70 pointer-events-none'
+                      )}
                       onClick={() => handleDmTargetClick(t)}
                     >
                       {t.kind === 'agent' ? <DirectMessageAvatar starshipId={starshipId} agent={t.agent} /> : <HumanAvatar user={t.user} />}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between mb-1 gap-2">
-                          <p className={cn('text-sm font-medium truncate')}>{label}</p>
+                          <p className={cn('text-sm font-medium truncate', isActive && 'text-primary')}>{label}</p>
                         </div>
                       </div>
                     </div>

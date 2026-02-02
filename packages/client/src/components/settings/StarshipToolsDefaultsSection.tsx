@@ -2,7 +2,6 @@
 
 import Icon from '@/components/primitives/Icon'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -18,6 +17,7 @@ import {
   type ToolPermission,
   useStarshipToolPermissions,
 } from '@/hooks/useStarshipToolPermissions'
+import { PROFILE_SECTION_CARD_CLASS } from '@/components/profile/profileCardClasses'
 
 type Props = {
   starshipId: string
@@ -64,9 +64,7 @@ function PermissionBadge({ value }: { value: PermissionUIValue }) {
 
 export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
   const queryClient = useQueryClient()
-  const [search, setSearch] = useState('')
   const [toolToAdd, setToolToAdd] = useState<string>('')
-  const [permissionToAdd, setPermissionToAdd] = useState<ToolPermission>('ask')
 
   const { data: starshipTools = [], isLoading: toolsLoading } = useQuery({
     queryKey: ['starship-tools', starshipId] as const,
@@ -99,18 +97,17 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
 
   // IMPORTANT: Only show tools that are assigned at the starship level
   // (i.e. present in starship_tools via permissionRows).
-  const filteredAssigned = useMemo(() => {
-    const q = (search || '').trim().toLowerCase()
+  const assignedRows = useMemo(() => {
     const list = Array.isArray(permissionRows) ? permissionRows : []
-    if (!q) return list
-    return list.filter(r => {
-      const slug = (r.toolSlug || '').toLowerCase()
-      const tool = r.toolSlug ? toolBySlug.get(r.toolSlug) : undefined
-      const name = (tool?.name || '').toLowerCase()
-      const desc = (tool?.description || '').toLowerCase()
-      return slug.includes(q) || name.includes(q) || desc.includes(q)
+    // Stable + user-friendly ordering: tool name/slug, fallback to slug.
+    return list.slice().sort((a, b) => {
+      const at = a.toolSlug ? toolBySlug.get(a.toolSlug) : undefined
+      const bt = b.toolSlug ? toolBySlug.get(b.toolSlug) : undefined
+      const ak = (at?.name || a.toolSlug || '').toLowerCase()
+      const bk = (bt?.name || b.toolSlug || '').toLowerCase()
+      return ak.localeCompare(bk)
     })
-  }, [permissionRows, search, toolBySlug])
+  }, [permissionRows, toolBySlug])
 
   const addableTools = useMemo(() => {
     const already = new Set(permissionRows.map(r => r.toolSlug).filter(Boolean))
@@ -188,7 +185,7 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
   const loading = toolsLoading || permsLoading
 
   return (
-    <Card>
+    <Card className={PROFILE_SECTION_CARD_CLASS}>
       <CardHeader className="pb-4">
         <CardTitle className="text-base flex items-center gap-2">
           <Icon name="wrench" className="h-4 w-4 text-primary" />
@@ -204,9 +201,12 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
         {canEdit ? (
           <div className="rounded-xl border border-border/60 bg-muted/10 p-3">
             <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-              <div className="grid w-full grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_180px]">
+              <div className="grid w-full grid-cols-1 gap-3">
                 <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">Add tool</div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="text-xs font-medium text-muted-foreground">Add tool</div>
+                    <span className="text-[11px] text-muted-foreground">Assigned with: <span className="font-medium">Ask</span></span>
+                  </div>
                   <Select value={toolToAdd} onValueChange={v => setToolToAdd(v)} disabled={isBusy || addableTools.length === 0}>
                     <SelectTrigger>
                       <SelectValue placeholder={addableTools.length === 0 ? 'No available tools' : 'Select a tool…'} />
@@ -220,20 +220,6 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
                     </SelectContent>
                   </Select>
                 </div>
-
-                <div className="space-y-2">
-                  <div className="text-xs font-medium text-muted-foreground">Default permission</div>
-                  <Select value={permissionToAdd} onValueChange={v => setPermissionToAdd(v as ToolPermission)} disabled={isBusy}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="allow">{PERMISSION_LABEL.allow}</SelectItem>
-                      <SelectItem value="ask">{PERMISSION_LABEL.ask}</SelectItem>
-                      <SelectItem value="deny">{PERMISSION_LABEL.deny}</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
               </div>
 
               <div className="flex items-center justify-end gap-2">
@@ -243,9 +229,8 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
                   disabled={!toolToAdd || isBusy}
                   onClick={async () => {
                     if (!toolToAdd) return
-                    await upsertPermission.mutateAsync({ toolSlug: toolToAdd, permission: permissionToAdd })
+                    await upsertPermission.mutateAsync({ toolSlug: toolToAdd, permission: 'ask' })
                     setToolToAdd('')
-                    setPermissionToAdd('ask')
                   }}
                 >
                   Add
@@ -254,26 +239,6 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
             </div>
           </div>
         ) : null}
-
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="relative w-full sm:max-w-md">
-            <Icon name="search" className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4 pointer-events-none" />
-            <Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search tools…" className="pl-10" />
-          </div>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            disabled={!starshipId || isBusy}
-            onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['starship-tools', starshipId] as const })
-              queryClient.invalidateQueries({ queryKey: STARSHIP_TOOL_PERMISSION_QUERY_KEYS.byStarship(starshipId) })
-            }}
-          >
-            Refresh
-          </Button>
-        </div>
 
         {loading ? (
           <p className="text-sm text-muted-foreground">Loading tools…</p>
@@ -284,7 +249,7 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
         ) : (
           <div className="rounded-xl border border-border/60 overflow-hidden">
             <div className="divide-y divide-border/40">
-              {filteredAssigned.map(row => {
+              {assignedRows.map(row => {
                 const tool = row.toolSlug ? toolBySlug.get(row.toolSlug) : undefined
                 const toolSlug = row.toolSlug || tool?.slug || ''
                 const current = toolSlug ? permBySlug.get(toolSlug) : undefined
@@ -328,10 +293,6 @@ export function StarshipToolsDefaultsSection({ starshipId, canEdit }: Props) {
                   </div>
                 )
               })}
-
-              {filteredAssigned.length === 0 ? (
-                <div className="p-4 text-sm text-muted-foreground">No tools match your search.</div>
-              ) : null}
             </div>
           </div>
         )}

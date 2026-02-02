@@ -1,8 +1,9 @@
 import api, { getCurrentToken } from '@/lib/api'
+import { playNotificationChime } from '@/lib/notificationSound'
 import type { ApiResponse, NotificationModel } from '@starships/protocol'
 import { experimental_streamedQuery as streamedQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { fetchEventSource, type EventSourceMessage } from '@microsoft/fetch-event-source'
-import { useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 export const NOTIFICATION_QUERY_KEYS = {
   all: ['notifications'] as const,
@@ -28,6 +29,13 @@ type StreamChunk =
   | { type: 'notification.append'; data: { notification: NotificationModel } }
   | { type: 'notification.state'; data: { unread: UnreadSummary } }
   | { type: 'error'; error: unknown }
+
+const playedNotificationIdsByStarship = new Map<string, Set<string>>()
+function shouldPlayForNotification(n: NotificationModel): boolean {
+  const typ = String((n as any)?.type || '')
+  // Current UI treats only these as unread-notification types.
+  return typ === 'dm' || typ === 'mention'
+}
 
 export function useNotificationsStream(starshipId: string | null, enabled: boolean = true) {
   const queryClient = useQueryClient()
@@ -215,6 +223,62 @@ export function useNotificationsStream(starshipId: string | null, enabled: boole
     }
     return list
   }, [chunks.length, snapshot])
+
+  // Play a short notification sound for newly appended notifications.
+  // Important: this hook can be mounted in multiple places; dedupe globally by notification id.
+  const lastProcessedIdxRef = useRef(0)
+  const initRef = useRef(false)
+  useEffect(() => {
+    // Reset when switching starships or disabling.
+    initRef.current = false
+    lastProcessedIdxRef.current = 0
+  }, [starshipId, enabled])
+
+  useEffect(() => {
+    if (!starshipId || !enabled) return
+
+    // On first mount, don't replay historical chunks; just start tracking from "now".
+    if (!initRef.current) {
+      initRef.current = true
+      lastProcessedIdxRef.current = chunks.length
+      return
+    }
+
+    const start = Math.max(0, lastProcessedIdxRef.current)
+    if (chunks.length <= start) {
+      lastProcessedIdxRef.current = chunks.length
+      return
+    }
+
+    for (let i = start; i < chunks.length; i++) {
+      const c: any = chunks[i] as any
+      if (c?.type !== 'notification.append' || !c?.data?.notification) continue
+      const n = c.data.notification as NotificationModel
+      if (!shouldPlayForNotification(n)) continue
+
+      const sid = String(starshipId)
+      const id = String((n as any)?.id ?? '')
+      if (!id) continue
+
+      let set = playedNotificationIdsByStarship.get(sid)
+      if (!set) {
+        set = new Set<string>()
+        playedNotificationIdsByStarship.set(sid, set)
+      }
+      if (set.has(id)) continue
+      set.add(id)
+
+      // Prevent unbounded growth if the tab is open for a long time.
+      if (set.size > 500) {
+        const keep = new Set(Array.from(set).slice(-250))
+        playedNotificationIdsByStarship.set(sid, keep)
+      }
+
+      playNotificationChime()
+    }
+
+    lastProcessedIdxRef.current = chunks.length
+  }, [chunks.length, enabled, starshipId])
 
   const markSeen = useMutation({
     mutationFn: async (args?: { before?: string | null }) => {

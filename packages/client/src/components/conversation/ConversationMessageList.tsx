@@ -27,6 +27,89 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
+import { useUserPreferencesStore } from '@/store/user-preferences-store'
+import { useModelContextLength } from '@/hooks/useLlmModels'
+
+type TurnUsageForRing = {
+  turnId: string
+  at: string
+  agentId?: string
+  agentName?: string
+  model?: string
+  usage: { promptTokens: number; completionTokens: number; totalTokens: number; cost?: number }
+}
+
+function AgentAvatarWithTurnUsageRing({
+  seed,
+  imageUrl,
+  size,
+  rounded,
+  usage,
+  enabled,
+  className,
+}: {
+  seed: string
+  imageUrl?: string
+  size: number
+  rounded?: boolean
+  usage?: TurnUsageForRing | null
+  enabled: boolean
+  className?: string
+}) {
+  const modelId = typeof usage?.model === 'string' ? usage.model : null
+  const { contextLength } = useModelContextLength(modelId)
+
+  const promptTokens = Number(usage?.usage?.promptTokens ?? 0)
+  const ctx = typeof contextLength === 'number' && Number.isFinite(contextLength) && contextLength > 0 ? contextLength : null
+
+  // Outer ring padding (px) around the avatar
+  const pad = 3
+  const outer = size + pad * 2
+  const stroke = 2
+  const r = outer / 2 - stroke / 2
+  const c = 2 * Math.PI * r
+  const pct = ctx && promptTokens > 0 ? Math.max(0, Math.min(100, (promptTokens / ctx) * 100)) : null
+  const offset = pct == null ? c : c * (1 - pct / 100)
+
+  const ringClass =
+    pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 75 ? 'text-orange-500' : 'text-primary'
+  const title =
+    enabled && ctx && pct != null
+      ? `${promptTokens.toLocaleString()}/${ctx.toLocaleString()} prompt tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${typeof usage?.usage?.totalTokens === 'number' ? ` • ${Number(usage.usage.totalTokens).toLocaleString()} total` : ''}${typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''}`
+      : undefined
+
+  if (!enabled || !usage || !ctx || pct == null) {
+    return (
+      <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden', className)} style={{ width: size, height: size }}>
+        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn('relative flex-shrink-0', className)} style={{ width: outer, height: outer }} aria-label={title} title={title}>
+      <svg width={outer} height={outer} viewBox={`0 0 ${outer} ${outer}`} className="absolute inset-0" aria-hidden="true" focusable="false">
+        <circle cx={outer / 2} cy={outer / 2} r={r} fill="none" stroke="currentColor" strokeWidth={stroke} className="text-muted-foreground/25" />
+        <circle
+          cx={outer / 2}
+          cy={outer / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeDasharray={c}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          transform={`rotate(-90 ${outer / 2} ${outer / 2})`}
+          className={ringClass}
+        />
+      </svg>
+      <div className="absolute inset-[3px] rounded-full bg-muted flex items-center justify-center overflow-hidden">
+        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      </div>
+    </div>
+  )
+}
 
 function LinkedConversationCard({
   linkedConversationId,
@@ -327,6 +410,8 @@ export function ConversationMessageList({
   const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
+  const turnUsageByTurnId = (stream as any)?.turnUsageByTurnId as Record<string, any> | undefined
+  const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
@@ -1403,6 +1488,12 @@ export function ConversationMessageList({
                       isLastMessage={idx === renderMessages.length - 1}
                       sizeVariant={sizeVariant}
                       highlightTerm={normalizedHighlightTerm}
+                      expertMode={expertMode}
+                      turnUsage={
+                        expertMode && message.role === 'assistant' && typeof (message as any)?.turnId === 'string'
+                          ? ((turnUsageByTurnId?.[String((message as any).turnId)] ?? null) as any)
+                          : null
+                      }
                     />
                     {(() => {
                       const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
@@ -1562,6 +1653,10 @@ interface ConversationMessageBubbleProps {
   sizeVariant?: 'default' | 'hero' | 'delegation'
   /** When set, highlight this search term in message content (in-chat search). */
   highlightTerm?: string
+  /** Expert-mode UX: show per-turn context ring around agent avatar. */
+  expertMode?: boolean
+  /** UX-only usage for this message's turn (if available). */
+  turnUsage?: TurnUsageForRing | null
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -1696,6 +1791,8 @@ const MemoizedMessageBubble = memo(
     isLastMessage = false,
     sizeVariant = 'default',
     highlightTerm,
+    expertMode = false,
+    turnUsage,
   }: ConversationMessageBubbleProps) {
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
@@ -1938,8 +2035,16 @@ const MemoizedMessageBubble = memo(
           <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
             <div className={cn('flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
-                <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
-                  <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={avatarSize} />
+                <div className={cn('mt-1', avatarWidthClass)}>
+                  <AgentAvatarWithTurnUsageRing
+                    seed={agentName || 'AI'}
+                    imageUrl={agentAvatarUrl}
+                    size={avatarSize}
+                    rounded
+                    enabled={Boolean(expertMode)}
+                    usage={turnUsage}
+                    className={cn('mx-auto', avatarClass)}
+                  />
                 </div>
               ) : (
                 <div className={cn('flex-shrink-0 mt-1', avatarClass)} aria-hidden="true" />
@@ -1995,8 +2100,16 @@ const MemoizedMessageBubble = memo(
             )}
           >
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
+              <div className="flex-shrink-0 mt-1">
+                <AgentAvatarWithTurnUsageRing
+                  seed={agentName || 'AI'}
+                  imageUrl={agentAvatarUrl}
+                  size={40}
+                  rounded
+                  enabled={Boolean(expertMode)}
+                  usage={turnUsage}
+                  className="w-10 h-10"
+                />
               </div>
             ) : (
               <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />

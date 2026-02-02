@@ -17,8 +17,7 @@ import {
   useUpdateConversationState,
 } from '@/hooks/useConversations'
 import { useConversationStreamContext } from '@/hooks/ConversationStreamContext'
-import { useConversationUsageTotals } from '@/hooks/useUsage'
-import { useModelContextLength } from '@/hooks/useLlmModels'
+import { useConversationContextUsage } from '@/hooks/useConversationContextUsage'
 import { useWallet } from '@/hooks/useWallet'
 import { useStarshipBySlug } from '@/hooks/useStarships'
 import { cn } from '@/lib/utils'
@@ -233,12 +232,16 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const shouldShowStop = Boolean(sending || hookBusy)
     const showLoaderRing = Boolean(shouldShowStop)
 
-    // Usage and context control
-    const { data: totalsData } = useConversationUsageTotals(conversationId ?? null)
-    const { contextLength: agentContextLength } = useModelContextLength(selectedAgent?.model || null)
-    const tokensUsed = Number(totalsData?.totalTokens ?? 0)
-    const contextLimit = Number(agentContextLength ?? 0)
-    const hardLimitActive = !!conversationId && contextLimit > 0
+    // Context-window usage (mirrors server behavior: last N persisted messages + optional fold message).
+    // IMPORTANT: this is **not** lifetime token usage; it's a proxy for how "full" the next-turn context is
+    // given we cap history by message count on the server.
+    const CONTEXT_MESSAGE_LIMIT = 30
+    const { data: ctxUsage } = useConversationContextUsage(conversationId ?? null, { limit: CONTEXT_MESSAGE_LIMIT, enabled: Boolean(conversationId) })
+    const contextLimit = CONTEXT_MESSAGE_LIMIT
+    const contextMessageCountRaw = Number(ctxUsage?.messageCount ?? 0)
+    const contextMessageCount = Number.isFinite(contextMessageCountRaw) ? Math.max(0, Math.min(contextLimit, contextMessageCountRaw)) : 0
+    const hasHistoryFold = Boolean(ctxUsage?.hasMoreBefore)
+    const contextActive = Boolean(conversationId)
 
     // Conversation state for web browsing toggle
     const { data: conversation, isLoading: isLoadingConversation } = useConversationDetail(conversationId ?? null)
@@ -982,7 +985,6 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
     const getPlaceholder = () => {
       if (isStreamingEffective) return promptAgent ? `${promptAgent.name} is responding...` : 'AI is responding...'
       if (sending) return promptAgent ? `${promptAgent.name} is thinking...` : 'Thinking...'
-      if (hardLimitActive && tokensUsed >= contextLimit) return promptAgent ? `Context limit reached for ${promptAgent.name}` : 'Context limit reached'
       if (!promptAgent) return isChannelConversation ? 'Message this channel (mention agents with @)' : 'Select an agent to assign a task'
       // Show placeholder even after the conversation has started.
       return `Assign a task to ${promptAgent.name}`
@@ -1445,7 +1447,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
 
     // Removed global capture listener to avoid recursive event dispatch; rely on element-level handlers
 
-    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, hardLimitActive, tokensUsed, contextLimit, conversationId])
+    const placeholderText = useMemo(() => getPlaceholder(), [selectedAgent, isStreamingEffective, sending, conversationId])
     const placeholderRef = useRef<string>(placeholderText)
     useEffect(() => {
       placeholderRef.current = placeholderText
@@ -1694,15 +1696,15 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
       [handleSuggestionSubmit, tiptap]
     )
 
-    // Calculate context usage percentage for progress indicator
-    const contextUsagePercent = contextLimit > 0 ? Math.min(100, (tokensUsed / contextLimit) * 100) : 0
+    // Calculate context-window usage percentage for progress indicator
+    const contextUsagePercent = contextLimit > 0 ? Math.min(100, (contextMessageCount / contextLimit) * 100) : 0
     const contextWarningLevel = contextUsagePercent >= 90 ? 'critical' : contextUsagePercent >= 75 ? 'warning' : 'normal'
 
     return (
       <div className="relative opacity-100">
         <PlaceholderStyles />
-        {/* Context Limit Progress Indicator - Show when context limit is active and usage > 50% */}
-        {hardLimitActive && contextUsagePercent > 50 && !minimal && (
+        {/* Context Window Indicator - Show when there is a conversation and the window is filling */}
+        {contextActive && contextUsagePercent > 50 && !minimal && (
           <div className="mb-2 px-3 py-2 rounded-lg bg-muted/50 border border-border/40">
             <div className="flex items-center justify-between gap-3 mb-1.5">
               <div className="flex items-center gap-2">
@@ -1710,7 +1712,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                   name="database"
                   className={cn('h-3.5 w-3.5', contextWarningLevel === 'critical' ? 'text-red-500' : contextWarningLevel === 'warning' ? 'text-orange-500' : 'text-muted-foreground')}
                 />
-                <span className="text-xs font-medium text-foreground">Context Usage</span>
+                <span className="text-xs font-medium text-foreground">Context Window</span>
               </div>
               <span
                 className={cn(
@@ -1722,7 +1724,7 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
                       : 'text-muted-foreground'
                 )}
               >
-                {tokensUsed.toLocaleString()} / {contextLimit.toLocaleString()} tokens
+                {contextMessageCount.toLocaleString()} / {contextLimit.toLocaleString()} messages{hasHistoryFold ? ' + summary' : ''}
               </span>
             </div>
             <div className="relative h-1.5 bg-muted rounded-full overflow-hidden">
@@ -1740,7 +1742,9 @@ export const ConversationMessageInput = forwardRef<ConversationMessageInputRef, 
             </div>
             {contextWarningLevel !== 'normal' && (
               <p className={cn('mt-1.5 text-xs', contextWarningLevel === 'critical' ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400')}>
-                {contextWarningLevel === 'critical' ? '⚠️ Context limit almost reached. Consider starting a new conversation.' : '⚡ Approaching context limit. Messages may be truncated soon.'}
+                {contextWarningLevel === 'critical'
+                  ? 'Context window is full. Older history will be summarized for the next turn.'
+                  : 'Approaching the context window limit. Older history may be summarized soon.'}
               </p>
             )}
           </div>

@@ -3018,6 +3018,33 @@ export class ConversationService {
                       promptTokens: usagePayload.promptTokens,
                       completionTokens: usagePayload.completionTokens,
                     });
+
+              // Emit a UX-only per-turn usage event so clients can show context utilization
+              // around the agent avatar for this turn.
+              try {
+                const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
+                const agent = this.currentAgentForConversation.get(conversationId);
+                await this.streamBus.publish(conversationId, {
+                  type: 'turn.usage',
+                  data: {
+                    conversationId,
+                    turnId,
+                    at: new Date().toISOString(),
+                    ...(agent?.id ? { agentId: agent.id } : {}),
+                    ...(agent?.name ? { agentName: agent.name } : {}),
+                    ...(typeof usagePayload.model === 'string' ? { model: usagePayload.model } : {}),
+                    usage: {
+                      promptTokens: usagePayload.promptTokens,
+                      completionTokens: usagePayload.completionTokens,
+                      totalTokens: usagePayload.totalTokens,
+                      ...(typeof computedCost === 'number' && Number.isFinite(computedCost) ? { cost: Number(computedCost) } : {}),
+                    },
+                  },
+                });
+              } catch {
+                // best-effort only; UX hint
+              }
+
               await this.usageService.createUsageForTurn({
                 starshipId: starship.id,
                 conversationId,

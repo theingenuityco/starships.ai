@@ -933,6 +933,14 @@ export function useConversationStreamed(conversationId: string | null, starshipI
   const lastSseErrorAtRef = useRef<number | null>(null)
 
   type TurnState = { turnId: string | null; status: StreamTurnStatus | null }
+  type TurnUsage = {
+    turnId: string
+    at: string
+    agentId?: string
+    agentName?: string
+    model?: string
+    usage: { promptTokens: number; completionTokens: number; totalTokens: number; cost?: number }
+  }
 
   type LegacyChunk = { type: 'append'; message: ClientMessage } | { type: 'turn_started'; payload?: { local?: boolean } }
   type StreamErrorChunk = { type: 'error'; error: unknown }
@@ -1036,6 +1044,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
               return
             case 'turn.status':
               push({ type: 'turn.status', data })
+              return
+            case 'turn.usage':
+              push({ type: 'turn.usage', data })
               return
             case 'assistant.delta':
               push({ type: 'assistant.delta', data })
@@ -1542,6 +1553,30 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
   const turnState = useMemo<TurnState>(() => chunks.reduce(reduceTurn, { turnId: null, status: null }), [chunksRevisionKey])
 
+  function reduceTurnUsage(acc: Record<string, TurnUsage>, chunk: StreamedChunk): Record<string, TurnUsage> {
+    if (chunk.type !== 'turn.usage') return acc
+    const d: any = (chunk as any)?.data
+    const turnId = typeof d?.turnId === 'string' ? String(d.turnId) : ''
+    if (!turnId) return acc
+    const at = typeof d?.at === 'string' ? String(d.at) : new Date().toISOString()
+    const usageNode = d?.usage && typeof d.usage === 'object' ? d.usage : null
+    if (!usageNode) return acc
+    const promptTokens = typeof usageNode.promptTokens === 'number' ? usageNode.promptTokens : 0
+    const completionTokens = typeof usageNode.completionTokens === 'number' ? usageNode.completionTokens : 0
+    const totalTokens = typeof usageNode.totalTokens === 'number' ? usageNode.totalTokens : Number(promptTokens) + Number(completionTokens)
+    const cost = typeof usageNode.cost === 'number' && Number.isFinite(usageNode.cost) ? usageNode.cost : undefined
+
+    const next: TurnUsage = {
+      turnId,
+      at,
+      ...(typeof d?.agentId === 'string' ? { agentId: String(d.agentId) } : null),
+      ...(typeof d?.agentName === 'string' ? { agentName: String(d.agentName) } : null),
+      ...(typeof d?.model === 'string' ? { model: String(d.model) } : null),
+      usage: { promptTokens, completionTokens, totalTokens, ...(typeof cost === 'number' ? { cost } : null) },
+    }
+    return { ...acc, [turnId]: next }
+  }
+
   // Filter chunks to delay message.append until animation completes
   const filteredChunks = useMemo(() => {
     const processed: StreamedChunk[] = []
@@ -1588,6 +1623,8 @@ export function useConversationStreamed(conversationId: string | null, starshipI
 
     return processed
   }, [chunksRevisionKey, turnState.status])
+
+  const turnUsageByTurnId = useMemo<Record<string, TurnUsage>>(() => filteredChunks.reduce(reduceTurnUsage, {}), [chunksRevisionKey])
 
   // Process queued chunks when animation completes
   useEffect(() => {
@@ -1862,6 +1899,9 @@ export function useConversationStreamed(conversationId: string | null, starshipI
     isAwaitingAssistant,
     isAwaitingToolResults,
     hasCompleteEvent: turnState.status === 'completed' || turnState.status === 'failed' || turnState.status === 'cancelled',
+    turnId: turnState.turnId,
+    turnStatus: turnState.status,
+    turnUsageByTurnId,
     lastUIAction,
     hasMoreBefore: latestSnapshot.hasMoreBefore,
     oldestCursor: latestSnapshot.oldestCursor,

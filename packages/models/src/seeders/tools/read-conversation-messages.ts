@@ -8,8 +8,8 @@ import type { ToolTemplateModel } from '@starships/protocol';
  * older messages by specifying an `offset` (skip N most recent messages) and `limit`.
  */
 export const readConversationMessagesTool: ToolParams = {
-  name: 'Read Conversation Messages',
-  slug: 'read-conversation-messages',
+  name: 'Read Older Messages',
+  slug: 'read-older-messages',
   description:
     'Read older conversation history beyond the agent prompt window. `offset` skips that many most recent messages (tail offset), then returns the next `limit` older messages (chronological order).',
   parameters: {
@@ -122,12 +122,39 @@ export const readConversationMessagesTool: ToolParams = {
               }
 
               const msgs = data && typeof data === 'object' && Array.isArray(data.messages) ? data.messages : [];
-              const outMessages = msgs.map((m) => ({
-                id: m && m.id,
-                role: m && m.role,
-                createdAt: m && m.createdAt,
-                content: m && m.content,
-              }));
+              
+              // Filter/redact nested read-conversation-messages payloads to prevent recursive ballooning.
+              const looksLikeNestedRead = (s) => {
+                if (typeof s !== 'string') return false;
+                const str = s.trim();
+                if (!str) return false;
+                // Cheap pre-check to avoid parsing most strings.
+                if (!(str.startsWith('{') && str.includes('"messages"'))) return false;
+                try {
+                  const obj = JSON.parse(str);
+                  if (!obj || typeof obj !== 'object') return false;
+                  if (!Array.isArray(obj.messages)) return false;
+                  if (!('limit' in obj) || !('offset' in obj)) return false;
+                  // Extra hint: this tool's output shape includes these keys.
+                  if (!('hasMoreBefore' in obj) && !('oldestCursor' in obj)) return false;
+                  return true;
+                } catch {
+                  return false;
+                }
+              };
+
+              const outMessages = msgs.map((m) => {
+                const content = m && typeof m.content === 'string' ? m.content : '';
+                const nested = looksLikeNestedRead(content);
+                return {
+                  id: m && m.id,
+                  role: m && m.role,
+                  createdAt: m && m.createdAt,
+                  // If nested, strip content entirely (leave a marker so callers can tell it was redacted).
+                  content: nested ? '' : content,
+                  ...(nested ? { redacted: true, redactionReason: 'nested_read_conversation_messages' } : {}),
+                };
+              });
 
               return {
                 conversationId: data && data.conversationId,
@@ -169,7 +196,7 @@ export const readConversationMessagesToolTemplate: Omit<ToolTemplateModel, 'id' 
   parameters: readConversationMessagesTool.parameters,
   blueprint: readConversationMessagesTool.blueprint,
 
-  slug: 'read-conversation-messages',
+  slug: 'read-older-messages',
   version: '1.0.0',
   category: 'utility',
   exampleUsage: '{ "limit": 20, "offset": 30 } // returns 20 messages older than the newest 30',

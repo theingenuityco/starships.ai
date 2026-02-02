@@ -969,6 +969,18 @@ export class ConversationService {
     };
   }
 
+  private buildHistoryFoldMessage(args: { historyLimit: number }): LlmMessage {
+    const { historyLimit } = args;
+    const content =
+      `Note: conversation history is truncated in this prompt.\n` +
+      `- Only the most recent ${historyLimit} messages are included to avoid overflowing the model context.\n` +
+      `- Earlier messages exist but are folded.\n` +
+      `To read older messages, use an available history-reading tool (discoverable via your tool list) that accepts an \`offset\` (skip N newest messages) and \`limit\`.\n` +
+      `Example: { "offset": ${historyLimit}, "limit": 20 }`;
+
+    return { role: 'system', content };
+  }
+
   /**
    * Delete a conversation and cleanup all associated S3 files
    */
@@ -1568,6 +1580,7 @@ export class ConversationService {
     const llmHistoryLimit = 30;
     const initialPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
     let messages = initialPage.messages;
+    let hasMoreBefore = initialPage.hasMoreBefore;
 
     // Load conversation state for context - reload conversation to get latest state
     const latestConversation = await this.getConversationById(data.conversationId);
@@ -1680,7 +1693,7 @@ export class ConversationService {
         };
 
         // Prepare input messages snapshot for this agent (with multimodal content support)
-        const llmMessages: LlmMessage[] = await Promise.all(
+        const llmMessagesCore: LlmMessage[] = await Promise.all(
           messages.map(async (msg): Promise<LlmMessage> => {
             // Build multimodal content if message has attachments
             const content = await this.buildMessageContent(msg, starship.id);
@@ -1699,6 +1712,9 @@ export class ConversationService {
             return baseMessage;
           })
         );
+        const llmMessages: LlmMessage[] = hasMoreBefore
+          ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCore]
+          : llmMessagesCore;
         // input not required; execution.state messages are set directly
 
         // Attribute streamed content to the current agent
@@ -1740,6 +1756,7 @@ export class ConversationService {
         // see the updated conversation state, but do not perform mention-based handoffs
         const refreshedPage = await this.getConversationMessagesPage({ conversationId: data.conversationId, limit: llmHistoryLimit });
         messages = refreshedPage.messages;
+        hasMoreBefore = refreshedPage.hasMoreBefore;
       }
     } catch (error) {
       console.error('❌ [AGENT-SERVICE] Streaming conversation execution failed:', {
@@ -1908,7 +1925,7 @@ export class ConversationService {
       const llmHistoryLimit = 30;
       const page = await this.getConversationMessagesPage({ conversationId, limit: llmHistoryLimit });
       const messages = page.messages;
-      const llmMessages: LlmMessage[] = await Promise.all(
+      const llmMessagesCore: LlmMessage[] = await Promise.all(
         messages.map(async (msg): Promise<LlmMessage> => {
           const content = await this.buildMessageContent(msg, starship.id);
           const baseMessage: LlmMessage = {
@@ -1925,6 +1942,9 @@ export class ConversationService {
           return baseMessage;
         })
       );
+      const llmMessages: LlmMessage[] = page.hasMoreBefore
+        ? [this.buildHistoryFoldMessage({ historyLimit: llmHistoryLimit }), ...llmMessagesCore]
+        : llmMessagesCore;
 
       const env = getEnvConfig();
 

@@ -425,7 +425,7 @@ export function useChildConversationsPendingApprovals(
     refetchOnWindowFocus: true,
   })
 
-  const payload = (q.data as any) as Payload | undefined
+  const payload = q.data as any as Payload | undefined
   return {
     children: Array.isArray(payload?.children) ? payload!.children : [],
     hasMoreBefore: Boolean(payload?.hasMoreBefore),
@@ -1660,8 +1660,7 @@ export function useConversationStreamed(conversationId: string | null, starshipI
       const currentMessages = processedChunksRef.current.reduce(reduceMessages, emptyMessages)
       const lastAssistantId = getLastAssistantMessageId(currentMessages)
       const turnStatus = turnState.status
-      const shouldBypassAnimation =
-        turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
+      const shouldBypassAnimation = turnStatus === 'completed' || turnStatus === 'failed' || turnStatus === 'cancelled'
 
       if (!lastAssistantId || isAnimationComplete(lastAssistantId) || shouldBypassAnimation) {
         // Animation complete, add queued chunks to the query data

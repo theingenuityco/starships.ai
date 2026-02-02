@@ -1197,8 +1197,8 @@ router.put('/agents/:id/tool-permissions', jwtAuthMiddleware, async (req: Reques
     await agentService.setAgentToolPermissionsDerived(agentId, userId, bodyValidation.permissions);
     sendSuccess(res, { ok: true });
   } catch (error) {
-    console.error('[AGENTS] Error updating agent tool permissions:', error);
-    sendError(res, 'INTERNAL_SERVER_ERROR', 'Failed to update tool permissions');
+    // Use shared error handler so ValidationErrors surface as 4xx (not 500).
+    handleError(error, res, 'updating agent tool permissions');
   }
 });
 

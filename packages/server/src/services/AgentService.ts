@@ -539,7 +539,7 @@ export class AgentService {
 
     for (const p of permissions) {
       if (!p?.toolSlug) continue;
-      await this.agentRepository.setAgentToolPermissionBySlug({
+      await this.agentRepository.setEffectiveToolPermissionBySlug({
         agentId,
         starshipId,
         toolSlug: p.toolSlug,

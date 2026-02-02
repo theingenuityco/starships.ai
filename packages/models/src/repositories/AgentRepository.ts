@@ -771,6 +771,80 @@ export class AgentRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Update the effective permission for an agent/tool slug within a starship WITHOUT creating assignment rows.
+   *
+   * Precedence:
+   * - If an agent_tools row exists → update agent_tools.permission (agent override)
+   * - Else if a starship_tools row exists → update starship_tools.permission (starship default)
+   * - Else throw (tool not available in this scope)
+   */
+  async setEffectiveToolPermissionBySlug(args: {
+    agentId: string;
+    starshipId: string;
+    toolSlug: string;
+    permission: 'allow' | 'ask' | 'deny';
+  }): Promise<{ scope: 'agent' | 'starship' }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const { agentId, starshipId, toolSlug, permission } = args;
+        if (!agentId?.trim() || !starshipId?.trim() || !toolSlug?.trim()) {
+          throw new Error('agentId, starshipId, and toolSlug are required');
+        }
+
+        const connection = this.getConnection();
+        // Resolve tool id (instance slug first, then template slug)
+        let toolResult = await connection.queryOne<{ id: string }>('SELECT id FROM tools WHERE slug = $1 AND starship_id = $2', [
+          toolSlug,
+          starshipId,
+        ]);
+        if (!toolResult?.id) {
+          toolResult = await connection.queryOne<{ id: string }>(
+            `SELECT t.id FROM tools t
+             INNER JOIN tool_templates tt ON t.source_template_id = tt.id
+             WHERE tt.slug = $1 AND t.starship_id = $2
+             LIMIT 1`,
+            [toolSlug, starshipId]
+          );
+        }
+        if (!toolResult?.id) {
+          throw new Error(`Tool not found: ${toolSlug} on starship ${starshipId}`);
+        }
+
+        // 1) Agent override (update-only)
+        const agentRes = await connection.queryWithResult(
+          `
+          UPDATE agent_tools
+          SET permission = $3
+          WHERE agent_id = $1 AND tool_id = $2
+          `,
+          [agentId, toolResult.id, permission]
+        );
+        if (agentRes.rowCount && agentRes.rowCount > 0) {
+          return { scope: 'agent' as const };
+        }
+
+        // 2) Starship default (update-only; do NOT create starship_tools rows here)
+        const shipRes = await connection.queryWithResult(
+          `
+          UPDATE starship_tools
+          SET permission = $3, updated_at = NOW()
+          WHERE starship_id = $1 AND tool_id = $2
+          `,
+          [starshipId, toolResult.id, permission]
+        );
+        if (shipRes.rowCount && shipRes.rowCount > 0) {
+          return { scope: 'starship' as const };
+        }
+
+        throw new ValidationError('Tool is not available to agent', 'toolSlug', { agentId, toolSlug });
+      },
+      'setEffectiveToolPermissionBySlug',
+      'Agent',
+      args.agentId
+    );
+  }
+
   // ============================================================================
   // AGENT TEMPLATE RELATIONSHIPS
   // ============================================================================

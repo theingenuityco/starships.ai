@@ -105,13 +105,7 @@ export function extractPersistableState(executionState: Record<string, unknown> 
   // Persist most execution state to conversation.state, but keep certain keys ephemeral
   // (per-turn/per-request) so they don't "stick" across turns.
   // Plugins are conversation-level only (controlled by UI toggle) and should NEVER be persisted from execution state
-  const blacklist = new Set([
-    'messages',
-    'tools',
-    'modalities',
-    'imageConfig',
-    'plugins',
-  ]);
+  const blacklist = new Set(['messages', 'tools', 'modalities', 'imageConfig', 'plugins']);
 
   // Blacklist: Store everything except messages, tools, and plugins
   // Plugins are managed exclusively via conversation state updates (UI toggle), not from execution state

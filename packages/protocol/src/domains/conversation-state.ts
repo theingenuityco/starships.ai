@@ -35,7 +35,7 @@ export interface ConversationState {
    * - [{ id: 'web', max_results: 3 }]: plugins enabled
    */
   plugins?: ConversationPlugin[] | null;
-  
+
   /**
    * Allow other state fields for extensibility
    */
@@ -44,7 +44,7 @@ export interface ConversationState {
 
 /**
  * Agent state structure
- * 
+ *
  * Similar to conversation state but for agent-level configuration.
  * Note: Conversation-level plugins take precedence over agent-level plugins.
  */
@@ -54,20 +54,19 @@ export interface AgentState {
    * This is a fallback - conversation-level plugins override this.
    */
   plugins?: ConversationPlugin[] | null;
-  
+
   /**
    * Messages array (ephemeral, not persisted)
    */
   messages?: unknown[];
-  
+
   /**
    * Tools array (ephemeral, not persisted)
    */
   tools?: unknown[];
-  
+
   /**
    * Allow other state fields for extensibility
    */
   [key: string]: unknown;
 }
-

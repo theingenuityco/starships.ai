@@ -1283,7 +1283,8 @@ export class ConversationService {
       return {
         summary: typeof row.summary === 'string' ? row.summary : '',
         summaryBeforeCreatedAt: row.summary_before_created_at ? this.toIso(row.summary_before_created_at) : null,
-        summaryBeforeMessageId: typeof row.summary_before_message_id === 'string' && row.summary_before_message_id ? row.summary_before_message_id : null,
+        summaryBeforeMessageId:
+          typeof row.summary_before_message_id === 'string' && row.summary_before_message_id ? row.summary_before_message_id : null,
         updatedAt: row.updated_at ? this.toIso(row.updated_at) : null,
         version: typeof row.version === 'number' ? row.version : 0,
       };

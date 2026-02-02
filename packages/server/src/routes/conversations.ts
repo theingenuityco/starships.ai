@@ -698,6 +698,77 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         }
       }
 
+      // Best-effort: include recent per-turn usage so token-based UI survives refresh.
+      // We scan the same Redis stream window we already used above (or fetch it again if needed).
+      let turnUsageByTurnId: Record<string, any> | undefined;
+      try {
+        const recentDesc = await bus.readReverse(conversationId, snapshotCursor, { count: 2_000 }, redisReader);
+        if (Array.isArray(recentDesc) && recentDesc.length > 0) {
+          const recent = recentDesc.slice().reverse(); // chronological
+          // IMPORTANT:
+          // A single "assistant turn" can trigger multiple LLM calls (planning/tool flows, retries, etc).
+          // We want per-turn totals for UX, so we AGGREGATE all `turn.usage` events per turnId here
+          // (rather than only keeping the last event).
+          const map = new Map<string, any>();
+          for (const item of recent) {
+            const evt = item.evt as any;
+            if (!evt || evt.type !== 'turn.usage') continue;
+            const d = evt.data as any;
+            const tid = typeof d?.turnId === 'string' ? String(d.turnId) : '';
+            if (!tid) continue;
+            const u = d?.usage && typeof d.usage === 'object' ? d.usage : null;
+            if (!u) continue;
+            const promptTokens = typeof u.promptTokens === 'number' ? u.promptTokens : 0;
+            const completionTokens = typeof u.completionTokens === 'number' ? u.completionTokens : 0;
+            const totalTokens = typeof u.totalTokens === 'number' ? u.totalTokens : Number(promptTokens) + Number(completionTokens);
+            const cost = typeof u.cost === 'number' && Number.isFinite(u.cost) ? u.cost : 0;
+
+            const prev = map.get(tid);
+            if (!prev) {
+              map.set(tid, {
+                ...d,
+                turnId: tid,
+                usage: {
+                  promptTokens,
+                  completionTokens,
+                  totalTokens,
+                  ...(typeof u.cost === 'number' && Number.isFinite(u.cost) ? { cost: Number(u.cost) } : null),
+                },
+              });
+              continue;
+            }
+
+            const pu = prev?.usage && typeof prev.usage === 'object' ? prev.usage : {};
+            const prevPrompt = typeof pu.promptTokens === 'number' ? pu.promptTokens : 0;
+            const prevCompletion = typeof pu.completionTokens === 'number' ? pu.completionTokens : 0;
+            const prevTotal = typeof pu.totalTokens === 'number' ? pu.totalTokens : Number(prevPrompt) + Number(prevCompletion);
+            const prevCost = typeof pu.cost === 'number' && Number.isFinite(pu.cost) ? pu.cost : 0;
+            const nextAt = typeof d?.at === 'string' ? String(d.at) : typeof prev?.at === 'string' ? String(prev.at) : new Date().toISOString();
+
+            map.set(tid, {
+              ...prev,
+              // Prefer latest timestamp for display/debug.
+              at: nextAt,
+              // Prefer richer metadata as we observe it.
+              ...(typeof prev?.agentId === 'string' ? { agentId: prev.agentId } : typeof d?.agentId === 'string' ? { agentId: d.agentId } : null),
+              ...(typeof prev?.agentName === 'string' ? { agentName: prev.agentName } : typeof d?.agentName === 'string' ? { agentName: d.agentName } : null),
+              ...(typeof prev?.model === 'string' ? { model: prev.model } : typeof d?.model === 'string' ? { model: d.model } : null),
+              usage: {
+                promptTokens: Number(prevPrompt) + Number(promptTokens),
+                completionTokens: Number(prevCompletion) + Number(completionTokens),
+                totalTokens: Number(prevTotal) + Number(totalTokens),
+                ...(Number(prevCost) + Number(cost) > 0 ? { cost: Number(prevCost) + Number(cost) } : null),
+              },
+            });
+          }
+          if (map.size > 0) {
+            turnUsageByTurnId = Object.fromEntries(map.entries());
+          }
+        }
+      } catch {
+        // best-effort only
+      }
+
       // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
       res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
@@ -737,7 +808,9 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // best-effort only
       }
 
-      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor })}\n\n`);
+      res.write(
+        `data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor, ...(turnUsageByTurnId ? { turnUsageByTurnId } : null) })}\n\n`
+      );
 
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.
@@ -1066,16 +1139,18 @@ router.post(
       // - Cache hits for 'allow' → trust (fast path).
       // - Cache hits for 'ask'/'deny' → re-check DB to pick up recent changes, then update cache.
       let permission =
-        cachedPerm !== undefined ? cachedPerm : await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+        cachedPerm !== undefined
+          ? cachedPerm
+          : await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
       if (cachedPerm === undefined) {
         setCachedPermission(permCacheKey, permission);
       } else if (cachedPerm === 'ask' || cachedPerm === 'deny') {
-        const fresh = await agentRepo.getAgentToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
+        const fresh = await agentRepo.getEffectiveToolPermissionBySlug(agentId, conversation.starshipId, toolSlug);
         permission = fresh;
         setCachedPermission(permCacheKey, fresh);
       }
       if (!permission) {
-        sendError(res, 'FORBIDDEN', 'Tool is not assigned to agent', 200, { agentId, toolSlug, toolCallId });
+        sendError(res, 'FORBIDDEN', 'Tool is not available to agent', 200, { agentId, toolSlug, toolCallId });
         return;
       }
       if (permission === 'deny') {
@@ -2023,74 +2098,77 @@ router.get('/conversations/:conversationId/children', jwtAuthMiddleware, async (
  * Returns child conversations (threads) that currently have pending tool-call approvals.
  * This is used to power the parent composer callout without fetching all children and polling each one.
  */
-router.get('/conversations/:conversationId/children/pending-approvals', jwtAuthMiddleware, async (req: Request, res: Response): Promise<void> => {
-  try {
-    const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
-    if (!paramValidation) return;
+router.get(
+  '/conversations/:conversationId/children/pending-approvals',
+  jwtAuthMiddleware,
+  async (req: Request, res: Response): Promise<void> => {
+    try {
+      const paramValidation = validateData(z.object({ conversationId: IdSchema }), req.params, res, 'conversation parameter');
+      if (!paramValidation) return;
 
-    const { conversationId } = paramValidation;
+      const { conversationId } = paramValidation;
 
-    const authUserId = req.user?.id as string | undefined;
-    if (!authUserId) {
-      sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
-      return;
-    }
+      const authUserId = req.user?.id as string | undefined;
+      if (!authUserId) {
+        sendError(res, 'AUTHENTICATION_REQUIRED', 'User not authenticated', 401);
+        return;
+      }
 
-    const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
-    if (!paginationValidation) return;
+      const paginationValidation = validateData(PaginationSchema, req.query, res, 'pagination parameters');
+      if (!paginationValidation) return;
 
-    const cursorValidation = validateData(
-      z
-        .object({
-          beforeUpdatedAt: z.string().datetime().optional(),
-          beforeId: IdSchema.optional(),
-        })
-        .refine((v) => (v.beforeUpdatedAt && !v.beforeId ? false : v.beforeId && !v.beforeUpdatedAt ? false : true), {
-          message: 'beforeUpdatedAt and beforeId must be provided together',
-        }),
-      req.query,
-      res,
-      'children pending approvals cursor'
-    );
-    if (!cursorValidation) return;
-
-    const conversationService = new ConversationService();
-    const conversation = await conversationService.getConversationById(conversationId);
-    if (!conversation) {
-      sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
-      return;
-    }
-    if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
-    if (
-      !(await enforcePrivateChannelMembership({
-        conversationId,
-        conversationStarshipId: conversation.starshipId,
-        userId: authUserId,
-        req,
+      const cursorValidation = validateData(
+        z
+          .object({
+            beforeUpdatedAt: z.string().datetime().optional(),
+            beforeId: IdSchema.optional(),
+          })
+          .refine((v) => (v.beforeUpdatedAt && !v.beforeId ? false : v.beforeId && !v.beforeUpdatedAt ? false : true), {
+            message: 'beforeUpdatedAt and beforeId must be provided together',
+          }),
+        req.query,
         res,
-      }))
-    ) {
-      return;
-    }
-    if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
-      return;
-    }
+        'children pending approvals cursor'
+      );
+      if (!cursorValidation) return;
 
-    // Efficient DB query: find children with pending approvals, newest first.
-    const conn = getConnection();
-    const limit = Math.max(1, Math.min(200, Number(paginationValidation.limit || 50)));
-    const pageSize = limit + 1;
+      const conversationService = new ConversationService();
+      const conversation = await conversationService.getConversationById(conversationId);
+      if (!conversation) {
+        sendError(res, 'RESOURCE_NOT_FOUND', 'Conversation not found', 404, { conversationId });
+        return;
+      }
+      if (!(await verifyResourceAccess(conversation.starshipId, authUserId, 'conversation', conversationId, res))) return;
+      if (
+        !(await enforcePrivateChannelMembership({
+          conversationId,
+          conversationStarshipId: conversation.starshipId,
+          userId: authUserId,
+          req,
+          res,
+        }))
+      ) {
+        return;
+      }
+      if (!(await enforceDirectMessageMembership({ conversationId, userId: authUserId, req, res }))) {
+        return;
+      }
 
-    const useCursor = Boolean(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId);
-    const rows = await conn.query<{
-      id: string;
-      updated_at: string;
-      created_at: string;
-      pending_count: number;
-      agent_name: string | null;
-    }>(
-      useCursor
-        ? `
+      // Efficient DB query: find children with pending approvals, newest first.
+      const conn = getConnection();
+      const limit = Math.max(1, Math.min(200, Number(paginationValidation.limit || 50)));
+      const pageSize = limit + 1;
+
+      const useCursor = Boolean(cursorValidation.beforeUpdatedAt && cursorValidation.beforeId);
+      const rows = await conn.query<{
+        id: string;
+        updated_at: string;
+        created_at: string;
+        pending_count: number;
+        agent_name: string | null;
+      }>(
+        useCursor
+          ? `
           SELECT
             c.id,
             c.updated_at,
@@ -2116,7 +2194,7 @@ router.get('/conversations/:conversationId/children/pending-approvals', jwtAuthM
           ORDER BY c.updated_at DESC, c.id DESC
           LIMIT $4
         `
-        : `
+          : `
           SELECT
             c.id,
             c.updated_at,
@@ -2138,53 +2216,54 @@ router.get('/conversations/:conversationId/children/pending-approvals', jwtAuthM
           ORDER BY c.updated_at DESC, c.id DESC
           LIMIT $2
         `,
-      useCursor ? [conversationId, cursorValidation.beforeUpdatedAt, cursorValidation.beforeId, pageSize] : [conversationId, pageSize]
-    );
+        useCursor ? [conversationId, cursorValidation.beforeUpdatedAt, cursorValidation.beforeId, pageSize] : [conversationId, pageSize]
+      );
 
-    const hasMoreBefore = rows.length > limit;
-    const trimmed = rows.slice(0, limit);
-    const oldest = trimmed.length > 0 ? trimmed[trimmed.length - 1] : null;
-    const toIso = (v: unknown): string => {
-      if (v == null) return '';
-      if (v instanceof Date) return v.toISOString();
-      if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
-      if (typeof v === 'string') {
-        const t = Date.parse(v);
-        return Number.isFinite(t) ? new Date(t).toISOString() : v;
-      }
-      try {
-        const s = String(v);
-        const t = Date.parse(s);
-        return Number.isFinite(t) ? new Date(t).toISOString() : s;
-      } catch {
-        return '';
-      }
-    };
+      const hasMoreBefore = rows.length > limit;
+      const trimmed = rows.slice(0, limit);
+      const oldest = trimmed.length > 0 ? trimmed[trimmed.length - 1] : null;
+      const toIso = (v: unknown): string => {
+        if (v == null) return '';
+        if (v instanceof Date) return v.toISOString();
+        if (typeof v === 'number' && Number.isFinite(v)) return new Date(v).toISOString();
+        if (typeof v === 'string') {
+          const t = Date.parse(v);
+          return Number.isFinite(t) ? new Date(t).toISOString() : v;
+        }
+        try {
+          const s = String(v);
+          const t = Date.parse(s);
+          return Number.isFinite(t) ? new Date(t).toISOString() : s;
+        } catch {
+          return '';
+        }
+      };
 
-    const oldestCursor = oldest ? { updatedAt: toIso(oldest.updated_at || oldest.created_at), id: String(oldest.id) } : null;
+      const oldestCursor = oldest ? { updatedAt: toIso(oldest.updated_at || oldest.created_at), id: String(oldest.id) } : null;
 
-    const items = trimmed.map((r) => ({
-      id: String(r.id),
-      updatedAt: toIso(r.updated_at || r.created_at),
-      pendingCount: Number(r.pending_count) || 0,
-      agentName: typeof r.agent_name === 'string' ? r.agent_name : '',
-    }));
+      const items = trimmed.map((r) => ({
+        id: String(r.id),
+        updatedAt: toIso(r.updated_at || r.created_at),
+        pendingCount: Number(r.pending_count) || 0,
+        agentName: typeof r.agent_name === 'string' ? r.agent_name : '',
+      }));
 
-    sendSuccess(
-      res,
-      {
-        parentConversationId: conversationId,
-        children: items,
-        total: items.length,
-        hasMoreBefore,
-        oldestCursor,
-      },
-      200
-    );
-  } catch (error) {
-    handleError(error, res, 'fetching child pending approvals');
+      sendSuccess(
+        res,
+        {
+          parentConversationId: conversationId,
+          children: items,
+          total: items.length,
+          hasMoreBefore,
+          oldestCursor,
+        },
+        200
+      );
+    } catch (error) {
+      handleError(error, res, 'fetching child pending approvals');
+    }
   }
-});
+);
 
 /**
  * GET /starships/:starshipId/conversations - Get conversations by starship

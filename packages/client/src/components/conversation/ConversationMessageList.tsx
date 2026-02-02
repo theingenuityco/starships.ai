@@ -27,6 +27,115 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { InlineWidgetRenderer } from '@/components/widgets/InlineWidgetRenderer'
 import { MarketplaceAvatar } from '@/components/marketplace/MarketplaceAvatar'
+import { useUserPreferencesStore } from '@/store/user-preferences-store'
+import { useModelContextLength } from '@/hooks/useLlmModels'
+
+type TurnUsageForRing = {
+  turnId: string
+  at: string
+  agentId?: string
+  agentName?: string
+  model?: string
+  usage: { promptTokens: number; completionTokens: number; totalTokens: number; cost?: number }
+}
+
+function AgentAvatarWithTurnUsageRing({
+  seed,
+  imageUrl,
+  modelIdOverride,
+  tokenLimitOverride,
+  size,
+  rounded,
+  usage,
+  enabled,
+  className,
+}: {
+  seed: string
+  imageUrl?: string
+  modelIdOverride?: string | null
+  tokenLimitOverride?: number | null
+  size: number
+  rounded?: boolean
+  usage?: TurnUsageForRing | null
+  enabled: boolean
+  className?: string
+}) {
+  const modelId =
+    (typeof usage?.model === 'string' && usage.model.trim().length > 0 ? usage.model.trim() : null) ||
+    (typeof modelIdOverride === 'string' && modelIdOverride.trim().length > 0 ? modelIdOverride.trim() : null)
+  const { contextLength } = useModelContextLength(modelId)
+
+  const promptTokens = Number(usage?.usage?.promptTokens ?? 0)
+  const completionTokens = Number(usage?.usage?.completionTokens ?? 0)
+  const totalTokens = Number(usage?.usage?.totalTokens ?? 0) || Number(promptTokens) + Number(completionTokens)
+  const agentTokenLimit = typeof tokenLimitOverride === 'number' && Number.isFinite(tokenLimitOverride) && tokenLimitOverride > 0 ? tokenLimitOverride : null
+  const ctx = typeof contextLength === 'number' && Number.isFinite(contextLength) && contextLength > 0 ? contextLength : null
+
+  // Outer ring padding (px) around the avatar
+  const pad = 3
+  const outer = size + pad * 2
+  const stroke = 2
+  const r = outer / 2 - stroke / 2
+  const c = 2 * Math.PI * r
+
+  // Preferred ring meaning:
+  // 1) Turn "tokens burned" vs model context window (preferred when available)
+  // 2) Fallback: turn "tokens burned" vs agent token limit (maxTokens)
+  const pctTurnVsCtx = ctx && totalTokens > 0 ? Math.max(0, Math.min(100, (totalTokens / ctx) * 100)) : null
+  const pctTurnVsMax = agentTokenLimit && totalTokens > 0 ? Math.max(0, Math.min(100, (totalTokens / agentTokenLimit) * 100)) : null
+  const pct = pctTurnVsCtx ?? pctTurnVsMax
+  const offset = pct == null ? c : c * (1 - pct / 100)
+
+  const ringClass =
+    pct != null && pct >= 90 ? 'text-red-500' : pct != null && pct >= 50 ? 'text-orange-500' : 'text-yellow-500'
+  const title = (() => {
+    if (!enabled || pct == null) return undefined
+    if (pctTurnVsCtx != null && ctx) {
+      return `${totalTokens.toLocaleString()}/${ctx.toLocaleString()} turn tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
+        typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''
+      }`
+    }
+    if (pctTurnVsMax != null && agentTokenLimit) {
+      return `${totalTokens.toLocaleString()}/${agentTokenLimit.toLocaleString()} turn tokens (${pct.toFixed(pct >= 10 ? 0 : 1)}%)${
+        typeof usage?.usage?.cost === 'number' ? ` • $${Number(usage.usage.cost).toFixed(2)}` : ''
+      }`
+    }
+    return undefined
+  })()
+
+  if (!enabled || !usage || pct == null) {
+    return (
+      <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center overflow-hidden', className)} style={{ width: size, height: size }}>
+        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      </div>
+    )
+  }
+
+  return (
+    <div className={cn('relative flex-shrink-0', className)} style={{ width: outer, height: outer }} aria-label={title} title={title}>
+      <svg width={outer} height={outer} viewBox={`0 0 ${outer} ${outer}`} className="absolute inset-0" aria-hidden="true" focusable="false">
+        <circle
+          cx={outer / 2}
+          cy={outer / 2}
+          r={r}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={stroke}
+          strokeDasharray={c}
+          // Negative offset reverses direction (anti-clockwise).
+          strokeDashoffset={-offset}
+          strokeLinecap="round"
+          // Start 45° anticlockwise from bottom (~5 o'clock).
+          transform={`rotate(45 ${outer / 2} ${outer / 2})`}
+          className={ringClass}
+        />
+      </svg>
+      <div className="absolute inset-[3px] rounded-full bg-muted flex items-center justify-center overflow-hidden">
+        <AgentAvatar seed={seed} imageUrl={imageUrl} size={size} rounded={rounded} />
+      </div>
+    </div>
+  )
+}
 
 function LinkedConversationCard({
   linkedConversationId,
@@ -327,6 +436,11 @@ export function ConversationMessageList({
   const isResponding = isRespondingOverride ?? stream?.isResponding ?? false
   const isAssistantStreaming = isAssistantStreamingOverride ?? stream?.isAssistantStreaming ?? false
   const isAwaitingToolResults = isAwaitingToolResultsOverride ?? stream?.isAwaitingToolResults ?? false
+  const turnUsageByTurnId = (stream as any)?.turnUsageByTurnId as Record<string, any> | undefined
+  const activeTurnId = typeof (stream as any)?.turnId === 'string' ? String((stream as any).turnId) : null
+  const activeTurnStatus = typeof (stream as any)?.turnStatus === 'string' ? String((stream as any).turnStatus) : null
+  const isTerminalTurnStatus = activeTurnStatus === 'completed' || activeTurnStatus === 'failed' || activeTurnStatus === 'cancelled'
+  const expertMode = useUserPreferencesStore(s => s.expertMode)
   const canLoadOlder = !messagesOverride && Boolean(stream?.hasMoreBefore) && Boolean(stream?.oldestCursor) && typeof stream?.loadOlder === 'function'
   const isLoadingOlder = Boolean(stream?.isLoadingOlder)
 
@@ -345,6 +459,7 @@ export function ConversationMessageList({
     role?: string
     slug?: string
     avatarAttachmentId?: string
+    model?: string
   }
   const { data: conversationAgentsRaw = [] } = useConversationAgents(conversationId)
   const conversationAgents = useMemo(() => (Array.isArray(conversationAgentsRaw) ? (conversationAgentsRaw as ConversationAgent[]) : []), [conversationAgentsRaw])
@@ -456,7 +571,12 @@ export function ConversationMessageList({
       const avatarAttachmentId = typeof (agent as any)?.avatarAttachmentId === 'string' ? String((agent as any).avatarAttachmentId).trim() : ''
       const avatarUrl = agentAvatarUrlOverride ?? (avatarAttachmentId ? agentAvatarUrlByAttachmentId.get(avatarAttachmentId) : undefined)
 
-      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl }
+      const model = typeof (agent as any)?.model === 'string' ? String((agent as any).model).trim() : ''
+      const maxTokensRaw = (agent as any)?.maxTokens ?? (agent as any)?.state?.maxTokens
+      const maxTokensNum = typeof maxTokensRaw === 'number' ? maxTokensRaw : typeof maxTokensRaw === 'string' ? Number(maxTokensRaw) : NaN
+      const maxTokens = Number.isFinite(maxTokensNum) && maxTokensNum > 0 ? maxTokensNum : undefined
+
+      return { displayName: displayName.trim() || 'Assistant', slug, avatarUrl, modelId: model || undefined, maxTokens }
     },
     [agentAvatarUrlByAttachmentId, agentAvatarUrlOverride, agentById, agentDisplayNameById, fallbackAgent, fallbackAgentDisplayName]
   )
@@ -1385,6 +1505,8 @@ export function ConversationMessageList({
                       agentSlug={assistant?.slug}
                       starshipSlug={starshipSlug}
                       agentAvatarUrl={assistant?.avatarUrl}
+                      agentModelId={assistant?.modelId}
+                      agentMaxTokens={assistant?.maxTokens}
                       isStreamingActive={message.id === activeRenderedStreamingAssistantId}
                       starshipId={starshipId}
                       enableChannelMessageThreads={enableChannelMessageThreads}
@@ -1403,6 +1525,27 @@ export function ConversationMessageList({
                       isLastMessage={idx === renderMessages.length - 1}
                       sizeVariant={sizeVariant}
                       highlightTerm={normalizedHighlightTerm}
+                      expertMode={expertMode}
+                      turnUsage={
+                        (() => {
+                          if (!expertMode) return null
+                          if (message.role !== 'assistant') return null
+                          const tid = typeof (message as any)?.turnId === 'string' ? String((message as any).turnId) : ''
+                          if (!tid) return null
+                          const raw = (turnUsageByTurnId?.[tid] ?? null) as any
+                          if (!raw) return null
+                          // Avoid showing partial/in-progress usage for the currently active turn.
+                          // This fixes the "stream value inaccurate, refresh correct" UX: we only display once final.
+                          // Robust gating:
+                          // - Prefer terminal turn status when we have it.
+                          // - But if the client misses the terminal `turn.status` event (SSE drop/reconnect edge cases),
+                          //   `activeTurnStatus` can remain "active" even though the UI is no longer responding.
+                          //   In that case, allow the ring to render once `isResponding` is false.
+                          const shouldHide = Boolean(activeTurnId && tid === activeTurnId && !isTerminalTurnStatus && isResponding)
+                          if (shouldHide) return null
+                          return raw
+                        })()
+                      }
                     />
                     {(() => {
                       const widgets = message.role === 'assistant' && message.messageType !== 'tool_result' ? extractWidgetResults((message as ExtendedMessage).uiActions) : []
@@ -1536,6 +1679,10 @@ interface ConversationMessageBubbleProps {
   agentSlug?: string
   starshipSlug?: string
   agentAvatarUrl?: string
+  /** Agent configured model id (fallback when provider usage omits model). */
+  agentModelId?: string
+  /** Agent maxTokens (internal per-turn budget / cap). */
+  agentMaxTokens?: number
   isStreamingActive?: boolean
   starshipId?: string
   enableChannelMessageThreads?: boolean
@@ -1562,6 +1709,10 @@ interface ConversationMessageBubbleProps {
   sizeVariant?: 'default' | 'hero' | 'delegation'
   /** When set, highlight this search term in message content (in-chat search). */
   highlightTerm?: string
+  /** Expert-mode UX: show per-turn context ring around agent avatar. */
+  expertMode?: boolean
+  /** UX-only usage for this message's turn (if available). */
+  turnUsage?: TurnUsageForRing | null
 }
 
 const HIGHLIGHT_TERM_MAX_LENGTH = 200
@@ -1678,6 +1829,8 @@ const MemoizedMessageBubble = memo(
     agentSlug,
     starshipSlug,
     agentAvatarUrl,
+    agentModelId,
+    agentMaxTokens,
     isStreamingActive,
     starshipId,
     enableChannelMessageThreads = false,
@@ -1696,6 +1849,8 @@ const MemoizedMessageBubble = memo(
     isLastMessage = false,
     sizeVariant = 'default',
     highlightTerm,
+    expertMode = false,
+    turnUsage,
   }: ConversationMessageBubbleProps) {
     const isHero = sizeVariant === 'hero'
     const isDelegation = sizeVariant === 'delegation'
@@ -1931,6 +2086,14 @@ const MemoizedMessageBubble = memo(
         typeof starshipSlug === 'string' && starshipSlug.trim().length > 0 && typeof agentSlug === 'string' && agentSlug.trim().length > 0
           ? `/ship/${encodeURIComponent(starshipSlug)}/agent/${encodeURIComponent(agentSlug)}`
           : null
+      // Keep the avatar "slot" width stable across consecutive assistant messages.
+      // When expert mode is on and we have turn usage, `AgentAvatarWithTurnUsageRing` renders an outer ring that adds padding.
+      // If we don't reserve the extra width on *subsequent* messages (where the avatar is hidden), the first message in a turn
+      // ends up slightly narrower.
+      const usageRingPadPx = 3 // must match `AgentAvatarWithTurnUsageRing`'s `pad`
+      const shouldReserveUsageRing = Boolean(expertMode) && Boolean(turnUsage)
+      const assistantAvatarBasePx = isHero || isDelegation ? avatarSize : 40
+      const assistantAvatarSlotPx = assistantAvatarBasePx + (shouldReserveUsageRing ? usageRingPadPx * 2 : 0)
 
       if (isHero || isDelegation) {
         const assistantGap = isDelegation ? 'gap-2' : 'gap-3'
@@ -1938,11 +2101,21 @@ const MemoizedMessageBubble = memo(
           <div className={cn('flex justify-start', startsNewGroup ? (isDelegation ? 'mt-2' : 'mt-4') : '')}>
             <div className={cn('flex items-start w-full', assistantGap)}>
               {showAssistantAvatar ? (
-                <div className={cn('flex-shrink-0 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden', avatarClass)}>
-                  <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={avatarSize} />
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                  <AgentAvatarWithTurnUsageRing
+                    seed={agentName || 'AI'}
+                    imageUrl={agentAvatarUrl}
+                    modelIdOverride={agentModelId ?? null}
+                    tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                    size={avatarSize}
+                    rounded
+                    enabled={Boolean(expertMode)}
+                    usage={turnUsage}
+                    className={cn('mx-auto', avatarClass)}
+                  />
                 </div>
               ) : (
-                <div className={cn('flex-shrink-0 mt-1', avatarClass)} aria-hidden="true" />
+                <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
               )}
               <div className="flex-1 w-full pt-0.5">
                 <ConversationMessageContent
@@ -1995,11 +2168,21 @@ const MemoizedMessageBubble = memo(
             )}
           >
             {showAssistantAvatar ? (
-              <div className="flex-shrink-0 w-10 h-10 rounded-full bg-muted flex items-center justify-center mt-1 overflow-hidden">
-                <AgentAvatar seed={agentName || 'AI'} imageUrl={agentAvatarUrl} size={40} rounded />
+              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }}>
+                <AgentAvatarWithTurnUsageRing
+                  seed={agentName || 'AI'}
+                  imageUrl={agentAvatarUrl}
+                  modelIdOverride={agentModelId ?? null}
+                  tokenLimitOverride={typeof agentMaxTokens === 'number' ? agentMaxTokens : null}
+                  size={40}
+                  rounded
+                  enabled={Boolean(expertMode)}
+                  usage={turnUsage}
+                  className="mx-auto"
+                />
               </div>
             ) : (
-              <div className="flex-shrink-0 w-10 h-10 mt-1" aria-hidden="true" />
+              <div className="flex-shrink-0 mt-1" style={{ width: assistantAvatarSlotPx, height: assistantAvatarSlotPx }} aria-hidden="true" />
             )}
             <div className="min-w-0 flex-1 w-full pt-0.5">
               {showAssistantAvatar && (
@@ -2057,6 +2240,8 @@ const MemoizedMessageBubble = memo(
     if (prevProps.message.streaming !== nextProps.message.streaming) return false
     if (prevProps.isStreamingActive !== nextProps.isStreamingActive) return false
     if (prevProps.message.messageType !== nextProps.message.messageType) return false
+    // Re-render when expert mode toggles, since it affects avatar ring visibility.
+    if (Boolean(prevProps.expertMode) !== Boolean(nextProps.expertMode)) return false
     {
       const prevAny = prevProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
       const nextAny = nextProps.message as unknown as { linkedConversationId?: unknown; linked_conversation_id?: unknown }
@@ -2075,6 +2260,27 @@ const MemoizedMessageBubble = memo(
 
     // Re-render if the agent avatar URL changes (e.g. after attachments load)
     if ((prevProps.agentAvatarUrl || '') !== (nextProps.agentAvatarUrl || '')) return false
+
+    // Re-render when agent model/maxTokens metadata loads (affects turn-usage ring computation).
+    if ((prevProps.agentModelId || '') !== (nextProps.agentModelId || '')) return false
+    if (Number(prevProps.agentMaxTokens ?? 0) !== Number(nextProps.agentMaxTokens ?? 0)) return false
+
+    // Re-render when turn usage arrives/updates; otherwise the ring can stay missing until refresh.
+    {
+      const prevTU = prevProps.turnUsage as any
+      const nextTU = nextProps.turnUsage as any
+      const prevTurnId = typeof prevTU?.turnId === 'string' ? String(prevTU.turnId) : ''
+      const nextTurnId = typeof nextTU?.turnId === 'string' ? String(nextTU.turnId) : ''
+      if (prevTurnId !== nextTurnId) return false
+
+      const prevTotal = Number(prevTU?.usage?.totalTokens ?? 0)
+      const nextTotal = Number(nextTU?.usage?.totalTokens ?? 0)
+      if (prevTotal !== nextTotal) return false
+
+      const prevCost = typeof prevTU?.usage?.cost === 'number' && Number.isFinite(prevTU.usage.cost) ? Number(prevTU.usage.cost) : 0
+      const nextCost = typeof nextTU?.usage?.cost === 'number' && Number.isFinite(nextTU.usage.cost) ? Number(nextTU.usage.cost) : 0
+      if (prevCost !== nextCost) return false
+    }
 
     // Re-render when text (assistant content) changes
     if (prevProps.message.content !== nextProps.message.content) return false

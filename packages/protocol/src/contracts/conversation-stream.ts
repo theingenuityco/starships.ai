@@ -6,6 +6,21 @@ export type ConversationStreamSnapshot = {
   conversationId: string;
   messages: MessageModel[];
   /**
+   * Optional: best-effort per-turn usage map (keyed by turnId) for recent turns.
+   * Used to restore token usage UI (e.g. avatar rings) after refresh/reconnect.
+   */
+  turnUsageByTurnId?: Record<
+    string,
+    {
+      turnId: string;
+      at: string;
+      agentId?: string;
+      agentName?: string;
+      model?: string;
+      usage: { promptTokens: number; completionTokens: number; totalTokens: number; cost?: number };
+    }
+  >;
+  /**
    * If true, there are older persisted messages before `oldestCursor`.
    */
   hasMoreBefore?: boolean;
@@ -64,6 +79,27 @@ export type ConversationStreamAssistantReasoningDelta = {
 export type ConversationStreamMessageAppend = {
   conversationId: string;
   message: MessageModel;
+};
+
+/**
+ * Provider/model usage for a specific LLM call inside a turn.
+ *
+ * This is emitted as soon as the provider reports usage (typically on content_complete).
+ * It is intended for **UX/debug** only (e.g. showing a context utilization ring on the agent avatar).
+ */
+export type ConversationStreamTurnUsage = {
+  conversationId: string;
+  turnId: string;
+  at: string;
+  agentId?: string;
+  agentName?: string;
+  model?: string;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+    cost?: number;
+  };
 };
 
 // ----------------------------------------------------------------------------
@@ -136,6 +172,7 @@ export type ConversationStreamEvent =
   | { type: 'snapshot'; data: ConversationStreamSnapshot }
   | { type: 'turn.started'; data: ConversationStreamTurnStarted }
   | { type: 'turn.status'; data: ConversationStreamTurnStatus }
+  | { type: 'turn.usage'; data: ConversationStreamTurnUsage }
   | { type: 'assistant.delta'; data: ConversationStreamAssistantDelta }
   | { type: 'assistant.reasoning_delta'; data: ConversationStreamAssistantReasoningDelta }
   | { type: 'message.append'; data: ConversationStreamMessageAppend }

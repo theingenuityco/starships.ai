@@ -114,9 +114,7 @@ export class AgentTemplateService {
     return result;
   }
 
-  async createTemplate(
-    templateData: CreateAgentTemplateRequest
-  ): Promise<AgentTemplateModel> {
+  async createTemplate(templateData: CreateAgentTemplateRequest): Promise<AgentTemplateModel> {
     // Validate required fields
     if (!templateData.name || !templateData.model) {
       throw new ValidationError('Template name and model are required');
@@ -146,8 +144,8 @@ export class AgentTemplateService {
       throw new NotFoundError('Template', templateId);
     }
 
-    // Deploy assigned tool templates to the starship as tool instances
-    const deployedToolIds: string[] = [];
+    // Deploy assigned tool templates to the starship as tool instances (track id + slug for permission defaults)
+    const deployedTools: Array<{ id: string; slug: string }> = [];
 
     if (template.assignedToolSlugs && template.assignedToolSlugs.length > 0) {
       console.log(`[AGENT-TEMPLATE-SERVICE] Deploying ${template.assignedToolSlugs.length} tools to starship ${starshipId}`);
@@ -165,7 +163,7 @@ export class AgentTemplateService {
           // Check if starship already has a tool from this template (by source_template_id).
           // If it does, we reuse that deployed tool instance (and its slug).
           let existingTool = await this.toolRepository.findByTemplateIdAndStarship(toolTemplate.id, starshipId);
-          
+
           if (!existingTool) {
             // Create tool instance directly from template id
             existingTool = await this.toolRepository.createFromTemplateId(toolTemplate.id, starshipId);
@@ -174,9 +172,9 @@ export class AgentTemplateService {
             console.log(`[AGENT-TEMPLATE-SERVICE] Tool from template '${toolSlug}' already deployed to starship ${starshipId}`);
           }
 
-          // Track deployed tool ID for relationship creation
+          // Track deployed tool ID and slug for relationship creation and permission defaults
           if (existingTool) {
-            deployedToolIds.push(existingTool.id);
+            deployedTools.push({ id: existingTool.id, slug: existingTool.slug ?? toolSlug });
           }
         } catch (error) {
           console.error(`[AGENT-TEMPLATE-SERVICE] Failed to deploy tool '${toolSlug}':`, error);
@@ -191,13 +189,27 @@ export class AgentTemplateService {
     const agent = await this.agentRepository.createFromTemplate(templateId, starshipId);
 
     // Establish Agent→Tool relationships with deployed tool instances
-    if (deployedToolIds.length > 0) {
-      console.log(`[AGENT-TEMPLATE-SERVICE] Establishing relationships between agent ${agent.id} and ${deployedToolIds.length} tools`);
-      for (const toolId of deployedToolIds) {
+    if (deployedTools.length > 0) {
+      console.log(`[AGENT-TEMPLATE-SERVICE] Establishing relationships between agent ${agent.id} and ${deployedTools.length} tools`);
+      for (const { id: toolId } of deployedTools) {
         try {
           await this.agentRepository.addToolRelationship(agent.id, toolId);
         } catch (error) {
           console.error(`[AGENT-TEMPLATE-SERVICE] Failed to create agent-tool relationship:`, error);
+        }
+      }
+      // Apply template default permissions (publisher's choices) so new agent starts with those defaults
+      for (const { slug } of deployedTools) {
+        try {
+          const permission = template.assignedToolDefaultPermissions?.[slug] ?? 'ask';
+          await this.agentRepository.setAgentToolPermissionBySlug({
+            agentId: agent.id,
+            starshipId,
+            toolSlug: slug,
+            permission,
+          });
+        } catch (error) {
+          console.error(`[AGENT-TEMPLATE-SERVICE] Failed to set tool permission for ${slug}:`, error);
         }
       }
     }

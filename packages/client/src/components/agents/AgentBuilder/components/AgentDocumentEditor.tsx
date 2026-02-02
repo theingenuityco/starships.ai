@@ -284,11 +284,15 @@ export function AgentDocumentEditor({
         const idx = next.findIndex(r => r.agentId === agentIdForPermissions && r.toolSlug === input.toolSlug)
         if (idx >= 0) {
           next[idx] = { ...next[idx], permission: input.permission }
-        } else {
-          // toolId isn't required for this UI; keep it empty for optimistic row
-          next.push({ agentId: agentIdForPermissions, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
+          return next
         }
-        return next
+        // Only add a new row when we already have data; otherwise cache was empty and
+        // we'd end up with one row, making all other tools show the fallback ('allow').
+        if (next.length > 0) {
+          next.push({ agentId: agentIdForPermissions, toolId: '', toolSlug: input.toolSlug, permission: input.permission })
+          return next
+        }
+        return old
       })
       return { prev }
     },
@@ -1437,23 +1441,10 @@ export function AgentDocumentEditor({
       {/* Core configuration */}
       <Card className="rounded-2xl border-border/50 shadow-sm">
         <CardHeader className="pb-3">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Icon name="settings" className="h-4 w-4 text-primary" />
-                Agent configuration
-              </CardTitle>
-            </div>
-            {isTemplateAgent ? (
-              <Badge variant="outline" className="border-border/60 bg-muted/30 text-foreground">
-                Marketplace
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="border-border/60 bg-muted/20 text-muted-foreground">
-                Custom
-              </Badge>
-            )}
-          </div>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Icon name="settings" className="h-4 w-4 text-primary" />
+            Agent profile
+          </CardTitle>
         </CardHeader>
 
         <CardContent className="space-y-3">
@@ -1649,14 +1640,11 @@ export function AgentDocumentEditor({
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               {assignedToolModels.map(tool => {
-                const current = permissionByToolSlug.get(tool.slug) ?? ('allow' as StarshipAgentToolPermissionModel['permission'])
+                const current = permissionByToolSlug.get(tool.slug) ?? ('ask' as StarshipAgentToolPermissionModel['permission'])
                 const disabled = readOnly || setPermissionMutation.isPending
                 const toolSecondary = (tool.description || '').trim() || tool.slug
                 return (
-                  <div
-                    key={tool.slug}
-                    className="group relative rounded-xl border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4"
-                  >
+                  <div key={tool.slug} className="group relative rounded-xl border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-start gap-3 min-w-0">
                         <div className="mt-1.5 flex-shrink-0">
@@ -1736,13 +1724,7 @@ export function AgentDocumentEditor({
               ) : (
                 <ul className="grid grid-cols-1 gap-3">
                   {(value.previewPrompts || []).map((prompt, idx) => (
-                    <li
-                      key={idx}
-                      className={cn(
-                        'group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4',
-                        promptsEditable && 'transition-colors'
-                      )}
-                    >
+                    <li key={idx} className={cn('group relative rounded-lg border border-border/50 bg-gradient-to-br from-background/50 to-background/30 p-4', promptsEditable && 'transition-colors')}>
                       <div className="flex items-start gap-3">
                         <div className="mt-0.5 flex-shrink-0">
                           <Icon name="sparkles" className="h-4 w-4 text-primary" />
@@ -1751,10 +1733,7 @@ export function AgentDocumentEditor({
                         <div className="min-w-0 flex-1">
                           {promptsEditable ? (
                             <Input
-                              className={cn(
-                                'h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0',
-                                'text-sm leading-relaxed text-foreground'
-                              )}
+                              className={cn('h-auto border-0 bg-transparent px-0 py-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0', 'text-sm leading-relaxed text-foreground')}
                               value={prompt}
                               onChange={e => {
                                 const next = [...(value.previewPrompts || [])]

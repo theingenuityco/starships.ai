@@ -174,15 +174,12 @@ async function buildMessageTextWithAttachments(args: { message: MessageModel; st
       try {
         if (attachment.sizeBytes > MAX_TEXT_FILE_SIZE) {
           // Best-effort: still try to fetch, but we'll truncate aggressively below.
-          console.warn(
-            `[ConversationSummaries] Text attachment ${attachment.filename} exceeds MAX_TEXT_FILE_SIZE; will truncate heavily`
-          );
+          console.warn(`[ConversationSummaries] Text attachment ${attachment.filename} exceeds MAX_TEXT_FILE_SIZE; will truncate heavily`);
         }
 
         const textContent = await fetchTextFromS3(attachment.s3Key);
         const maxChars = 20000; // keep summarizer prompt bounded
-        const truncated =
-          textContent.length > maxChars ? textContent.slice(0, maxChars) + '\n\n[... content truncated ...]' : textContent;
+        const truncated = textContent.length > maxChars ? textContent.slice(0, maxChars) + '\n\n[... content truncated ...]' : textContent;
 
         text += `\n\n--- Content of ${attachment.filename} (attachmentId: ${attachment.id}) ---\n${truncated}\n--- End of ${attachment.filename} ---`;
       } catch (err) {
@@ -350,7 +347,9 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
     existingRow && typeof existingRow.summary_before_message_id === 'string' && existingRow.summary_before_message_id
       ? (() => {
           const createdAtIso = toIso(existingRow.summary_before_created_at);
-          return createdAtIso ? ({ createdAt: createdAtIso, id: existingRow.summary_before_message_id } as ConversationSummaryCursor) : null;
+          return createdAtIso
+            ? ({ createdAt: createdAtIso, id: existingRow.summary_before_message_id } as ConversationSummaryCursor)
+            : null;
         })()
       : null;
 
@@ -462,4 +461,3 @@ async function summarizeConversationJob(data: ConversationSummaryJobData): Promi
     summaryBefore: nextCursorBoundary,
   });
 }
-

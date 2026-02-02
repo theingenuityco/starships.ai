@@ -10,4 +10,3 @@ export function NotificationSoundBootstrap() {
 
   return null
 }
-

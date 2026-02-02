@@ -39,24 +39,20 @@ export function PresenceIndicator({
     kind === 'busy'
       ? 'bg-amber-500 dark:bg-amber-400'
       : kind === 'offline'
-        ? 'bg-muted-foreground/60 dark:bg-muted-foreground/50'
+        ? 'bg-muted-foreground dark:bg-muted-foreground'
         : 'bg-emerald-500 dark:bg-emerald-400'
 
   return (
     <span className={cn(pos, className)} aria-label={kind} title={kind}>
       <span
-        // Add a subtle neutral outline (not white) so the dot is visible on top of photos.
-        className={cn('inline-block rounded-full shadow-md opacity-90 ring-1 ring-border/80', color)}
+        // Solid fill + solid outline (no opacity/alpha) so it stays fully opaque everywhere.
+        className={cn(
+          'inline-block rounded-full ring-2 ring-background outline outline-1 outline-border',
+          color,
+        )}
         style={{
           width: sizePx,
           height: sizePx,
-          // Subtle glow similar to StatusDots success/error (but no animation).
-          boxShadow:
-            kind === 'busy'
-              ? '0 0 10px rgba(245, 158, 11, 0.30)'
-              : kind === 'offline'
-                ? '0 0 10px rgba(148, 163, 184, 0.18)'
-                : '0 0 10px rgba(16, 185, 129, 0.30)',
         }}
       />
     </span>

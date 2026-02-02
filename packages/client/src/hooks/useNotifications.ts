@@ -335,7 +335,10 @@ export function useNotificationsList(starshipId: string | null, enabled: boolean
       const sid = String(starshipId || '')
       const resp = await api.get(`/api/v1/starships/${sid}/notifications`, { params: { limit: 50 } })
       const data = (resp as any).data?.data as any
-      return { notifications: (data?.notifications as NotificationModel[]) ?? [], unread: (data?.unread as UnreadSummary) ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {} } }
+      return {
+        notifications: (data?.notifications as NotificationModel[]) ?? [],
+        unread: (data?.unread as UnreadSummary) ?? { totalUnread: 0, dmUnreadByConversationId: {}, mentionUnreadByConversationId: {} },
+      }
     },
   })
 }
@@ -366,7 +369,7 @@ export function useMarkConversationRead() {
       const resp = await api.post(`/api/v1/conversations/${cid}/read`)
       return (resp as any).data?.data as any
     },
-    onSuccess: (data) => {
+    onSuccess: data => {
       // Best-effort: invalidate unread queries + update notification stream cache with new unread state
       queryClient.invalidateQueries({ queryKey: NOTIFICATION_QUERY_KEYS.all })
       try {
@@ -376,4 +379,3 @@ export function useMarkConversationRead() {
     },
   })
 }
-

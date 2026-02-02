@@ -2980,31 +2980,6 @@ export class ConversationService {
         const llmEvent = event as LLMEvent;
         const llmUsage = llmEvent.data?.usage;
         const model = llmEvent.data?.model;
-        // #region agent log (hypothesis C)
-        try {
-          // best-effort debug log (no secrets)
-          void fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              sessionId: 'debug-session',
-              runId: 'ring-pre',
-              hypothesisId: 'C',
-              location: 'ConversationService.ts:content_complete',
-              message: 'content_complete_seen',
-              data: {
-                conversationId,
-                executionDepth: event.executionDepth ?? null,
-                hasUsage: Boolean(llmUsage),
-                model: typeof model === 'string' ? model : null,
-              },
-              timestamp: Date.now(),
-            }),
-          }).catch(() => {});
-        } catch {
-          /* ignore */
-        }
-        // #endregion
 
         const usagePayload = llmUsage
           ? {
@@ -3049,31 +3024,6 @@ export class ConversationService {
               try {
                 const turnId = this.currentTurnId.get(conversationId) || this.generationId.get(conversationId) || conversationId;
                 const agent = this.currentAgentForConversation.get(conversationId);
-                // #region agent log (hypothesis C)
-                try {
-                  void fetch('http://127.0.0.1:7242/ingest/f94efb64-8fc4-4319-97c1-245fc1440b35', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      sessionId: 'debug-session',
-                      runId: 'ring-pre',
-                      hypothesisId: 'C',
-                      location: 'ConversationService.ts:turn.usage_publish',
-                      message: 'publishing_turn_usage',
-                      data: {
-                        conversationId,
-                        turnId,
-                        agentId: agent?.id ?? null,
-                        model: typeof usagePayload.model === 'string' ? usagePayload.model : null,
-                        promptTokens: usagePayload.promptTokens,
-                      },
-                      timestamp: Date.now(),
-                    }),
-                  }).catch(() => {});
-                } catch {
-                  /* ignore */
-                }
-                // #endregion
                 await this.streamBus.publish(conversationId, {
                   type: 'turn.usage',
                   data: {

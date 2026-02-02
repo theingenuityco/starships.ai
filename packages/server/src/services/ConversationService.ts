@@ -3368,7 +3368,7 @@ export class ConversationService {
             const evolvedState = this.extractPersistableState(execution.state);
             if (evolvedState) {
               // Atomically merge state patch in DB to avoid clobbering concurrent writers
-              // (e.g. background conversation summarizer updating summary fields).
+              // (e.g. multiple processes persisting state concurrently).
               // Plugins are never in evolvedState due to blacklist; this preserves conversation-level plugins.
               await this.conversationRepository.mergeState(conversationId, evolvedState);
             }

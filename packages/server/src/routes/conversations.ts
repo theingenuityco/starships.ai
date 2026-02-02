@@ -698,6 +698,30 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         }
       }
 
+      // Best-effort: include recent per-turn usage so token-based UI survives refresh.
+      // We scan the same Redis stream window we already used above (or fetch it again if needed).
+      let turnUsageByTurnId: Record<string, any> | undefined;
+      try {
+        const recentDesc = await bus.readReverse(conversationId, snapshotCursor, { count: 2_000 }, redisReader);
+        if (Array.isArray(recentDesc) && recentDesc.length > 0) {
+          const recent = recentDesc.slice().reverse(); // chronological
+          const map = new Map<string, any>();
+          for (const item of recent) {
+            const evt = item.evt as any;
+            if (!evt || evt.type !== 'turn.usage') continue;
+            const d = evt.data as any;
+            const tid = typeof d?.turnId === 'string' ? String(d.turnId) : '';
+            if (!tid) continue;
+            map.set(tid, d);
+          }
+          if (map.size > 0) {
+            turnUsageByTurnId = Object.fromEntries(map.entries());
+          }
+        }
+      } catch {
+        // best-effort only
+      }
+
       // IMPORTANT: attach an id to the snapshot so clients can overwrite any stale local cursor on refresh.
       res.write(`id: ${snapshotCursor}\n`);
       res.write(`event: snapshot\n`);
@@ -737,7 +761,7 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
         // best-effort only
       }
 
-      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor })}\n\n`);
+      res.write(`data: ${JSON.stringify({ conversationId, messages: snapshotMessages, turn, hasMoreBefore, oldestCursor, ...(turnUsageByTurnId ? { turnUsageByTurnId } : null) })}\n\n`);
 
       // Always emit one diagnostic event so we can tell whether Redis is receiving/publishing events
       // (and what cursor this connection is using) without needing extra flags.

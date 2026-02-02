@@ -32,7 +32,8 @@ async function postHeartbeat(starshipId: string): Promise<void> {
 
 export function useStarshipPresence(starshipId: string, enabled: boolean = true) {
   const enabledSafe = Boolean(enabled && starshipId)
-  const heartbeatTimerRef = useRef<ReturnType<typeof window.setInterval> | null>(null)
+  // `window.setInterval` returns a number in the browser (DOM typing).
+  const heartbeatTimerRef = useRef<number | null>(null)
 
   const query = useQuery({
     queryKey: STARSHIP_PRESENCE_QUERY_KEYS.byStarship(starshipId),

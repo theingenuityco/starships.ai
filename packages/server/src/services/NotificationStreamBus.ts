@@ -67,7 +67,12 @@ export class NotificationStreamBus {
     return v == null ? '' : String(v);
   }
 
-  async publish(starshipId: string, userId: string, evt: NotificationStreamEvent, opts?: { maxLenApprox?: number }): Promise<PublishResult> {
+  async publish(
+    starshipId: string,
+    userId: string,
+    evt: NotificationStreamEvent,
+    opts?: { maxLenApprox?: number }
+  ): Promise<PublishResult> {
     const key = this.streamKey(starshipId, userId);
     const maxLen = typeof opts?.maxLenApprox === 'number' && opts.maxLenApprox > 0 ? Math.floor(opts.maxLenApprox) : 20_000;
     const payload = JSON.stringify(evt);
@@ -147,4 +152,3 @@ export class NotificationStreamBus {
     return out;
   }
 }
-

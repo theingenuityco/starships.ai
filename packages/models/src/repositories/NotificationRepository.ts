@@ -218,4 +218,3 @@ export class NotificationRepository extends BaseRepository {
     );
   }
 }
-

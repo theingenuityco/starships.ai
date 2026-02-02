@@ -28,9 +28,7 @@ export async function up(client: Client): Promise<void> {
     await client.query(
       `CREATE INDEX IF NOT EXISTS idx_conversation_read_states_conversation_id ON conversation_read_states(conversation_id);`
     );
-    await client.query(
-      `CREATE INDEX IF NOT EXISTS idx_conversation_read_states_updated_at ON conversation_read_states(updated_at DESC);`
-    );
+    await client.query(`CREATE INDEX IF NOT EXISTS idx_conversation_read_states_updated_at ON conversation_read_states(updated_at DESC);`);
 
     // -----------------------------------------------------------------------
     // message_mentions
@@ -70,7 +68,9 @@ export async function up(client: Client): Promise<void> {
       );
     `);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id, created_at DESC);`);
-    await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_starship_user ON notifications(starship_id, user_id, created_at DESC);`);
+    await client.query(
+      `CREATE INDEX IF NOT EXISTS idx_notifications_starship_user ON notifications(starship_id, user_id, created_at DESC);`
+    );
     await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_conversation ON notifications(conversation_id, created_at DESC);`);
     await client.query(`CREATE INDEX IF NOT EXISTS idx_notifications_unread ON notifications(user_id) WHERE read_at IS NULL;`);
     // De-dupe per user per message per type (DM vs mention).
@@ -95,4 +95,3 @@ export async function down(client: Client): Promise<void> {
   }
   await client.query('COMMIT');
 }
-

@@ -52,7 +52,7 @@ function DirectMessageAvatar({ starshipId, agent, busy }: { starshipId: string; 
       <Avatar className="h-5 w-5 rounded-full ring-1 ring-border/40">
         <AgentAvatar seed={agent?.name || 'DM'} imageUrl={previewUrl} size={20} rounded />
       </Avatar>
-      <PresenceIndicator kind="busy" active={Boolean(busy)} />
+      <PresenceIndicator kind={busy ? 'busy' : 'online'} active={true} size="xs" />
     </div>
   )
 }
@@ -65,7 +65,7 @@ function HumanAvatar({ user, online }: { user: StarshipMemberListItem; online?: 
         {user.avatar ? <AvatarImage src={user.avatar} alt={user.displayName || user.email || 'User'} referrerPolicy="no-referrer" crossOrigin="anonymous" className="object-cover" /> : null}
         <AvatarFallback className="rounded-full bg-primary/10 text-primary text-[10px] font-semibold">{fallback}</AvatarFallback>
       </Avatar>
-      <PresenceIndicator kind="online" active={Boolean(online)} />
+      <PresenceIndicator kind="online" active={Boolean(online)} size="xs" />
     </div>
   )
 }
@@ -95,6 +95,21 @@ export function ConversationList({
   const { data: agentsData, isLoading: agentsLoading, error: agentsError } = useStarshipAgents(starshipId, true)
   const { data: membersData, isLoading: membersLoading, error: membersError } = useStarshipMembersAndInvites(starshipId, true)
   const { isUserOnline } = useStarshipPresence(starshipId, true)
+  const busyAgentIds = useMemo(() => {
+    const set = new Set<string>()
+    const list = (directMessagesData?.directMessages || []) as DirectMessageListItem[]
+    for (const item of list) {
+      const dm: any = (item as any)?.dm
+      if (!dm || dm.dmType !== 'user_agent') continue
+      const agentId = typeof dm.agentId === 'string' ? String(dm.agentId) : ''
+      if (!agentId) continue
+      const conv: any = (item as any)?.conversation
+      const busy = !!(conv?.state && typeof conv.state === 'object' && (conv.state as any).turnActive === true)
+      if (busy) set.add(agentId)
+    }
+    return set
+  }, [directMessagesData?.directMessages])
+
   const createChannel = useCreateChannel()
   const { userId: authUserId } = useAuthContext()
   const [searchQuery, setSearchQuery] = useState('')
@@ -206,21 +221,6 @@ export function ConversationList({
       if (agentId && cid) map.set(agentId, cid)
     }
     return map
-  }, [directMessagesData?.directMessages])
-
-  const busyAgentIds = useMemo(() => {
-    const set = new Set<string>()
-    const list = (directMessagesData?.directMessages || []) as DirectMessageListItem[]
-    for (const item of list) {
-      const dm: any = (item as any)?.dm
-      if (!dm || dm.dmType !== 'user_agent') continue
-      const agentId = typeof dm.agentId === 'string' ? String(dm.agentId) : ''
-      if (!agentId) continue
-      const conv: any = (item as any)?.conversation
-      const busy = !!(conv?.state && typeof conv.state === 'object' && (conv.state as any).turnActive === true)
-      if (busy) set.add(agentId)
-    }
-    return set
   }, [directMessagesData?.directMessages])
 
   const existingDmConversationIdByPeerUserId = useMemo(() => {

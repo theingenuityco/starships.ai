@@ -381,7 +381,7 @@ export function ConversationSummaryBar({
                     <div className="h-5 w-5 rounded-full ring-1 ring-border/40 bg-muted/30 overflow-hidden">
                       <AgentAvatar seed={p.seed} imageUrl={p.avatarAttachmentId ? avatarUrlById.get(p.avatarAttachmentId) : undefined} size={20} rounded />
                     </div>
-                    <PresenceIndicator kind="busy" active={isConversationBusy} />
+                    <PresenceIndicator kind={isConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
                   </div>
                 ) : (
                   <div className="relative">
@@ -393,7 +393,7 @@ export function ConversationSummaryBar({
                       const key = String(p.key || '')
                       const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
                       const userId = m?.[1]
-                      return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} />
+                      return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} size="xs" />
                     })()}
                   </div>
                 )}
@@ -520,7 +520,7 @@ export function ConversationSummaryBar({
                                         <div className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
                                           <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
                                         </div>
-                                        <PresenceIndicator kind="busy" active={isConversationBusy} className="w-3 h-3 border-2" />
+                                        <PresenceIndicator kind={isConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
                                       </div>
                                     )
                                   }
@@ -534,7 +534,7 @@ export function ConversationSummaryBar({
                                         const key = String(p.key || '')
                                         const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
                                         const userId = m?.[1]
-                                        return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} className="w-3 h-3 border-2" />
+                                        return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} size="xs" />
                                       })()}
                                     </div>
                                   )
@@ -720,7 +720,7 @@ export function ConversationSummaryBar({
                                       <div className="h-4 w-4 rounded-full ring-1 ring-background bg-muted overflow-hidden">
                                         <AgentAvatar seed={p.seed} imageUrl={imageUrl} size={16} rounded />
                                       </div>
-                                      <PresenceIndicator kind="busy" active={isConversationBusy} className="w-3 h-3 border-2" />
+                                      <PresenceIndicator kind={isConversationBusy ? 'busy' : 'online'} active={true} size="xs" />
                                     </div>
                                 )
                               }
@@ -734,7 +734,7 @@ export function ConversationSummaryBar({
                                       const key = String(p.key || '')
                                       const m = key.match(/^human:([a-z0-9_-]{10,30})$/i)
                                       const userId = m?.[1]
-                                      return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} className="w-3 h-3 border-2" />
+                                      return <PresenceIndicator kind="online" active={Boolean(userId && isUserOnline(userId))} size="xs" />
                                     })()}
                                   </div>
                               )

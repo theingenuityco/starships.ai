@@ -212,9 +212,9 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   const setThreadConversationIdInUrl = useCallback(
     (conversationId: string | null) => {
-      const next = new URLSearchParams(searchParams.toString())
+      // Only persist channel-relevant query params.
+      const next = new URLSearchParams()
       if (conversationId) next.set('thread', conversationId)
-      else next.delete('thread')
       const qs = next.toString()
       const basePath =
         routeParams.channelSlug && String(routeParams.channelSlug).trim() ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(String(routeParams.channelSlug))}` : `/ship/${routeParams.slug}`
@@ -314,10 +314,12 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     if (channelsLoading) return
     if (hasAutoNavigatedRef.current) return
 
-    // Preserve query params (e.g. thread), but drop agent to prevent "starter" behaviors.
-    const sp = new URLSearchParams(searchParams.toString())
-    sp.delete('agent')
-    const qs = sp.toString()
+    // When redirecting to a channel, only carry channel-relevant query params.
+    // (Do not forward arbitrary params like `agent`.)
+    const next = new URLSearchParams()
+    const thread = (searchParams.get('thread') || '').trim()
+    if (thread) next.set('thread', thread)
+    const qs = next.toString()
 
     const href = pickAutoChannelSlug
       ? qs
@@ -349,8 +351,11 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
     if (!routeParams.channelSlug) return
     if (activeChannel) return
     if (!pickAutoChannelSlug) return
-    const sp = new URLSearchParams(searchParams.toString())
-    const qs = sp.toString()
+    // When redirecting to a channel, only carry channel-relevant query params.
+    const next = new URLSearchParams()
+    const thread = (searchParams.get('thread') || '').trim()
+    if (thread) next.set('thread', thread)
+    const qs = next.toString()
     const href = qs
       ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}?${qs}`
       : `/ship/${routeParams.slug}/channels/${encodeURIComponent(pickAutoChannelSlug)}`
@@ -376,9 +381,9 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       sp.delete('peerUserId')
       sp.delete('peerLabel')
       sp.delete('peerAvatar')
-      const qs = sp.toString()
 
       if (!newConversationId) {
+        const qs = sp.toString()
         router.push(qs ? `/ship/${routeParams.slug}?${qs}` : `/ship/${routeParams.slug}`)
         return
       }
@@ -387,11 +392,17 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       const channels = channelsData?.channels ?? []
       const matchingChannel = channels.find((ch: any) => String(ch?.conversationId || '') === cid) ?? null
       if (matchingChannel?.slug) {
+        // When routing into channels, only carry channel-relevant query params.
+        const next = new URLSearchParams()
+        const thread = (sp.get('thread') || '').trim()
+        if (thread) next.set('thread', thread)
+        const qs = next.toString()
         const channelSlug = String(matchingChannel.slug)
         router.push(qs ? `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}?${qs}` : `/ship/${routeParams.slug}/channels/${encodeURIComponent(channelSlug)}`)
         return
       }
 
+      const qs = sp.toString()
       router.push(qs ? `/ship/${routeParams.slug}/conversations/${encodeURIComponent(cid)}?${qs}` : `/ship/${routeParams.slug}/conversations/${encodeURIComponent(cid)}`)
     },
     [channelsData?.channels, router, routeParams.slug, searchParams]

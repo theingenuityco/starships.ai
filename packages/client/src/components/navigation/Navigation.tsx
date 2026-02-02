@@ -237,6 +237,12 @@ export function Navigation(props: NavigationProps) {
               itemRef: myAgentsRef,
               isOnboardingHighlighted: getOnboardingHighlight('My Agents'),
             },
+            {
+              href: `/ship/${starshipSlug}/notifications`,
+              label: 'Notifications',
+              icon: 'bell',
+              isActive: pathname.startsWith(`/ship/${starshipSlug}/notifications`),
+            },
           ]
         : []),
       ...(canManageConnectors && starshipSlug

@@ -21,6 +21,8 @@ import { toast } from 'sonner'
 import type { MessageModel } from '@starships/protocol'
 import type { LlmToolCall } from '@starships/autopilot'
 import { useMessageAttachments } from '@/hooks/useFileUpload'
+import { useStarshipAgents } from '@/hooks/useAgents'
+import { useStarshipMembersAndInvites, type StarshipMemberListItem } from '@/hooks/useStarshipMembers'
 import { MessageAttachment, MessageAttachmentSkeleton } from './MessageAttachment'
 import { markAnimationComplete } from '@/hooks/useMessageAnimationState'
 import { toolAPI } from '@/lib/api'
@@ -78,6 +80,27 @@ function aggregateStreamChunks(chunks: StreamChunk[]): string {
   }
 
   return agg
+}
+
+function replaceMentionTokens(args: {
+  content: string
+  agentNameById: Map<string, string>
+  userNameById: Map<string, string>
+}): string {
+  const input = String(args.content || '')
+  if (!input) return ''
+  // Replace tokens so markdown does not treat them as HTML tags.
+  return input
+    .replace(/<@a:([^>\s]+)>/g, (_m, idRaw) => {
+      const id = String(idRaw || '').trim()
+      const name = id ? args.agentNameById.get(id) : null
+      return `@${name || id || 'agent'}`
+    })
+    .replace(/<@u:([^>\s]+)>/g, (_m, idRaw) => {
+      const id = String(idRaw || '').trim()
+      const name = id ? args.userNameById.get(id) : null
+      return `@${name || id || 'user'}`
+    })
 }
 
 function useSlabTypewriterText({
@@ -426,6 +449,34 @@ export function ConversationMessageContent({
   const [copiedStates, setCopiedStates] = useState<Record<string, boolean>>({})
   const [toolNameBySlug, setToolNameBySlug] = useState<Record<string, string>>({})
 
+  // Mention token display resolution (keeps DB content parseable while rendering readable @names).
+  const sid = typeof starshipId === 'string' ? starshipId : ''
+  const { data: starshipAgents = [] } = useStarshipAgents(sid, Boolean(sid))
+  const { data: membersData } = useStarshipMembersAndInvites(sid, Boolean(sid))
+  const memberUsers: StarshipMemberListItem[] = useMemo(() => {
+    const list = (membersData as any)?.members
+    return Array.isArray(list) ? (list as StarshipMemberListItem[]) : []
+  }, [membersData])
+  const agentNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    const list = Array.isArray(starshipAgents) ? starshipAgents : []
+    for (const a of list as any[]) {
+      const id = typeof a?.id === 'string' ? String(a.id) : ''
+      const name = typeof a?.name === 'string' ? String(a.name) : ''
+      if (id && name) map.set(id, name)
+    }
+    return map
+  }, [starshipAgents])
+  const userNameById = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const u of Array.isArray(memberUsers) ? memberUsers : []) {
+      const id = typeof (u as any)?.userId === 'string' ? String((u as any).userId) : ''
+      const name = String(u.displayName || u.email || '').trim()
+      if (id && name) map.set(id, name)
+    }
+    return map
+  }, [memberUsers])
+
   const messageAttachmentIds = useMemo(() => (Array.isArray(attachmentIds) ? attachmentIds : []), [attachmentIds])
 
   // Attachments can live on tool_result messages grouped into this message.
@@ -616,6 +667,10 @@ export function ConversationMessageContent({
     return content && content.trim().length > 0 ? content : aggregated
   }, [content, chunks, isStreaming, messageId])
 
+  const fullContentRenderable = useMemo(() => {
+    return replaceMentionTokens({ content: fullContent, agentNameById, userNameById })
+  }, [fullContent, agentNameById, userNameById])
+
   const displayReasoningFull = useMemo(() => {
     const hasR = Array.isArray(reasoningChunks) && reasoningChunks.length > 0
     if (!hasR) return reasoning || ''
@@ -624,7 +679,7 @@ export function ConversationMessageContent({
   }, [reasoning, reasoningChunks, isStreaming])
 
   const { displayText: displayContent } = useSlabTypewriterText({
-    fullText: fullContent,
+    fullText: fullContentRenderable,
     isStreaming,
     resetKey: messageId,
     onComplete: () => markAnimationComplete(messageId),

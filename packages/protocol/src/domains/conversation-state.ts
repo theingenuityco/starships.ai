@@ -13,15 +13,6 @@ export interface ConversationPlugin {
 }
 
 /**
- * Cursor used to describe a stable boundary in a conversation's message timeline.
- * Commonly used for summarization coverage: "all messages strictly before this cursor".
- */
-export interface ConversationSummaryCursor {
-  createdAt: string;
-  id: string;
-}
-
-/**
  * Conversation state structure
  *
  * State is stored as JSONB in the database and can contain various fields.

@@ -107,8 +107,7 @@ export class ConversationRepository extends BaseRepository {
    * Atomically merge a partial state patch into conversation.state (JSONB) in the database.
    *
    * This avoids race conditions where multiple processes read-modify-write `state` concurrently
-   * (e.g. background summarizer updating summary fields while the main server persists other
-   * execution state keys).
+   * (e.g. multiple processes persisting different execution state keys concurrently).
    *
    * Note: This performs a shallow JSONB merge at the top level: `state = state || patch`.
    */
@@ -520,8 +519,8 @@ export class ConversationRepository extends BaseRepository {
    * - `after*` sets a lower bound (exclusive by default, or inclusive when `afterInclusive` is true)
    * - `before*` sets an upper bound (always exclusive)
    *
-   * This is useful for incremental processing jobs (e.g. background summarization) that need to
-   * resume from a cursor and process the next N messages without scanning the entire history.
+   * This is useful for incremental processing jobs that need to resume from a cursor and
+   * process the next N messages without scanning the entire history.
    */
   async getConversationMessagesRangePage(args: {
     conversationId: string;

@@ -25,6 +25,11 @@ import {
 import { ExecutionItemUtils } from '@/utils/ExecutionItemUtils';
 import OpenAI from 'openai';
 
+// Gate LLM prompt/arg logging behind a single constant.
+// Defaults to OFF unless explicitly enabled via env var.
+const ENABLE_LLM_LOGGING =
+  typeof process !== 'undefined' && typeof process.env !== 'undefined' && process.env.ENABLE_LLM_LOGGING === 'true';
+
 // Typed view over the normalized streaming chunk we forward to the ConversationService
 type NormalizedToolCallDelta = {
   index?: number;
@@ -461,41 +466,43 @@ export class LLM extends BaseNode<LlmParams> {
 
       const openAiMessagesForRequest = this.convertMessagesToOpenAI(providerMessagesForRequest);
 
-      // Always log the prompt we are about to send (safe + bounded).
+      // Log the prompt we are about to send (safe + bounded) ONLY when explicitly enabled.
       // This logs the provider request (after sanitization), with URL redaction for multimodal blocks.
-      try {
-        const runtime = (opts?.runtimeEnv && typeof opts.runtimeEnv === 'object' ? opts.runtimeEnv : {}) as Record<string, unknown>;
-        const conversationId = typeof runtime.CONVERSATION_ID === 'string' ? runtime.CONVERSATION_ID : undefined;
-        const starshipId = typeof runtime.STARSHIP_ID === 'string' ? runtime.STARSHIP_ID : undefined;
-        const agentId = typeof runtime.AGENT_ID === 'string' ? runtime.AGENT_ID : undefined;
+      if (ENABLE_LLM_LOGGING) {
+        try {
+          const runtime = (opts?.runtimeEnv && typeof opts.runtimeEnv === 'object' ? opts.runtimeEnv : {}) as Record<string, unknown>;
+          const conversationId = typeof runtime.CONVERSATION_ID === 'string' ? runtime.CONVERSATION_ID : undefined;
+          const starshipId = typeof runtime.STARSHIP_ID === 'string' ? runtime.STARSHIP_ID : undefined;
+          const agentId = typeof runtime.AGENT_ID === 'string' ? runtime.AGENT_ID : undefined;
 
-        const tools = Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined;
-        const toolSlugs = Array.isArray(tools)
-          ? tools
-              .map((t) => (t && typeof t === 'object' ? (t as unknown as { slug?: unknown }).slug : undefined))
-              .filter((s): s is string => typeof s === 'string' && s.length > 0)
-          : [];
+          const tools = Array.isArray(params.tools) ? (params.tools as ToolParams[]) : undefined;
+          const toolSlugs = Array.isArray(tools)
+            ? tools
+                .map((t) => (t && typeof t === 'object' ? (t as unknown as { slug?: unknown }).slug : undefined))
+                .filter((s): s is string => typeof s === 'string' && s.length > 0)
+            : [];
 
-        const pretty = this.formatMessagesForLog({
-          messages: Array.isArray(openAiMessagesForRequest) ? (openAiMessagesForRequest as unknown[]) : [],
-        });
+          const pretty = this.formatMessagesForLog({
+            messages: Array.isArray(openAiMessagesForRequest) ? (openAiMessagesForRequest as unknown[]) : [],
+          });
 
-        const header = [
-          '[LLM_PROMPT]',
-          `model=${String(params.model)}`,
-          conversationId ? `conversationId=${conversationId}` : null,
-          starshipId ? `starshipId=${starshipId}` : null,
-          agentId ? `agentId=${agentId}` : null,
-          typeof params.temperature === 'number' ? `temperature=${params.temperature}` : null,
-          typeof params.maxTokens === 'number' ? `maxTokens=${params.maxTokens}` : null,
-          toolSlugs.length ? `tools=${toolSlugs.join(',')}` : null,
-        ]
-          .filter(Boolean)
-          .join(' ');
+          const header = [
+            '[LLM_PROMPT]',
+            `model=${String(params.model)}`,
+            conversationId ? `conversationId=${conversationId}` : null,
+            starshipId ? `starshipId=${starshipId}` : null,
+            agentId ? `agentId=${agentId}` : null,
+            typeof params.temperature === 'number' ? `temperature=${params.temperature}` : null,
+            typeof params.maxTokens === 'number' ? `maxTokens=${params.maxTokens}` : null,
+            toolSlugs.length ? `tools=${toolSlugs.join(',')}` : null,
+          ]
+            .filter(Boolean)
+            .join(' ');
 
-        console.info(`${header}\n\n${pretty}\n`);
-      } catch (err) {
-        console.info('[LLM_PROMPT] Failed to log prompt', { error: err instanceof Error ? err.message : String(err) });
+          console.info(`${header}\n\n${pretty}\n`);
+        } catch {
+          // best-effort: never fail the LLM request because logging failed
+        }
       }
 
       const stream = await hostRuntime.llm({
@@ -1315,8 +1322,10 @@ export class LLM extends BaseNode<LlmParams> {
                 argsLength: prefer.length,
                 error: parseError instanceof Error ? parseError.message : String(parseError),
               });
-              // Log full args for debugging
-              console.error(`[LLM FINAL] Full arguments:`, prefer);
+              // Log full args for debugging ONLY when explicitly enabled (may contain secrets).
+              if (ENABLE_LLM_LOGGING) {
+                console.error(`[LLM FINAL] Full arguments:`, prefer);
+              }
               argsObj = {};
             }
           }

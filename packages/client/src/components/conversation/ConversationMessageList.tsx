@@ -1034,8 +1034,21 @@ export function ConversationMessageList({
     return <EmptyState />
   }
 
-  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage)
+  // Only show the "beginning of channel" hero when we are actually at the beginning of the timeline.
+  // If there are older messages available (pagination / "load older"), do NOT render the hero yet.
+  const isAtConversationStart = (() => {
+    // Static/demo rendering: treat "start" as empty list only.
+    if (messagesOverride) return renderMessages.length === 0
+    // Streamed conversations: start == no more older pages.
+    if (stream) return !Boolean((stream as any)?.hasMoreBefore)
+    return renderMessages.length === 0
+  })()
+  const isChildConversation = Boolean((conversationDetail as any)?.parentConversationId)
+  const showChannelHero = Boolean(enableChannelMessageThreads && !pinnedFirstMessage && isAtConversationStart)
   const shouldBottomAlignChannelHero = Boolean(showChannelHero && renderMessages.length === 0 && !shouldShowGapLoader)
+  const showDmHero = Boolean(!enableChannelMessageThreads && !pinnedFirstMessage && !isChildConversation && isAtConversationStart)
+  const shouldBottomAlignDmHero = Boolean(showDmHero && renderMessages.length === 0 && !shouldShowGapLoader)
+  const shouldBottomAlignAnyHero = Boolean(shouldBottomAlignChannelHero || shouldBottomAlignDmHero)
 
   const hasSearchMatches = matchingPositions.length > 0
   // Search input UI intentionally disabled for now.
@@ -1132,7 +1145,7 @@ export function ConversationMessageList({
         // When the channel is empty, we want the hero to "sit" near the bottom like Slack.
         // The normal bottom padding is intentionally large (to avoid message overlap with the composer),
         // but that padding makes an empty-state hero float too high.
-        style={{ paddingBottom: shouldBottomAlignChannelHero ? 32 : (bottomPaddingPx ?? 160) }}
+        style={{ paddingBottom: shouldBottomAlignAnyHero ? 32 : (bottomPaddingPx ?? 160) }}
         onScroll={() => {
           const container = scrollContainerRef.current
           if (!container) return
@@ -1160,6 +1173,12 @@ export function ConversationMessageList({
           )}
 
           <div className="mt-auto">
+            {showDmHero ? (
+              <DmHero
+                conversationTitle={typeof (conversationDetail as any)?.title === 'string' ? String((conversationDetail as any).title) : null}
+                bottomAlign={shouldBottomAlignDmHero}
+              />
+            ) : null}
             {showChannelHero ? (
               <ChannelHero
                 channelName={channelName}
@@ -1996,6 +2015,37 @@ function ChannelHero({
         aria-hidden="true"
         // Match ConversationSummaryBar's `border-b border-border` (same thickness + color),
         // but with a left-weighted fade (transparent → solid border → transparent).
+        className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
+      />
+    </div>
+  )
+}
+
+function DmHero({
+  conversationTitle,
+  bottomAlign,
+}: {
+  conversationTitle: string | null
+  bottomAlign: boolean
+}) {
+  const displayName = typeof conversationTitle === 'string' && conversationTitle.trim().length > 0 ? conversationTitle.trim() : 'Direct message'
+
+  return (
+    <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
+      <div className="max-w-3xl">
+        <div className="flex items-start gap-4">
+          <div className="h-14 w-14 rounded-2xl bg-muted/60 border border-border/60 flex items-center justify-center flex-shrink-0">
+            <Icon name="message-square" className="h-7 w-7 text-muted-foreground" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="text-2xl font-semibold text-foreground truncate">{displayName}</h2>
+            <p className="text-muted-foreground mt-1 leading-relaxed">This is the beginning of this conversation. Send a message to start.</p>
+          </div>
+        </div>
+      </div>
+      <div
+        role="separator"
+        aria-hidden="true"
         className="mt-8 h-px w-full bg-[linear-gradient(90deg,transparent_0%,hsl(var(--border))_7%,hsl(var(--border))_18%,hsl(var(--border)/0.35)_62%,transparent_100%)]"
       />
     </div>

@@ -419,7 +419,7 @@ export function Navigation(props: NavigationProps) {
                 onItemClick={isMobile && onClose ? onClose : undefined}
               />
               {/* Divider to clearly separate primary navigation from channels/DMs */}
-              <div className="mt-3 mb-2 border-t border-border/60" />
+              <div className="mt-5 mb-2 border-t border-border/60" />
             </div>
           </div>
 

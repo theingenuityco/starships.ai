@@ -103,6 +103,48 @@ export class ConversationRepository extends BaseRepository {
     );
   }
 
+  /**
+   * Atomically merge a partial state patch into conversation.state (JSONB) in the database.
+   *
+   * This avoids race conditions where multiple processes read-modify-write `state` concurrently
+   * (e.g. multiple processes persisting different execution state keys concurrently).
+   *
+   * Note: This performs a shallow JSONB merge at the top level: `state = state || patch`.
+   */
+  async mergeState(conversationId: string, patch: Record<string, unknown>): Promise<ConversationModel | null> {
+    return this.executeWithErrorHandling(
+      async () => {
+        if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+          throw new Error('State patch must be an object');
+        }
+
+        const connection = this.getConnection();
+        // Pass JSON as text and cast to jsonb for deterministic typing.
+        const patchJson = JSON.stringify(patch);
+
+        const result = await connection.queryOne<Record<string, unknown>>(
+          `
+            UPDATE conversations
+            SET state = COALESCE(state, '{}'::jsonb) || $2::jsonb,
+                updated_at = NOW()
+            WHERE id = $1
+            RETURNING *
+          `,
+          [conversationId, patchJson]
+        );
+
+        if (!result) {
+          this.handleNotFound('Conversation', conversationId);
+        }
+
+        return result ? fromDatabase(ConversationEntity, result) : null;
+      },
+      'mergeState',
+      'Conversation',
+      conversationId
+    );
+  }
+
   async delete(id: string): Promise<boolean> {
     return this.executeWithErrorHandling(
       async () => {
@@ -400,6 +442,162 @@ export class ConversationRepository extends BaseRepository {
         return { messages: fromDatabaseArray(MessageEntity, chronological), hasMoreBefore };
       },
       'getConversationMessagesPage',
+      'Conversation',
+      args.conversationId
+    );
+  }
+
+  /**
+   * Tail-offset message history for a conversation.
+   *
+   * Semantics:
+   * - `offset` is counted from the most recent message (newest). `offset = 0` returns the latest page.
+   * - `offset = N` skips the N most recent messages, then returns the next `limit` older messages.
+   *
+   * Returns the selected messages in chronological order (oldest → newest).
+   *
+   * This is useful for agent "rolling memory" scenarios where the model prompt is capped
+   * to the latest N messages, but a tool can fetch older messages by offset.
+   */
+  async getConversationMessagesTailOffsetPage(args: {
+    conversationId: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+        const offset = Math.max(0, Math.min(100_000, Number(args.offset || 0)));
+
+        // Fast path: latest page.
+        if (offset === 0) {
+          return await this.getConversationMessagesPage({ conversationId: args.conversationId, limit });
+        }
+
+        // Find the cursor message that represents the last skipped message.
+        // Example: offset=1 skips newest message => cursor is newest message (OFFSET 0).
+        const cursorRow = await connection.queryOne<{ created_at: unknown; id: unknown }>(
+          `
+            SELECT created_at, id
+            FROM messages
+            WHERE conversation_id = $1
+            ORDER BY created_at DESC, id DESC
+            OFFSET $2
+            LIMIT 1
+          `,
+          [args.conversationId, offset - 1]
+        );
+
+        if (!cursorRow || !cursorRow.id || !cursorRow.created_at) {
+          return { messages: [], hasMoreBefore: false };
+        }
+
+        const beforeId = String(cursorRow.id);
+        const beforeCreatedAt =
+          cursorRow.created_at instanceof Date ? cursorRow.created_at.toISOString() : new Date(String(cursorRow.created_at)).toISOString();
+
+        // Reuse the keyset pagination implementation to fetch older messages before the cursor.
+        return await this.getConversationMessagesPage({
+          conversationId: args.conversationId,
+          limit,
+          beforeCreatedAt,
+          beforeId,
+        });
+      },
+      'getConversationMessagesTailOffsetPage',
+      'Conversation',
+      args.conversationId
+    );
+  }
+
+  /**
+   * Keyset-paginated message history within an optional cursor range.
+   *
+   * Returns the oldest messages first (created_at ASC, id ASC).
+   *
+   * - `after*` sets a lower bound (exclusive by default, or inclusive when `afterInclusive` is true)
+   * - `before*` sets an upper bound (always exclusive)
+   *
+   * This is useful for incremental processing jobs that need to resume from a cursor and
+   * process the next N messages without scanning the entire history.
+   */
+  async getConversationMessagesRangePage(args: {
+    conversationId: string;
+    limit: number;
+    afterCreatedAt?: string;
+    afterId?: string;
+    afterInclusive?: boolean;
+    beforeCreatedAt?: string;
+    beforeId?: string;
+  }): Promise<{ messages: MessageModel[]; hasMoreAfter: boolean; nextCursor: { createdAt: string; id: string } | null }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+        const pageSize = limit + 1;
+
+        const afterCursorValid =
+          typeof args.afterCreatedAt === 'string' &&
+          typeof args.afterId === 'string' &&
+          args.afterCreatedAt.trim().length > 0 &&
+          args.afterId.trim().length > 0;
+
+        const beforeCursorValid =
+          typeof args.beforeCreatedAt === 'string' &&
+          typeof args.beforeId === 'string' &&
+          args.beforeCreatedAt.trim().length > 0 &&
+          args.beforeId.trim().length > 0;
+
+        const params: unknown[] = [args.conversationId];
+        const where: string[] = ['conversation_id = $1'];
+        const afterInclusive = args.afterInclusive === true;
+
+        if (afterCursorValid) {
+          params.push(args.afterCreatedAt, args.afterId);
+          // IMPORTANT: SQL placeholders are 1-based, but params array is 0-based.
+          // afterCreatedAt is the second-to-last param, afterId is the last param.
+          const createdIdx = params.length - 1; // placeholder index for afterCreatedAt
+          const atIdx = params.length; // placeholder index for afterId
+          where.push(
+            afterInclusive
+              ? `(created_at > $${createdIdx}::timestamptz OR (created_at = $${createdIdx}::timestamptz AND id >= $${atIdx}::text))`
+              : `(created_at > $${createdIdx}::timestamptz OR (created_at = $${createdIdx}::timestamptz AND id > $${atIdx}::text))`
+          );
+        }
+
+        if (beforeCursorValid) {
+          params.push(args.beforeCreatedAt, args.beforeId);
+          const createdIdx = params.length - 1; // placeholder index for beforeCreatedAt
+          const idIdx = params.length; // placeholder index for beforeId
+          where.push(`(created_at < $${createdIdx}::timestamptz OR (created_at = $${createdIdx}::timestamptz AND id < $${idIdx}::text))`);
+        }
+
+        params.push(pageSize);
+        const limitIdx = params.length;
+
+        const rows = await connection.query<Record<string, unknown>>(
+          `
+            SELECT *
+            FROM messages
+            WHERE ${where.join(' AND ')}
+            ORDER BY created_at ASC, id ASC
+            LIMIT $${limitIdx}
+          `,
+          params
+        );
+
+        const hasMoreAfter = rows.length > limit;
+        const trimmed = rows.slice(0, limit);
+        const messages = fromDatabaseArray(MessageEntity, trimmed);
+
+        const next = hasMoreAfter ? fromDatabase(MessageEntity, rows[limit] as Record<string, unknown>) : null;
+        const nextCursor =
+          next && typeof next.createdAt === 'string' && typeof next.id === 'string' ? { createdAt: next.createdAt, id: next.id } : null;
+
+        return { messages, hasMoreAfter, nextCursor };
+      },
+      'getConversationMessagesRangePage',
       'Conversation',
       args.conversationId
     );

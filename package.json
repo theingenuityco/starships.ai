@@ -8,7 +8,7 @@
   ],
   "scripts": {
     "dev": "NODE_OPTIONS=--no-node-snapshot turbo run dev",
-    "dev:with-schedule": "concurrently -n web,scheduler,worker -c \"cyan,magenta,green\" \"pnpm dev\" \"pnpm --filter @starships/server run schedule:scheduler\" \"pnpm --filter @starships/server run schedule:worker\"",
+    "dev:with-workers": "concurrently --verbose -n app,scheduler,worker -c \"cyan,magenta,green\" \"NODE_OPTIONS=--no-node-snapshot turbo run dev\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:scheduler\" \"NODE_OPTIONS=--no-node-snapshot pnpm --filter @starships/server run schedule:worker\"",
     "lint": "turbo run lint",
     "type-check": "turbo run type-check",
     "test": "turbo run test",

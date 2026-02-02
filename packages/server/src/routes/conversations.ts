@@ -18,7 +18,6 @@ import { CREDITS_PER_USER_MESSAGE } from '@/config/credits';
 import { AttachmentService } from '@/services/AttachmentService';
 import {
   AgentRepository,
-  ChannelRepository,
   ConversationMemberRepository,
   ConversationWidgetRepository,
   DirectMessageRepository,
@@ -422,7 +421,7 @@ async function replaceBase64ImagesWithAttachments(args: {
       });
       urlToId.set(url, created.id);
       createdIds.push(created.id);
-    } catch (e) {
+    } catch {
       attachmentErrors.push({ index: i, reason: 'persist_failed' });
     }
   }
@@ -841,13 +840,32 @@ router.get('/conversations/:conversationId/messages', jwtAuthMiddleware, async (
       );
       if (!cursorValidation) return;
 
-      const page = await conversationService.getConversationMessagesPage({
-        conversationId,
-        limit: paginationValidation.limit,
-        ...(cursorValidation.beforeCreatedAt && cursorValidation.beforeId
-          ? { beforeCreatedAt: cursorValidation.beforeCreatedAt, beforeId: cursorValidation.beforeId }
-          : {}),
-      });
+      const offset = typeof paginationValidation.offset === 'number' ? paginationValidation.offset : 0;
+      const hasOffset = Number.isFinite(offset) && offset > 0;
+      const hasCursor = !!(cursorValidation.beforeCreatedAt && cursorValidation.beforeId);
+
+      // For this endpoint, `offset` is interpreted as a tail offset (skip N most recent messages),
+      // and is mutually exclusive with the keyset cursor.
+      if (hasOffset && hasCursor) {
+        sendError(res, 'VALIDATION_ERROR', 'offset cannot be used together with beforeCreatedAt/beforeId', 400, {
+          offset,
+          beforeCreatedAt: cursorValidation.beforeCreatedAt,
+          beforeId: cursorValidation.beforeId,
+        });
+        return;
+      }
+
+      const page = hasOffset
+        ? await conversationService.getConversationMessagesTailOffsetPage({
+            conversationId,
+            limit: paginationValidation.limit,
+            offset,
+          })
+        : await conversationService.getConversationMessagesPage({
+            conversationId,
+            limit: paginationValidation.limit,
+            ...(hasCursor ? { beforeCreatedAt: cursorValidation.beforeCreatedAt, beforeId: cursorValidation.beforeId } : {}),
+          });
       const messages = orderValidation.orderDirection === 'desc' ? page.messages.slice().reverse() : page.messages;
 
       // Verify conversation exists

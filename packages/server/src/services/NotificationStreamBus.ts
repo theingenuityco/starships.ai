@@ -61,7 +61,9 @@ export class NotificationStreamBus {
     }
     try {
       if (typeof Buffer !== 'undefined' && Buffer.isBuffer(v)) return v.toString('utf8');
-    } catch {}
+    } catch {
+      /* ignore */
+    }
     return v == null ? '' : String(v);
   }
 
@@ -137,7 +139,9 @@ export class NotificationStreamBus {
           const evt = JSON.parse(payload) as NotificationStreamEvent;
           if (!evt || typeof (evt as any).type !== 'string') continue;
           out.push({ id, evt });
-        } catch {}
+        } catch {
+          /* ignore */
+        }
       }
     }
     return out;

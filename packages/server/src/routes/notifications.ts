@@ -36,14 +36,20 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       });
       try {
         res.socket?.setNoDelay(true);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
       try {
         const maybe = res as unknown as { flushHeaders?: () => void };
         if (typeof maybe.flushHeaders === 'function') maybe.flushHeaders();
-      } catch {}
+      } catch {
+        /* ignore */
+      }
       try {
         res.write(':ok\n\n');
-      } catch {}
+      } catch {
+        /* ignore */
+      }
 
       const bus = NotificationStreamBus.getInstance();
       const redisReader = bus.createReaderClient();
@@ -51,14 +57,18 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
 
       try {
         await redisReader.connect();
-      } catch {}
+      } catch {
+        /* ignore */
+      }
 
       let closed = false;
       res.on('close', () => {
         closed = true;
         try {
           redisReader.disconnect();
-        } catch {}
+        } catch {
+          /* ignore */
+        }
       });
 
       const qpCursorRaw = typeof req.query.cursor === 'string' ? String(req.query.cursor) : '';
@@ -70,7 +80,9 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       let lastId: string | null = null;
       try {
         [len, lastId] = await Promise.all([bus.getLen(params.starshipId, authUserId), bus.getLastId(params.starshipId, authUserId)]);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
 
       const snapshotCursor = lastId || qpCursor || lastEventIdHeader || '0-0';
       let cursor = snapshotCursor;
@@ -84,7 +96,9 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
       try {
         res.write(`event: stream_debug\n`);
         res.write(`data: ${JSON.stringify({ starshipId: params.starshipId, userId: authUserId, cursor, len, lastId })}\n\n`);
-      } catch {}
+      } catch {
+        /* ignore */
+      }
 
       while (!closed && !res.writableEnded && !res.destroyed) {
         const batch = await bus.read(params.starshipId, authUserId, cursor, { blockMs: 25_000, count: 200 }, redisReader);
@@ -99,7 +113,9 @@ router.get('/starships/:starshipId/notifications', jwtAuthMiddleware, async (req
             try {
               const maybe = res as unknown as { flush?: () => void };
               if (typeof maybe.flush === 'function') maybe.flush();
-            } catch {}
+            } catch {
+              /* ignore */
+            }
           } catch {
             closed = true;
             break;
@@ -182,7 +198,9 @@ router.post('/starships/:starshipId/notifications/mark-seen', jwtAuthMiddleware,
     try {
       const bus = NotificationStreamBus.getInstance();
       await bus.publish(params.starshipId, authUserId, { type: 'notification.state', data: { unread } });
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     sendSuccess(res, { updated: result.updated, unread }, 200);
   } catch (error) {
@@ -221,7 +239,9 @@ router.post('/starships/:starshipId/notifications/mark-read', jwtAuthMiddleware,
     try {
       const bus = NotificationStreamBus.getInstance();
       await bus.publish(params.starshipId, authUserId, { type: 'notification.state', data: { unread } });
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     sendSuccess(res, { updated: result.updated, unread }, 200);
   } catch (error) {
@@ -277,7 +297,9 @@ router.post('/conversations/:conversationId/read', jwtAuthMiddleware, async (req
     try {
       const bus = NotificationStreamBus.getInstance();
       await bus.publish(starshipId, authUserId, { type: 'notification.state', data: { unread } });
-    } catch {}
+    } catch {
+      /* ignore */
+    }
 
     sendSuccess(res, { readState: state, unread }, 200);
   } catch (error) {
@@ -328,20 +350,27 @@ router.post('/starships/:starshipId/unread', jwtAuthMiddleware, async (req: Requ
       WITH ids AS (
         SELECT UNNEST($3::text[]) AS conversation_id
       ),
+      scoped AS (
+        SELECT i.conversation_id
+          FROM ids i
+          INNER JOIN conversations c
+            ON c.id = i.conversation_id
+           AND c.starship_id = $1::text
+      ),
       last_msg AS (
         SELECT m.conversation_id, MAX(m.created_at) AS last_message_at
           FROM messages m
-          INNER JOIN ids i ON i.conversation_id = m.conversation_id
+          INNER JOIN scoped s ON s.conversation_id = m.conversation_id
          GROUP BY m.conversation_id
       )
       SELECT
-        i.conversation_id,
+        s.conversation_id,
         lm.last_message_at,
         rs.last_read_at
-      FROM ids i
-      LEFT JOIN last_msg lm ON lm.conversation_id = i.conversation_id
+      FROM scoped s
+      LEFT JOIN last_msg lm ON lm.conversation_id = s.conversation_id
       LEFT JOIN conversation_read_states rs
-        ON rs.conversation_id = i.conversation_id
+        ON rs.conversation_id = s.conversation_id
        AND rs.user_id = $2
       `,
       [params.starshipId, authUserId, ids]

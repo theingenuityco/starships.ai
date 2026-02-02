@@ -63,7 +63,7 @@ export class NotificationRepository extends BaseRepository {
           `
           INSERT INTO notifications (starship_id, user_id, type, conversation_id, message_id)
           VALUES ($1, $2, $3, $4, $5)
-          ON CONFLICT ON CONSTRAINT uq_notifications_user_type_message DO NOTHING
+          ON CONFLICT (user_id, type, message_id) DO NOTHING
           RETURNING *;
           `,
           [sid, uid, args.type, cid, mid]

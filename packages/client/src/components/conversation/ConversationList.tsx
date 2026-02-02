@@ -508,6 +508,7 @@ export function ConversationList({
                             >
                               <Icon
                                 name="hash"
+                                weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
                                 className={cn(
                                   'h-4 w-4',
                                   isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground'
@@ -543,7 +544,7 @@ export function ConversationList({
             ) : null}
           </div>
 
-          <div className="h-4" />
+          <div className="my-3 border-t border-border/60" />
 
           {/* Direct messages - takes remaining space below Channels */}
           <div
@@ -671,6 +672,7 @@ export function ConversationList({
                       >
                         <Icon
                           name="hash"
+                          weight={isActive ? 'regular' : hasUnread || mentionCount > 0 ? 'bold' : 'regular'}
                           className={cn('h-4 w-4', isActive ? 'text-primary' : hasUnread || mentionCount > 0 ? 'text-foreground' : 'text-muted-foreground')}
                         />
                         <div className="flex-1 min-w-0">
@@ -705,6 +707,8 @@ export function ConversationList({
               </div>
             )}
           </div>
+
+          <div className="my-3 border-t border-border/60" />
 
           <div className="mb-4">
             <div className="px-2 mb-2 flex items-center justify-between">

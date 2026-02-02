@@ -170,12 +170,12 @@ export class PublicationService {
   /**
    * Sync tools from agent to template
    */
-  private async syncToolsToTemplate(agent: AgentModel, templateId: string, adminUserId: string): Promise<void> {
+  private async syncToolsToTemplate(agent: AgentModel, agentTemplateId: string, adminUserId: string): Promise<void> {
     try {
       const toolRepo = new ToolRepository();
       const toolTemplateRepo = new ToolTemplateRepository();
       const agentTools = await this.agentRepository.getAgentTools(agent.id, agent.starshipId);
-      const toolTemplateIds: string[] = [];
+      const relationshipItems: Array<{ toolTemplateId: string; defaultPermission: 'allow' | 'ask' | 'deny' }> = [];
 
       for (const tool of agentTools as ToolModel[]) {
         const hasParams = !!tool.parameters && tool.parameters.type === 'object';
@@ -187,13 +187,13 @@ export class PublicationService {
 
         if (tool.status === 'draft' || !hasParams || !hasBlueprint) continue;
 
-        let templateId = tool.publishedTemplateId;
+        let toolTemplateId = tool.publishedTemplateId;
         const nextToolVersion = tool.publicationRequestedVersion || tool.version || '1.0.0';
 
-        if (templateId) {
-          const existingTemplate = await toolTemplateRepo.findById(templateId);
+        if (toolTemplateId) {
+          const existingTemplate = await toolTemplateRepo.findById(toolTemplateId);
           if (existingTemplate) {
-            await toolTemplateRepo.update(templateId, {
+            await toolTemplateRepo.update(toolTemplateId, {
               name: tool.name,
               description: tool.description,
               parameters: tool.parameters,
@@ -204,11 +204,11 @@ export class PublicationService {
               version: nextToolVersion,
             });
           } else {
-            templateId = undefined;
+            toolTemplateId = undefined;
           }
         }
 
-        if (!templateId) {
+        if (!toolTemplateId) {
           const createdTemplate = await toolTemplateRepo.create({
             name: tool.name,
             description: tool.description,
@@ -220,24 +220,26 @@ export class PublicationService {
             condition: tool.condition,
             version: nextToolVersion,
           });
-          templateId = createdTemplate.id;
+          toolTemplateId = createdTemplate.id;
         }
 
         await toolRepo.update(tool.id, {
           version: nextToolVersion,
-          publishedTemplateId: templateId,
+          publishedTemplateId: toolTemplateId,
           publicationStatus: 'published',
           publicationApprovedBy: adminUserId,
           publicationApprovedAt: new Date().toISOString(),
         });
 
-        if (templateId && !toolTemplateIds.includes(templateId)) {
-          toolTemplateIds.push(templateId);
+        if (toolTemplateId && !relationshipItems.some((item) => item.toolTemplateId === toolTemplateId)) {
+          const permission =
+            (await this.agentRepository.getAgentToolPermissionBySlug(agent.id, agent.starshipId, tool.slug)) ?? 'ask';
+          relationshipItems.push({ toolTemplateId, defaultPermission: permission });
         }
       }
 
       const templateRepo = new AgentTemplateRepository();
-      await templateRepo.setToolTemplateRelationshipsByIds(templateId, toolTemplateIds);
+      await templateRepo.setToolTemplateRelationshipsWithDefaults(agentTemplateId, relationshipItems);
     } catch (err) {
       console.error('[PUBLICATION] Failed to synchronize tools:', err);
       // Non-fatal - don't throw

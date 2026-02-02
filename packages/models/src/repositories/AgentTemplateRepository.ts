@@ -198,10 +198,10 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const baseTemplate = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
 
-        // Populate assigned tool template slugs from junction table (authoritative source).
+        // Populate assigned tool template slugs and default permissions from junction table (authoritative source).
         const connection = this.getConnection();
-        const toolResults = await connection.query<{ slug: string }>(
-          `SELECT tt.slug
+        const toolResults = await connection.query<{ slug: string; default_permission: string | null }>(
+          `SELECT tt.slug, COALESCE(attt.default_permission, 'ask') AS default_permission
            FROM tool_templates tt
            JOIN agent_template_tool_templates attt ON tt.id = attt.tool_template_id
            WHERE attt.agent_template_id = $1
@@ -210,10 +210,17 @@ export class AgentTemplateRepository extends BaseRepository {
         );
 
         const assignedToolSlugs = toolResults.map((row) => row.slug).filter(Boolean);
+        const assignedToolDefaultPermissions: Record<string, 'allow' | 'ask' | 'deny'> = {};
+        for (const row of toolResults) {
+          if (row?.slug && row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
+            assignedToolDefaultPermissions[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
+          }
+        }
 
         return {
           ...(baseTemplate as AgentTemplateModel),
           assignedToolSlugs,
+          assignedToolDefaultPermissions: Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
         };
       },
       'findInternalById',
@@ -246,9 +253,9 @@ export class AgentTemplateRepository extends BaseRepository {
         const templates = fromDatabaseArray(AgentTemplateEntity, rows) as Array<AgentTemplateModel & Record<string, unknown>>;
         if (!templates || templates.length === 0) return new Map();
 
-        // Populate assignedToolSlugs from junction table in one query.
-        const toolRows = await connection.query<{ agent_template_id: string; slug: string }>(
-          `SELECT attt.agent_template_id, tt.slug
+        // Populate assignedToolSlugs and assignedToolDefaultPermissions from junction table in one query.
+        const toolRows = await connection.query<{ agent_template_id: string; slug: string; default_permission: string | null }>(
+          `SELECT attt.agent_template_id, tt.slug, COALESCE(attt.default_permission, 'ask') AS default_permission
            FROM agent_template_tool_templates attt
            JOIN tool_templates tt ON tt.id = attt.tool_template_id
            WHERE attt.agent_template_id = ANY($1)
@@ -257,20 +264,28 @@ export class AgentTemplateRepository extends BaseRepository {
         );
 
         const assignedToolSlugsByTemplateId = new Map<string, string[]>();
+        const assignedToolDefaultPermissionsByTemplateId = new Map<string, Record<string, 'allow' | 'ask' | 'deny'>>();
         for (const row of toolRows || []) {
           if (!row?.agent_template_id || !row?.slug) continue;
           const key = String(row.agent_template_id);
           const list = assignedToolSlugsByTemplateId.get(key) ?? [];
           list.push(row.slug);
           assignedToolSlugsByTemplateId.set(key, list);
+          if (row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
+            const perms = assignedToolDefaultPermissionsByTemplateId.get(key) ?? {};
+            perms[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
+            assignedToolDefaultPermissionsByTemplateId.set(key, perms);
+          }
         }
 
         const out = new Map<string, AgentTemplateModel>();
         for (const t of templates) {
           const id = String(t.id);
+          const defaultPerms = assignedToolDefaultPermissionsByTemplateId.get(id);
           out.set(id, {
             ...(t as AgentTemplateModel),
             assignedToolSlugs: assignedToolSlugsByTemplateId.get(id) ?? [],
+            ...(defaultPerms && Object.keys(defaultPerms).length > 0 ? { assignedToolDefaultPermissions: defaultPerms } : {}),
           });
         }
 
@@ -551,10 +566,11 @@ export class AgentTemplateRepository extends BaseRepository {
         const templateIds = templates.map((t) => t.id).filter((id): id is string => typeof id === 'string' && id.trim().length > 0);
 
         const assignedToolSlugsByTemplateId = new Map<string, string[]>();
+        const assignedToolDefaultPermissionsByTemplateId = new Map<string, Record<string, 'allow' | 'ask' | 'deny'>>();
         if (templateIds.length > 0) {
           const connection = this.getConnection();
-          const toolResults = await connection.query<{ agent_template_id: string; slug: string }>(
-            `SELECT attt.agent_template_id, tt.slug
+          const toolResults = await connection.query<{ agent_template_id: string; slug: string; default_permission: string | null }>(
+            `SELECT attt.agent_template_id, tt.slug, COALESCE(attt.default_permission, 'ask') AS default_permission
              FROM agent_template_tool_templates attt
              JOIN tool_templates tt ON tt.id = attt.tool_template_id
              WHERE attt.agent_template_id = ANY($1)
@@ -568,16 +584,24 @@ export class AgentTemplateRepository extends BaseRepository {
             const list = assignedToolSlugsByTemplateId.get(key) ?? [];
             list.push(row.slug);
             assignedToolSlugsByTemplateId.set(key, list);
+            if (row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
+              const perms = assignedToolDefaultPermissionsByTemplateId.get(key) ?? {};
+              perms[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
+              assignedToolDefaultPermissionsByTemplateId.set(key, perms);
+            }
           }
         }
 
         return Promise.all(
-          templates.map((t) =>
-            this.toPublicModel({
+          templates.map((t) => {
+            const id = String(t.id);
+            const defaultPerms = assignedToolDefaultPermissionsByTemplateId.get(id);
+            return this.toPublicModel({
               ...t,
-              assignedToolSlugs: assignedToolSlugsByTemplateId.get(String(t.id)) ?? [],
-            } as AgentTemplateModel & Record<string, unknown>)
-          )
+              assignedToolSlugs: assignedToolSlugsByTemplateId.get(id) ?? [],
+              ...(defaultPerms && Object.keys(defaultPerms).length > 0 ? { assignedToolDefaultPermissions: defaultPerms } : {}),
+            } as AgentTemplateModel & Record<string, unknown>);
+          })
         );
       },
       'findAll',
@@ -599,10 +623,10 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const baseTemplate = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
 
-        // Get assigned tool template slugs from junction table
+        // Get assigned tool template slugs and default permissions from junction table
         const connection = this.getConnection();
-        const toolResults = await connection.query<{ slug: string }>(
-          `SELECT tt.slug
+        const toolResults = await connection.query<{ slug: string; default_permission: string | null }>(
+          `SELECT tt.slug, COALESCE(attt.default_permission, 'ask') AS default_permission
            FROM tool_templates tt
            JOIN agent_template_tool_templates attt ON tt.id = attt.tool_template_id
            WHERE attt.agent_template_id = $1
@@ -611,10 +635,17 @@ export class AgentTemplateRepository extends BaseRepository {
         );
 
         const assignedToolSlugs = toolResults.map((result) => result.slug);
+        const assignedToolDefaultPermissions: Record<string, 'allow' | 'ask' | 'deny'> = {};
+        for (const row of toolResults) {
+          if (row?.slug && row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
+            assignedToolDefaultPermissions[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
+          }
+        }
 
         return await this.toPublicModel({
           ...baseTemplate,
           assignedToolSlugs,
+          assignedToolDefaultPermissions: Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
         } as AgentTemplateModel & Record<string, unknown>);
       },
       'findById',
@@ -632,8 +663,33 @@ export class AgentTemplateRepository extends BaseRepository {
 
         const result = await this.resolveTemplateRowBySlug(slug);
         if (!result) return null;
+        const templateId = typeof result.id === 'string' ? result.id : null;
+        if (!templateId) return null;
         const template = fromDatabase(AgentTemplateEntity, result) as AgentTemplateModel & Record<string, unknown>;
-        return await this.toPublicModel(template);
+
+        // Populate assignedToolSlugs and assignedToolDefaultPermissions from junction (same as findById)
+        const connection = this.getConnection();
+        const toolResults = await connection.query<{ slug: string; default_permission: string | null }>(
+          `SELECT tt.slug, COALESCE(attt.default_permission, 'ask') AS default_permission
+           FROM tool_templates tt
+           JOIN agent_template_tool_templates attt ON tt.id = attt.tool_template_id
+           WHERE attt.agent_template_id = $1
+           ORDER BY tt.name`,
+          [templateId]
+        );
+        const assignedToolSlugs = toolResults.map((r) => r.slug).filter(Boolean);
+        const assignedToolDefaultPermissions: Record<string, 'allow' | 'ask' | 'deny'> = {};
+        for (const row of toolResults) {
+          if (row?.slug && row.default_permission && ['allow', 'ask', 'deny'].includes(row.default_permission)) {
+            assignedToolDefaultPermissions[row.slug] = row.default_permission as 'allow' | 'ask' | 'deny';
+          }
+        }
+
+        return await this.toPublicModel({
+          ...template,
+          assignedToolSlugs,
+          assignedToolDefaultPermissions: Object.keys(assignedToolDefaultPermissions).length > 0 ? assignedToolDefaultPermissions : undefined,
+        } as AgentTemplateModel & Record<string, unknown>);
       },
       'findBySlug',
       'AgentTemplate',
@@ -984,23 +1040,29 @@ export class AgentTemplateRepository extends BaseRepository {
   // ============================================================================
 
   /**
-   * Create a USES_TOOL_TEMPLATE relationship between AgentTemplate and ToolTemplate
+   * Create a USES_TOOL_TEMPLATE relationship between AgentTemplate and ToolTemplate.
+   * Optional defaultPermission is stored for marketplace deploy defaults (publisher's choice).
    */
-  async addToolTemplateRelationship(agentTemplateId: string, toolTemplateId: string): Promise<void> {
+  async addToolTemplateRelationship(
+    agentTemplateId: string,
+    toolTemplateId: string,
+    defaultPermission?: 'allow' | 'ask' | 'deny'
+  ): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         if (!agentTemplateId?.trim() || !toolTemplateId?.trim()) {
           throw new Error('Both agentTemplateId and toolTemplateId are required');
         }
 
+        const permission = defaultPermission && ['allow', 'ask', 'deny'].includes(defaultPermission) ? defaultPermission : 'ask';
         const connection = this.getConnection();
 
         // Insert into junction table (ON CONFLICT DO NOTHING to avoid duplicates)
         await connection.query(
-          `INSERT INTO agent_template_tool_templates (agent_template_id, tool_template_id, created_at)
-           VALUES ($1, $2, $3)
+          `INSERT INTO agent_template_tool_templates (agent_template_id, tool_template_id, default_permission, created_at)
+           VALUES ($1, $2, $3, $4)
            ON CONFLICT (agent_template_id, tool_template_id) DO NOTHING`,
-          [agentTemplateId, toolTemplateId, new Date().toISOString()]
+          [agentTemplateId, toolTemplateId, permission, new Date().toISOString()]
         );
       },
       'addToolTemplateRelationship',
@@ -1016,30 +1078,48 @@ export class AgentTemplateRepository extends BaseRepository {
    * `assignedToolSlugs` should be treated as a derived/convenience field populated by joins.
    */
   async setToolTemplateRelationshipsByIds(agentTemplateId: string, toolTemplateIds: string[]): Promise<void> {
+    const items = (toolTemplateIds || []).map((toolTemplateId) => ({ toolTemplateId, defaultPermission: 'ask' as const }));
+    return this.setToolTemplateRelationshipsWithDefaults(agentTemplateId, items);
+  }
+
+  /**
+   * Replace the full set of ToolTemplate relationships with optional default permissions per tool.
+   * Used by the publish flow to store the publisher's tool permissions as deploy defaults.
+   */
+  async setToolTemplateRelationshipsWithDefaults(
+    agentTemplateId: string,
+    items: Array<{ toolTemplateId: string; defaultPermission?: 'allow' | 'ask' | 'deny' }>
+  ): Promise<void> {
     return this.executeWithErrorHandling(
       async () => {
         const id = String(agentTemplateId || '').trim();
         if (!id) throw new Error('agentTemplateId is required');
 
-        const uniqueToolTemplateIds = Array.from(new Set((toolTemplateIds || []).map((t) => String(t).trim()).filter(Boolean)));
         const connection = this.getConnection();
+        const now = new Date().toISOString();
 
         // Replace the set atomically-ish (within the connection's transaction behavior, if any).
         await connection.query('DELETE FROM agent_template_tool_templates WHERE agent_template_id = $1', [id]);
 
-        if (uniqueToolTemplateIds.length === 0) return;
-
-        for (const toolTemplateId of uniqueToolTemplateIds) {
-          await this.addToolTemplateRelationship(id, toolTemplateId);
+        for (const item of items || []) {
+          const toolTemplateId = String(item?.toolTemplateId || '').trim();
+          if (!toolTemplateId) continue;
+          const permission = item.defaultPermission && ['allow', 'ask', 'deny'].includes(item.defaultPermission) ? item.defaultPermission : 'ask';
+          await connection.query(
+            `INSERT INTO agent_template_tool_templates (agent_template_id, tool_template_id, default_permission, created_at)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (agent_template_id, tool_template_id) DO UPDATE SET default_permission = EXCLUDED.default_permission`,
+            [id, toolTemplateId, permission, now]
+          );
         }
 
         // IMPORTANT:
         // Relationship changes live in the junction table, but we still need a cheap "has this template changed?"
         // signal for startup/manual reconciliation logic. Bump the parent template `updated_at` so agents can
         // compare `template.updatedAt` vs `agent.templateSnapshotAt` to decide if reconciliation is needed.
-        await connection.query('UPDATE agent_templates SET updated_at = $2 WHERE id = $1', [id, new Date().toISOString()]);
+        await connection.query('UPDATE agent_templates SET updated_at = $2 WHERE id = $1', [id, now]);
       },
-      'setToolTemplateRelationshipsByIds',
+      'setToolTemplateRelationshipsWithDefaults',
       'AgentTemplate',
       agentTemplateId
     );

@@ -56,15 +56,16 @@ export function DeploymentConfirmationModal({ isOpen, onOpenChange, onConfirm, i
     if (!isAgent) return
     if (assignedToolSlugs.length === 0) return
 
+    const defaults = (template as AgentTemplateModel).assignedToolDefaultPermissions
     setToolPermissions(prev => {
       const next: Record<string, AgentToolPermission> = {}
       for (const slug of assignedToolSlugs) {
-        // Default to "ask" for safety; user can promote to allow or lock down to deny.
-        next[slug] = prev?.[slug] ?? 'ask'
+        // Use publisher's default when present; else "ask". User can still change in the modal.
+        next[slug] = prev?.[slug] ?? defaults?.[slug] ?? 'ask'
       }
       return next
     })
-  }, [isOpen, isAgent, assignedToolSlugs.join('|')])
+  }, [isOpen, isAgent, assignedToolSlugs.join('|'), template])
 
   const permissionLabel = (p: AgentToolPermission): string => {
     if (p === 'allow') return 'Allow'

@@ -2562,7 +2562,7 @@ function ChannelHero({ channelName, conversationTitle, bottomAlign }: { channelN
     <div className={cn(bottomAlign && 'mt-auto', 'pb-10 pt-10')}>
       <div className="max-w-3xl">
         <div className="flex items-start gap-4">
-          <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-muted/40 shadow-lg flex items-center justify-center')}>
+          <div className={cn('relative overflow-hidden flex-shrink-0', sizeClassName, 'rounded-2xl ring-1 ring-border/50 bg-card shadow-lg flex items-center justify-center')}>
             <Icon name="hash" className="h-8 w-8 sm:h-9 sm:w-9 text-muted-foreground" />
             <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" />
           </div>

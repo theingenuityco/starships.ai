@@ -449,6 +449,70 @@ export class ConversationRepository extends BaseRepository {
   }
 
   /**
+   * Tail-offset message history for a conversation.
+   *
+   * Semantics:
+   * - `offset` is counted from the most recent message (newest). `offset = 0` returns the latest page.
+   * - `offset = N` skips the N most recent messages, then returns the next `limit` older messages.
+   *
+   * Returns the selected messages in chronological order (oldest → newest).
+   *
+   * This is useful for agent "rolling memory" scenarios where the model prompt is capped
+   * to the latest N messages, but a tool can fetch older messages by offset.
+   */
+  async getConversationMessagesTailOffsetPage(args: {
+    conversationId: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ messages: MessageModel[]; hasMoreBefore: boolean }> {
+    return this.executeWithErrorHandling(
+      async () => {
+        const connection = this.getConnection();
+        const limit = Math.max(1, Math.min(200, Number(args.limit || 50)));
+        const offset = Math.max(0, Math.min(100_000, Number(args.offset || 0)));
+
+        // Fast path: latest page.
+        if (offset === 0) {
+          return await this.getConversationMessagesPage({ conversationId: args.conversationId, limit });
+        }
+
+        // Find the cursor message that represents the last skipped message.
+        // Example: offset=1 skips newest message => cursor is newest message (OFFSET 0).
+        const cursorRow = await connection.queryOne<{ created_at: unknown; id: unknown }>(
+          `
+            SELECT created_at, id
+            FROM messages
+            WHERE conversation_id = $1
+            ORDER BY created_at DESC, id DESC
+            OFFSET $2
+            LIMIT 1
+          `,
+          [args.conversationId, offset - 1]
+        );
+
+        if (!cursorRow || !cursorRow.id || !cursorRow.created_at) {
+          return { messages: [], hasMoreBefore: false };
+        }
+
+        const beforeId = String(cursorRow.id);
+        const beforeCreatedAt =
+          cursorRow.created_at instanceof Date ? cursorRow.created_at.toISOString() : new Date(String(cursorRow.created_at)).toISOString();
+
+        // Reuse the keyset pagination implementation to fetch older messages before the cursor.
+        return await this.getConversationMessagesPage({
+          conversationId: args.conversationId,
+          limit,
+          beforeCreatedAt,
+          beforeId,
+        });
+      },
+      'getConversationMessagesTailOffsetPage',
+      'Conversation',
+      args.conversationId
+    );
+  }
+
+  /**
    * Keyset-paginated message history within an optional cursor range.
    *
    * Returns the oldest messages first (created_at ASC, id ASC).

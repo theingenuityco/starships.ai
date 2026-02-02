@@ -78,7 +78,8 @@ export function MarketplaceAvatar({
           <span className={fallbackTextClassName}>{initials || 'AI'}</span>
         </div>
       )}
-      {showInsetRing ? <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" /> : null}
+      {/* Avoid an inner border on "empty" (missing-image) avatars. */}
+      {showInsetRing && hasImage ? <div className="pointer-events-none absolute inset-0 ring-1 ring-inset ring-white/10" /> : null}
     </div>
   )
 }

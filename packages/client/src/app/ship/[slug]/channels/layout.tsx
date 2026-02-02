@@ -30,7 +30,15 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
 
   // Desktop thread pane width (draggable resizer)
   const THREAD_PANE_WIDTH_STORAGE_KEY = 'starships.threadPaneWidthPx'
-  const [threadPaneWidthPx, setThreadPaneWidthPx] = useState<number>(420)
+  const [threadPaneWidthPx, setThreadPaneWidthPx] = useState<number>(() => {
+    if (typeof window === 'undefined') return 600
+    const w = window.innerWidth
+    // Slightly wider by default; clamped to keep the main column usable.
+    if (w >= 1536) return 720
+    if (w >= 1280) return 660
+    if (w >= 1024) return 600
+    return 480
+  })
   const resizeStateRef = useRef<{ startX: number; startWidth: number; prevUserSelect: string } | null>(null)
   const resizeCleanupRef = useRef<null | (() => void)>(null)
 
@@ -54,7 +62,8 @@ export default function ChannelsLayout({ children }: { children: React.ReactNode
       const raw = typeof window !== 'undefined' ? window.localStorage.getItem(THREAD_PANE_WIDTH_STORAGE_KEY) : null
       const parsed = raw ? Number(raw) : NaN
       const hasStored = Number.isFinite(parsed) && parsed > 0
-      const defaultWidth = typeof window !== 'undefined' && window.innerWidth >= 1024 ? 520 : 420
+      const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1200
+      const defaultWidth = viewportW >= 1536 ? 720 : viewportW >= 1280 ? 660 : viewportW >= 1024 ? 600 : 480
       setThreadPaneWidthPx(clampThreadPaneWidthPx(hasStored ? parsed : defaultWidth))
     } catch {
       // ignore
